@@ -240,6 +240,40 @@ describe('useStudioGeneration', () => {
     });
   });
 
+  it('preserves gen1 input URLs when gen2 starts before gen1 completes (keep browsing + switch model)', async () => {
+    const ctx = makeContextValue();
+    mockStartPhotoshoot
+      .mockResolvedValueOnce({ workflow_id: 'wf-gen1', status_url: '', result_url: '' })
+      .mockResolvedValueOnce({ workflow_id: 'wf-gen2', status_url: '', result_url: '' });
+
+    const modelA = { id: 'model-a', url: 'https://example.com/model-a.jpg', name: 'Model A', label: 'Model A', metadata: {} };
+    const modelB = { id: 'model-b', url: 'https://example.com/model-b.jpg', name: 'Model B', label: 'Model B', metadata: {} };
+
+    let options = { ...baseOptions(), selectedModel: modelA, activeModelUrl: modelA.url };
+    const { result, rerender } = renderHook(() => useStudioGeneration(options), { wrapper: wrapper(ctx) });
+
+    // Gen1 with Model A
+    await act(async () => { await result.current.handleGenerate(); });
+    expect(result.current.workflowId).toBe('wf-gen1');
+    expect(result.current.generationInputUrls?.modelUrl).toBe('https://example.com/model-a.jpg');
+
+    // Keep browsing + switch to Model B (no resetGeneration)
+    options = { ...baseOptions(), selectedModel: modelB, activeModelUrl: modelB.url };
+    act(() => { rerender(); });
+
+    // Gen2 with Model B
+    await act(async () => { await result.current.handleGenerate(); });
+    expect(result.current.workflowId).toBe('wf-gen2');
+    expect(result.current.generationInputUrls?.modelUrl).toBe('https://example.com/model-b.jpg');
+
+    // User clicks toast for Gen1 — restores Gen1
+    act(() => { result.current.restoreAsyncResult('wf-gen1', ['https://example.com/result-gen1.jpg']); });
+
+    expect(result.current.workflowId).toBe('wf-gen1');
+    expect(result.current.generationInputUrls?.modelUrl).toBe('https://example.com/model-a.jpg');
+    expect(result.current.generationInputUrls?.jewelryUrl).toBe('https://example.com/jewelry.jpg');
+  });
+
   it('clears generationInputUrls on resetGeneration', async () => {
     const ctx = makeContextValue();
     mockStartPhotoshoot.mockResolvedValue({ workflow_id: 'wf-reset', status_url: '', result_url: '' });

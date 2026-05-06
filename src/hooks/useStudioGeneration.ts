@@ -105,10 +105,9 @@ export function useStudioGeneration({
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [regenerationCount, setRegenerationCount] = useState(0);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const [generationInputUrls, setGenerationInputUrls] = useState<{
-    jewelryUrl: string;
-    modelUrl: string;
-  } | null>(null);
+  const [generationInputUrlsMap, setGenerationInputUrlsMap] = useState<
+    Record<string, { jewelryUrl: string; modelUrl: string }>
+  >({});
 
   const { generations, trackGeneration, clearGeneration } = useGenerations();
 
@@ -117,6 +116,7 @@ export function useStudioGeneration({
   const generationProgress = myGeneration?.progress ?? 0;
   const generationStep = myGeneration?.generationStep ?? '';
   const hasNavigatedAway = useRef(false);
+  const generationInputUrls = workflowId ? (generationInputUrlsMap[workflowId] ?? null) : null;
 
   // Cycle rotating messages every 4s while generating
   useEffect(() => {
@@ -213,8 +213,6 @@ export function useStudioGeneration({
         return;
       }
 
-      setGenerationInputUrls({ jewelryUrl, modelUrl });
-
       const idempotencyKey = `${Date.now()}-${effectiveJewelryType}-${selectedModel?.id || 'custom'}`;
       const category = TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType;
 
@@ -239,6 +237,7 @@ export function useStudioGeneration({
           });
 
       const _workflowId = startResponse.workflow_id;
+      setGenerationInputUrlsMap(prev => ({ ...prev, [_workflowId]: { jewelryUrl, modelUrl } }));
       setWorkflowId(_workflowId);
       trackGeneration({
         workflowId: _workflowId,
@@ -283,7 +282,7 @@ export function useStudioGeneration({
     setGenerationError(null);
     setRegenerationCount(0);
     setFeedbackOpen(false);
-    setGenerationInputUrls(null);
+    setGenerationInputUrlsMap({});
   }, []);
 
   return {
