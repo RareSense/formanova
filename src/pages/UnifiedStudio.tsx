@@ -384,6 +384,7 @@ export default function UnifiedStudio() {
     setRegenerationCount,
     feedbackOpen,
     setFeedbackOpen,
+    generationInputUrls,
     handleGenerate,
     handleKeepBrowsing,
     resumeGeneration,
@@ -579,10 +580,10 @@ export default function UnifiedStudio() {
             handleStartOver={handleStartOver}
             feedbackOpen={feedbackOpen}
             setFeedbackOpen={setFeedbackOpen}
-            jewelryUploadedUrl={jewelryUploadedUrl}
+            jewelryUploadedUrl={generationInputUrls?.jewelryUrl ?? jewelryUploadedUrl}
             jewelrySasUrl={jewelrySasUrl}
             jewelryImage={jewelryImage}
-            activeModelUrl={activeModelUrl}
+            activeModelUrl={generationInputUrls?.modelUrl ?? activeModelUrl}
             userEmail={user?.email}
           />
         )}

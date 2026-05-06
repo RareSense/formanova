@@ -105,6 +105,10 @@ export function useStudioGeneration({
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [regenerationCount, setRegenerationCount] = useState(0);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [generationInputUrls, setGenerationInputUrls] = useState<{
+    jewelryUrl: string;
+    modelUrl: string;
+  } | null>(null);
 
   const { generations, trackGeneration, clearGeneration } = useGenerations();
 
@@ -209,6 +213,8 @@ export function useStudioGeneration({
         return;
       }
 
+      setGenerationInputUrls({ jewelryUrl, modelUrl });
+
       const idempotencyKey = `${Date.now()}-${effectiveJewelryType}-${selectedModel?.id || 'custom'}`;
       const category = TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType;
 
@@ -271,6 +277,7 @@ export function useStudioGeneration({
     setGenerationError(null);
     setRegenerationCount(0);
     setFeedbackOpen(false);
+    setGenerationInputUrls(null);
   }, []);
 
   return {
@@ -286,6 +293,7 @@ export function useStudioGeneration({
     setRegenerationCount,
     feedbackOpen,
     setFeedbackOpen,
+    generationInputUrls,
     handleGenerate,
     handleKeepBrowsing,
     resumeGeneration,

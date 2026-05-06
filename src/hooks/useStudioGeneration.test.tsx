@@ -209,6 +209,35 @@ describe('useStudioGeneration', () => {
     expect(result.current.generationProgress).toBe(40);
   });
 
+  it('captures generationInputUrls from the URLs actually sent to startPhotoshoot', async () => {
+    const ctx = makeContextValue();
+    mockStartPhotoshoot.mockResolvedValue({ workflow_id: 'wf-inputs', status_url: '', result_url: '' });
+
+    const { result } = renderHook(() => useStudioGeneration(baseOptions()), { wrapper: wrapper(ctx) });
+
+    expect(result.current.generationInputUrls).toBeNull();
+
+    await act(async () => { await result.current.handleGenerate(); });
+
+    expect(result.current.generationInputUrls).toEqual({
+      jewelryUrl: 'https://example.com/jewelry.jpg',
+      modelUrl: 'https://example.com/model.jpg',
+    });
+  });
+
+  it('clears generationInputUrls on resetGeneration', async () => {
+    const ctx = makeContextValue();
+    mockStartPhotoshoot.mockResolvedValue({ workflow_id: 'wf-reset', status_url: '', result_url: '' });
+
+    const { result } = renderHook(() => useStudioGeneration(baseOptions()), { wrapper: wrapper(ctx) });
+
+    await act(async () => { await result.current.handleGenerate(); });
+    expect(result.current.generationInputUrls).not.toBeNull();
+
+    act(() => { result.current.resetGeneration(); });
+    expect(result.current.generationInputUrls).toBeNull();
+  });
+
   it('calls clearStudioSession on generation completion', async () => {
     mockStartPhotoshoot.mockResolvedValue({ workflow_id: 'wf-test-4', status_url: '', result_url: '' });
 
