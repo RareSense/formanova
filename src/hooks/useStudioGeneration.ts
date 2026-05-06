@@ -270,6 +270,12 @@ export function useStudioGeneration({
     setCurrentStep('generating');
   }, [setCurrentStep]);
 
+  const restoreAsyncResult = useCallback((id: string, images: string[]) => {
+    setWorkflowId(id);
+    setResultImages(images);
+    hasNavigatedAway.current = false;
+  }, []);
+
   const resetGeneration = useCallback(() => {
     hasNavigatedAway.current = false;
     setResultImages([]);
@@ -297,6 +303,7 @@ export function useStudioGeneration({
     handleGenerate,
     handleKeepBrowsing,
     resumeGeneration,
+    restoreAsyncResult,
     resetGeneration,
   };
 }

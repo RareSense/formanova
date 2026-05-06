@@ -258,7 +258,7 @@ export default function UnifiedStudio() {
     } | null;
     if (!state?.asyncResult && !state?.viewGenerating) return;
     if (state.asyncResult) {
-      setResultImages(state.asyncResult.resultImages);
+      restoreAsyncResult(state.asyncResult.workflowId, state.asyncResult.resultImages);
       setCurrentStep('results');
     } else if (state.viewGenerating) {
       resumeGeneration(state.viewGenerating);
@@ -268,7 +268,7 @@ export default function UnifiedStudio() {
   }, [location.state]); // eslint-disable-line react-hooks/exhaustive-deps
   // Dep: location.state — re-runs when the router delivers new state (covers the case where the
   // user is already on this page when toast/header is clicked, so component is never remounted).
-  // Other deps excluded: navigate, setResultImages, setCurrentStep, resumeGeneration — all stable refs.
+  // Other deps excluded: navigate, restoreAsyncResult, setCurrentStep, resumeGeneration — all stable refs.
   // No loop risk: navigate(replace+clear) sets state to null → effect re-runs → guard exits.
   // Regression to watch: any navigation to this route must NOT set asyncResult or viewGenerating
   // in location.state for a different purpose, or it will be misread here.
@@ -388,6 +388,7 @@ export default function UnifiedStudio() {
     handleGenerate,
     handleKeepBrowsing,
     resumeGeneration,
+    restoreAsyncResult,
     resetGeneration,
   } = useStudioGeneration({
     isProductShot,

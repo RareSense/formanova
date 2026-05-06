@@ -209,6 +209,21 @@ describe('useStudioGeneration', () => {
     expect(result.current.generationProgress).toBe(40);
   });
 
+  it('restoreAsyncResult sets workflowId and resultImages together', () => {
+    const ctx = makeContextValue();
+    const { result } = renderHook(() => useStudioGeneration(baseOptions()), { wrapper: wrapper(ctx) });
+
+    expect(result.current.workflowId).toBeNull();
+    expect(result.current.resultImages).toEqual([]);
+
+    act(() => {
+      result.current.restoreAsyncResult('wf-async-1', ['https://example.com/result-async.jpg']);
+    });
+
+    expect(result.current.workflowId).toBe('wf-async-1');
+    expect(result.current.resultImages).toEqual(['https://example.com/result-async.jpg']);
+  });
+
   it('captures generationInputUrls from the URLs actually sent to startPhotoshoot', async () => {
     const ctx = makeContextValue();
     mockStartPhotoshoot.mockResolvedValue({ workflow_id: 'wf-inputs', status_url: '', result_url: '' });
