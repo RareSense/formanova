@@ -313,3 +313,232 @@ EOF
 ```
 
 Expected: PR URL printed to terminal. Share it with your frontend developer for review.
+
+---
+
+## Task 6: Experiment conclusion — cleanup (run AFTER results are in)
+
+> Run exactly one of the two options below depending on which variant won. Do not run both.
+> Archive the experiment in PostHog (Experiments → Button Labels Experiment → Stop) before or after the code change — order doesn't matter.
+
+---
+
+### Option A: Control wins — revert to original labels permanently
+
+Original labels: **"Fix this result"** and **"Regenerate"**
+
+- [ ] **Step 1: Remove the exposure call from AuthContext.tsx**
+
+Find:
+```ts
+import { trackLogin, trackLogout, identifyUser, trackFreeGenerationExperimentExposure, trackButtonLabelExperimentExposure } from '@/lib/posthog-events';
+```
+
+Replace with:
+```ts
+import { trackLogin, trackLogout, identifyUser, trackFreeGenerationExperimentExposure } from '@/lib/posthog-events';
+```
+
+Then find:
+```ts
+        trackFreeGenerationExperimentExposure();
+        trackButtonLabelExperimentExposure();
+```
+
+Replace with:
+```ts
+        trackFreeGenerationExperimentExposure();
+```
+
+- [ ] **Step 2: Remove isNewLabels and revert labels in StudioResultsStep.tsx**
+
+Find:
+```ts
+}: StudioResultsStepProps) {
+  const isNewLabels = getButtonLabelVariant() === 'treatment';
+  return (
+```
+
+Replace with:
+```ts
+}: StudioResultsStepProps) {
+  return (
+```
+
+Find:
+```ts
+import { trackRegenerateClicked, getButtonLabelVariant } from '@/lib/posthog-events';
+```
+
+Replace with:
+```ts
+import { trackRegenerateClicked } from '@/lib/posthog-events';
+```
+
+Find:
+```tsx
+            {isNewLabels ? 'Redo with human' : 'Fix this result'}
+```
+
+Replace with:
+```tsx
+            Fix this result
+```
+
+Find:
+```tsx
+            {isNewLabels ? 'Redo with AI' : 'Regenerate'}
+```
+
+Replace with:
+```tsx
+            Regenerate
+```
+
+- [ ] **Step 3: Delete the two functions from posthog-events.ts**
+
+Find and delete this entire block (including the blank line before it):
+
+```ts
+
+/** TO REMOVE when experiment ends: delete this function, getButtonLabelVariant below,
+ *  and the call in AuthContext.tsx (~line 40). */
+export function trackButtonLabelExperimentExposure() {
+  if (!posthog.__loaded) return;
+  posthog.onFeatureFlags(() => {
+    posthog.getFeatureFlag('button-labels-experiment');
+  });
+}
+
+/** Sync read of the button-labels-experiment flag value.
+ *  Returns 'treatment' | 'control' | undefined.
+ *  undefined means flags not yet loaded — callers must treat it as control.
+ *  TO REMOVE when experiment ends. */
+export function getButtonLabelVariant(): string | undefined {
+  if (!posthog.__loaded) return undefined;
+  return posthog.getFeatureFlag('button-labels-experiment') as string | undefined;
+}
+```
+
+- [ ] **Step 4: Delete the tests from posthog-events.test.ts**
+
+Find and delete the import names `trackButtonLabelExperimentExposure` and `getButtonLabelVariant` from the import block at the top.
+
+Find and delete this entire block:
+
+```ts
+// ── trackButtonLabelExperimentExposure ──────────────────────────────
+
+describe('trackButtonLabelExperimentExposure', () => {
+  it('calls onFeatureFlags and then getFeatureFlag with button-labels-experiment', () => {
+    let captured: (() => void) | undefined;
+    (posthog.onFeatureFlags as any).mockImplementation((fn: () => void) => {
+      captured = fn;
+    });
+    trackButtonLabelExperimentExposure();
+    expect(posthog.onFeatureFlags).toHaveBeenCalled();
+    captured!();
+    expect(posthog.getFeatureFlag).toHaveBeenCalledWith('button-labels-experiment');
+  });
+})
+
+// ── getButtonLabelVariant ───────────────────────────────────────────
+
+describe('getButtonLabelVariant', () => {
+  it('returns the flag value when treatment', () => {
+    (posthog.getFeatureFlag as any).mockReturnValue('treatment');
+    expect(getButtonLabelVariant()).toBe('treatment');
+    expect(posthog.getFeatureFlag).toHaveBeenCalledWith('button-labels-experiment');
+  });
+
+  it('returns undefined when flag is not yet loaded', () => {
+    (posthog.getFeatureFlag as any).mockReturnValue(undefined);
+    expect(getButtonLabelVariant()).toBeUndefined();
+  });
+})
+```
+
+- [ ] **Step 5: Run full test suite**
+
+```bash
+npx vitest run
+```
+
+Expected: all tests pass.
+
+- [ ] **Step 6: Commit and push**
+
+```bash
+git add src/lib/posthog-events.ts src/lib/posthog-events.test.ts src/contexts/AuthContext.tsx src/components/studio/StudioResultsStep.tsx
+git commit -m "cleanup: remove button-labels-experiment flag, revert to original labels"
+git push
+```
+
+---
+
+### Option B: Treatment wins — ship new labels permanently
+
+Permanent labels: **"Redo with human"** and **"Redo with AI"**
+
+- [ ] **Step 1: Same as Option A Steps 1, 3, 4** — remove the exposure call, the two functions, and the tests. Identical — follow those steps exactly.
+
+- [ ] **Step 2: Hardcode the new labels and remove isNewLabels in StudioResultsStep.tsx**
+
+Find:
+```ts
+}: StudioResultsStepProps) {
+  const isNewLabels = getButtonLabelVariant() === 'treatment';
+  return (
+```
+
+Replace with:
+```ts
+}: StudioResultsStepProps) {
+  return (
+```
+
+Find:
+```ts
+import { trackRegenerateClicked, getButtonLabelVariant } from '@/lib/posthog-events';
+```
+
+Replace with:
+```ts
+import { trackRegenerateClicked } from '@/lib/posthog-events';
+```
+
+Find:
+```tsx
+            {isNewLabels ? 'Redo with human' : 'Fix this result'}
+```
+
+Replace with:
+```tsx
+            Redo with human
+```
+
+Find:
+```tsx
+            {isNewLabels ? 'Redo with AI' : 'Regenerate'}
+```
+
+Replace with:
+```tsx
+            Redo with AI
+```
+
+- [ ] **Step 3: Run full test suite**
+
+```bash
+npx vitest run
+```
+
+Expected: all tests pass.
+
+- [ ] **Step 4: Commit and push**
+
+```bash
+git add src/lib/posthog-events.ts src/lib/posthog-events.test.ts src/contexts/AuthContext.tsx src/components/studio/StudioResultsStep.tsx
+git commit -m "cleanup: remove button-labels-experiment flag, ship Redo with AI / Redo with human permanently"
+git push
+```
