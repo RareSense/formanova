@@ -117,8 +117,13 @@ Open `src/lib/posthog-events.ts`. Find the end of `trackFreeGenerationExperiment
 
 ```ts
 
-/** TO REMOVE when experiment ends: delete this function, getButtonLabelVariant below,
- *  and the call in AuthContext.tsx (~line 40). */
+// ─── A/B EXPERIMENT: button-labels-experiment ───────────────────────────────
+// Cleanup instructions (both outcomes): docs/superpowers/plans/2026-05-09-button-labels-experiment.md → Task 6
+// TO REMOVE when experiment ends: delete trackButtonLabelExperimentExposure,
+// getButtonLabelVariant, their tests in posthog-events.test.ts,
+// the call in AuthContext.tsx, and the isNewLabels logic in StudioResultsStep.tsx.
+// ────────────────────────────────────────────────────────────────────────────
+
 export function trackButtonLabelExperimentExposure() {
   if (!posthog.__loaded) return;
   posthog.onFeatureFlags(() => {
@@ -126,10 +131,6 @@ export function trackButtonLabelExperimentExposure() {
   });
 }
 
-/** Sync read of the button-labels-experiment flag value.
- *  Returns 'treatment' | 'control' | undefined.
- *  undefined means flags not yet loaded — callers must treat it as control.
- *  TO REMOVE when experiment ends. */
 export function getButtonLabelVariant(): string | undefined {
   if (!posthog.__loaded) return undefined;
   return posthog.getFeatureFlag('button-labels-experiment') as string | undefined;
