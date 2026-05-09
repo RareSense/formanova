@@ -336,6 +336,13 @@ describe('trackButtonLabelExperimentExposure', () => {
     captured!();
     expect(posthog.getFeatureFlag).toHaveBeenCalledWith('button-labels-experiment');
   });
+
+  it('does nothing when posthog is not loaded', () => {
+    ;(posthog as any).__loaded = false
+    trackButtonLabelExperimentExposure()
+    expect(posthog.onFeatureFlags).not.toHaveBeenCalled()
+    ;(posthog as any).__loaded = true
+  });
 })
 
 // ── getButtonLabelVariant ───────────────────────────────────────────
@@ -350,5 +357,12 @@ describe('getButtonLabelVariant', () => {
   it('returns undefined when flag is not yet loaded', () => {
     (posthog.getFeatureFlag as any).mockReturnValue(undefined);
     expect(getButtonLabelVariant()).toBeUndefined();
+  });
+
+  it('returns undefined when posthog is not loaded', () => {
+    ;(posthog as any).__loaded = false
+    expect(getButtonLabelVariant()).toBeUndefined()
+    expect(posthog.getFeatureFlag).not.toHaveBeenCalled()
+    ;(posthog as any).__loaded = true
   });
 })
