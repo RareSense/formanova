@@ -248,12 +248,16 @@ Replace with:
 
 Find:
 ```tsx
+            <RefreshCw className="h-4 w-4" />
             Regenerate
+            <span className="ml-1 flex items-center gap-1 text-xs normal-case tracking-normal opacity-70">
 ```
 
 Replace with:
 ```tsx
+            <RefreshCw className="h-4 w-4" />
             {isNewLabels ? 'Redo with AI' : 'Regenerate'}
+            <span className="ml-1 flex items-center gap-1 text-xs normal-case tracking-normal opacity-70">
 ```
 
 - [ ] **Step 5: Run the full test suite**
