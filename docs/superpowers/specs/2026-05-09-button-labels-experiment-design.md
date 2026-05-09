@@ -5,7 +5,7 @@
 
 ## Hypothesis
 
-Using explicit mechanism labels ("Retry with AI" / "Retry with human") instead of vague action labels ("Regenerate" / "Fix this result") will result in higher overall click-through rate on both buttons, because users will better understand what each action does.
+Using explicit mechanism labels ("Redo with AI" / "Redo with human") instead of vague action labels ("Regenerate" / "Fix this result") will result in higher overall click-through rate on both buttons, because users will better understand what each action does.
 
 ## What we're testing
 
@@ -13,8 +13,8 @@ Two buttons in `StudioResultsStep.tsx` (the results screen after a generation co
 
 | Button | Control (current) | Treatment (new) |
 |--------|-------------------|-----------------|
-| Opens FeedbackModal → emails admin to manually fix result | Fix this result | Retry with human |
-| Re-runs the AI generation | Regenerate | Retry with AI |
+| Opens FeedbackModal → emails admin to manually fix result | Fix this result | Redo with human |
+| Re-runs the AI generation | Regenerate | Redo with AI |
 
 Only the text labels change. Icons, styling, credit cost display, and click handlers are identical across variants.
 
@@ -51,8 +51,8 @@ Call `trackButtonLabelExperimentExposure()` on the same line/block as the existi
 - Import `getButtonLabelVariant` from `@/lib/posthog-events`
 - Call it once at the top of the component: `const isNewLabels = getButtonLabelVariant() === 'treatment'`
 - Conditionally set label strings:
-  - Fix button: `isNewLabels ? 'Retry with human' : 'Fix this result'`
-  - Regenerate button: `isNewLabels ? 'Retry with AI' : 'Regenerate'`
+  - Fix button: `isNewLabels ? 'Redo with human' : 'Fix this result'`
+  - Regenerate button: `isNewLabels ? 'Redo with AI' : 'Regenerate'`
 - Nothing else changes — icons, className, handlers, credit cost span all stay identical
 
 Fallback: if `getButtonLabelVariant()` returns `undefined` (flags not yet loaded), `isNewLabels` is `false`, so control labels render. Safe default.
