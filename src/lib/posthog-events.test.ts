@@ -24,6 +24,8 @@ import {
   trackUserTypeSelected,
   trackFeedbackSubmitted,
   setUserProfession,
+  trackButtonLabelExperimentExposure,
+  getButtonLabelVariant,
 } from './posthog-events'
 
 beforeEach(() => {
@@ -319,4 +321,48 @@ describe('setUserProfession', () => {
     expect((posthog as any).setPersonProperties).not.toHaveBeenCalled()
     ;(posthog as any).__loaded = true
   })
+})
+
+// ── trackButtonLabelExperimentExposure ──────────────────────────────
+
+describe('trackButtonLabelExperimentExposure', () => {
+  it('calls onFeatureFlags and then getFeatureFlag with button-labels-experiment', () => {
+    let captured: (() => void) | undefined;
+    (posthog.onFeatureFlags as any).mockImplementation((fn: () => void) => {
+      captured = fn;
+    });
+    trackButtonLabelExperimentExposure();
+    expect(posthog.onFeatureFlags).toHaveBeenCalled();
+    captured!();
+    expect(posthog.getFeatureFlag).toHaveBeenCalledWith('button-labels-experiment');
+  });
+
+  it('does nothing when posthog is not loaded', () => {
+    ;(posthog as any).__loaded = false
+    trackButtonLabelExperimentExposure()
+    expect(posthog.onFeatureFlags).not.toHaveBeenCalled()
+    ;(posthog as any).__loaded = true
+  });
+})
+
+// ── getButtonLabelVariant ───────────────────────────────────────────
+
+describe('getButtonLabelVariant', () => {
+  it('returns the flag value when treatment', () => {
+    (posthog.getFeatureFlag as any).mockReturnValue('treatment');
+    expect(getButtonLabelVariant()).toBe('treatment');
+    expect(posthog.getFeatureFlag).toHaveBeenCalledWith('button-labels-experiment');
+  });
+
+  it('returns undefined when flag is not yet loaded', () => {
+    (posthog.getFeatureFlag as any).mockReturnValue(undefined);
+    expect(getButtonLabelVariant()).toBeUndefined();
+  });
+
+  it('returns undefined when posthog is not loaded', () => {
+    ;(posthog as any).__loaded = false
+    expect(getButtonLabelVariant()).toBeUndefined()
+    expect(posthog.getFeatureFlag).not.toHaveBeenCalled()
+    ;(posthog as any).__loaded = true
+  });
 })

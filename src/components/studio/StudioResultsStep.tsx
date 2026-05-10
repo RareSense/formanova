@@ -12,7 +12,7 @@ import { Diamond, RefreshCw, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ResultImageItem } from '@/components/studio/ResultImageItem';
 import { FeedbackModal } from '@/components/studio/FeedbackModal';
-import { trackRegenerateClicked } from '@/lib/posthog-events';
+import { trackRegenerateClicked, getButtonLabelVariant } from '@/lib/posthog-events';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
 import { type FeedbackCategory } from '@/lib/feedback-api';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
@@ -58,6 +58,7 @@ export function StudioResultsStep({
   activeModelUrl,
   userEmail,
 }: StudioResultsStepProps) {
+  const isNewLabels = getButtonLabelVariant() === 'treatment';
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -101,7 +102,7 @@ export function StudioResultsStep({
             className="h-10 flex-1 gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] px-3 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"
           >
             <Wrench className="h-4 w-4" />
-            Fix this result
+            {isNewLabels ? 'Redo with human' : 'Fix this result'}
           </Button>
           <Button
             size="sm"
@@ -119,7 +120,7 @@ export function StudioResultsStep({
             className="h-10 flex-1 gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] bg-background px-3 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"
           >
             <RefreshCw className="h-4 w-4" />
-            Regenerate
+            {isNewLabels ? 'Redo with AI' : 'Regenerate'}
             <span className="ml-1 flex items-center gap-1 text-xs normal-case tracking-normal opacity-70">
               &le; <img src={creditCoinIcon} alt="" className="h-4 w-4 object-contain" /> 10
             </span>
