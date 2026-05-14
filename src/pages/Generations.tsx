@@ -85,15 +85,21 @@ export default function Generations() {
     // Try cache first for instant render
     const cached = loadCache();
     if (cached) {
+      const normalizedEnriched = Object.fromEntries(
+        Object.entries(cached.enriched).filter(([workflowId, data]) => {
+          const workflow = cached.workflows.find((w) => w.workflow_id === workflowId);
+          return !(workflow?.source_type === 'product_shot' && data.thumbnail_url === '');
+        }),
+      );
       // Apply cached enrichment data on top of workflow list
       const hydrated = cached.workflows.map(w => {
-        const e = cached.enriched[w.workflow_id];
+        const e = normalizedEnriched[w.workflow_id];
         return e ? { ...w, ...e } : w;
       });
       setAllWorkflows(hydrated);
-      enrichedRef.current = cached.enriched;
+      enrichedRef.current = normalizedEnriched;
       // Preload all cached thumbnail images into browser cache
-      Object.values(cached.enriched).forEach(e => {
+      Object.values(normalizedEnriched).forEach(e => {
         if (e.thumbnail_url) preloadImage(e.thumbnail_url);
       });
       setGlobalLoading(false);
@@ -248,7 +254,8 @@ export default function Generations() {
               return;
             }
             if (wf.source_type === 'product_shot') {
-              const thumbnail_url = await extractProductShotThumbnail(wf.workflow_id);
+              const details = await getWorkflowDetails(wf.workflow_id);
+              const thumbnail_url = extractProductShotThumbnail(details.steps ?? []);
               if (thumbnail_url) preloadImage(thumbnail_url);
               if (!cancelled) applyEnrichment(wf.workflow_id, { thumbnail_url: thumbnail_url ?? '' });
               return;

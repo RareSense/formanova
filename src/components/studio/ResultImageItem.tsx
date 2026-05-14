@@ -4,6 +4,34 @@ import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
 
+function safeFetch(src: string): Promise<Response> {
+  // Artifact paths need the Bearer token; CDN/signed URLs must use plain fetch
+  // (adding Authorization to a cross-origin CDN request triggers CORS preflight failure)
+  return src.includes('/artifacts/') ? authenticatedFetch(src) : fetch(src);
+}
+
+async function openImageInNewTab(src: string) {
+  if (src.startsWith('blob:') || src.startsWith('data:')) {
+    window.open(src, '_blank', 'noopener,noreferrer');
+    return;
+  }
+
+  const newTab = window.open('', '_blank', 'noopener,noreferrer');
+  if (!newTab) throw new Error('Popup blocked');
+
+  try {
+    const resp = await safeFetch(src);
+    if (!resp.ok) throw new Error('Fetch failed');
+    const blob = await resp.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    newTab.location.href = blobUrl;
+    window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+  } catch (error) {
+    newTab.close();
+    throw error;
+  }
+}
+
 export function ResultImageItem({ url, index, workflowId, jewelryType, naturalAspect }: {
   url: string;
   index: number;
@@ -27,17 +55,23 @@ export function ResultImageItem({ url, index, workflowId, jewelryType, naturalAs
           onClick={async (e) => {
             e.stopPropagation();
             try {
-              const resp = await authenticatedFetch(url);
-              if (!resp.ok) throw new Error('Fetch failed');
-              const blob = await resp.blob();
-              const blobUrl = URL.createObjectURL(blob);
+              const src = resolvedSrc ?? url;
+              let blobUrl: string;
+              if (src.startsWith('blob:') || src.startsWith('data:')) {
+                blobUrl = src;
+              } else {
+                const resp = await safeFetch(src);
+                if (!resp.ok) throw new Error('Fetch failed');
+                const blob = await resp.blob();
+                blobUrl = URL.createObjectURL(blob);
+              }
               const a = document.createElement('a');
               a.href = blobUrl;
               a.download = `photoshoot-${workflowId?.slice(0, 8)}-${index + 1}.jpg`;
               document.body.appendChild(a);
               a.click();
               document.body.removeChild(a);
-              URL.revokeObjectURL(blobUrl);
+              if (!src.startsWith('blob:') && !src.startsWith('data:')) URL.revokeObjectURL(blobUrl);
               import('@/lib/posthog-events').then(m => m.trackDownloadClicked({
                 file_type: 'jpg',
                 context: 'unified-studio',
@@ -55,13 +89,12 @@ export function ResultImageItem({ url, index, workflowId, jewelryType, naturalAs
           onClick={async (e) => {
             e.stopPropagation();
             try {
-              const resp = await authenticatedFetch(url);
-              if (!resp.ok) throw new Error('Fetch failed');
-              const blob = await resp.blob();
-              const blobUrl = URL.createObjectURL(blob);
-              window.open(blobUrl, '_blank', 'noopener,noreferrer');
-              // Do not revoke -- new tab loads the URL asynchronously
-            } catch { /* silent -- tab simply won't open */ }
+              const src = resolvedSrc ?? url;
+              if (!src) throw new Error('No image source');
+              await openImageInNewTab(src);
+            } catch {
+              alert('Could not open the image in a new tab. Please try again.');
+            }
           }}
         >
           <ExternalLink className="h-3.5 w-3.5" />
