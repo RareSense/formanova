@@ -125,32 +125,58 @@ describe('extractCadTextData', () => {
   });
 });
 
-// -- extractProductShotThumbnail - URL shape --
+// -- extractProductShotThumbnail - step-based (sync) --
 
 describe('extractProductShotThumbnail', () => {
-  it('calls authenticatedFetch with a relative /api/result path', async () => {
-    mockAuthFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ items: [{ output_url: 'https://cdn.example.com/img.jpg' }] }),
-    });
-
-    await extractProductShotThumbnail('wf-thumb');
-
-    expect(mockAuthFetch).toHaveBeenCalledWith('/api/result/wf-thumb');
+  it('returns an http output_url from step output', () => {
+    const steps = [{ output: { output_url: 'https://cdn.example.com/img.jpg' } }];
+    expect(extractProductShotThumbnail(steps)).toBe('https://cdn.example.com/img.jpg');
   });
 
-  it('does not use a hardcoded production domain', async () => {
-    mockAuthFetch.mockResolvedValueOnce({ ok: false, json: async () => ({}) });
-
-    await extractProductShotThumbnail('wf-any');
-
-    const [calledUrl] = mockAuthFetch.mock.calls[0];
-    expect(calledUrl).not.toContain('formanova.ai');
+  it('converts azure:// URIs to https', () => {
+    const steps = [{ output: { output_url: 'azure://container/path/img.jpg' } }];
+    const result = extractProductShotThumbnail(steps);
+    expect(result).toBeTruthy();
+    expect(result).not.toContain('azure://');
   });
 
-  it('returns null when the fetch fails', async () => {
-    mockAuthFetch.mockResolvedValueOnce({ ok: false, json: async () => ({}) });
-    const result = await extractProductShotThumbnail('wf-fail');
-    expect(result).toBeNull();
+  it('returns null for empty steps', () => {
+    expect(extractProductShotThumbnail([])).toBeNull();
+  });
+
+  it('returns null when steps have no image fields', () => {
+    const steps = [{ output: { some_other_field: 'value' } }];
+    expect(extractProductShotThumbnail(steps)).toBeNull();
+  });
+
+  it('extracts nested output_image objects from product-shot results', () => {
+    const steps = [{
+      output_data: {
+        result: {
+          output_image: {
+            uri: 'azure://container/path/nested.png',
+          },
+        },
+      },
+    }];
+
+    expect(extractProductShotThumbnail(steps)).toBe('https://cdn.example.com/container/path/nested.png');
+  });
+
+  it('extracts nested image_b64 payloads recursively', () => {
+    const steps = [{
+      output_data: {
+        nodes: [
+          {
+            result: {
+              image_b64: 'recursive123',
+              mime_type: 'image/png',
+            },
+          },
+        ],
+      },
+    }];
+
+    expect(extractProductShotThumbnail(steps)).toBe('data:image/png;base64,recursive123');
   });
 });

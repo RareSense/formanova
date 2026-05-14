@@ -81,11 +81,11 @@ export function usePrefetchGenerations() {
           const batch = toEnrich.slice(i, i + 3);
           const results = await Promise.allSettled(
             batch.map(async (wf) => {
+              const details = await getWorkflowDetails(wf.workflow_id);
               if (wf.source_type === 'product_shot') {
-                const thumb = await extractProductShotThumbnail(wf.workflow_id);
+                const thumb = extractProductShotThumbnail(details.steps ?? []);
                 return { id: wf.workflow_id, thumbnail_url: thumb ?? '' };
               }
-              const details = await getWorkflowDetails(wf.workflow_id);
               if (wf.source_type === 'cad_text') {
                 return { id: wf.workflow_id, ...extractCadTextData(details.steps ?? []) };
               }

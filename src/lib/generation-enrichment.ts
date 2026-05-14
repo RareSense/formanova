@@ -19,6 +19,69 @@ function findAzureUri(obj: unknown): string | null {
   return null;
 }
 
+function normalizeImageUrl(value: string): string | null {
+  if (!value) return null;
+  if (value.startsWith('azure://')) return azureUriToUrl(value);
+  if (value.startsWith('http') || value.startsWith('data:') || value.startsWith('blob:')) return value;
+  return null;
+}
+
+function findBase64Image(obj: unknown): string | null {
+  if (!obj || typeof obj !== 'object') return null;
+  if (Array.isArray(obj)) {
+    for (const item of obj) {
+      const found = findBase64Image(item);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  const record = obj as Record<string, unknown>;
+  const b64 = typeof record.image_b64 === 'string' ? record.image_b64 : null;
+  if (b64 && b64.length > 0) {
+    const mime = typeof record.mime_type === 'string' && record.mime_type.length > 0
+      ? record.mime_type
+      : 'image/jpeg';
+    return `data:${mime};base64,${b64}`;
+  }
+
+  for (const value of Object.values(record)) {
+    const found = findBase64Image(value);
+    if (found) return found;
+  }
+  return null;
+}
+
+function findKeyedImageUrl(obj: unknown): string | null {
+  if (!obj || typeof obj !== 'object') return null;
+  if (Array.isArray(obj)) {
+    for (const item of obj) {
+      const found = findKeyedImageUrl(item);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  const record = obj as Record<string, unknown>;
+  for (const key of ['output_url', 'image_url', 'result_url', 'url', 'output_image']) {
+    const value = record[key];
+    if (typeof value === 'string') {
+      const normalized = normalizeImageUrl(value);
+      if (normalized) return normalized;
+    }
+    if (value && typeof value === 'object') {
+      const found = findKeyedImageUrl(value);
+      if (found) return found;
+    }
+  }
+
+  for (const value of Object.values(record)) {
+    const found = findKeyedImageUrl(value);
+    if (found) return found;
+  }
+  return null;
+}
+
 // ── Photo thumbnail extraction ───────────────────────────────────────
 
 export function extractPhotoThumbnail(steps: any[]): string | null {
@@ -34,28 +97,19 @@ export function extractPhotoThumbnail(steps: any[]): string | null {
 }
 
 // ── Product shot thumbnail extraction ───────────────────────────────
-// Fetches from the result endpoint and returns the first image URL found
+// Same approach as model shot: caller fetches getWorkflowDetails, passes steps here.
 
-export async function extractProductShotThumbnail(
-  workflowId: string,
-): Promise<string | null> {
-  try {
-    const { authenticatedFetch } = await import('@/lib/authenticated-fetch');
-    const res = await authenticatedFetch(`/api/result/${workflowId}`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    for (const items of Object.values(data)) {
-      if (!Array.isArray(items)) continue;
-      for (const item of items) {
-        if (!item || typeof item !== 'object') continue;
-        for (const key of ['output_url', 'image_url', 'result_url', 'url']) {
-          const val = (item as any)[key];
-          if (typeof val === 'string' && val.startsWith('http')) return val;
-        }
-      }
-    }
-    return null;
-  } catch { return null; }
+export function extractProductShotThumbnail(steps: any[]): string | null {
+  for (const step of steps) {
+    const out = step?.output_data ?? step?.output ?? {};
+    const b64 = findBase64Image(out);
+    if (b64) return b64;
+    const directUrl = findKeyedImageUrl(out);
+    if (directUrl) return directUrl;
+    const uri = findAzureUri(out);
+    if (uri) return azureUriToUrl(uri);
+  }
+  return null;
 }
 
 // ── CAD text data extraction ─────────────────────────────────────────
