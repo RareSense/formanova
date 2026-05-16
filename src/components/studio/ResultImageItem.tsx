@@ -45,7 +45,7 @@ export function ResultImageItem({ url, index, workflowId, jewelryType, naturalAs
       <img
         src={resolvedSrc ?? ""}
         alt={`Result ${index + 1}`}
-        className={`w-full object-contain bg-muted/30${naturalAspect ? '' : ' aspect-[3/4]'}`}
+        className={`w-full object-contain bg-muted/30 max-h-[70vh]${naturalAspect ? '' : ' aspect-[3/4]'}`}
       />
       <div className="absolute top-2 right-2 flex gap-1.5">
         <Button
