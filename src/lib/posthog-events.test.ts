@@ -195,6 +195,35 @@ describe('trackGenerationComplete', () => {
       upload_type: null,
     }))
   })
+
+  it('includes aspect_ratio and resolution when provided', () => {
+    trackGenerationComplete({
+      source: 'unified-studio',
+      category: 'ring',
+      upload_type: null,
+      duration_ms: 3000,
+      is_first_ever: false,
+      aspect_ratio: '3:4',
+      resolution: '2K',
+    })
+    expect(posthog.capture).toHaveBeenCalledWith('generation_completed', expect.objectContaining({
+      aspect_ratio: '3:4',
+      resolution: '2K',
+    }))
+  })
+
+  it('omits aspect_ratio and resolution when not provided', () => {
+    trackGenerationComplete({
+      source: 'unified-studio',
+      category: 'ring',
+      upload_type: null,
+      duration_ms: 3000,
+      is_first_ever: false,
+    })
+    const call = (posthog.capture as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[1]
+    expect(call.aspect_ratio).toBeUndefined()
+    expect(call.resolution).toBeUndefined()
+  })
 })
 
 describe('trackDownloadClicked', () => {

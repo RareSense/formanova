@@ -142,6 +142,8 @@ export function useStudioGeneration({
         upload_type: null,
         duration_ms: Date.now() - (myGeneration.startedAt ?? Date.now()),
         is_first_ever: consumeFirstGeneration(),
+        aspect_ratio: aspectRatio,
+        resolution,
       });
       clearStudioSession();
       if (!hasNavigatedAway.current) {
