@@ -277,13 +277,11 @@ export function Header() {
               <Button
                 variant="default"
                 size="sm"
-                asChild
+                onClick={() => navigate('/login')}
                 className="gap-2"
               >
-                <Link to="/login">
-                  <LogIn className="h-4 w-4" />
-                  Sign In
-                </Link>
+                <LogIn className="h-4 w-4" />
+                Sign In
               </Button>
             )}
           </nav>
