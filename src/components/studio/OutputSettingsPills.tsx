@@ -68,7 +68,7 @@ const PILL_BASE =
   'h-11 flex items-center justify-between gap-1.5 px-3 rounded-md border border-primary/60 bg-background ' +
   'hover:border-primary transition-colors font-mono text-sm ' +
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ' +
-  'w-[5rem] xl:w-[7.5rem]';
+  'w-[5.5rem] xl:w-[8.5rem]';
 
 interface AspectRatioPillProps {
   value: string;
