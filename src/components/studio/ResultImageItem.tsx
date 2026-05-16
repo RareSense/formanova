@@ -41,11 +41,11 @@ export function ResultImageItem({ url, index, workflowId, jewelryType, naturalAs
 }) {
   const resolvedSrc = useAuthenticatedImage(url);
   return (
-    <div className="relative group border border-border/30 overflow-hidden w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.75rem)] max-w-xs max-h-[70vh]">
+    <div className="relative group border border-border/30 overflow-hidden w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.75rem)] max-w-xs">
       <img
         src={resolvedSrc ?? ""}
         alt={`Result ${index + 1}`}
-        className={`w-full h-full object-contain bg-muted/30${naturalAspect ? '' : ' aspect-[3/4]'}`}
+        className={`w-full object-contain bg-muted/30 max-h-[70vh]${naturalAspect ? '' : ' aspect-[3/4]'}`}
       />
       <div className="absolute top-2 right-2 flex gap-1.5">
         <Button
