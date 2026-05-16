@@ -548,7 +548,6 @@ export default function UnifiedStudio() {
             aspectRatio={aspectRatio}
             resolution={resolution}
             generationCost={generationCost}
-            costLoading={costLoading}
             onAspectRatioChange={setAspectRatio}
             onResolutionChange={setResolution}
             handleModelUpload={handleModelUpload}

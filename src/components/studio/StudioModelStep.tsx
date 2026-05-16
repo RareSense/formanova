@@ -83,7 +83,6 @@ interface StudioModelStepProps {
   aspectRatio: string;
   resolution: Resolution;
   generationCost: number;
-  costLoading: boolean;
   onAspectRatioChange: (v: string) => void;
   onResolutionChange: (v: Resolution) => void;
   handleModelUpload: (file: File) => void;
@@ -117,7 +116,6 @@ export function StudioModelStep({
   aspectRatio,
   resolution,
   generationCost,
-  costLoading,
   onAspectRatioChange,
   onResolutionChange,
   setModelGuideOpen,
@@ -277,7 +275,7 @@ export function StudioModelStep({
                 {preflightChecking || isModelUploading ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
                 ) : (
-                  <span className={`flex items-center gap-1 text-sm font-mono normal-case tracking-normal transition-opacity ${costLoading ? 'opacity-30' : 'opacity-70'}`}>
+                  <span className="flex items-center gap-1 opacity-70 text-sm font-mono normal-case tracking-normal">
                     <img src={creditCoinIcon} alt="" className="h-4 w-4 object-contain" /> {generationCost}
                   </span>
                 )}
