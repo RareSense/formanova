@@ -124,7 +124,7 @@ export function ResolutionPill({ value, onChange, className }: ResolutionPillPro
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button type="button" aria-haspopup="listbox" className={`${PILL_BASE} ${PILL_WIDTH} ${className ?? ''}`}>
-          <span className="text-foreground font-medium">{value}</span>
+          <span className="flex-1 text-center text-foreground font-medium">{value}</span>
           <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
         </button>
       </DropdownMenuTrigger>
