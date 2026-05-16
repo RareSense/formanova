@@ -127,7 +127,13 @@ export default function UnifiedStudio() {
   });
 
   const [formanovaCategory, setFormanovaCategory] = useState<string>('ecom');
-  const [aspectRatio, setAspectRatio] = useState('3:4');
+  const [aspectRatio, setAspectRatio] = useState(() =>
+    sessionStorage.getItem('formanova_studio_aspect_ratio') ?? '3:4'
+  );
+  const handleAspectRatioChange = (v: string) => {
+    setAspectRatio(v);
+    sessionStorage.setItem('formanova_studio_aspect_ratio', v);
+  };
   const [resolution, setResolution] = useState<Resolution>(() => {
     const saved = sessionStorage.getItem('formanova_studio_resolution');
     return (saved === '1K' || saved === '2K' || saved === '4K') ? saved : '1K';
@@ -557,7 +563,7 @@ export default function UnifiedStudio() {
             aspectRatio={aspectRatio}
             resolution={resolution}
             generationCost={generationCost}
-            onAspectRatioChange={setAspectRatio}
+            onAspectRatioChange={handleAspectRatioChange}
             onResolutionChange={handleResolutionChange}
             handleModelUpload={handleModelUpload}
             handleGenerate={handleGenerate}
