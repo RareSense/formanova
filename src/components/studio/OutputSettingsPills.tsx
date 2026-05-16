@@ -73,8 +73,8 @@ const PILL_BASE =
   'hover:border-primary transition-colors font-mono text-sm ' +
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2';
 
-const FRAME_PILL_WIDTH = 'w-[5.5rem] xl:w-[8.5rem]';
-const RES_PILL_WIDTH   = 'w-[4.5rem] xl:w-[7rem]';
+const FRAME_PILL_WIDTH = 'w-[5.5rem]';
+const RES_PILL_WIDTH   = 'w-[4.5rem]';
 
 interface AspectRatioPillProps {
   value: string;
@@ -87,12 +87,7 @@ export function AspectRatioPill({ value, onChange, className }: AspectRatioPillP
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button type="button" aria-haspopup="listbox" className={`${PILL_BASE} ${FRAME_PILL_WIDTH} ${className ?? ''}`}>
-          <span className="flex items-center gap-1.5">
-            <span className="text-muted-foreground text-[11px] uppercase tracking-widest hidden xl:inline whitespace-nowrap">
-              Frame
-            </span>
-            <span className="text-foreground font-medium whitespace-nowrap">{value}</span>
-          </span>
+          <span className="text-foreground font-medium whitespace-nowrap">{value}</span>
           <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
         </button>
       </DropdownMenuTrigger>
@@ -127,12 +122,7 @@ export function ResolutionPill({ value, onChange, className }: ResolutionPillPro
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button type="button" aria-haspopup="listbox" className={`${PILL_BASE} ${RES_PILL_WIDTH} ${className ?? ''}`}>
-          <span className="flex items-center gap-1.5">
-            <span className="text-muted-foreground text-[11px] uppercase tracking-widest hidden xl:inline whitespace-nowrap">
-              Res
-            </span>
-            <span className="text-foreground font-medium">{value}</span>
-          </span>
+          <span className="text-foreground font-medium">{value}</span>
           <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
         </button>
       </DropdownMenuTrigger>
