@@ -154,12 +154,22 @@ export function GenerationsContextProvider({ children }: { children: React.React
 
         const result = pollResult.result;
         console.log('[GenerationsContext] poll result', JSON.stringify(result).slice(0, 2000));
-        const generateItems = (result['generate'] ?? result['generate_image'] ?? []) as unknown[];
-        const hasActivityError = Array.isArray(generateItems) && generateItems.length > 0
-          ? generateItems.some((i: any) => i?.action === 'error' || i?.status === 'failed')
-          : Object.values(result).some(
-              (items) => Array.isArray(items) && items.some((i: any) => i?.action === 'error' || i?.status === 'failed')
-            );
+
+        // Extract images first — if we got output images the generation succeeded regardless
+        // of what other keys exist in the result (handles _2k/_4k workflows with different node names).
+        const resultImages = extractResultImages(result);
+
+        // Only check for activity errors when no images were produced.
+        // Prefer targeted key lookup; only fall back to scanning all values when those keys are absent.
+        const hasActivityError = resultImages.length === 0 && (() => {
+          const generateItems = (result['generate'] ?? result['generate_image'] ?? []) as unknown[];
+          if (Array.isArray(generateItems) && generateItems.length > 0) {
+            return generateItems.some((i: any) => i?.action === 'error' || i?.status === 'failed');
+          }
+          return Object.values(result).some(
+            (items) => Array.isArray(items) && items.some((i: any) => i?.action === 'error' || i?.status === 'failed')
+          );
+        })();
 
         if (hasActivityError) {
           setGenerations(prev => prev.map(g =>
@@ -170,8 +180,6 @@ export function GenerationsContextProvider({ children }: { children: React.React
           toast({ variant: 'destructive', title: 'Generation failed', description: 'Try again from the studio' });
           return;
         }
-
-        const resultImages = extractResultImages(result);
         const duration = Math.round((Date.now() - startTime) / 1000);
         const label = gen.jewelryType.charAt(0).toUpperCase() + gen.jewelryType.slice(1);
 
