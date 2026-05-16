@@ -86,7 +86,7 @@ export function AspectRatioPill({ value, onChange, className }: AspectRatioPillP
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button type="button" aria-haspopup="listbox" className={`${PILL_BASE} ${PILL_WIDTH} ${className ?? ''}`}>
-          <span className="flex items-center gap-1.5">
+          <span className="flex-1 flex items-center justify-center gap-1.5">
             <FrameIcon ratio={value} active />
             <span className="text-foreground font-medium whitespace-nowrap">{value}</span>
           </span>
