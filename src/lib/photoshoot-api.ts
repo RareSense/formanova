@@ -17,6 +17,8 @@ export interface PhotoshootStartRequest {
   model_image_url: string;
   category: string;
   idempotency_key?: string;
+  aspect_ratio?: string;
+  resolution?: string;
   input_jewelry_asset_id?: string;
   input_model_asset_id?: string;
   /** UUID of the selected FormaNova preset model — audit field only, never affects generation */
@@ -147,6 +149,8 @@ export interface PdpStartRequest {
   inspiration_image_url: string;
   category: string;
   idempotency_key?: string;
+  aspect_ratio?: string;
+  resolution?: string;
   input_jewelry_asset_id?: string;
   /** Set if user uploaded their own inspiration — never send both */
   input_inspiration_asset_id?: string;

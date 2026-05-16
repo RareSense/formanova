@@ -13,6 +13,7 @@ import { ModelGuideModal } from '@/components/studio/ModelGuideModal';
 import { UploadGuideModal } from '@/components/studio/UploadGuideModal';
 import { ProductShotGuideModal } from '@/components/studio/ProductShotGuideModal';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
+import { type Resolution } from '@/components/studio/OutputSettingsPills';
 import { useStudioOnboarding } from '@/hooks/useStudioOnboarding';
 import { useStudioModels } from '@/hooks/useStudioModels';
 import { useStudioGeneration } from '@/hooks/useStudioGeneration';
@@ -125,6 +126,8 @@ export default function UnifiedStudio() {
   });
 
   const [formanovaCategory, setFormanovaCategory] = useState<string>('ecom');
+  const [aspectRatio, setAspectRatio] = useState('3:4');
+  const [resolution, setResolution] = useState<Resolution>('1K');
 
   // Fetch preset models from the backend. No local fallback catalog is used.
   const { data: presetModelsData, isLoading: presetModelsLoading, isError: presetModelsError } = useQuery<PresetModelsResponse>({
@@ -400,6 +403,8 @@ export default function UnifiedStudio() {
     selectedModel,
     customModelImage,
     modelAssetId,
+    aspectRatio,
+    resolution,
     checkCredits,
     toast,
     setCurrentStep,
@@ -537,6 +542,10 @@ export default function UnifiedStudio() {
             setModelAssetId={setModelAssetId}
             setMyModelsSearch={setMyModelsSearch}
             setFormanovaCategory={setFormanovaCategory}
+            aspectRatio={aspectRatio}
+            resolution={resolution}
+            onAspectRatioChange={setAspectRatio}
+            onResolutionChange={setResolution}
             handleModelUpload={handleModelUpload}
             handleGenerate={handleGenerate}
             handleDeleteUserModel={handleDeleteUserModel}

@@ -62,6 +62,7 @@ import {
 import { useGenerations } from '@/contexts/GenerationsContext';
 import type { PresetModel } from '@/lib/models-api';
 import type { useToast } from '@/hooks/use-toast';
+import type { Resolution } from '@/components/studio/OutputSettingsPills';
 
 type StudioStep = 'upload' | 'model' | 'generating' | 'results';
 
@@ -75,6 +76,8 @@ interface UseStudioGenerationOptions {
   selectedModel: PresetModel | null;
   customModelImage: string | null;
   modelAssetId: string | null;
+  aspectRatio: string;
+  resolution: Resolution;
   checkCredits: (tool: string) => Promise<boolean>;
   toast: ReturnType<typeof useToast>['toast'];
   setCurrentStep: (step: StudioStep) => void;
@@ -92,6 +95,8 @@ export function useStudioGeneration({
   selectedModel,
   customModelImage,
   modelAssetId,
+  aspectRatio,
+  resolution,
   checkCredits,
   toast,
   setCurrentStep,
@@ -222,6 +227,8 @@ export function useStudioGeneration({
             inspiration_image_url: modelUrl,
             category,
             idempotency_key: idempotencyKey,
+            aspect_ratio: aspectRatio,
+            resolution,
             ...(jewelryAssetId ? { input_jewelry_asset_id: jewelryAssetId } : {}),
             ...(selectedModel?.id ? { input_preset_inspiration_id: selectedModel.id }
                 : modelAssetId ? { input_inspiration_asset_id: modelAssetId } : {}),
@@ -231,6 +238,8 @@ export function useStudioGeneration({
             model_image_url: modelUrl,
             category,
             idempotency_key: idempotencyKey,
+            aspect_ratio: aspectRatio,
+            resolution,
             ...(jewelryAssetId ? { input_jewelry_asset_id: jewelryAssetId } : {}),
             ...(modelAssetId ? { input_model_asset_id: modelAssetId } : {}),
             ...(selectedModel?.id && !modelAssetId ? { input_preset_model_id: selectedModel.id } : {}),
@@ -254,6 +263,7 @@ export function useStudioGeneration({
   }, [
     isSubmitting, jewelryImage, activeModelUrl, isProductShot, effectiveJewelryType,
     jewelryUploadedUrl, jewelryAssetId, selectedModel, customModelImage, modelAssetId,
+    aspectRatio, resolution,
     checkCredits, toast, setCurrentStep, setJewelryAssetId, trackGeneration,
     clearStudioSession,
   ]);

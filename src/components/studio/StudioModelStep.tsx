@@ -43,6 +43,7 @@ import { MasonryGrid } from '@/components/ui/masonry-grid';
 import { ModelCard, type UserModel } from '@/components/studio/ModelCard';
 import { PresetModelThumb } from '@/components/studio/PresetModelThumb';
 import { type PresetModel } from '@/lib/models-api';
+import { AspectRatioPill, ResolutionPill, RESOLUTION_COSTS, type Resolution } from '@/components/studio/OutputSettingsPills';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
 
 interface PresetCategory {
@@ -79,6 +80,10 @@ interface StudioModelStepProps {
   setModelAssetId: (id: string | null) => void;
   setMyModelsSearch: (search: string) => void;
   setFormanovaCategory: (cat: string) => void;
+  aspectRatio: string;
+  resolution: Resolution;
+  onAspectRatioChange: (v: string) => void;
+  onResolutionChange: (v: Resolution) => void;
   handleModelUpload: (file: File) => void;
   handleGenerate: () => void;
   handleDeleteUserModel: (id: string) => void;
@@ -107,6 +112,10 @@ export function StudioModelStep({
   activePresetError,
   activePresetEmpty,
   presetModelsForCategory,
+  aspectRatio,
+  resolution,
+  onAspectRatioChange,
+  onResolutionChange,
   setModelGuideOpen,
   setCurrentStep,
   setSelectedModel,
@@ -121,6 +130,7 @@ export function StudioModelStep({
   handleRenameUserModel,
   handleSelectLibraryModel,
 }: StudioModelStepProps) {
+  const generationCost = RESOLUTION_COSTS[resolution];
   return (
     <motion.div
       ref={step2Ref}
@@ -240,8 +250,8 @@ export function StudioModelStep({
             )}
           </div>
 
-          {/* Actions row -- Back left, Generate right */}
-          <div className="flex items-center justify-between pt-2">
+          {/* Desktop/tablet action bar (md+): Back · [Frame] [Res] · Generate */}
+          <div className="hidden md:flex items-center justify-between pt-2">
             <Button
               variant="ghost"
               size="lg"
@@ -251,22 +261,29 @@ export function StudioModelStep({
               <ArrowLeft className="h-3.5 w-3.5" />
               Back
             </Button>
-            <Button
-              size="lg"
-              onClick={handleGenerate}
-              disabled={!jewelryImage || !activeModelUrl || preflightChecking || isModelUploading}
-              className="gap-2.5 font-display text-lg uppercase tracking-wide bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] text-background hover:opacity-90 transition-opacity border-0 disabled:opacity-40 disabled:from-muted disabled:to-muted disabled:text-muted-foreground"
-            >
-              {isModelUploading ? 'Uploading…' : 'Generate Photoshoot'}
-              {preflightChecking || isModelUploading ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <span className="flex items-center gap-1 opacity-70 text-sm font-mono normal-case tracking-normal">
-                  ≤ <img src={creditCoinIcon} alt="" className="h-4 w-4 object-contain" /> 10
-                </span>
-              )}
-            </Button>
+            <div className="flex items-center gap-2">
+              <AspectRatioPill value={aspectRatio} onChange={onAspectRatioChange} />
+              <ResolutionPill value={resolution} onChange={onResolutionChange} />
+              <Button
+                size="lg"
+                onClick={handleGenerate}
+                disabled={!jewelryImage || !activeModelUrl || preflightChecking || isModelUploading}
+                className="gap-2.5 font-display text-lg uppercase tracking-wide bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] text-background hover:opacity-90 transition-opacity border-0 disabled:opacity-40 disabled:from-muted disabled:to-muted disabled:text-muted-foreground"
+              >
+                {isModelUploading ? 'Uploading…' : 'Generate Photoshoot'}
+                {preflightChecking || isModelUploading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <span className="flex items-center gap-1 opacity-70 text-sm font-mono normal-case tracking-normal">
+                    <img src={creditCoinIcon} alt="" className="h-4 w-4 object-contain" /> {generationCost}
+                  </span>
+                )}
+              </Button>
+            </div>
           </div>
+
+          {/* Spacer so content clears the mobile sticky bar */}
+          <div className="md:hidden h-44" />
         </div>
 
         {/* Right 1/3 -- Model Selection Sidebar */}
@@ -438,6 +455,37 @@ export function StudioModelStep({
         </div>
       </div>
 
+      {/* Mobile sticky action bar (<md): 2-col pills + full-width CTA */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-md border-t border-border/20 px-4 pt-3 pb-5 space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <AspectRatioPill value={aspectRatio} onChange={onAspectRatioChange} className="w-full justify-center" />
+          <ResolutionPill value={resolution} onChange={onResolutionChange} className="w-full justify-center" />
+        </div>
+        <Button
+          size="lg"
+          onClick={handleGenerate}
+          disabled={!jewelryImage || !activeModelUrl || preflightChecking || isModelUploading}
+          className="w-full gap-2.5 font-display text-lg uppercase tracking-wide bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] text-background hover:opacity-90 transition-opacity border-0 disabled:opacity-40 disabled:from-muted disabled:to-muted disabled:text-muted-foreground"
+        >
+          {isModelUploading ? 'Uploading…' : 'Generate Photoshoot'}
+          {preflightChecking || isModelUploading ? (
+            <Loader2 className="h-5 w-5 animate-spin" />
+          ) : (
+            <span className="flex items-center gap-1 opacity-70 text-sm font-mono normal-case tracking-normal">
+              <img src={creditCoinIcon} alt="" className="h-4 w-4 object-contain" /> {generationCost}
+            </span>
+          )}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setCurrentStep('upload')}
+          className="gap-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground hover:text-foreground w-full"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Back
+        </Button>
+      </div>
     </motion.div>
   );
 }
