@@ -64,11 +64,17 @@ function FrameIcon({ ratio, active }: { ratio: string; active: boolean }) {
 }
 
 // Pill base — min-w sized to widest trigger content ("Frame 21:9 ▾" on xl, "21:9 ▾" below xl)
+// Width sized to largest trigger content per pill type.
+// AspectRatioPill: "21:9" / "Frame 21:9"
+// ResolutionPill:  "4K"   / "Res 4K"
+// Both use the same base class; widths are applied per-component via className.
 const PILL_BASE =
   'h-11 flex items-center justify-between gap-1.5 px-3 rounded-md border border-primary/60 bg-background ' +
   'hover:border-primary transition-colors font-mono text-sm ' +
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ' +
-  'w-[5.5rem] xl:w-[8.5rem]';
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2';
+
+const FRAME_PILL_WIDTH = 'w-[5.5rem] xl:w-[8.5rem]';
+const RES_PILL_WIDTH   = 'w-[4.5rem] xl:w-[7rem]';
 
 interface AspectRatioPillProps {
   value: string;
@@ -80,7 +86,7 @@ export function AspectRatioPill({ value, onChange, className }: AspectRatioPillP
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" aria-haspopup="listbox" className={`${PILL_BASE} ${className ?? ''}`}>
+        <button type="button" aria-haspopup="listbox" className={`${PILL_BASE} ${FRAME_PILL_WIDTH} ${className ?? ''}`}>
           <span className="flex items-center gap-1.5">
             <span className="text-muted-foreground text-[11px] uppercase tracking-widest hidden xl:inline whitespace-nowrap">
               Frame
@@ -120,7 +126,7 @@ export function ResolutionPill({ value, onChange, className }: ResolutionPillPro
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" aria-haspopup="listbox" className={`${PILL_BASE} ${className ?? ''}`}>
+        <button type="button" aria-haspopup="listbox" className={`${PILL_BASE} ${RES_PILL_WIDTH} ${className ?? ''}`}>
           <span className="flex items-center gap-1.5">
             <span className="text-muted-foreground text-[11px] uppercase tracking-widest hidden xl:inline whitespace-nowrap">
               Res
