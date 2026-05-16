@@ -276,10 +276,8 @@ export function StudioModelStep({
                 {isModelUploading ? 'Uploading…' : 'Generate Photoshoot'}
                 {preflightChecking || isModelUploading ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
-                ) : costLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin opacity-50" />
                 ) : (
-                  <span className="flex items-center gap-1 opacity-70 text-sm font-mono normal-case tracking-normal">
+                  <span className={`flex items-center gap-1 text-sm font-mono normal-case tracking-normal transition-opacity ${costLoading ? 'opacity-30' : 'opacity-70'}`}>
                     <img src={creditCoinIcon} alt="" className="h-4 w-4 object-contain" /> {generationCost}
                   </span>
                 )}
