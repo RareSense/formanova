@@ -73,8 +73,7 @@ const PILL_BASE =
   'hover:border-primary transition-colors font-mono text-sm ' +
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2';
 
-const FRAME_PILL_WIDTH = 'w-[5.5rem]';
-const RES_PILL_WIDTH   = 'w-[4.5rem]';
+const PILL_WIDTH = 'w-[5.5rem]';
 
 interface AspectRatioPillProps {
   value: string;
@@ -86,8 +85,11 @@ export function AspectRatioPill({ value, onChange, className }: AspectRatioPillP
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" aria-haspopup="listbox" className={`${PILL_BASE} ${FRAME_PILL_WIDTH} ${className ?? ''}`}>
-          <span className="text-foreground font-medium whitespace-nowrap">{value}</span>
+        <button type="button" aria-haspopup="listbox" className={`${PILL_BASE} ${PILL_WIDTH} ${className ?? ''}`}>
+          <span className="flex items-center gap-1.5">
+            <FrameIcon ratio={value} active />
+            <span className="text-foreground font-medium whitespace-nowrap">{value}</span>
+          </span>
           <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
         </button>
       </DropdownMenuTrigger>
@@ -121,7 +123,7 @@ export function ResolutionPill({ value, onChange, className }: ResolutionPillPro
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" aria-haspopup="listbox" className={`${PILL_BASE} ${RES_PILL_WIDTH} ${className ?? ''}`}>
+        <button type="button" aria-haspopup="listbox" className={`${PILL_BASE} ${PILL_WIDTH} ${className ?? ''}`}>
           <span className="text-foreground font-medium">{value}</span>
           <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
         </button>
