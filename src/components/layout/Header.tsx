@@ -93,7 +93,7 @@ function GenerationIndicator() {
 export function Header() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const { user, signOut, signInWithGoogle } = useAuth();
   const { credits, lastDelta } = useCredits();
   const isAdmin = useIsAdmin();
   const [visibleDelta, setVisibleDelta] = useState<{ amount: number; id: number } | null>(null);
@@ -277,7 +277,7 @@ export function Header() {
               <Button
                 variant="default"
                 size="sm"
-                onClick={() => navigate('/login')}
+                onClick={() => signInWithGoogle()}
                 className="gap-2"
               >
                 <LogIn className="h-4 w-4" />
@@ -388,16 +388,16 @@ export function Header() {
               </div>
             </div>
           ) : (
-            <Link
-              to="/login"
-              className={`transition-all duration-500 ${isMobileMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+            <Button
+              variant="default"
+              size="lg"
+              onClick={() => signInWithGoogle()}
+              className={`gap-2 px-8 transition-all duration-500 ${isMobileMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
               style={{ transitionDelay: isMobileMenuOpen ? `${navLinks.length * 100 + 200}ms` : '0ms' }}
             >
-              <Button variant="default" size="lg" className="gap-2 w-full px-8">
-                <LogIn className="h-5 w-5" />
-                Sign In
-              </Button>
-            </Link>
+              <LogIn className="h-5 w-5" />
+              Sign In
+            </Button>
           )}
 
           {/* Theme Switcher in mobile menu — below auth */}
