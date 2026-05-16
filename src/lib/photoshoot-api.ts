@@ -75,9 +75,10 @@ export async function startPhotoshoot(
     throw new Error('A valid model image URL must be provided.');
   }
 
-  const { input_jewelry_asset_id, input_model_asset_id, input_preset_model_id, resolution, ...payload } = request;
+  const { input_jewelry_asset_id, input_model_asset_id, input_preset_model_id, resolution, ...rest } = request;
 
   const workflowName = MODEL_SHOT_WORKFLOWS[resolution ?? '1K'] ?? MODEL_SHOT_WORKFLOWS['1K'];
+  const payload = { ...rest, image_size: resolution ?? '1K' };
 
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const jewelryId = input_jewelry_asset_id && UUID_RE.test(input_jewelry_asset_id) ? input_jewelry_asset_id : undefined;
@@ -190,7 +191,7 @@ export async function startPdpShot(
   const workflowName = PRODUCT_SHOT_WORKFLOWS[resolution ?? '1K'] ?? PRODUCT_SHOT_WORKFLOWS['1K'];
 
   // Backend expects jewelry_image_urls as an array
-  const payload = { ...rest, jewelry_image_urls: [jewelry_image_url] };
+  const payload = { ...rest, jewelry_image_urls: [jewelry_image_url], image_size: resolution ?? '1K' };
 
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const jewelryId = input_jewelry_asset_id && UUID_RE.test(input_jewelry_asset_id) ? input_jewelry_asset_id : undefined;
