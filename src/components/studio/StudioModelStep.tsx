@@ -43,7 +43,7 @@ import { MasonryGrid } from '@/components/ui/masonry-grid';
 import { ModelCard, type UserModel } from '@/components/studio/ModelCard';
 import { PresetModelThumb } from '@/components/studio/PresetModelThumb';
 import { type PresetModel } from '@/lib/models-api';
-import { AspectRatioPill, ResolutionPill, RESOLUTION_COSTS, type Resolution } from '@/components/studio/OutputSettingsPills';
+import { AspectRatioPill, ResolutionPill, type Resolution } from '@/components/studio/OutputSettingsPills';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
 
 interface PresetCategory {
@@ -82,6 +82,8 @@ interface StudioModelStepProps {
   setFormanovaCategory: (cat: string) => void;
   aspectRatio: string;
   resolution: Resolution;
+  generationCost: number;
+  costLoading: boolean;
   onAspectRatioChange: (v: string) => void;
   onResolutionChange: (v: Resolution) => void;
   handleModelUpload: (file: File) => void;
@@ -114,6 +116,8 @@ export function StudioModelStep({
   presetModelsForCategory,
   aspectRatio,
   resolution,
+  generationCost,
+  costLoading,
   onAspectRatioChange,
   onResolutionChange,
   setModelGuideOpen,
@@ -130,7 +134,6 @@ export function StudioModelStep({
   handleRenameUserModel,
   handleSelectLibraryModel,
 }: StudioModelStepProps) {
-  const generationCost = RESOLUTION_COSTS[resolution];
   return (
     <motion.div
       ref={step2Ref}
@@ -273,6 +276,8 @@ export function StudioModelStep({
                 {isModelUploading ? 'Uploading…' : 'Generate Photoshoot'}
                 {preflightChecking || isModelUploading ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
+                ) : costLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin opacity-50" />
                 ) : (
                   <span className="flex items-center gap-1 opacity-70 text-sm font-mono normal-case tracking-normal">
                     <img src={creditCoinIcon} alt="" className="h-4 w-4 object-contain" /> {generationCost}
