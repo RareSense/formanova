@@ -144,7 +144,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
         intervalMs: 3000,
         timeoutMs: 720_000,
         max404s: Number.MAX_SAFE_INTEGER,
-        maxPollErrors: 1,
+        maxPollErrors: 10,
         maxResultRetries: 6,
         resultRetryDelayMs: 1000,
         signal: ctrl.signal,
@@ -153,9 +153,12 @@ export function GenerationsContextProvider({ children }: { children: React.React
         if (pollResult.status === 'cancelled') return;
 
         const result = pollResult.result;
-        const hasActivityError = Object.values(result).some(
-          (items) => Array.isArray(items) && items.some((i: any) => i?.action === 'error' || i?.status === 'failed')
-        );
+        const generateItems = (result['generate'] ?? result['generate_image'] ?? []) as unknown[];
+        const hasActivityError = Array.isArray(generateItems) && generateItems.length > 0
+          ? generateItems.some((i: any) => i?.action === 'error' || i?.status === 'failed')
+          : Object.values(result).some(
+              (items) => Array.isArray(items) && items.some((i: any) => i?.action === 'error' || i?.status === 'failed')
+            );
 
         if (hasActivityError) {
           setGenerations(prev => prev.map(g =>

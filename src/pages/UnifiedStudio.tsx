@@ -128,7 +128,14 @@ export default function UnifiedStudio() {
 
   const [formanovaCategory, setFormanovaCategory] = useState<string>('ecom');
   const [aspectRatio, setAspectRatio] = useState('3:4');
-  const [resolution, setResolution] = useState<Resolution>('1K');
+  const [resolution, setResolution] = useState<Resolution>(() => {
+    const saved = sessionStorage.getItem('formanova_studio_resolution');
+    return (saved === '1K' || saved === '2K' || saved === '4K') ? saved : '1K';
+  });
+  const handleResolutionChange = (v: Resolution) => {
+    setResolution(v);
+    sessionStorage.setItem('formanova_studio_resolution', v);
+  };
   const MODEL_SHOT_WORKFLOWS: Record<string, string> = { '1K': 'jewelry_photoshoots_generator', '2K': 'jewelry_photoshoots_generator_2k', '4K': 'jewelry_photoshoots_generator_4k' };
   const PRODUCT_SHOT_WORKFLOWS: Record<string, string> = { '1K': 'Product_shot_pipeline', '2K': 'Product_shot_pipeline_2k', '4K': 'Product_shot_pipeline_4k' };
   const generationWorkflow = isProductShot ? (PRODUCT_SHOT_WORKFLOWS[resolution] ?? 'Product_shot_pipeline') : (MODEL_SHOT_WORKFLOWS[resolution] ?? 'jewelry_photoshoots_generator');
@@ -551,7 +558,7 @@ export default function UnifiedStudio() {
             resolution={resolution}
             generationCost={generationCost}
             onAspectRatioChange={setAspectRatio}
-            onResolutionChange={setResolution}
+            onResolutionChange={handleResolutionChange}
             handleModelUpload={handleModelUpload}
             handleGenerate={handleGenerate}
             handleDeleteUserModel={handleDeleteUserModel}
