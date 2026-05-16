@@ -7,7 +7,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-export const ASPECT_RATIOS = ['1:1', '16:9', '9:16', '4:3', '3:4', '2:3', '3:2', '4:5', '5:4', '21:9'];
+export const ASPECT_RATIOS = ['3:4', '4:5', '1:1', '9:16', '4:3', '3:2', '2:3', '16:9', '5:4', '21:9'];
 
 export type Resolution = '1K' | '2K' | '4K';
 
