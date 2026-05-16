@@ -25,8 +25,8 @@ const RESOLUTION_OPTIONS: { value: Resolution; label: string; delta: number | nu
 ];
 
 const PILL_BASE =
-  'h-11 flex items-center gap-1.5 px-3 rounded-md border border-border/40 bg-background ' +
-  'hover:border-border hover:bg-muted/20 transition-colors font-mono text-sm ' +
+  'h-11 flex items-center gap-1.5 px-3 rounded-md border border-primary/60 bg-background ' +
+  'hover:border-primary transition-colors font-mono text-sm ' +
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-w-[44px]';
 
 interface AspectRatioPillProps {
