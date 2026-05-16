@@ -10,6 +10,18 @@ import { authenticatedFetch } from '@/lib/authenticated-fetch';
 
 const API_BASE = '/api';
 
+const MODEL_SHOT_WORKFLOWS: Record<string, string> = {
+  '1K': 'jewelry_photoshoots_generator',
+  '2K': 'jewelry_photoshoots_generator_2k',
+  '4K': 'jewelry_photoshoots_generator_4k',
+};
+
+const PRODUCT_SHOT_WORKFLOWS: Record<string, string> = {
+  '1K': 'Product_shot_pipeline',
+  '2K': 'Product_shot_pipeline_2k',
+  '4K': 'Product_shot_pipeline_4k',
+};
+
 // ─── Types ──────────────────────────────────────────────────────────
 
 export interface PhotoshootStartRequest {
@@ -63,14 +75,16 @@ export async function startPhotoshoot(
     throw new Error('A valid model image URL must be provided.');
   }
 
-  const { input_jewelry_asset_id, input_model_asset_id, input_preset_model_id, ...payload } = request;
+  const { input_jewelry_asset_id, input_model_asset_id, input_preset_model_id, resolution, ...payload } = request;
+
+  const workflowName = MODEL_SHOT_WORKFLOWS[resolution ?? '1K'] ?? MODEL_SHOT_WORKFLOWS['1K'];
 
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const jewelryId = input_jewelry_asset_id && UUID_RE.test(input_jewelry_asset_id) ? input_jewelry_asset_id : undefined;
   const modelId = input_model_asset_id && UUID_RE.test(input_model_asset_id) ? input_model_asset_id : undefined;
   const presetModelId = input_preset_model_id && UUID_RE.test(input_preset_model_id) ? input_preset_model_id : undefined;
 
-  const res = await authenticatedFetch(`${API_BASE}/run/state/jewelry_photoshoots_generator`, {
+  const res = await authenticatedFetch(`${API_BASE}/run/state/${workflowName}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -169,8 +183,11 @@ export async function startPdpShot(
     input_jewelry_asset_id,
     input_inspiration_asset_id,
     input_preset_inspiration_id,
+    resolution,
     ...rest
   } = request;
+
+  const workflowName = PRODUCT_SHOT_WORKFLOWS[resolution ?? '1K'] ?? PRODUCT_SHOT_WORKFLOWS['1K'];
 
   // Backend expects jewelry_image_urls as an array
   const payload = { ...rest, jewelry_image_urls: [jewelry_image_url] };
@@ -187,7 +204,7 @@ export async function startPdpShot(
     ? { input_preset_inspiration_id: presetInspirationId }
     : {};
 
-  const res = await authenticatedFetch(`${API_BASE}/run/Product_shot_pipeline`, {
+  const res = await authenticatedFetch(`${API_BASE}/run/${workflowName}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

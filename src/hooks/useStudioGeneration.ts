@@ -168,7 +168,10 @@ export function useStudioGeneration({
       return;
     }
 
-    const hasCredits = await checkCredits(isProductShot ? 'Product_shot_pipeline' : 'jewelry_photoshoots_generator');
+    const MODEL_SHOT_WORKFLOWS: Record<string, string> = { '1K': 'jewelry_photoshoots_generator', '2K': 'jewelry_photoshoots_generator_2k', '4K': 'jewelry_photoshoots_generator_4k' };
+    const PRODUCT_SHOT_WORKFLOWS: Record<string, string> = { '1K': 'Product_shot_pipeline', '2K': 'Product_shot_pipeline_2k', '4K': 'Product_shot_pipeline_4k' };
+    const workflowName = isProductShot ? (PRODUCT_SHOT_WORKFLOWS[resolution] ?? 'Product_shot_pipeline') : (MODEL_SHOT_WORKFLOWS[resolution] ?? 'jewelry_photoshoots_generator');
+    const hasCredits = await checkCredits(workflowName);
     if (!hasCredits) {
       trackPaywallHit({
         category: TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType,

@@ -129,8 +129,10 @@ export default function UnifiedStudio() {
   const [formanovaCategory, setFormanovaCategory] = useState<string>('ecom');
   const [aspectRatio, setAspectRatio] = useState('3:4');
   const [resolution, setResolution] = useState<Resolution>('1K');
-  const generationWorkflow = isProductShot ? 'Product_shot_pipeline' : 'jewelry_photoshoots_generator';
-  const { cost: generationCost, loading: costLoading } = useGenerationCost(generationWorkflow, resolution);
+  const MODEL_SHOT_WORKFLOWS: Record<string, string> = { '1K': 'jewelry_photoshoots_generator', '2K': 'jewelry_photoshoots_generator_2k', '4K': 'jewelry_photoshoots_generator_4k' };
+  const PRODUCT_SHOT_WORKFLOWS: Record<string, string> = { '1K': 'Product_shot_pipeline', '2K': 'Product_shot_pipeline_2k', '4K': 'Product_shot_pipeline_4k' };
+  const generationWorkflow = isProductShot ? (PRODUCT_SHOT_WORKFLOWS[resolution] ?? 'Product_shot_pipeline') : (MODEL_SHOT_WORKFLOWS[resolution] ?? 'jewelry_photoshoots_generator');
+  const { cost: generationCost } = useGenerationCost(generationWorkflow, resolution);
 
   // Fetch preset models from the backend. No local fallback catalog is used.
   const { data: presetModelsData, isLoading: presetModelsLoading, isError: presetModelsError } = useQuery<PresetModelsResponse>({

@@ -27,7 +27,6 @@ export function useGenerationCost(workflowName: string, resolution: Resolution):
       body: JSON.stringify({
         workflow_name: workflowName,
         num_variations: 1,
-        pricing_context: { resolution },
       }),
       signal: controller.signal,
     })
