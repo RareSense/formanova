@@ -153,6 +153,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
         if (pollResult.status === 'cancelled') return;
 
         const result = pollResult.result;
+        console.log('[GenerationsContext] poll result', JSON.stringify(result).slice(0, 2000));
         const generateItems = (result['generate'] ?? result['generate_image'] ?? []) as unknown[];
         const hasActivityError = Array.isArray(generateItems) && generateItems.length > 0
           ? generateItems.some((i: any) => i?.action === 'error' || i?.status === 'failed')
