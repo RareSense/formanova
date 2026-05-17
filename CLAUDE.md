@@ -133,3 +133,37 @@ This fixes a race condition where returning users appeared as anonymous UUIDs in
 **`TO_SINGULAR` map** is in `src/lib/jewelry-utils.ts`. All PostHog event `category` values must be singular (`'ring'` not `'rings'`). Use `TO_SINGULAR[jewelryType] ?? jewelryType` wherever `jewelryType` comes from a URL param.
 
 **Tests:** `npx vitest run src/lib/posthog-events.test.ts` — 20 tests, must stay green. Do not delete or weaken them.
+
+## Async Generation Architecture (keep-browsing)
+
+`GenerationsContext` (`src/contexts/GenerationsContext.tsx`) owns all background polling. Never poll inside a page component.
+
+### Invariants — violations cause silent regressions:
+
+**1. `extractResultImages` must return early on the first valid URL per item.**
+Do not collect all candidate fields (output_url, image_url, result_url, url, image_b64) from the same item into an array. If you do, items that have both a URL and a base64 field will produce duplicate entries → same image shown twice in the result grid. Always return `[url]` on the first match and exit.
+
+**2. Any navigation to `/studio/:jewelryType` that should restore async context MUST include `mode` in state.**
+```ts
+navigate(`/studio/${jewelryType}`, {
+  state: { asyncResult: { workflowId, resultImages }, mode: isProductShot ? 'product-shot' : 'model-shot' },
+});
+```
+`isProductShot` in `UnifiedStudio` reads `location.state?.mode` first, then URL `?mode=`, then sessionStorage. If you omit `mode`, sessionStorage is stale and the wrong shot type is restored. This applies to: GenerationsContext toast action, Header indicator click (completed + running).
+
+**3. `TrackedGeneration` carries `isProductShot` — use it for navigation.**
+Never reconstruct shot type from the URL or infer it from `jewelryType`. Read it from `gen.isProductShot`.
+
+**4. Workflow name tables exist in three places — keep them in sync.**
+`src/lib/photoshoot-api.ts` (canonical), `src/hooks/useStudioGeneration.ts`, `src/pages/UnifiedStudio.tsx`. If you add a new resolution or workflow variant, update all three.
+
+**5. `hasNavigatedAway` ref controls whether the on-page effect shows results.**
+`handleKeepBrowsing()` sets it to `true`. `restoreAsyncResult()` / `resumeGeneration()` / `resetGeneration()` reset it to `false`. Do not add navigation inside `useStudioGeneration` without updating this ref.
+
+### Supported workflow variants
+| Mode | 1K | 2K | 4K |
+|---|---|---|---|
+| Model shot | `jewelry_photoshoots_generator` | `jewelry_photoshoots_generator_2k` | `jewelry_photoshoots_generator_4k` |
+| Product shot | `Product_shot_pipeline` | `Product_shot_pipeline_2k` | `Product_shot_pipeline_4k` |
+
+All six variants go through the same `GenerationsContext` polling path. The workflow name only matters at start time (`startPhotoshoot` / `startPdpShot`). Polling uses `workflowId` only.
