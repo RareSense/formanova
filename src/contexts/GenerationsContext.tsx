@@ -7,7 +7,6 @@ import { pollWorkflow } from '@/lib/poll-workflow';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { markGenerationCompleted, markGenerationFailed } from '@/lib/generation-lifecycle';
 import { azureUriToUrl } from '@/lib/azure-utils';
-import { getWorkflowDetails } from '@/lib/generation-history-api';
 import type { PhotoshootResultResponse } from '@/lib/photoshoot-api';
 
 // ── Types ─────────────────────────────────────────────────────────────────
@@ -21,12 +20,16 @@ export interface TrackedGeneration {
   isProductShot: boolean;
   jewelryType: string;
   startedAt: number;
+  statusUrl: string;
+  resultUrl: string;
 }
 
 export interface TrackGenerationParams {
   workflowId: string;
   isProductShot: boolean;
   jewelryType: string;
+  statusUrl: string;
+  resultUrl: string;
 }
 
 export interface GenerationsContextValue {
@@ -70,29 +73,6 @@ function extractResultImages(result: PhotoshootResultResponse): string[] {
   return images;
 }
 
-// Fallback: extract images from workflow details steps when /api/result returns no images.
-// Backend confirmed: successful generate steps store the image at output_data.result.output_url.
-function extractImagesFromDetails(steps: any[]): string[] {
-  const images: string[] = [];
-  for (const step of steps) {
-    if (typeof step.tool !== 'string' || !step.tool.startsWith('generate_jewelry_image')) continue;
-    if (step.is_success === false) continue;
-    const out = step.output ?? step.output_data ?? {};
-    // Confirmed path: output_data.result.output_url
-    const url = out?.result?.output_url ?? out?.output_url;
-    if (typeof url === 'string' && url.length > 0) {
-      if (url.startsWith('azure://')) images.push(azureUriToUrl(url));
-      else if (url.startsWith('http')) images.push(url);
-    }
-    const b64 = out?.result?.image_b64 ?? out?.image_b64;
-    if (typeof b64 === 'string' && b64.length > 0) {
-      const mime = out?.result?.mime_type ?? out?.mime_type ?? 'image/jpeg';
-      images.push(`data:${mime};base64,${b64}`);
-    }
-  }
-  return images;
-}
-
 // ── Provider ─────────────────────────────────────────────────────────────
 
 export function GenerationsContextProvider({ children }: { children: React.ReactNode }) {
@@ -114,6 +94,8 @@ export function GenerationsContextProvider({ children }: { children: React.React
         isProductShot: params.isProductShot,
         jewelryType: params.jewelryType,
         startedAt: Date.now(),
+        statusUrl: params.statusUrl,
+        resultUrl: params.resultUrl,
       },
     ]);
   }, []);
@@ -154,8 +136,8 @@ export function GenerationsContextProvider({ children }: { children: React.React
 
       pollWorkflow<PhotoshootResultResponse>({
         mode: 'status-then-result',
-        fetchStatus: () => authenticatedFetch(`/api/status/${gen.workflowId}`),
-        fetchResult: () => authenticatedFetch(`/api/result/${gen.workflowId}`),
+        fetchStatus: () => authenticatedFetch(gen.statusUrl),
+        fetchResult: () => authenticatedFetch(gen.resultUrl),
         onStatusData: (statusData: unknown) => {
           const s = statusData as { progress?: { total_nodes?: number; completed_nodes?: number; visited?: string[] } };
           if (!s.progress) return;
@@ -187,22 +169,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
 
         // Extract images first — if we got output images the generation succeeded regardless
         // of what other keys exist in the result (handles _2k/_4k workflows with different node names).
-        let resultImages = extractResultImages(result);
-
-        // Fallback: /api/result sometimes returns a failed node even when the backend
-        // actually succeeded (confirmed backend bug). Try /history/workflow/details
-        // which reads directly from DB and has the correct output_data.result.output_url.
-        if (resultImages.length === 0) {
-          try {
-            const details = await getWorkflowDetails(gen.workflowId);
-            resultImages = extractImagesFromDetails(details.steps);
-            if (resultImages.length > 0) {
-              console.log('[GenerationsContext] recovered images via details fallback');
-            }
-          } catch {
-            // details endpoint unavailable — fall through to normal error handling
-          }
-        }
+        const resultImages = extractResultImages(result);
 
         // Only check for activity errors when no images were produced.
         // Prefer targeted key lookup; only fall back to scanning all values when those keys are absent.

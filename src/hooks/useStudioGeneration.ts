@@ -257,6 +257,8 @@ export function useStudioGeneration({
         workflowId: _workflowId,
         isProductShot,
         jewelryType: TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType,
+        statusUrl: startResponse.status_url,
+        resultUrl: startResponse.result_url,
       });
       markGenerationStarted(_workflowId);
       setCurrentStep('generating');
