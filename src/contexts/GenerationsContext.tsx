@@ -10,6 +10,9 @@ import { azureUriToUrl } from '@/lib/azure-utils';
 import type { PhotoshootResultResponse } from '@/lib/photoshoot-api';
 import type { Resolution } from '@/components/studio/OutputSettingsPills';
 
+const STUDIO_RESULT_RETRY_DELAY_MS = 3000;
+const STUDIO_RESULT_MAX_RETRIES = 30;
+
 // ── Types ─────────────────────────────────────────────────────────────────
 
 export interface TrackedGeneration {
@@ -203,8 +206,8 @@ export function GenerationsContextProvider({ children }: { children: React.React
         timeoutMs: 720_000,
         max404s: Number.MAX_SAFE_INTEGER,
         maxPollErrors: 1,
-        maxResultRetries: 6,
-        resultRetryDelayMs: 1000,
+        maxResultRetries: STUDIO_RESULT_MAX_RETRIES,
+        resultRetryDelayMs: STUDIO_RESULT_RETRY_DELAY_MS,
         signal: ctrl.signal,
       }).then(pollResult => {
         clearInterval(ticker);

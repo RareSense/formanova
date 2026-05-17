@@ -92,7 +92,7 @@ export function StudioGeneratingStep({
                   {displayMsg}
                 </motion.p>
               </AnimatePresence>
-              <p className="font-mono text-[10px] italic text-muted-foreground mb-8">This can take up to 60 seconds</p>
+              <p className="font-mono text-[10px] italic text-muted-foreground mb-8">This can take up to 90 seconds</p>
             </>
           );
         })()}

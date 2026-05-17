@@ -76,6 +76,8 @@ describe('GenerationsContext', () => {
       intervalMs: 3000,
       timeoutMs: 720_000,
       maxPollErrors: 1,
+      maxResultRetries: 30,
+      resultRetryDelayMs: 3000,
     }));
   });
 
