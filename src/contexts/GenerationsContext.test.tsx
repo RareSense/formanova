@@ -163,15 +163,15 @@ describe('GenerationsContext', () => {
     expect(callArgs.signal.aborted).toBe(true);
   });
 
-  it('polls the stored backend urls instead of rebuilding them from workflowId', async () => {
+  it('polls /api/status|result/{workflowId} constructed urls', async () => {
     const { result } = renderHook(() => useGenerations(), { wrapper });
     act(() => {
       result.current.trackGeneration({
         workflowId: 'wf-6',
         isProductShot: false,
         jewelryType: 'ring',
-        statusUrl: '/api/status/custom-status-id',
-        resultUrl: '/api/result/custom-result-id',
+        statusUrl: '/api/status/wf-6',
+        resultUrl: '/api/result/wf-6',
       });
     });
 
@@ -182,7 +182,7 @@ describe('GenerationsContext', () => {
 
     const { authenticatedFetch } = await import('@/lib/authenticated-fetch');
     const mockAuthenticatedFetch = vi.mocked(authenticatedFetch);
-    expect(mockAuthenticatedFetch).toHaveBeenNthCalledWith(1, '/api/status/custom-status-id');
-    expect(mockAuthenticatedFetch).toHaveBeenNthCalledWith(2, '/api/result/custom-result-id');
+    expect(mockAuthenticatedFetch).toHaveBeenNthCalledWith(1, '/api/status/wf-6');
+    expect(mockAuthenticatedFetch).toHaveBeenNthCalledWith(2, '/api/result/wf-6');
   });
 });

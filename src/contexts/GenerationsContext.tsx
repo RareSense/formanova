@@ -144,8 +144,8 @@ export function GenerationsContextProvider({ children }: { children: React.React
 
       pollWorkflow<PhotoshootResultResponse>({
         mode: 'status-then-result',
-        fetchStatus: () => authenticatedFetch(gen.statusUrl),
-        fetchResult: () => authenticatedFetch(gen.resultUrl),
+        fetchStatus: () => authenticatedFetch(`/api/status/${gen.workflowId}`),
+        fetchResult: () => authenticatedFetch(`/api/result/${gen.workflowId}`),
         onStatusData: (statusData: unknown) => {
           const s = statusData as { progress?: { total_nodes?: number; completed_nodes?: number; visited?: string[] } };
           if (!s.progress) return;
