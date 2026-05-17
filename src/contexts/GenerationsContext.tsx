@@ -70,7 +70,7 @@ function extractResultImages(result: PhotoshootResultResponse): string[] {
       }
     }
   }
-  return images;
+  return Array.from(new Set(images));
 }
 
 // ── Provider ─────────────────────────────────────────────────────────────

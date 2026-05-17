@@ -86,6 +86,27 @@ describe('GenerationsContext', () => {
     expect(mockMarkCompleted).toHaveBeenCalledWith('wf-3', expect.any(Number));
   });
 
+  it('dedupes identical result image urls before rendering', async () => {
+    const resultData = {
+      output: [
+        { output_url: 'https://example.com/image.jpg' },
+        { result_url: 'https://example.com/image.jpg' },
+      ],
+    };
+    mockPollWorkflow.mockResolvedValueOnce({ status: 'completed', result: resultData });
+
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    act(() => {
+      result.current.trackGeneration({ workflowId: 'wf-dup', isProductShot: false, jewelryType: 'ring', statusUrl: '/api/status/wf-dup', resultUrl: '/api/result/wf-dup' });
+    });
+
+    await waitFor(() => {
+      const gen = result.current.generations.find(g => g.workflowId === 'wf-dup');
+      expect(gen?.status).toBe('completed');
+      expect(gen?.resultImages).toEqual(['https://example.com/image.jpg']);
+    });
+  });
+
   it('transitions to failed when poll rejects', async () => {
     mockPollWorkflow.mockRejectedValueOnce(new Error('timeout'));
 
