@@ -11,7 +11,6 @@ import { TOOL_COSTS } from "@/lib/credits-api";
 import { AuthExpiredError } from "@/lib/authenticated-fetch";
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import { pollWorkflow, type PollWorkflowResult } from "@/lib/poll-workflow";
-import { resolveWorkflowPollingUrls } from "@/lib/workflow-urls";
 import {
   resolveCadTerminalNode,
   resolveCadProgressNode,
@@ -377,12 +376,8 @@ export default function TextToCAD() {
         throw new Error(err.error || err.detail || `Failed to start generation (${startRes.status})`);
       }
 
-      const startBody = await startRes.json();
-      const {
-        workflowId: workflow_id,
-        statusUrl,
-        resultUrl,
-      } = resolveWorkflowPollingUrls(startBody);
+      const { workflow_id } = await startRes.json();
+      if (!workflow_id) throw new Error("No workflow_id returned");
 
       console.log("[TextToCAD] Workflow started:", workflow_id);
 
@@ -395,8 +390,11 @@ export default function TextToCAD() {
       try {
         genPollResult = await pollWorkflow<CadGenerationResult>({
           mode: 'status-then-result',
-          fetchStatus: () => authenticatedFetch(statusUrl, { signal: pollAbort.signal }),
-          fetchResult: () => authenticatedFetch(resultUrl),
+          fetchStatus: () => authenticatedFetch(
+            `/api/status/${encodeURIComponent(workflow_id)}`,
+            { signal: pollAbort.signal }
+          ),
+          fetchResult: () => authenticatedFetch(`/api/result/${encodeURIComponent(workflow_id)}`),
           resolveState: (statusData) => {
             const s = statusData as { runtime?: { state?: string }; progress?: { state?: string }; state?: string };
             const state = (s.runtime?.state || s.progress?.state || s.state || 'unknown').toLowerCase();
@@ -500,12 +498,8 @@ export default function TextToCAD() {
         throw new Error(err.error || err.detail || `Failed to start edit (${startRes.status})`);
       }
 
-      const startBody = await startRes.json();
-      const {
-        workflowId: workflow_id,
-        statusUrl,
-        resultUrl,
-      } = resolveWorkflowPollingUrls(startBody);
+      const { workflow_id } = await startRes.json();
+      if (!workflow_id) throw new Error("No workflow_id returned");
       console.log(`[TextToCAD] Edit "${label}" workflow started:`, workflow_id);
 
       // Step 2 + 3: Poll status then fetch result
@@ -517,8 +511,11 @@ export default function TextToCAD() {
       try {
         editPollResult = await pollWorkflow<CadGenerationResult>({
           mode: 'status-then-result',
-          fetchStatus: () => authenticatedFetch(statusUrl, { signal: pollAbort.signal }),
-          fetchResult: () => authenticatedFetch(resultUrl),
+          fetchStatus: () => authenticatedFetch(
+            `/api/status/${encodeURIComponent(workflow_id)}`,
+            { signal: pollAbort.signal }
+          ),
+          fetchResult: () => authenticatedFetch(`/api/result/${encodeURIComponent(workflow_id)}`),
           resolveState: (statusData) => {
             const s = statusData as { runtime?: { state?: string }; progress?: { state?: string }; state?: string };
             const state = (s.runtime?.state || s.progress?.state || s.state || 'unknown').toLowerCase();
@@ -752,12 +749,12 @@ export default function TextToCAD() {
         toast.error(weightStartBody?.error || "Failed to start weight estimation");
         return;
       }
-      const { resultUrl } = resolveWorkflowPollingUrls(weightStartBody);
+      const { workflow_id } = weightStartBody;
 
       // Poll until done (2s interval, ~2 min timeout)
       const pollResult = await pollWorkflow({
         mode: 'result-direct',
-        fetchResult: () => authenticatedFetch(resultUrl),
+        fetchResult: () => authenticatedFetch(`/api/result/${encodeURIComponent(workflow_id)}`),
         parseResult: (d) => d as { success: boolean; error?: string; scale_warning?: boolean; weight_14k_gold_g?: number; weight_platinum_g?: number },
         intervalMs: 2000,
         timeoutMs: 120_000,
@@ -823,12 +820,12 @@ export default function TextToCAD() {
         toast.error(stlStartBody?.error || "Failed to start STL export");
         return;
       }
-      const { resultUrl } = resolveWorkflowPollingUrls(stlStartBody);
+      const { workflow_id } = stlStartBody;
 
       // Poll until done (2s interval, ~5 min timeout for high quality)
       const pollResult = await pollWorkflow({
         mode: 'result-direct',
-        fetchResult: () => authenticatedFetch(resultUrl),
+        fetchResult: () => authenticatedFetch(`/api/result/${encodeURIComponent(workflow_id)}`),
         parseResult: (d) => d as { success: boolean; error_text?: string; stl_artifact?: { uri: string } },
         intervalMs: 2000,
         timeoutMs: 300_000,
