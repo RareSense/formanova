@@ -54,14 +54,13 @@ function GenerationIndicator() {
 
   const handleClick = () => {
     if (!mostRecent) return;
-    const mode = mostRecent.isProductShot ? 'product-shot' : 'model-shot';
     if (mostRecent.status === 'completed') {
       navigate(`/studio/${mostRecent.jewelryType}`, {
-        state: { asyncResult: { workflowId: mostRecent.workflowId, resultImages: mostRecent.resultImages }, mode },
+        state: { asyncResult: { workflowId: mostRecent.workflowId, resultImages: mostRecent.resultImages } },
       });
     } else {
       navigate(`/studio/${mostRecent.jewelryType}`, {
-        state: { viewGenerating: mostRecent.workflowId, mode },
+        state: { viewGenerating: mostRecent.workflowId },
       });
     }
   };
