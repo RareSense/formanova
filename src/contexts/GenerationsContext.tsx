@@ -48,7 +48,7 @@ function extractResultImages(result: PhotoshootResultResponse): string[] {
     for (const item of items) {
       if (!item || typeof item !== 'object') continue;
       const obj = item as Record<string, unknown>;
-      for (const k of ['output_url', 'image_url', 'result_url', 'url', 'image_b64', 'output_image']) {
+      for (const k of ['output_url', 'image_url', 'result_url', 'url', 'output_image']) {
         const val = obj[k];
         if (typeof val === 'string' && val.length > 0) {
           if (val.startsWith('azure://')) {
@@ -57,6 +57,12 @@ function extractResultImages(result: PhotoshootResultResponse): string[] {
             images.push(val);
           }
         }
+      }
+      // Handle raw base64 — construct proper data URI using sibling mime_type field
+      const b64 = obj['image_b64'];
+      if (typeof b64 === 'string' && b64.length > 0) {
+        const mime = typeof obj['mime_type'] === 'string' ? obj['mime_type'] : 'image/jpeg';
+        images.push(`data:${mime};base64,${b64}`);
       }
     }
   }
