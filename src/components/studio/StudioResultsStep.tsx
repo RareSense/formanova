@@ -37,6 +37,7 @@ interface StudioResultsStepProps {
   jewelryImage: string | null;
   activeModelUrl: string | null;
   userEmail?: string | null;
+  generationCost?: number | null;
 }
 
 export function StudioResultsStep({
@@ -57,6 +58,7 @@ export function StudioResultsStep({
   jewelryImage,
   activeModelUrl,
   userEmail,
+  generationCost,
 }: StudioResultsStepProps) {
   const isNewLabels = getButtonLabelVariant() === 'treatment';
   return (
@@ -122,7 +124,7 @@ export function StudioResultsStep({
             <RefreshCw className="h-4 w-4" />
             {isNewLabels ? 'Redo with AI' : 'Regenerate'}
             <span className="ml-1 flex items-center gap-1 text-xs normal-case tracking-normal opacity-70">
-              <img src={creditCoinIcon} alt="" className="h-4 w-4 object-contain" /> 10
+              <img src={creditCoinIcon} alt="" className="h-4 w-4 object-contain" /> {generationCost ?? 10}
             </span>
           </Button>
         </div>

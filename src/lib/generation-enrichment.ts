@@ -85,7 +85,8 @@ function findKeyedImageUrl(obj: unknown): string | null {
 // ── Photo thumbnail extraction ───────────────────────────────────────
 
 export function extractPhotoThumbnail(steps: any[]): string | null {
-  const genStep = steps.find((s: any) => s.tool === 'generate_jewelry_image');
+  // Match generate_jewelry_image, generate_jewelry_image_2k, generate_jewelry_image_4k, etc.
+  const genStep = steps.find((s: any) => typeof s.tool === 'string' && s.tool.startsWith('generate_jewelry_image'));
   if (!genStep?.output) return null;
   const out = genStep.output as any;
   const b64: string | undefined = out?.image_b64 ?? out?.result?.image_b64;
@@ -93,6 +94,9 @@ export function extractPhotoThumbnail(steps: any[]): string | null {
   if (typeof b64 === 'string') return `data:${mime};base64,${b64}`;
   const outputUrl: string | undefined = out?.output_url ?? out?.result?.output_url;
   if (typeof outputUrl === 'string' && outputUrl.startsWith('https://')) return outputUrl;
+  // Also handle azure:// URIs returned by higher-res workflows
+  const azureUri: string | undefined = out?.output_url ?? out?.result?.output_url ?? findAzureUri(out) ?? undefined;
+  if (typeof azureUri === 'string' && azureUri.startsWith('azure://')) return azureUriToUrl(azureUri);
   return null;
 }
 

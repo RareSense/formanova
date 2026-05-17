@@ -35,6 +35,14 @@ const PRODUCT_SHOT_MSGS = [
   'Almost there...',
 ];
 
+const MODEL_SHOT_MSGS = [
+  'Analysing your jewelry...',
+  'Selecting the best pose...',
+  'Placing jewelry on model...',
+  'Refining the details...',
+  'Almost there...',
+];
+
 export function StudioGeneratingStep({
   isProductShot,
   generationStep,
@@ -63,56 +71,31 @@ export function StudioGeneratingStep({
 
         <h2 className="font-display text-3xl uppercase tracking-tight mb-3">Generating</h2>
 
-        {/* Model shot: progress bar. Product shot: rotating messages */}
-        {!isProductShot ? (
-          <>
-            <AnimatePresence mode="wait">
-              <motion.p
-                key={generationStep}
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.3 }}
-                className="font-mono text-[11px] tracking-[0.2em] text-muted-foreground uppercase mb-6 text-center"
-              >
-                {generationStep || 'Starting...'}
-              </motion.p>
-            </AnimatePresence>
-            <div className="w-full h-1.5 bg-muted overflow-hidden mb-2">
-              <motion.div
-                className="h-full bg-primary"
-                initial={{ width: 0 }}
-                animate={{ width: `${generationProgress}%` }}
-                transition={{ duration: 0.8, ease: 'easeOut' }}
-              />
-            </div>
-            <p className="font-mono text-[10px] text-muted-foreground mb-8">{Math.round(generationProgress)}%</p>
-          </>
-        ) : (
-          <>
-            {(() => {
-              const isFetching = generationStep === 'Fetching results...';
-              const displayMsg = isFetching
-                ? 'Fetching result...'
-                : PRODUCT_SHOT_MSGS[Math.min(rotatingMsgIdx, PRODUCT_SHOT_MSGS.length - 1)];
-              return (
-                <AnimatePresence mode="wait">
-                  <motion.p
-                    key={displayMsg}
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -4 }}
-                    transition={{ duration: 0.4 }}
-                    className="font-mono text-[11px] tracking-[0.15em] text-muted-foreground uppercase mb-6 text-center"
-                  >
-                    {displayMsg}
-                  </motion.p>
-                </AnimatePresence>
-              );
-            })()}
-            <p className="font-mono text-[10px] italic text-muted-foreground mb-8">This can take up to 50 seconds</p>
-          </>
-        )}
+        {/* Both modes: rotating messages + time estimate */}
+        {(() => {
+          const msgs = isProductShot ? PRODUCT_SHOT_MSGS : MODEL_SHOT_MSGS;
+          const isFetching = generationStep === 'Fetching results...';
+          const displayMsg = isFetching
+            ? 'Fetching result...'
+            : msgs[Math.min(rotatingMsgIdx, msgs.length - 1)];
+          return (
+            <>
+              <AnimatePresence mode="wait">
+                <motion.p
+                  key={displayMsg}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.4 }}
+                  className="font-mono text-[11px] tracking-[0.15em] text-muted-foreground uppercase mb-6 text-center"
+                >
+                  {displayMsg}
+                </motion.p>
+              </AnimatePresence>
+              <p className="font-mono text-[10px] italic text-muted-foreground mb-8">This can take up to 90 seconds</p>
+            </>
+          );
+        })()}
 
         <button
           onClick={onKeepBrowsing}

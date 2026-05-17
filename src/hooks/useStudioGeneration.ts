@@ -62,6 +62,7 @@ import {
 import { useGenerations } from '@/contexts/GenerationsContext';
 import type { PresetModel } from '@/lib/models-api';
 import type { useToast } from '@/hooks/use-toast';
+import type { Resolution } from '@/components/studio/OutputSettingsPills';
 
 type StudioStep = 'upload' | 'model' | 'generating' | 'results';
 
@@ -75,6 +76,9 @@ interface UseStudioGenerationOptions {
   selectedModel: PresetModel | null;
   customModelImage: string | null;
   modelAssetId: string | null;
+  aspectRatio: string;
+  resolution: Resolution;
+  generationCost: number | null;
   checkCredits: (tool: string) => Promise<boolean>;
   toast: ReturnType<typeof useToast>['toast'];
   setCurrentStep: (step: StudioStep) => void;
@@ -92,6 +96,9 @@ export function useStudioGeneration({
   selectedModel,
   customModelImage,
   modelAssetId,
+  aspectRatio,
+  resolution,
+  generationCost,
   checkCredits,
   toast,
   setCurrentStep,
@@ -106,7 +113,13 @@ export function useStudioGeneration({
   const [regenerationCount, setRegenerationCount] = useState(0);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [generationInputUrlsMap, setGenerationInputUrlsMap] = useState<
-    Record<string, { jewelryUrl: string; modelUrl: string }>
+    Record<string, {
+      jewelryUrl?: string;
+      modelUrl?: string;
+      aspectRatio: string;
+      resolution: Resolution;
+      generationCost: number | null;
+    }>
   >({});
 
   const { generations, trackGeneration, clearGeneration } = useGenerations();
@@ -116,7 +129,13 @@ export function useStudioGeneration({
   const generationProgress = myGeneration?.progress ?? 0;
   const generationStep = myGeneration?.generationStep ?? '';
   const hasNavigatedAway = useRef(false);
-  const generationInputUrls = workflowId ? (generationInputUrlsMap[workflowId] ?? null) : null;
+  const generationInputUrls = workflowId ? ({
+    jewelryUrl: generationInputUrlsMap[workflowId]?.jewelryUrl ?? myGeneration?.jewelryUrl,
+    modelUrl: generationInputUrlsMap[workflowId]?.modelUrl ?? myGeneration?.modelUrl,
+    aspectRatio: generationInputUrlsMap[workflowId]?.aspectRatio ?? myGeneration?.aspectRatio ?? '3:4',
+    resolution: generationInputUrlsMap[workflowId]?.resolution ?? myGeneration?.resolution ?? '1K',
+    generationCost: generationInputUrlsMap[workflowId]?.generationCost ?? myGeneration?.generationCost ?? null,
+  }) : null;
 
   // Cycle rotating messages every 4s while generating
   useEffect(() => {
@@ -137,6 +156,8 @@ export function useStudioGeneration({
         upload_type: null,
         duration_ms: Date.now() - (myGeneration.startedAt ?? Date.now()),
         is_first_ever: consumeFirstGeneration(),
+        aspect_ratio: aspectRatio,
+        resolution,
       });
       clearStudioSession();
       if (!hasNavigatedAway.current) {
@@ -163,7 +184,10 @@ export function useStudioGeneration({
       return;
     }
 
-    const hasCredits = await checkCredits(isProductShot ? 'Product_shot_pipeline' : 'jewelry_photoshoots_generator');
+    const MODEL_SHOT_WORKFLOWS: Record<string, string> = { '1K': 'jewelry_photoshoots_generator', '2K': 'jewelry_photoshoots_generator_2k', '4K': 'jewelry_photoshoots_generator_4k' };
+    const PRODUCT_SHOT_WORKFLOWS: Record<string, string> = { '1K': 'Product_shot_pipeline', '2K': 'Product_shot_pipeline_2k', '4K': 'Product_shot_pipeline_4k' };
+    const workflowName = isProductShot ? (PRODUCT_SHOT_WORKFLOWS[resolution] ?? 'Product_shot_pipeline') : (MODEL_SHOT_WORKFLOWS[resolution] ?? 'jewelry_photoshoots_generator');
+    const hasCredits = await checkCredits(workflowName);
     if (!hasCredits) {
       trackPaywallHit({
         category: TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType,
@@ -222,6 +246,8 @@ export function useStudioGeneration({
             inspiration_image_url: modelUrl,
             category,
             idempotency_key: idempotencyKey,
+            aspect_ratio: aspectRatio,
+            resolution,
             ...(jewelryAssetId ? { input_jewelry_asset_id: jewelryAssetId } : {}),
             ...(selectedModel?.id ? { input_preset_inspiration_id: selectedModel.id }
                 : modelAssetId ? { input_inspiration_asset_id: modelAssetId } : {}),
@@ -231,18 +257,28 @@ export function useStudioGeneration({
             model_image_url: modelUrl,
             category,
             idempotency_key: idempotencyKey,
+            aspect_ratio: aspectRatio,
+            resolution,
             ...(jewelryAssetId ? { input_jewelry_asset_id: jewelryAssetId } : {}),
             ...(modelAssetId ? { input_model_asset_id: modelAssetId } : {}),
             ...(selectedModel?.id && !modelAssetId ? { input_preset_model_id: selectedModel.id } : {}),
           });
 
       const _workflowId = startResponse.workflow_id;
-      setGenerationInputUrlsMap(prev => ({ ...prev, [_workflowId]: { jewelryUrl, modelUrl } }));
+      setGenerationInputUrlsMap(prev => ({
+        ...prev,
+        [_workflowId]: { jewelryUrl, modelUrl, aspectRatio, resolution, generationCost },
+      }));
       setWorkflowId(_workflowId);
       trackGeneration({
         workflowId: _workflowId,
         isProductShot,
         jewelryType: TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType,
+        jewelryUrl,
+        modelUrl,
+        aspectRatio,
+        resolution,
+        generationCost,
       });
       markGenerationStarted(_workflowId);
       setCurrentStep('generating');
@@ -254,7 +290,8 @@ export function useStudioGeneration({
   }, [
     isSubmitting, jewelryImage, activeModelUrl, isProductShot, effectiveJewelryType,
     jewelryUploadedUrl, jewelryAssetId, selectedModel, customModelImage, modelAssetId,
-    checkCredits, toast, setCurrentStep, setJewelryAssetId, trackGeneration,
+    aspectRatio, resolution,
+    generationCost, checkCredits, toast, setCurrentStep, setJewelryAssetId, trackGeneration,
     clearStudioSession,
   ]);
 
@@ -263,13 +300,45 @@ export function useStudioGeneration({
     setCurrentStep('model');
   }, [setCurrentStep]);
 
-  const resumeGeneration = useCallback((id: string) => {
+  const resumeGeneration = useCallback((id: string, meta?: {
+    aspectRatio?: string;
+    resolution?: Resolution;
+    generationCost?: number | null;
+  }) => {
+    if (meta?.resolution || meta?.aspectRatio || meta?.generationCost !== undefined) {
+      setGenerationInputUrlsMap(prev => ({
+        ...prev,
+        [id]: {
+          jewelryUrl: prev[id]?.jewelryUrl,
+          modelUrl: prev[id]?.modelUrl,
+          aspectRatio: meta?.aspectRatio ?? prev[id]?.aspectRatio ?? '3:4',
+          resolution: meta?.resolution ?? prev[id]?.resolution ?? '1K',
+          generationCost: meta?.generationCost ?? prev[id]?.generationCost ?? null,
+        },
+      }));
+    }
     setWorkflowId(id);
     hasNavigatedAway.current = false;
     setCurrentStep('generating');
   }, [setCurrentStep]);
 
-  const restoreAsyncResult = useCallback((id: string, images: string[]) => {
+  const restoreAsyncResult = useCallback((id: string, images: string[], meta?: {
+    aspectRatio?: string;
+    resolution?: Resolution;
+    generationCost?: number | null;
+  }) => {
+    if (meta?.resolution || meta?.aspectRatio || meta?.generationCost !== undefined) {
+      setGenerationInputUrlsMap(prev => ({
+        ...prev,
+        [id]: {
+          jewelryUrl: prev[id]?.jewelryUrl,
+          modelUrl: prev[id]?.modelUrl,
+          aspectRatio: meta?.aspectRatio ?? prev[id]?.aspectRatio ?? '3:4',
+          resolution: meta?.resolution ?? prev[id]?.resolution ?? '1K',
+          generationCost: meta?.generationCost ?? prev[id]?.generationCost ?? null,
+        },
+      }));
+    }
     setWorkflowId(id);
     setResultImages(images);
     hasNavigatedAway.current = false;

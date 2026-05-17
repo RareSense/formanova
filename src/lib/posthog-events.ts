@@ -66,6 +66,8 @@ export interface GenerationCompleteProps {
   upload_type: string | null;
   duration_ms: number;
   is_first_ever: boolean;
+  aspect_ratio?: string;
+  resolution?: string;
 }
 
 export interface PaymentSuccessProps {

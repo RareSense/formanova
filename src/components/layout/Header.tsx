@@ -56,11 +56,26 @@ function GenerationIndicator() {
     if (!mostRecent) return;
     if (mostRecent.status === 'completed') {
       navigate(`/studio/${mostRecent.jewelryType}`, {
-        state: { asyncResult: { workflowId: mostRecent.workflowId, resultImages: mostRecent.resultImages } },
+        state: {
+          asyncResult: {
+            workflowId: mostRecent.workflowId,
+            resultImages: mostRecent.resultImages,
+            aspectRatio: mostRecent.aspectRatio,
+            resolution: mostRecent.resolution,
+            generationCost: mostRecent.generationCost,
+          },
+        },
       });
     } else {
       navigate(`/studio/${mostRecent.jewelryType}`, {
-        state: { viewGenerating: mostRecent.workflowId },
+        state: {
+          viewGenerating: {
+            workflowId: mostRecent.workflowId,
+            aspectRatio: mostRecent.aspectRatio,
+            resolution: mostRecent.resolution,
+            generationCost: mostRecent.generationCost,
+          },
+        },
       });
     }
   };

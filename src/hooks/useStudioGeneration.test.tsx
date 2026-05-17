@@ -80,14 +80,14 @@ function baseOptions() {
     selectedModel: { id: 'model-1', url: 'https://example.com/model.jpg', name: 'Model 1', label: 'Model 1', metadata: {} },
     customModelImage: null,
     modelAssetId: null,
-    validationResult: null,
+    aspectRatio: '3:4',
+    resolution: '1K' as const,
+    generationCost: 10,
     checkCredits: mockCheckCredits,
-    refreshCredits: mockRefreshCredits,
     toast: vi.fn(),
     setCurrentStep: mockSetCurrentStep,
     setJewelryAssetId: mockSetJewelryAssetId,
     clearStudioSession: mockClearStudioSession,
-    clearValidation: mockClearValidation,
   };
 }
 
@@ -112,6 +112,11 @@ describe('useStudioGeneration', () => {
       workflowId: 'wf-test-1',
       isProductShot: false,
       jewelryType: 'ring',
+      jewelryUrl: 'https://example.com/jewelry.jpg',
+      modelUrl: 'https://example.com/model.jpg',
+      aspectRatio: '3:4',
+      resolution: '1K',
+      generationCost: 10,
     });
     expect(mockMarkGenerationStarted).toHaveBeenCalledWith('wf-test-1');
     expect(mockSetCurrentStep).toHaveBeenCalledWith('generating');
@@ -124,7 +129,12 @@ describe('useStudioGeneration', () => {
     const completedGeneration: TrackedGeneration = {
       workflowId: 'wf-test-2', status: 'completed', progress: 100,
       generationStep: 'Done', resultImages: ['https://example.com/result.jpg'],
+      jewelryUrl: 'https://example.com/jewelry.jpg',
+      modelUrl: 'https://example.com/model.jpg',
       isProductShot: false, jewelryType: 'ring', startedAt: Date.now() - 30000,
+      aspectRatio: '3:4',
+      resolution: '1K',
+      generationCost: 10,
     };
 
     // Start with no generations, then simulate completion
@@ -159,7 +169,12 @@ describe('useStudioGeneration', () => {
     const failedGeneration: TrackedGeneration = {
       workflowId: 'wf-test-3', status: 'failed', progress: 0,
       generationStep: '', resultImages: [],
+      jewelryUrl: 'https://example.com/jewelry.jpg',
+      modelUrl: 'https://example.com/model.jpg',
       isProductShot: false, jewelryType: 'ring', startedAt: Date.now(),
+      aspectRatio: '3:4',
+      resolution: '1K',
+      generationCost: 10,
     };
 
     let ctxGenerations: TrackedGeneration[] = [];
@@ -185,7 +200,12 @@ describe('useStudioGeneration', () => {
     const runningGeneration: TrackedGeneration = {
       workflowId: 'wf-resume-1', status: 'running', progress: 40,
       generationStep: 'Processing', resultImages: [],
+      jewelryUrl: 'https://example.com/jewelry.jpg',
+      modelUrl: 'https://example.com/model.jpg',
       isProductShot: false, jewelryType: 'ring', startedAt: Date.now() - 5000,
+      aspectRatio: '3:4',
+      resolution: '1K',
+      generationCost: 10,
     };
 
     const ctx = makeContextValue({
@@ -224,6 +244,23 @@ describe('useStudioGeneration', () => {
     expect(result.current.resultImages).toEqual(['https://example.com/result-async.jpg']);
   });
 
+  it('restoreAsyncResult stores workflow-specific generation metadata', () => {
+    const ctx = makeContextValue();
+    const { result } = renderHook(() => useStudioGeneration(baseOptions()), { wrapper: wrapper(ctx) });
+
+    act(() => {
+      result.current.restoreAsyncResult('wf-async-2', ['https://example.com/result-async-2.jpg'], {
+        aspectRatio: '1:1',
+        resolution: '4K',
+        generationCost: 40,
+      });
+    });
+
+    expect(result.current.generationInputUrls?.aspectRatio).toBe('1:1');
+    expect(result.current.generationInputUrls?.resolution).toBe('4K');
+    expect(result.current.generationInputUrls?.generationCost).toBe(40);
+  });
+
   it('captures generationInputUrls from the URLs actually sent to startPhotoshoot', async () => {
     const ctx = makeContextValue();
     mockStartPhotoshoot.mockResolvedValue({ workflow_id: 'wf-inputs', status_url: '', result_url: '' });
@@ -237,6 +274,9 @@ describe('useStudioGeneration', () => {
     expect(result.current.generationInputUrls).toEqual({
       jewelryUrl: 'https://example.com/jewelry.jpg',
       modelUrl: 'https://example.com/model.jpg',
+      aspectRatio: '3:4',
+      resolution: '1K',
+      generationCost: 10,
     });
   });
 
@@ -274,6 +314,127 @@ describe('useStudioGeneration', () => {
     expect(result.current.generationInputUrls?.jewelryUrl).toBe('https://example.com/jewelry.jpg');
   });
 
+  it('keeps workflow-specific state when later generations complete before an earlier 4K workflow', async () => {
+    const modelA = { id: 'model-a', url: 'https://example.com/model-a.jpg', name: 'Model A', label: 'Model A', metadata: {} };
+    const modelB = { id: 'model-b', url: 'https://example.com/model-b.jpg', name: 'Model B', label: 'Model B', metadata: {} };
+    const modelC = { id: 'model-c', url: 'https://example.com/model-c.jpg', name: 'Model C', label: 'Model C', metadata: {} };
+    const modelD = { id: 'model-d', url: 'https://example.com/model-d.jpg', name: 'Model D', label: 'Model D', metadata: {} };
+
+    mockStartPhotoshoot
+      .mockResolvedValueOnce({ workflow_id: 'wf1', status_url: '', result_url: '' })
+      .mockResolvedValueOnce({ workflow_id: 'wf2', status_url: '', result_url: '' })
+      .mockResolvedValueOnce({ workflow_id: 'wf3', status_url: '', result_url: '' })
+      .mockResolvedValueOnce({ workflow_id: 'wf4', status_url: '', result_url: '' });
+
+    let ctxGenerations: TrackedGeneration[] = [];
+    const mockClearGeneration = vi.fn((workflowId: string) => {
+      ctxGenerations = ctxGenerations.filter(g => g.workflowId !== workflowId);
+    });
+    const ctx = makeContextValue({
+      get generations() { return ctxGenerations; },
+      trackGeneration: vi.fn(),
+      clearGeneration: mockClearGeneration,
+    });
+
+    let options = {
+      ...baseOptions(),
+      selectedModel: modelA,
+      activeModelUrl: modelA.url,
+      resolution: '4K' as const,
+      generationCost: 25,
+    };
+    const { result, rerender } = renderHook(() => useStudioGeneration(options), { wrapper: wrapper(ctx) });
+
+    await act(async () => { await result.current.handleGenerate(); });
+    expect(result.current.workflowId).toBe('wf1');
+    expect(result.current.generationInputUrls).toEqual({
+      jewelryUrl: 'https://example.com/jewelry.jpg',
+      modelUrl: 'https://example.com/model-a.jpg',
+      aspectRatio: '3:4',
+      resolution: '4K',
+      generationCost: 25,
+    });
+
+    act(() => { result.current.handleKeepBrowsing(); });
+
+    options = {
+      ...baseOptions(),
+      selectedModel: modelB,
+      activeModelUrl: modelB.url,
+      resolution: '1K' as const,
+      generationCost: 10,
+    };
+    rerender();
+    await act(async () => { await result.current.handleGenerate(); });
+    expect(result.current.workflowId).toBe('wf2');
+
+    act(() => { result.current.handleKeepBrowsing(); });
+
+    options = {
+      ...baseOptions(),
+      selectedModel: modelC,
+      activeModelUrl: modelC.url,
+      resolution: '2K' as const,
+      generationCost: 15,
+    };
+    rerender();
+    await act(async () => { await result.current.handleGenerate(); });
+    expect(result.current.workflowId).toBe('wf3');
+
+    act(() => { result.current.handleKeepBrowsing(); });
+
+    options = {
+      ...baseOptions(),
+      selectedModel: modelD,
+      activeModelUrl: modelD.url,
+      resolution: '1K' as const,
+      generationCost: 10,
+    };
+    rerender();
+    await act(async () => { await result.current.handleGenerate(); });
+    expect(result.current.workflowId).toBe('wf4');
+
+    ctxGenerations = [{
+      workflowId: 'wf4',
+      status: 'completed',
+      progress: 100,
+      generationStep: 'Done',
+      resultImages: ['https://example.com/result-wf4.jpg'],
+      jewelryUrl: 'https://example.com/jewelry.jpg',
+      modelUrl: 'https://example.com/model-d.jpg',
+      isProductShot: false,
+      jewelryType: 'ring',
+      startedAt: Date.now() - 40_000,
+      aspectRatio: '3:4',
+      resolution: '1K',
+      generationCost: 10,
+    }];
+    act(() => { rerender(); });
+
+    await waitFor(() => {
+      expect(result.current.resultImages).toEqual(['https://example.com/result-wf4.jpg']);
+    });
+    expect(result.current.workflowId).toBe('wf4');
+
+    act(() => {
+      result.current.restoreAsyncResult('wf1', ['https://example.com/result-wf1.jpg'], {
+        aspectRatio: '3:4',
+        resolution: '4K',
+        generationCost: 25,
+      });
+    });
+
+    expect(result.current.workflowId).toBe('wf1');
+    expect(result.current.resultImages).toEqual(['https://example.com/result-wf1.jpg']);
+    expect(result.current.generationInputUrls).toEqual({
+      jewelryUrl: 'https://example.com/jewelry.jpg',
+      modelUrl: 'https://example.com/model-a.jpg',
+      aspectRatio: '3:4',
+      resolution: '4K',
+      generationCost: 25,
+    });
+  });
+
   it('clears generationInputUrls on resetGeneration', async () => {
     const ctx = makeContextValue();
     mockStartPhotoshoot.mockResolvedValue({ workflow_id: 'wf-reset', status_url: '', result_url: '' });
@@ -293,7 +454,12 @@ describe('useStudioGeneration', () => {
     const completedGeneration: TrackedGeneration = {
       workflowId: 'wf-test-4', status: 'completed', progress: 100,
       generationStep: '', resultImages: ['https://example.com/r.jpg'],
+      jewelryUrl: 'https://example.com/jewelry.jpg',
+      modelUrl: 'https://example.com/model.jpg',
       isProductShot: false, jewelryType: 'ring', startedAt: Date.now() - 10000,
+      aspectRatio: '3:4',
+      resolution: '1K',
+      generationCost: 10,
     };
 
     let ctxGenerations: TrackedGeneration[] = [];

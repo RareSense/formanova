@@ -8,6 +8,14 @@ import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { markGenerationCompleted, markGenerationFailed } from '@/lib/generation-lifecycle';
 import { azureUriToUrl } from '@/lib/azure-utils';
 import type { PhotoshootResultResponse } from '@/lib/photoshoot-api';
+import type { Resolution } from '@/components/studio/OutputSettingsPills';
+import { getWorkflowDetails } from '@/lib/generation-history-api';
+import { extractPhotoThumbnail, extractProductShotThumbnail } from '@/lib/generation-enrichment';
+
+const STUDIO_RESULT_RETRY_DELAY_MS = 3000;
+// 4K workflows can reach "completed" before the result payload is readable.
+// Keep the status poll bounded separately and only extend this post-completion lag window.
+const STUDIO_RESULT_MAX_RETRIES = 100;
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -17,15 +25,25 @@ export interface TrackedGeneration {
   progress: number;
   generationStep: string;
   resultImages: string[];
+  jewelryUrl: string;
+  modelUrl: string;
   isProductShot: boolean;
   jewelryType: string;
   startedAt: number;
+  aspectRatio: string;
+  resolution: Resolution;
+  generationCost: number | null;
 }
 
 export interface TrackGenerationParams {
   workflowId: string;
   isProductShot: boolean;
   jewelryType: string;
+  jewelryUrl: string;
+  modelUrl: string;
+  aspectRatio: string;
+  resolution: Resolution;
+  generationCost: number | null;
 }
 
 export interface GenerationsContextValue {
@@ -40,27 +58,80 @@ export const GenerationsContext = createContext<GenerationsContextValue | null>(
 // ── Result extraction ────────────────────────────────────────────────────
 // Moved here from useStudioGeneration.ts (Phase 1 spec).
 
+function normalizeResultImage(value: string): string | null {
+  if (!value) return null;
+  if (value.startsWith('azure://')) return azureUriToUrl(value);
+  if (value.startsWith('http') || value.startsWith('data:') || value.startsWith('blob:')) return value;
+  return null;
+}
+
+function findNestedResultImage(item: unknown): string | null {
+  if (!item || typeof item !== 'object') return null;
+  if (Array.isArray(item)) {
+    for (const child of item) {
+      const found = findNestedResultImage(child);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  const record = item as Record<string, unknown>;
+
+  for (const candidate of ['output_url', 'image_url', 'result_url', 'url', 'uri']) {
+    const value = record[candidate];
+    if (typeof value !== 'string' || value.length === 0) continue;
+    const normalized = normalizeResultImage(value);
+    if (normalized) return normalized;
+  }
+
+  const b64 = record['image_b64'];
+  if (typeof b64 === 'string' && b64.length > 0) {
+    const mime = typeof record['mime_type'] === 'string' ? record['mime_type'] : 'image/jpeg';
+    return `data:${mime};base64,${b64}`;
+  }
+
+  for (const value of Object.values(record)) {
+    const found = findNestedResultImage(value);
+    if (found) return found;
+  }
+
+  return null;
+}
+
 function extractResultImages(result: PhotoshootResultResponse): string[] {
-  const images: string[] = [];
-  for (const key of Object.keys(result)) {
+  const preferredKeys = [
+    'output',
+    'generate',
+    'generate_image',
+    'generate_images',
+    'result',
+  ];
+  const orderedResultKeys = [
+    ...preferredKeys.filter(key => key in result),
+    ...Object.keys(result).filter(key => !preferredKeys.includes(key)),
+  ];
+
+  for (const key of orderedResultKeys) {
     const items = result[key];
     if (!Array.isArray(items)) continue;
     for (const item of items) {
-      if (!item || typeof item !== 'object') continue;
-      const obj = item as Record<string, unknown>;
-      for (const k of ['output_url', 'image_url', 'result_url', 'url', 'image_b64', 'output_image']) {
-        const val = obj[k];
-        if (typeof val === 'string' && val.length > 0) {
-          if (val.startsWith('azure://')) {
-            images.push(azureUriToUrl(val));
-          } else if (val.startsWith('http') || val.startsWith('data:')) {
-            images.push(val);
-          }
-        }
-      }
+      const found = findNestedResultImage(item);
+      if (found) return [found];
     }
   }
-  return images;
+
+  return [];
+}
+
+async function fallbackResultImagesFromHistory(
+  workflowId: string,
+  isProductShot: boolean,
+): Promise<string[]> {
+  const details = await getWorkflowDetails(workflowId);
+  const image = isProductShot
+    ? extractProductShotThumbnail(details.steps ?? [])
+    : extractPhotoThumbnail(details.steps ?? []);
+  return image ? [image] : [];
 }
 
 // ── Provider ─────────────────────────────────────────────────────────────
@@ -81,9 +152,14 @@ export function GenerationsContextProvider({ children }: { children: React.React
         progress: 35,
         generationStep: 'Generating photoshoot...',
         resultImages: [],
+        jewelryUrl: params.jewelryUrl,
+        modelUrl: params.modelUrl,
         isProductShot: params.isProductShot,
         jewelryType: params.jewelryType,
         startedAt: Date.now(),
+        aspectRatio: params.aspectRatio,
+        resolution: params.resolution,
+        generationCost: params.generationCost,
       },
     ]);
   }, []);
@@ -145,19 +221,73 @@ export function GenerationsContextProvider({ children }: { children: React.React
         timeoutMs: 720_000,
         max404s: Number.MAX_SAFE_INTEGER,
         maxPollErrors: 1,
-        maxResultRetries: 6,
-        resultRetryDelayMs: 1000,
+        maxResultRetries: STUDIO_RESULT_MAX_RETRIES,
+        resultRetryDelayMs: STUDIO_RESULT_RETRY_DELAY_MS,
         signal: ctrl.signal,
-      }).then(pollResult => {
+      }).then(async pollResult => {
         clearInterval(ticker);
         if (pollResult.status === 'cancelled') return;
 
         const result = pollResult.result;
-        const hasActivityError = Object.values(result).some(
-          (items) => Array.isArray(items) && items.some((i: any) => i?.action === 'error' || i?.status === 'failed')
-        );
+
+        // Extract images first — if we got output images the generation succeeded regardless
+        // of what other keys exist in the result (handles _2k/_4k workflows with different node names).
+        const resultImages = extractResultImages(result);
+
+        // Only check for activity errors when no images were produced.
+        // Prefer targeted key lookup; only fall back to scanning all values when those keys are absent.
+        const hasActivityError = resultImages.length === 0 && (() => {
+          const generateItems = (result['generate'] ?? result['generate_image'] ?? []) as unknown[];
+          if (Array.isArray(generateItems) && generateItems.length > 0) {
+            return generateItems.some((i: any) => i?.action === 'error' || i?.status === 'failed');
+          }
+          return Object.values(result).some(
+            (items) => Array.isArray(items) && items.some((i: any) => i?.action === 'error' || i?.status === 'failed')
+          );
+        })();
 
         if (hasActivityError) {
+          try {
+            const fallbackImages = await fallbackResultImagesFromHistory(gen.workflowId, gen.isProductShot);
+            if (fallbackImages.length > 0) {
+              const duration = Math.round((Date.now() - startTime) / 1000);
+              const label = gen.jewelryType.charAt(0).toUpperCase() + gen.jewelryType.slice(1);
+              setGenerations(prev => prev.map(g =>
+                g.workflowId === gen.workflowId
+                  ? { ...g, status: 'completed', progress: 100, resultImages: fallbackImages }
+                  : g
+              ));
+              markGenerationCompleted(gen.workflowId, startTime);
+              refreshCredits();
+              controllers.current.delete(gen.workflowId);
+              toast({
+                title: 'Your photoshoot is ready',
+                description: `${label} · ${duration}s`,
+                action: (
+                  <ToastAction
+                    altText="View Results"
+                    onClick={() => navigate(`/studio/${gen.jewelryType}`, {
+                      state: {
+                        asyncResult: {
+                          workflowId: gen.workflowId,
+                          resultImages: fallbackImages,
+                          aspectRatio: gen.aspectRatio,
+                          resolution: gen.resolution,
+                          generationCost: gen.generationCost,
+                        },
+                      },
+                    })}
+                  >
+                    View Results
+                  </ToastAction>
+                ),
+              });
+              return;
+            }
+          } catch {
+            // Fall through to the normal failure path below if history details do not help.
+          }
+
           setGenerations(prev => prev.map(g =>
             g.workflowId === gen.workflowId ? { ...g, status: 'failed' } : g
           ));
@@ -166,8 +296,6 @@ export function GenerationsContextProvider({ children }: { children: React.React
           toast({ variant: 'destructive', title: 'Generation failed', description: 'Try again from the studio' });
           return;
         }
-
-        const resultImages = extractResultImages(result);
         const duration = Math.round((Date.now() - startTime) / 1000);
         const label = gen.jewelryType.charAt(0).toUpperCase() + gen.jewelryType.slice(1);
 
@@ -187,16 +315,66 @@ export function GenerationsContextProvider({ children }: { children: React.React
             <ToastAction
               altText="View Results"
               onClick={() => navigate(`/studio/${gen.jewelryType}`, {
-                state: { asyncResult: { workflowId: gen.workflowId, resultImages } },
+                state: {
+                  asyncResult: {
+                    workflowId: gen.workflowId,
+                    resultImages,
+                    aspectRatio: gen.aspectRatio,
+                    resolution: gen.resolution,
+                    generationCost: gen.generationCost,
+                  },
+                },
               })}
             >
               View Results
             </ToastAction>
           ),
         });
-      }).catch(err => {
+      }).catch(async err => {
         clearInterval(ticker);
         if (err?.name === 'AbortError') return;
+
+        try {
+          const fallbackImages = await fallbackResultImagesFromHistory(gen.workflowId, gen.isProductShot);
+          if (fallbackImages.length > 0) {
+            const duration = Math.round((Date.now() - startTime) / 1000);
+            const label = gen.jewelryType.charAt(0).toUpperCase() + gen.jewelryType.slice(1);
+            setGenerations(prev => prev.map(g =>
+              g.workflowId === gen.workflowId
+                ? { ...g, status: 'completed', progress: 100, resultImages: fallbackImages }
+                : g
+            ));
+            markGenerationCompleted(gen.workflowId, startTime);
+            refreshCredits();
+            controllers.current.delete(gen.workflowId);
+            toast({
+              title: 'Your photoshoot is ready',
+              description: `${label} · ${duration}s`,
+              action: (
+                <ToastAction
+                  altText="View Results"
+                  onClick={() => navigate(`/studio/${gen.jewelryType}`, {
+                    state: {
+                      asyncResult: {
+                        workflowId: gen.workflowId,
+                        resultImages: fallbackImages,
+                        aspectRatio: gen.aspectRatio,
+                        resolution: gen.resolution,
+                        generationCost: gen.generationCost,
+                      },
+                    },
+                  })}
+                >
+                  View Results
+                </ToastAction>
+              ),
+            });
+            return;
+          }
+        } catch {
+          // Fall through to the normal failure path below if history details do not help.
+        }
+
         setGenerations(prev => prev.map(g =>
           g.workflowId === gen.workflowId ? { ...g, status: 'failed' } : g
         ));
