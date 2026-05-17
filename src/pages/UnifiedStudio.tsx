@@ -274,15 +274,41 @@ export default function UnifiedStudio() {
   // Handle result/resume navigation from toast or header indicator click
   useEffect(() => {
     const state = location.state as {
-      asyncResult?: { workflowId: string; resultImages: string[] };
-      viewGenerating?: string;
+      asyncResult?: {
+        workflowId: string;
+        resultImages: string[];
+        aspectRatio?: string;
+        resolution?: Resolution;
+        generationCost?: number | null;
+      };
+      viewGenerating?: string | {
+        workflowId: string;
+        aspectRatio?: string;
+        resolution?: Resolution;
+        generationCost?: number | null;
+      };
     } | null;
     if (!state?.asyncResult && !state?.viewGenerating) return;
     if (state.asyncResult) {
-      restoreAsyncResult(state.asyncResult.workflowId, state.asyncResult.resultImages);
+      if (state.asyncResult.aspectRatio) handleAspectRatioChange(state.asyncResult.aspectRatio);
+      if (state.asyncResult.resolution) handleResolutionChange(state.asyncResult.resolution);
+      restoreAsyncResult(state.asyncResult.workflowId, state.asyncResult.resultImages, {
+        aspectRatio: state.asyncResult.aspectRatio,
+        resolution: state.asyncResult.resolution,
+        generationCost: state.asyncResult.generationCost,
+      });
       setCurrentStep('results');
     } else if (state.viewGenerating) {
-      resumeGeneration(state.viewGenerating);
+      const viewGenerating = typeof state.viewGenerating === 'string'
+        ? { workflowId: state.viewGenerating }
+        : state.viewGenerating;
+      if (viewGenerating.aspectRatio) handleAspectRatioChange(viewGenerating.aspectRatio);
+      if (viewGenerating.resolution) handleResolutionChange(viewGenerating.resolution);
+      resumeGeneration(viewGenerating.workflowId, {
+        aspectRatio: viewGenerating.aspectRatio,
+        resolution: viewGenerating.resolution,
+        generationCost: viewGenerating.generationCost,
+      });
     }
     // Clear route state so a refresh doesn't re-apply
     navigate(location.pathname, { replace: true, state: null });
@@ -423,12 +449,17 @@ export default function UnifiedStudio() {
     modelAssetId,
     aspectRatio,
     resolution,
+    generationCost,
     checkCredits,
     toast,
     setCurrentStep,
     setJewelryAssetId,
     clearStudioSession,
   });
+  const generatingJewelryImage = generationInputUrls?.jewelryUrl ?? jewelryImage;
+  const generatingActiveModelUrl = generationInputUrls?.modelUrl ?? activeModelUrl;
+  const resolvedGeneratingJewelryImage = useAuthenticatedImage(generatingJewelryImage);
+  const resolvedGeneratingActiveModelUrl = useAuthenticatedImage(generatingActiveModelUrl);
 
   // Paste handler — supports jewelry upload (step 1) AND model upload (step 2 empty state)
   useEffect(() => {
@@ -582,10 +613,10 @@ export default function UnifiedStudio() {
             generationStep={generationStep}
             generationProgress={generationProgress}
             rotatingMsgIdx={rotatingMsgIdx}
-            jewelryImage={jewelryImage}
-            resolvedJewelryImage={resolvedJewelryImage}
-            activeModelUrl={activeModelUrl}
-            resolvedActiveModelUrl={resolvedActiveModelUrl}
+            jewelryImage={generatingJewelryImage}
+            resolvedJewelryImage={resolvedGeneratingJewelryImage}
+            activeModelUrl={generatingActiveModelUrl}
+            resolvedActiveModelUrl={resolvedGeneratingActiveModelUrl}
             generationError={generationError}
             handleStartOver={handleStartOver}
             onKeepBrowsing={handleKeepBrowsing}
@@ -614,7 +645,7 @@ export default function UnifiedStudio() {
             jewelryImage={jewelryImage}
             activeModelUrl={generationInputUrls?.modelUrl ?? activeModelUrl}
             userEmail={user?.email}
-            generationCost={generationCost}
+            generationCost={generationInputUrls?.generationCost ?? generationCost}
           />
         )}
       </div>

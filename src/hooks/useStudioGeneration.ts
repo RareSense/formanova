@@ -78,6 +78,7 @@ interface UseStudioGenerationOptions {
   modelAssetId: string | null;
   aspectRatio: string;
   resolution: Resolution;
+  generationCost: number | null;
   checkCredits: (tool: string) => Promise<boolean>;
   toast: ReturnType<typeof useToast>['toast'];
   setCurrentStep: (step: StudioStep) => void;
@@ -97,6 +98,7 @@ export function useStudioGeneration({
   modelAssetId,
   aspectRatio,
   resolution,
+  generationCost,
   checkCredits,
   toast,
   setCurrentStep,
@@ -111,7 +113,13 @@ export function useStudioGeneration({
   const [regenerationCount, setRegenerationCount] = useState(0);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [generationInputUrlsMap, setGenerationInputUrlsMap] = useState<
-    Record<string, { jewelryUrl: string; modelUrl: string }>
+    Record<string, {
+      jewelryUrl?: string;
+      modelUrl?: string;
+      aspectRatio: string;
+      resolution: Resolution;
+      generationCost: number | null;
+    }>
   >({});
 
   const { generations, trackGeneration, clearGeneration } = useGenerations();
@@ -121,7 +129,13 @@ export function useStudioGeneration({
   const generationProgress = myGeneration?.progress ?? 0;
   const generationStep = myGeneration?.generationStep ?? '';
   const hasNavigatedAway = useRef(false);
-  const generationInputUrls = workflowId ? (generationInputUrlsMap[workflowId] ?? null) : null;
+  const generationInputUrls = workflowId ? ({
+    jewelryUrl: generationInputUrlsMap[workflowId]?.jewelryUrl ?? myGeneration?.jewelryUrl,
+    modelUrl: generationInputUrlsMap[workflowId]?.modelUrl ?? myGeneration?.modelUrl,
+    aspectRatio: generationInputUrlsMap[workflowId]?.aspectRatio ?? myGeneration?.aspectRatio ?? '3:4',
+    resolution: generationInputUrlsMap[workflowId]?.resolution ?? myGeneration?.resolution ?? '1K',
+    generationCost: generationInputUrlsMap[workflowId]?.generationCost ?? myGeneration?.generationCost ?? null,
+  }) : null;
 
   // Cycle rotating messages every 4s while generating
   useEffect(() => {
@@ -251,12 +265,20 @@ export function useStudioGeneration({
           });
 
       const _workflowId = startResponse.workflow_id;
-      setGenerationInputUrlsMap(prev => ({ ...prev, [_workflowId]: { jewelryUrl, modelUrl } }));
+      setGenerationInputUrlsMap(prev => ({
+        ...prev,
+        [_workflowId]: { jewelryUrl, modelUrl, aspectRatio, resolution, generationCost },
+      }));
       setWorkflowId(_workflowId);
       trackGeneration({
         workflowId: _workflowId,
         isProductShot,
         jewelryType: TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType,
+        jewelryUrl,
+        modelUrl,
+        aspectRatio,
+        resolution,
+        generationCost,
       });
       markGenerationStarted(_workflowId);
       setCurrentStep('generating');
@@ -269,7 +291,7 @@ export function useStudioGeneration({
     isSubmitting, jewelryImage, activeModelUrl, isProductShot, effectiveJewelryType,
     jewelryUploadedUrl, jewelryAssetId, selectedModel, customModelImage, modelAssetId,
     aspectRatio, resolution,
-    checkCredits, toast, setCurrentStep, setJewelryAssetId, trackGeneration,
+    generationCost, checkCredits, toast, setCurrentStep, setJewelryAssetId, trackGeneration,
     clearStudioSession,
   ]);
 
@@ -278,13 +300,45 @@ export function useStudioGeneration({
     setCurrentStep('model');
   }, [setCurrentStep]);
 
-  const resumeGeneration = useCallback((id: string) => {
+  const resumeGeneration = useCallback((id: string, meta?: {
+    aspectRatio?: string;
+    resolution?: Resolution;
+    generationCost?: number | null;
+  }) => {
+    if (meta?.resolution || meta?.aspectRatio || meta?.generationCost !== undefined) {
+      setGenerationInputUrlsMap(prev => ({
+        ...prev,
+        [id]: {
+          jewelryUrl: prev[id]?.jewelryUrl,
+          modelUrl: prev[id]?.modelUrl,
+          aspectRatio: meta?.aspectRatio ?? prev[id]?.aspectRatio ?? '3:4',
+          resolution: meta?.resolution ?? prev[id]?.resolution ?? '1K',
+          generationCost: meta?.generationCost ?? prev[id]?.generationCost ?? null,
+        },
+      }));
+    }
     setWorkflowId(id);
     hasNavigatedAway.current = false;
     setCurrentStep('generating');
   }, [setCurrentStep]);
 
-  const restoreAsyncResult = useCallback((id: string, images: string[]) => {
+  const restoreAsyncResult = useCallback((id: string, images: string[], meta?: {
+    aspectRatio?: string;
+    resolution?: Resolution;
+    generationCost?: number | null;
+  }) => {
+    if (meta?.resolution || meta?.aspectRatio || meta?.generationCost !== undefined) {
+      setGenerationInputUrlsMap(prev => ({
+        ...prev,
+        [id]: {
+          jewelryUrl: prev[id]?.jewelryUrl,
+          modelUrl: prev[id]?.modelUrl,
+          aspectRatio: meta?.aspectRatio ?? prev[id]?.aspectRatio ?? '3:4',
+          resolution: meta?.resolution ?? prev[id]?.resolution ?? '1K',
+          generationCost: meta?.generationCost ?? prev[id]?.generationCost ?? null,
+        },
+      }));
+    }
     setWorkflowId(id);
     setResultImages(images);
     hasNavigatedAway.current = false;

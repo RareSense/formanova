@@ -8,6 +8,7 @@ import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { markGenerationCompleted, markGenerationFailed } from '@/lib/generation-lifecycle';
 import { azureUriToUrl } from '@/lib/azure-utils';
 import type { PhotoshootResultResponse } from '@/lib/photoshoot-api';
+import type { Resolution } from '@/components/studio/OutputSettingsPills';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -17,15 +18,25 @@ export interface TrackedGeneration {
   progress: number;
   generationStep: string;
   resultImages: string[];
+  jewelryUrl: string;
+  modelUrl: string;
   isProductShot: boolean;
   jewelryType: string;
   startedAt: number;
+  aspectRatio: string;
+  resolution: Resolution;
+  generationCost: number | null;
 }
 
 export interface TrackGenerationParams {
   workflowId: string;
   isProductShot: boolean;
   jewelryType: string;
+  jewelryUrl: string;
+  modelUrl: string;
+  aspectRatio: string;
+  resolution: Resolution;
+  generationCost: number | null;
 }
 
 export interface GenerationsContextValue {
@@ -95,9 +106,14 @@ export function GenerationsContextProvider({ children }: { children: React.React
         progress: 35,
         generationStep: 'Generating photoshoot...',
         resultImages: [],
+        jewelryUrl: params.jewelryUrl,
+        modelUrl: params.modelUrl,
         isProductShot: params.isProductShot,
         jewelryType: params.jewelryType,
         startedAt: Date.now(),
+        aspectRatio: params.aspectRatio,
+        resolution: params.resolution,
+        generationCost: params.generationCost,
       },
     ]);
   }, []);
@@ -212,7 +228,15 @@ export function GenerationsContextProvider({ children }: { children: React.React
             <ToastAction
               altText="View Results"
               onClick={() => navigate(`/studio/${gen.jewelryType}`, {
-                state: { asyncResult: { workflowId: gen.workflowId, resultImages } },
+                state: {
+                  asyncResult: {
+                    workflowId: gen.workflowId,
+                    resultImages,
+                    aspectRatio: gen.aspectRatio,
+                    resolution: gen.resolution,
+                    generationCost: gen.generationCost,
+                  },
+                },
               })}
             >
               View Results

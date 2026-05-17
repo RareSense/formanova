@@ -82,6 +82,7 @@ function baseOptions() {
     modelAssetId: null,
     aspectRatio: '3:4',
     resolution: '1K' as const,
+    generationCost: 10,
     checkCredits: mockCheckCredits,
     toast: vi.fn(),
     setCurrentStep: mockSetCurrentStep,
@@ -111,6 +112,11 @@ describe('useStudioGeneration', () => {
       workflowId: 'wf-test-1',
       isProductShot: false,
       jewelryType: 'ring',
+      jewelryUrl: 'https://example.com/jewelry.jpg',
+      modelUrl: 'https://example.com/model.jpg',
+      aspectRatio: '3:4',
+      resolution: '1K',
+      generationCost: 10,
     });
     expect(mockMarkGenerationStarted).toHaveBeenCalledWith('wf-test-1');
     expect(mockSetCurrentStep).toHaveBeenCalledWith('generating');
@@ -123,7 +129,12 @@ describe('useStudioGeneration', () => {
     const completedGeneration: TrackedGeneration = {
       workflowId: 'wf-test-2', status: 'completed', progress: 100,
       generationStep: 'Done', resultImages: ['https://example.com/result.jpg'],
+      jewelryUrl: 'https://example.com/jewelry.jpg',
+      modelUrl: 'https://example.com/model.jpg',
       isProductShot: false, jewelryType: 'ring', startedAt: Date.now() - 30000,
+      aspectRatio: '3:4',
+      resolution: '1K',
+      generationCost: 10,
     };
 
     // Start with no generations, then simulate completion
@@ -158,7 +169,12 @@ describe('useStudioGeneration', () => {
     const failedGeneration: TrackedGeneration = {
       workflowId: 'wf-test-3', status: 'failed', progress: 0,
       generationStep: '', resultImages: [],
+      jewelryUrl: 'https://example.com/jewelry.jpg',
+      modelUrl: 'https://example.com/model.jpg',
       isProductShot: false, jewelryType: 'ring', startedAt: Date.now(),
+      aspectRatio: '3:4',
+      resolution: '1K',
+      generationCost: 10,
     };
 
     let ctxGenerations: TrackedGeneration[] = [];
@@ -184,7 +200,12 @@ describe('useStudioGeneration', () => {
     const runningGeneration: TrackedGeneration = {
       workflowId: 'wf-resume-1', status: 'running', progress: 40,
       generationStep: 'Processing', resultImages: [],
+      jewelryUrl: 'https://example.com/jewelry.jpg',
+      modelUrl: 'https://example.com/model.jpg',
       isProductShot: false, jewelryType: 'ring', startedAt: Date.now() - 5000,
+      aspectRatio: '3:4',
+      resolution: '1K',
+      generationCost: 10,
     };
 
     const ctx = makeContextValue({
@@ -223,6 +244,23 @@ describe('useStudioGeneration', () => {
     expect(result.current.resultImages).toEqual(['https://example.com/result-async.jpg']);
   });
 
+  it('restoreAsyncResult stores workflow-specific generation metadata', () => {
+    const ctx = makeContextValue();
+    const { result } = renderHook(() => useStudioGeneration(baseOptions()), { wrapper: wrapper(ctx) });
+
+    act(() => {
+      result.current.restoreAsyncResult('wf-async-2', ['https://example.com/result-async-2.jpg'], {
+        aspectRatio: '1:1',
+        resolution: '4K',
+        generationCost: 40,
+      });
+    });
+
+    expect(result.current.generationInputUrls?.aspectRatio).toBe('1:1');
+    expect(result.current.generationInputUrls?.resolution).toBe('4K');
+    expect(result.current.generationInputUrls?.generationCost).toBe(40);
+  });
+
   it('captures generationInputUrls from the URLs actually sent to startPhotoshoot', async () => {
     const ctx = makeContextValue();
     mockStartPhotoshoot.mockResolvedValue({ workflow_id: 'wf-inputs', status_url: '', result_url: '' });
@@ -236,6 +274,9 @@ describe('useStudioGeneration', () => {
     expect(result.current.generationInputUrls).toEqual({
       jewelryUrl: 'https://example.com/jewelry.jpg',
       modelUrl: 'https://example.com/model.jpg',
+      aspectRatio: '3:4',
+      resolution: '1K',
+      generationCost: 10,
     });
   });
 
@@ -292,7 +333,12 @@ describe('useStudioGeneration', () => {
     const completedGeneration: TrackedGeneration = {
       workflowId: 'wf-test-4', status: 'completed', progress: 100,
       generationStep: '', resultImages: ['https://example.com/r.jpg'],
+      jewelryUrl: 'https://example.com/jewelry.jpg',
+      modelUrl: 'https://example.com/model.jpg',
       isProductShot: false, jewelryType: 'ring', startedAt: Date.now() - 10000,
+      aspectRatio: '3:4',
+      resolution: '1K',
+      generationCost: 10,
     };
 
     let ctxGenerations: TrackedGeneration[] = [];

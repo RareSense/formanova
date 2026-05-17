@@ -41,7 +41,16 @@ describe('GenerationsContext', () => {
   it('appends a running generation when trackGeneration is called', () => {
     const { result } = renderHook(() => useGenerations(), { wrapper });
     act(() => {
-      result.current.trackGeneration({ workflowId: 'wf-1', isProductShot: false, jewelryType: 'ring' });
+      result.current.trackGeneration({
+        workflowId: 'wf-1',
+        isProductShot: false,
+        jewelryType: 'ring',
+        jewelryUrl: 'https://example.com/jewelry.jpg',
+        modelUrl: 'https://example.com/model.jpg',
+        aspectRatio: '3:4',
+        resolution: '1K',
+        generationCost: 10,
+      });
     });
     expect(result.current.generations).toHaveLength(1);
     expect(result.current.generations[0]).toMatchObject({ workflowId: 'wf-1', status: 'running' });
@@ -50,7 +59,16 @@ describe('GenerationsContext', () => {
   it('starts pollWorkflow when a generation is tracked', async () => {
     const { result } = renderHook(() => useGenerations(), { wrapper });
     act(() => {
-      result.current.trackGeneration({ workflowId: 'wf-2', isProductShot: false, jewelryType: 'necklace' });
+      result.current.trackGeneration({
+        workflowId: 'wf-2',
+        isProductShot: false,
+        jewelryType: 'necklace',
+        jewelryUrl: 'https://example.com/jewelry.jpg',
+        modelUrl: 'https://example.com/model.jpg',
+        aspectRatio: '3:4',
+        resolution: '1K',
+        generationCost: 10,
+      });
     });
     await waitFor(() => expect(mockPollWorkflow).toHaveBeenCalledOnce());
     expect(mockPollWorkflow).toHaveBeenCalledWith(expect.objectContaining({
@@ -64,8 +82,8 @@ describe('GenerationsContext', () => {
   it('allows concurrent generations (unbounded queue)', () => {
     const { result } = renderHook(() => useGenerations(), { wrapper });
     act(() => {
-      result.current.trackGeneration({ workflowId: 'wf-a', isProductShot: false, jewelryType: 'ring' });
-      result.current.trackGeneration({ workflowId: 'wf-b', isProductShot: true, jewelryType: 'necklace' });
+      result.current.trackGeneration({ workflowId: 'wf-a', isProductShot: false, jewelryType: 'ring', jewelryUrl: 'https://example.com/jewelry-a.jpg', modelUrl: 'https://example.com/model-a.jpg', aspectRatio: '3:4', resolution: '1K', generationCost: 10 });
+      result.current.trackGeneration({ workflowId: 'wf-b', isProductShot: true, jewelryType: 'necklace', jewelryUrl: 'https://example.com/jewelry-b.jpg', modelUrl: 'https://example.com/model-b.jpg', aspectRatio: '1:1', resolution: '2K', generationCost: 20 });
     });
     expect(result.current.generations).toHaveLength(2);
   });
@@ -76,7 +94,7 @@ describe('GenerationsContext', () => {
 
     const { result } = renderHook(() => useGenerations(), { wrapper });
     act(() => {
-      result.current.trackGeneration({ workflowId: 'wf-3', isProductShot: false, jewelryType: 'ring' });
+      result.current.trackGeneration({ workflowId: 'wf-3', isProductShot: false, jewelryType: 'ring', jewelryUrl: 'https://example.com/jewelry.jpg', modelUrl: 'https://example.com/model.jpg', aspectRatio: '3:4', resolution: '1K', generationCost: 10 });
     });
 
     await waitFor(() => {
@@ -98,7 +116,7 @@ describe('GenerationsContext', () => {
 
     const { result } = renderHook(() => useGenerations(), { wrapper });
     act(() => {
-      result.current.trackGeneration({ workflowId: 'wf-dup', isProductShot: false, jewelryType: 'ring' });
+      result.current.trackGeneration({ workflowId: 'wf-dup', isProductShot: false, jewelryType: 'ring', jewelryUrl: 'https://example.com/jewelry.jpg', modelUrl: 'https://example.com/model.jpg', aspectRatio: '3:4', resolution: '1K', generationCost: 10 });
     });
 
     await waitFor(() => {
@@ -122,7 +140,7 @@ describe('GenerationsContext', () => {
 
     const { result } = renderHook(() => useGenerations(), { wrapper });
     act(() => {
-      result.current.trackGeneration({ workflowId: 'wf-one-only', isProductShot: false, jewelryType: 'ring' });
+      result.current.trackGeneration({ workflowId: 'wf-one-only', isProductShot: false, jewelryType: 'ring', jewelryUrl: 'https://example.com/jewelry.jpg', modelUrl: 'https://example.com/model.jpg', aspectRatio: '3:4', resolution: '1K', generationCost: 10 });
     });
 
     await waitFor(() => {
@@ -137,7 +155,7 @@ describe('GenerationsContext', () => {
 
     const { result } = renderHook(() => useGenerations(), { wrapper });
     act(() => {
-      result.current.trackGeneration({ workflowId: 'wf-4', isProductShot: false, jewelryType: 'ring' });
+      result.current.trackGeneration({ workflowId: 'wf-4', isProductShot: false, jewelryType: 'ring', jewelryUrl: 'https://example.com/jewelry.jpg', modelUrl: 'https://example.com/model.jpg', aspectRatio: '3:4', resolution: '1K', generationCost: 10 });
     });
 
     await waitFor(() => {
@@ -150,7 +168,7 @@ describe('GenerationsContext', () => {
   it('removes generation and aborts poll when clearGeneration is called', async () => {
     const { result } = renderHook(() => useGenerations(), { wrapper });
     act(() => {
-      result.current.trackGeneration({ workflowId: 'wf-5', isProductShot: false, jewelryType: 'ring' });
+      result.current.trackGeneration({ workflowId: 'wf-5', isProductShot: false, jewelryType: 'ring', jewelryUrl: 'https://example.com/jewelry.jpg', modelUrl: 'https://example.com/model.jpg', aspectRatio: '3:4', resolution: '1K', generationCost: 10 });
     });
     await waitFor(() => expect(mockPollWorkflow).toHaveBeenCalledOnce());
 
@@ -171,6 +189,11 @@ describe('GenerationsContext', () => {
         workflowId: 'wf-6',
         isProductShot: false,
         jewelryType: 'ring',
+        jewelryUrl: 'https://example.com/jewelry.jpg',
+        modelUrl: 'https://example.com/model.jpg',
+        aspectRatio: '3:4',
+        resolution: '1K',
+        generationCost: 10,
       });
     });
 

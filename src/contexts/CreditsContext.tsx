@@ -17,6 +17,7 @@ interface CreditsContextType {
 }
 
 const CreditsContext = createContext<CreditsContextType | undefined>(undefined);
+const CREDITS_REFRESH_INTERVAL_MS = 15_000;
 
 let deltaCounter = 0;
 
@@ -74,6 +75,29 @@ export function CreditsProvider({ children }: { children: React.ReactNode }) {
     } else {
       setCredits(null);
     }
+  }, [user?.id, refreshCredits]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const refreshIfVisible = () => {
+      if (document.visibilityState === 'visible') {
+        refreshCredits().catch(() => {});
+      }
+    };
+
+    const intervalId = window.setInterval(() => {
+      refreshIfVisible();
+    }, CREDITS_REFRESH_INTERVAL_MS);
+
+    window.addEventListener('focus', refreshIfVisible);
+    document.addEventListener('visibilitychange', refreshIfVisible);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', refreshIfVisible);
+      document.removeEventListener('visibilitychange', refreshIfVisible);
+    };
   }, [user?.id, refreshCredits]);
 
   return (
