@@ -150,6 +150,61 @@ describe('GenerationsContext', () => {
     });
   });
 
+  it('treats a nested output image object as a successful result', async () => {
+    const resultData = {
+      output: [
+        {
+          output_image: {
+            uri: 'azure://container/path/nested.png',
+          },
+        },
+      ],
+      generate: [
+        { action: 'error' },
+      ],
+    };
+    mockPollWorkflow.mockResolvedValueOnce({ status: 'completed', result: resultData });
+
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    act(() => {
+      result.current.trackGeneration({ workflowId: 'wf-nested', isProductShot: true, jewelryType: 'ring', jewelryUrl: 'https://example.com/jewelry.jpg', modelUrl: 'https://example.com/model.jpg', aspectRatio: '1:1', resolution: '2K', generationCost: 20 });
+    });
+
+    await waitFor(() => {
+      const gen = result.current.generations.find(g => g.workflowId === 'wf-nested');
+      expect(gen?.status).toBe('completed');
+      expect(gen?.resultImages).toEqual(['https://cdn.example.com/container/path/nested.png']);
+    });
+  });
+
+  it('keeps scanning later keys when earlier arrays have no direct image fields', async () => {
+    const resultData = {
+      generate: [
+        { status: 'ok', detail: 'finished without direct output_url' },
+      ],
+      result: [
+        {
+          nested: {
+            image_b64: 'abc123',
+            mime_type: 'image/png',
+          },
+        },
+      ],
+    };
+    mockPollWorkflow.mockResolvedValueOnce({ status: 'completed', result: resultData });
+
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    act(() => {
+      result.current.trackGeneration({ workflowId: 'wf-late-key', isProductShot: false, jewelryType: 'ring', jewelryUrl: 'https://example.com/jewelry.jpg', modelUrl: 'https://example.com/model.jpg', aspectRatio: '3:4', resolution: '4K', generationCost: 25 });
+    });
+
+    await waitFor(() => {
+      const gen = result.current.generations.find(g => g.workflowId === 'wf-late-key');
+      expect(gen?.status).toBe('completed');
+      expect(gen?.resultImages).toEqual(['data:image/png;base64,abc123']);
+    });
+  });
+
   it('transitions to failed when poll rejects', async () => {
     mockPollWorkflow.mockRejectedValueOnce(new Error('timeout'));
 

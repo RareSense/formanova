@@ -51,6 +51,46 @@ export const GenerationsContext = createContext<GenerationsContextValue | null>(
 // ── Result extraction ────────────────────────────────────────────────────
 // Moved here from useStudioGeneration.ts (Phase 1 spec).
 
+function normalizeResultImage(value: string): string | null {
+  if (!value) return null;
+  if (value.startsWith('azure://')) return azureUriToUrl(value);
+  if (value.startsWith('http') || value.startsWith('data:') || value.startsWith('blob:')) return value;
+  return null;
+}
+
+function findNestedResultImage(item: unknown): string | null {
+  if (!item || typeof item !== 'object') return null;
+  if (Array.isArray(item)) {
+    for (const child of item) {
+      const found = findNestedResultImage(child);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  const record = item as Record<string, unknown>;
+
+  for (const candidate of ['output_url', 'image_url', 'result_url', 'url', 'uri']) {
+    const value = record[candidate];
+    if (typeof value !== 'string' || value.length === 0) continue;
+    const normalized = normalizeResultImage(value);
+    if (normalized) return normalized;
+  }
+
+  const b64 = record['image_b64'];
+  if (typeof b64 === 'string' && b64.length > 0) {
+    const mime = typeof record['mime_type'] === 'string' ? record['mime_type'] : 'image/jpeg';
+    return `data:${mime};base64,${b64}`;
+  }
+
+  for (const value of Object.values(record)) {
+    const found = findNestedResultImage(value);
+    if (found) return found;
+  }
+
+  return null;
+}
+
 function extractResultImages(result: PhotoshootResultResponse): string[] {
   const preferredKeys = [
     'output',
@@ -68,20 +108,8 @@ function extractResultImages(result: PhotoshootResultResponse): string[] {
     const items = result[key];
     if (!Array.isArray(items)) continue;
     for (const item of items) {
-      if (!item || typeof item !== 'object') continue;
-      const obj = item as Record<string, unknown>;
-      for (const candidate of ['output_url', 'image_url', 'result_url', 'url', 'output_image']) {
-        const val = obj[candidate];
-        if (typeof val !== 'string' || val.length === 0) continue;
-        if (val.startsWith('azure://')) return [azureUriToUrl(val)];
-        if (val.startsWith('http') || val.startsWith('data:')) return [val];
-      }
-
-      const b64 = obj['image_b64'];
-      if (typeof b64 === 'string' && b64.length > 0) {
-        const mime = typeof obj['mime_type'] === 'string' ? obj['mime_type'] : 'image/jpeg';
-        return [`data:${mime};base64,${b64}`];
-      }
+      const found = findNestedResultImage(item);
+      if (found) return [found];
     }
   }
 
