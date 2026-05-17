@@ -20,16 +20,12 @@ export interface TrackedGeneration {
   isProductShot: boolean;
   jewelryType: string;
   startedAt: number;
-  statusUrl: string;
-  resultUrl: string;
 }
 
 export interface TrackGenerationParams {
   workflowId: string;
   isProductShot: boolean;
   jewelryType: string;
-  statusUrl: string;
-  resultUrl: string;
 }
 
 export interface GenerationsContextValue {
@@ -102,8 +98,6 @@ export function GenerationsContextProvider({ children }: { children: React.React
         isProductShot: params.isProductShot,
         jewelryType: params.jewelryType,
         startedAt: Date.now(),
-        statusUrl: params.statusUrl,
-        resultUrl: params.resultUrl,
       },
     ]);
   }, []);
@@ -164,7 +158,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
         intervalMs: 3000,
         timeoutMs: 720_000,
         max404s: Number.MAX_SAFE_INTEGER,
-        maxPollErrors: 10,
+        maxPollErrors: 1,
         maxResultRetries: 6,
         resultRetryDelayMs: 1000,
         signal: ctrl.signal,

@@ -80,14 +80,13 @@ function baseOptions() {
     selectedModel: { id: 'model-1', url: 'https://example.com/model.jpg', name: 'Model 1', label: 'Model 1', metadata: {} },
     customModelImage: null,
     modelAssetId: null,
-    validationResult: null,
+    aspectRatio: '3:4',
+    resolution: '1K' as const,
     checkCredits: mockCheckCredits,
-    refreshCredits: mockRefreshCredits,
     toast: vi.fn(),
     setCurrentStep: mockSetCurrentStep,
     setJewelryAssetId: mockSetJewelryAssetId,
     clearStudioSession: mockClearStudioSession,
-    clearValidation: mockClearValidation,
   };
 }
 
