@@ -191,7 +191,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
         maxResultRetries: 6,
         resultRetryDelayMs: 1000,
         signal: ctrl.signal,
-      }).then(pollResult => {
+      }).then(async pollResult => {
         clearInterval(ticker);
         if (pollResult.status === 'cancelled') return;
 
