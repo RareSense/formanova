@@ -14,13 +14,23 @@ vi.mock('@/lib/generation-lifecycle', () => ({
   markGenerationFailed: vi.fn(),
 }));
 vi.mock('@/lib/azure-utils', () => ({ azureUriToUrl: (v: string) => v.replace('azure://', 'https://cdn.example.com/') }));
+vi.mock('@/lib/generation-history-api', () => ({ getWorkflowDetails: vi.fn() }));
+vi.mock('@/lib/generation-enrichment', () => ({
+  extractPhotoThumbnail: vi.fn(),
+  extractProductShotThumbnail: vi.fn(),
+}));
 
 import { pollWorkflow } from '@/lib/poll-workflow';
 import { markGenerationCompleted, markGenerationFailed } from '@/lib/generation-lifecycle';
+import { getWorkflowDetails } from '@/lib/generation-history-api';
+import { extractPhotoThumbnail, extractProductShotThumbnail } from '@/lib/generation-enrichment';
 
 const mockPollWorkflow = vi.mocked(pollWorkflow);
 const mockMarkCompleted = vi.mocked(markGenerationCompleted);
 const mockMarkFailed = vi.mocked(markGenerationFailed);
+const mockGetWorkflowDetails = vi.mocked(getWorkflowDetails);
+const mockExtractPhotoThumbnail = vi.mocked(extractPhotoThumbnail);
+const mockExtractProductShotThumbnail = vi.mocked(extractProductShotThumbnail);
 
 function wrapper({ children }: { children: React.ReactNode }) {
   return <MemoryRouter><GenerationsContextProvider>{children}</GenerationsContextProvider></MemoryRouter>;
@@ -31,6 +41,9 @@ describe('GenerationsContext', () => {
     vi.clearAllMocks();
     // Default: never resolves (long-running generation)
     mockPollWorkflow.mockReturnValue(new Promise(() => {}));
+    mockGetWorkflowDetails.mockResolvedValue({ summary: { id: 'wf', name: '', status: 'completed', created_at: '', finished_at: null }, steps: [] });
+    mockExtractPhotoThumbnail.mockReturnValue(null);
+    mockExtractProductShotThumbnail.mockReturnValue(null);
   });
 
   it('starts with empty generations array', () => {
@@ -76,7 +89,7 @@ describe('GenerationsContext', () => {
       intervalMs: 3000,
       timeoutMs: 720_000,
       maxPollErrors: 1,
-      maxResultRetries: 30,
+      maxResultRetries: 100,
       resultRetryDelayMs: 3000,
     }));
   });
@@ -220,6 +233,45 @@ describe('GenerationsContext', () => {
       expect(gen?.status).toBe('failed');
     });
     expect(mockMarkFailed).toHaveBeenCalledWith('wf-4', expect.any(String), expect.any(Number));
+  });
+
+  it('uses history details fallback when /api/result payload says failed but a final image exists in workflow details', async () => {
+    const resultData = {
+      generate_image: [{ action: 'error', error: 'Activity task failed', status: 'failed' }],
+    };
+    mockPollWorkflow.mockResolvedValueOnce({ status: 'completed', result: resultData });
+    mockExtractPhotoThumbnail.mockReturnValueOnce('https://example.com/history-image.jpg');
+
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    act(() => {
+      result.current.trackGeneration({ workflowId: 'wf-history-fallback', isProductShot: false, jewelryType: 'ring', jewelryUrl: 'https://example.com/jewelry.jpg', modelUrl: 'https://example.com/model.jpg', aspectRatio: '3:4', resolution: '4K', generationCost: 25 });
+    });
+
+    await waitFor(() => {
+      const gen = result.current.generations.find(g => g.workflowId === 'wf-history-fallback');
+      expect(gen?.status).toBe('completed');
+      expect(gen?.resultImages).toEqual(['https://example.com/history-image.jpg']);
+    });
+    expect(mockGetWorkflowDetails).toHaveBeenCalledWith('wf-history-fallback');
+    expect(mockMarkFailed).not.toHaveBeenCalled();
+  });
+
+  it('uses history details fallback when result fetch exhausts but workflow details already contain the final image', async () => {
+    mockPollWorkflow.mockRejectedValueOnce(new Error('Result fetch exhausted all retries'));
+    mockExtractProductShotThumbnail.mockReturnValueOnce('https://example.com/product-history-image.jpg');
+
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    act(() => {
+      result.current.trackGeneration({ workflowId: 'wf-history-reject', isProductShot: true, jewelryType: 'necklace', jewelryUrl: 'https://example.com/jewelry.jpg', modelUrl: 'https://example.com/model.jpg', aspectRatio: '1:1', resolution: '4K', generationCost: 25 });
+    });
+
+    await waitFor(() => {
+      const gen = result.current.generations.find(g => g.workflowId === 'wf-history-reject');
+      expect(gen?.status).toBe('completed');
+      expect(gen?.resultImages).toEqual(['https://example.com/product-history-image.jpg']);
+    });
+    expect(mockGetWorkflowDetails).toHaveBeenCalledWith('wf-history-reject');
+    expect(mockMarkFailed).not.toHaveBeenCalled();
   });
 
   it('removes generation and aborts poll when clearGeneration is called', async () => {

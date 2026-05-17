@@ -9,9 +9,13 @@ import { markGenerationCompleted, markGenerationFailed } from '@/lib/generation-
 import { azureUriToUrl } from '@/lib/azure-utils';
 import type { PhotoshootResultResponse } from '@/lib/photoshoot-api';
 import type { Resolution } from '@/components/studio/OutputSettingsPills';
+import { getWorkflowDetails } from '@/lib/generation-history-api';
+import { extractPhotoThumbnail, extractProductShotThumbnail } from '@/lib/generation-enrichment';
 
 const STUDIO_RESULT_RETRY_DELAY_MS = 3000;
-const STUDIO_RESULT_MAX_RETRIES = 30;
+// 4K workflows can reach "completed" before the result payload is readable.
+// Keep the status poll bounded separately and only extend this post-completion lag window.
+const STUDIO_RESULT_MAX_RETRIES = 100;
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -119,6 +123,17 @@ function extractResultImages(result: PhotoshootResultResponse): string[] {
   return [];
 }
 
+async function fallbackResultImagesFromHistory(
+  workflowId: string,
+  isProductShot: boolean,
+): Promise<string[]> {
+  const details = await getWorkflowDetails(workflowId);
+  const image = isProductShot
+    ? extractProductShotThumbnail(details.steps ?? [])
+    : extractPhotoThumbnail(details.steps ?? []);
+  return image ? [image] : [];
+}
+
 // ── Provider ─────────────────────────────────────────────────────────────
 
 export function GenerationsContextProvider({ children }: { children: React.ReactNode }) {
@@ -209,7 +224,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
         maxResultRetries: STUDIO_RESULT_MAX_RETRIES,
         resultRetryDelayMs: STUDIO_RESULT_RETRY_DELAY_MS,
         signal: ctrl.signal,
-      }).then(pollResult => {
+      }).then(async pollResult => {
         clearInterval(ticker);
         if (pollResult.status === 'cancelled') return;
 
@@ -232,6 +247,47 @@ export function GenerationsContextProvider({ children }: { children: React.React
         })();
 
         if (hasActivityError) {
+          try {
+            const fallbackImages = await fallbackResultImagesFromHistory(gen.workflowId, gen.isProductShot);
+            if (fallbackImages.length > 0) {
+              const duration = Math.round((Date.now() - startTime) / 1000);
+              const label = gen.jewelryType.charAt(0).toUpperCase() + gen.jewelryType.slice(1);
+              setGenerations(prev => prev.map(g =>
+                g.workflowId === gen.workflowId
+                  ? { ...g, status: 'completed', progress: 100, resultImages: fallbackImages }
+                  : g
+              ));
+              markGenerationCompleted(gen.workflowId, startTime);
+              refreshCredits();
+              controllers.current.delete(gen.workflowId);
+              toast({
+                title: 'Your photoshoot is ready',
+                description: `${label} · ${duration}s`,
+                action: (
+                  <ToastAction
+                    altText="View Results"
+                    onClick={() => navigate(`/studio/${gen.jewelryType}`, {
+                      state: {
+                        asyncResult: {
+                          workflowId: gen.workflowId,
+                          resultImages: fallbackImages,
+                          aspectRatio: gen.aspectRatio,
+                          resolution: gen.resolution,
+                          generationCost: gen.generationCost,
+                        },
+                      },
+                    })}
+                  >
+                    View Results
+                  </ToastAction>
+                ),
+              });
+              return;
+            }
+          } catch {
+            // Fall through to the normal failure path below if history details do not help.
+          }
+
           setGenerations(prev => prev.map(g =>
             g.workflowId === gen.workflowId ? { ...g, status: 'failed' } : g
           ));
@@ -274,9 +330,51 @@ export function GenerationsContextProvider({ children }: { children: React.React
             </ToastAction>
           ),
         });
-      }).catch(err => {
+      }).catch(async err => {
         clearInterval(ticker);
         if (err?.name === 'AbortError') return;
+
+        try {
+          const fallbackImages = await fallbackResultImagesFromHistory(gen.workflowId, gen.isProductShot);
+          if (fallbackImages.length > 0) {
+            const duration = Math.round((Date.now() - startTime) / 1000);
+            const label = gen.jewelryType.charAt(0).toUpperCase() + gen.jewelryType.slice(1);
+            setGenerations(prev => prev.map(g =>
+              g.workflowId === gen.workflowId
+                ? { ...g, status: 'completed', progress: 100, resultImages: fallbackImages }
+                : g
+            ));
+            markGenerationCompleted(gen.workflowId, startTime);
+            refreshCredits();
+            controllers.current.delete(gen.workflowId);
+            toast({
+              title: 'Your photoshoot is ready',
+              description: `${label} · ${duration}s`,
+              action: (
+                <ToastAction
+                  altText="View Results"
+                  onClick={() => navigate(`/studio/${gen.jewelryType}`, {
+                    state: {
+                      asyncResult: {
+                        workflowId: gen.workflowId,
+                        resultImages: fallbackImages,
+                        aspectRatio: gen.aspectRatio,
+                        resolution: gen.resolution,
+                        generationCost: gen.generationCost,
+                      },
+                    },
+                  })}
+                >
+                  View Results
+                </ToastAction>
+              ),
+            });
+            return;
+          }
+        } catch {
+          // Fall through to the normal failure path below if history details do not help.
+        }
+
         setGenerations(prev => prev.map(g =>
           g.workflowId === gen.workflowId ? { ...g, status: 'failed' } : g
         ));
