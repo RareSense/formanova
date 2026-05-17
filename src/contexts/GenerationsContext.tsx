@@ -219,7 +219,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
             <ToastAction
               altText="View Results"
               onClick={() => navigate(`/studio/${gen.jewelryType}`, {
-                state: { asyncResult: { workflowId: gen.workflowId, resultImages } },
+                state: { asyncResult: { workflowId: gen.workflowId, resultImages }, mode: gen.isProductShot ? 'product-shot' : 'model-shot' },
               })}
             >
               View Results
