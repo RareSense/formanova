@@ -5,6 +5,7 @@ import { performCreditPreflight, type PreflightResult } from "@/lib/credit-prefl
 import { TOOL_COSTS } from "@/lib/credits-api";
 import { AuthExpiredError, authenticatedFetch } from "@/lib/authenticated-fetch";
 import { pollWorkflow, type PollWorkflowResult } from "@/lib/poll-workflow";
+import { resolveWorkflowPollingUrls } from "@/lib/workflow-urls";
 import {
   resolveCadTerminalNode,
   resolveCadProgressNode,
@@ -119,8 +120,12 @@ export function useImageToCADWorkflow({ model, prompt, referenceImage, pushUndo,
         throw new Error(err.error || err.detail || `Failed to start generation (${startRes.status})`);
       }
 
-      const { workflow_id } = await startRes.json();
-      if (!workflow_id) throw new Error("No workflow_id returned");
+      const startBody = await startRes.json();
+      const {
+        workflowId: workflow_id,
+        statusUrl,
+        resultUrl,
+      } = resolveWorkflowPollingUrls(startBody);
 
       pollAbortRef.current?.abort();
       const pollAbort = new AbortController();
@@ -130,8 +135,8 @@ export function useImageToCADWorkflow({ model, prompt, referenceImage, pushUndo,
       try {
         genPollResult = await pollWorkflow<CadGenerationResult>({
           mode: 'status-then-result',
-          fetchStatus: () => authenticatedFetch(`/api/status/${encodeURIComponent(workflow_id)}`, { signal: pollAbort.signal }),
-          fetchResult: () => authenticatedFetch(`/api/result/${encodeURIComponent(workflow_id)}`),
+          fetchStatus: () => authenticatedFetch(statusUrl, { signal: pollAbort.signal }),
+          fetchResult: () => authenticatedFetch(resultUrl),
           resolveState: (statusData) => {
             const s = statusData as { runtime?: { state?: string }; progress?: { state?: string }; state?: string };
             const state = (s.runtime?.state || s.progress?.state || s.state || 'unknown').toLowerCase();
@@ -218,8 +223,12 @@ export function useImageToCADWorkflow({ model, prompt, referenceImage, pushUndo,
         throw new Error(err.error || err.detail || `Failed to start edit (${startRes.status})`);
       }
 
-      const { workflow_id } = await startRes.json();
-      if (!workflow_id) throw new Error("No workflow_id returned");
+      const startBody = await startRes.json();
+      const {
+        workflowId: workflow_id,
+        statusUrl,
+        resultUrl,
+      } = resolveWorkflowPollingUrls(startBody);
 
       pollAbortRef.current?.abort();
       const pollAbort = new AbortController();
@@ -229,8 +238,8 @@ export function useImageToCADWorkflow({ model, prompt, referenceImage, pushUndo,
       try {
         editPollResult = await pollWorkflow<CadGenerationResult>({
           mode: 'status-then-result',
-          fetchStatus: () => authenticatedFetch(`/api/status/${encodeURIComponent(workflow_id)}`, { signal: pollAbort.signal }),
-          fetchResult: () => authenticatedFetch(`/api/result/${encodeURIComponent(workflow_id)}`),
+          fetchStatus: () => authenticatedFetch(statusUrl, { signal: pollAbort.signal }),
+          fetchResult: () => authenticatedFetch(resultUrl),
           resolveState: (statusData) => {
             const s = statusData as { runtime?: { state?: string }; progress?: { state?: string }; state?: string };
             const state = (s.runtime?.state || s.progress?.state || s.state || 'unknown').toLowerCase();

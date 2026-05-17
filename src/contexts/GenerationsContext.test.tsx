@@ -41,7 +41,7 @@ describe('GenerationsContext', () => {
   it('appends a running generation when trackGeneration is called', () => {
     const { result } = renderHook(() => useGenerations(), { wrapper });
     act(() => {
-      result.current.trackGeneration({ workflowId: 'wf-1', isProductShot: false, jewelryType: 'ring' });
+      result.current.trackGeneration({ workflowId: 'wf-1', isProductShot: false, jewelryType: 'ring', statusUrl: '/api/status/wf-1', resultUrl: '/api/result/wf-1' });
     });
     expect(result.current.generations).toHaveLength(1);
     expect(result.current.generations[0]).toMatchObject({ workflowId: 'wf-1', status: 'running' });
@@ -50,7 +50,7 @@ describe('GenerationsContext', () => {
   it('starts pollWorkflow when a generation is tracked', async () => {
     const { result } = renderHook(() => useGenerations(), { wrapper });
     act(() => {
-      result.current.trackGeneration({ workflowId: 'wf-2', isProductShot: false, jewelryType: 'necklace' });
+      result.current.trackGeneration({ workflowId: 'wf-2', isProductShot: false, jewelryType: 'necklace', statusUrl: '/api/status/wf-2', resultUrl: '/api/result/wf-2' });
     });
     await waitFor(() => expect(mockPollWorkflow).toHaveBeenCalledOnce());
     expect(mockPollWorkflow).toHaveBeenCalledWith(expect.objectContaining({
@@ -63,8 +63,8 @@ describe('GenerationsContext', () => {
   it('allows concurrent generations (unbounded queue)', () => {
     const { result } = renderHook(() => useGenerations(), { wrapper });
     act(() => {
-      result.current.trackGeneration({ workflowId: 'wf-a', isProductShot: false, jewelryType: 'ring' });
-      result.current.trackGeneration({ workflowId: 'wf-b', isProductShot: true, jewelryType: 'necklace' });
+      result.current.trackGeneration({ workflowId: 'wf-a', isProductShot: false, jewelryType: 'ring', statusUrl: '/api/status/wf-a', resultUrl: '/api/result/wf-a' });
+      result.current.trackGeneration({ workflowId: 'wf-b', isProductShot: true, jewelryType: 'necklace', statusUrl: '/api/status/wf-b', resultUrl: '/api/result/wf-b' });
     });
     expect(result.current.generations).toHaveLength(2);
   });
@@ -75,7 +75,7 @@ describe('GenerationsContext', () => {
 
     const { result } = renderHook(() => useGenerations(), { wrapper });
     act(() => {
-      result.current.trackGeneration({ workflowId: 'wf-3', isProductShot: false, jewelryType: 'ring' });
+      result.current.trackGeneration({ workflowId: 'wf-3', isProductShot: false, jewelryType: 'ring', statusUrl: '/api/status/wf-3', resultUrl: '/api/result/wf-3' });
     });
 
     await waitFor(() => {
@@ -91,7 +91,7 @@ describe('GenerationsContext', () => {
 
     const { result } = renderHook(() => useGenerations(), { wrapper });
     act(() => {
-      result.current.trackGeneration({ workflowId: 'wf-4', isProductShot: false, jewelryType: 'ring' });
+      result.current.trackGeneration({ workflowId: 'wf-4', isProductShot: false, jewelryType: 'ring', statusUrl: '/api/status/wf-4', resultUrl: '/api/result/wf-4' });
     });
 
     await waitFor(() => {
@@ -104,7 +104,7 @@ describe('GenerationsContext', () => {
   it('removes generation and aborts poll when clearGeneration is called', async () => {
     const { result } = renderHook(() => useGenerations(), { wrapper });
     act(() => {
-      result.current.trackGeneration({ workflowId: 'wf-5', isProductShot: false, jewelryType: 'ring' });
+      result.current.trackGeneration({ workflowId: 'wf-5', isProductShot: false, jewelryType: 'ring', statusUrl: '/api/status/wf-5', resultUrl: '/api/result/wf-5' });
     });
     await waitFor(() => expect(mockPollWorkflow).toHaveBeenCalledOnce());
 
@@ -116,5 +116,28 @@ describe('GenerationsContext', () => {
     const callArgs = mockPollWorkflow.mock.calls[0][0];
     expect(callArgs.signal).toBeInstanceOf(AbortSignal);
     expect(callArgs.signal.aborted).toBe(true);
+  });
+
+  it('polls the stored backend urls instead of rebuilding them from workflowId', async () => {
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    act(() => {
+      result.current.trackGeneration({
+        workflowId: 'wf-6',
+        isProductShot: false,
+        jewelryType: 'ring',
+        statusUrl: '/api/status/custom-status-id',
+        resultUrl: '/api/result/custom-result-id',
+      });
+    });
+
+    await waitFor(() => expect(mockPollWorkflow).toHaveBeenCalledOnce());
+    const callArgs = mockPollWorkflow.mock.calls[0][0];
+    await callArgs.fetchStatus?.();
+    await callArgs.fetchResult();
+
+    const { authenticatedFetch } = await import('@/lib/authenticated-fetch');
+    const mockAuthenticatedFetch = vi.mocked(authenticatedFetch);
+    expect(mockAuthenticatedFetch).toHaveBeenNthCalledWith(1, '/api/status/custom-status-id');
+    expect(mockAuthenticatedFetch).toHaveBeenNthCalledWith(2, '/api/result/custom-result-id');
   });
 });

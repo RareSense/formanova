@@ -54,6 +54,7 @@ import { uploadToAzure } from '@/lib/microservices-api';
 import { compressImageBlob, imageSourceToBlob } from '@/lib/image-compression';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
 import { markGenerationStarted } from '@/lib/generation-lifecycle';
+import { resolveWorkflowPollingUrls } from '@/lib/workflow-urls';
 import {
   trackPaywallHit,
   trackGenerationComplete,
@@ -250,15 +251,19 @@ export function useStudioGeneration({
             ...(selectedModel?.id && !modelAssetId ? { input_preset_model_id: selectedModel.id } : {}),
           });
 
-      const _workflowId = startResponse.workflow_id;
+      const {
+        workflowId: _workflowId,
+        statusUrl,
+        resultUrl,
+      } = resolveWorkflowPollingUrls(startResponse);
       setGenerationInputUrlsMap(prev => ({ ...prev, [_workflowId]: { jewelryUrl, modelUrl } }));
       setWorkflowId(_workflowId);
       trackGeneration({
         workflowId: _workflowId,
         isProductShot,
         jewelryType: TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType,
-        statusUrl: startResponse.status_url,
-        resultUrl: startResponse.result_url,
+        statusUrl,
+        resultUrl,
       });
       markGenerationStarted(_workflowId);
       setCurrentStep('generating');
