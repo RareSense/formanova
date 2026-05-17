@@ -614,6 +614,7 @@ export default function UnifiedStudio() {
             jewelryImage={jewelryImage}
             activeModelUrl={generationInputUrls?.modelUrl ?? activeModelUrl}
             userEmail={user?.email}
+            generationCost={generationCost}
           />
         )}
       </div>
