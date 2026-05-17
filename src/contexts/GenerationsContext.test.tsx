@@ -107,6 +107,30 @@ describe('GenerationsContext', () => {
     });
   });
 
+  it('renders only one final image even when the payload contains multiple image entries', async () => {
+    const resultData = {
+      output: [
+        { output_url: 'https://example.com/first.jpg' },
+        { output_url: 'https://example.com/second.jpg' },
+      ],
+      extra: [
+        { image_url: 'https://example.com/third.jpg' },
+      ],
+    };
+    mockPollWorkflow.mockResolvedValueOnce({ status: 'completed', result: resultData });
+
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    act(() => {
+      result.current.trackGeneration({ workflowId: 'wf-one-only', isProductShot: false, jewelryType: 'ring', statusUrl: '/api/status/wf-one-only', resultUrl: '/api/result/wf-one-only' });
+    });
+
+    await waitFor(() => {
+      const gen = result.current.generations.find(g => g.workflowId === 'wf-one-only');
+      expect(gen?.status).toBe('completed');
+      expect(gen?.resultImages).toEqual(['https://example.com/first.jpg']);
+    });
+  });
+
   it('transitions to failed when poll rejects', async () => {
     mockPollWorkflow.mockRejectedValueOnce(new Error('timeout'));
 

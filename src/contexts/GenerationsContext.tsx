@@ -45,32 +45,40 @@ export const GenerationsContext = createContext<GenerationsContextValue | null>(
 // Moved here from useStudioGeneration.ts (Phase 1 spec).
 
 function extractResultImages(result: PhotoshootResultResponse): string[] {
-  const images: string[] = [];
-  for (const key of Object.keys(result)) {
+  const preferredKeys = [
+    'output',
+    'generate',
+    'generate_image',
+    'generate_images',
+    'result',
+  ];
+  const orderedResultKeys = [
+    ...preferredKeys.filter(key => key in result),
+    ...Object.keys(result).filter(key => !preferredKeys.includes(key)),
+  ];
+
+  for (const key of orderedResultKeys) {
     const items = result[key];
     if (!Array.isArray(items)) continue;
     for (const item of items) {
       if (!item || typeof item !== 'object') continue;
       const obj = item as Record<string, unknown>;
-      for (const k of ['output_url', 'image_url', 'result_url', 'url', 'output_image']) {
-        const val = obj[k];
-        if (typeof val === 'string' && val.length > 0) {
-          if (val.startsWith('azure://')) {
-            images.push(azureUriToUrl(val));
-          } else if (val.startsWith('http') || val.startsWith('data:')) {
-            images.push(val);
-          }
-        }
+      for (const candidate of ['output_url', 'image_url', 'result_url', 'url', 'output_image']) {
+        const val = obj[candidate];
+        if (typeof val !== 'string' || val.length === 0) continue;
+        if (val.startsWith('azure://')) return [azureUriToUrl(val)];
+        if (val.startsWith('http') || val.startsWith('data:')) return [val];
       }
-      // Handle raw base64 — construct proper data URI using sibling mime_type field
+
       const b64 = obj['image_b64'];
       if (typeof b64 === 'string' && b64.length > 0) {
         const mime = typeof obj['mime_type'] === 'string' ? obj['mime_type'] : 'image/jpeg';
-        images.push(`data:${mime};base64,${b64}`);
+        return [`data:${mime};base64,${b64}`];
       }
     }
   }
-  return Array.from(new Set(images));
+
+  return [];
 }
 
 // ── Provider ─────────────────────────────────────────────────────────────
