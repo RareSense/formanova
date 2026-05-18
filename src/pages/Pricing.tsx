@@ -217,7 +217,7 @@ export default function Pricing() {
                           </span>
                         </div>
                         <p className="font-mono text-[10px] tracking-wider text-muted-foreground mt-1">
-                          $2 per account
+                          ${(20 / tier.credits).toFixed(2)} per photo
                         </p>
                       </div>
 
