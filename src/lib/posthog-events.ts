@@ -212,6 +212,10 @@ export function trackPaymentCancel() {
   capture('payment_cancelled');
 }
 
+export function trackStarterPackPurchased() {
+  capture('starter_pack_purchased');
+}
+
 // ═══════ Engagement ═════════════════════════════════════════════════
 
 export function trackButtonClick(buttonName: string, context?: string) {
@@ -244,20 +248,6 @@ export function setUserProfession(profession: UserProfession) {
   if (posthog.__loaded) {
     posthog.setPersonProperties({ profession });
   }
-}
-
-/** Fire experiment exposure after identify() so PostHog enrolls the user under
- *  their identified UUID, not the cached anonymous variant.
- *  onFeatureFlags() waits for the post-identify flag reload to complete before
- *  calling getFeatureFlag(), which auto-fires $feature_flag_called via the JS SDK.
- *  Call once, on login only — not on every page load.
- *
- *  TO REMOVE when experiment ends: delete this function and its call in AuthContext.tsx line ~38. */
-export function trackFreeGenerationExperimentExposure() {
-  if (!posthog.__loaded) return;
-  posthog.onFeatureFlags(() => {
-    posthog.getFeatureFlag('free-generation-experiment');
-  });
 }
 
 // ─── A/B EXPERIMENT: button-labels-experiment ───────────────────────────────

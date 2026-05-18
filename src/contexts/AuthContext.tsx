@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
-import { trackLogin, trackLogout, identifyUser, trackFreeGenerationExperimentExposure, trackButtonLabelExperimentExposure } from '@/lib/posthog-events';
+import { trackLogin, trackLogout, identifyUser, trackButtonLabelExperimentExposure } from '@/lib/posthog-events';
 import { 
   authApi, 
   getStoredToken, 
@@ -36,7 +36,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(u);
       if (u) {
         identifyUser(u.id, { email: u.email, name: u.full_name });
-        trackFreeGenerationExperimentExposure();
         trackButtonLabelExperimentExposure();
         trackLogin('google', u.email);
       }

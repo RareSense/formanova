@@ -19,6 +19,7 @@ import {
   trackDownloadClicked,
   trackRegenerateClicked,
   trackPaymentSuccess,
+  trackStarterPackPurchased,
   trackUploadGuideViewed,
   trackUploadGuideAcknowledged,
   trackUserTypeSelected,
@@ -268,6 +269,13 @@ describe('trackPaymentSuccess', () => {
       amount_usd: 9,
       currency_shown: 'USD',
     })
+  })
+})
+
+describe('trackStarterPackPurchased', () => {
+  it('captures starter_pack_purchased', () => {
+    trackStarterPackPurchased()
+    expect(posthog.capture).toHaveBeenCalledWith('starter_pack_purchased', undefined)
   })
 })
 
