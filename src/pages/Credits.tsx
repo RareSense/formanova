@@ -205,7 +205,12 @@ export default function Credits() {
     );
   }
 
-  const colsClass = tiers.length === 4 ? 'md:grid-cols-4' : 'md:grid-cols-3';
+  const gridTiers: BillingTier[] =
+    tiers.length > 0
+      ? tiers
+      : PLANS.map(p => ({ tier_id: p.tierId, name: p.name, type: 'subscription', credits: p.credits }));
+
+  const colsClass = gridTiers.length === 4 ? 'md:grid-cols-4' : 'md:grid-cols-3';
 
   return (
     <div className="min-h-[calc(100vh-5rem)] bg-background py-6 px-6 md:px-12 lg:px-16">
@@ -264,7 +269,7 @@ export default function Credits() {
           ) : (
             <>
               <div className={`grid grid-cols-1 sm:grid-cols-2 ${colsClass} gap-4`}>
-                {tiers.map((tier) => {
+                {gridTiers.map((tier) => {
                   if (isStarterTier(tier)) {
                     return (
                       <div
