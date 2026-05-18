@@ -58,7 +58,7 @@ interface BillingTier {
 const PLAN_BY_CREDITS = Object.fromEntries(PLANS.map(p => [p.credits, p])) as Record<number, typeof PLANS[0]>;
 
 function isStarterTier(t: BillingTier): boolean {
-  return t.type === 'one_time';
+  return !PLAN_BY_CREDITS[t.credits];
 }
 
 const CHECKOUT_URL = '/billing/checkout';
