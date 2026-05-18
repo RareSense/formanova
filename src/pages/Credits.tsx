@@ -212,6 +212,7 @@ export default function Credits() {
       : PLANS.map(p => ({ tier_id: p.tierId, name: p.name, type: 'subscription', credits: p.credits }));
 
   const colsClass = gridTiers.length === 4 ? 'md:grid-cols-4' : 'md:grid-cols-3';
+  const maxWidthClass = gridTiers.length === 4 ? 'max-w-7xl' : 'max-w-5xl';
 
   return (
     <div className="min-h-[calc(100vh-5rem)] bg-background py-6 px-6 md:px-12 lg:px-16">
@@ -219,7 +220,7 @@ export default function Credits() {
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="max-w-7xl mx-auto"
+        className={`${maxWidthClass} mx-auto`}
       >
         {/* Header */}
         <motion.div variants={itemVariants} className="mb-10 flex items-end justify-between">
