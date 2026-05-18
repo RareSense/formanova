@@ -221,10 +221,10 @@ export default function Pricing() {
                           You get
                         </p>
                         <p className="font-mono text-xl text-foreground">
-                          50 credits
+                          {tier.credits} credits
                         </p>
                         <p className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground uppercase">
-                          Generate up to 5 photos
+                          Generate up to {Math.floor(tier.credits / 10)} photos
                         </p>
                       </div>
 
@@ -239,7 +239,7 @@ export default function Pricing() {
                           {loadingTier === tier.tier_id ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
-                            'Buy 50 credits'
+                            `Buy ${tier.credits} credits`
                           )}
                         </Button>
                         {unavailableTier === tier.tier_id && (
