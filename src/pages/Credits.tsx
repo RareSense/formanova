@@ -106,7 +106,8 @@ export default function Credits() {
         return;
       }
       const data: BillingTier[] = await res.json();
-      const sorted = [...data].sort((a, b) =>
+      const filtered = data.filter(t => t.tier_id !== 'tier_3519ba8c');
+      const sorted = [...filtered].sort((a, b) =>
         isStarterTier(a) ? -1 : isStarterTier(b) ? 1 : 0
       );
       setTiers(sorted);
