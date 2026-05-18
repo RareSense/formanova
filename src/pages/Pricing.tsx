@@ -54,11 +54,11 @@ interface BillingTier {
   credits: number;
 }
 
-function isStarterTier(t: BillingTier): boolean {
-  return t.type === 'one_time' && t.credits === 50;
-}
-
 const PLAN_BY_CREDITS = Object.fromEntries(PLANS.map(p => [p.credits, p])) as Record<number, typeof PLANS[0]>;
+
+function isStarterTier(t: BillingTier): boolean {
+  return !PLAN_BY_CREDITS[t.credits];
+}
 
 export default function Pricing() {
   const { user } = useAuth();
