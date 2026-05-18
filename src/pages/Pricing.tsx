@@ -194,7 +194,7 @@ export default function Pricing() {
                       <div>
                         <motion.span
                           className="inline-block font-mono text-[10px] tracking-[0.25em] text-primary uppercase italic font-bold"
-                          animate={{ scale: [1, 1.06, 1], opacity: [1, 0.7, 1] }}
+                          animate={{ scale: [1, 1.08, 1] }}
                           transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
                         >
                           One-time offer only
