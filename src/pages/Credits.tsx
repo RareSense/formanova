@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Loader2, Check, AlertCircle, Gift } from 'lucide-react';
@@ -48,6 +48,19 @@ const PLANS = [
   },
 ];
 
+interface BillingTier {
+  tier_id: string;
+  name: string;
+  type: string;
+  credits: number;
+}
+
+function isStarterTier(t: BillingTier): boolean {
+  return t.type === 'one_time' && t.credits === 50;
+}
+
+const PLAN_BY_CREDITS = Object.fromEntries(PLANS.map(p => [p.credits, p])) as Record<number, typeof PLANS[0]>;
+
 const CHECKOUT_URL = '/billing/checkout';
 
 const containerVariants = {
@@ -80,6 +93,30 @@ export default function Credits() {
   const [promoResult, setPromoResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
   const [errorTier, setErrorTier] = useState<string | null>(null);
+  const [tiers, setTiers] = useState<BillingTier[]>([]);
+  const [tiersLoading, setTiersLoading] = useState(true);
+  const [unavailableTier, setUnavailableTier] = useState<string | null>(null);
+
+  const fetchTiers = useCallback(async () => {
+    setTiersLoading(true);
+    try {
+      const res = await authenticatedFetch('/billing/tiers');
+      if (!res.ok) {
+        setTiers([]);
+        return;
+      }
+      const data: BillingTier[] = await res.json();
+      const sorted = [...data].sort((a, b) =>
+        isStarterTier(a) ? -1 : isStarterTier(b) ? 1 : 0
+      );
+      setTiers(sorted);
+      setUnavailableTier(null);
+    } catch {
+      setTiers([]);
+    } finally {
+      setTiersLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -91,6 +128,9 @@ export default function Credits() {
     refreshCredits();
   }, [refreshCredits]);
 
+  useEffect(() => {
+    if (user) fetchTiers();
+  }, [user, fetchTiers]);
 
   const handleCheckout = async (tierId: string) => {
     if (!user?.id) {
@@ -100,6 +140,7 @@ export default function Credits() {
     if (loadingTier) return;
     setLoadingTier(tierId);
     setErrorTier(null);
+    setUnavailableTier(null);
 
     try {
       const response = await authenticatedFetch(CHECKOUT_URL, {
@@ -108,6 +149,12 @@ export default function Credits() {
         body: JSON.stringify({ tier_id: tierId, redirect: '/credits', ...(country ? { country } : {}) }),
       });
 
+      if (response.status === 404) {
+        setUnavailableTier(tierId);
+        setLoadingTier(null);
+        fetchTiers();
+        return;
+      }
       if (!response.ok) throw new Error('Checkout failed');
       const data = await response.json();
       if (!data.url) throw new Error('No checkout URL');
@@ -157,6 +204,13 @@ export default function Credits() {
       </div>
     );
   }
+
+  const gridTiers: BillingTier[] =
+    tiers.length > 0
+      ? tiers
+      : PLANS.map(p => ({ tier_id: p.tierId, name: p.name, type: 'subscription', credits: p.credits }));
+
+  const colsClass = gridTiers.length === 4 ? 'md:grid-cols-4' : 'md:grid-cols-3';
 
   return (
     <div className="min-h-[calc(100vh-5rem)] bg-background py-6 px-6 md:px-12 lg:px-16">
@@ -208,67 +262,161 @@ export default function Credits() {
           <span className="font-mono text-[9px] tracking-[0.3em] text-muted-foreground uppercase block mb-6">
             Get More Credits
           </span>
-          <div className="grid md:grid-cols-3 gap-4">
-            {PLANS.map((plan) => (
-              <div
-                key={plan.tier}
-                className="p-8 flex flex-col gap-6 border-2 border-foreground"
-              >
-                <div>
-                  <span className="font-mono text-[10px] tracking-[0.25em] text-muted-foreground uppercase">
-                    {plan.name}
-                  </span>
-                </div>
+          {tiersLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <>
+              <div className={`grid grid-cols-1 ${colsClass} gap-4`}>
+                {gridTiers.map((tier) => {
+                  if (isStarterTier(tier)) {
+                    return (
+                      <div
+                        key={tier.tier_id}
+                        className="p-8 flex flex-col gap-6 border-2 border-foreground"
+                      >
+                        <div>
+                          <span className="font-mono text-[10px] tracking-[0.25em] text-muted-foreground uppercase italic">
+                            One-time offer only
+                          </span>
+                        </div>
 
-                <div>
-                  <div className="flex items-baseline gap-1">
-                    <span className="font-display text-5xl uppercase tracking-tight text-foreground">
-                      {isINR ? `${symbol}${plan.inrPrice.toLocaleString('en-IN')}` : `$${plan.price}`}
-                    </span>
-                    <span className="font-mono text-[10px] tracking-wider text-muted-foreground uppercase">
-                      {currency}
-                    </span>
-                  </div>
-                  <p className="font-mono text-[10px] tracking-wider text-muted-foreground mt-1">
-                    {isINR ? plan.inrPerPhoto : plan.perPhoto} per photo
-                  </p>
-                </div>
+                        <div>
+                          <div className="flex items-baseline gap-1">
+                            <span
+                              className="font-display text-2xl uppercase tracking-tight text-muted-foreground"
+                              style={{ textDecoration: 'line-through', textDecorationThickness: '1.5px' }}
+                            >
+                              $5
+                            </span>
+                            <span className="font-display text-5xl uppercase tracking-tight text-foreground">
+                              $2
+                            </span>
+                            <span className="font-mono text-[10px] tracking-wider text-muted-foreground uppercase">
+                              USD
+                            </span>
+                          </div>
+                          <p className="font-mono text-[10px] tracking-wider text-muted-foreground mt-1">
+                            One per account
+                          </p>
+                        </div>
 
-                <div className="border-t border-border/30 pt-5 space-y-2">
-                  <p className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground uppercase">
-                    You get
-                  </p>
-                  <p className="font-mono text-xl text-foreground">
-                    {plan.credits.toLocaleString()} credits
-                  </p>
-                  <p className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground uppercase">
-                    Generate up to {plan.photos} photos
-                  </p>
-                </div>
+                        <div className="border-t border-border/30 pt-5 space-y-2">
+                          <p className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground uppercase">
+                            You get
+                          </p>
+                          <p className="font-mono text-xl text-foreground">
+                            50 credits
+                          </p>
+                          <p className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground uppercase">
+                            Generate up to 5 photos
+                          </p>
+                        </div>
 
-                <div className="mt-auto pt-2">
-                  <Button
-                    className="w-full font-mono text-[10px] tracking-[0.2em] uppercase"
-                    size="lg"
-                    variant="default"
-                    disabled={loadingTier !== null}
-                    onClick={() => handleCheckout(plan.tierId)}
-                  >
-                    {loadingTier === plan.tierId ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      `Buy ${plan.credits.toLocaleString()} Credits`
-                    )}
-                  </Button>
-                  {errorTier === plan.tierId && (
-                    <p className="font-mono text-[9px] tracking-wider text-destructive mt-2">
-                      Checkout failed. Please try again.
-                    </p>
-                  )}
-                </div>
+                        <div className="mt-auto pt-2">
+                          <Button
+                            className="w-full font-mono text-[10px] tracking-[0.2em] uppercase"
+                            size="lg"
+                            variant="default"
+                            disabled={loadingTier !== null}
+                            onClick={() => handleCheckout(tier.tier_id)}
+                          >
+                            {loadingTier === tier.tier_id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              'Buy 50 credits'
+                            )}
+                          </Button>
+                          {unavailableTier === tier.tier_id && (
+                            <p className="font-mono text-[9px] tracking-wider text-destructive mt-2">
+                              Offer unavailable.
+                            </p>
+                          )}
+                          {errorTier === tier.tier_id && (
+                            <p className="font-mono text-[9px] tracking-wider text-destructive mt-2">
+                              Checkout failed. Please try again.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  const plan = PLAN_BY_CREDITS[tier.credits];
+                  if (!plan) return null;
+
+                  return (
+                    <div
+                      key={tier.tier_id}
+                      className="p-8 flex flex-col gap-6 border-2 border-foreground"
+                    >
+                      <div>
+                        <span className="font-mono text-[10px] tracking-[0.25em] text-muted-foreground uppercase">
+                          {plan.name}
+                        </span>
+                      </div>
+
+                      <div>
+                        <div className="flex items-baseline gap-1">
+                          <span className="font-display text-5xl uppercase tracking-tight text-foreground">
+                            {isINR ? `${symbol}${plan.inrPrice.toLocaleString('en-IN')}` : `$${plan.price}`}
+                          </span>
+                          <span className="font-mono text-[10px] tracking-wider text-muted-foreground uppercase">
+                            {currency}
+                          </span>
+                        </div>
+                        <p className="font-mono text-[10px] tracking-wider text-muted-foreground mt-1">
+                          {isINR ? plan.inrPerPhoto : plan.perPhoto} per photo
+                        </p>
+                      </div>
+
+                      <div className="border-t border-border/30 pt-5 space-y-2">
+                        <p className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground uppercase">
+                          You get
+                        </p>
+                        <p className="font-mono text-xl text-foreground">
+                          {plan.credits.toLocaleString()} credits
+                        </p>
+                        <p className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground uppercase">
+                          Generate up to {plan.photos} photos
+                        </p>
+                      </div>
+
+                      <div className="mt-auto pt-2">
+                        <Button
+                          className="w-full font-mono text-[10px] tracking-[0.2em] uppercase"
+                          size="lg"
+                          variant="default"
+                          disabled={loadingTier !== null}
+                          onClick={() => handleCheckout(tier.tier_id)}
+                        >
+                          {loadingTier === tier.tier_id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            `Buy ${plan.credits.toLocaleString()} Credits`
+                          )}
+                        </Button>
+                        {unavailableTier === tier.tier_id && (
+                          <p className="font-mono text-[9px] tracking-wider text-destructive mt-2">
+                            Offer unavailable.
+                          </p>
+                        )}
+                        {errorTier === tier.tier_id && (
+                          <p className="font-mono text-[9px] tracking-wider text-destructive mt-2">
+                            Checkout failed. Please try again.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
-          </div>
+              <p className="font-mono text-[9px] tracking-wider text-muted-foreground mt-4">
+                1 standard photo = 10 credits.&nbsp;&nbsp;Higher-resolution photos use more credits.
+              </p>
+            </>
+          )}
         </motion.div>
 
         {/* Promo Code Section */}
