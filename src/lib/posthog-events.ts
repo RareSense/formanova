@@ -210,6 +210,10 @@ export function trackPaymentCancel() {
   capture('payment_cancelled');
 }
 
+export function trackStarterPackPurchased() {
+  capture('starter_pack_purchased');
+}
+
 // ═══════ Engagement ═════════════════════════════════════════════════
 
 export function trackButtonClick(buttonName: string, context?: string) {
