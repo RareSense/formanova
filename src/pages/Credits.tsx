@@ -277,9 +277,13 @@ export default function Credits() {
                         className="p-8 flex flex-col gap-6 border-2 border-foreground"
                       >
                         <div>
-                          <span className="font-mono text-[10px] tracking-[0.25em] text-primary uppercase italic font-bold">
+                          <motion.span
+                            className="inline-block font-mono text-[10px] tracking-[0.25em] text-primary uppercase italic font-bold"
+                            animate={{ scale: [1, 1.06, 1], opacity: [1, 0.7, 1] }}
+                            transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+                          >
                             One-time offer only
-                          </span>
+                          </motion.span>
                         </div>
 
                         <div>
@@ -298,7 +302,7 @@ export default function Credits() {
                             </span>
                           </div>
                           <p className="font-mono text-[10px] tracking-wider text-muted-foreground mt-1">
-                            One per account
+                            $2 per account
                           </p>
                         </div>
 
