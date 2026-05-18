@@ -330,7 +330,7 @@ export default function Pricing() {
                 );
               })}
             </div>
-            <p className="font-mono text-[9px] tracking-wider text-muted-foreground mt-4 text-center">
+            <p className="font-mono text-xs tracking-wider text-muted-foreground mt-4 text-center">
               1 standard photo = 10 credits.&nbsp;&nbsp;Higher-resolution photos use more credits.
             </p>
           </>
