@@ -191,7 +191,7 @@ export default function Pricing() {
                       className="p-8 flex flex-col gap-8 border-2 border-foreground"
                     >
                       <div>
-                        <span className="font-mono text-[10px] tracking-[0.25em] text-muted-foreground uppercase italic">
+                        <span className="font-mono text-[10px] tracking-[0.25em] text-primary uppercase italic font-bold">
                           One-time offer only
                         </span>
                       </div>
