@@ -218,7 +218,7 @@ export default function Credits() {
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="max-w-5xl mx-auto"
+        className="max-w-7xl mx-auto"
       >
         {/* Header */}
         <motion.div variants={itemVariants} className="mb-10 flex items-end justify-between">
@@ -268,7 +268,7 @@ export default function Credits() {
             </div>
           ) : (
             <>
-              <div className={`grid grid-cols-1 ${colsClass} gap-4`}>
+              <div className={`grid grid-cols-1 sm:grid-cols-2 ${colsClass} gap-4`}>
                 {gridTiers.map((tier) => {
                   if (isStarterTier(tier)) {
                     return (

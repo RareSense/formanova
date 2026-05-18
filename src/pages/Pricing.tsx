@@ -149,7 +149,7 @@ export default function Pricing() {
 
   return (
     <div className="min-h-[calc(100vh-5rem)] bg-background py-6 px-6 md:px-12 lg:px-16">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-7xl mx-auto">
 
         {/* Header — matches Dashboard/Generations style */}
         <div className="mb-10 flex items-end justify-between">
@@ -182,7 +182,7 @@ export default function Pricing() {
           </div>
         ) : (
           <>
-            <div className={`grid grid-cols-1 ${colsClass} gap-6`}>
+            <div className={`grid grid-cols-1 sm:grid-cols-2 ${colsClass} gap-6`}>
               {gridTiers.map((tier) => {
                 if (isStarterTier(tier)) {
                   return (
