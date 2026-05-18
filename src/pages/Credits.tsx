@@ -58,7 +58,7 @@ interface BillingTier {
 const PLAN_BY_CREDITS = Object.fromEntries(PLANS.map(p => [p.credits, p])) as Record<number, typeof PLANS[0]>;
 
 function isStarterTier(t: BillingTier): boolean {
-  return !PLAN_BY_CREDITS[t.credits];
+  return t.type === 'one_time';
 }
 
 const CHECKOUT_URL = '/billing/checkout';
@@ -205,12 +205,7 @@ export default function Credits() {
     );
   }
 
-  const gridTiers: BillingTier[] =
-    tiers.length > 0
-      ? tiers
-      : PLANS.map(p => ({ tier_id: p.tierId, name: p.name, type: 'subscription', credits: p.credits }));
-
-  const colsClass = gridTiers.length === 4 ? 'md:grid-cols-4' : 'md:grid-cols-3';
+  const colsClass = tiers.length === 4 ? 'md:grid-cols-4' : 'md:grid-cols-3';
 
   return (
     <div className="min-h-[calc(100vh-5rem)] bg-background py-6 px-6 md:px-12 lg:px-16">
@@ -269,7 +264,7 @@ export default function Credits() {
           ) : (
             <>
               <div className={`grid grid-cols-1 sm:grid-cols-2 ${colsClass} gap-4`}>
-                {gridTiers.map((tier) => {
+                {tiers.map((tier) => {
                   if (isStarterTier(tier)) {
                     return (
                       <div
