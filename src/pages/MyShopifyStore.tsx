@@ -86,17 +86,38 @@ export default function MyShopifyStore() {
               </div>
             ) : isError ? (
               <div className="space-y-4">
-                <p className="text-sm text-destructive">
-                  We could not load your Shopify connection right now.
-                </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => invalidateStatus()}
-                  className="h-10 font-mono text-[10px] uppercase tracking-[0.15em]"
-                >
-                  Retry
-                </Button>
+                <div className="flex items-start gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full border border-border bg-muted/40">
+                    <Store className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <div className="space-y-2">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                      Shopify
+                    </p>
+                    <p className="text-sm leading-relaxed text-muted-foreground">
+                      We could not confirm your Shopify connection right now. You can still start the connection flow below.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <Button
+                    type="button"
+                    onClick={() => setConnectOpen(true)}
+                    className="h-11 gap-2 font-mono text-[10px] uppercase tracking-[0.15em]"
+                  >
+                    <Store className="h-4 w-4" />
+                    Connect Shopify
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => invalidateStatus()}
+                    className="h-11 font-mono text-[10px] uppercase tracking-[0.15em]"
+                  >
+                    Retry
+                  </Button>
+                </div>
               </div>
             ) : status?.connected ? (
               <div className="space-y-5">
