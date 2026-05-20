@@ -24,7 +24,12 @@ export interface ShopifyExportResult {
 
 export async function getShopifyStatus(): Promise<ShopifyStatus> {
   const res = await authenticatedFetch('/shopify/status');
-  if (!res.ok) throw new Error('Failed to fetch Shopify status');
+  if (!res.ok) {
+    if (res.status === 404 || res.status === 409) {
+      return { connected: false };
+    }
+    throw new Error('Failed to fetch Shopify status');
+  }
   return res.json();
 }
 
