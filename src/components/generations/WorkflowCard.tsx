@@ -7,6 +7,7 @@ import creditCoinIcon from '@/assets/icons/credit-coin.png';
 import { OptimizedImage } from '@/components/ui/optimized-image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ShopifyPublishButton } from '@/components/shopify/ShopifyPublishButton';
 import type { WorkflowSummary } from '@/lib/generation-history-api';
 import { SnapshotPreviewModal } from './SnapshotPreviewModal';
 import { PhotoPreviewModal } from './PhotoPreviewModal';
@@ -393,6 +394,7 @@ function PhotoCard({ workflow, index }: { workflow: WorkflowSummary; index: numb
   const isEnriching = workflow.thumbnail_url === undefined;
   const hasThumbnail = !!workflow.thumbnail_url;
   const resolvedThumbnail = useAuthenticatedImage(workflow.thumbnail_url);
+  const supportsShopifyPublish = workflow.source_type === 'photo' || workflow.source_type === 'product_shot';
 
   return (
     <>
@@ -490,6 +492,17 @@ function PhotoCard({ workflow, index }: { workflow: WorkflowSummary; index: numb
             </span>
           </div>
         </div>
+
+        {hasThumbnail && supportsShopifyPublish && (
+          <div className="px-3 pb-3">
+            <ShopifyPublishButton
+              assetId={workflow.output_asset_id ?? null}
+              assetName={displayName ?? workflow.output_asset_name ?? workflow.name ?? 'Untitled'}
+              workflowId={workflow.workflow_id}
+              className="h-10 w-full font-mono text-[10px] uppercase tracking-[0.15em]"
+            />
+          </div>
+        )}
       </motion.div>
 
       {/* Enlarged preview modal */}

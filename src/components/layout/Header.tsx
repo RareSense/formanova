@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { Button } from '@/components/ui/button';
-import { Menu, X, LogIn, LogOut, User, Image, BadgeCheck, ScanEye, Gem, Check } from 'lucide-react';
+import { Menu, X, LogIn, LogOut, User, Image, BadgeCheck, ScanEye, Gem, Check, Store } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
 import { useCredits } from '@/contexts/CreditsContext';
@@ -268,6 +268,13 @@ export function Header() {
                       <img src={creditCoinIcon} alt="" className="h-6 w-6 mr-2 object-contain" width={24} height={24} loading="eager" decoding="sync" />
                       My Credits
                     </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => navigate('/my-shopify-store')}
+                      className="text-sm"
+                    >
+                      <Store className="h-4 w-4 mr-2" />
+                      My Shopify Store
+                    </DropdownMenuItem>
                     {isAdmin && (
                       <DropdownMenuItem
                         onClick={() => navigate('/admin')}
@@ -381,6 +388,12 @@ export function Header() {
                   <Button variant="outline" size="lg" className="gap-2 w-full">
                     <img src={creditCoinIcon} alt="" className="h-7 w-7 object-contain" width={28} height={28} loading="eager" decoding="sync" />
                     My Credits
+                  </Button>
+                </Link>
+                <Link to="/my-shopify-store">
+                  <Button variant="outline" size="lg" className="gap-2 w-full">
+                    <Store className="h-5 w-5" />
+                    My Shopify Store
                   </Button>
                 </Link>
                 {isAdmin && (

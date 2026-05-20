@@ -145,3 +145,31 @@ export async function downloadAsset(assetId: string): Promise<void> {
   a.click();
   URL.revokeObjectURL(blobUrl);
 }
+
+const generatedPhotoAssetByWorkflowIdCache = new Map<string, Promise<UserAsset | null>>();
+
+export async function findGeneratedPhotoAssetByWorkflowId(workflowId: string): Promise<UserAsset | null> {
+  const cached = generatedPhotoAssetByWorkflowIdCache.get(workflowId);
+  if (cached) return cached;
+
+  const lookup = fetchUserAssets('generated_photo', 0, 100)
+    .then((response) => (
+      response.items.find((asset) => (
+        asset.workflow_id === workflowId ||
+        asset.workflow_run_id === workflowId ||
+        asset.source_workflow_id === workflowId ||
+        asset.generation_workflow_id === workflowId ||
+        asset.metadata?.workflow_id === workflowId ||
+        asset.metadata?.workflow_run_id === workflowId ||
+        asset.metadata?.source_workflow_id === workflowId ||
+        asset.metadata?.generation_workflow_id === workflowId
+      )) ?? null
+    ))
+    .catch((error) => {
+      generatedPhotoAssetByWorkflowIdCache.delete(workflowId);
+      throw error;
+    });
+
+  generatedPhotoAssetByWorkflowIdCache.set(workflowId, lookup);
+  return lookup;
+}

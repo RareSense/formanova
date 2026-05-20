@@ -1,9 +1,12 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { OptimizedImage } from '@/components/ui/optimized-image';
 import { usePrefetchGenerations } from '@/hooks/use-prefetch-generations';
+import { useToast } from '@/hooks/use-toast';
+import { useShopifyStatus } from '@/hooks/useShopify';
 
 // Reuse the same hero imagery
 import heroNecklace from '@/assets/jewelry/hero-necklace-diamond.jpg';
@@ -30,10 +33,25 @@ const itemVariants = {
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { toast } = useToast();
+  const { refetch: refetchShopifyStatus } = useShopifyStatus();
   const userName = user?.email ? user.email.split('@')[0] : '';
 
   // Prefetch generation history in background so it's instant when user opens Generations
   usePrefetchGenerations();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('shopify_connected') !== 'true') return;
+
+    refetchShopifyStatus().then(({ data }) => {
+      const shopName = data?.shop_name ?? data?.shop_domain ?? 'your Shopify store';
+      toast({
+        title: `Shopify connected. You can now export images directly to ${shopName}.`,
+      });
+      window.history.replaceState({}, '', window.location.pathname);
+    });
+  }, [refetchShopifyStatus, toast]);
 
   return (
     <div className="min-h-[calc(100vh-5rem)] bg-background py-6 px-6 md:px-12 lg:px-16">

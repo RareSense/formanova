@@ -9,6 +9,15 @@ vi.mock('@/hooks/useAuthenticatedImage', () => ({
   useAuthenticatedImage: (url: string) => url,
 }));
 
+vi.mock('@/components/shopify/ShopifyPublishButton', () => ({
+  ShopifyPublishButton: () => <button type="button">Publish to Shopify</button>,
+}));
+
+vi.mock('@/lib/assets-api', () => ({
+  findGeneratedPhotoAssetByWorkflowId: vi.fn(async () => null),
+  getAssetDisplayName: vi.fn(() => ''),
+}));
+
 vi.mock('@/lib/authenticated-fetch', () => ({
   authenticatedFetch: mockAuthenticatedFetch,
 }));
@@ -54,7 +63,7 @@ describe('ResultImageItem', () => {
       />,
     );
 
-    fireEvent.click(screen.getAllByRole('button')[1]);
+    fireEvent.click(screen.getByRole('button', { name: /open image in new tab/i }));
 
     await waitFor(() => {
       expect(window.open).toHaveBeenCalledWith('', '_blank', 'noopener,noreferrer');
@@ -76,7 +85,7 @@ describe('ResultImageItem', () => {
       />,
     );
 
-    fireEvent.click(screen.getAllByRole('button')[1]);
+    fireEvent.click(screen.getByRole('button', { name: /open image in new tab/i }));
 
     await waitFor(() => {
       expect(window.alert).toHaveBeenCalledWith('Could not open the image in a new tab. Please try again.');
