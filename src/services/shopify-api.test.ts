@@ -66,7 +66,7 @@ describe('initiateShopifyConnect', () => {
 
     expect(authenticatedFetch).toHaveBeenCalledWith('/api/shopify/initiate', expect.objectContaining({
       method: 'POST',
-      body: JSON.stringify({ shop: 'test-store.myshopify.com' }),
+      body: JSON.stringify({ shop: 'test-store' }),
     }));
     expect(url).toBe('https://shopify.com/oauth/authorize?shop=test-store.myshopify.com');
   });

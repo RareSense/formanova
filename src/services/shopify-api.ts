@@ -37,7 +37,7 @@ export async function initiateShopifyConnect(subdomain: string): Promise<string>
   const res = await authenticatedFetch('/api/shopify/initiate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ shop: `${subdomain}.myshopify.com` }),
+    body: JSON.stringify({ shop: subdomain }),
   });
   if (!res.ok) throw new Error('Failed to initiate Shopify connect');
   const data = await res.json();
