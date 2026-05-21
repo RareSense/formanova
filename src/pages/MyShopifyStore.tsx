@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Check, Loader2, Unplug } from 'lucide-react';
+import { ArrowLeft, Check, Eye, ExternalLink, Lock, Loader2, Shield, Sparkles, Unplug } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,8 @@ import { disconnectShopify, updateShopifySettings } from '@/services/shopify-api
 import { useToast } from '@/hooks/use-toast';
 import { formatRelativeShopifyTime } from '@/lib/shopify-utils';
 
-function ShopifyIcon({ className }: { className?: string }) {
+/* Shopify bag icon — bag body + handle arc */
+function ShopifyBagIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
       <path d="M4 9a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1l-1 11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 9z" fill="currentColor" />
@@ -54,7 +55,7 @@ export default function MyShopifyStore() {
 
   return (
     <div className="min-h-[calc(100vh-5rem)] bg-background px-6 py-8 md:px-12 lg:px-16">
-      <div className="mx-auto max-w-xl">
+      <div className="mx-auto max-w-4xl">
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -74,7 +75,7 @@ export default function MyShopifyStore() {
           <div>
             <h1 className="font-display text-4xl uppercase tracking-tight">Shopify</h1>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              Connect once. Publish finished photos straight to your store as draft products.
+              Connect once. Send finished photos to Shopify as draft products.
             </p>
           </div>
 
@@ -100,6 +101,22 @@ export default function MyShopifyStore() {
           ) : (
             <DisconnectedCard onConnect={() => setConnectOpen(true)} />
           )}
+
+          {/* Help link */}
+          {!isLoading && !status?.connected && (
+            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+              <ExternalLink className="h-4 w-4" />
+              <span>Need help connecting?</span>
+              <a
+                href="https://help.formanova.ai/shopify"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
+              >
+                View guide
+              </a>
+            </div>
+          )}
         </motion.div>
       </div>
 
@@ -108,32 +125,116 @@ export default function MyShopifyStore() {
   );
 }
 
-/* ---------- sub-cards ---------- */
+/* ---------- Disconnected ---------- */
 
 function DisconnectedCard({ onConnect }: { onConnect: () => void }) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-8">
-      <div className="flex flex-col items-center gap-6 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/40">
-          <ShopifyIcon className="h-8 w-8 text-muted-foreground" />
+    <div className="overflow-hidden rounded-2xl border border-border bg-card">
+      <div className="grid grid-cols-1 md:grid-cols-2">
+
+        {/* Left — connect pane */}
+        <div className="flex flex-col gap-6 p-8">
+          {/* Icon */}
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#008060]/10">
+            <ShopifyBagIcon className="h-9 w-9 text-[#008060]" />
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="text-xl font-semibold text-foreground">Connect Shopify</h2>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              Send finished photos to your Shopify store as draft products.
+            </p>
+          </div>
+
+          {/* Safety note */}
+          <div className="flex gap-3 rounded-xl border border-border bg-muted/20 p-4">
+            <Shield className="mt-0.5 h-4 w-4 shrink-0 text-[#008060]" />
+            <div className="space-y-0.5">
+              <p className="text-sm font-medium text-foreground">Nothing goes live automatically.</p>
+              <p className="text-sm text-muted-foreground">
+                You'll review everything in Shopify before publishing.
+              </p>
+            </div>
+          </div>
+
+          {/* CTA */}
+          <div className="space-y-3">
+            <Button
+              onClick={onConnect}
+              className="h-12 w-full gap-2.5 bg-foreground text-background hover:bg-foreground/90 text-sm font-medium"
+            >
+              <ShopifyBagIcon className="h-4 w-4 shrink-0" />
+              Connect store
+            </Button>
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Lock className="h-3 w-3 shrink-0" />
+              Takes less than a minute. You can disconnect anytime.
+            </p>
+          </div>
         </div>
-        <div className="space-y-2">
-          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Not connected</p>
-          <p className="text-sm leading-relaxed text-muted-foreground max-w-xs">
-            No store linked yet. Connect your store and every export is one click away.
-          </p>
+
+        {/* Divider (vertical on md+, horizontal on mobile) */}
+        <div className="hidden md:block w-px bg-border self-stretch" />
+        <div className="block md:hidden h-px bg-border" />
+
+        {/* Right — explainer pane */}
+        <div className="flex flex-col gap-6 p-8">
+          <h3 className="text-sm font-semibold text-foreground">What happens after connecting?</h3>
+
+          {/* Step visualizer */}
+          <div className="flex items-start justify-between gap-2">
+            <Step
+              icon={<Sparkles className="h-5 w-5 text-[hsl(var(--formanova-hero-accent))]" />}
+              bg="bg-[hsl(var(--formanova-hero-accent))]/10"
+              label="Finished photo"
+            />
+            <Dash />
+            <Step
+              icon={<ShopifyBagIcon className="h-5 w-5 text-[#008060]" />}
+              bg="bg-[#008060]/10"
+              label={<><strong>Draft product</strong><br />in Shopify</>}
+            />
+            <Dash />
+            <Step
+              icon={<Eye className="h-5 w-5 text-purple-500" />}
+              bg="bg-purple-500/10"
+              label={<>Review in Shopify<br />before going live</>}
+            />
+          </div>
+
+          {/* Control note */}
+          <div className="flex gap-3 rounded-xl border border-border bg-muted/20 p-4">
+            <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-[#008060]">
+              <Check className="h-3 w-3 text-[#008060]" />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              You stay in control. Publish only when you're ready.
+            </p>
+          </div>
         </div>
-        <Button
-          onClick={onConnect}
-          className="h-11 gap-2 px-6 font-mono text-[10px] uppercase tracking-[0.15em]"
-        >
-          <ShopifyIcon className="h-4 w-4" />
-          Connect Shopify Store
-        </Button>
       </div>
     </div>
   );
 }
+
+function Step({ icon, bg, label }: { icon: React.ReactNode; bg: string; label: React.ReactNode }) {
+  return (
+    <div className="flex flex-1 flex-col items-center gap-2 text-center">
+      <div className={`flex h-12 w-12 items-center justify-center rounded-full ${bg}`}>
+        {icon}
+      </div>
+      <p className="text-xs leading-snug text-muted-foreground">{label}</p>
+    </div>
+  );
+}
+
+function Dash() {
+  return (
+    <div className="mt-6 flex-1 border-t-2 border-dashed border-border" />
+  );
+}
+
+/* ---------- Connected ---------- */
 
 function ConnectedCard({
   status,
@@ -151,15 +252,14 @@ function ConnectedCard({
   onDisconnect: () => void;
 }) {
   return (
-    <div className="rounded-2xl border border-[#008060]/30 bg-card overflow-hidden">
-      {/* Green header band */}
+    <div className="overflow-hidden rounded-2xl border border-[#008060]/30 bg-card">
+      {/* Green header */}
       <div className="flex items-center gap-3 bg-[#008060] px-6 py-4">
-        <ShopifyIcon className="h-5 w-5 text-white" />
+        <ShopifyBagIcon className="h-5 w-5 text-white" />
         <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/90">Connected</span>
         <Check className="ml-auto h-4 w-4 text-white" />
       </div>
 
-      {/* Store info */}
       <div className="space-y-6 p-6">
         <div className="space-y-1">
           <p className="text-base font-medium text-foreground">{status.shop_name}</p>
@@ -169,7 +269,6 @@ function ConnectedCard({
           </p>
         </div>
 
-        {/* Auto-suggest toggle */}
         <label className="flex cursor-default items-start gap-3 rounded-xl border border-border bg-muted/20 p-4">
           <input
             type="checkbox"
@@ -186,13 +285,12 @@ function ConnectedCard({
           </div>
         </label>
 
-        {/* Disconnect */}
         <Button
           type="button"
           variant="outline"
           onClick={onDisconnect}
           disabled={isDisconnecting}
-          className="h-10 gap-2 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground hover:text-destructive hover:border-destructive"
+          className="h-10 gap-2 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground hover:border-destructive hover:text-destructive"
         >
           {isDisconnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unplug className="h-4 w-4" />}
           Disconnect store
@@ -202,32 +300,27 @@ function ConnectedCard({
   );
 }
 
+/* ---------- Error ---------- */
+
 function ErrorCard({ onConnect, onRetry }: { onConnect: () => void; onRetry: () => void }) {
   return (
     <div className="rounded-2xl border border-border bg-card p-8">
       <div className="flex flex-col items-center gap-6 text-center">
         <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/40">
-          <ShopifyIcon className="h-8 w-8 text-muted-foreground" />
+          <ShopifyBagIcon className="h-8 w-8 text-muted-foreground" />
         </div>
         <div className="space-y-2">
           <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Can't reach Shopify</p>
           <p className="text-sm leading-relaxed text-muted-foreground max-w-xs">
-            We couldn't check your connection status. You can retry or start the connect flow.
+            We couldn't check your connection. You can retry or start the connect flow.
           </p>
         </div>
         <div className="flex gap-3">
-          <Button
-            variant="outline"
-            onClick={onRetry}
-            className="h-10 font-mono text-[10px] uppercase tracking-[0.15em]"
-          >
+          <Button variant="outline" onClick={onRetry} className="h-10 font-mono text-[10px] uppercase tracking-[0.15em]">
             Retry
           </Button>
-          <Button
-            onClick={onConnect}
-            className="h-10 gap-2 px-5 font-mono text-[10px] uppercase tracking-[0.15em]"
-          >
-            <ShopifyIcon className="h-4 w-4" />
+          <Button onClick={onConnect} className="h-10 gap-2 px-5 font-mono text-[10px] uppercase tracking-[0.15em]">
+            <ShopifyBagIcon className="h-4 w-4" />
             Connect Store
           </Button>
         </div>
