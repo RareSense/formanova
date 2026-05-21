@@ -142,7 +142,7 @@ export function ResultImageItem({ url, index, workflowId, outputAssetId, jewelry
       </div>
 
       {/* Action buttons below the image */}
-      <div className="grid grid-cols-2 items-start gap-3 mt-3">
+      <div className="flex flex-col gap-3 mt-3 sm:flex-row">
         <Button
           variant="outline"
           aria-label="Download image"
@@ -158,7 +158,7 @@ export function ResultImageItem({ url, index, workflowId, outputAssetId, jewelry
           workflowId={workflowId}
           isResolvingAsset={isResolvingAsset}
           label="Publish to Shopify"
-          className="h-11 w-full text-xs font-medium"
+          className="h-11 w-full text-sm font-medium"
         />
       </div>
     </div>
