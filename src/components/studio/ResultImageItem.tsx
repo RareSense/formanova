@@ -149,6 +149,7 @@ export function ResultImageItem({ url, index, workflowId, jewelryType, naturalAs
           assetName={(generatedAsset && getAssetDisplayName(generatedAsset)) || generatedAsset?.name || `Photoshoot ${index + 1}`}
           workflowId={workflowId}
           isResolvingAsset={isResolvingAsset}
+          label="Publish"
           className="h-10 w-full font-mono text-[10px] uppercase tracking-[0.15em]"
         />
       </div>
