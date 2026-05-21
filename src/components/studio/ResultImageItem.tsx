@@ -35,18 +35,25 @@ async function openImageInNewTab(src: string) {
   }
 }
 
-export function ResultImageItem({ url, index, workflowId, jewelryType, naturalAspect }: {
+export function ResultImageItem({ url, index, workflowId, outputAssetId, jewelryType, naturalAspect }: {
   url: string;
   index: number;
   workflowId: string | null;
+  outputAssetId?: string | null;
   jewelryType: string;
   naturalAspect?: boolean;
 }) {
   const resolvedSrc = useAuthenticatedImage(url);
   const [generatedAsset, setGeneratedAsset] = useState<UserAsset | null>(null);
-  const [isResolvingAsset, setIsResolvingAsset] = useState(Boolean(workflowId));
+  // Skip the lookup entirely when outputAssetId is already known
+  const [isResolvingAsset, setIsResolvingAsset] = useState(Boolean(workflowId) && outputAssetId === undefined);
 
   useEffect(() => {
+    // If the caller already knows the asset ID, no lookup needed
+    if (outputAssetId !== undefined) {
+      setIsResolvingAsset(false);
+      return;
+    }
     if (!workflowId) {
       setGeneratedAsset(null);
       setIsResolvingAsset(false);
@@ -146,7 +153,7 @@ export function ResultImageItem({ url, index, workflowId, jewelryType, naturalAs
           Download image
         </Button>
         <ShopifyPublishButton
-          assetId={generatedAsset?.id ?? null}
+          assetId={outputAssetId ?? generatedAsset?.id ?? null}
           assetName={(generatedAsset && getAssetDisplayName(generatedAsset)) || generatedAsset?.name || `Photoshoot ${index + 1}`}
           workflowId={workflowId}
           isResolvingAsset={isResolvingAsset}

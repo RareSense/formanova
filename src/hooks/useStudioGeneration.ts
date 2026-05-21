@@ -109,6 +109,7 @@ export function useStudioGeneration({
   const [rotatingMsgIdx, setRotatingMsgIdx] = useState(0);
   const [workflowId, setWorkflowId] = useState<string | null>(null);
   const [resultImages, setResultImages] = useState<string[]>([]);
+  const [outputAssetId, setOutputAssetId] = useState<string | null>(null);
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [regenerationCount, setRegenerationCount] = useState(0);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -149,6 +150,7 @@ export function useStudioGeneration({
     if (!myGeneration) return;
     if (myGeneration.status === 'completed') {
       setResultImages(myGeneration.resultImages);
+      setOutputAssetId(myGeneration.outputAssetId ?? null);
       clearGeneration(workflowId!);
       trackGenerationComplete({
         source: 'unified-studio',
@@ -326,6 +328,7 @@ export function useStudioGeneration({
     aspectRatio?: string;
     resolution?: Resolution;
     generationCost?: number | null;
+    outputAssetId?: string | null;
   }) => {
     if (meta?.resolution || meta?.aspectRatio || meta?.generationCost !== undefined) {
       setGenerationInputUrlsMap(prev => ({
@@ -341,6 +344,7 @@ export function useStudioGeneration({
     }
     setWorkflowId(id);
     setResultImages(images);
+    setOutputAssetId(meta?.outputAssetId ?? null);
     hasNavigatedAway.current = false;
   }, []);
 
@@ -361,6 +365,7 @@ export function useStudioGeneration({
     rotatingMsgIdx,
     workflowId,
     resultImages,
+    outputAssetId,
     setResultImages,
     generationError,
     regenerationCount,

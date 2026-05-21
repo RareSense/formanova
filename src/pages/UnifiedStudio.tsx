@@ -277,6 +277,7 @@ export default function UnifiedStudio() {
       asyncResult?: {
         workflowId: string;
         resultImages: string[];
+        outputAssetId?: string | null;
         aspectRatio?: string;
         resolution?: Resolution;
         generationCost?: number | null;
@@ -296,6 +297,7 @@ export default function UnifiedStudio() {
         aspectRatio: state.asyncResult.aspectRatio,
         resolution: state.asyncResult.resolution,
         generationCost: state.asyncResult.generationCost,
+        outputAssetId: state.asyncResult.outputAssetId,
       });
       setCurrentStep('results');
     } else if (state.viewGenerating) {
@@ -630,6 +632,7 @@ export default function UnifiedStudio() {
           <StudioResultsStep
             resultImages={resultImages}
             workflowId={workflowId}
+            outputAssetId={outputAssetId}
             effectiveJewelryType={effectiveJewelryType}
             isProductShot={isProductShot}
             regenerationCount={regenerationCount}

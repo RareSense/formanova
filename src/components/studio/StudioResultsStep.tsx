@@ -22,6 +22,7 @@ type StudioStep = 'upload' | 'model' | 'generating' | 'results';
 interface StudioResultsStepProps {
   resultImages: string[];
   workflowId: string | null;
+  outputAssetId?: string | null;
   effectiveJewelryType: string;
   isProductShot: boolean;
   regenerationCount: number;
@@ -43,6 +44,7 @@ interface StudioResultsStepProps {
 export function StudioResultsStep({
   resultImages,
   workflowId,
+  outputAssetId,
   effectiveJewelryType,
   isProductShot,
   regenerationCount,
@@ -76,7 +78,7 @@ export function StudioResultsStep({
       {resultImages.length > 0 ? (
         <div className="flex flex-wrap justify-center gap-4 max-w-5xl mx-auto">
           {resultImages.map((url, i) => (
-            <ResultImageItem key={i} url={url} index={i} workflowId={workflowId} jewelryType={effectiveJewelryType} naturalAspect />
+            <ResultImageItem key={i} url={url} index={i} workflowId={workflowId} outputAssetId={outputAssetId} jewelryType={effectiveJewelryType} naturalAspect />
           ))}
         </div>
       ) : (
