@@ -34,7 +34,7 @@ export async function getShopifyStatus(): Promise<ShopifyStatus> {
 }
 
 export function getShopifyInstallUrl(subdomain: string): string {
-  return `/shopify/install?shop=${subdomain}.myshopify.com`;
+  return `/api/shopify/install?shop=${subdomain}.myshopify.com`;
 }
 
 export async function disconnectShopify(): Promise<{ disconnected: true }> {
