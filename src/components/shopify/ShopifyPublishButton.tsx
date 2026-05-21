@@ -36,7 +36,7 @@ export function ShopifyPublishButton({
   autoSuggest = false,
   isResolvingAsset = false,
 }: ShopifyPublishButtonProps) {
-  const { data: status, isLoading } = useShopifyStatus();
+  const { data: status } = useShopifyStatus();
   const [exportOpen, setExportOpen] = useState(false);
   const [showDisconnectedHint, setShowDisconnectedHint] = useState(false);
   const [showNotReadyHint, setShowNotReadyHint] = useState(false);
@@ -66,13 +66,13 @@ export function ShopifyPublishButton({
         type="button"
         variant="outline"
         onClick={handleClick}
-        disabled={isLoading || isResolvingAsset}
+        disabled={isResolvingAsset}
         className={cn(
           'gap-2 border-2 border-[#95BF46] bg-background text-[#95BF46] hover:bg-[#95BF46]/10 hover:text-[#95BF46]',
           className
         )}
       >
-        {isLoading || isResolvingAsset
+        {isResolvingAsset
           ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
           : <ShopifyIcon />}
         <span className="truncate">{label}</span>
