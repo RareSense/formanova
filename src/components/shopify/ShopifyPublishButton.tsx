@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { ShopifyExportDialog } from '@/components/shopify/ShopifyExportDialog';
+import { ShopifyConnectDialog } from '@/components/shopify/ShopifyConnectDialog';
 import { useShopifyStatus } from '@/hooks/useShopify';
 import { cn } from '@/lib/utils';
 
@@ -38,7 +38,7 @@ export function ShopifyPublishButton({
 }: ShopifyPublishButtonProps) {
   const { data: status } = useShopifyStatus();
   const [exportOpen, setExportOpen] = useState(false);
-  const [showDisconnectedHint, setShowDisconnectedHint] = useState(false);
+  const [connectOpen, setConnectOpen] = useState(false);
   const [showNotReadyHint, setShowNotReadyHint] = useState(false);
 
   const isConnected = status?.connected;
@@ -47,17 +47,14 @@ export function ShopifyPublishButton({
     if (isConnected) {
       if (!assetId) {
         setShowNotReadyHint(true);
-        setShowDisconnectedHint(false);
         return;
       }
-      setShowDisconnectedHint(false);
       setShowNotReadyHint(false);
       setExportOpen(true);
       return;
     }
 
-    setShowDisconnectedHint(true);
-    setShowNotReadyHint(false);
+    setConnectOpen(true);
   };
 
   return (
@@ -78,23 +75,13 @@ export function ShopifyPublishButton({
         <span className="truncate">{label}</span>
       </Button>
 
-      {showDisconnectedHint && (
-        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-          Connect your Shopify store first.{' '}
-          <Link
-            to="/my-shopify-store"
-            className="underline underline-offset-4 transition-colors hover:text-foreground"
-          >
-            Open Shopify settings
-          </Link>
-        </p>
-      )}
-
       {showNotReadyHint && (
         <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
           Asset not ready yet. Try again in a moment.
         </p>
       )}
+
+      <ShopifyConnectDialog open={connectOpen} onOpenChange={setConnectOpen} />
 
       {assetId && (
         <ShopifyExportDialog

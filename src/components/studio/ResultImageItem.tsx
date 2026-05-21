@@ -142,7 +142,7 @@ export function ResultImageItem({ url, index, workflowId, outputAssetId, jewelry
       </div>
 
       {/* Action buttons below the image */}
-      <div className="grid grid-cols-2 items-start gap-3 mt-3">
+      <div className="flex flex-col gap-3 mt-3">
         <Button
           variant="outline"
           aria-label="Download image"
