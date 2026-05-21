@@ -104,8 +104,9 @@ export function ResultImageItem({ url, index, workflowId, jewelryType, naturalAs
   };
 
   return (
-    <div className="relative group border border-border/30 overflow-hidden w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.75rem)] max-w-xs">
-      <div className="relative">
+    <div className="w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.75rem)] max-w-xs">
+      {/* Image card */}
+      <div className="relative border border-border/30 overflow-hidden group">
         <img
           src={resolvedSrc ?? ""}
           alt={`Result ${index + 1}`}
@@ -133,23 +134,24 @@ export function ResultImageItem({ url, index, workflowId, jewelryType, naturalAs
         </div>
       </div>
 
-      <div className="grid grid-cols-2 items-start gap-2 border-t border-border/30 bg-background/80 p-3">
+      {/* Action buttons below the image */}
+      <div className="grid grid-cols-2 items-start gap-3 mt-3">
         <Button
           variant="outline"
           aria-label="Download image"
-          className="h-10 w-full gap-2 font-mono text-[10px] uppercase tracking-[0.15em]"
           onClick={handleDownload}
+          className="h-11 w-full gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] bg-background font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"
         >
           <Download className="h-4 w-4" />
-          Download
+          Download image
         </Button>
         <ShopifyPublishButton
           assetId={generatedAsset?.id ?? null}
           assetName={(generatedAsset && getAssetDisplayName(generatedAsset)) || generatedAsset?.name || `Photoshoot ${index + 1}`}
           workflowId={workflowId}
           isResolvingAsset={isResolvingAsset}
-          label="Publish"
-          className="h-10 w-full font-mono text-[10px] uppercase tracking-[0.15em]"
+          label="Publish to Shopify"
+          className="h-11 w-full font-mono text-[10px] uppercase tracking-wider"
         />
       </div>
     </div>
