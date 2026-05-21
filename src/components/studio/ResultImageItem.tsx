@@ -158,7 +158,7 @@ export function ResultImageItem({ url, index, workflowId, outputAssetId, jewelry
           workflowId={workflowId}
           isResolvingAsset={isResolvingAsset}
           label="Publish to Shopify"
-          className="h-11 w-full font-mono text-[10px] uppercase tracking-wider"
+          className="h-11 w-full font-mono text-[10px] uppercase tracking-normal"
         />
       </div>
     </div>
