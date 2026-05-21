@@ -427,6 +427,7 @@ export default function UnifiedStudio() {
     rotatingMsgIdx,
     workflowId,
     resultImages,
+    outputAssetId,
     setResultImages,
     generationError,
     regenerationCount,
