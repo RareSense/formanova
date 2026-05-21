@@ -141,16 +141,17 @@ export function ResultImageItem({ url, index, workflowId, outputAssetId, jewelry
         </div>
       </div>
 
-      {/* Action buttons below the image — single col on mobile, two equal cols on md+ */}
-      <div className="grid grid-cols-1 gap-3 mt-3 md:grid-cols-2">
+      {/* Action buttons — always equal-width two columns */}
+      <div className="mt-3 grid grid-cols-2 gap-3">
         <Button
           variant="outline"
           aria-label="Download image"
           onClick={handleDownload}
-          className="h-11 w-full gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] bg-background font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"
+          className="h-[44px] w-full gap-[6px] border-2 border-[hsl(var(--formanova-hero-accent))] bg-background px-[10px] font-mono text-[10px] uppercase tracking-[0.03em] text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"
         >
-          <Download className="h-4 w-4" />
-          Download image
+          <Download className="h-4 w-4 shrink-0" />
+          <span className="hidden whitespace-nowrap sm:inline">Download image</span>
+          <span className="whitespace-nowrap sm:hidden">Download</span>
         </Button>
         <ShopifyPublishButton
           assetId={outputAssetId ?? generatedAsset?.id ?? null}
@@ -158,7 +159,8 @@ export function ResultImageItem({ url, index, workflowId, outputAssetId, jewelry
           workflowId={workflowId}
           isResolvingAsset={isResolvingAsset}
           label="Publish to Shopify"
-          className="h-11 w-full gap-2 font-mono text-[10px] uppercase tracking-wider"
+          shortLabel="Publish"
+          className="h-[44px] w-full gap-[6px] px-[10px] font-mono text-[10px] uppercase tracking-[0.03em]"
         />
       </div>
     </div>

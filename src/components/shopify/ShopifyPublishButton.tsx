@@ -22,6 +22,7 @@ interface ShopifyPublishButtonProps {
   assetName: string;
   workflowId?: string | null;
   label?: string;
+  shortLabel?: string;
   className?: string;
   autoSuggest?: boolean;
   isResolvingAsset?: boolean;
@@ -32,6 +33,7 @@ export function ShopifyPublishButton({
   assetName,
   workflowId,
   label = 'Publish to Shopify',
+  shortLabel,
   className,
   autoSuggest = false,
   isResolvingAsset = false,
@@ -72,7 +74,14 @@ export function ShopifyPublishButton({
         {isResolvingAsset
           ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
           : <ShopifyIcon />}
-        <span className="truncate">{label}</span>
+        {shortLabel ? (
+          <>
+            <span className="hidden whitespace-nowrap sm:inline">{label}</span>
+            <span className="whitespace-nowrap sm:hidden">{shortLabel}</span>
+          </>
+        ) : (
+          <span className="whitespace-nowrap">{label}</span>
+        )}
       </Button>
 
       {showNotReadyHint && (
