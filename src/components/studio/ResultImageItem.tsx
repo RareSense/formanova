@@ -133,10 +133,9 @@ export function ResultImageItem({ url, index, workflowId, jewelryType, naturalAs
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 border-t border-border/30 bg-background/80 p-3">
+      <div className="grid grid-cols-2 items-start gap-2 border-t border-border/30 bg-background/80 p-3">
         <Button
           variant="outline"
-          size="sm"
           aria-label="Download image"
           className="h-10 w-full gap-2 font-mono text-[10px] uppercase tracking-[0.15em]"
           onClick={handleDownload}

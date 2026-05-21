@@ -43,7 +43,7 @@ export function ShopifyPublishButton({
   };
 
   return (
-    <div className="space-y-2">
+    <div>
       <Button
         type="button"
         onClick={handleClick}
@@ -55,7 +55,7 @@ export function ShopifyPublishButton({
       </Button>
 
       {showDisconnectedHint && (
-        <p className="text-xs leading-relaxed text-muted-foreground">
+        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
           Connect your Shopify store first.{' '}
           <Link
             to="/my-shopify-store"
