@@ -23,7 +23,7 @@ export interface ShopifyExportResult {
 }
 
 export async function getShopifyStatus(): Promise<ShopifyStatus> {
-  const res = await authenticatedFetch('/shopify/status');
+  const res = await authenticatedFetch('/api/shopify/status');
   if (!res.ok) {
     if (res.status === 404 || res.status === 409) {
       return { connected: false };
@@ -38,13 +38,13 @@ export function getShopifyInstallUrl(subdomain: string): string {
 }
 
 export async function disconnectShopify(): Promise<{ disconnected: true }> {
-  const res = await authenticatedFetch('/shopify/disconnect', { method: 'DELETE' });
+  const res = await authenticatedFetch('/api/shopify/disconnect', { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to disconnect Shopify');
   return res.json();
 }
 
 export async function updateShopifySettings(autoSuggest: boolean): Promise<{ auto_suggest: boolean }> {
-  const res = await authenticatedFetch('/shopify/settings', {
+  const res = await authenticatedFetch('/api/shopify/settings', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ auto_suggest: autoSuggest }),
@@ -54,7 +54,7 @@ export async function updateShopifySettings(autoSuggest: boolean): Promise<{ aut
 }
 
 export async function suggestShopifyMetadata(assetId: string, workflowId?: string | null): Promise<ShopifySuggestResult> {
-  const res = await authenticatedFetch('/shopify/suggest', {
+  const res = await authenticatedFetch('/api/shopify/suggest', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -73,7 +73,7 @@ export async function exportToShopify(params: {
   description: string;
   altText: string;
 }): Promise<ShopifyExportResult> {
-  const res = await authenticatedFetch('/shopify/export', {
+  const res = await authenticatedFetch('/api/shopify/export', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
