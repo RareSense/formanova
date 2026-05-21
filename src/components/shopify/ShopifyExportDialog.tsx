@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { useShopifyStatus } from '@/hooks/useShopify';
 import { exportToShopify, suggestShopifyMetadata } from '@/services/shopify-api';
 
 interface ShopifyExportDialogProps {
@@ -34,6 +35,8 @@ export function ShopifyExportDialog({
   autoSuggest = false,
 }: ShopifyExportDialogProps) {
   const { toast } = useToast();
+  const { data: shopifyStatus } = useShopifyStatus();
+  const shopName = shopifyStatus?.shop_name ?? shopifyStatus?.shop_domain ?? 'Shopify';
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [altText, setAltText] = useState('');
@@ -78,7 +81,7 @@ export function ShopifyExportDialog({
 
       if (result.success && result.shopify_admin_url) {
         toast({
-          title: 'Draft product created in Shopify.',
+          title: `Draft product created in ${shopName}.`,
           action: (
             <ToastAction
               altText="Open in Shopify"

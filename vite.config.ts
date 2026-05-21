@@ -45,39 +45,48 @@ function versionJsonPlugin(): Plugin {
 }
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
-  server: {
-    host: "::",
-    port: 8080,
-  },
-  plugins: [
-    react(),
-    mode === "development" && componentTagger(),
-    ViteImageOptimizer({
-      png: { quality: 70 },
-      jpeg: { quality: 70 },
-      jpg: { quality: 70 },
-      webp: { quality: 65 },
-    }),
-    // Only apply async CSS in production builds
-    mode === "production" && asyncCssPlugin(),
-    versionJsonPlugin(),
-  ].filter(Boolean),
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
+export default defineConfig(({ mode }) => {
+  const backendTarget = process.env.VITE_PIPELINE_API_URL || 'http://localhost:8005';
+
+  return {
+    server: {
+      host: "::",
+      port: 8080,
+      proxy: {
+        '/shopify': backendTarget,
+        '/api': backendTarget,
+        '/auth': backendTarget,
+        '/billing': backendTarget,
+      },
     },
-  },
-  build: {
-    sourcemap: mode === "development",
-    target: "es2022",
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          "vendor-framer": ["framer-motion"],
-          "vendor-posthog": ["posthog-js", "posthog-js/react"],
+    plugins: [
+      react(),
+      mode === "development" && componentTagger(),
+      ViteImageOptimizer({
+        png: { quality: 70 },
+        jpeg: { quality: 70 },
+        jpg: { quality: 70 },
+        webp: { quality: 65 },
+      }),
+      mode === "production" && asyncCssPlugin(),
+      versionJsonPlugin(),
+    ].filter(Boolean),
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "./src"),
+      },
+    },
+    build: {
+      sourcemap: mode === "development",
+      target: "es2022",
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            "vendor-framer": ["framer-motion"],
+            "vendor-posthog": ["posthog-js", "posthog-js/react"],
+          },
         },
       },
     },
-  },
-}));
+  };
+});
