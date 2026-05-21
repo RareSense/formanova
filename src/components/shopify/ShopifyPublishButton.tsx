@@ -68,7 +68,7 @@ export function ShopifyPublishButton({
         onClick={handleClick}
         disabled={isLoading || isResolvingAsset}
         className={cn(
-          'gap-2 border-2 border-[#008060] bg-background text-[#008060] hover:bg-[#008060]/10 hover:text-[#008060]',
+          'gap-2 border-2 border-[#95BF46] bg-background text-[#95BF46] hover:bg-[#95BF46]/10 hover:text-[#95BF46]',
           className
         )}
       >
