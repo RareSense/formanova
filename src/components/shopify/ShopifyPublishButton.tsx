@@ -76,15 +76,17 @@ export function ShopifyPublishButton({
         onClick={handleClick}
         disabled={isLoading || isResolvingAsset}
         className={cn(
-          'gap-2',
+          'gap-2 overflow-hidden',
           isConnected
             ? 'border-2 border-[#008060] bg-[#008060] text-white hover:bg-[#006e52] hover:border-[#006e52]'
             : 'border-2 border-[hsl(var(--formanova-hero-accent))] bg-background text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]',
           className
         )}
       >
-        {isLoading || isResolvingAsset ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShopifyIcon className="h-4 w-4" />}
-        {label}
+        {isLoading || isResolvingAsset
+          ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+          : <ShopifyIcon className="h-4 w-4 shrink-0" />}
+        <span className="truncate">{label}</span>
       </Button>
 
       {showDisconnectedHint && (
