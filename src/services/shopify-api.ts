@@ -33,8 +33,15 @@ export async function getShopifyStatus(): Promise<ShopifyStatus> {
   return res.json();
 }
 
-export function getShopifyInstallUrl(subdomain: string): string {
-  return `/api/shopify/install?shop=${subdomain}.myshopify.com`;
+export async function initiateShopifyConnect(subdomain: string): Promise<string> {
+  const res = await authenticatedFetch('/api/shopify/initiate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ shop: `${subdomain}.myshopify.com` }),
+  });
+  if (!res.ok) throw new Error('Failed to initiate Shopify connect');
+  const data = await res.json();
+  return data.install_url;
 }
 
 export async function disconnectShopify(): Promise<{ disconnected: true }> {

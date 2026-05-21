@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useShopifyStatus } from '@/hooks/useShopify';
-import { getShopifyInstallUrl } from '@/services/shopify-api';
+import { initiateShopifyConnect } from '@/services/shopify-api';
 import { isValidShopifySubdomain, normalizeShopifySubdomain } from '@/lib/shopify-utils';
 
 interface ShopifyConnectDialogProps {
@@ -23,8 +23,9 @@ export function ShopifyConnectDialog({ open, onOpenChange }: ShopifyConnectDialo
   const { data: status } = useShopifyStatus();
   const [shop, setShop] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [connecting, setConnecting] = useState(false);
 
-  const handleConnect = () => {
+  const handleConnect = async () => {
     const normalizedShop = normalizeShopifySubdomain(shop);
 
     if (!normalizedShop) {
@@ -38,7 +39,14 @@ export function ShopifyConnectDialog({ open, onOpenChange }: ShopifyConnectDialo
     }
 
     setError(null);
-    window.location.href = getShopifyInstallUrl(normalizedShop);
+    setConnecting(true);
+    try {
+      const installUrl = await initiateShopifyConnect(normalizedShop);
+      window.location.href = installUrl;
+    } catch {
+      setError('Could not start Shopify connection. Try again.');
+      setConnecting(false);
+    }
   };
 
   return (
@@ -97,10 +105,11 @@ export function ShopifyConnectDialog({ open, onOpenChange }: ShopifyConnectDialo
 
             <Button
               onClick={handleConnect}
+              disabled={connecting}
               className="h-11 w-full gap-2 font-mono text-[10px] uppercase tracking-[0.15em]"
             >
               <Store className="h-4 w-4" />
-              Connect Shopify Store
+              {connecting ? 'Connecting…' : 'Connect Shopify Store'}
             </Button>
           </div>
         )}

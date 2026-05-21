@@ -6,7 +6,7 @@ vi.mock('@/lib/authenticated-fetch', () => ({
   authenticatedFetch: (...args: unknown[]) => authenticatedFetch(...args),
 }));
 
-import { getShopifyStatus } from './shopify-api';
+import { getShopifyStatus, initiateShopifyConnect } from './shopify-api';
 
 function jsonResponse(status: number, body: unknown): Response {
   return {
@@ -49,5 +49,31 @@ describe('shopify-api', () => {
     authenticatedFetch.mockResolvedValueOnce(jsonResponse(500, { detail: 'Server error' }));
 
     await expect(getShopifyStatus()).rejects.toThrow('Failed to fetch Shopify status');
+  });
+});
+
+describe('initiateShopifyConnect', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('posts to /api/shopify/initiate with the full shop domain and returns install_url', async () => {
+    authenticatedFetch.mockResolvedValueOnce(jsonResponse(200, {
+      install_url: 'https://shopify.com/oauth/authorize?shop=test-store.myshopify.com',
+    }));
+
+    const url = await initiateShopifyConnect('test-store');
+
+    expect(authenticatedFetch).toHaveBeenCalledWith('/api/shopify/initiate', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ shop: 'test-store.myshopify.com' }),
+    }));
+    expect(url).toBe('https://shopify.com/oauth/authorize?shop=test-store.myshopify.com');
+  });
+
+  it('throws on non-ok response', async () => {
+    authenticatedFetch.mockResolvedValueOnce(jsonResponse(500, {}));
+
+    await expect(initiateShopifyConnect('test-store')).rejects.toThrow('Failed to initiate Shopify connect');
   });
 });
