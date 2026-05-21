@@ -111,13 +111,13 @@ export function ResultImageItem({ url, index, workflowId, outputAssetId, jewelry
   };
 
   return (
-    <div className="flex w-full flex-col items-center sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.75rem)]">
-      {/* Image — natural aspect ratio, centered, max 460px wide */}
-      <div className="relative w-full max-w-[460px] border border-border/30 overflow-hidden group">
+    <div className="w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.75rem)] max-w-xs">
+      {/* Image card */}
+      <div className="relative border border-border/30 overflow-hidden group">
         <img
           src={resolvedSrc ?? ""}
           alt={`Result ${index + 1}`}
-          className="block w-full h-auto max-h-[560px] object-contain bg-muted/30"
+          className={`w-full object-contain bg-muted/30 max-h-[70vh]${naturalAspect ? '' : ' aspect-[3/4]'}`}
         />
         <div className="absolute top-2 right-2 flex gap-1.5">
           <Button
@@ -141,15 +141,15 @@ export function ResultImageItem({ url, index, workflowId, outputAssetId, jewelry
         </div>
       </div>
 
-      {/* Action buttons — equal-width two-column grid, aligned to image */}
-      <div className="mt-3 grid w-full max-w-[460px] grid-cols-2 gap-[10px] sm:gap-3">
+      {/* Action buttons below the image — single col on mobile, two equal cols on md+ */}
+      <div className="grid grid-cols-1 gap-3 mt-3 md:grid-cols-2">
         <Button
           variant="outline"
           aria-label="Download image"
           onClick={handleDownload}
-          className="h-11 w-full gap-1.5 border-2 border-[hsl(var(--formanova-hero-accent))] bg-background font-mono text-[10px] uppercase tracking-[0.03em] text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))] sm:gap-2 sm:px-3 sm:tracking-[0.05em] sm:text-[11px]"
+          className="h-11 w-full gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] bg-background font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"
         >
-          <Download className="h-4 w-4 shrink-0" />
+          <Download className="h-4 w-4" />
           Download image
         </Button>
         <ShopifyPublishButton
@@ -158,7 +158,7 @@ export function ResultImageItem({ url, index, workflowId, outputAssetId, jewelry
           workflowId={workflowId}
           isResolvingAsset={isResolvingAsset}
           label="Publish to Shopify"
-          className="h-11 w-full gap-1.5 font-mono text-[10px] uppercase tracking-[0.03em] sm:gap-2 sm:px-3 sm:tracking-[0.05em] sm:text-[11px]"
+          className="h-11 w-full gap-2 font-mono text-[10px] uppercase tracking-wider"
         />
       </div>
     </div>
