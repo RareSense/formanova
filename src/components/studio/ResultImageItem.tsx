@@ -111,13 +111,13 @@ export function ResultImageItem({ url, index, workflowId, outputAssetId, jewelry
   };
 
   return (
-    <div className="flex w-full flex-col items-center sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.75rem)]">
-      {/* Image — natural aspect ratio, centered, max 460px wide */}
-      <div className="relative w-full max-w-[460px] border border-border/30 overflow-hidden group">
+    <div className="flex w-full flex-col sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.75rem)]">
+      {/* Image — fixed-height preview frame, full image always visible, no crop */}
+      <div className="relative w-full max-w-[520px] mx-auto flex items-center justify-center border border-[#e2e2dc] bg-[#f7f7f5] group" style={{ height: 'min(520px, 70vh)' }}>
         <img
           src={resolvedSrc ?? ""}
           alt={`Result ${index + 1}`}
-          className="block w-full h-auto max-h-[560px] object-contain bg-muted/30"
+          className="block max-w-full max-h-full w-auto h-auto object-contain"
         />
         <div className="absolute top-2 right-2 flex gap-1.5">
           <Button
@@ -141,8 +141,8 @@ export function ResultImageItem({ url, index, workflowId, outputAssetId, jewelry
         </div>
       </div>
 
-      {/* Action buttons — equal-width two-column grid, aligned to image */}
-      <div className="mt-3 grid w-full max-w-[460px] grid-cols-2 gap-[10px] sm:gap-3">
+      {/* Action buttons — independent of image width, always equal two columns */}
+      <div className="mt-3 grid w-full max-w-[460px] mx-auto grid-cols-2 gap-[10px] sm:gap-3">
         <Button
           variant="outline"
           aria-label="Download image"
