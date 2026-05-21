@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Loader2, Store, Unplug } from 'lucide-react';
+import { ArrowLeft, Check, Loader2, Unplug } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,15 @@ import { useInvalidateShopifyStatus, useShopifyStatus } from '@/hooks/useShopify
 import { disconnectShopify, updateShopifySettings } from '@/services/shopify-api';
 import { useToast } from '@/hooks/use-toast';
 import { formatRelativeShopifyTime } from '@/lib/shopify-utils';
+
+function ShopifyIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <path d="M4 9a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1l-1 11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 9z" fill="currentColor" />
+      <path d="M9 8V6.5a3 3 0 0 1 6 0V8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 export default function MyShopifyStore() {
   const { toast } = useToast();
@@ -22,17 +31,10 @@ export default function MyShopifyStore() {
     mutationFn: disconnectShopify,
     onSuccess: async () => {
       await invalidateStatus();
-      toast({
-        title: 'Shopify disconnected',
-        description: 'Your store has been disconnected from FormaNova.',
-      });
+      toast({ title: 'Store disconnected.' });
     },
     onError: () => {
-      toast({
-        title: 'Disconnect failed',
-        description: 'We could not disconnect your Shopify store. Please try again.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Could not disconnect. Try again.', variant: 'destructive' });
     },
   });
 
@@ -44,10 +46,7 @@ export default function MyShopifyStore() {
     },
     onError: () => {
       setOptimisticAutoSuggest(null);
-      toast({
-        title: 'Could not update Shopify settings.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Could not save setting.', variant: 'destructive' });
     },
   });
 
@@ -55,149 +54,184 @@ export default function MyShopifyStore() {
 
   return (
     <div className="min-h-[calc(100vh-5rem)] bg-background px-6 py-8 md:px-12 lg:px-16">
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto max-w-xl">
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
-          className="space-y-6"
+          className="space-y-8"
         >
+          {/* Back link */}
+          <Link
+            to="/dashboard"
+            className="inline-flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.3em] text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="h-3 w-3" />
+            Dashboard
+          </Link>
+
+          {/* Page title */}
           <div>
-            <Link
-              to="/dashboard"
-              className="mb-3 inline-flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.3em] text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <ArrowLeft className="h-3 w-3" />
-              Dashboard
-            </Link>
-            <h1 className="font-display text-4xl uppercase tracking-tight text-foreground">
-              My Shopify Store
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-              Manage the Shopify connection used by your publish flow in the studio and generation history.
+            <h1 className="font-display text-4xl uppercase tracking-tight">Shopify</h1>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              Connect once. Publish finished photos straight to your store as draft products.
             </p>
           </div>
 
-          <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
-            {isLoading ? (
-              <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading Shopify connection status...
-              </div>
-            ) : isError ? (
-              <div className="space-y-4">
-                <div className="flex items-start gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full border border-border bg-muted/40">
-                    <Store className="h-6 w-6 text-muted-foreground" />
-                  </div>
-                  <div className="space-y-2">
-                    <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                      Shopify
-                    </p>
-                    <p className="text-sm leading-relaxed text-muted-foreground">
-                      We could not confirm your Shopify connection right now. You can still start the connection flow below.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <Button
-                    type="button"
-                    onClick={() => setConnectOpen(true)}
-                    className="h-11 gap-2 font-mono text-[10px] uppercase tracking-[0.15em]"
-                  >
-                    <Store className="h-4 w-4" />
-                    Connect Shopify
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => invalidateStatus()}
-                    className="h-11 font-mono text-[10px] uppercase tracking-[0.15em]"
-                  >
-                    Retry
-                  </Button>
-                </div>
-              </div>
-            ) : status?.connected ? (
-              <div className="space-y-5">
-                <div className="flex items-start gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full border border-border bg-muted/40">
-                    <Store className="h-6 w-6 text-foreground" />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                        Shopify
-                      </p>
-                      <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">
-                        Connected
-                      </span>
-                    </div>
-                    <p className="text-base text-foreground">{status.shop_name}</p>
-                    <p className="text-sm text-muted-foreground">{status.shop_domain}</p>
-                    <p className="text-sm leading-relaxed text-muted-foreground">
-                      Last used: {formatRelativeShopifyTime(status.last_used_at)}
-                    </p>
-                  </div>
-                </div>
-
-                <label className="flex items-center gap-3 rounded-md border border-border bg-muted/20 p-4">
-                  <input
-                    type="checkbox"
-                    checked={autoSuggestValue}
-                    onChange={(event) => {
-                      const next = event.target.checked;
-                      setOptimisticAutoSuggest(next);
-                      settingsMutation.mutate(next);
-                    }}
-                    className="h-4 w-4"
-                  />
-                  <span className="text-sm text-foreground">Always generate AI suggestions</span>
-                </label>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => disconnectMutation.mutate()}
-                  disabled={disconnectMutation.isPending}
-                  className="h-11 gap-2 font-mono text-[10px] uppercase tracking-[0.15em]"
-                >
-                  {disconnectMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unplug className="h-4 w-4" />}
-                  Disconnect store
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-5">
-                <div className="flex items-start gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full border border-border bg-muted/40">
-                    <Store className="h-6 w-6 text-muted-foreground" />
-                  </div>
-                  <div className="space-y-2">
-                    <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                      Shopify
-                    </p>
-                    <p className="text-sm leading-relaxed text-muted-foreground">
-                      Publish your images directly to your Shopify store as draft products.
-                    </p>
-                  </div>
-                </div>
-
-                <Button
-                  type="button"
-                  onClick={() => setConnectOpen(true)}
-                  className="h-11 gap-2 font-mono text-[10px] uppercase tracking-[0.15em]"
-                >
-                  <Store className="h-4 w-4" />
-                  Connect Shopify
-                </Button>
-              </div>
-            )}
-          </div>
+          {/* Card */}
+          {isLoading ? (
+            <div className="flex h-64 items-center justify-center rounded-2xl border border-border bg-card">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : isError ? (
+            <ErrorCard onConnect={() => setConnectOpen(true)} onRetry={() => invalidateStatus()} />
+          ) : status?.connected ? (
+            <ConnectedCard
+              status={status}
+              autoSuggestValue={autoSuggestValue}
+              isDisconnecting={disconnectMutation.isPending}
+              isSavingSetting={settingsMutation.isPending}
+              onToggleAutoSuggest={(next) => {
+                setOptimisticAutoSuggest(next);
+                settingsMutation.mutate(next);
+              }}
+              onDisconnect={() => disconnectMutation.mutate()}
+            />
+          ) : (
+            <DisconnectedCard onConnect={() => setConnectOpen(true)} />
+          )}
         </motion.div>
       </div>
 
       <ShopifyConnectDialog open={connectOpen} onOpenChange={setConnectOpen} />
+    </div>
+  );
+}
+
+/* ---------- sub-cards ---------- */
+
+function DisconnectedCard({ onConnect }: { onConnect: () => void }) {
+  return (
+    <div className="rounded-2xl border border-border bg-card p-8">
+      <div className="flex flex-col items-center gap-6 text-center">
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/40">
+          <ShopifyIcon className="h-8 w-8 text-muted-foreground" />
+        </div>
+        <div className="space-y-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Not connected</p>
+          <p className="text-sm leading-relaxed text-muted-foreground max-w-xs">
+            No store linked yet. Connect your store and every export is one click away.
+          </p>
+        </div>
+        <Button
+          onClick={onConnect}
+          className="h-11 gap-2 px-6 font-mono text-[10px] uppercase tracking-[0.15em]"
+        >
+          <ShopifyIcon className="h-4 w-4" />
+          Connect Shopify Store
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ConnectedCard({
+  status,
+  autoSuggestValue,
+  isDisconnecting,
+  isSavingSetting,
+  onToggleAutoSuggest,
+  onDisconnect,
+}: {
+  status: { shop_name?: string; shop_domain?: string; last_used_at?: string | null; auto_suggest?: boolean };
+  autoSuggestValue: boolean;
+  isDisconnecting: boolean;
+  isSavingSetting: boolean;
+  onToggleAutoSuggest: (v: boolean) => void;
+  onDisconnect: () => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-[#008060]/30 bg-card overflow-hidden">
+      {/* Green header band */}
+      <div className="flex items-center gap-3 bg-[#008060] px-6 py-4">
+        <ShopifyIcon className="h-5 w-5 text-white" />
+        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/90">Connected</span>
+        <Check className="ml-auto h-4 w-4 text-white" />
+      </div>
+
+      {/* Store info */}
+      <div className="space-y-6 p-6">
+        <div className="space-y-1">
+          <p className="text-base font-medium text-foreground">{status.shop_name}</p>
+          <p className="font-mono text-xs text-muted-foreground">{status.shop_domain}</p>
+          <p className="text-xs text-muted-foreground">
+            Last used: {formatRelativeShopifyTime(status.last_used_at)}
+          </p>
+        </div>
+
+        {/* Auto-suggest toggle */}
+        <label className="flex cursor-default items-start gap-3 rounded-xl border border-border bg-muted/20 p-4">
+          <input
+            type="checkbox"
+            checked={autoSuggestValue}
+            disabled={isSavingSetting}
+            onChange={(e) => onToggleAutoSuggest(e.target.checked)}
+            className="mt-0.5 h-4 w-4 accent-[#008060]"
+          />
+          <div className="space-y-0.5">
+            <p className="text-sm text-foreground">Auto-generate AI copy</p>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Every time you open the export panel, AI will pre-fill title, description, and alt text.
+            </p>
+          </div>
+        </label>
+
+        {/* Disconnect */}
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onDisconnect}
+          disabled={isDisconnecting}
+          className="h-10 gap-2 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground hover:text-destructive hover:border-destructive"
+        >
+          {isDisconnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unplug className="h-4 w-4" />}
+          Disconnect store
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ErrorCard({ onConnect, onRetry }: { onConnect: () => void; onRetry: () => void }) {
+  return (
+    <div className="rounded-2xl border border-border bg-card p-8">
+      <div className="flex flex-col items-center gap-6 text-center">
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/40">
+          <ShopifyIcon className="h-8 w-8 text-muted-foreground" />
+        </div>
+        <div className="space-y-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Can't reach Shopify</p>
+          <p className="text-sm leading-relaxed text-muted-foreground max-w-xs">
+            We couldn't check your connection status. You can retry or start the connect flow.
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <Button
+            variant="outline"
+            onClick={onRetry}
+            className="h-10 font-mono text-[10px] uppercase tracking-[0.15em]"
+          >
+            Retry
+          </Button>
+          <Button
+            onClick={onConnect}
+            className="h-10 gap-2 px-5 font-mono text-[10px] uppercase tracking-[0.15em]"
+          >
+            <ShopifyIcon className="h-4 w-4" />
+            Connect Store
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
