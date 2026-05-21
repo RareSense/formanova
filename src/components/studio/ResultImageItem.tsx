@@ -146,7 +146,7 @@ export function ResultImageItem({ url, index, workflowId, jewelryType, naturalAs
         </Button>
         <ShopifyPublishButton
           assetId={generatedAsset?.id ?? null}
-          assetName={getAssetDisplayName(generatedAsset) || generatedAsset?.name || `Photoshoot ${index + 1}`}
+          assetName={(generatedAsset && getAssetDisplayName(generatedAsset)) || generatedAsset?.name || `Photoshoot ${index + 1}`}
           workflowId={workflowId}
           isResolvingAsset={isResolvingAsset}
           className="h-10 w-full font-mono text-[10px] uppercase tracking-[0.15em]"
