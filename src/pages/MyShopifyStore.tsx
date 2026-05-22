@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '@/contexts/ThemeContext';
 import logoBlack from '@/assets/formanova-logo-black.png';
 import logoWhite from '@/assets/formanova-logo-white.png';
-import { ArrowLeft, ArrowRight, Check, Lock, Loader2, Settings, Store, Unplug } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Lock, Loader2, Settings, Store } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
@@ -348,22 +348,25 @@ function ConnectedCard({
   onDisconnect: () => void;
 }) {
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
-  const showShopName = status.shop_name && status.shop_name !== status.shop_domain;
 
   return (
     <>
       <div className="border border-border">
 
-        {/* Top row: connection control */}
-        <div className="flex items-center gap-3 border-b border-border px-5 py-4">
-          <ShopifyBagIcon className="h-5 w-5 shrink-0" />
-          <span className="text-sm font-medium text-foreground">Shopify connection</span>
-          <div className="ml-auto flex items-center gap-2.5">
+        {/* Card header: icon + title + toggle */}
+        <div className="flex items-start gap-4 border-b border-border px-6 py-5">
+          <ShopifyBagIcon className="mt-0.5 h-5 w-5 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-foreground">Shopify publishing</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Manage Shopify draft-product publishing.</p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2.5">
             <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-primary">Connected</span>
             <button
               type="button"
               role="switch"
               aria-checked
+              aria-label="Disconnect Shopify"
               onClick={() => setShowDisconnectConfirm(true)}
               disabled={isDisconnecting}
               className="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full bg-primary transition-colors disabled:opacity-50"
@@ -373,23 +376,16 @@ function ConnectedCard({
           </div>
         </div>
 
-        <div className="space-y-5 p-5">
+        <div className="divide-y divide-border">
 
-          {/* Store info */}
-          <div className="space-y-1">
-            <p className="font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground">Connected store</p>
-            <p className="text-sm font-medium text-foreground">{status.shop_domain}</p>
-            {showShopName && (
-              <p className="text-xs text-muted-foreground">{status.shop_name}</p>
-            )}
+          {/* Connected store */}
+          <div className="px-6 py-5">
+            <p className="font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground">Connected to</p>
+            <p className="mt-1.5 text-sm font-medium text-foreground">{status.shop_domain}</p>
           </div>
 
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Finished photos can now be published to Shopify as draft products.
-          </p>
-
-          {/* AI copy setting */}
-          <label className="flex cursor-default items-start gap-3 border border-border/40 p-4">
+          {/* AI setting */}
+          <label className="flex cursor-default items-start gap-3 px-6 py-5">
             <input
               type="checkbox"
               checked={autoSuggestValue}
@@ -406,6 +402,13 @@ function ConnectedCard({
           </label>
 
         </div>
+
+        {/* Footer hint */}
+        <div className="border-t border-border px-6 py-3">
+          <p className="font-mono text-[9px] tracking-[0.1em] text-muted-foreground">
+            Turning the toggle off will ask for confirmation.
+          </p>
+        </div>
       </div>
 
       {/* Disconnect confirmation modal */}
@@ -416,7 +419,7 @@ function ConnectedCard({
               Disconnect Shopify store?
             </DialogTitle>
             <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
-              This will stop publishing finished photos to Shopify until you reconnect.
+              This will pause Shopify publishing. Finished photos will not be sent to Shopify until you reconnect.
             </DialogDescription>
             <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
               <Button
@@ -436,8 +439,8 @@ function ConnectedCard({
                 disabled={isDisconnecting}
                 className="h-10 gap-2 font-mono text-[10px] uppercase tracking-[0.15em]"
               >
-                {isDisconnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unplug className="h-4 w-4" />}
-                Disconnect store
+                {isDisconnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Disconnect
               </Button>
             </div>
           </div>
