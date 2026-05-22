@@ -20,7 +20,6 @@ import {
 } from '@/services/shopify-api';
 import { useToast } from '@/hooks/use-toast';
 import {
-  formatRelativeShopifyTime,
   isValidShopifySubdomain,
   normalizeShopifySubdomain,
 } from '@/lib/shopify-utils';
@@ -279,16 +278,18 @@ function ConnectedCard({
   onToggleAutoSuggest,
   onDisconnect,
 }: {
-  status: { shop_name?: string; shop_domain?: string; last_used_at?: string | null; auto_suggest?: boolean };
+  status: { shop_name?: string; shop_domain?: string; auto_suggest?: boolean };
   autoSuggestValue: boolean;
   isDisconnecting: boolean;
   isSavingSetting: boolean;
   onToggleAutoSuggest: (v: boolean) => void;
   onDisconnect: () => void;
 }) {
+  const showShopName = status.shop_name && status.shop_name !== status.shop_domain;
+
   return (
-    <div className="border border-[#008060]/40">
-      {/* Green header */}
+    <div className="border border-border">
+      {/* Green status bar */}
       <div className="flex items-center gap-3 bg-[#008060] px-6 py-4">
         <ShopifyBagIcon className="h-5 w-5" />
         <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-white/90">Connected</span>
@@ -296,14 +297,19 @@ function ConnectedCard({
       </div>
 
       <div className="space-y-6 p-6">
-        <div className="space-y-1">
-          <p className="font-display text-xl uppercase tracking-wide text-foreground leading-none">{status.shop_name}</p>
-          <p className="font-mono text-[10px] tracking-[0.15em] text-muted-foreground">{status.shop_domain}</p>
-          <p className="font-mono text-[9px] tracking-[0.1em] text-muted-foreground">
-            Last used: {formatRelativeShopifyTime(status.last_used_at)}
+        {/* Store info */}
+        <div className="space-y-1.5">
+          <p className="font-mono text-[9px] uppercase tracking-[0.3em] text-muted-foreground">Store</p>
+          <p className="text-sm font-medium text-foreground">{status.shop_domain}</p>
+          {showShopName && (
+            <p className="text-xs text-muted-foreground">{status.shop_name}</p>
+          )}
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Connected successfully. Finished photos can now be published as Shopify draft products.
           </p>
         </div>
 
+        {/* AI copy setting */}
         <label className="flex cursor-default items-start gap-3 border border-border/30 p-4">
           <input
             type="checkbox"
@@ -313,19 +319,20 @@ function ConnectedCard({
             className="mt-0.5 h-4 w-4 accent-[#008060]"
           />
           <div className="space-y-1">
-            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-foreground">Auto-generate AI copy</p>
-            <p className="font-mono text-[9px] leading-relaxed tracking-[0.1em] text-muted-foreground">
-              Every time you open the export panel, AI will pre-fill title, description, and alt text.
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-foreground">Pre-fill product copy with AI</p>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Generate draft title, description, and alt text before publishing.
             </p>
           </div>
         </label>
 
+        {/* Disconnect */}
         <Button
           type="button"
           variant="outline"
           onClick={onDisconnect}
           disabled={isDisconnecting}
-          className="h-10 gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:border-destructive hover:text-destructive"
+          className="h-10 gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground"
         >
           {isDisconnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unplug className="h-4 w-4" />}
           Disconnect store
