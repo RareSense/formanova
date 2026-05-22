@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useTheme } from '@/contexts/ThemeContext';
+import logoBlack from '@/assets/formanova-logo-black.png';
+import logoWhite from '@/assets/formanova-logo-white.png';
 import { ArrowLeft, ArrowRight, Check, Loader2, Unplug } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 
@@ -34,8 +37,12 @@ function ShopifyBagIcon({ className }: { className?: string }) {
   );
 }
 
+const DARK_THEMES = new Set(['dark', 'cyberpunk', 'retro', 'fashion', 'luxury', 'synthwave', 'neon']);
+
 export default function MyShopifyStore() {
   const { toast } = useToast();
+  const { theme } = useTheme();
+  const logoSrc = DARK_THEMES.has(theme) ? logoWhite : logoBlack;
   const invalidateStatus = useInvalidateShopifyStatus();
   const { data: status, isLoading, isError } = useShopifyStatus();
   const [optimisticAutoSuggest, setOptimisticAutoSuggest] = useState<boolean | null>(null);
@@ -126,7 +133,7 @@ export default function MyShopifyStore() {
                   <span className="flex items-center gap-1">
                     {[0, 1, 2].map((i) => <span key={i} className="block h-1 w-1 rounded-full bg-border" />)}
                   </span>
-                  <span className="font-display text-xl uppercase tracking-wide text-foreground">formanova</span>
+                  <img src={logoSrc} alt="FormaNova" className="h-7 w-auto object-contain" />
                 </div>
 
                 <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
