@@ -150,7 +150,7 @@ function ConnectCard() {
   };
 
   return (
-    <div className="rounded-2xl border border-border bg-card shadow-sm">
+    <div className="rounded-2xl border border-border bg-card">
       <div className="flex flex-col items-center gap-8 px-8 py-12 sm:px-12 sm:py-14">
 
         {/* Shopify icon */}
@@ -160,13 +160,13 @@ function ConnectCard() {
 
         {/* Heading */}
         <div className="space-y-1.5 text-center">
-          <h2 className="text-xl font-semibold text-foreground">Connect your Shopify store</h2>
+          <p className="text-xl font-semibold text-foreground">Connect your Shopify store</p>
           <p className="text-sm text-muted-foreground">Enter your store name to continue.</p>
         </div>
 
         {/* Form */}
         <div className="w-full max-w-sm space-y-3">
-          <label htmlFor="shopify-subdomain" className="block font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          <label htmlFor="shopify-subdomain" className="block font-mono text-[10px] uppercase tracking-[0.2em] text-foreground">
             Shopify store name
           </label>
 
@@ -222,7 +222,7 @@ function ConnectCard() {
             {connecting ? 'Connecting...' : 'Continue to Shopify'}
             {!connecting && <ArrowRight className="h-4 w-4 shrink-0" />}
           </Button>
-          <p className="text-center text-xs text-muted-foreground">
+          <p className="text-center text-xs text-foreground">
             You'll approve the connection on Shopify.
           </p>
         </div>
