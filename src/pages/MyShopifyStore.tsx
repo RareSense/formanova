@@ -103,8 +103,8 @@ export default function MyShopifyStore() {
 
           {/* Page title */}
           <div>
-            <h1 className="text-2xl font-semibold text-foreground">Connect your Shopify store</h1>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            <h1 className="font-display text-4xl uppercase tracking-wide text-foreground leading-none">Connect your Shopify store</h1>
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
               Send finished photos to your Shopify store as draft products.
             </p>
           </div>
