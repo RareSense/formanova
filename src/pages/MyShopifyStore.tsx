@@ -149,21 +149,20 @@ function ConnectCard() {
   };
 
   return (
-    <div className="border border-border/30 p-8 md:p-10">
+    <div className="border border-border/30 px-8 py-12 md:px-12 md:py-14">
+      <div className="flex flex-col items-center">
 
-      {/* Card heading row */}
-      <div className="mb-8 flex items-center gap-3">
-        <ShopifyBagIcon className="h-6 w-6 shrink-0" />
-        <div>
-          <p className="font-display text-xl uppercase tracking-wide text-foreground leading-none">My Shopify store</p>
-          <p className="mt-1 font-mono text-[10px] tracking-[0.2em] text-muted-foreground uppercase">
-            Enter your store name to continue
-          </p>
-        </div>
+      {/* Card heading */}
+      <div className="mb-8 flex flex-col items-center gap-2 text-center">
+        <ShopifyBagIcon className="h-7 w-7" />
+        <p className="font-display text-xl uppercase tracking-wide text-foreground leading-none">My Shopify store</p>
+        <p className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground uppercase">
+          Enter your store name to continue
+        </p>
       </div>
 
       {/* Form + CTA — constrained width */}
-      <div className="max-w-sm space-y-5">
+      <div className="w-full max-w-sm space-y-5">
 
         {/* Label + input */}
         <div className="space-y-2">
@@ -225,6 +224,7 @@ function ConnectCard() {
         </div>
 
 
+      </div>
       </div>
     </div>
   );
