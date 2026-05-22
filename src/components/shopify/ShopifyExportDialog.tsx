@@ -158,7 +158,7 @@ export function ShopifyExportDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-5">
+        <div className="space-y-4">
           <div className="space-y-2">
             <label htmlFor="shopify-title" className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
               Title
@@ -180,13 +180,13 @@ export function ShopifyExportDialog({
               Description
             </label>
             {isSuggesting ? (
-              <div className="min-h-[140px] animate-pulse rounded-md border border-input bg-muted/30" />
+              <div className="min-h-[80px] animate-pulse rounded-md border border-input bg-muted/30" />
             ) : (
               <Textarea
                 id="shopify-description"
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
-                className="min-h-[140px] text-sm"
+                className="min-h-[80px] text-sm"
               />
             )}
           </div>
@@ -196,13 +196,13 @@ export function ShopifyExportDialog({
               Alt text
             </label>
             {isSuggesting ? (
-              <div className="min-h-[96px] animate-pulse rounded-md border border-input bg-muted/30" />
+              <div className="h-11 animate-pulse rounded-md border border-input bg-muted/30" />
             ) : (
-              <Textarea
+              <Input
                 id="shopify-alt-text"
                 value={altText}
                 onChange={(event) => setAltText(event.target.value)}
-                className="min-h-[96px] text-sm"
+                className="h-11 text-sm"
               />
             )}
           </div>

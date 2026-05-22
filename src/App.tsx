@@ -18,6 +18,7 @@ import { ChunkErrorBoundary } from '@/components/ChunkErrorBoundary';
 import { RouteErrorBoundary } from '@/components/RouteErrorBoundary';
 import { UpdateBanner } from '@/components/UpdateBanner';
 import { useVersionPolling } from '@/hooks/use-version-polling';
+import { ShopifyReturnHandler } from '@/components/ShopifyReturnHandler';
 
 import { lazyWithRetry } from '@/utils/lazyWithRetry';
 import { Loader2 } from "lucide-react";
@@ -182,6 +183,7 @@ const App = () => (
               <PostHogPageView />
               <PostReloadHandler />
               <OnboardingRedirectHandler />
+              <ShopifyReturnHandler />
               <VersionBanner />
 
               <DeferredDecorations>

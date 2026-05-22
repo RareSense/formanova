@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { ShopifyExportDialog } from '@/components/shopify/ShopifyExportDialog';
@@ -42,8 +43,18 @@ export function ShopifyPublishButton({
   const [exportOpen, setExportOpen] = useState(false);
   const [connectOpen, setConnectOpen] = useState(false);
   const [showNotReadyHint, setShowNotReadyHint] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const isConnected = status?.connected;
+
+  useEffect(() => {
+    const pending = location.state?.shopifyPendingExport;
+    if (!pending || !isConnected) return;
+    if (pending.assetId !== assetId) return;
+    setExportOpen(true);
+    navigate(location.pathname + location.search, { replace: true, state: {} });
+  }, [isConnected, location.state, assetId]);
 
   const handleClick = () => {
     if (isConnected) {
@@ -56,6 +67,14 @@ export function ShopifyPublishButton({
       return;
     }
 
+    if (assetId) {
+      sessionStorage.setItem('shopify_pending_export', JSON.stringify({
+        assetId,
+        assetName,
+        workflowId: workflowId ?? null,
+        returnPath: location.pathname + location.search,
+      }));
+    }
     setConnectOpen(true);
   };
 
