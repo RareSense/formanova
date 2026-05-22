@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '@/contexts/ThemeContext';
 import logoBlack from '@/assets/formanova-logo-black.png';
 import logoWhite from '@/assets/formanova-logo-white.png';
-import { ArrowLeft, ArrowRight, Check, Lock, Loader2, Unplug } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Lock, Loader2, Settings, Unplug } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useInvalidateShopifyStatus, useShopifyStatus } from '@/hooks/useShopify';
@@ -112,33 +111,32 @@ export default function MyShopifyStore() {
           {/* Success modal — shown once after OAuth callback */}
           <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
             <DialogContent className="sm:max-w-sm">
-              <div className="flex flex-col items-center gap-5 px-2 pt-2 pb-1 text-center">
-                <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#008060]">
-                  Connection confirmed
-                </p>
+              <div className="flex flex-col items-center gap-5 px-2 pt-3 pb-2 text-center">
+
+                {/* Connection graphic: Shopify → ✓ → FormaNova */}
+                <div className="flex items-center justify-center gap-4">
+                  <ShopifyBagIcon className="h-9 w-9 shrink-0" />
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#008060]">
+                    <Check className="h-3.5 w-3.5 text-white" />
+                  </span>
+                  <img src={logoSrc} alt="FormaNova" className="h-7 w-auto object-contain" />
+                </div>
 
                 <DialogTitle className="font-display text-3xl uppercase tracking-wide text-foreground leading-none">
                   Shopify connected
                 </DialogTitle>
 
-                {/* Connection graphic: Shopify → ✓ → formanova */}
-                <div className="flex items-center gap-2.5 py-1">
-                  <ShopifyBagIcon className="h-10 w-10 shrink-0" />
-                  <span className="flex items-center gap-1">
-                    {[0, 1, 2].map((i) => <span key={i} className="block h-1 w-1 rounded-full bg-border" />)}
-                  </span>
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#008060]">
-                    <Check className="h-4 w-4 text-white" />
-                  </span>
-                  <span className="flex items-center gap-1">
-                    {[0, 1, 2].map((i) => <span key={i} className="block h-1 w-1 rounded-full bg-border" />)}
-                  </span>
-                  <img src={logoSrc} alt="FormaNova" className="h-7 w-auto object-contain" />
-                </div>
-
                 <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
-                  You've successfully connected Shopify to FormaNova. Finished photos can now be published as draft products.
+                  Your store is now connected to FormaNova. Finished photos can be published as draft products.
                 </DialogDescription>
+
+                {/* Connected store confirmation */}
+                {status?.shop_domain && (
+                  <div className="w-full border border-border bg-muted/20 px-4 py-3 text-left">
+                    <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Connected store</p>
+                    <p className="mt-1 text-sm font-medium text-foreground">{status.shop_domain}</p>
+                  </div>
+                )}
 
                 <Button
                   onClick={() => setShowSuccessModal(false)}
@@ -146,6 +144,13 @@ export default function MyShopifyStore() {
                 >
                   Got it
                 </Button>
+
+                <div className="flex items-center justify-center gap-1.5 pb-1">
+                  <Settings className="h-3 w-3 shrink-0 text-muted-foreground" />
+                  <p className="font-mono text-[8px] tracking-[0.1em] text-muted-foreground">
+                    You can manage this connection anytime in settings.
+                  </p>
+                </div>
               </div>
             </DialogContent>
           </Dialog>
