@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Check, Lock, Loader2, Unplug } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Loader2, Unplug } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
@@ -224,14 +224,6 @@ function ConnectCard() {
           </Button>
         </div>
 
-        {/* Reassurance */}
-        <div className="flex items-start gap-2.5 border border-border/30 p-4">
-          <Lock className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />
-          <p className="font-mono text-[9px] leading-relaxed tracking-[0.1em] text-muted-foreground">
-            <span className="text-foreground">Nothing goes live automatically.</span>{' '}
-            You'll review everything in Shopify before publishing.
-          </p>
-        </div>
 
       </div>
     </div>
