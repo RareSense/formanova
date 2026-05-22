@@ -359,7 +359,7 @@ function ConnectedCard({
 
         {/* Card header: icon + title + toggle */}
         <div className="flex items-start gap-4 border-b border-border px-6 py-5">
-          <ShopifyBagIcon className="mt-0.5 h-5 w-5 shrink-0" />
+          <ShopifyBagIcon className="mt-0.5 h-8 w-8 shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-foreground">Shopify publishing</p>
             <p className="mt-0.5 text-xs text-muted-foreground">Manage Shopify draft-product publishing.</p>
