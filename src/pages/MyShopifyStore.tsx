@@ -82,7 +82,7 @@ export default function MyShopifyStore() {
           <div>
             <h1 className="font-display text-4xl uppercase tracking-tight">Connect Shopify</h1>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              Send finished photos to Shopify as draft products.
+              Send finished photos to your Shopify store as draft products.
             </p>
           </div>
 
@@ -160,15 +160,16 @@ function ConnectCard() {
 
         {/* Heading */}
         <div className="space-y-1.5 text-center">
-          <p className="text-xl font-semibold text-foreground">Connect your Shopify store</p>
+          <p className="text-xl font-semibold text-foreground">My Shopify store</p>
           <p className="text-sm text-muted-foreground">Enter your store name to continue.</p>
         </div>
 
         {/* Reassurance */}
         <div className="flex w-full max-w-sm items-center gap-2.5 rounded-xl border border-border bg-muted/20 px-4 py-3">
           <Lock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          <p className="whitespace-nowrap text-xs text-muted-foreground">
-            Nothing goes live automatically. You review everything before publishing.
+          <p className="text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">Nothing goes live automatically.</span>{' '}
+            You'll review everything in Shopify before publishing.
           </p>
         </div>
 
