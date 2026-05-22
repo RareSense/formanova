@@ -164,6 +164,14 @@ function ConnectCard() {
           <p className="text-sm text-muted-foreground">Enter your store name to continue.</p>
         </div>
 
+        {/* Reassurance */}
+        <div className="flex w-full max-w-sm items-center gap-2.5 rounded-xl border border-border bg-muted/20 px-4 py-3">
+          <Lock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <p className="whitespace-nowrap text-xs text-muted-foreground">
+            Nothing goes live automatically. You review everything before publishing.
+          </p>
+        </div>
+
         {/* Form */}
         <div className="w-full max-w-sm space-y-3">
           <label htmlFor="shopify-subdomain" className="block font-mono text-[10px] uppercase tracking-[0.2em] text-foreground">
@@ -227,13 +235,6 @@ function ConnectCard() {
           </p>
         </div>
 
-        {/* Reassurance */}
-        <div className="flex w-full max-w-sm items-start gap-2.5 rounded-xl border border-border bg-muted/20 px-4 py-3">
-          <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Nothing goes live automatically. You'll review everything in Shopify before publishing.
-          </p>
-        </div>
       </div>
     </div>
   );
