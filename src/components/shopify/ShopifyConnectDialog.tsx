@@ -53,7 +53,7 @@ export function ShopifyConnectDialog({ open, onOpenChange }: ShopifyConnectDialo
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader className="space-y-3 text-left">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-muted/40">
+          <div className="flex h-10 w-10 items-center justify-center border border-border bg-muted/40">
             <Store className="h-5 w-5 text-foreground" />
           </div>
           <DialogTitle className="font-display text-2xl uppercase tracking-wide">
@@ -66,7 +66,7 @@ export function ShopifyConnectDialog({ open, onOpenChange }: ShopifyConnectDialo
 
         {status?.connected ? (
           <div className="space-y-4">
-            <div className="rounded-md border border-border bg-muted/20 p-4">
+            <div className="border border-border bg-muted/20 p-4">
               <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                 Connected store
               </p>
@@ -84,7 +84,7 @@ export function ShopifyConnectDialog({ open, onOpenChange }: ShopifyConnectDialo
           <div className="space-y-4">
             <div className="space-y-2">
               <label htmlFor="shopify-shop-domain" className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                Your Shopify subdomain
+                Store name
               </label>
               <Input
                 id="shopify-shop-domain"
@@ -95,7 +95,7 @@ export function ShopifyConnectDialog({ open, onOpenChange }: ShopifyConnectDialo
                 className="h-11"
               />
               <p className="text-xs leading-relaxed text-muted-foreground">
-                Enter only the store subdomain. We&apos;ll send you to Shopify to approve the connection.
+                The name before .myshopify.com in your store URL. We&apos;ll redirect you to Shopify to approve access.
               </p>
             </div>
 

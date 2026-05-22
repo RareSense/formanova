@@ -306,11 +306,11 @@ function ErrorCard({ onRetry }: { onRetry: () => void }) {
         <div className="space-y-1">
           <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">Can't reach Shopify</p>
           <p className="font-mono text-[9px] leading-relaxed tracking-[0.1em] text-muted-foreground">
-            We couldn't check your connection. Retry to try again.
+            Couldn't load your Shopify status. Check your connection and try again.
           </p>
         </div>
         <Button variant="outline" onClick={onRetry} className="h-10 font-mono text-[10px] uppercase tracking-[0.2em]">
-          Retry
+          Try again
         </Button>
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, Sparkles } from 'lucide-react';
+import { ArrowRight, Loader2, Sparkles } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
@@ -154,7 +154,7 @@ export function ShopifyExportDialog({
             Export to Shopify
           </DialogTitle>
           <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
-            Create a Shopify draft product from this asset.
+            Creates a draft product in {shopName}. You can review and publish it from your Shopify admin.
           </DialogDescription>
         </DialogHeader>
 
@@ -208,7 +208,7 @@ export function ShopifyExportDialog({
           </div>
 
           {suggestError && (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-destructive">
               {suggestError}
             </p>
           )}
@@ -222,26 +222,26 @@ export function ShopifyExportDialog({
               className="h-10 gap-2 font-mono text-[10px] uppercase tracking-[0.15em]"
             >
               {isSuggesting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              AI Generate suggestions
+              Generate with AI
             </Button>
           )}
 
-          <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <Button
               type="button"
               onClick={handleExport}
               disabled={isSuggesting || isExporting || !title.trim()}
               className="h-11 flex-1 gap-2 font-mono text-[10px] uppercase tracking-[0.15em]"
             >
-              {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
               Export to Shopify
             </Button>
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               onClick={() => onOpenChange(false)}
               disabled={isExporting}
-              className="h-11 flex-1 font-mono text-[10px] uppercase tracking-[0.15em]"
+              className="h-11 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground sm:flex-none"
             >
               Cancel
             </Button>
