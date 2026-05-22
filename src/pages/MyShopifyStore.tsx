@@ -171,7 +171,7 @@ function ConnectCard() {
           </label>
 
           {/* Input with suffix */}
-          <div className="flex h-11 overflow-hidden rounded-lg border border-input bg-background ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+          <div className="flex h-11 overflow-hidden rounded-xl border border-input bg-background ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
             <input
               id="shopify-subdomain"
               type="text"
@@ -220,7 +220,7 @@ function ConnectCard() {
               <ShopifyBagIcon className="h-4 w-4 shrink-0" />
             )}
             {connecting ? 'Connecting...' : 'Continue to Shopify'}
-            {!connecting && <ArrowRight className="ml-auto h-4 w-4 shrink-0" />}
+            {!connecting && <ArrowRight className="h-4 w-4 shrink-0" />}
           </Button>
           <p className="text-center text-xs text-muted-foreground">
             You'll approve the connection on Shopify.
