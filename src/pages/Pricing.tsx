@@ -209,17 +209,17 @@ export default function Pricing() {
                             className="font-display text-2xl uppercase tracking-tight text-muted-foreground"
                             style={{ textDecoration: 'line-through', textDecorationThickness: '1.5px' }}
                           >
-                            $5
+                            {isINR ? '₹499' : '$5'}
                           </span>
                           <span className="font-display text-5xl uppercase tracking-tight text-foreground">
-                            $2
+                            {isINR ? '₹199' : '$2'}
                           </span>
                           <span className="font-mono text-[10px] tracking-wider text-muted-foreground uppercase">
-                            USD
+                            {isINR ? 'INR' : 'USD'}
                           </span>
                         </div>
                         <p className="font-mono text-[10px] tracking-wider text-muted-foreground mt-1">
-                          ${(20 / tier.credits).toFixed(2)} per photo
+                          {isINR ? `₹${(1990 / tier.credits).toFixed(0)}` : `$${(20 / tier.credits).toFixed(2)}`} per photo
                         </p>
                       </div>
 
