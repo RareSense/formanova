@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '@/contexts/ThemeContext';
 import logoBlack from '@/assets/formanova-logo-black.png';
 import logoWhite from '@/assets/formanova-logo-white.png';
-import { ArrowLeft, ArrowRight, Check, Loader2, Unplug } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Lock, Loader2, Unplug } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
@@ -103,8 +103,8 @@ export default function MyShopifyStore() {
 
           {/* Page title */}
           <div>
-            <h1 className="font-display text-4xl uppercase tracking-wide text-foreground leading-none">Connect Shopify</h1>
-            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            <h1 className="text-2xl font-semibold text-foreground">Connect your Shopify store</h1>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
               Send finished photos to your Shopify store as draft products.
             </p>
           </div>
@@ -185,11 +185,13 @@ function ConnectCard() {
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
 
+  const isValid = shop.length > 0 && isValidShopifySubdomain(shop);
+
   const handleConnect = async () => {
     const normalizedShop = normalizeShopifySubdomain(shop);
 
     if (!normalizedShop) {
-      setError('Enter your store name to continue.');
+      setError('Enter your store URL to continue.');
       return;
     }
 
@@ -215,32 +217,29 @@ function ConnectCard() {
   };
 
   return (
-    <div className="border border-border/30 px-8 py-12 md:px-12 md:py-14">
+    <div className="border border-foreground px-8 py-8 md:px-10 md:py-10">
       <div className="flex flex-col items-center">
 
       {/* Card heading */}
-      <div className="mb-8 flex flex-col items-center gap-2 text-center">
-        <ShopifyBagIcon className="h-7 w-7" />
-        <p className="font-display text-xl uppercase tracking-wide text-foreground leading-none">My Shopify store</p>
-        <p className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground uppercase">
-          Enter your store name to continue
-        </p>
+      <div className="mb-6 flex flex-col items-center gap-2 text-center">
+        <ShopifyBagIcon className="h-10 w-10" />
+        <p className="font-display text-xl uppercase tracking-wide text-foreground leading-none">Enter your Shopify URL</p>
       </div>
 
       {/* Form + CTA — constrained width */}
-      <div className="w-full max-w-sm space-y-5">
+      <div className="w-full max-w-sm space-y-4">
 
         {/* Label + input */}
         <div className="space-y-2">
           <label htmlFor="shopify-subdomain" className="block font-mono text-[11px] uppercase tracking-[0.2em] text-foreground">
-            Shopify store name
+            Shopify URL
           </label>
 
           <p id="shopify-helper" className="font-mono text-[9px] tracking-[0.15em] text-muted-foreground">
-            Use the name before .myshopify.com in your Shopify URL.
+            Use the first part of your .myshopify.com URL.
           </p>
 
-          <div className="flex h-11 border border-input bg-background ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+          <div className="flex h-11 border border-foreground bg-background ring-offset-background focus-within:ring-2 focus-within:ring-foreground focus-within:ring-offset-2">
             <input
               id="shopify-subdomain"
               type="text"
@@ -260,10 +259,19 @@ function ConnectCard() {
               aria-invalid={!!error}
               className="min-w-0 flex-1 bg-transparent px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50"
             />
-            <div className="flex items-center border-l border-input bg-muted/30 px-3">
+            <div className="flex items-center border-l border-foreground bg-muted/30 px-3">
               <span className="whitespace-nowrap font-mono text-[10px] tracking-[0.1em] text-muted-foreground">.myshopify.com</span>
             </div>
           </div>
+
+          {isValid && !error && (
+            <div className="flex items-center gap-1.5">
+              <Check className="h-3 w-3 shrink-0 text-[#008060]" />
+              <span className="font-mono text-[9px] tracking-[0.1em] text-muted-foreground">
+                You'll connect: <span className="text-foreground">{shop}.myshopify.com</span>
+              </span>
+            </div>
+          )}
 
           {error && (
             <p id="shopify-error" role="alert" className="font-mono text-[10px] tracking-[0.1em] text-destructive">
@@ -273,7 +281,7 @@ function ConnectCard() {
         </div>
 
         {/* CTA */}
-        <div className="space-y-2">
+        <div className="space-y-3">
           <Button
             onClick={handleConnect}
             disabled={connecting}
@@ -284,11 +292,17 @@ function ConnectCard() {
             ) : (
               <ShopifyBagIcon className="h-4 w-4 shrink-0" />
             )}
-            {connecting ? 'Connecting...' : 'Continue to Shopify'}
+            {connecting ? 'Connecting...' : 'Continue to Shopify to authorize'}
             {!connecting && <ArrowRight className="h-4 w-4 shrink-0" />}
           </Button>
-        </div>
 
+          <div className="flex items-center justify-center gap-1.5">
+            <Lock className="h-3 w-3 shrink-0 text-muted-foreground" />
+            <p className="font-mono text-[8px] tracking-[0.1em] text-muted-foreground">
+              We'll only use this to create draft products from your finished photos.
+            </p>
+          </div>
+        </div>
 
       </div>
       </div>
