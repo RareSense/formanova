@@ -158,82 +158,86 @@ function ConnectCard() {
           <ShopifyBagIcon className="h-9 w-9" />
         </div>
 
-        {/* Heading */}
-        <div className="space-y-1.5 text-center">
-          <p className="text-xl font-semibold text-foreground">My Shopify store</p>
-          <p className="text-sm text-muted-foreground">Enter your store name to continue.</p>
-        </div>
+        {/* All content — single width column so everything aligns */}
+        <div className="flex w-full max-w-sm flex-col gap-6">
 
-        {/* Reassurance */}
-        <div className="flex w-full max-w-sm items-center gap-2.5 rounded-xl border border-border bg-muted/20 px-4 py-3">
-          <Lock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          <p className="text-xs text-muted-foreground">
-            <span className="font-medium text-foreground">Nothing goes live automatically.</span>{' '}
-            You'll review everything in Shopify before publishing.
-          </p>
-        </div>
-
-        {/* Form */}
-        <div className="w-full max-w-sm space-y-3">
-          <label htmlFor="shopify-subdomain" className="block font-mono text-[10px] uppercase tracking-[0.2em] text-foreground">
-            Shopify store name
-          </label>
-
-          {/* Input with suffix */}
-          <div className="flex h-11 overflow-hidden rounded-xl border border-input bg-background ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
-            <input
-              id="shopify-subdomain"
-              type="text"
-              value={shop}
-              onChange={(e) => {
-                setShop(normalizeShopifySubdomain(e.target.value));
-                if (error) setError(null);
-              }}
-              onKeyDown={handleKeyDown}
-              placeholder="maevori-jewelry"
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="none"
-              spellCheck={false}
-              disabled={connecting}
-              aria-describedby="shopify-helper shopify-error"
-              aria-invalid={!!error}
-              className="min-w-0 flex-1 bg-transparent px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50"
-            />
-            <div className="flex items-center border-l border-input bg-muted/40 px-3">
-              <span className="whitespace-nowrap text-sm text-muted-foreground">.myshopify.com</span>
-            </div>
+          {/* Heading */}
+          <div className="space-y-1.5 text-center">
+            <p className="text-xl font-semibold text-foreground">My Shopify store</p>
+            <p className="text-sm text-muted-foreground">Enter your store name to continue.</p>
           </div>
 
-          <p id="shopify-helper" className="text-xs leading-relaxed text-muted-foreground">
-            Use the name before .myshopify.com in your Shopify URL.
-          </p>
+          {/* Form */}
+          <div className="space-y-3">
+            <label htmlFor="shopify-subdomain" className="block font-mono text-[10px] uppercase tracking-[0.2em] text-foreground">
+              Shopify store name
+            </label>
 
-          {error && (
-            <p id="shopify-error" role="alert" className="text-sm text-destructive">
-              {error}
+            <div className="flex h-11 overflow-hidden rounded-xl border border-input bg-background ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+              <input
+                id="shopify-subdomain"
+                type="text"
+                value={shop}
+                onChange={(e) => {
+                  setShop(normalizeShopifySubdomain(e.target.value));
+                  if (error) setError(null);
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder="maevori-jewelry"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                disabled={connecting}
+                aria-describedby="shopify-helper shopify-error"
+                aria-invalid={!!error}
+                className="min-w-0 flex-1 bg-transparent px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50"
+              />
+              <div className="flex items-center border-l border-input bg-muted/40 px-3">
+                <span className="whitespace-nowrap text-sm text-muted-foreground">.myshopify.com</span>
+              </div>
+            </div>
+
+            <p id="shopify-helper" className="text-xs leading-relaxed text-muted-foreground">
+              Use the name before .myshopify.com in your Shopify URL.
             </p>
-          )}
-        </div>
 
-        {/* CTA */}
-        <div className="w-full max-w-sm space-y-2.5">
-          <Button
-            onClick={handleConnect}
-            disabled={connecting}
-            className="h-12 w-full gap-2.5 bg-foreground text-background hover:bg-foreground/90 text-sm font-medium"
-          >
-            {connecting ? (
-              <Loader2 className="h-4 w-4 animate-spin shrink-0" />
-            ) : (
-              <ShopifyBagIcon className="h-4 w-4 shrink-0" />
+            {error && (
+              <p id="shopify-error" role="alert" className="text-sm text-destructive">
+                {error}
+              </p>
             )}
-            {connecting ? 'Connecting...' : 'Continue to Shopify'}
-            {!connecting && <ArrowRight className="h-4 w-4 shrink-0" />}
-          </Button>
-          <p className="text-center text-xs text-foreground">
-            You'll approve the connection on Shopify.
-          </p>
+          </div>
+
+          {/* CTA */}
+          <div className="space-y-2.5">
+            <Button
+              onClick={handleConnect}
+              disabled={connecting}
+              className="h-12 w-full gap-2.5 bg-foreground text-background hover:bg-foreground/90 text-sm font-medium"
+            >
+              {connecting ? (
+                <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+              ) : (
+                <ShopifyBagIcon className="h-4 w-4 shrink-0" />
+              )}
+              {connecting ? 'Connecting...' : 'Continue to Shopify'}
+              {!connecting && <ArrowRight className="h-4 w-4 shrink-0" />}
+            </Button>
+            <p className="text-center text-xs text-foreground">
+              You'll approve the connection on Shopify.
+            </p>
+          </div>
+
+          {/* Reassurance */}
+          <div className="flex items-center gap-2.5 rounded-xl border border-border bg-muted/20 px-4 py-3">
+            <Lock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <p className="text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">Nothing goes live automatically.</span>{' '}
+              You'll review everything in Shopify before publishing.
+            </p>
+          </div>
+
         </div>
 
       </div>
