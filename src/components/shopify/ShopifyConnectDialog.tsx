@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useShopifyStatus } from '@/hooks/useShopify';
@@ -63,17 +62,14 @@ export function ShopifyConnectDialog({ open, onOpenChange }: ShopifyConnectDialo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md border-foreground/30">
         <div className="flex flex-col items-center pt-2">
 
           <div className="mb-6 flex flex-col items-center gap-2 text-center">
-            <ShopifyBagIcon className="h-7 w-7" />
+            <ShopifyBagIcon className="h-12 w-12" />
             <DialogTitle className="font-display text-2xl uppercase tracking-wide text-foreground leading-none">
               Connect Shopify
             </DialogTitle>
-            <DialogDescription className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground uppercase">
-              Enter your store name to continue
-            </DialogDescription>
           </div>
 
           {status?.connected ? (
@@ -100,10 +96,14 @@ export function ShopifyConnectDialog({ open, onOpenChange }: ShopifyConnectDialo
               <div className="space-y-2">
                 <label
                   htmlFor="shopify-dialog-domain"
-                  className="block font-mono text-[9px] uppercase tracking-[0.3em] text-muted-foreground"
+                  className="block text-sm font-medium text-foreground"
                 >
                   Shopify store name
                 </label>
+
+                <p id="shopify-dialog-helper" className="font-mono text-[9px] tracking-[0.15em] text-muted-foreground">
+                  Use the name before .myshopify.com in your Shopify URL.
+                </p>
 
                 <div className="flex h-11 border border-input bg-background ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
                   <input
@@ -129,10 +129,6 @@ export function ShopifyConnectDialog({ open, onOpenChange }: ShopifyConnectDialo
                     <span className="whitespace-nowrap font-mono text-[10px] tracking-[0.1em] text-muted-foreground">.myshopify.com</span>
                   </div>
                 </div>
-
-                <p id="shopify-dialog-helper" className="font-mono text-[9px] tracking-[0.15em] text-muted-foreground">
-                  Use the name before .myshopify.com in your Shopify URL.
-                </p>
 
                 {error && (
                   <p id="shopify-dialog-error" role="alert" className="font-mono text-[10px] tracking-[0.1em] text-destructive">

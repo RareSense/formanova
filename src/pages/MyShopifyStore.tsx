@@ -232,9 +232,13 @@ function ConnectCard() {
 
         {/* Label + input */}
         <div className="space-y-2">
-          <label htmlFor="shopify-subdomain" className="block font-mono text-[9px] uppercase tracking-[0.3em] text-muted-foreground">
+          <label htmlFor="shopify-subdomain" className="block text-sm font-medium text-foreground">
             Shopify store name
           </label>
+
+          <p id="shopify-helper" className="font-mono text-[9px] tracking-[0.15em] text-muted-foreground">
+            Use the name before .myshopify.com in your Shopify URL.
+          </p>
 
           <div className="flex h-11 border border-input bg-background ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
             <input
@@ -260,10 +264,6 @@ function ConnectCard() {
               <span className="whitespace-nowrap font-mono text-[10px] tracking-[0.1em] text-muted-foreground">.myshopify.com</span>
             </div>
           </div>
-
-          <p id="shopify-helper" className="font-mono text-[9px] tracking-[0.15em] text-muted-foreground">
-            Use the name before .myshopify.com in your Shopify URL.
-          </p>
 
           {error && (
             <p id="shopify-error" role="alert" className="font-mono text-[10px] tracking-[0.1em] text-destructive">
