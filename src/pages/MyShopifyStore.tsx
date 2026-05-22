@@ -1,10 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Check, Loader2, Unplug } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useInvalidateShopifyStatus, useShopifyStatus } from '@/hooks/useShopify';
 import {
   disconnectShopify,
@@ -33,6 +40,17 @@ export default function MyShopifyStore() {
   const invalidateStatus = useInvalidateShopifyStatus();
   const { data: status, isLoading, isError } = useShopifyStatus();
   const [optimisticAutoSuggest, setOptimisticAutoSuggest] = useState<boolean | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('shopify') !== 'connected') return;
+    navigate('/my-shopify-store', { replace: true });
+    invalidateStatus();
+    setShowSuccessModal(true);
+  }, [location.search]);
 
   const disconnectMutation = useMutation({
     mutationFn: disconnectShopify,
@@ -84,6 +102,26 @@ export default function MyShopifyStore() {
               Send finished photos to your Shopify store as draft products.
             </p>
           </div>
+
+          {/* Success modal — shown once after OAuth callback */}
+          <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader className="space-y-3 text-left">
+                <DialogTitle className="font-display text-2xl uppercase tracking-wide">
+                  Shopify connected
+                </DialogTitle>
+                <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
+                  You can now publish finished photos to your Shopify store as draft products.
+                </DialogDescription>
+              </DialogHeader>
+              <Button
+                onClick={() => setShowSuccessModal(false)}
+                className="h-11 w-full font-mono text-[10px] uppercase tracking-[0.2em]"
+              >
+                Done
+              </Button>
+            </DialogContent>
+          </Dialog>
 
           {/* Card */}
           {isLoading ? (
@@ -137,6 +175,7 @@ function ConnectCard() {
     setConnecting(true);
     try {
       const installUrl = await initiateShopifyConnect(normalizedShop);
+      sessionStorage.setItem('shopify_connect_return', '/my-shopify-store');
       window.location.href = installUrl;
     } catch {
       setError('Could not start Shopify connection. Try again.');
