@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Check, Lock, Loader2, Shield, Unplug } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Lock, Loader2, Unplug } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { useInvalidateShopifyStatus, useShopifyStatus } from '@/hooks/useShopify';
 import {
   disconnectShopify,
@@ -80,15 +79,15 @@ export default function MyShopifyStore() {
 
           {/* Page title */}
           <div>
-            <h1 className="font-display text-4xl uppercase tracking-tight">Connect Shopify</h1>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            <h1 className="font-display text-4xl uppercase tracking-wide text-foreground leading-none">Connect Shopify</h1>
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
               Send finished photos to your Shopify store as draft products.
             </p>
           </div>
 
           {/* Card */}
           {isLoading ? (
-            <div className="flex h-64 items-center justify-center rounded-2xl border border-border bg-card">
+            <div className="flex h-64 items-center justify-center border border-border/30">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
           ) : isError ? (
@@ -150,94 +149,91 @@ function ConnectCard() {
   };
 
   return (
-    <div className="rounded-2xl border border-border bg-card">
-      <div className="flex flex-col items-center gap-8 px-8 py-12 sm:px-12 sm:py-14">
+    <div className="border border-border/30 p-8 md:p-10">
 
-        {/* Shopify icon */}
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#008060]/10">
-          <ShopifyBagIcon className="h-9 w-9" />
+      {/* Card heading row */}
+      <div className="mb-8 flex items-center gap-3">
+        <ShopifyBagIcon className="h-6 w-6 shrink-0" />
+        <div>
+          <p className="font-display text-xl uppercase tracking-wide text-foreground leading-none">My Shopify store</p>
+          <p className="mt-1 font-mono text-[10px] tracking-[0.2em] text-muted-foreground uppercase">
+            Enter your store name to continue
+          </p>
+        </div>
+      </div>
+
+      {/* Form + CTA — constrained width */}
+      <div className="max-w-sm space-y-5">
+
+        {/* Label + input */}
+        <div className="space-y-2">
+          <label htmlFor="shopify-subdomain" className="block font-mono text-[9px] uppercase tracking-[0.3em] text-muted-foreground">
+            Shopify store name
+          </label>
+
+          <div className="flex h-11 border border-input bg-background ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+            <input
+              id="shopify-subdomain"
+              type="text"
+              value={shop}
+              onChange={(e) => {
+                setShop(normalizeShopifySubdomain(e.target.value));
+                if (error) setError(null);
+              }}
+              onKeyDown={handleKeyDown}
+              placeholder="maevori-jewelry"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              disabled={connecting}
+              aria-describedby="shopify-helper shopify-error"
+              aria-invalid={!!error}
+              className="min-w-0 flex-1 bg-transparent px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50"
+            />
+            <div className="flex items-center border-l border-input bg-muted/30 px-3">
+              <span className="whitespace-nowrap font-mono text-[10px] tracking-[0.1em] text-muted-foreground">.myshopify.com</span>
+            </div>
+          </div>
+
+          <p id="shopify-helper" className="font-mono text-[9px] tracking-[0.15em] text-muted-foreground">
+            Use the name before .myshopify.com in your Shopify URL.
+          </p>
+
+          {error && (
+            <p id="shopify-error" role="alert" className="font-mono text-[10px] tracking-[0.1em] text-destructive">
+              {error}
+            </p>
+          )}
         </div>
 
-        {/* All content — single width column so everything aligns */}
-        <div className="flex w-full max-w-sm flex-col gap-6">
-
-          {/* Heading */}
-          <div className="space-y-1.5 text-center">
-            <p className="text-xl font-semibold text-foreground">My Shopify store</p>
-            <p className="text-sm text-muted-foreground">Enter your store name to continue.</p>
-          </div>
-
-          {/* Form */}
-          <div className="space-y-3">
-            <label htmlFor="shopify-subdomain" className="block font-mono text-[10px] uppercase tracking-[0.2em] text-foreground">
-              Shopify store name
-            </label>
-
-            <div className="flex h-11 overflow-hidden rounded-xl border border-input bg-background ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
-              <input
-                id="shopify-subdomain"
-                type="text"
-                value={shop}
-                onChange={(e) => {
-                  setShop(normalizeShopifySubdomain(e.target.value));
-                  if (error) setError(null);
-                }}
-                onKeyDown={handleKeyDown}
-                placeholder="maevori-jewelry"
-                autoComplete="off"
-                autoCorrect="off"
-                autoCapitalize="none"
-                spellCheck={false}
-                disabled={connecting}
-                aria-describedby="shopify-helper shopify-error"
-                aria-invalid={!!error}
-                className="min-w-0 flex-1 bg-transparent px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50"
-              />
-              <div className="flex items-center border-l border-input bg-muted/40 px-3">
-                <span className="whitespace-nowrap text-sm text-muted-foreground">.myshopify.com</span>
-              </div>
-            </div>
-
-            <p id="shopify-helper" className="text-xs leading-relaxed text-muted-foreground">
-              Use the name before .myshopify.com in your Shopify URL.
-            </p>
-
-            {error && (
-              <p id="shopify-error" role="alert" className="text-sm text-destructive">
-                {error}
-              </p>
+        {/* CTA */}
+        <div className="space-y-2">
+          <Button
+            onClick={handleConnect}
+            disabled={connecting}
+            className="h-11 w-full gap-2.5 bg-foreground text-background hover:bg-foreground/90 font-mono text-[10px] uppercase tracking-[0.2em]"
+          >
+            {connecting ? (
+              <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+            ) : (
+              <ShopifyBagIcon className="h-4 w-4 shrink-0" />
             )}
-          </div>
+            {connecting ? 'Connecting...' : 'Continue to Shopify'}
+            {!connecting && <ArrowRight className="h-4 w-4 shrink-0" />}
+          </Button>
+          <p className="text-center font-mono text-[9px] tracking-[0.15em] text-muted-foreground">
+            You'll approve the connection on Shopify.
+          </p>
+        </div>
 
-          {/* CTA */}
-          <div className="space-y-2.5">
-            <Button
-              onClick={handleConnect}
-              disabled={connecting}
-              className="h-12 w-full gap-2.5 bg-foreground text-background hover:bg-foreground/90 text-sm font-medium"
-            >
-              {connecting ? (
-                <Loader2 className="h-4 w-4 animate-spin shrink-0" />
-              ) : (
-                <ShopifyBagIcon className="h-4 w-4 shrink-0" />
-              )}
-              {connecting ? 'Connecting...' : 'Continue to Shopify'}
-              {!connecting && <ArrowRight className="h-4 w-4 shrink-0" />}
-            </Button>
-            <p className="text-center text-xs text-foreground">
-              You'll approve the connection on Shopify.
-            </p>
-          </div>
-
-          {/* Reassurance */}
-          <div className="flex items-center gap-2.5 rounded-xl border border-border bg-muted/20 px-4 py-3">
-            <Lock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            <p className="text-xs text-muted-foreground">
-              <span className="font-medium text-foreground">Nothing goes live automatically.</span>{' '}
-              You'll review everything in Shopify before publishing.
-            </p>
-          </div>
-
+        {/* Reassurance */}
+        <div className="flex items-start gap-2.5 border border-border/30 p-4">
+          <Lock className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />
+          <p className="font-mono text-[9px] leading-relaxed tracking-[0.1em] text-muted-foreground">
+            <span className="text-foreground">Nothing goes live automatically.</span>{' '}
+            You'll review everything in Shopify before publishing.
+          </p>
         </div>
 
       </div>
@@ -263,24 +259,24 @@ function ConnectedCard({
   onDisconnect: () => void;
 }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-[#008060]/30 bg-card">
+    <div className="border border-[#008060]/40">
       {/* Green header */}
       <div className="flex items-center gap-3 bg-[#008060] px-6 py-4">
-        <ShopifyBagIcon className="h-5 w-5 text-white" />
-        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/90">Connected</span>
+        <ShopifyBagIcon className="h-5 w-5" />
+        <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-white/90">Connected</span>
         <Check className="ml-auto h-4 w-4 text-white" />
       </div>
 
       <div className="space-y-6 p-6">
         <div className="space-y-1">
-          <p className="text-base font-medium text-foreground">{status.shop_name}</p>
-          <p className="font-mono text-xs text-muted-foreground">{status.shop_domain}</p>
-          <p className="text-xs text-muted-foreground">
+          <p className="font-display text-xl uppercase tracking-wide text-foreground leading-none">{status.shop_name}</p>
+          <p className="font-mono text-[10px] tracking-[0.15em] text-muted-foreground">{status.shop_domain}</p>
+          <p className="font-mono text-[9px] tracking-[0.1em] text-muted-foreground">
             Last used: {formatRelativeShopifyTime(status.last_used_at)}
           </p>
         </div>
 
-        <label className="flex cursor-default items-start gap-3 rounded-xl border border-border bg-muted/20 p-4">
+        <label className="flex cursor-default items-start gap-3 border border-border/30 p-4">
           <input
             type="checkbox"
             checked={autoSuggestValue}
@@ -288,9 +284,9 @@ function ConnectedCard({
             onChange={(e) => onToggleAutoSuggest(e.target.checked)}
             className="mt-0.5 h-4 w-4 accent-[#008060]"
           />
-          <div className="space-y-0.5">
-            <p className="text-sm text-foreground">Auto-generate AI copy</p>
-            <p className="text-xs leading-relaxed text-muted-foreground">
+          <div className="space-y-1">
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-foreground">Auto-generate AI copy</p>
+            <p className="font-mono text-[9px] leading-relaxed tracking-[0.1em] text-muted-foreground">
               Every time you open the export panel, AI will pre-fill title, description, and alt text.
             </p>
           </div>
@@ -301,7 +297,7 @@ function ConnectedCard({
           variant="outline"
           onClick={onDisconnect}
           disabled={isDisconnecting}
-          className="h-10 gap-2 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground hover:border-destructive hover:text-destructive"
+          className="h-10 gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:border-destructive hover:text-destructive"
         >
           {isDisconnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unplug className="h-4 w-4" />}
           Disconnect store
@@ -315,18 +311,16 @@ function ConnectedCard({
 
 function ErrorCard({ onRetry }: { onRetry: () => void }) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-8">
-      <div className="flex flex-col items-center gap-6 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/40">
-          <ShopifyBagIcon className="h-8 w-8 text-muted-foreground" />
-        </div>
-        <div className="space-y-2">
-          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Can't reach Shopify</p>
-          <p className="text-sm leading-relaxed text-muted-foreground max-w-xs">
+    <div className="border border-border/30 p-8">
+      <div className="flex flex-col items-start gap-6">
+        <ShopifyBagIcon className="h-8 w-8 text-muted-foreground" />
+        <div className="space-y-1">
+          <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">Can't reach Shopify</p>
+          <p className="font-mono text-[9px] leading-relaxed tracking-[0.1em] text-muted-foreground">
             We couldn't check your connection. Retry to try again.
           </p>
         </div>
-        <Button variant="outline" onClick={onRetry} className="h-10 font-mono text-[10px] uppercase tracking-[0.15em]">
+        <Button variant="outline" onClick={onRetry} className="h-10 font-mono text-[10px] uppercase tracking-[0.2em]">
           Retry
         </Button>
       </div>
