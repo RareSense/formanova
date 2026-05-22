@@ -161,9 +161,9 @@ export default function MyShopifyStore() {
                 </Button>
 
                 <div className="flex items-center justify-center gap-1.5 pb-1">
-                  <Settings className="h-3 w-3 shrink-0 text-muted-foreground" />
+                  <Lock className="h-3 w-3 shrink-0 text-muted-foreground" />
                   <p className="font-mono text-[8px] tracking-[0.1em] text-muted-foreground">
-                    You can manage this connection anytime in settings.
+                    You can manage this connection anytime.
                   </p>
                 </div>
               </div>
