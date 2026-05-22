@@ -68,7 +68,7 @@ export async function suggestShopifyMetadata(assetId: string, workflowId?: strin
       asset_id: assetId,
       ...(workflowId ? { workflow_id: workflowId } : {}),
     }),
-    signal: AbortSignal.timeout(35_000),
+    signal: AbortSignal.timeout(40_000),
   });
   if (!res.ok) throw new Error('Failed to get AI suggestions');
   return res.json();
