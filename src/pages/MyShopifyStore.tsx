@@ -141,7 +141,7 @@ export default function MyShopifyStore() {
                 </div>
 
                 <DialogDescription className="max-w-xs text-sm leading-relaxed text-muted-foreground">
-                  Your store is now connected to FormaNova. Finished photos can now be published as draft products.
+                  Your store is now connected to FormaNova.
                 </DialogDescription>
 
                 {/* Connected store card */}
