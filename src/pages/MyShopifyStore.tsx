@@ -104,21 +104,42 @@ export default function MyShopifyStore() {
 
           {/* Success modal — shown once after OAuth callback */}
           <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader className="space-y-3 text-left">
-                <DialogTitle className="font-display text-2xl uppercase tracking-wide">
+            <DialogContent className="sm:max-w-sm">
+              <div className="flex flex-col items-center gap-5 px-2 pt-2 pb-1 text-center">
+                <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#008060]">
+                  Connection confirmed
+                </p>
+
+                <DialogTitle className="font-display text-3xl uppercase tracking-wide text-foreground leading-none">
                   Shopify connected
                 </DialogTitle>
+
+                {/* Connection graphic: Shopify → ✓ → formanova */}
+                <div className="flex items-center gap-2.5 py-1">
+                  <ShopifyBagIcon className="h-10 w-10 shrink-0" />
+                  <span className="flex items-center gap-1">
+                    {[0, 1, 2].map((i) => <span key={i} className="block h-1 w-1 rounded-full bg-border" />)}
+                  </span>
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#008060]">
+                    <Check className="h-4 w-4 text-white" />
+                  </span>
+                  <span className="flex items-center gap-1">
+                    {[0, 1, 2].map((i) => <span key={i} className="block h-1 w-1 rounded-full bg-border" />)}
+                  </span>
+                  <span className="font-display text-xl uppercase tracking-wide text-foreground">formanova</span>
+                </div>
+
                 <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
-                  You can now publish finished photos to your Shopify store as draft products.
+                  You've successfully connected Shopify to FormaNova. Finished photos can now be published as draft products.
                 </DialogDescription>
-              </DialogHeader>
-              <Button
-                onClick={() => setShowSuccessModal(false)}
-                className="h-11 w-full font-mono text-[10px] uppercase tracking-[0.2em]"
-              >
-                Done
-              </Button>
+
+                <Button
+                  onClick={() => setShowSuccessModal(false)}
+                  className="h-11 w-full font-mono text-[10px] uppercase tracking-[0.2em]"
+                >
+                  Done
+                </Button>
+              </div>
             </DialogContent>
           </Dialog>
 
