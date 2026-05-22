@@ -212,7 +212,7 @@ function ConnectCard() {
           <Button
             onClick={handleConnect}
             disabled={connecting}
-            className="h-11 w-full gap-2.5 bg-foreground text-background hover:bg-foreground/90 font-mono text-[10px] uppercase tracking-[0.2em]"
+            className="h-11 w-full gap-2.5 font-mono text-[10px] uppercase tracking-[0.2em]"
           >
             {connecting ? (
               <Loader2 className="h-4 w-4 animate-spin shrink-0" />
