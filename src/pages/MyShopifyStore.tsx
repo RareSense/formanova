@@ -292,7 +292,7 @@ function ConnectCard() {
             ) : (
               <ShopifyBagIcon className="h-4 w-4 shrink-0" />
             )}
-            {connecting ? 'Connecting...' : 'Continue to Shopify to authorize'}
+            {connecting ? 'Connecting...' : 'Connect to Shopify'}
             {!connecting && <ArrowRight className="h-4 w-4 shrink-0" />}
           </Button>
 
