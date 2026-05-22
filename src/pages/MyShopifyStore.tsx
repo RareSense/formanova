@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '@/contexts/ThemeContext';
 import logoBlack from '@/assets/formanova-logo-black.png';
 import logoWhite from '@/assets/formanova-logo-white.png';
-import { ArrowLeft, ArrowRight, Check, Lock, Loader2, Settings, Store } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Info, Lock, Loader2, Settings, Store } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
@@ -404,7 +404,8 @@ function ConnectedCard({
         </div>
 
         {/* Footer hint */}
-        <div className="border-t border-border px-6 py-3">
+        <div className="flex items-center gap-1.5 border-t border-border px-6 py-3">
+          <Info className="h-3 w-3 shrink-0 text-muted-foreground" />
           <p className="font-mono text-[9px] tracking-[0.1em] text-muted-foreground">
             Turning the toggle off will ask for confirmation.
           </p>
