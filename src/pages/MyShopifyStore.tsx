@@ -114,18 +114,22 @@ export default function MyShopifyStore() {
               <div className="flex flex-col items-center gap-6 px-3 pt-5 pb-3 text-center">
 
                 {/* Connection graphic: Shopify → ··· → ✓ → ··· → FormaNova */}
-                <div className="flex items-center justify-center gap-3">
-                  <ShopifyBagIcon className="h-10 w-10 shrink-0" />
-                  <span className="flex items-center gap-1">
-                    {[0, 1, 2].map((i) => <span key={i} className="block h-1.5 w-1.5 rounded-full bg-border" />)}
-                  </span>
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#008060]">
+                <div className="flex w-full items-center">
+                  <div className="flex flex-1 items-center justify-end gap-3">
+                    <ShopifyBagIcon className="h-10 w-10 shrink-0" />
+                    <span className="flex items-center gap-1">
+                      {[0, 1, 2].map((i) => <span key={i} className="block h-1.5 w-1.5 rounded-full bg-border" />)}
+                    </span>
+                  </div>
+                  <span className="mx-3 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#008060]">
                     <Check className="h-4 w-4 text-white" />
                   </span>
-                  <span className="flex items-center gap-1">
-                    {[0, 1, 2].map((i) => <span key={i} className="block h-1.5 w-1.5 rounded-full bg-border" />)}
-                  </span>
-                  <img src={logoSrc} alt="FormaNova" className="h-8 w-auto object-contain" />
+                  <div className="flex flex-1 items-center justify-start gap-3">
+                    <span className="flex items-center gap-1">
+                      {[0, 1, 2].map((i) => <span key={i} className="block h-1.5 w-1.5 rounded-full bg-border" />)}
+                    </span>
+                    <img src={logoSrc} alt="FormaNova" className="h-8 w-auto object-contain" />
+                  </div>
                 </div>
 
                 {/* Title + green accent line */}
