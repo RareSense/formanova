@@ -62,7 +62,7 @@ export function ShopifyConnectDialog({ open, onOpenChange }: ShopifyConnectDialo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md border-foreground/30">
+      <DialogContent className="sm:max-w-md border-foreground">
         <div className="flex flex-col items-center pt-2">
 
           <div className="mb-6 flex flex-col items-center gap-2 text-center">
@@ -96,7 +96,7 @@ export function ShopifyConnectDialog({ open, onOpenChange }: ShopifyConnectDialo
               <div className="space-y-2">
                 <label
                   htmlFor="shopify-dialog-domain"
-                  className="block text-sm font-medium text-foreground"
+                  className="block font-mono text-[11px] uppercase tracking-[0.2em] text-foreground"
                 >
                   Shopify store name
                 </label>

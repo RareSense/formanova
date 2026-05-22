@@ -232,7 +232,7 @@ function ConnectCard() {
 
         {/* Label + input */}
         <div className="space-y-2">
-          <label htmlFor="shopify-subdomain" className="block text-sm font-medium text-foreground">
+          <label htmlFor="shopify-subdomain" className="block font-mono text-[11px] uppercase tracking-[0.2em] text-foreground">
             Shopify store name
           </label>
 
