@@ -358,14 +358,14 @@ function ConnectedCard({
       <div className="border border-border">
 
         {/* Card header: icon + title + toggle */}
-        <div className="flex items-start gap-4 border-b border-border px-6 py-5">
-          <ShopifyBagIcon className="mt-0.5 h-8 w-8 shrink-0" />
+        <div className="flex items-start gap-5 border-b border-border px-8 py-6">
+          <ShopifyBagIcon className="mt-1 h-9 w-9 shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground">Shopify publishing</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">Manage Shopify draft-product publishing.</p>
+            <p className="text-base font-medium text-foreground">Shopify publishing</p>
+            <p className="mt-1 text-sm text-muted-foreground">Manage Shopify draft-product publishing.</p>
           </div>
-          <div className="flex shrink-0 items-center gap-2.5">
-            <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-primary">Connected</span>
+          <div className="flex shrink-0 items-center gap-3">
+            <span className="font-mono text-[11px] uppercase tracking-[0.15em] text-primary">Connected</span>
             <button
               type="button"
               role="switch"
@@ -373,9 +373,9 @@ function ConnectedCard({
               aria-label="Disconnect Shopify"
               onClick={() => setShowDisconnectConfirm(true)}
               disabled={isDisconnecting}
-              className="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full bg-primary transition-colors disabled:opacity-50"
+              className="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full bg-primary transition-colors disabled:opacity-50"
             >
-              <span className="inline-block h-4 w-4 translate-x-[18px] rounded-full bg-primary-foreground shadow transition-transform" />
+              <span className="inline-block h-5 w-5 translate-x-[22px] rounded-full bg-primary-foreground shadow transition-transform" />
             </button>
           </div>
         </div>
@@ -383,13 +383,13 @@ function ConnectedCard({
         <div className="divide-y divide-border">
 
           {/* Connected store */}
-          <div className="px-6 py-5">
-            <p className="font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground">Connected to</p>
-            <p className="mt-1.5 text-sm font-medium text-foreground">{status.shop_domain}</p>
+          <div className="px-8 py-6">
+            <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">Connected to</p>
+            <p className="mt-2 text-base font-medium text-foreground">{status.shop_domain}</p>
           </div>
 
           {/* AI setting */}
-          <label className="flex cursor-default items-start gap-3 px-6 py-5">
+          <label className="flex cursor-default items-start gap-4 px-8 py-6">
             <input
               type="checkbox"
               checked={autoSuggestValue}
@@ -397,9 +397,9 @@ function ConnectedCard({
               onChange={(e) => onToggleAutoSuggest(e.target.checked)}
               className="mt-0.5 h-4 w-4 accent-primary"
             />
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-foreground">Pre-fill product copy with AI</p>
-              <p className="text-xs leading-relaxed text-muted-foreground">
+            <div className="space-y-1.5">
+              <p className="text-base font-medium text-foreground">Pre-fill product copy with AI</p>
+              <p className="text-sm leading-relaxed text-muted-foreground">
                 Generate draft title, description, and alt text before publishing.
               </p>
             </div>
@@ -408,9 +408,9 @@ function ConnectedCard({
         </div>
 
         {/* Footer hint */}
-        <div className="flex items-center gap-1.5 border-t border-border px-6 py-3">
-          <Info className="h-3 w-3 shrink-0 text-muted-foreground" />
-          <p className="font-mono text-[9px] tracking-[0.1em] text-muted-foreground">
+        <div className="flex items-center gap-2 border-t border-border px-8 py-4">
+          <Info className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <p className="font-mono text-[10px] tracking-[0.1em] text-muted-foreground">
             Turning the toggle off will ask for confirmation.
           </p>
         </div>
