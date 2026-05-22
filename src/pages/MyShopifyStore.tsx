@@ -332,60 +332,103 @@ function ConnectedCard({
   onToggleAutoSuggest: (v: boolean) => void;
   onDisconnect: () => void;
 }) {
+  const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
   const showShopName = status.shop_name && status.shop_name !== status.shop_domain;
 
   return (
-    <div className="border border-border">
-      {/* Green status bar */}
-      <div className="flex items-center gap-3 bg-[#008060] px-6 py-4">
-        <ShopifyBagIcon className="h-5 w-5" />
-        <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-white/90">Connected</span>
-        <Check className="ml-auto h-4 w-4 text-white" />
-      </div>
+    <>
+      <div className="border border-border">
 
-      <div className="space-y-6 p-6">
-        {/* Store info */}
-        <div className="space-y-1.5">
-          <p className="font-mono text-[9px] uppercase tracking-[0.3em] text-muted-foreground">Store</p>
-          <p className="text-sm font-medium text-foreground">{status.shop_domain}</p>
-          {showShopName && (
-            <p className="text-xs text-muted-foreground">{status.shop_name}</p>
-          )}
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Connected successfully. Finished photos can now be published as Shopify draft products.
-          </p>
+        {/* Top row: connection control */}
+        <div className="flex items-center gap-3 border-b border-border px-5 py-4">
+          <ShopifyBagIcon className="h-5 w-5 shrink-0" />
+          <span className="text-sm font-medium text-foreground">Shopify connection</span>
+          <div className="ml-auto flex items-center gap-2.5">
+            <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-primary">Connected</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked
+              onClick={() => setShowDisconnectConfirm(true)}
+              disabled={isDisconnecting}
+              className="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full bg-primary transition-colors disabled:opacity-50"
+            >
+              <span className="inline-block h-4 w-4 translate-x-[18px] rounded-full bg-primary-foreground shadow transition-transform" />
+            </button>
+          </div>
         </div>
 
-        {/* AI copy setting */}
-        <label className="flex cursor-default items-start gap-3 border border-border/30 p-4">
-          <input
-            type="checkbox"
-            checked={autoSuggestValue}
-            disabled={isSavingSetting}
-            onChange={(e) => onToggleAutoSuggest(e.target.checked)}
-            className="mt-0.5 h-4 w-4 accent-[#008060]"
-          />
-          <div className="space-y-1">
-            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-foreground">Pre-fill product copy with AI</p>
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              Generate draft title, description, and alt text before publishing.
-            </p>
-          </div>
-        </label>
+        <div className="space-y-5 p-5">
 
-        {/* Disconnect */}
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onDisconnect}
-          disabled={isDisconnecting}
-          className="h-10 gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground"
-        >
-          {isDisconnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unplug className="h-4 w-4" />}
-          Disconnect store
-        </Button>
+          {/* Store info */}
+          <div className="space-y-1">
+            <p className="font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground">Connected store</p>
+            <p className="text-sm font-medium text-foreground">{status.shop_domain}</p>
+            {showShopName && (
+              <p className="text-xs text-muted-foreground">{status.shop_name}</p>
+            )}
+          </div>
+
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Finished photos can now be published to Shopify as draft products.
+          </p>
+
+          {/* AI copy setting */}
+          <label className="flex cursor-default items-start gap-3 border border-border/40 p-4">
+            <input
+              type="checkbox"
+              checked={autoSuggestValue}
+              disabled={isSavingSetting}
+              onChange={(e) => onToggleAutoSuggest(e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-primary"
+            />
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-foreground">Pre-fill product copy with AI</p>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Generate draft title, description, and alt text before publishing.
+              </p>
+            </div>
+          </label>
+
+        </div>
       </div>
-    </div>
+
+      {/* Disconnect confirmation modal */}
+      <Dialog open={showDisconnectConfirm} onOpenChange={setShowDisconnectConfirm}>
+        <DialogContent className="sm:max-w-sm">
+          <div className="space-y-4 px-1 pt-1 pb-1">
+            <DialogTitle className="font-display text-2xl uppercase tracking-wide text-foreground leading-none">
+              Disconnect Shopify store?
+            </DialogTitle>
+            <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
+              This will stop publishing finished photos to Shopify until you reconnect.
+            </DialogDescription>
+            <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setShowDisconnectConfirm(false)}
+                disabled={isDisconnecting}
+                className="h-10 font-mono text-[10px] uppercase tracking-[0.15em]"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  setShowDisconnectConfirm(false);
+                  onDisconnect();
+                }}
+                disabled={isDisconnecting}
+                className="h-10 gap-2 font-mono text-[10px] uppercase tracking-[0.15em]"
+              >
+                {isDisconnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unplug className="h-4 w-4" />}
+                Disconnect store
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
