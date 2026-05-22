@@ -144,7 +144,7 @@ export default function MyShopifyStore() {
                   onClick={() => setShowSuccessModal(false)}
                   className="h-11 w-full font-mono text-[10px] uppercase tracking-[0.2em]"
                 >
-                  Done
+                  Got it
                 </Button>
               </div>
             </DialogContent>
