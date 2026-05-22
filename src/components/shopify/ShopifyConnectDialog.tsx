@@ -116,7 +116,7 @@ export function ShopifyConnectDialog({ open, onOpenChange }: ShopifyConnectDialo
                     }}
                     onKeyDown={handleKeyDown}
                     placeholder="maevori-jewelry"
-                    autoComplete="off"
+                    autoComplete="on"
                     autoCorrect="off"
                     autoCapitalize="none"
                     spellCheck={false}

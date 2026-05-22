@@ -247,7 +247,7 @@ function ConnectCard() {
               }}
               onKeyDown={handleKeyDown}
               placeholder="maevori-jewelry"
-              autoComplete="off"
+              autoComplete="on"
               autoCorrect="off"
               autoCapitalize="none"
               spellCheck={false}
