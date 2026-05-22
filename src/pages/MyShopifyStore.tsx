@@ -222,9 +222,6 @@ function ConnectCard() {
             {connecting ? 'Connecting...' : 'Continue to Shopify'}
             {!connecting && <ArrowRight className="h-4 w-4 shrink-0" />}
           </Button>
-          <p className="text-center font-mono text-[9px] tracking-[0.15em] text-muted-foreground">
-            You'll approve the connection on Shopify.
-          </p>
         </div>
 
         {/* Reassurance */}
