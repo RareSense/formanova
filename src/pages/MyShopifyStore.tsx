@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '@/contexts/ThemeContext';
 import logoBlack from '@/assets/formanova-logo-black.png';
 import logoWhite from '@/assets/formanova-logo-white.png';
-import { ArrowLeft, ArrowRight, Check, Lock, Loader2, Settings, Unplug } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Lock, Loader2, Settings, Store, Unplug } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
@@ -110,37 +110,52 @@ export default function MyShopifyStore() {
 
           {/* Success modal — shown once after OAuth callback */}
           <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
-            <DialogContent className="sm:max-w-sm">
-              <div className="flex flex-col items-center gap-5 px-2 pt-3 pb-2 text-center">
+            <DialogContent className="sm:max-w-md">
+              <div className="flex flex-col items-center gap-6 px-3 pt-5 pb-3 text-center">
 
-                {/* Connection graphic: Shopify → ✓ → FormaNova */}
-                <div className="flex items-center justify-center gap-4">
-                  <ShopifyBagIcon className="h-9 w-9 shrink-0" />
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#008060]">
-                    <Check className="h-3.5 w-3.5 text-white" />
+                {/* Connection graphic: Shopify → ··· → ✓ → ··· → FormaNova */}
+                <div className="flex items-center justify-center gap-3">
+                  <ShopifyBagIcon className="h-10 w-10 shrink-0" />
+                  <span className="flex items-center gap-1">
+                    {[0, 1, 2].map((i) => <span key={i} className="block h-1.5 w-1.5 rounded-full bg-border" />)}
                   </span>
-                  <img src={logoSrc} alt="FormaNova" className="h-7 w-auto object-contain" />
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#008060]">
+                    <Check className="h-4 w-4 text-white" />
+                  </span>
+                  <span className="flex items-center gap-1">
+                    {[0, 1, 2].map((i) => <span key={i} className="block h-1.5 w-1.5 rounded-full bg-border" />)}
+                  </span>
+                  <img src={logoSrc} alt="FormaNova" className="h-8 w-auto object-contain" />
                 </div>
 
-                <DialogTitle className="font-display text-3xl uppercase tracking-wide text-foreground leading-none">
-                  Shopify connected
-                </DialogTitle>
+                {/* Title + green accent line */}
+                <div className="flex flex-col items-center gap-2.5">
+                  <DialogTitle className="font-display text-3xl uppercase tracking-wide text-foreground leading-none">
+                    Shopify connected
+                  </DialogTitle>
+                  <span className="block h-0.5 w-8 bg-[#008060]" />
+                </div>
 
-                <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
-                  Your store is now connected to FormaNova. Finished photos can be published as draft products.
+                <DialogDescription className="max-w-xs text-sm leading-relaxed text-muted-foreground">
+                  Your store is now connected to FormaNova. Finished photos can now be published as draft products.
                 </DialogDescription>
 
-                {/* Connected store confirmation */}
+                {/* Connected store card */}
                 {status?.shop_domain && (
-                  <div className="w-full border border-border bg-muted/20 px-4 py-3 text-left">
-                    <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Connected store</p>
-                    <p className="mt-1 text-sm font-medium text-foreground">{status.shop_domain}</p>
+                  <div className="flex w-full items-center gap-3 border border-border bg-muted/20 px-4 py-3 text-left">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center border border-border bg-background">
+                      <Store className="h-4 w-4 text-[#008060]" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Connected store</p>
+                      <p className="mt-0.5 truncate text-sm font-medium text-foreground">{status.shop_domain}</p>
+                    </div>
                   </div>
                 )}
 
                 <Button
                   onClick={() => setShowSuccessModal(false)}
-                  className="h-11 w-full font-mono text-[10px] uppercase tracking-[0.2em]"
+                  className="h-12 w-full font-mono text-[10px] uppercase tracking-[0.2em]"
                 >
                   Got it
                 </Button>
