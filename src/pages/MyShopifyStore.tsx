@@ -395,6 +395,15 @@ function ConnectedCard({
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Button
+                  variant="ghost"
+                  onClick={() => setShowDisconnectConfirm(false)}
+                  disabled={isDisconnecting}
+                  className="h-11 w-full font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground"
+                >
+                  Keep connected
+                </Button>
+
+                <Button
                   onClick={() => {
                     setShowDisconnectConfirm(false);
                     onDisconnect();
@@ -404,15 +413,6 @@ function ConnectedCard({
                 >
                   {isDisconnecting ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : null}
                   Disconnect Shopify
-                </Button>
-
-                <Button
-                  variant="ghost"
-                  onClick={() => setShowDisconnectConfirm(false)}
-                  disabled={isDisconnecting}
-                  className="h-11 w-full font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground"
-                >
-                  Keep connected
                 </Button>
               </div>
             </div>

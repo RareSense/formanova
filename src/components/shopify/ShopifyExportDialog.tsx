@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, Check, ExternalLink, Loader2 } from 'lucide-react';
+import { ArrowRight, Check, Loader2 } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
@@ -146,23 +145,17 @@ export function ShopifyExportDialog({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-h-[90vh] overflow-y-auto border-foreground sm:max-w-md">
           <div className="flex flex-col items-center pt-2">
-            <div className="mb-6 flex flex-col items-center gap-2 text-center">
-              <ShopifyBagIcon className="h-12 w-12" />
-              <DialogTitle className="font-display text-2xl uppercase tracking-wide text-foreground leading-none">
-                Export to Shopify
-              </DialogTitle>
-            </div>
+          <div className="mb-6 flex flex-col items-center gap-2 text-center">
+            <ShopifyBagIcon className="h-12 w-12" />
+            <DialogTitle className="font-display text-2xl uppercase tracking-wide text-foreground leading-none">
+              Export to Shopify
+            </DialogTitle>
+            <DialogDescription className="max-w-sm text-sm leading-6 text-muted-foreground">
+              This will create a draft product in {shopName}. Review it in Shopify before making it live.
+            </DialogDescription>
+          </div>
 
-            <div className="w-full space-y-5">
-              <div className="border border-border bg-muted/20 p-4">
-                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                  Draft product
-                </p>
-                <DialogDescription className="mt-2 text-sm leading-6 text-foreground">
-                  This will create a draft product in {shopName}. Review it in Shopify before making it live.
-                </DialogDescription>
-              </div>
-
+          <div className="w-full space-y-5">
               <div className="space-y-2">
                 <label htmlFor="shopify-title" className="block font-mono text-[11px] uppercase tracking-[0.2em] text-foreground">
                   Product title
@@ -173,11 +166,11 @@ export function ShopifyExportDialog({
                 {isSuggesting ? (
                   <div className="h-11 animate-pulse rounded-md border border-input bg-muted/30" />
                 ) : (
-                  <Input
+                  <Textarea
                     id="shopify-title"
                     value={title}
                     onChange={(event) => setTitle(event.target.value)}
-                    className="h-11"
+                    className="min-h-[72px] resize-y text-sm leading-6"
                   />
                 )}
               </div>
@@ -196,7 +189,7 @@ export function ShopifyExportDialog({
                     id="shopify-description"
                     value={description}
                     onChange={(event) => setDescription(event.target.value)}
-                    className="min-h-[112px] text-sm leading-6"
+                    className="min-h-[112px] resize-y text-sm leading-6"
                   />
                 )}
               </div>
@@ -211,11 +204,11 @@ export function ShopifyExportDialog({
                 {isSuggesting ? (
                   <div className="h-11 animate-pulse rounded-md border border-input bg-muted/30" />
                 ) : (
-                  <Input
+                  <Textarea
                     id="shopify-alt-text"
                     value={altText}
                     onChange={(event) => setAltText(event.target.value)}
-                    className="h-11 text-sm"
+                    className="min-h-[72px] resize-y text-sm leading-6"
                   />
                 )}
               </div>
@@ -268,21 +261,16 @@ export function ShopifyExportDialog({
                 <Check className="h-6 w-6 text-white" />
               </span>
               <DialogTitle className="font-display text-2xl uppercase tracking-wide text-foreground leading-none">
-                Draft created
+                Exported to Shopify
               </DialogTitle>
             </div>
 
             <div className="w-full space-y-5">
-              <div className="border border-border bg-muted/20 p-4">
-                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                  Shopify export
-                </p>
-                <DialogDescription className="mt-2 text-sm leading-6 text-foreground">
-                  Your draft product is ready in {shopName}. Open Shopify to review it.
-                </DialogDescription>
-              </div>
+              <DialogDescription className="text-center text-sm leading-6 text-muted-foreground">
+                Your draft is ready in {shopName}.
+              </DialogDescription>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="flex justify-center">
                 <Button
                   type="button"
                   onClick={() => {
@@ -290,22 +278,10 @@ export function ShopifyExportDialog({
                       window.open(shopifyAdminUrl, '_blank', 'noopener,noreferrer');
                     }
                   }}
-                  className="h-11 w-full gap-2.5 font-mono text-[10px] uppercase tracking-[0.2em]"
+                  className="h-11 min-w-[220px] gap-2.5 px-6 font-mono text-[10px] uppercase tracking-[0.2em]"
                 >
-                  <ExternalLink className="h-4 w-4 shrink-0" />
+                  <ShopifyBagIcon className="h-4 w-4 shrink-0" />
                   View in Shopify
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => {
-                    setSuccessOpen(false);
-                    setShopifyAdminUrl(null);
-                  }}
-                  className="h-11 w-full font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground"
-                >
-                  Close
                 </Button>
               </div>
             </div>
