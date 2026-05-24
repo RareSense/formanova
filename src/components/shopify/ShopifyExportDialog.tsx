@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, Loader2 } from 'lucide-react';
+import { ArrowRight, Check, ExternalLink, Loader2 } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { ToastAction } from '@/components/ui/toast';
 import {
   Dialog,
   DialogContent,
@@ -50,6 +49,8 @@ export function ShopifyExportDialog({
   const [description, setDescription] = useState('');
   const [altText, setAltText] = useState('');
   const [suggestError, setSuggestError] = useState<string | null>(null);
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [shopifyAdminUrl, setShopifyAdminUrl] = useState<string | null>(null);
   const didAutoSuggestRef = useRef(false);
 
   const resetDefaults = () => {
@@ -86,20 +87,10 @@ export function ShopifyExportDialog({
       altText: altText.trim(),
     }),
     onSuccess: (result) => {
-      onOpenChange(false);
-
       if (result.success && result.shopify_admin_url) {
-        toast({
-          title: `Draft product created in ${shopName}.`,
-          action: (
-            <ToastAction
-              altText="Open in Shopify"
-              onClick={() => window.open(result.shopify_admin_url, '_blank', 'noopener,noreferrer')}
-            >
-              Open in Shopify
-            </ToastAction>
-          ),
-        });
+        onOpenChange(false);
+        setShopifyAdminUrl(result.shopify_admin_url);
+        setSuccessOpen(true);
         return;
       }
 
@@ -151,115 +142,176 @@ export function ShopifyExportDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto border-foreground sm:max-w-md">
-        <div className="flex flex-col items-center pt-2">
-          <div className="mb-6 flex flex-col items-center gap-2 text-center">
-            <ShopifyBagIcon className="h-12 w-12" />
-            <DialogTitle className="font-display text-2xl uppercase tracking-wide text-foreground leading-none">
-              Export to Shopify
-            </DialogTitle>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto border-foreground sm:max-w-md">
+          <div className="flex flex-col items-center pt-2">
+            <div className="mb-6 flex flex-col items-center gap-2 text-center">
+              <ShopifyBagIcon className="h-12 w-12" />
+              <DialogTitle className="font-display text-2xl uppercase tracking-wide text-foreground leading-none">
+                Export to Shopify
+              </DialogTitle>
+            </div>
+
+            <div className="w-full space-y-5">
+              <div className="border border-border bg-muted/20 p-4">
+                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                  Draft product
+                </p>
+                <DialogDescription className="mt-2 text-sm leading-6 text-foreground">
+                  This will create a draft product in {shopName}. Review it in Shopify before making it live.
+                </DialogDescription>
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="shopify-title" className="block font-mono text-[11px] uppercase tracking-[0.2em] text-foreground">
+                  Product title
+                </label>
+                <p className="font-mono text-[9px] tracking-[0.15em] text-muted-foreground">
+                  Keep it short and recognizable.
+                </p>
+                {isSuggesting ? (
+                  <div className="h-11 animate-pulse rounded-md border border-input bg-muted/30" />
+                ) : (
+                  <Input
+                    id="shopify-title"
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
+                    className="h-11"
+                  />
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="shopify-description" className="block font-mono text-[11px] uppercase tracking-[0.2em] text-foreground">
+                  Description
+                </label>
+                <p className="font-mono text-[9px] tracking-[0.15em] text-muted-foreground">
+                  Add the key details customers should see first.
+                </p>
+                {isSuggesting ? (
+                  <div className="min-h-[112px] animate-pulse rounded-md border border-input bg-muted/30" />
+                ) : (
+                  <Textarea
+                    id="shopify-description"
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                    className="min-h-[112px] text-sm leading-6"
+                  />
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="shopify-alt-text" className="block font-mono text-[11px] uppercase tracking-[0.2em] text-foreground">
+                  Alt text
+                </label>
+                <p className="font-mono text-[9px] tracking-[0.15em] text-muted-foreground">
+                  Describe what is visible in the image.
+                </p>
+                {isSuggesting ? (
+                  <div className="h-11 animate-pulse rounded-md border border-input bg-muted/30" />
+                ) : (
+                  <Input
+                    id="shopify-alt-text"
+                    value={altText}
+                    onChange={(event) => setAltText(event.target.value)}
+                    className="h-11 text-sm"
+                  />
+                )}
+              </div>
+
+              {suggestError && (
+                <p className="font-mono text-[10px] tracking-[0.1em] text-destructive">
+                  {suggestError}
+                </p>
+              )}
+
+              <div className="flex flex-col gap-3">
+                <Button
+                  type="button"
+                  onClick={handleExport}
+                  disabled={isSuggesting || isExporting || !title.trim()}
+                  className="h-11 w-full gap-2.5 px-3 font-mono text-[10px] uppercase tracking-[0.15em] sm:tracking-[0.2em]"
+                >
+                  {isExporting ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : <ShopifyBagIcon className="h-4 w-4 shrink-0" />}
+                  <span className="hidden whitespace-nowrap sm:inline">Export to Shopify</span>
+                  <span className="whitespace-nowrap sm:hidden">Export</span>
+                  {!isExporting && <ArrowRight className="h-4 w-4 shrink-0" />}
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => onOpenChange(false)}
+                  disabled={isExporting}
+                  className="h-11 w-full font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
           </div>
+        </DialogContent>
+      </Dialog>
 
-          <div className="w-full space-y-5">
-            <div className="border border-border bg-muted/20 p-4">
-              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                Draft product
-              </p>
-              <DialogDescription className="mt-2 text-sm leading-6 text-foreground">
-                This will create a draft product in {shopName}. Review it in Shopify before making it live.
-              </DialogDescription>
+      <Dialog
+        open={successOpen}
+        onOpenChange={(nextOpen) => {
+          setSuccessOpen(nextOpen);
+          if (!nextOpen) setShopifyAdminUrl(null);
+        }}
+      >
+        <DialogContent className="border-foreground sm:max-w-md">
+          <div className="flex flex-col items-center pt-2">
+            <div className="mb-6 flex flex-col items-center gap-2 text-center">
+              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#008060]">
+                <Check className="h-6 w-6 text-white" />
+              </span>
+              <DialogTitle className="font-display text-2xl uppercase tracking-wide text-foreground leading-none">
+                Draft created
+              </DialogTitle>
             </div>
 
-            <div className="space-y-2">
-              <label htmlFor="shopify-title" className="block font-mono text-[11px] uppercase tracking-[0.2em] text-foreground">
-                Product title
-              </label>
-              <p className="font-mono text-[9px] tracking-[0.15em] text-muted-foreground">
-                Keep it short and recognizable.
-              </p>
-              {isSuggesting ? (
-                <div className="h-11 animate-pulse rounded-md border border-input bg-muted/30" />
-              ) : (
-                <Input
-                  id="shopify-title"
-                  value={title}
-                  onChange={(event) => setTitle(event.target.value)}
-                  className="h-11"
-                />
-              )}
-            </div>
+            <div className="w-full space-y-5">
+              <div className="border border-border bg-muted/20 p-4">
+                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                  Shopify export
+                </p>
+                <DialogDescription className="mt-2 text-sm leading-6 text-foreground">
+                  Your draft product is ready in {shopName}. Open Shopify to review it.
+                </DialogDescription>
+              </div>
 
-            <div className="space-y-2">
-              <label htmlFor="shopify-description" className="block font-mono text-[11px] uppercase tracking-[0.2em] text-foreground">
-                Description
-              </label>
-              <p className="font-mono text-[9px] tracking-[0.15em] text-muted-foreground">
-                Add the key details customers should see first.
-              </p>
-              {isSuggesting ? (
-                <div className="min-h-[112px] animate-pulse rounded-md border border-input bg-muted/30" />
-              ) : (
-                <Textarea
-                  id="shopify-description"
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                  className="min-h-[112px] text-sm leading-6"
-                />
-              )}
-            </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Button
+                  type="button"
+                  onClick={() => {
+                    if (shopifyAdminUrl) {
+                      window.open(shopifyAdminUrl, '_blank', 'noopener,noreferrer');
+                    }
+                  }}
+                  className="h-11 w-full gap-2.5 font-mono text-[10px] uppercase tracking-[0.2em]"
+                >
+                  <ExternalLink className="h-4 w-4 shrink-0" />
+                  View in Shopify
+                </Button>
 
-            <div className="space-y-2">
-              <label htmlFor="shopify-alt-text" className="block font-mono text-[11px] uppercase tracking-[0.2em] text-foreground">
-                Alt text
-              </label>
-              <p className="font-mono text-[9px] tracking-[0.15em] text-muted-foreground">
-                Describe what is visible in the image.
-              </p>
-              {isSuggesting ? (
-                <div className="h-11 animate-pulse rounded-md border border-input bg-muted/30" />
-              ) : (
-                <Input
-                  id="shopify-alt-text"
-                  value={altText}
-                  onChange={(event) => setAltText(event.target.value)}
-                  className="h-11 text-sm"
-                />
-              )}
-            </div>
-
-            {suggestError && (
-              <p className="font-mono text-[10px] tracking-[0.1em] text-destructive">
-                {suggestError}
-              </p>
-            )}
-
-            <div className="flex flex-col gap-3">
-              <Button
-                type="button"
-                onClick={handleExport}
-                disabled={isSuggesting || isExporting || !title.trim()}
-                className="h-11 w-full gap-2.5 px-3 font-mono text-[10px] uppercase tracking-[0.15em] sm:tracking-[0.2em]"
-              >
-                {isExporting ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : <ShopifyBagIcon className="h-4 w-4 shrink-0" />}
-                <span className="hidden whitespace-nowrap sm:inline">Export to Shopify</span>
-                <span className="whitespace-nowrap sm:hidden">Export</span>
-                {!isExporting && <ArrowRight className="h-4 w-4 shrink-0" />}
-              </Button>
-
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => onOpenChange(false)}
-                disabled={isExporting}
-                className="h-11 w-full font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground"
-              >
-                Cancel
-              </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setSuccessOpen(false);
+                    setShopifyAdminUrl(null);
+                  }}
+                  className="h-11 w-full font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground"
+                >
+                  Close
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

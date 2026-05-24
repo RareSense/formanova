@@ -59,7 +59,6 @@ export default function MyShopifyStore() {
     mutationFn: disconnectShopify,
     onSuccess: async () => {
       await invalidateStatus();
-      toast({ title: 'Store disconnected.' });
     },
     onError: () => {
       toast({ title: 'Could not disconnect. Try again.', variant: 'destructive' });
@@ -394,16 +393,7 @@ function ConnectedCard({
                 </DialogDescription>
               </div>
 
-              {status.shop_domain && (
-                <div className="border border-border bg-background p-4 text-left">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                    Connected store
-                  </p>
-                  <p className="mt-1 text-sm text-foreground">{status.shop_domain}</p>
-                </div>
-              )}
-
-              <div className="flex flex-col gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Button
                   onClick={() => {
                     setShowDisconnectConfirm(false);
