@@ -40,7 +40,8 @@ const Auth = forwardRef<HTMLDivElement>(function Auth(_, ref) {
   const [copiedLink, setCopiedLink] = useState(false);
 
   // Support ?redirect= query param (from ProtectedRoute guard) AND location.state (from in-app redirects)
-  const redirectParam = searchParams.get('redirect') || searchParams.get('next');
+  const rawRedirect = searchParams.get('redirect') || searchParams.get('next');
+  const redirectParam = rawRedirect && !rawRedirect.startsWith('/login') ? rawRedirect : null;
   const from = redirectParam || (location.state as { from?: string })?.from || AUTH_SUCCESS_REDIRECT;
 
   // Persist return URL across OAuth redirect (location.state is lost during OAuth flow)
