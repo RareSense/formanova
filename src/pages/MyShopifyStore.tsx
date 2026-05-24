@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '@/contexts/ThemeContext';
 import logoBlack from '@/assets/formanova-logo-black.png';
 import logoWhite from '@/assets/formanova-logo-white.png';
-import { ArrowLeft, ArrowRight, Check, Info, Lock, Loader2, Settings, Store } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Info, Lock, Loader2, Store } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,6 @@ import { useInvalidateShopifyStatus, useShopifyStatus } from '@/hooks/useShopify
 import {
   disconnectShopify,
   initiateShopifyConnect,
-  updateShopifySettings,
 } from '@/services/shopify-api';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -44,7 +43,6 @@ export default function MyShopifyStore() {
   const logoSrc = DARK_THEMES.has(theme) ? logoWhite : logoBlack;
   const invalidateStatus = useInvalidateShopifyStatus();
   const { data: status, isLoading, isError } = useShopifyStatus();
-  const [optimisticAutoSuggest, setOptimisticAutoSuggest] = useState<boolean | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -67,20 +65,6 @@ export default function MyShopifyStore() {
       toast({ title: 'Could not disconnect. Try again.', variant: 'destructive' });
     },
   });
-
-  const settingsMutation = useMutation({
-    mutationFn: updateShopifySettings,
-    onSuccess: async (result) => {
-      setOptimisticAutoSuggest(result.auto_suggest);
-      await invalidateStatus();
-    },
-    onError: () => {
-      setOptimisticAutoSuggest(null);
-      toast({ title: 'Could not save setting.', variant: 'destructive' });
-    },
-  });
-
-  const autoSuggestValue = optimisticAutoSuggest ?? status?.auto_suggest ?? false;
 
   return (
     <div className="min-h-[calc(100vh-5rem)] bg-background px-4 py-8 sm:px-6 md:px-12 lg:px-16">
@@ -110,25 +94,29 @@ export default function MyShopifyStore() {
 
           {/* Success modal — shown once after OAuth callback */}
           <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-lg">
               <div className="flex flex-col items-center gap-6 px-3 pt-5 pb-3 text-center">
 
                 {/* Connection graphic: Shopify → ··· → ✓ → ··· → FormaNova */}
-                <div className="flex w-full items-center">
-                  <div className="flex flex-1 items-center justify-end gap-3">
-                    <ShopifyBagIcon className="h-10 w-10 shrink-0" />
+                <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-3">
+                  <div className="flex items-center justify-end gap-3">
+                    <div className="flex h-12 w-20 items-center justify-center">
+                      <ShopifyBagIcon className="h-10 w-10 shrink-0" />
+                    </div>
                     <span className="flex items-center gap-1">
                       {[0, 1, 2].map((i) => <span key={i} className="block h-1.5 w-1.5 rounded-full bg-border" />)}
                     </span>
                   </div>
-                  <span className="mx-3 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#008060]">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#008060]">
                     <Check className="h-4 w-4 text-white" />
                   </span>
-                  <div className="flex flex-1 items-center justify-start gap-3">
+                  <div className="flex items-center justify-start gap-3">
                     <span className="flex items-center gap-1">
                       {[0, 1, 2].map((i) => <span key={i} className="block h-1.5 w-1.5 rounded-full bg-border" />)}
                     </span>
-                    <img src={logoSrc} alt="FormaNova" className="h-8 w-auto object-contain" />
+                    <div className="flex h-12 w-20 items-center justify-center">
+                      <img src={logoSrc} alt="FormaNova" className="max-h-8 w-auto object-contain" />
+                    </div>
                   </div>
                 </div>
 
@@ -184,13 +172,7 @@ export default function MyShopifyStore() {
           ) : status?.connected ? (
             <ConnectedCard
               status={status}
-              autoSuggestValue={autoSuggestValue}
               isDisconnecting={disconnectMutation.isPending}
-              isSavingSetting={settingsMutation.isPending}
-              onToggleAutoSuggest={(next) => {
-                setOptimisticAutoSuggest(next);
-                settingsMutation.mutate(next);
-              }}
               onDisconnect={() => disconnectMutation.mutate()}
             />
           ) : (
@@ -338,17 +320,11 @@ function ConnectCard() {
 
 function ConnectedCard({
   status,
-  autoSuggestValue,
   isDisconnecting,
-  isSavingSetting,
-  onToggleAutoSuggest,
   onDisconnect,
 }: {
-  status: { shop_name?: string; shop_domain?: string; auto_suggest?: boolean };
-  autoSuggestValue: boolean;
+  status: { shop_name?: string; shop_domain?: string };
   isDisconnecting: boolean;
-  isSavingSetting: boolean;
-  onToggleAutoSuggest: (v: boolean) => void;
   onDisconnect: () => void;
 }) {
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
@@ -381,30 +357,11 @@ function ConnectedCard({
         </div>
 
         <div className="divide-y divide-border">
-
           {/* Connected store */}
           <div className="px-8 py-6">
             <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">Connected to</p>
             <p className="mt-2 text-base font-medium text-foreground">{status.shop_domain}</p>
           </div>
-
-          {/* AI setting */}
-          <label className="flex cursor-default items-start gap-4 px-8 py-6">
-            <input
-              type="checkbox"
-              checked={autoSuggestValue}
-              disabled={isSavingSetting}
-              onChange={(e) => onToggleAutoSuggest(e.target.checked)}
-              className="mt-0.5 h-4 w-4 accent-primary"
-            />
-            <div className="space-y-1.5">
-              <p className="text-base font-medium text-foreground">Pre-fill product copy with AI</p>
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                Generate draft title, description, and alt text before publishing.
-              </p>
-            </div>
-          </label>
-
         </div>
 
         {/* Footer hint */}
@@ -418,35 +375,56 @@ function ConnectedCard({
 
       {/* Disconnect confirmation modal */}
       <Dialog open={showDisconnectConfirm} onOpenChange={setShowDisconnectConfirm}>
-        <DialogContent className="sm:max-w-sm">
-          <div className="space-y-4 px-1 pt-1 pb-1">
-            <DialogTitle className="font-display text-2xl uppercase tracking-wide text-foreground leading-none">
-              Disconnect Shopify store?
-            </DialogTitle>
-            <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
-              This will pause Shopify publishing. Finished photos will not be sent to Shopify until you reconnect.
-            </DialogDescription>
-            <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-              <Button
-                variant="outline"
-                onClick={() => setShowDisconnectConfirm(false)}
-                disabled={isDisconnecting}
-                className="h-10 font-mono text-[10px] uppercase tracking-[0.15em]"
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={() => {
-                  setShowDisconnectConfirm(false);
-                  onDisconnect();
-                }}
-                disabled={isDisconnecting}
-                className="h-10 gap-2 font-mono text-[10px] uppercase tracking-[0.15em]"
-              >
-                {isDisconnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                Disconnect
-              </Button>
+        <DialogContent className="border-foreground sm:max-w-md">
+          <div className="flex flex-col items-center pt-2">
+            <div className="mb-6 flex flex-col items-center gap-2 text-center">
+              <ShopifyBagIcon className="h-12 w-12" />
+              <DialogTitle className="font-display text-2xl uppercase tracking-wide text-foreground leading-none">
+                Disconnect Shopify
+              </DialogTitle>
+            </div>
+
+            <div className="w-full space-y-5">
+              <div className="border border-border bg-muted/20 p-4">
+                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                  What changes
+                </p>
+                <DialogDescription className="mt-2 text-sm leading-6 text-foreground">
+                  Publishing will pause. Nothing will be sent to Shopify again until you reconnect this store.
+                </DialogDescription>
+              </div>
+
+              {status.shop_domain && (
+                <div className="border border-border bg-background p-4 text-left">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                    Connected store
+                  </p>
+                  <p className="mt-1 text-sm text-foreground">{status.shop_domain}</p>
+                </div>
+              )}
+
+              <div className="flex flex-col gap-3">
+                <Button
+                  onClick={() => {
+                    setShowDisconnectConfirm(false);
+                    onDisconnect();
+                  }}
+                  disabled={isDisconnecting}
+                  className="h-11 w-full gap-2.5 font-mono text-[10px] uppercase tracking-[0.2em]"
+                >
+                  {isDisconnecting ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : null}
+                  Disconnect Shopify
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowDisconnectConfirm(false)}
+                  disabled={isDisconnecting}
+                  className="h-11 w-full font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground"
+                >
+                  Keep connected
+                </Button>
+              </div>
             </div>
           </div>
         </DialogContent>

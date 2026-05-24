@@ -158,8 +158,8 @@ export function ResultImageItem({ url, index, workflowId, outputAssetId, jewelry
           assetName={(generatedAsset && getAssetDisplayName(generatedAsset)) || generatedAsset?.name || `Photoshoot ${index + 1}`}
           workflowId={workflowId}
           isResolvingAsset={isResolvingAsset}
-          label="Publish to Shopify"
-          shortLabel="Publish"
+          label="Export to Shopify"
+          shortLabel="Export"
           className="h-[44px] w-full gap-[6px] px-[10px] font-mono text-[10px] uppercase tracking-[0.03em]"
         />
       </div>

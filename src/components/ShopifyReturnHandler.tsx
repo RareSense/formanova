@@ -1,11 +1,22 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { ShopifyExportDialog } from '@/components/shopify/ShopifyExportDialog';
 import { useShopifyStatus } from '@/hooks/useShopify';
+import { toast } from '@/hooks/use-toast';
+
+interface PendingShopifyExport {
+  assetId: string;
+  assetName: string;
+  workflowId?: string | null;
+  returnPath?: string;
+}
 
 export function ShopifyReturnHandler() {
   const navigate = useNavigate();
   const location = useLocation();
   const { data: status } = useShopifyStatus();
+  const [pendingExport, setPendingExport] = useState<PendingShopifyExport | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
 
   // Intercept backend OAuth callback: /dashboard?shopify_connected=true
   useEffect(() => {
@@ -30,16 +41,37 @@ export function ShopifyReturnHandler() {
     const raw = sessionStorage.getItem('shopify_pending_export');
     if (!raw) return;
     try {
-      const pending = JSON.parse(raw);
+      const pending = JSON.parse(raw) as Partial<PendingShopifyExport>;
       sessionStorage.removeItem('shopify_pending_export');
-      navigate(pending.returnPath || '/dashboard', {
-        replace: true,
-        state: { shopifyPendingExport: pending },
+      if (!pending.assetId || !pending.assetName) return;
+      const shopName = status.shop_name ?? status.shop_domain ?? 'your Shopify store';
+      toast({
+        title: `Shopify connected. You can now export images directly to ${shopName}.`,
       });
+      setPendingExport({
+        assetId: pending.assetId,
+        assetName: pending.assetName,
+        workflowId: pending.workflowId ?? null,
+        returnPath: pending.returnPath,
+      });
+      setExportOpen(true);
+      navigate(pending.returnPath || '/dashboard', { replace: true });
     } catch {
       sessionStorage.removeItem('shopify_pending_export');
     }
-  }, [status?.connected, navigate]);
+  }, [status?.connected, status?.shop_domain, status?.shop_name, navigate]);
 
-  return null;
+  return pendingExport ? (
+    <ShopifyExportDialog
+      open={exportOpen}
+      onOpenChange={(open) => {
+        setExportOpen(open);
+        if (!open) setPendingExport(null);
+      }}
+      assetId={pendingExport.assetId}
+      assetName={pendingExport.assetName}
+      workflowId={pendingExport.workflowId}
+      autoSuggest={false}
+    />
+  ) : null;
 }

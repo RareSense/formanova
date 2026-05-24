@@ -10,7 +10,7 @@ vi.mock('@/hooks/useAuthenticatedImage', () => ({
 }));
 
 vi.mock('@/components/shopify/ShopifyPublishButton', () => ({
-  ShopifyPublishButton: () => <button type="button">Publish to Shopify</button>,
+  ShopifyPublishButton: () => <button type="button">Export to Shopify</button>,
 }));
 
 vi.mock('@/lib/assets-api', () => ({

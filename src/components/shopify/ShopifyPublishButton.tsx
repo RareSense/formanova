@@ -8,6 +8,8 @@ import { ShopifyConnectDialog } from '@/components/shopify/ShopifyConnectDialog'
 import { useShopifyStatus } from '@/hooks/useShopify';
 import { cn } from '@/lib/utils';
 
+const SHOPIFY_BUTTON_ACCENT = '#6E9735';
+
 function ShopifyIcon() {
   return (
     <svg viewBox="-18 0 292 292" className="h-5 w-5 shrink-0" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid">
@@ -33,7 +35,7 @@ export function ShopifyPublishButton({
   assetId,
   assetName,
   workflowId,
-  label = 'Publish to Shopify',
+  label = 'Export to Shopify',
   shortLabel,
   className,
   autoSuggest = false,
@@ -85,8 +87,12 @@ export function ShopifyPublishButton({
         variant="outline"
         onClick={handleClick}
         disabled={isResolvingAsset}
+        style={{
+          borderColor: SHOPIFY_BUTTON_ACCENT,
+          color: SHOPIFY_BUTTON_ACCENT,
+        }}
         className={cn(
-          'gap-2 border border-[#95BF46] bg-background text-[#95BF46] hover:bg-[#95BF46]/10 hover:text-[#95BF46]',
+          'gap-2 border bg-background hover:bg-background hover:text-[#6E9735]',
           className
         )}
       >
@@ -118,7 +124,7 @@ export function ShopifyPublishButton({
           assetId={assetId}
           assetName={assetName}
           workflowId={workflowId}
-          autoSuggest={autoSuggest || Boolean(status?.auto_suggest)}
+          autoSuggest={false}
         />
       )}
     </div>
