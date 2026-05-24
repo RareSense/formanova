@@ -255,9 +255,9 @@ const Auth = forwardRef<HTMLDivElement>(function Auth(_, ref) {
 
           {isReviewLoginEnabled && (
             <div className="w-full max-w-xs mb-8">
-              <p className="text-xs font-medium text-foreground mb-1">Shopify Reviewer Login</p>
+              <p className="text-xs font-medium text-foreground mb-1">Reviewer Login</p>
               <p className="text-[11px] text-muted-foreground mb-4">
-                For Shopify app review only.
+                Use the credentials from the review instructions.
               </p>
               <form onSubmit={handleReviewLogin} className="flex flex-col gap-3">
                 <input
@@ -266,7 +266,7 @@ const Auth = forwardRef<HTMLDivElement>(function Auth(_, ref) {
                   value={reviewEmail}
                   onChange={e => setReviewEmail(e.target.value)}
                   required
-                  className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  className="w-full h-12 rounded-md border border-input bg-background px-3 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 />
                 <input
                   type="password"
@@ -274,12 +274,12 @@ const Auth = forwardRef<HTMLDivElement>(function Auth(_, ref) {
                   value={reviewPassword}
                   onChange={e => setReviewPassword(e.target.value)}
                   required
-                  className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  className="w-full h-12 rounded-md border border-input bg-background px-3 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 />
                 {reviewError && (
                   <p className="text-destructive text-xs">{reviewError}</p>
                 )}
-                <Button type="submit" variant="outline" className="w-full h-10" disabled={reviewLoading}>
+                <Button type="submit" variant="outline" className="w-full h-12 text-base" disabled={reviewLoading}>
                   {reviewLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Sign in'}
                 </Button>
               </form>
