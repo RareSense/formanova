@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ShopifyExportDialog } from '@/components/shopify/ShopifyExportDialog';
 import { useShopifyStatus } from '@/hooks/useShopify';
-import { toast } from '@/hooks/use-toast';
 
 interface PendingShopifyExport {
   assetId: string;
@@ -44,10 +43,6 @@ export function ShopifyReturnHandler() {
       const pending = JSON.parse(raw) as Partial<PendingShopifyExport>;
       sessionStorage.removeItem('shopify_pending_export');
       if (!pending.assetId || !pending.assetName) return;
-      const shopName = status.shop_name ?? status.shop_domain ?? 'your Shopify store';
-      toast({
-        title: `Shopify connected. You can now export images directly to ${shopName}.`,
-      });
       setPendingExport({
         assetId: pending.assetId,
         assetName: pending.assetName,

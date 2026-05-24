@@ -177,7 +177,7 @@ export function ShopifyExportDialog({
 
               <div className="space-y-2">
                 <label htmlFor="shopify-description" className="block font-mono text-[11px] uppercase tracking-[0.2em] text-foreground">
-                  Description
+                  Description optional
                 </label>
                 <p className="font-mono text-[9px] tracking-[0.15em] text-muted-foreground">
                   Add the key details customers should see first.
@@ -196,7 +196,7 @@ export function ShopifyExportDialog({
 
               <div className="space-y-2">
                 <label htmlFor="shopify-alt-text" className="block font-mono text-[11px] uppercase tracking-[0.2em] text-foreground">
-                  Alt text
+                  Alt text optional
                 </label>
                 <p className="font-mono text-[9px] tracking-[0.15em] text-muted-foreground">
                   Describe what is visible in the image.
@@ -230,16 +230,6 @@ export function ShopifyExportDialog({
                   <span className="hidden whitespace-nowrap sm:inline">Export to Shopify</span>
                   <span className="whitespace-nowrap sm:hidden">Export</span>
                   {!isExporting && <ArrowRight className="h-4 w-4 shrink-0" />}
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => onOpenChange(false)}
-                  disabled={isExporting}
-                  className="h-11 w-full font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground"
-                >
-                  Cancel
                 </Button>
               </div>
             </div>
