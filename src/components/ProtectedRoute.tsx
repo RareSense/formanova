@@ -24,10 +24,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   // Guard by token presence. User profile hydration can complete after mount.
   if (!token) {
     const destination = location.pathname + location.search + location.hash;
-    const redirectTo = location.pathname.startsWith('/login')
-      ? '/login'
-      : `/login?redirect=${encodeURIComponent(destination)}`;
-    return <Navigate to={redirectTo} replace />;
+    return <Navigate to={`/login?redirect=${encodeURIComponent(destination)}`} replace />;
   }
 
   return <>{children}</>;
