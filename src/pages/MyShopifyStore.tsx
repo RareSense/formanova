@@ -381,18 +381,12 @@ function ConnectedCard({
               <DialogTitle className="font-display text-2xl uppercase tracking-wide text-foreground leading-none">
                 Disconnect Shopify
               </DialogTitle>
+              <DialogDescription className="max-w-sm text-sm leading-6 text-muted-foreground">
+                Publishing will pause. Nothing will be sent to Shopify again until you reconnect this store.
+              </DialogDescription>
             </div>
 
             <div className="w-full space-y-5">
-              <div className="border border-border bg-muted/20 p-4">
-                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                  What changes
-                </p>
-                <DialogDescription className="mt-2 text-sm leading-6 text-foreground">
-                  Publishing will pause. Nothing will be sent to Shopify again until you reconnect this store.
-                </DialogDescription>
-              </div>
-
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Button
                   variant="ghost"
