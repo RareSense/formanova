@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, Check, Loader2 } from 'lucide-react';
+import { ArrowRight, Loader2 } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
@@ -48,8 +48,6 @@ export function ShopifyExportDialog({
   const [description, setDescription] = useState('');
   const [altText, setAltText] = useState('');
   const [suggestError, setSuggestError] = useState<string | null>(null);
-  const [successOpen, setSuccessOpen] = useState(false);
-  const [shopifyAdminUrl, setShopifyAdminUrl] = useState<string | null>(null);
   const didAutoSuggestRef = useRef(false);
 
   const resetDefaults = () => {
@@ -88,8 +86,7 @@ export function ShopifyExportDialog({
     onSuccess: (result) => {
       if (result.success && result.shopify_admin_url) {
         onOpenChange(false);
-        setShopifyAdminUrl(result.shopify_admin_url);
-        setSuccessOpen(true);
+        window.open(result.shopify_admin_url, '_blank', 'noopener,noreferrer');
         return;
       }
 
@@ -141,8 +138,7 @@ export function ShopifyExportDialog({
   };
 
   return (
-    <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-h-[90vh] overflow-y-auto border-foreground sm:max-w-md">
           <div className="flex flex-col items-center pt-2">
           <div className="mb-6 flex flex-col items-center gap-2 text-center">
@@ -235,49 +231,6 @@ export function ShopifyExportDialog({
             </div>
           </div>
         </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={successOpen}
-        onOpenChange={(nextOpen) => {
-          setSuccessOpen(nextOpen);
-          if (!nextOpen) setShopifyAdminUrl(null);
-        }}
-      >
-        <DialogContent className="border-foreground sm:max-w-md">
-          <div className="flex flex-col items-center pt-2">
-            <div className="mb-6 flex flex-col items-center gap-2 text-center">
-              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#008060]">
-                <Check className="h-6 w-6 text-white" />
-              </span>
-              <DialogTitle className="font-display text-2xl uppercase tracking-wide text-foreground leading-none">
-                Exported to Shopify
-              </DialogTitle>
-            </div>
-
-            <div className="w-full space-y-5">
-              <DialogDescription className="text-center text-sm leading-6 text-muted-foreground">
-                Your draft is ready in {shopName}.
-              </DialogDescription>
-
-              <div className="flex justify-center">
-                <Button
-                  type="button"
-                  onClick={() => {
-                    if (shopifyAdminUrl) {
-                      window.open(shopifyAdminUrl, '_blank', 'noopener,noreferrer');
-                    }
-                  }}
-                  className="h-11 min-w-[220px] gap-2.5 px-6 font-mono text-[10px] uppercase tracking-[0.2em]"
-                >
-                  <ShopifyBagIcon className="h-4 w-4 shrink-0" />
-                  View in Shopify
-                </Button>
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
+    </Dialog>
   );
 }
