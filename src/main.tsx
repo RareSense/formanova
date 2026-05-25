@@ -7,9 +7,10 @@ import { getStoredUser } from "./lib/auth-api";
 import { getHostRedirectDecision } from "./lib/host-redirect-policy";
 import posthog from 'posthog-js';
 
-// requestIdleCallback polyfill for Safari
+// requestIdleCallback / cancelIdleCallback polyfill for Safari
 if (typeof window !== 'undefined' && !('requestIdleCallback' in window)) {
   (window as any).requestIdleCallback = (cb: Function) => setTimeout(cb, 1);
+  (window as any).cancelIdleCallback = (id: number) => clearTimeout(id);
 }
 
 // ── Global chunk-load error handlers ──────────────────────────────
@@ -106,6 +107,13 @@ if (hostRedirect.shouldRedirect && hostRedirect.redirectUrl) {
     bootstrap: storedUser
       ? { distinctID: storedUser.id, isIdentifiedID: true }
       : undefined,
+    before_send: (event) => {
+      const msg = (event as any)?.properties?.$exception_message || '';
+      // Browser extensions (1Password, LastPass, etc.) inject into form inputs and
+      // fire async updates on DOM nodes React has already removed. Pure noise.
+      if (msg.includes('Object Not Found Matching Id')) return null;
+      return event;
+    },
   });
 
   root.render(
