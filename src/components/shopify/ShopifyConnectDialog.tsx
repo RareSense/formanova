@@ -81,7 +81,7 @@ export function ShopifyConnectDialog({ open, onOpenChange }: ShopifyConnectDialo
               </div>
               <div className="border border-border bg-muted/20 p-4">
                 <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Connected store</p>
-                <p className="mt-1 text-sm text-foreground">{status.shop_name || status.shop_domain}</p>
+                <p className="mt-1 text-sm text-foreground">{status?.shop_name || status?.shop_domain}</p>
               </div>
               <Button
                 onClick={() => onOpenChange(false)}
