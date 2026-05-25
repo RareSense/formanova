@@ -44,10 +44,11 @@ export function useStudioOnboarding({
   const hasCheckedUploadGuide = useRef(false);
   const hasCheckedProductShotGuide = useRef(false);
 
-  // Upload guide — shown once on first visit to Step 1 for gated users who haven't agreed to TOS
+  // Upload guide — shown once on first visit to Step 1 in model-shot mode for gated users who haven't agreed to TOS
   useEffect(() => {
     if (initializing || !user || hasCheckedUploadGuide.current) return;
     if (currentStep !== 'upload') return;
+    if (isProductShot) return;
 
     hasCheckedUploadGuide.current = true;
 
@@ -66,7 +67,7 @@ export function useStudioOnboarding({
         setUploadGuideOpen(true);
         trackUploadGuideViewed();
       });
-  }, [currentStep, initializing, user?.email, user?.id]);
+  }, [currentStep, initializing, isProductShot, user?.email, user?.id]);
 
   const handleUploadGuideClose = useCallback(() => {
     setUploadGuideOpen(false);
