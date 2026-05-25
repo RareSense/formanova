@@ -3,6 +3,24 @@
 
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit = {},
+  retries = 3,
+): Promise<Response> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const res = await authenticatedFetch(url, options);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res;
+    } catch (err) {
+      if (i === retries - 1) throw err;
+      await new Promise((r) => setTimeout(r, 500 * (i + 1)));
+    }
+  }
+  throw new Error('fetchWithRetry exhausted');
+}
+
 const API_BASE = import.meta.env.VITE_PIPELINE_API_URL ?? '';
 
 export type AssetType = 'jewelry_photo' | 'model_photo' | 'inspiration_photo' | 'generated_photo' | 'generated_cad';
@@ -68,10 +86,7 @@ export async function fetchUserAssets(
   const params = new URLSearchParams({ asset_type: type, page: String(page), page_size: String(pageSize) });
   if (category) params.set('category', category);
   if (intendedUse) params.set('intended_use', intendedUse);
-  const response = await authenticatedFetch(`${API_BASE}/assets?${params}`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ${type} assets: ${response.status}`);
-  }
+  const response = await fetchWithRetry(`${API_BASE}/assets?${params}`);
   return response.json();
 }
 
