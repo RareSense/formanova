@@ -289,7 +289,7 @@ const Auth = forwardRef<HTMLDivElement>(function Auth(_, ref) {
                 </Button>
               </form>
               <p className="text-[11px] text-muted-foreground mt-3">
-                Google Sign-In is not required — use the form above.
+                Google Sign-In is not required for reviewers.
               </p>
             </div>
           )}
