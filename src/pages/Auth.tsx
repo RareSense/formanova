@@ -255,8 +255,8 @@ const Auth = forwardRef<HTMLDivElement>(function Auth(_, ref) {
 
           {isReviewLoginEnabled && (
             <div className="w-full max-w-xs mb-8">
-              <p className="text-xs font-medium text-foreground mb-1">Reviewer Login</p>
-              <p className="text-[11px] text-muted-foreground mb-4">
+              <p className="text-xs font-bold text-foreground mb-1">Reviewer Login</p>
+              <p className="text-[11px] text-muted-foreground mb-4 italic">
                 Use the credentials from the review instructions.
               </p>
               <form onSubmit={handleReviewLogin} className="flex flex-col gap-3">
