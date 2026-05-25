@@ -214,7 +214,7 @@ const Auth = forwardRef<HTMLDivElement>(function Auth(_, ref) {
     setReviewLoading(true);
     setReviewError(null);
     try {
-      const response = await fetch('/auth/shopify-review-login', {
+      const response = await fetch('/api/auth/shopify-review-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: reviewEmail, password: reviewPassword }),
