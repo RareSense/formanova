@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, ExternalLink, Loader2, MessageSquareWarning } from 'lucide-react';
+import { AlertTriangle, ExternalLink, Loader2, MessageSquareWarning, Search } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -30,7 +30,6 @@ import {
 import { matchesAdminGenerationSearch } from '@/lib/admin-generations-search';
 
 const PAGE_SIZE = 20;
-const SEARCH_FETCH_LIMIT = 500;
 const STATUS_OPTIONS = ['queued', 'running', 'completed', 'failed', 'cancelled'] as const;
 const USER_TYPE_OPTIONS = [
   'jewelry_brand',
@@ -125,15 +124,15 @@ export default function AdminGenerationsPage() {
   const isPaying = searchParams.get('is_paying') ?? '';
   const offset = Number(searchParams.get('offset') ?? '0') || 0;
   const hasSearch = search.trim().length > 0;
-  const backendLimit = hasSearch ? SEARCH_FETCH_LIMIT : PAGE_SIZE;
-  const backendOffset = hasSearch ? 0 : offset;
+  const isEmailSearch = hasSearch && search.includes('@');
 
   const query = useQuery({
-    queryKey: ['admin-generations', { status, search, hasFeedback, userType, isPaying, backendOffset, backendLimit }],
+    queryKey: ['admin-generations', { status, search, hasFeedback, userType, isPaying, offset }],
     queryFn: () => listAdminGenerations({
-      limit: backendLimit,
-      offset: backendOffset,
+      limit: PAGE_SIZE,
+      offset,
       status: status || undefined,
+      user_email: isEmailSearch ? search.trim() : undefined,
       has_feedback: hasFeedback === '' ? undefined : hasFeedback === 'true',
       user_type: userType || undefined,
       is_paying: isPaying === '' ? undefined : isPaying === 'true',
@@ -142,16 +141,13 @@ export default function AdminGenerationsPage() {
   });
 
   const serverItems = query.data?.items ?? [];
-  const filteredItems = useMemo(
+  const items = useMemo(
     () => (hasSearch
       ? serverItems.filter((item) => matchesAdminGenerationSearch(item, search))
       : serverItems),
     [hasSearch, search, serverItems],
   );
-  const items = hasSearch
-    ? filteredItems.slice(offset, offset + PAGE_SIZE)
-    : filteredItems;
-  const total = hasSearch ? filteredItems.length : (query.data?.total ?? 0);
+  const total = query.data?.total ?? 0;
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const error = query.error instanceof AdminGenerationsApiError ? query.error : null;
@@ -191,12 +187,15 @@ export default function AdminGenerationsPage() {
     <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 sm:py-8">
 
         <div className="mb-5 flex flex-wrap gap-2">
-          <Input
-            value={search}
-            onChange={(event) => updateParam('search', event.target.value)}
-            placeholder="Search workflow, ID, or email"
-            className="h-9 w-full shrink-0 text-sm sm:w-64"
-          />
+          <div className="relative w-full shrink-0 sm:w-64">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(event) => updateParam('search', event.target.value)}
+              placeholder="Search by email, workflow, or ID..."
+              className="h-9 pl-8 text-sm"
+            />
+          </div>
 
           <Select value={status || 'all'} onValueChange={(value) => updateParam('status', value === 'all' ? '' : value)}>
             <SelectTrigger className="h-9 w-full shrink-0 text-sm sm:w-40">
@@ -257,9 +256,9 @@ export default function AdminGenerationsPage() {
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           </div>
-        ) : error?.status === 401 ? (
+        ) : error?.status === 401 || error?.status === 403 ? (
           <NotAuthorizedState />
-        ) : error?.status === 422 ? (
+        ) : error?.status === 402 || error?.status === 422 ? (
           <InvalidRequestState message={error.message || 'One or more filters are invalid.'} />
         ) : error ? (
           <div className="border border-border bg-card">

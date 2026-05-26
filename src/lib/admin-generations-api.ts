@@ -33,6 +33,7 @@ export interface AdminGenerationsListParams {
   offset?: number;
   status?: string;
   workflow_name?: string;
+  user_email?: string;
   has_feedback?: boolean;
   user_type?: string;
   is_paying?: boolean;
@@ -233,6 +234,7 @@ export async function listAdminGenerations(
   if (params.offset !== undefined) q.set('offset', String(params.offset));
   if (params.status) q.set('status', params.status);
   if (params.workflow_name) q.set('workflow_name', params.workflow_name);
+  if (params.user_email) q.set('user_email', params.user_email);
   if (params.has_feedback !== undefined) q.set('has_feedback', String(params.has_feedback));
   if (params.user_type) q.set('user_type', params.user_type);
   if (params.is_paying !== undefined) q.set('is_paying', String(params.is_paying));
