@@ -459,5 +459,6 @@ export default function Generations() {
         )}
       </div>
     </div>
+    </>
   );
 }
