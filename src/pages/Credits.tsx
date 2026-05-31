@@ -282,7 +282,7 @@ export default function Credits() {
                     return (
                       <div
                         key={tier.tier_id}
-                        className="p-8 flex flex-col gap-8 border-2 border-primary/40 bg-primary/5 shadow-sm"
+                        className="p-8 flex flex-col gap-8 border-2 border-[hsl(var(--formanova-hero-accent))] bg-[hsl(var(--formanova-hero-accent))]/10 shadow-sm"
                       >
                         {/* Badge */}
                         <div>
