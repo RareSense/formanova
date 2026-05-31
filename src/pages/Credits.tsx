@@ -216,6 +216,12 @@ export default function Credits() {
   const maxWidthClass = gridTiers.length === 4 ? 'max-w-7xl' : 'max-w-5xl';
 
   return (
+    <>
+      <Helmet>
+        <title>Credits & Plans | FormaNova</title>
+        <meta name="description" content="Check your credit balance, redeem promo codes, and top up your FormaNova account for more AI-generated jewelry content." />
+        <link rel="canonical" href="/credits" />
+      </Helmet>
     <div className="min-h-[calc(100vh-5rem)] bg-background py-6 px-6 md:px-12 lg:px-16">
       <motion.div
         variants={containerVariants}
@@ -477,5 +483,6 @@ export default function Credits() {
         </motion.div>
       </motion.div>
     </div>
+    </>
   );
 }

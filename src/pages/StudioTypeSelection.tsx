@@ -33,6 +33,12 @@ export default function StudioTypeSelection() {
   const navigate = useNavigate();
 
   return (
+    <>
+      <Helmet>
+        <title>Photo Studio | FormaNova</title>
+        <meta name="description" content="Choose between model-shot and product-shot studios for professional AI jewelry photography." />
+        <link rel="canonical" href="/studio" />
+      </Helmet>
     <div className="min-h-[calc(100dvh-5rem)] bg-background flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 lg:px-10 overflow-x-hidden pt-4 md:pt-8 lg:pt-0">
       {/* Header */}
       <motion.div
@@ -118,5 +124,6 @@ export default function StudioTypeSelection() {
         <span className="text-formanova-hero-accent">Studio</span>
       </motion.p>
     </div>
+    </>
   );
 }
