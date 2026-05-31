@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import { Helmet } from "react-helmet-async";
 import { useCredits } from "@/contexts/CreditsContext";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";

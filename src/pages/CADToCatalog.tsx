@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from "react";
+import { Helmet } from "react-helmet-async";
 import { motion, AnimatePresence } from "framer-motion";
 import { Upload, Camera, ChevronLeft, ChevronRight, Trash2, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";

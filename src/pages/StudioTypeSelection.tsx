@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { trackStudioTypeSelected } from '@/lib/posthog-events';
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
