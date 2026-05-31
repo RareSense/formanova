@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -151,6 +152,12 @@ export default function Pricing() {
   const maxWidthClass = gridTiers.length === 4 ? 'max-w-7xl' : 'max-w-5xl';
 
   return (
+    <>
+      <Helmet>
+        <title>Pricing | FormaNova AI Jewelry Studio</title>
+        <meta name="description" content="Choose a credit plan for AI jewelry photoshoots and CAD generation. Plans from $9. Upgrade or cancel anytime." />
+        <link rel="canonical" href="/pricing" />
+      </Helmet>
     <div className="min-h-[calc(100vh-5rem)] bg-background py-6 px-6 md:px-12 lg:px-16">
       <div className={`${maxWidthClass} mx-auto`}>
 
@@ -345,5 +352,6 @@ export default function Pricing() {
 
       </div>
     </div>
+    </>
   );
 }

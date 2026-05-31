@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { useParams, useLocation, useSearchParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -511,6 +512,12 @@ export default function UnifiedStudio() {
   // ─── Render ───────────────────────────────────────────────────────
 
   return (
+    <>
+      <Helmet>
+        <title>Jewelry Photoshoot | FormaNova</title>
+        <meta name="description" content="Upload jewelry photos and generate professional model or product shots with AI. Pixel-perfect preservation guaranteed." />
+        <link rel="canonical" href={location.pathname} />
+      </Helmet>
     <div className="h-screen bg-background relative overflow-hidden flex flex-col">
       {showInsufficientModal && preflightResult && (
         <CreditPreflightModal
@@ -677,5 +684,6 @@ export default function UnifiedStudio() {
         />
       )}
     </div>
+    </>
   );
 }

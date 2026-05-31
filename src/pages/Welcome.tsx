@@ -1,4 +1,5 @@
 import React, { lazy, Suspense } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { Link, useNavigate, Navigate } from 'react-router-dom';
 import { ArrowRight, Play } from 'lucide-react';
 import { ScrollRevealSection, StaggerContainer } from '@/components/ScrollRevealSection';
@@ -64,6 +65,12 @@ export default function Welcome() {
 
 
   return (
+    <>
+      <Helmet>
+        <title>FormaNova | AI Jewelry Photoshoot Studio & CAD Generator</title>
+        <meta name="description" content="AI jewelry photoshoot studio & CAD generator. Upload product images for professional model photos, or generate 3D jewelry models from text. Plans from $9." />
+        <link rel="canonical" href="/" />
+      </Helmet>
     <div className="min-h-screen bg-background overflow-x-hidden scroll-smooth">
       {/* Hero Section with Cinematic 3D Parallax */}
       <section className="min-h-screen relative overflow-hidden bg-background">
@@ -211,5 +218,6 @@ export default function Welcome() {
         </div>
       </footer>
     </div>
+    </>
   );
 }
