@@ -340,7 +340,7 @@ describe('useStudioGeneration', () => {
       ...baseOptions(),
       selectedModel: modelA,
       activeModelUrl: modelA.url,
-      resolution: '4K' as const,
+      resolution: '4K' as '1K' | '2K' | '4K',
       generationCost: 25,
     };
     const { result, rerender } = renderHook(() => useStudioGeneration(options), { wrapper: wrapper(ctx) });
@@ -361,7 +361,7 @@ describe('useStudioGeneration', () => {
       ...baseOptions(),
       selectedModel: modelB,
       activeModelUrl: modelB.url,
-      resolution: '1K' as const,
+      resolution: '1K' as '1K' | '2K' | '4K',
       generationCost: 10,
     };
     rerender();
@@ -374,7 +374,7 @@ describe('useStudioGeneration', () => {
       ...baseOptions(),
       selectedModel: modelC,
       activeModelUrl: modelC.url,
-      resolution: '2K' as const,
+      resolution: '2K' as '1K' | '2K' | '4K',
       generationCost: 15,
     };
     rerender();
@@ -387,7 +387,7 @@ describe('useStudioGeneration', () => {
       ...baseOptions(),
       selectedModel: modelD,
       activeModelUrl: modelD.url,
-      resolution: '1K' as const,
+      resolution: '1K' as '1K' | '2K' | '4K',
       generationCost: 10,
     };
     rerender();

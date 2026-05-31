@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockAuthenticatedFetch = vi.hoisted(() => vi.fn<[string, RequestInit?], Promise<Response>>());
+const mockAuthenticatedFetch = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/authenticated-fetch', () => ({
   authenticatedFetch: mockAuthenticatedFetch,
