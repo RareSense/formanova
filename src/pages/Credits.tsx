@@ -268,9 +268,6 @@ export default function Credits() {
 
         {/* Plans */}
         <motion.div variants={itemVariants} className="mb-12">
-          <span className="font-mono text-[9px] tracking-[0.3em] text-muted-foreground uppercase block mb-6">
-            Get More Credits
-          </span>
           {tiersLoading ? (
             <div className="flex justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -283,11 +280,11 @@ export default function Credits() {
                     return (
                       <div
                         key={tier.tier_id}
-                        className="p-8 flex flex-col gap-8 border-2 border-[hsl(var(--formanova-hero-accent))] bg-[hsl(var(--formanova-hero-accent))]/10 shadow-sm"
+                        className="p-8 flex flex-col gap-6 border-2 border-[hsl(var(--formanova-hero-accent))] bg-[hsl(var(--formanova-hero-accent))]/10 shadow-sm"
                       >
                         {/* Badge */}
                         <div>
-                          <span className="inline-block font-mono text-[10px] tracking-[0.25em] text-primary uppercase font-bold">
+                          <span className="inline-block font-mono text-[20px] tracking-[0.25em] text-[hsl(var(--formanova-hero-accent))] uppercase font-bold italic">
                             One-time offer
                           </span>
                         </div>
@@ -315,7 +312,7 @@ export default function Credits() {
 
                         {/* Description */}
                         <div className="space-y-2">
-                          <p className="text-sm text-foreground/80 leading-relaxed">
+                          <p className="text-sm italic leading-relaxed text-[hsl(var(--formanova-hero-accent))]">
                             Perfect for your first project. A simple way to try FormaNova before moving to a larger pack. Available once per account.
                           </p>
                         </div>
@@ -336,7 +333,7 @@ export default function Credits() {
                         {/* CTA */}
                         <div className="mt-auto pt-2">
                           <Button
-                            className="w-full font-mono text-[10px] tracking-[0.2em] uppercase"
+                            className="w-full font-mono text-xs tracking-[0.15em] uppercase"
                             size="lg"
                             variant="default"
                             disabled={loadingTier !== null}
@@ -405,7 +402,7 @@ export default function Credits() {
 
                       <div className="mt-auto pt-2">
                         <Button
-                          className="w-full font-mono text-[10px] tracking-[0.2em] uppercase"
+                          className="w-full font-mono text-xs tracking-[0.15em] uppercase"
                           size="lg"
                           variant="default"
                           disabled={loadingTier !== null}
