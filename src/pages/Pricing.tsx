@@ -250,7 +250,7 @@ export default function Pricing() {
                       {/* CTA */}
                       <div className="mt-auto pt-2">
                         <Button
-                          className="w-full font-mono text-xs tracking-[0.15em] uppercase"
+                          className="w-full font-mono text-[10px] tracking-[0.2em] uppercase"
                           size="lg"
                           variant="default"
                           disabled={loadingTier !== null}
@@ -323,7 +323,7 @@ export default function Pricing() {
                     {/* CTA */}
                     <div className="mt-auto pt-2">
                       <Button
-                        className="w-full font-mono text-xs tracking-[0.15em] uppercase"
+                        className="w-full font-mono text-[10px] tracking-[0.2em] uppercase"
                         size="lg"
                         variant="default"
                         disabled={loadingTier !== null}
