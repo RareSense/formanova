@@ -345,6 +345,12 @@ export default function Generations() {
   const cadSketchSection = imageToCadEnabled ? getSection('cad_sketch', cadSketchPage) : null;
 
   return (
+    <>
+      <Helmet>
+        <title>My Generations | FormaNova</title>
+        <meta name="description" content="View and manage your AI-generated jewelry photoshoots and CAD models. Download, share, or revisit past creations." />
+        <link rel="canonical" href="/generations" />
+      </Helmet>
     <div className="min-h-[calc(100vh-5rem)] bg-background py-6 px-6 md:px-12 lg:px-16">
       <div className="max-w-7xl mx-auto">
         <motion.div
