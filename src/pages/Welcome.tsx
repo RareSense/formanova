@@ -218,5 +218,6 @@ export default function Welcome() {
         </div>
       </footer>
     </div>
+    </>
   );
 }
