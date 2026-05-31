@@ -37,6 +37,12 @@ export default function Dashboard() {
   usePrefetchGenerations();
 
   return (
+    <>
+      <Helmet>
+        <title>Dashboard | FormaNova Studio</title>
+        <meta name="description" content="Your FormaNova dashboard. Start a jewelry photoshoot, generate a 3D CAD model, or browse your creation history." />
+        <link rel="canonical" href="/dashboard" />
+      </Helmet>
     <div className="min-h-[calc(100vh-5rem)] bg-background py-6 px-6 md:px-12 lg:px-16">
       {/* Header — matches Studio page */}
       <motion.div
