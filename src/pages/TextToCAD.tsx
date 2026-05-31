@@ -1064,6 +1064,12 @@ export default function TextToCAD() {
 
   // ── Phase 2: Full workspace with resizable panels ──
   return (
+    <>
+      <Helmet>
+        <title>Text to CAD | FormaNova</title>
+        <meta name="description" content="Describe any jewelry piece in text and get a manufacturable 3D CAD model in minutes. Rings, necklaces, bracelets & more." />
+        <link rel="canonical" href="/text-to-cad" />
+      </Helmet>
     <div
       className="flex h-[calc(100vh-5rem)] overflow-hidden bg-background"
       tabIndex={-1}
@@ -1414,5 +1420,6 @@ export default function TextToCAD() {
         )}
       </AnimatePresence>
     </div>
+    </>
   );
 }

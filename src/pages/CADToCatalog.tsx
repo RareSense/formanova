@@ -123,6 +123,12 @@ export default function CADToCatalog() {
   }, [modelUrl]);
 
   return (
+    <>
+      <Helmet>
+        <title>CAD to Catalog | FormaNova</title>
+        <meta name="description" content="Transform your 3D jewelry CAD models into professional product catalog images for e-commerce and marketing." />
+        <link rel="canonical" href="/cad-to-catalog" />
+      </Helmet>
     <div className="flex h-[calc(100vh-5rem)] overflow-hidden bg-muted/30">
       {/* ── LEFT PANEL: Material Library ── */}
       <AnimatePresence>
@@ -259,5 +265,6 @@ export default function CADToCatalog() {
         )}
       </AnimatePresence>
     </div>
+    </>
   );
 }

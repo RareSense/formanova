@@ -203,6 +203,12 @@ export default function ImageToCAD() {
 
   // ── Phase 2: Full workspace with resizable panels ──
   return (
+    <>
+      <Helmet>
+        <title>Image to CAD | FormaNova</title>
+        <meta name="description" content="Upload a jewelry sketch or reference image and convert it into a 3D CAD model with AI-powered accuracy." />
+        <link rel="canonical" href="/image-to-cad" />
+      </Helmet>
     <div className="flex h-[calc(100vh-5rem)] overflow-hidden bg-background" tabIndex={-1}>
       <ResizablePanelGroup direction="horizontal" className="h-full">
         <ResizablePanel
@@ -435,5 +441,6 @@ export default function ImageToCAD() {
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>
+    </>
   );
 }
