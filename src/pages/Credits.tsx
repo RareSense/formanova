@@ -268,6 +268,9 @@ export default function Credits() {
 
         {/* Plans */}
         <motion.div variants={itemVariants} className="mb-12">
+          <span className="font-mono text-[9px] tracking-[0.3em] text-muted-foreground uppercase block mb-6">
+            Get More Credits
+          </span>
           {tiersLoading ? (
             <div className="flex justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -280,16 +283,18 @@ export default function Credits() {
                     return (
                       <div
                         key={tier.tier_id}
-                        className="p-8 flex flex-col gap-6 border-2 border-[hsl(var(--formanova-hero-accent))] bg-[hsl(var(--formanova-hero-accent))]/10 shadow-sm"
+                        className="p-8 flex flex-col gap-6 border-2 border-foreground"
                       >
-                        {/* Badge */}
                         <div>
-                          <span className="inline-block whitespace-nowrap font-mono text-[20px] tracking-[0.15em] text-[hsl(var(--formanova-hero-accent))] uppercase font-bold italic">
-                            One-time offer
-                          </span>
+                          <motion.span
+                            className="inline-block font-mono text-[10px] tracking-[0.25em] text-primary uppercase italic font-bold"
+                            animate={{ scale: [1, 1.08, 1] }}
+                            transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+                          >
+                            One-time offer only
+                          </motion.span>
                         </div>
 
-                        {/* Price */}
                         <div>
                           <div className="flex items-baseline gap-1">
                             <span
@@ -306,31 +311,22 @@ export default function Credits() {
                             </span>
                           </div>
                           <p className="font-mono text-[10px] tracking-wider text-muted-foreground mt-1">
-                            {isINR ? '₹3.98' : '$0.40'} per photo
+                            {isINR ? `₹${(1990 / tier.credits).toFixed(0)}` : `$${(20 / tier.credits).toFixed(2)}`} per photo
                           </p>
                         </div>
 
-                        {/* Description */}
-                        <div className="space-y-2">
-                          <p className="text-sm italic leading-relaxed text-[hsl(var(--formanova-hero-accent))]">
-                            Perfect for your first project. A simple way to try FormaNova before moving to a larger pack. Available once per account.
-                          </p>
-                        </div>
-
-                        {/* Credits */}
                         <div className="border-t border-border/30 pt-5 space-y-2">
                           <p className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground uppercase">
                             You get
                           </p>
                           <p className="font-mono text-xl text-foreground">
-                            50 credits
+                            {tier.credits} credits
                           </p>
                           <p className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground uppercase">
-                            Generate up to 5 photos
+                            Generate up to {Math.floor(tier.credits / 10)} photos
                           </p>
                         </div>
 
-                        {/* CTA */}
                         <div className="mt-auto pt-2">
                           <Button
                             className="w-full font-mono text-[10px] tracking-[0.2em] uppercase"
@@ -342,7 +338,7 @@ export default function Credits() {
                             {loadingTier === tier.tier_id ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
-                              `Buy 50 Credits`
+                              `Buy ${tier.credits} credits`
                             )}
                           </Button>
                           {unavailableTier === tier.tier_id && (
@@ -386,11 +382,6 @@ export default function Credits() {
                         <p className="font-mono text-[10px] tracking-wider text-muted-foreground mt-1">
                           {isINR ? plan.inrPerPhoto : plan.perPhoto} per photo
                         </p>
-                      </div>
-
-                      {/* Spacer to match $2 card description height */}
-                      <div className="text-sm leading-relaxed invisible select-none" aria-hidden="true">
-                        &nbsp;
                       </div>
 
                       <div className="border-t border-border/30 pt-5 space-y-2">
