@@ -201,7 +201,7 @@ export default function Pricing() {
                     >
                       {/* Badge */}
                       <div>
-                        <span className="inline-block font-mono text-[20px] tracking-[0.25em] text-[hsl(var(--formanova-hero-accent))] uppercase font-bold italic">
+                        <span className="inline-block whitespace-nowrap font-mono text-[20px] tracking-[0.15em] text-[hsl(var(--formanova-hero-accent))] uppercase font-bold italic">
                           One-time offer
                         </span>
                       </div>
@@ -259,7 +259,7 @@ export default function Pricing() {
                           {loadingTier === tier.tier_id ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
-                            'Start for $2'
+                            `Buy 50 Credits`
                           )}
                         </Button>
                         {unavailableTier === tier.tier_id && (
@@ -305,6 +305,11 @@ export default function Pricing() {
                       <p className="font-mono text-[10px] tracking-wider text-muted-foreground mt-1">
                         {isINR ? plan.inrPerPhoto : plan.perPhoto} per photo
                       </p>
+                    </div>
+
+                    {/* Spacer to match $2 card description height */}
+                    <div className="text-sm leading-relaxed invisible select-none" aria-hidden="true">
+                      &nbsp;
                     </div>
 
                     {/* What you get */}
