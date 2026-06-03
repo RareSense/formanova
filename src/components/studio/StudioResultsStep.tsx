@@ -5,13 +5,17 @@
  * Displays result images in a flex grid, New Photoshoot / Regenerate action
  * buttons, and the optional feedback link + FeedbackModal.
  *
- * Has NO state of its own — all values flow in as props from UnifiedStudio.
+ * Generation values flow in as props from UnifiedStudio; local state is limited
+ * to transient, client-only coachmark visibility.
  */
+import { useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Diamond, RefreshCw, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { ResultImageItem } from '@/components/studio/ResultImageItem';
 import { FeedbackModal } from '@/components/studio/FeedbackModal';
+import { PostGenerationCoachmark } from '@/components/studio/PostGenerationCoachmark';
 import { trackRegenerateClicked, getButtonLabelVariant } from '@/lib/posthog-events';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
 import { type FeedbackCategory } from '@/lib/feedback-api';
@@ -61,12 +65,27 @@ export function StudioResultsStep({
   generationCost,
 }: StudioResultsStepProps) {
   const isNewLabels = getButtonLabelVariant() === 'treatment';
+  const humanButtonLabel = isNewLabels ? 'Redo with human' : 'Fix this result';
+  const [coachmarkVisible, setCoachmarkVisible] = useState(false);
+  const [coachmarkDismissSignal, setCoachmarkDismissSignal] = useState(0);
+  const actionAreaRef = useRef<HTMLDivElement>(null);
+  const humanButtonRef = useRef<HTMLDivElement>(null);
+  const generationKey = useMemo(
+    () => workflowId ?? resultImages.join('|'),
+    [resultImages, workflowId],
+  );
+
+  const dismissCoachmarkForGeneration = () => {
+    setCoachmarkDismissSignal(signal => signal + 1);
+    setCoachmarkVisible(false);
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
-      className="space-y-8"
+      className="relative space-y-8"
     >
       <div className="text-center">
         <span className="font-mono text-[9px] tracking-[0.3em] text-muted-foreground uppercase block mb-1">Complete</span>
@@ -86,7 +105,21 @@ export function StudioResultsStep({
       )}
 
       {/* Action buttons directly under results */}
-      <div className="mx-auto flex w-full max-w-[360px] flex-col gap-4 pt-2">
+      <div
+        ref={actionAreaRef}
+        className={cn(
+          "relative mx-auto flex w-full max-w-[360px] flex-col gap-4 pt-2",
+          coachmarkVisible ? "z-[70]" : "z-40",
+        )}
+      >
+        <PostGenerationCoachmark
+          enabled={resultImages.length > 0}
+          generationKey={generationKey}
+          dismissSignal={coachmarkDismissSignal}
+          targetRef={humanButtonRef}
+          anchorRef={actionAreaRef}
+          onVisibilityChange={setCoachmarkVisible}
+        />
         <Button
           size="lg"
           onClick={handleStartOver}
@@ -96,19 +129,34 @@ export function StudioResultsStep({
           New Photoshoot
         </Button>
         <div className="flex items-center justify-center gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setFeedbackOpen(true)}
-            className="h-10 flex-1 gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] px-3 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"
-          >
-            <Wrench className="h-4 w-4" />
-            {isNewLabels ? 'Redo with human' : 'Fix this result'}
-          </Button>
+          <div ref={humanButtonRef} className="relative flex-1">
+            {coachmarkVisible && (
+              <>
+                <span className="pointer-events-none absolute -inset-3 z-0 bg-white/70 blur-2xl" />
+                <span className="pointer-events-none absolute -inset-2 z-0 bg-[hsl(var(--formanova-hero-accent))]/25 blur-xl" />
+              </>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                dismissCoachmarkForGeneration();
+                setFeedbackOpen(true);
+              }}
+              className={cn(
+                "relative z-10 h-10 w-full gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] px-3 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]",
+                coachmarkVisible && "shadow-[0_0_22px_hsl(var(--formanova-hero-accent)/0.45)]"
+              )}
+            >
+              <Wrench className="h-4 w-4" />
+              {humanButtonLabel}
+            </Button>
+          </div>
           <Button
             size="sm"
             onClick={() => {
+              dismissCoachmarkForGeneration();
               setRegenerationCount(c => c + 1);
               trackRegenerateClicked({
                 context: 'unified-studio',
