@@ -239,10 +239,10 @@ export function PostGenerationCoachmark({
         }}
       >
         <div ref={cardRef} className="pointer-events-auto relative border border-[hsl(var(--formanova-hero-accent))]/35 bg-card px-3.5 pb-3 pt-7 text-card-foreground shadow-[0_14px_34px_hsl(0_0%_0%/0.16)]">
-          {layout.side === 'right' && (
+          {layout?.side === 'right' && (
             <span className="pointer-events-none absolute -right-3 top-1/2 h-6 w-6 -translate-y-1/2 rotate-45 border-r border-t border-[hsl(var(--formanova-hero-accent))]/35 bg-card" />
           )}
-          {layout.side === 'bottom' && (
+          {layout?.side === 'bottom' && (
             <span className="pointer-events-none absolute -bottom-3 left-8 h-6 w-6 rotate-45 border-b border-r border-[hsl(var(--formanova-hero-accent))]/35 bg-card" />
           )}
           <span className="pointer-events-none absolute bottom-0 left-0 h-1 w-full bg-[hsl(var(--formanova-hero-accent))]" />
