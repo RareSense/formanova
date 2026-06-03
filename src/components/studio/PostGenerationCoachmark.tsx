@@ -119,16 +119,8 @@ export function PostGenerationCoachmark({
     const dismissedGenerations = readStringList(COACHMARK_DISMISSED_KEY);
     if (dismissedGenerations.includes(generationKey)) return;
 
-    const seenGenerations = readStringList(COACHMARK_SEEN_KEY);
-    const showCount = readShowCount();
-    if (showCount >= MAX_COACHMARK_SHOWS && !seenGenerations.includes(generationKey)) return;
-
     const timer = window.setTimeout(() => {
       setPhase('measuring');
-      if (!seenGenerations.includes(generationKey)) {
-        rememberGeneration(generationKey, COACHMARK_SEEN_KEY);
-        writeShowCount(Math.min(showCount + 1, MAX_COACHMARK_SHOWS));
-      }
     }, COACHMARK_DELAY_MS);
 
     return () => window.clearTimeout(timer);
