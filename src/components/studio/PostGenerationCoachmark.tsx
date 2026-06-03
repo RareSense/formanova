@@ -2,9 +2,9 @@ import { type RefObject, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
-const COACHMARK_COUNT_KEY = 'formanova_post_generation_coachmark_count_v2';
-const COACHMARK_SEEN_KEY = 'formanova_post_generation_coachmark_seen_v2';
-const COACHMARK_DISMISSED_KEY = 'formanova_post_generation_coachmark_dismissed_v2';
+const COACHMARK_COUNT_KEY = 'formanova_post_generation_coachmark_count_v3';
+const COACHMARK_SEEN_KEY = 'formanova_post_generation_coachmark_seen_v3';
+const COACHMARK_DISMISSED_KEY = 'formanova_post_generation_coachmark_dismissed_v3';
 const MAX_COACHMARK_SHOWS = 3;
 const COACHMARK_DELAY_MS = 400;
 const MAX_STORED_GENERATIONS = 30;
