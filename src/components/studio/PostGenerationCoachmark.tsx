@@ -215,22 +215,27 @@ export function PostGenerationCoachmark({
     };
   }, [anchorRef, targetRef, visible, generationKey]);
 
-  if (!visible || !placementReady || !layout || typeof document === 'undefined') return null;
+  if (!visible || typeof document === 'undefined') return null;
+
+  const positioned = placementReady && layout != null;
 
   return createPortal(
     <>
-      <button
-        type="button"
-        aria-label="Dismiss coachmark"
-        onClick={handleDismiss}
-        className="fixed inset-0 z-[60] appearance-none border-0 bg-[hsl(var(--foreground))]/20 backdrop-brightness-75 p-0"
-      />
+      {positioned && (
+        <button
+          type="button"
+          aria-label="Dismiss coachmark"
+          onClick={handleDismiss}
+          className="fixed inset-0 z-[60] appearance-none border-0 bg-[hsl(var(--foreground))]/20 backdrop-brightness-75 p-0"
+        />
+      )}
       <div
         className="pointer-events-none fixed z-[80]"
         style={{
-          left: layout.cardLeft,
-          top: layout.cardTop,
-          width: layout.cardWidth,
+          left: positioned ? layout.cardLeft : -9999,
+          top: positioned ? layout.cardTop : -9999,
+          width: positioned ? layout.cardWidth : 218,
+          opacity: positioned ? 1 : 0,
         }}
       >
         <div ref={cardRef} className="pointer-events-auto relative border border-[hsl(var(--formanova-hero-accent))]/35 bg-card px-3.5 pb-3 pt-7 text-card-foreground shadow-[0_14px_34px_hsl(0_0%_0%/0.16)]">
