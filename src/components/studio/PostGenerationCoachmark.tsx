@@ -160,6 +160,7 @@ export function PostGenerationCoachmark({
   }, [phase, targetRef, anchorRef]);
 
   // Reposition on resize/scroll while visible.
+  // Also re-measure after 300ms to catch result images loading after initial measurement.
   useEffect(() => {
     if (phase !== 'visible') return;
 
@@ -168,12 +169,15 @@ export function PostGenerationCoachmark({
       setLayout(computeLayout(targetRef, anchorRef, cardRef.current));
     };
 
+    const timerId = window.setTimeout(reposition, 300);
+
     window.addEventListener('resize', reposition);
     window.addEventListener('scroll', reposition, true);
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') handleDismiss(); };
     window.addEventListener('keydown', onKey);
 
     return () => {
+      window.clearTimeout(timerId);
       window.removeEventListener('resize', reposition);
       window.removeEventListener('scroll', reposition, true);
       window.removeEventListener('keydown', onKey);
@@ -217,7 +221,7 @@ export function PostGenerationCoachmark({
           >
             <X className="h-3.5 w-3.5" />
           </button>
-          <div className="pr-1">
+          <div className="pr-8">
             <h3 className="font-body text-[12px] font-semibold leading-5 text-foreground">Not satisfied? Click this button</h3>
           </div>
         </div>
