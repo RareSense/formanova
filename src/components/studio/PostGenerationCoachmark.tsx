@@ -130,6 +130,25 @@ export function PostGenerationCoachmark({
     setPlacementReady(false);
   };
 
+  function computeLayout(): CoachmarkLayout {
+    const target = targetRef.current!;
+    const targetRect = target.getBoundingClientRect();
+    const anchorRect = anchorRef?.current?.getBoundingClientRect() ?? targetRect;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const cardWidth = Math.min(218, viewportWidth - 32);
+    const measuredHeight = cardRef.current?.offsetHeight ?? 66;
+    const sideGap = 34;
+    const canPlaceLeft = targetRect.left - cardWidth - sideGap >= 16;
+    const cardLeft = canPlaceLeft
+      ? targetRect.left - cardWidth - sideGap
+      : clamp(anchorRect.left + anchorRect.width / 2 - cardWidth / 2, 16, viewportWidth - cardWidth - 16);
+    const cardTop = canPlaceLeft
+      ? clamp(targetRect.top + targetRect.height / 2 - measuredHeight / 2, 88, viewportHeight - measuredHeight - 16)
+      : Math.max(88, anchorRect.top - measuredHeight - 10);
+    return { cardLeft, cardTop, cardWidth, side: canPlaceLeft ? 'right' : 'bottom' };
+  }
+
   useEffect(() => {
     if (!visible) {
       setLayout(null);
@@ -175,25 +194,7 @@ export function PostGenerationCoachmark({
         return;
       }
 
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-      const cardWidth = Math.min(218, viewportWidth - 32);
-      const measuredHeight = cardRef.current?.offsetHeight ?? 66;
-      const sideGap = 34;
-      const canPlaceLeft = targetRect.left - cardWidth - sideGap >= 16;
-      const cardLeft = canPlaceLeft
-        ? targetRect.left - cardWidth - sideGap
-        : clamp(anchorRect.left + anchorRect.width / 2 - cardWidth / 2, 16, viewportWidth - cardWidth - 16);
-      const cardTop = canPlaceLeft
-        ? clamp(targetRect.top + targetRect.height / 2 - measuredHeight / 2, 88, viewportHeight - measuredHeight - 16)
-        : Math.max(88, anchorRect.top - measuredHeight - 10);
-
-      setLayout({
-        cardLeft,
-        cardTop,
-        cardWidth,
-        side: canPlaceLeft ? 'right' : 'bottom',
-      });
+      setLayout(computeLayout());
       setPlacementReady(true);
     };
 
@@ -215,34 +216,38 @@ export function PostGenerationCoachmark({
     };
   }, [anchorRef, targetRef, visible, generationKey]);
 
-  if (!visible || typeof document === 'undefined') return null;
+  // Re-measure once after the card renders so the real card height corrects the position.
+  useEffect(() => {
+    if (!placementReady || !targetRef.current) return;
+    const rafId = window.requestAnimationFrame(() => {
+      setLayout(computeLayout());
+    });
+    return () => window.cancelAnimationFrame(rafId);
+  }, [placementReady]);
 
-  const positioned = placementReady && layout != null;
+  if (!visible || !placementReady || !layout || typeof document === 'undefined') return null;
 
   return createPortal(
     <>
-      {positioned && (
-        <button
-          type="button"
-          aria-label="Dismiss coachmark"
-          onClick={handleDismiss}
-          className="fixed inset-0 z-[60] appearance-none border-0 bg-[hsl(var(--foreground))]/20 backdrop-brightness-75 p-0"
-        />
-      )}
+      <button
+        type="button"
+        aria-label="Dismiss coachmark"
+        onClick={handleDismiss}
+        className="fixed inset-0 z-[60] appearance-none border-0 bg-[hsl(var(--foreground))]/20 backdrop-brightness-75 p-0"
+      />
       <div
         className="pointer-events-none fixed z-[80]"
         style={{
-          left: positioned ? layout.cardLeft : -9999,
-          top: positioned ? layout.cardTop : -9999,
-          width: positioned ? layout.cardWidth : 218,
-          opacity: positioned ? 1 : 0,
+          left: layout.cardLeft,
+          top: layout.cardTop,
+          width: layout.cardWidth,
         }}
       >
         <div ref={cardRef} className="pointer-events-auto relative border border-[hsl(var(--formanova-hero-accent))]/35 bg-card px-3.5 pb-3 pt-7 text-card-foreground shadow-[0_14px_34px_hsl(0_0%_0%/0.16)]">
-          {layout?.side === 'right' && (
+          {layout.side === 'right' && (
             <span className="pointer-events-none absolute -right-3 top-1/2 h-6 w-6 -translate-y-1/2 rotate-45 border-r border-t border-[hsl(var(--formanova-hero-accent))]/35 bg-card" />
           )}
-          {layout?.side === 'bottom' && (
+          {layout.side === 'bottom' && (
             <span className="pointer-events-none absolute -bottom-3 left-8 h-6 w-6 rotate-45 border-b border-r border-[hsl(var(--formanova-hero-accent))]/35 bg-card" />
           )}
           <span className="pointer-events-none absolute bottom-0 left-0 h-1 w-full bg-[hsl(var(--formanova-hero-accent))]" />
