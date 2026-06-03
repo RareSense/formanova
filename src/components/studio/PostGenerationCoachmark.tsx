@@ -79,8 +79,11 @@ export function PostGenerationCoachmark({
   onVisibilityChange,
 }: PostGenerationCoachmarkProps) {
   const [visible, setVisible] = useState(false);
+  const [placementReady, setPlacementReady] = useState(false);
   const [layout, setLayout] = useState<CoachmarkLayout | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
+  const previousSnapshotRef = useRef<string | null>(null);
+  const stableFrameCountRef = useRef(0);
 
   useEffect(() => {
     onVisibilityChange?.(visible);
@@ -88,6 +91,10 @@ export function PostGenerationCoachmark({
 
   useEffect(() => {
     setVisible(false);
+    setPlacementReady(false);
+    setLayout(null);
+    previousSnapshotRef.current = null;
+    stableFrameCountRef.current = 0;
 
     if (!enabled || !generationKey) return;
 
@@ -114,25 +121,60 @@ export function PostGenerationCoachmark({
     if (!dismissSignal || !generationKey) return;
     rememberGeneration(generationKey, COACHMARK_DISMISSED_KEY);
     setVisible(false);
+    setPlacementReady(false);
   }, [dismissSignal, generationKey]);
 
   const handleDismiss = () => {
     rememberGeneration(generationKey, COACHMARK_DISMISSED_KEY);
     setVisible(false);
+    setPlacementReady(false);
   };
 
   useEffect(() => {
     if (!visible) {
       setLayout(null);
+      setPlacementReady(false);
+      previousSnapshotRef.current = null;
+      stableFrameCountRef.current = 0;
       return;
     }
 
-    const updateLayout = () => {
+    let rafId = 0;
+
+    const measureLayout = () => {
       const target = targetRef.current;
-      if (!target) return;
+      if (!target || !cardRef.current) {
+        rafId = window.requestAnimationFrame(measureLayout);
+        return;
+      }
 
       const targetRect = target.getBoundingClientRect();
       const anchorRect = anchorRef?.current?.getBoundingClientRect() ?? targetRect;
+      const snapshot = [
+        targetRect.left,
+        targetRect.top,
+        targetRect.width,
+        targetRect.height,
+        anchorRect.left,
+        anchorRect.top,
+        anchorRect.width,
+        anchorRect.height,
+      ]
+        .map(value => Math.round(value * 10) / 10)
+        .join('|');
+
+      if (snapshot === previousSnapshotRef.current) {
+        stableFrameCountRef.current += 1;
+      } else {
+        previousSnapshotRef.current = snapshot;
+        stableFrameCountRef.current = 0;
+      }
+
+      if (stableFrameCountRef.current < 2) {
+        rafId = window.requestAnimationFrame(measureLayout);
+        return;
+      }
+
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
       const cardWidth = Math.min(218, viewportWidth - 32);
@@ -152,19 +194,28 @@ export function PostGenerationCoachmark({
         cardWidth,
         side: canPlaceLeft ? 'right' : 'bottom',
       });
+      setPlacementReady(true);
     };
 
-    updateLayout();
-    window.addEventListener('resize', updateLayout);
-    window.addEventListener('scroll', updateLayout, true);
+    rafId = window.requestAnimationFrame(measureLayout);
+    window.addEventListener('resize', measureLayout);
+    window.addEventListener('scroll', measureLayout, true);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        handleDismiss();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
 
     return () => {
-      window.removeEventListener('resize', updateLayout);
-      window.removeEventListener('scroll', updateLayout, true);
+      window.cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', measureLayout);
+      window.removeEventListener('scroll', measureLayout, true);
+      window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [anchorRef, targetRef, visible]);
+  }, [anchorRef, targetRef, visible, generationKey]);
 
-  if (!visible || !layout || typeof document === 'undefined') return null;
+  if (!visible || !placementReady || !layout || typeof document === 'undefined') return null;
 
   return createPortal(
     <>
@@ -172,7 +223,7 @@ export function PostGenerationCoachmark({
         type="button"
         aria-label="Dismiss coachmark"
         onClick={handleDismiss}
-        className="fixed inset-0 z-[60] appearance-none border-0 bg-black/45 p-0"
+        className="fixed inset-0 z-[60] appearance-none border-0 bg-[hsl(var(--foreground))]/20 backdrop-brightness-75 p-0"
       />
       <div
         className="pointer-events-none fixed z-[80]"
@@ -182,25 +233,25 @@ export function PostGenerationCoachmark({
           width: layout.cardWidth,
         }}
       >
-        <div ref={cardRef} className="pointer-events-auto relative border border-[hsl(var(--formanova-hero-accent))]/35 bg-white px-3.5 pb-3 pt-7 text-black shadow-[0_14px_34px_hsl(0_0%_0%/0.16)]">
+        <div ref={cardRef} className="pointer-events-auto relative border border-[hsl(var(--formanova-hero-accent))]/35 bg-card px-3.5 pb-3 pt-7 text-card-foreground shadow-[0_14px_34px_hsl(0_0%_0%/0.16)]">
           {layout.side === 'right' && (
-            <span className="pointer-events-none absolute -right-3 top-1/2 h-6 w-6 -translate-y-1/2 rotate-45 border-r border-t border-[hsl(var(--formanova-hero-accent))]/35 bg-white" />
+            <span className="pointer-events-none absolute -right-3 top-1/2 h-6 w-6 -translate-y-1/2 rotate-45 border-r border-t border-[hsl(var(--formanova-hero-accent))]/35 bg-card" />
           )}
           {layout.side === 'bottom' && (
-            <span className="pointer-events-none absolute -bottom-3 left-8 h-6 w-6 rotate-45 border-b border-r border-[hsl(var(--formanova-hero-accent))]/35 bg-white" />
+            <span className="pointer-events-none absolute -bottom-3 left-8 h-6 w-6 rotate-45 border-b border-r border-[hsl(var(--formanova-hero-accent))]/35 bg-card" />
           )}
           <span className="pointer-events-none absolute bottom-0 left-0 h-1 w-full bg-[hsl(var(--formanova-hero-accent))]" />
           <button
             type="button"
             onClick={handleDismiss}
             aria-label="Dismiss coachmark"
-            className="absolute right-1.5 top-1.5 inline-flex h-7 w-7 items-center justify-center text-black/55 transition-colors hover:text-black"
+            className="absolute right-1.5 top-1.5 inline-flex h-7 w-7 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
           >
             <X className="h-3.5 w-3.5" />
           </button>
 
           <div className="pr-1">
-            <h3 className="font-body text-[12px] font-semibold leading-5 text-black">Not satisfied? Click this button</h3>
+            <h3 className="font-body text-[12px] font-semibold leading-5 text-foreground">Not satisfied? Click this button</h3>
           </div>
         </div>
       </div>
