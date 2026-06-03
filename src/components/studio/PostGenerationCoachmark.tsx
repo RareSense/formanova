@@ -143,7 +143,7 @@ export function PostGenerationCoachmark({
 
     const measureLayout = () => {
       const target = targetRef.current;
-      if (!target || !cardRef.current) {
+      if (!target) {
         rafId = window.requestAnimationFrame(measureLayout);
         return;
       }
