@@ -22,9 +22,7 @@ function readStringList(key: string): string[] {
 function writeStringList(key: string, values: string[]) {
   try {
     window.localStorage.setItem(key, JSON.stringify(values.slice(-MAX_STORED_GENERATIONS)));
-  } catch {
-    // Ignore storage failures so the coachmark never blocks the results screen.
-  }
+  } catch {}
 }
 
 function readShowCount(): number {
@@ -39,9 +37,7 @@ function readShowCount(): number {
 function writeShowCount(value: number) {
   try {
     window.localStorage.setItem(COACHMARK_COUNT_KEY, String(value));
-  } catch {
-    // Ignore storage failures so the coachmark never blocks the results screen.
-  }
+  } catch {}
 }
 
 function rememberGeneration(key: string, storageKey: string) {
@@ -66,6 +62,9 @@ interface CoachmarkLayout {
   side: 'right' | 'bottom';
 }
 
+// hidden → measuring (card rendered invisible, real height read) → visible
+type Phase = 'hidden' | 'measuring' | 'visible';
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
@@ -78,20 +77,18 @@ export function PostGenerationCoachmark({
   anchorRef,
   onVisibilityChange,
 }: PostGenerationCoachmarkProps) {
-  const [visible, setVisible] = useState(false);
-  const [placementReady, setPlacementReady] = useState(false);
+  const [phase, setPhase] = useState<Phase>('hidden');
   const [layout, setLayout] = useState<CoachmarkLayout | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const previousSnapshotRef = useRef<string | null>(null);
   const stableFrameCountRef = useRef(0);
 
   useEffect(() => {
-    onVisibilityChange?.(visible);
-  }, [onVisibilityChange, visible]);
+    onVisibilityChange?.(phase === 'visible');
+  }, [onVisibilityChange, phase]);
 
   useEffect(() => {
-    setVisible(false);
-    setPlacementReady(false);
+    setPhase('hidden');
     setLayout(null);
     previousSnapshotRef.current = null;
     stableFrameCountRef.current = 0;
@@ -106,7 +103,7 @@ export function PostGenerationCoachmark({
     if (showCount >= MAX_COACHMARK_SHOWS && !seenGenerations.includes(generationKey)) return;
 
     const timer = window.setTimeout(() => {
-      setVisible(true);
+      setPhase('measuring');
 
       if (!seenGenerations.includes(generationKey)) {
         rememberGeneration(generationKey, COACHMARK_SEEN_KEY);
@@ -120,39 +117,20 @@ export function PostGenerationCoachmark({
   useEffect(() => {
     if (!dismissSignal || !generationKey) return;
     rememberGeneration(generationKey, COACHMARK_DISMISSED_KEY);
-    setVisible(false);
-    setPlacementReady(false);
+    setPhase('hidden');
+    setLayout(null);
   }, [dismissSignal, generationKey]);
 
   const handleDismiss = () => {
     rememberGeneration(generationKey, COACHMARK_DISMISSED_KEY);
-    setVisible(false);
-    setPlacementReady(false);
+    setPhase('hidden');
+    setLayout(null);
   };
 
-  function computeLayout(): CoachmarkLayout {
-    const target = targetRef.current!;
-    const targetRect = target.getBoundingClientRect();
-    const anchorRect = anchorRef?.current?.getBoundingClientRect() ?? targetRect;
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-    const cardWidth = Math.min(218, viewportWidth - 32);
-    const measuredHeight = cardRef.current?.offsetHeight ?? 66;
-    const sideGap = 34;
-    const canPlaceLeft = targetRect.left - cardWidth - sideGap >= 16;
-    const cardLeft = canPlaceLeft
-      ? targetRect.left - cardWidth - sideGap
-      : clamp(anchorRect.left + anchorRect.width / 2 - cardWidth / 2, 16, viewportWidth - cardWidth - 16);
-    const cardTop = canPlaceLeft
-      ? clamp(targetRect.top + targetRect.height / 2 - measuredHeight / 2, 88, viewportHeight - measuredHeight - 16)
-      : Math.max(88, anchorRect.top - measuredHeight - 10);
-    return { cardLeft, cardTop, cardWidth, side: canPlaceLeft ? 'right' : 'bottom' };
-  }
-
+  // Phase: measuring — card is in the DOM (invisible), wait for target rect to
+  // stabilise across 2 frames, then read the real card height and commit layout.
   useEffect(() => {
-    if (!visible) {
-      setLayout(null);
-      setPlacementReady(false);
+    if (phase !== 'measuring') {
       previousSnapshotRef.current = null;
       stableFrameCountRef.current = 0;
       return;
@@ -160,26 +138,20 @@ export function PostGenerationCoachmark({
 
     let rafId = 0;
 
-    const measureLayout = () => {
+    const measure = () => {
       const target = targetRef.current;
       if (!target) {
-        rafId = window.requestAnimationFrame(measureLayout);
+        rafId = window.requestAnimationFrame(measure);
         return;
       }
 
       const targetRect = target.getBoundingClientRect();
       const anchorRect = anchorRef?.current?.getBoundingClientRect() ?? targetRect;
       const snapshot = [
-        targetRect.left,
-        targetRect.top,
-        targetRect.width,
-        targetRect.height,
-        anchorRect.left,
-        anchorRect.top,
-        anchorRect.width,
-        anchorRect.height,
+        targetRect.left, targetRect.top, targetRect.width, targetRect.height,
+        anchorRect.left, anchorRect.top, anchorRect.width, anchorRect.height,
       ]
-        .map(value => Math.round(value * 10) / 10)
+        .map(v => Math.round(v * 10) / 10)
         .join('|');
 
       if (snapshot === previousSnapshotRef.current) {
@@ -190,64 +162,109 @@ export function PostGenerationCoachmark({
       }
 
       if (stableFrameCountRef.current < 2) {
-        rafId = window.requestAnimationFrame(measureLayout);
+        rafId = window.requestAnimationFrame(measure);
         return;
       }
 
-      setLayout(computeLayout());
-      setPlacementReady(true);
+      // Target is stable. Card is already in the DOM (measuring phase) so
+      // cardRef.current has its real height — no fallback needed.
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const cardWidth = Math.min(218, viewportWidth - 32);
+      const cardHeight = cardRef.current!.offsetHeight;
+      const sideGap = 34;
+      const canPlaceLeft = targetRect.left - cardWidth - sideGap >= 16;
+      const cardLeft = canPlaceLeft
+        ? targetRect.left - cardWidth - sideGap
+        : clamp(anchorRect.left + anchorRect.width / 2 - cardWidth / 2, 16, viewportWidth - cardWidth - 16);
+      const cardTop = canPlaceLeft
+        ? clamp(targetRect.top + targetRect.height / 2 - cardHeight / 2, 88, viewportHeight - cardHeight - 16)
+        : Math.max(88, anchorRect.top - cardHeight - 10);
+
+      setLayout({ cardLeft, cardTop, cardWidth, side: canPlaceLeft ? 'right' : 'bottom' });
+      setPhase('visible');
     };
 
-    rafId = window.requestAnimationFrame(measureLayout);
-    window.addEventListener('resize', measureLayout);
-    window.addEventListener('scroll', measureLayout, true);
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        handleDismiss();
-      }
+    rafId = window.requestAnimationFrame(measure);
+
+    const handleResize = () => {
+      previousSnapshotRef.current = null;
+      stableFrameCountRef.current = 0;
+      rafId = window.requestAnimationFrame(measure);
     };
+
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('scroll', handleResize, true);
+    const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') handleDismiss(); };
     window.addEventListener('keydown', handleKeyDown);
 
     return () => {
       window.cancelAnimationFrame(rafId);
-      window.removeEventListener('resize', measureLayout);
-      window.removeEventListener('scroll', measureLayout, true);
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('scroll', handleResize, true);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [anchorRef, targetRef, visible, generationKey]);
+  }, [phase, anchorRef, targetRef, generationKey]);
 
-  // Re-measure once after the card renders so the real card height corrects the position.
+  // Re-attach resize/scroll once visible so position tracks window changes.
   useEffect(() => {
-    if (!placementReady || !targetRef.current) return;
-    const rafId = window.requestAnimationFrame(() => {
-      setLayout(computeLayout());
-    });
-    return () => window.cancelAnimationFrame(rafId);
-  }, [placementReady]);
+    if (phase !== 'visible' || !layout) return;
 
-  if (!visible || !placementReady || !layout || typeof document === 'undefined') return null;
+    const reposition = () => {
+      const target = targetRef.current;
+      if (!target || !cardRef.current) return;
+      const targetRect = target.getBoundingClientRect();
+      const anchorRect = anchorRef?.current?.getBoundingClientRect() ?? targetRect;
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const cardWidth = Math.min(218, viewportWidth - 32);
+      const cardHeight = cardRef.current.offsetHeight;
+      const sideGap = 34;
+      const canPlaceLeft = targetRect.left - cardWidth - sideGap >= 16;
+      const cardLeft = canPlaceLeft
+        ? targetRect.left - cardWidth - sideGap
+        : clamp(anchorRect.left + anchorRect.width / 2 - cardWidth / 2, 16, viewportWidth - cardWidth - 16);
+      const cardTop = canPlaceLeft
+        ? clamp(targetRect.top + targetRect.height / 2 - cardHeight / 2, 88, viewportHeight - cardHeight - 16)
+        : Math.max(88, anchorRect.top - cardHeight - 10);
+      setLayout({ cardLeft, cardTop, cardWidth, side: canPlaceLeft ? 'right' : 'bottom' });
+    };
+
+    window.addEventListener('resize', reposition);
+    window.addEventListener('scroll', reposition, true);
+    return () => {
+      window.removeEventListener('resize', reposition);
+      window.removeEventListener('scroll', reposition, true);
+    };
+  }, [phase, anchorRef, targetRef]);
+
+  if (phase === 'hidden' || typeof document === 'undefined') return null;
 
   return createPortal(
     <>
-      <button
-        type="button"
-        aria-label="Dismiss coachmark"
-        onClick={handleDismiss}
-        className="fixed inset-0 z-[60] appearance-none border-0 bg-[hsl(var(--foreground))]/20 backdrop-brightness-75 p-0"
-      />
+      {phase === 'visible' && (
+        <button
+          type="button"
+          aria-label="Dismiss coachmark"
+          onClick={handleDismiss}
+          className="fixed inset-0 z-[60] appearance-none border-0 bg-[hsl(var(--foreground))]/20 backdrop-brightness-75 p-0"
+        />
+      )}
       <div
         className="pointer-events-none fixed z-[80]"
         style={{
-          left: layout.cardLeft,
-          top: layout.cardTop,
-          width: layout.cardWidth,
+          left: layout ? layout.cardLeft : -9999,
+          top: layout ? layout.cardTop : -9999,
+          width: layout ? layout.cardWidth : 218,
+          opacity: phase === 'visible' ? 1 : 0,
+          pointerEvents: phase === 'visible' ? 'auto' : 'none',
         }}
       >
         <div ref={cardRef} className="pointer-events-auto relative border border-[hsl(var(--formanova-hero-accent))]/35 bg-card px-3.5 pb-3 pt-7 text-card-foreground shadow-[0_14px_34px_hsl(0_0%_0%/0.16)]">
-          {layout.side === 'right' && (
+          {layout?.side === 'right' && (
             <span className="pointer-events-none absolute -right-3 top-1/2 h-6 w-6 -translate-y-1/2 rotate-45 border-r border-t border-[hsl(var(--formanova-hero-accent))]/35 bg-card" />
           )}
-          {layout.side === 'bottom' && (
+          {layout?.side === 'bottom' && (
             <span className="pointer-events-none absolute -bottom-3 left-8 h-6 w-6 rotate-45 border-b border-r border-[hsl(var(--formanova-hero-accent))]/35 bg-card" />
           )}
           <span className="pointer-events-none absolute bottom-0 left-0 h-1 w-full bg-[hsl(var(--formanova-hero-accent))]" />
