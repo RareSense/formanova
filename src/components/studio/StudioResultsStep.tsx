@@ -70,6 +70,7 @@ export function StudioResultsStep({
   const [coachmarkDismissSignal, setCoachmarkDismissSignal] = useState(0);
   const actionAreaRef = useRef<HTMLDivElement>(null);
   const humanButtonRef = useRef<HTMLDivElement>(null);
+  const resultsContainerRef = useRef<HTMLDivElement>(null);
   const generationKey = useMemo(
     () => workflowId ?? resultImages.join('|'),
     [resultImages, workflowId],
@@ -93,7 +94,7 @@ export function StudioResultsStep({
       </div>
 
       {resultImages.length > 0 ? (
-        <div className="flex flex-wrap justify-center gap-4 max-w-5xl mx-auto">
+        <div ref={resultsContainerRef} className="flex flex-wrap justify-center gap-4 max-w-5xl mx-auto">
           {resultImages.map((url, i) => (
             <ResultImageItem key={i} url={url} index={i} workflowId={workflowId} jewelryType={effectiveJewelryType} naturalAspect />
           ))}
@@ -118,6 +119,7 @@ export function StudioResultsStep({
           dismissSignal={coachmarkDismissSignal}
           targetRef={humanButtonRef}
           anchorRef={actionAreaRef}
+          observeRef={resultsContainerRef}
           onVisibilityChange={setCoachmarkVisible}
         />
         <Button

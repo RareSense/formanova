@@ -52,6 +52,7 @@ interface PostGenerationCoachmarkProps {
   dismissSignal: number;
   targetRef: RefObject<HTMLElement>;
   anchorRef?: RefObject<HTMLElement>;
+  observeRef?: RefObject<HTMLElement>;
   onVisibilityChange?: (visible: boolean) => void;
 }
 
@@ -98,6 +99,7 @@ export function PostGenerationCoachmark({
   dismissSignal,
   targetRef,
   anchorRef,
+  observeRef,
   onVisibilityChange,
 }: PostGenerationCoachmarkProps) {
   const [phase, setPhase] = useState<Phase>('hidden');
@@ -160,7 +162,7 @@ export function PostGenerationCoachmark({
   }, [phase, targetRef, anchorRef]);
 
   // Reposition on resize/scroll while visible.
-  // Also re-measure after 300ms to catch result images loading after initial measurement.
+  // ResizeObserver on observeRef re-measures whenever result images load and expand layout.
   useEffect(() => {
     if (phase !== 'visible') return;
 
@@ -169,20 +171,24 @@ export function PostGenerationCoachmark({
       setLayout(computeLayout(targetRef, anchorRef, cardRef.current));
     };
 
-    const timerId = window.setTimeout(reposition, 300);
-
     window.addEventListener('resize', reposition);
     window.addEventListener('scroll', reposition, true);
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') handleDismiss(); };
     window.addEventListener('keydown', onKey);
 
+    let ro: ResizeObserver | null = null;
+    if (observeRef?.current) {
+      ro = new ResizeObserver(reposition);
+      ro.observe(observeRef.current);
+    }
+
     return () => {
-      window.clearTimeout(timerId);
       window.removeEventListener('resize', reposition);
       window.removeEventListener('scroll', reposition, true);
       window.removeEventListener('keydown', onKey);
+      ro?.disconnect();
     };
-  }, [phase, targetRef, anchorRef]);
+  }, [phase, targetRef, anchorRef, observeRef]);
 
   if (phase === 'hidden' || typeof document === 'undefined') return null;
 
