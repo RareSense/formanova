@@ -350,6 +350,7 @@ export default function Generations() {
         <title>My Generations | FormaNova</title>
         <meta name="description" content="View and manage your AI-generated jewelry photoshoots and CAD models. Download, share, or revisit past creations." />
         <link rel="canonical" href="/generations" />
+        <meta name="robots" content="noindex, nofollow" />
       </Helmet>
     <div className="min-h-[calc(100vh-5rem)] bg-background py-6 px-6 md:px-12 lg:px-16">
       <div className="max-w-7xl mx-auto">

@@ -206,7 +206,7 @@ const Auth = forwardRef<HTMLDivElement>(function Auth(_, ref) {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4">
       <Helmet>
-        <meta name="robots" content="noindex, follow" />
+        <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       <ThemeLogo className="h-16 md:h-20 mb-8" />
       
