@@ -106,6 +106,7 @@ export function useStudioGeneration({
   clearStudioSession,
 }: UseStudioGenerationOptions) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isFirstGeneration, setIsFirstGeneration] = useState(false);
   const [rotatingMsgIdx, setRotatingMsgIdx] = useState(0);
   const [workflowId, setWorkflowId] = useState<string | null>(null);
   const [resultImages, setResultImages] = useState<string[]>([]);
@@ -150,12 +151,14 @@ export function useStudioGeneration({
     if (myGeneration.status === 'completed') {
       setResultImages(myGeneration.resultImages);
       clearGeneration(workflowId!);
+      const isFirst = consumeFirstGeneration();
+      setIsFirstGeneration(isFirst);
       trackGenerationComplete({
         source: 'unified-studio',
         category: TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType,
         upload_type: null,
         duration_ms: Date.now() - (myGeneration.startedAt ?? Date.now()),
-        is_first_ever: consumeFirstGeneration(),
+        is_first_ever: isFirst,
         aspect_ratio: aspectRatio,
         resolution,
       });
@@ -373,5 +376,6 @@ export function useStudioGeneration({
     resumeGeneration,
     restoreAsyncResult,
     resetGeneration,
+    isFirstGeneration,
   };
 }
