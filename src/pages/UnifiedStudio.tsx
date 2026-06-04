@@ -438,7 +438,6 @@ export default function UnifiedStudio() {
     resumeGeneration,
     restoreAsyncResult,
     resetGeneration,
-    isFirstGeneration,
   } = useStudioGeneration({
     isProductShot,
     effectiveJewelryType,
@@ -654,7 +653,6 @@ export default function UnifiedStudio() {
             activeModelUrl={generationInputUrls?.modelUrl ?? activeModelUrl}
             userEmail={user?.email}
             generationCost={generationInputUrls?.generationCost ?? generationCost}
-            isFirstGeneration={isFirstGeneration}
           />
         )}
       </div>
