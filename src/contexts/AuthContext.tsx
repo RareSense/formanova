@@ -1,6 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
-import { trackLogin, trackLogout, identifyUser, trackButtonLabelExperimentExposure } from '@/lib/posthog-events';
+import {
+  trackLogin,
+  trackLogout,
+  identifyUser,
+  trackButtonLabelExperimentExposure,
+  trackTooltipExperimentExposure,
+} from '@/lib/posthog-events';
 import { 
   authApi, 
   getStoredToken, 
@@ -37,6 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (u) {
         identifyUser(u.id, { email: u.email, name: u.full_name });
         trackButtonLabelExperimentExposure();
+        trackTooltipExperimentExposure();
         trackLogin('google', u.email);
       }
     };

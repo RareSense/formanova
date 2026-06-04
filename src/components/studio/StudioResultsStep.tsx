@@ -8,7 +8,7 @@
  * Generation values flow in as props from UnifiedStudio; local state is limited
  * to transient, client-only coachmark visibility.
  */
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Diamond, RefreshCw, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { ResultImageItem } from '@/components/studio/ResultImageItem';
 import { FeedbackModal } from '@/components/studio/FeedbackModal';
 import { PostGenerationCoachmark } from '@/components/studio/PostGenerationCoachmark';
-import { trackRegenerateClicked, getButtonLabelVariant } from '@/lib/posthog-events';
+import { trackRegenerateClicked, getButtonLabelVariant, getTooltipExperimentVariant, trackTooltipShown } from '@/lib/posthog-events';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
 import { type FeedbackCategory } from '@/lib/feedback-api';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
@@ -42,6 +42,7 @@ interface StudioResultsStepProps {
   activeModelUrl: string | null;
   userEmail?: string | null;
   generationCost?: number | null;
+  isFirstGeneration?: boolean;
 }
 
 export function StudioResultsStep({
@@ -63,8 +64,14 @@ export function StudioResultsStep({
   activeModelUrl,
   userEmail,
   generationCost,
+  isFirstGeneration = false,
 }: StudioResultsStepProps) {
   const isNewLabels = getButtonLabelVariant() === 'treatment';
+  const showTooltip = isFirstGeneration && getTooltipExperimentVariant() === 'treatment';
+
+  useEffect(() => {
+    if (showTooltip) trackTooltipShown();
+  }, [showTooltip]);
   const humanButtonLabel = isNewLabels ? 'Redo with human' : 'Fix this result';
   const [coachmarkVisible, setCoachmarkVisible] = useState(false);
   const [coachmarkDismissSignal, setCoachmarkDismissSignal] = useState(0);
@@ -114,7 +121,7 @@ export function StudioResultsStep({
         )}
       >
         <PostGenerationCoachmark
-          enabled={resultImages.length > 0}
+          enabled={showTooltip && resultImages.length > 0}
           generationKey={generationKey}
           dismissSignal={coachmarkDismissSignal}
           targetRef={humanButtonRef}
