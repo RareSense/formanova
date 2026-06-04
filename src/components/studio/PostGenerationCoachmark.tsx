@@ -223,7 +223,7 @@ export function PostGenerationCoachmark({
           >
             <X className="h-3.5 w-3.5" />
           </button>
-          <div className="pr-8">
+          <div className="text-center">
             <h3 className="font-body text-[12px] font-semibold leading-5 text-foreground">Not satisfied? Click this button</h3>
           </div>
         </div>
