@@ -59,58 +59,59 @@
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "SoftwareApplication",
-      "name": "FormaNova",
-      "applicationCategory": "DesignApplication",
-      "description": "AI-powered jewelry photoshoot studio and text-to-CAD generator. Upload product images to create professional model photoshoots, or describe jewelry in text to generate 3D CAD models.",
-      "url": "https://formanova.ai",
-      "image": "https://formanova.ai/og-image-v2.png",
-      "operatingSystem": "Web",
-      "offers": [
+      "@graph": [
         {
-          "@type": "Offer",
-          "name": "Starter",
-          "price": "2",
-          "priceCurrency": "USD",
-          "description": "50 credits — generate up to 5 photos"
+          "@type": "Organization",
+          "@id": "https://formanova.ai",
+          "name": "FormaNova",
+          "alternateName": "Forma Nova",
+          "url": "https://formanova.ai",
+          "logo": "https://formanova.ai/formanova-logo-black-tagline.png"
         },
         {
-          "@type": "Offer",
-          "name": "Basic",
-          "price": "9",
-          "priceCurrency": "USD",
-          "description": "100 credits — generate up to 10 photos"
-        },
-        {
-          "@type": "Offer",
-          "name": "Standard",
-          "price": "39",
-          "priceCurrency": "USD",
-          "description": "500 credits — generate up to 50 photos"
-        },
-        {
-          "@type": "Offer",
-          "name": "Pro",
-          "price": "99",
-          "priceCurrency": "USD",
-          "description": "1500 credits — generate up to 150 photos"
+          "@type": "SoftwareApplication",
+          "name": "FormaNova",
+          "applicationCategory": "DesignApplication",
+          "description": "AI-powered jewelry photoshoot studio and text-to-CAD generator. Upload product images to create professional model photoshoots, or describe jewelry in text to generate 3D CAD models.",
+          "url": "https://formanova.ai",
+          "image": "https://formanova.ai/og-image-v2.png",
+          "operatingSystem": "Web",
+          "creator": {
+            "@type": "Organization",
+            "@id": "https://formanova.ai"
+          },
+          "offers": [
+            {
+              "@type": "Offer",
+              "name": "Starter",
+              "price": "2",
+              "priceCurrency": "USD",
+              "description": "50 credits — generate up to 5 photos"
+            },
+            {
+              "@type": "Offer",
+              "name": "Basic",
+              "price": "9",
+              "priceCurrency": "USD",
+              "description": "100 credits — generate up to 10 photos"
+            },
+            {
+              "@type": "Offer",
+              "name": "Standard",
+              "price": "39",
+              "priceCurrency": "USD",
+              "description": "500 credits — generate up to 50 photos"
+            },
+            {
+              "@type": "Offer",
+              "name": "Pro",
+              "price": "99",
+              "priceCurrency": "USD",
+              "description": "1500 credits — generate up to 150 photos"
+            }
+          ]
         }
-      ],
-      "creator": {
-        "@type": "Organization",
-        "name": "FormaNova",
-        "url": "https://formanova.ai"
-      }
-    }
-    </script>
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "Organization",
-      "name": "FormaNova",
-      "alternateName": "Forma Nova",
-      "url": "https://formanova.ai",
-      "logo": "https://formanova.ai/formanova-logo-black-tagline.png"
+      ]
     }
     </script>
     <!-- Critical inline CSS: hero above-the-fold styles to allow first paint before full stylesheet -->
