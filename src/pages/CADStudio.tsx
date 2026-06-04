@@ -34,6 +34,7 @@ export default function CADStudio() {
         <title>CAD Studio | FormaNova</title>
         <meta name="description" content="Browse, edit, and export your AI-generated 3D jewelry CAD models. Refine materials and prepare for manufacturing." />
         <link rel="canonical" href="/studio-cad" />
+        <meta name="robots" content="noindex, nofollow" />
       </Helmet>
     <div className="min-h-[calc(100dvh-5rem)] bg-background flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 lg:px-10 overflow-x-hidden pt-4 md:pt-8 lg:pt-0">
       {/* Header */}

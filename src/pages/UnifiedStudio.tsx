@@ -517,6 +517,7 @@ export default function UnifiedStudio() {
         <title>Jewelry Photoshoot | FormaNova</title>
         <meta name="description" content="Upload jewelry photos and generate professional model or product shots with AI. Pixel-perfect preservation guaranteed." />
         <link rel="canonical" href={location.pathname} />
+        <meta name="robots" content="noindex, nofollow" />
       </Helmet>
     <div className="h-screen bg-background relative overflow-hidden flex flex-col">
       {showInsufficientModal && preflightResult && (

@@ -221,6 +221,7 @@ export default function Credits() {
         <title>Credits & Plans | FormaNova</title>
         <meta name="description" content="Check your credit balance, redeem promo codes, and top up your FormaNova account for more AI-generated jewelry content." />
         <link rel="canonical" href="/credits" />
+        <meta name="robots" content="noindex, nofollow" />
       </Helmet>
     <div className="min-h-[calc(100vh-5rem)] bg-background py-6 px-6 md:px-12 lg:px-16">
       <motion.div
