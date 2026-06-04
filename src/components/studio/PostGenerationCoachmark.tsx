@@ -190,14 +190,6 @@ export function PostGenerationCoachmark({
 
   return createPortal(
     <>
-      {phase === 'visible' && (
-        <button
-          type="button"
-          aria-label="Dismiss coachmark"
-          onClick={handleDismiss}
-          className="fixed inset-0 z-[60] appearance-none border-0 bg-[hsl(var(--foreground))]/20 backdrop-brightness-75 p-0"
-        />
-      )}
       <div
         className="pointer-events-none fixed z-[80]"
         style={{
