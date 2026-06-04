@@ -72,8 +72,8 @@ export function StudioResultsStep({
   const humanButtonRef = useRef<HTMLDivElement>(null);
   const resultsContainerRef = useRef<HTMLDivElement>(null);
   const generationKey = useMemo(
-    () => workflowId ?? resultImages.join('|'),
-    [resultImages, workflowId],
+    () => workflowId ?? resultImages[0] ?? '',
+    [workflowId, resultImages[0]],
   );
 
   const dismissCoachmarkForGeneration = () => {

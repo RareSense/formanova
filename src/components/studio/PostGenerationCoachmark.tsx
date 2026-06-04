@@ -170,7 +170,11 @@ export function PostGenerationCoachmark({
 
     let ro: ResizeObserver | null = null;
     if (observeRef?.current) {
-      ro = new ResizeObserver(reposition);
+      let rafId = 0;
+      ro = new ResizeObserver(() => {
+        window.cancelAnimationFrame(rafId);
+        rafId = window.requestAnimationFrame(reposition);
+      });
       ro.observe(observeRef.current);
     }
 
