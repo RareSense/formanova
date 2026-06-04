@@ -69,7 +69,7 @@ export function StudioResultsStep({
   const [coachmarkVisible, setCoachmarkVisible] = useState(false);
   const [coachmarkDismissSignal, setCoachmarkDismissSignal] = useState(0);
   const actionAreaRef = useRef<HTMLDivElement>(null);
-  const humanButtonRef = useRef<HTMLButtonElement>(null);
+  const humanButtonRef = useRef<HTMLDivElement>(null);
   const resultsContainerRef = useRef<HTMLDivElement>(null);
   const generationKey = useMemo(
     () => workflowId ?? resultImages[0] ?? '',
@@ -131,23 +131,24 @@ export function StudioResultsStep({
           New Photoshoot
         </Button>
         <div className="flex items-center justify-center gap-3">
-          <Button
-            ref={humanButtonRef}
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              dismissCoachmarkForGeneration();
-              setFeedbackOpen(true);
-            }}
-            className={cn(
-              "relative z-10 h-10 flex-1 gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] px-3 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]",
-              coachmarkVisible && "shadow-[0_0_4px_hsl(var(--formanova-hero-accent)/0.10)]"
-            )}
-          >
-            <Wrench className="h-4 w-4" />
-            {humanButtonLabel}
-          </Button>
+          <div ref={humanButtonRef} className="relative flex-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                dismissCoachmarkForGeneration();
+                setFeedbackOpen(true);
+              }}
+              className={cn(
+                "relative z-10 h-10 w-full gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] px-3 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]",
+                coachmarkVisible && "shadow-[0_0_4px_hsl(var(--formanova-hero-accent)/0.10)]"
+              )}
+            >
+              <Wrench className="h-4 w-4" />
+              {humanButtonLabel}
+            </Button>
+          </div>
           <Button
             size="sm"
             onClick={() => {

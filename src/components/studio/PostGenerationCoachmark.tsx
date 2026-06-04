@@ -50,7 +50,7 @@ interface PostGenerationCoachmarkProps {
   enabled: boolean;
   generationKey: string;
   dismissSignal: number;
-  targetRef: RefObject<HTMLElement | HTMLButtonElement>;
+  targetRef: RefObject<HTMLElement>;
   anchorRef?: RefObject<HTMLElement>;
   observeRef?: RefObject<HTMLElement>;
   onVisibilityChange?: (visible: boolean) => void;
