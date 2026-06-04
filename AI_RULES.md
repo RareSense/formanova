@@ -129,14 +129,6 @@ Do not defer these tests to a later PR.
 
 ---
 
-## 12. Render timing changes
-
-When changing when something renders (earlier, later, or conditionally), scan the entire render for everything that assumes the old timing — null refs, undefined state, missing props — and fix all of it in the same edit before pushing.
-
-Do not push a partial fix that resolves one symptom but leaves other reads of the same newly-nullable value unguarded.
-
----
-
 ## 11. Error boundaries
 
 `ChunkErrorBoundary` is not enough for normal runtime crashes.
