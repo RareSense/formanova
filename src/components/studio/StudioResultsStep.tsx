@@ -72,7 +72,7 @@ export function StudioResultsStep({
     hasClickedFixButton() ? 'blocked' : 'loading'
   );
   const isTreatment = getTooltipExperimentVariant() === 'treatment';
-  const showTooltip = isTreatment && tooltipReady === 'show';
+  const showTooltip = isFirstGeneration && isTreatment && tooltipReady === 'show';
 
   useEffect(() => {
     if (tooltipReady !== 'loading') return;
