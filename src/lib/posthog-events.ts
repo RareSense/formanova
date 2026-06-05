@@ -306,6 +306,10 @@ export function trackTooltipShown() {
   capture('tooltip_shown', { experiment: 'tooltip-first-gen-experiment' });
 }
 
+export function trackTooltipDismissed() {
+  capture('tooltip_dismissed', { experiment: 'tooltip-first-gen-experiment' });
+}
+
 const FIX_BUTTON_CLICKED_KEY = 'formanova_fix_button_ever_clicked';
 
 export function hasClickedFixButton(): boolean {
