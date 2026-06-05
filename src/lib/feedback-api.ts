@@ -1,5 +1,16 @@
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 
+export async function checkHasSubmittedFeedback(): Promise<boolean> {
+  try {
+    const res = await authenticatedFetch('/api/my-feedback/exists');
+    if (!res.ok) return false;
+    const data = await res.json();
+    return data.has_submitted === true;
+  } catch {
+    return false;
+  }
+}
+
 export type GenerationType =
   | 'photoshoot'
   | 'text_to_cad';
