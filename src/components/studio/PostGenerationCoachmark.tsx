@@ -1,6 +1,7 @@
 import { type RefObject, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import { trackTooltipDismissed } from '@/lib/posthog-events';
 
 const COACHMARK_DISMISSED_KEY = 'formanova_post_generation_coachmark_dismissed_v3';
 const COACHMARK_DELAY_MS = 600;
@@ -119,6 +120,7 @@ export function PostGenerationCoachmark({
 
   const handleDismiss = () => {
     rememberGeneration(generationKey, COACHMARK_DISMISSED_KEY);
+    trackTooltipDismissed();
     onPermanentDismiss?.();
     setPhase('hidden');
     setLayout(null);

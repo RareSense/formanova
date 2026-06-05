@@ -24,6 +24,7 @@ import {
   trackUploadGuideAcknowledged,
   trackUserTypeSelected,
   trackFeedbackModalOpened,
+  trackTooltipDismissed,
   trackFeedbackSubmitted,
   setUserProfession,
   trackButtonLabelExperimentExposure,
@@ -456,6 +457,15 @@ describe('trackTooltipShown', () => {
   it('calls capture with correct event name and properties', () => {
     trackTooltipShown();
     expect(posthog.capture).toHaveBeenCalledWith('tooltip_shown', {
+      experiment: 'tooltip-first-gen-experiment',
+    });
+  });
+})
+
+describe('trackTooltipDismissed', () => {
+  it('calls capture with correct event name and properties', () => {
+    trackTooltipDismissed();
+    expect(posthog.capture).toHaveBeenCalledWith('tooltip_dismissed', {
       experiment: 'tooltip-first-gen-experiment',
     });
   });
