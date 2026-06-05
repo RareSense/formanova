@@ -2,10 +2,7 @@ import { type RefObject, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
-const COACHMARK_COUNT_KEY = 'formanova_post_generation_coachmark_count_v3';
-const COACHMARK_SEEN_KEY = 'formanova_post_generation_coachmark_seen_v3';
 const COACHMARK_DISMISSED_KEY = 'formanova_post_generation_coachmark_dismissed_v3';
-const MAX_COACHMARK_SHOWS = 3;
 const COACHMARK_DELAY_MS = 600;
 const MAX_STORED_GENERATIONS = 30;
 
@@ -25,21 +22,6 @@ function writeStringList(key: string, values: string[]) {
   } catch {}
 }
 
-function readShowCount(): number {
-  try {
-    const value = Number(window.localStorage.getItem(COACHMARK_COUNT_KEY) ?? '0');
-    return Number.isFinite(value) ? value : 0;
-  } catch {
-    return 0;
-  }
-}
-
-function writeShowCount(value: number) {
-  try {
-    window.localStorage.setItem(COACHMARK_COUNT_KEY, String(value));
-  } catch {}
-}
-
 function rememberGeneration(key: string, storageKey: string) {
   const values = readStringList(storageKey);
   if (values.includes(key)) return;
@@ -54,6 +36,7 @@ interface PostGenerationCoachmarkProps {
   anchorRef?: RefObject<HTMLElement>;
   observeRef?: RefObject<HTMLElement>;
   onVisibilityChange?: (visible: boolean) => void;
+  onPermanentDismiss?: () => void;
 }
 
 interface CoachmarkLayout {
@@ -101,6 +84,7 @@ export function PostGenerationCoachmark({
   anchorRef,
   observeRef,
   onVisibilityChange,
+  onPermanentDismiss,
 }: PostGenerationCoachmarkProps) {
   const [phase, setPhase] = useState<Phase>('hidden');
   const [layout, setLayout] = useState<CoachmarkLayout | null>(null);
@@ -135,6 +119,7 @@ export function PostGenerationCoachmark({
 
   const handleDismiss = () => {
     rememberGeneration(generationKey, COACHMARK_DISMISSED_KEY);
+    onPermanentDismiss?.();
     setPhase('hidden');
     setLayout(null);
   };

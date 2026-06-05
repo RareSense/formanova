@@ -16,9 +16,9 @@ import { cn } from '@/lib/utils';
 import { ResultImageItem } from '@/components/studio/ResultImageItem';
 import { FeedbackModal } from '@/components/studio/FeedbackModal';
 import { PostGenerationCoachmark } from '@/components/studio/PostGenerationCoachmark';
-import { trackRegenerateClicked, getButtonLabelVariant, getTooltipExperimentVariant, trackTooltipShown } from '@/lib/posthog-events';
+import { trackRegenerateClicked, getButtonLabelVariant, getTooltipExperimentVariant, trackTooltipShown, trackFeedbackModalOpened, hasClickedFixButton, markFixButtonClicked } from '@/lib/posthog-events';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
-import { type FeedbackCategory } from '@/lib/feedback-api';
+import { type FeedbackCategory, checkHasSubmittedFeedback } from '@/lib/feedback-api';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
 
 type StudioStep = 'upload' | 'model' | 'generating' | 'results';
@@ -67,7 +67,25 @@ export function StudioResultsStep({
   isFirstGeneration = false,
 }: StudioResultsStepProps) {
   const isNewLabels = getButtonLabelVariant() === 'treatment';
-  const showTooltip = isFirstGeneration && getTooltipExperimentVariant() === 'treatment';
+  const [fixButtonEverClicked, setFixButtonEverClicked] = useState(() => hasClickedFixButton());
+  const [tooltipReady, setTooltipReady] = useState<'loading' | 'show' | 'blocked'>(() =>
+    hasClickedFixButton() ? 'blocked' : 'loading'
+  );
+  const isTreatment = getTooltipExperimentVariant() === 'treatment';
+  const showTooltip = isTreatment && tooltipReady === 'show';
+
+  useEffect(() => {
+    if (tooltipReady !== 'loading') return;
+    checkHasSubmittedFeedback().then(hasSubmitted => {
+      if (hasSubmitted) {
+        markFixButtonClicked();
+        setFixButtonEverClicked(true);
+        setTooltipReady('blocked');
+      } else {
+        setTooltipReady('show');
+      }
+    });
+  }, []);
 
   useEffect(() => {
     if (showTooltip) trackTooltipShown();
@@ -128,6 +146,7 @@ export function StudioResultsStep({
           anchorRef={actionAreaRef}
           observeRef={resultsContainerRef}
           onVisibilityChange={setCoachmarkVisible}
+          onPermanentDismiss={() => { markFixButtonClicked(); setFixButtonEverClicked(true); }}
         />
         <Button
           size="lg"
@@ -144,8 +163,15 @@ export function StudioResultsStep({
               variant="outline"
               size="sm"
               onClick={() => {
+                markFixButtonClicked();
+                setFixButtonEverClicked(true);
                 dismissCoachmarkForGeneration();
                 setFeedbackOpen(true);
+                trackFeedbackModalOpened({
+                  category: TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType,
+                  workflow_id: workflowId,
+                  via_tooltip: coachmarkVisible,
+                });
               }}
               className={cn(
                 "relative z-10 h-10 w-full gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] px-3 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]",

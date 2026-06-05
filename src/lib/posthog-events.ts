@@ -87,7 +87,17 @@ export interface FeedbackSubmittedProps {
   workflow_id: string | null;
 }
 
+export interface FeedbackModalOpenedProps {
+  category: string;
+  workflow_id: string | null;
+  via_tooltip: boolean;
+}
+
 // ═══════ Feedback ═══════════════════════════════════════════════════
+
+export function trackFeedbackModalOpened(props: FeedbackModalOpenedProps) {
+  capture('feedback_modal_opened', { ...props });
+}
 
 export function trackFeedbackSubmitted(props: FeedbackSubmittedProps) {
   capture('feedback_submitted', { ...props });
@@ -294,6 +304,16 @@ export function getTooltipExperimentVariant(): string | undefined {
 
 export function trackTooltipShown() {
   capture('tooltip_shown', { experiment: 'tooltip-first-gen-experiment' });
+}
+
+const FIX_BUTTON_CLICKED_KEY = 'formanova_fix_button_ever_clicked';
+
+export function hasClickedFixButton(): boolean {
+  return localStorage.getItem(FIX_BUTTON_CLICKED_KEY) === '1';
+}
+
+export function markFixButtonClicked() {
+  localStorage.setItem(FIX_BUTTON_CLICKED_KEY, '1');
 }
 
 // ═══════ Studio Actions ══════════════════════════════════════════════

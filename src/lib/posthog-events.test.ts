@@ -23,6 +23,7 @@ import {
   trackUploadGuideViewed,
   trackUploadGuideAcknowledged,
   trackUserTypeSelected,
+  trackFeedbackModalOpened,
   trackFeedbackSubmitted,
   setUserProfession,
   trackButtonLabelExperimentExposure,
@@ -295,6 +296,26 @@ describe('trackUploadGuideAcknowledged', () => {
   it('captures upload_guide_acknowledged', () => {
     trackUploadGuideAcknowledged()
     expect(posthog.capture).toHaveBeenCalledWith('upload_guide_acknowledged', undefined)
+  })
+})
+
+describe('trackFeedbackModalOpened', () => {
+  it('captures feedback_modal_opened with via_tooltip true', () => {
+    trackFeedbackModalOpened({ category: 'ring', workflow_id: 'wf-123', via_tooltip: true })
+    expect(posthog.capture).toHaveBeenCalledWith('feedback_modal_opened', {
+      category: 'ring',
+      workflow_id: 'wf-123',
+      via_tooltip: true,
+    })
+  })
+
+  it('captures feedback_modal_opened with via_tooltip false', () => {
+    trackFeedbackModalOpened({ category: 'earring', workflow_id: null, via_tooltip: false })
+    expect(posthog.capture).toHaveBeenCalledWith('feedback_modal_opened', {
+      category: 'earring',
+      workflow_id: null,
+      via_tooltip: false,
+    })
   })
 })
 
