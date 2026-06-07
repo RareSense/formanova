@@ -104,7 +104,7 @@ export function AIFixModal({
               What should change?
             </DialogTitle>
             <DialogDescription className="text-sm text-justify leading-relaxed text-muted-foreground mt-1">
-              Tell us what's wrong and we'll fix it.
+              What's wrong and what do you want instead?
             </DialogDescription>
           </div>
 
