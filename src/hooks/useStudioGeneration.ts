@@ -122,6 +122,7 @@ export function useStudioGeneration({
       aspectRatio: string;
       resolution: Resolution;
       generationCost: number | null;
+      jewelryDescription?: string;
     }>
   >({});
 
@@ -152,6 +153,12 @@ export function useStudioGeneration({
     if (!myGeneration) return;
     if (myGeneration.status === 'completed') {
       setResultImages(myGeneration.resultImages);
+      if (myGeneration.jewelryDescription) {
+        setGenerationInputUrlsMap(prev => ({
+          ...prev,
+          [workflowId!]: { ...prev[workflowId!], jewelryDescription: myGeneration.jewelryDescription },
+        }));
+      }
       clearGeneration(workflowId!);
       const isFirst = consumeFirstGeneration();
       trackGenerationComplete({
@@ -307,6 +314,7 @@ export function useStudioGeneration({
     const fixAspectRatio = prevData?.aspectRatio ?? aspectRatio;
     const resultImageUrl = resultImages[0];
     const jewelryImageUrl = prevData?.jewelryUrl ?? jewelryUploadedUrl;
+    const jewelryDescription = prevData?.jewelryDescription;
 
     if (!resultImageUrl || !jewelryImageUrl) {
       toast({ variant: 'destructive', title: 'Missing images', description: 'Cannot fix — original images are not available.' });
@@ -350,10 +358,11 @@ export function useStudioGeneration({
         resolution: fixResolution,
         resultImageUrl,
         jewelryImageUrl,
-        fix_instruction: prompt,
+        prompt,
         category,
         aspect_ratio: fixAspectRatio,
         idempotency_key: `fix-${Date.now()}-${effectiveJewelryType}`,
+        ...(isProductShot && jewelryDescription ? { jewelry_description: jewelryDescription } : {}),
       });
 
       const _workflowId = startResponse.workflow_id;
@@ -365,6 +374,7 @@ export function useStudioGeneration({
           aspectRatio: fixAspectRatio,
           resolution: fixResolution,
           generationCost: prevData?.generationCost ?? generationCost,
+          ...(jewelryDescription ? { jewelryDescription } : {}),
         },
       }));
       setWorkflowId(_workflowId);

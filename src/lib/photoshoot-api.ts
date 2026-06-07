@@ -242,10 +242,11 @@ export interface FixShotRequest {
   resolution: string;
   resultImageUrl: string;
   jewelryImageUrl: string;
-  fix_instruction?: string;
+  prompt?: string;
   category: string;
   aspect_ratio?: string;
   idempotency_key?: string;
+  jewelry_description?: string;
 }
 
 export async function startFixShot(request: FixShotRequest): Promise<PhotoshootStartResponse> {
@@ -266,7 +267,10 @@ export async function startFixShot(request: FixShotRequest): Promise<PhotoshootS
     ...resultImageField,
     ...jewelryImageField,
     category: request.category,
-    ...(request.fix_instruction ? { fix_instruction: request.fix_instruction } : {}),
+    // model shot uses fix_instruction; product shot uses prompt
+    ...(request.prompt
+      ? (request.isProductShot ? { prompt: request.prompt } : { fix_instruction: request.prompt })
+      : {}),
     ...(request.aspect_ratio ? { aspect_ratio: request.aspect_ratio } : {}),
     ...(request.idempotency_key ? { idempotency_key: request.idempotency_key } : {}),
   };
@@ -274,6 +278,10 @@ export async function startFixShot(request: FixShotRequest): Promise<PhotoshootS
   if (!request.isProductShot && !request.jewelryImageUrl.startsWith('data:')) {
     // Model shot describe step needs jewelry as an array; product shot does not use this field
     payload.jewelry_image_urls = [request.jewelryImageUrl];
+  }
+
+  if (request.isProductShot && request.jewelry_description) {
+    payload.jewelry_description = request.jewelry_description;
   }
 
   // Model shot uses /run/state/ — mirrors jewelry_photoshoots_generator
