@@ -272,8 +272,8 @@ export async function startFixShot(request: FixShotRequest): Promise<PhotoshootS
     ...(request.idempotency_key ? { idempotency_key: request.idempotency_key } : {}),
   };
 
-  if (!request.isProductShot && !request.jewelryImageUrl.startsWith('data:')) {
-    // Model shot describe step needs jewelry as an array
+  if (!request.jewelryImageUrl.startsWith('data:')) {
+    // Both model and product shot fix workflows expect jewelry as an array (mirrors startPhotoshoot/startPdpShot)
     payload.jewelry_image_urls = [request.jewelryImageUrl];
   }
 
