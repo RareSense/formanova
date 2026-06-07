@@ -336,6 +336,13 @@ export function useStudioGeneration({
     setRegenerationCount(c => c + 1);
     trackRegenerateClicked({ context: 'unified-studio', category, regeneration_number: newRegenerationNumber });
     trackAIFixSubmitted({ category, prompt_length: prompt.length, workflow_id: workflowId, regeneration_number: newRegenerationNumber });
+    // Show result image in the second slot while the fix API call is in flight
+    if (workflowId) {
+      setGenerationInputUrlsMap(prev => ({
+        ...prev,
+        [workflowId]: { ...prev[workflowId], modelUrl: resultImageUrl },
+      }));
+    }
     setResultImages([]);
     setCurrentStep('generating');
 
@@ -356,7 +363,7 @@ export function useStudioGeneration({
         ...prev,
         [_workflowId]: {
           jewelryUrl: jewelryImageUrl,
-          modelUrl: prevData?.modelUrl,
+          modelUrl: resultImageUrl,
           aspectRatio: fixAspectRatio,
           resolution: fixResolution,
           generationCost: prevData?.generationCost ?? generationCost,
@@ -368,7 +375,7 @@ export function useStudioGeneration({
         isProductShot,
         jewelryType: category,
         jewelryUrl: jewelryImageUrl,
-        modelUrl: prevData?.modelUrl ?? '',
+        modelUrl: resultImageUrl,
         aspectRatio: fixAspectRatio,
         resolution: fixResolution,
         generationCost: prevData?.generationCost ?? generationCost,

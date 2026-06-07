@@ -104,7 +104,7 @@ export function AIFixModal({
               What should change?
             </DialogTitle>
             <DialogDescription className="text-sm text-justify leading-relaxed text-muted-foreground mt-1">
-              Describe what's wrong or what you want different. The AI will use your feedback to regenerate a new result.
+              Tell us what's wrong and we'll fix it.
             </DialogDescription>
           </div>
 
