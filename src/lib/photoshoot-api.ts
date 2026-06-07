@@ -282,16 +282,20 @@ export async function startFixShot(request: FixShotRequest): Promise<PhotoshootS
     payload.jewelry_description = request.jewelry_description;
   }
 
-  // Model shot uses /run/state/ — mirrors jewelry_photoshoots_generator
-  // Product shot uses /run/ — mirrors Product_shot_pipeline
+  // Model shot: /run/state/ with { payload } envelope
+  // Product shot: /run/ with { data } envelope (GraphFlowRunEnvelope)
   const endpoint = request.isProductShot
     ? `${API_BASE}/run/${workflowName}`
     : `${API_BASE}/run/state/${workflowName}`;
 
+  const body = request.isProductShot
+    ? JSON.stringify({ data: payload })
+    : JSON.stringify({ payload });
+
   const res = await authenticatedFetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ payload }),
+    body,
   });
 
   if (!res.ok) {
