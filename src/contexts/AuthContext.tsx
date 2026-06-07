@@ -4,7 +4,6 @@ import {
   trackLogin,
   trackLogout,
   identifyUser,
-  trackTooltipExperimentExposure,
 } from '@/lib/posthog-events';
 import { 
   authApi, 
@@ -41,7 +40,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(u);
       if (u) {
         identifyUser(u.id, { email: u.email, name: u.full_name });
-        trackTooltipExperimentExposure();
         trackLogin('google', u.email);
       }
     };

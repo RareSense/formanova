@@ -25,12 +25,8 @@ import {
   trackUploadGuideAcknowledged,
   trackUserTypeSelected,
   trackFeedbackModalOpened,
-  trackTooltipDismissed,
   trackFeedbackSubmitted,
   setUserProfession,
-  trackTooltipExperimentExposure,
-  getTooltipExperimentVariant,
-  trackTooltipShown,
 } from './posthog-events'
 
 beforeEach(() => {
@@ -403,67 +399,4 @@ describe('setUserProfession', () => {
   })
 })
 
-// ── trackTooltipExperimentExposure ─────────────────────────────────
-
-describe('trackTooltipExperimentExposure', () => {
-  it('calls onFeatureFlags and then getFeatureFlag with tooltip-first-gen-experiment', () => {
-    let captured: (() => void) | undefined;
-    (posthog.onFeatureFlags as any).mockImplementation((fn: () => void) => {
-      captured = fn;
-    });
-    trackTooltipExperimentExposure();
-    expect(posthog.onFeatureFlags).toHaveBeenCalled();
-    captured!();
-    expect(posthog.getFeatureFlag).toHaveBeenCalledWith('tooltip-first-gen-experiment');
-  });
-
-  it('does nothing when posthog is not loaded', () => {
-    ;(posthog as any).__loaded = false
-    trackTooltipExperimentExposure()
-    expect(posthog.onFeatureFlags).not.toHaveBeenCalled()
-    ;(posthog as any).__loaded = true
-  });
-})
-
-// ── getTooltipExperimentVariant ────────────────────────────────────
-
-describe('getTooltipExperimentVariant', () => {
-  it('returns the flag value when treatment', () => {
-    (posthog.getFeatureFlag as any).mockReturnValue('treatment');
-    expect(getTooltipExperimentVariant()).toBe('treatment');
-    expect(posthog.getFeatureFlag).toHaveBeenCalledWith('tooltip-first-gen-experiment');
-  });
-
-  it('returns undefined when flag is not yet loaded', () => {
-    (posthog.getFeatureFlag as any).mockReturnValue(undefined);
-    expect(getTooltipExperimentVariant()).toBeUndefined();
-  });
-
-  it('returns undefined when posthog is not loaded', () => {
-    ;(posthog as any).__loaded = false
-    expect(getTooltipExperimentVariant()).toBeUndefined()
-    expect(posthog.getFeatureFlag).not.toHaveBeenCalled()
-    ;(posthog as any).__loaded = true
-  });
-})
-
-// ── trackTooltipShown ──────────────────────────────────────────────
-
-describe('trackTooltipShown', () => {
-  it('calls capture with correct event name and properties', () => {
-    trackTooltipShown();
-    expect(posthog.capture).toHaveBeenCalledWith('tooltip_shown', {
-      experiment: 'tooltip-first-gen-experiment',
-    });
-  });
-})
-
-describe('trackTooltipDismissed', () => {
-  it('calls capture with correct event name and properties', () => {
-    trackTooltipDismissed();
-    expect(posthog.capture).toHaveBeenCalledWith('tooltip_dismissed', {
-      experiment: 'tooltip-first-gen-experiment',
-    });
-  });
-})
 
