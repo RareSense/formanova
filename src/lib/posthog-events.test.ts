@@ -18,6 +18,7 @@ import {
   trackGenerationComplete,
   trackDownloadClicked,
   trackRegenerateClicked,
+  trackAIFixSubmitted,
   trackPaymentSuccess,
   trackStarterPackPurchased,
   trackUploadGuideViewed,
@@ -263,6 +264,25 @@ describe('trackRegenerateClicked', () => {
       category: 'ring',
       regeneration_number: 1,
     })
+  })
+})
+
+describe('trackAIFixSubmitted', () => {
+  it('captures ai_fix_submitted with correct shape', () => {
+    trackAIFixSubmitted({ category: 'ring', prompt_length: 42, workflow_id: 'wf-abc', regeneration_number: 2 })
+    expect(posthog.capture).toHaveBeenCalledWith('ai_fix_submitted', {
+      category: 'ring',
+      prompt_length: 42,
+      workflow_id: 'wf-abc',
+      regeneration_number: 2,
+    })
+  })
+
+  it('accepts null workflow_id', () => {
+    trackAIFixSubmitted({ category: 'necklace', prompt_length: 10, workflow_id: null, regeneration_number: 1 })
+    expect(posthog.capture).toHaveBeenCalledWith('ai_fix_submitted', expect.objectContaining({
+      workflow_id: null,
+    }))
   })
 })
 

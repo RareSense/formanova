@@ -49,6 +49,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   startPhotoshoot,
   startPdpShot,
+  startFixShot,
 } from '@/lib/photoshoot-api';
 import { uploadToAzure } from '@/lib/microservices-api';
 import { compressImageBlob, imageSourceToBlob } from '@/lib/image-compression';
@@ -57,6 +58,8 @@ import { markGenerationStarted } from '@/lib/generation-lifecycle';
 import {
   trackPaywallHit,
   trackGenerationComplete,
+  trackRegenerateClicked,
+  trackAIFixSubmitted,
   consumeFirstGeneration,
 } from '@/lib/posthog-events';
 import { useGenerations } from '@/contexts/GenerationsContext';
@@ -298,6 +301,91 @@ export function useStudioGeneration({
     clearStudioSession,
   ]);
 
+  const handleAIFix = useCallback(async (prompt: string) => {
+    if (isSubmitting) return;
+
+    const prevData = generationInputUrlsMap[workflowId ?? ''];
+    const fixResolution = prevData?.resolution ?? resolution;
+    const fixAspectRatio = prevData?.aspectRatio ?? aspectRatio;
+    const resultImageUrl = resultImages[0];
+    const jewelryImageUrl = prevData?.jewelryUrl ?? jewelryUploadedUrl;
+
+    if (!resultImageUrl || !jewelryImageUrl) {
+      toast({ variant: 'destructive', title: 'Missing images', description: 'Cannot fix — original images are not available.' });
+      return;
+    }
+
+    const FIX_MODEL_SHOT: Record<string, string> = { '1K': 'fix_model_shot', '2K': 'fix_model_shot_2k', '4K': 'fix_model_shot_4k' };
+    const FIX_PRODUCT_SHOT: Record<string, string> = { '1K': 'fix_product_shot', '2K': 'fix_product_shot_2k', '4K': 'fix_product_shot_4k' };
+    const fixWorkflowName = isProductShot
+      ? (FIX_PRODUCT_SHOT[fixResolution] ?? 'fix_product_shot')
+      : (FIX_MODEL_SHOT[fixResolution] ?? 'fix_model_shot');
+
+    const hasCredits = await checkCredits(fixWorkflowName);
+    if (!hasCredits) {
+      trackPaywallHit({ category: TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType, steps_completed: 3 });
+      return;
+    }
+
+    const category = TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType;
+    const newRegenerationNumber = regenerationCount + 1;
+
+    setIsSubmitting(true);
+    setGenerationError(null);
+    hasNavigatedAway.current = false;
+    setRegenerationCount(c => c + 1);
+    trackRegenerateClicked({ context: 'unified-studio', category, regeneration_number: newRegenerationNumber });
+    trackAIFixSubmitted({ category, prompt_length: prompt.length, workflow_id: workflowId, regeneration_number: newRegenerationNumber });
+    setResultImages([]);
+    setCurrentStep('generating');
+
+    try {
+      const startResponse = await startFixShot({
+        isProductShot,
+        resolution: fixResolution,
+        resultImageUrl,
+        jewelryImageUrl,
+        fix_instruction: prompt,
+        category,
+        aspect_ratio: fixAspectRatio,
+        idempotency_key: `fix-${Date.now()}-${effectiveJewelryType}`,
+      });
+
+      const _workflowId = startResponse.workflow_id;
+      setGenerationInputUrlsMap(prev => ({
+        ...prev,
+        [_workflowId]: {
+          jewelryUrl: jewelryImageUrl,
+          modelUrl: prevData?.modelUrl,
+          aspectRatio: fixAspectRatio,
+          resolution: fixResolution,
+          generationCost: prevData?.generationCost ?? generationCost,
+        },
+      }));
+      setWorkflowId(_workflowId);
+      trackGeneration({
+        workflowId: _workflowId,
+        isProductShot,
+        jewelryType: category,
+        jewelryUrl: jewelryImageUrl,
+        modelUrl: prevData?.modelUrl ?? '',
+        aspectRatio: fixAspectRatio,
+        resolution: fixResolution,
+        generationCost: prevData?.generationCost ?? generationCost,
+      });
+      markGenerationStarted(_workflowId);
+    } catch {
+      setGenerationError('unavailable');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [
+    isSubmitting, resultImages, workflowId, generationInputUrlsMap,
+    jewelryUploadedUrl, isProductShot, effectiveJewelryType,
+    resolution, aspectRatio, generationCost, checkCredits,
+    toast, setCurrentStep, trackGeneration, regenerationCount,
+  ]);
+
   const handleKeepBrowsing = useCallback(() => {
     hasNavigatedAway.current = true;
     setCurrentStep('model');
@@ -372,6 +460,7 @@ export function useStudioGeneration({
     setFeedbackOpen,
     generationInputUrls,
     handleGenerate,
+    handleAIFix,
     handleKeepBrowsing,
     resumeGeneration,
     restoreAsyncResult,

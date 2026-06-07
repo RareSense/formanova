@@ -15,24 +15,19 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { ResultImageItem } from '@/components/studio/ResultImageItem';
 import { FeedbackModal } from '@/components/studio/FeedbackModal';
+import { AIFixModal } from '@/components/studio/AIFixModal';
 import { PostGenerationCoachmark } from '@/components/studio/PostGenerationCoachmark';
-import { trackRegenerateClicked, getButtonLabelVariant, getTooltipExperimentVariant, trackTooltipShown, trackFeedbackModalOpened, hasClickedFixButton, markFixButtonClicked } from '@/lib/posthog-events';
+import { getButtonLabelVariant, getTooltipExperimentVariant, trackTooltipShown, trackFeedbackModalOpened, hasClickedFixButton, markFixButtonClicked } from '@/lib/posthog-events';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
 import { type FeedbackCategory, checkHasSubmittedFeedback } from '@/lib/feedback-api';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
-
-type StudioStep = 'upload' | 'model' | 'generating' | 'results';
 
 interface StudioResultsStepProps {
   resultImages: string[];
   workflowId: string | null;
   effectiveJewelryType: string;
   isProductShot: boolean;
-  regenerationCount: number;
-  setRegenerationCount: (fn: (c: number) => number) => void;
-  setResultImages: (imgs: string[]) => void;
-  setCurrentStep: (step: StudioStep) => void;
-  handleGenerate: () => void;
+  onAIFix: (prompt: string) => void;
   handleStartOver: () => void;
   feedbackOpen: boolean;
   setFeedbackOpen: (open: boolean) => void;
@@ -50,11 +45,7 @@ export function StudioResultsStep({
   workflowId,
   effectiveJewelryType,
   isProductShot,
-  regenerationCount,
-  setRegenerationCount,
-  setResultImages,
-  setCurrentStep,
-  handleGenerate,
+  onAIFix,
   handleStartOver,
   feedbackOpen,
   setFeedbackOpen,
@@ -91,6 +82,7 @@ export function StudioResultsStep({
     if (showTooltip) trackTooltipShown();
   }, [showTooltip]);
   const humanButtonLabel = isNewLabels ? 'Redo with human' : 'Fix this result';
+  const [aiFixOpen, setAiFixOpen] = useState(false);
   const [coachmarkVisible, setCoachmarkVisible] = useState(false);
   const [coachmarkDismissSignal, setCoachmarkDismissSignal] = useState(0);
   const actionAreaRef = useRef<HTMLDivElement>(null);
@@ -186,15 +178,7 @@ export function StudioResultsStep({
             size="sm"
             onClick={() => {
               dismissCoachmarkForGeneration();
-              setRegenerationCount(c => c + 1);
-              trackRegenerateClicked({
-                context: 'unified-studio',
-                category: TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType,
-                regeneration_number: regenerationCount + 1,
-              });
-              setResultImages([]);
-              setCurrentStep('generating');
-              handleGenerate();
+              setAiFixOpen(true);
             }}
             className="h-10 flex-1 gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] bg-background px-3 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"
           >
@@ -217,6 +201,16 @@ export function StudioResultsStep({
         resultImageUrl={resultImages[0] ?? null}
         category={(TO_SINGULAR[effectiveJewelryType] ?? 'other') as FeedbackCategory}
         userEmail={userEmail}
+      />
+
+      <AIFixModal
+        open={aiFixOpen}
+        onClose={() => setAiFixOpen(false)}
+        onConfirm={onAIFix}
+        jewelryDisplayUrl={jewelrySasUrl || jewelryImage}
+        resultImageUrl={resultImages[0] ?? null}
+        isProductShot={isProductShot}
+        generationCost={generationCost}
       />
     </motion.div>
   );

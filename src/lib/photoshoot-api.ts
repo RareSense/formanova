@@ -223,6 +223,80 @@ export async function startPdpShot(
   return res.json();
 }
 
+// ─── Fix Shot ───────────────────────────────────────────────────────
+
+const FIX_MODEL_SHOT_WORKFLOWS: Record<string, string> = {
+  '1K': 'fix_model_shot',
+  '2K': 'fix_model_shot_2k',
+  '4K': 'fix_model_shot_4k',
+};
+
+const FIX_PRODUCT_SHOT_WORKFLOWS: Record<string, string> = {
+  '1K': 'fix_product_shot',
+  '2K': 'fix_product_shot_2k',
+  '4K': 'fix_product_shot_4k',
+};
+
+export interface FixShotRequest {
+  isProductShot: boolean;
+  resolution: string;
+  resultImageUrl: string;
+  jewelryImageUrl: string;
+  fix_instruction?: string;
+  category: string;
+  aspect_ratio?: string;
+  idempotency_key?: string;
+  // TODO: pass jewelry_description from original pipeline run — not yet stored on frontend
+}
+
+export async function startFixShot(request: FixShotRequest): Promise<PhotoshootStartResponse> {
+  const workflowName = request.isProductShot
+    ? (FIX_PRODUCT_SHOT_WORKFLOWS[request.resolution] ?? 'fix_product_shot')
+    : (FIX_MODEL_SHOT_WORKFLOWS[request.resolution] ?? 'fix_model_shot');
+
+  // Strip data: prefix → send as b64; otherwise send as URL
+  const resultImageField = request.resultImageUrl.startsWith('data:')
+    ? { result_image_b64: request.resultImageUrl.replace(/^data:[^;]+;base64,/, '') }
+    : { result_image_url: request.resultImageUrl };
+
+  const jewelryImageField = request.jewelryImageUrl.startsWith('data:')
+    ? { jewelry_image_b64: request.jewelryImageUrl.replace(/^data:[^;]+;base64,/, '') }
+    : { jewelry_image_url: request.jewelryImageUrl };
+
+  const payload: Record<string, unknown> = {
+    ...resultImageField,
+    ...jewelryImageField,
+    category: request.category,
+    ...(request.fix_instruction ? { fix_instruction: request.fix_instruction } : {}),
+    ...(request.aspect_ratio ? { aspect_ratio: request.aspect_ratio } : {}),
+    ...(request.idempotency_key ? { idempotency_key: request.idempotency_key } : {}),
+  };
+
+  if (!request.isProductShot && !request.jewelryImageUrl.startsWith('data:')) {
+    // Model shot describe step needs jewelry as an array
+    payload.jewelry_image_urls = [request.jewelryImageUrl];
+  }
+
+  // Model shot uses /run/state/ — mirrors jewelry_photoshoots_generator
+  // Product shot uses /run/ — mirrors Product_shot_pipeline
+  const endpoint = request.isProductShot
+    ? `${API_BASE}/run/${workflowName}`
+    : `${API_BASE}/run/state/${workflowName}`;
+
+  const res = await authenticatedFetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ payload }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to start fix: ${res.status} — ${text.substring(0, 200)}`);
+  }
+
+  return res.json();
+}
+
 /**
  * Helper to resolve the runtime state from a status response.
  * Checks runtime.state first, then progress.state, then top-level state.

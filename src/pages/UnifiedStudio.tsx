@@ -434,6 +434,7 @@ export default function UnifiedStudio() {
     setFeedbackOpen,
     generationInputUrls,
     handleGenerate,
+    handleAIFix,
     handleKeepBrowsing,
     resumeGeneration,
     restoreAsyncResult,
@@ -641,11 +642,7 @@ export default function UnifiedStudio() {
             workflowId={workflowId}
             effectiveJewelryType={effectiveJewelryType}
             isProductShot={isProductShot}
-            regenerationCount={regenerationCount}
-            setRegenerationCount={setRegenerationCount}
-            setResultImages={setResultImages}
-            setCurrentStep={setCurrentStep}
-            handleGenerate={handleGenerate}
+            onAIFix={handleAIFix}
             handleStartOver={handleStartOver}
             feedbackOpen={feedbackOpen}
             setFeedbackOpen={setFeedbackOpen}

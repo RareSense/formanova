@@ -341,3 +341,14 @@ export function trackRegenerateClicked(props?: {
 }) {
   capture('regenerate_clicked', props ?? {});
 }
+
+export interface AIFixSubmittedProps {
+  category: string;
+  prompt_length: number;
+  workflow_id: string | null;
+  regeneration_number: number;
+}
+
+export function trackAIFixSubmitted(props: AIFixSubmittedProps) {
+  capture('ai_fix_submitted', { ...props });
+}
