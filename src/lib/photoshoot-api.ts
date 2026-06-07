@@ -267,16 +267,14 @@ export async function startFixShot(request: FixShotRequest): Promise<PhotoshootS
     ...resultImageField,
     ...jewelryImageField,
     category: request.category,
-    // model shot uses fix_instruction; product shot uses prompt
-    ...(request.prompt
-      ? (request.isProductShot ? { prompt: request.prompt } : { fix_instruction: request.prompt })
-      : {}),
+    ...(request.prompt ? { fix_instruction: request.prompt } : {}),
     ...(request.aspect_ratio ? { aspect_ratio: request.aspect_ratio } : {}),
     ...(request.idempotency_key ? { idempotency_key: request.idempotency_key } : {}),
+    ...(request.isProductShot ? { generation_type: 'product_shot_v1' } : {}),
   };
 
   if (!request.isProductShot && !request.jewelryImageUrl.startsWith('data:')) {
-    // Model shot describe step needs jewelry as an array; product shot does not use this field
+    // Model shot describe step needs jewelry as an array
     payload.jewelry_image_urls = [request.jewelryImageUrl];
   }
 
