@@ -33,6 +33,7 @@ export interface TrackedGeneration {
   aspectRatio: string;
   resolution: Resolution;
   generationCost: number | null;
+  jewelryDescription?: string;
 }
 
 export interface TrackGenerationParams {
@@ -95,6 +96,26 @@ function findNestedResultImage(item: unknown): string | null {
     if (found) return found;
   }
 
+  return null;
+}
+
+function extractJewelryDescription(result: PhotoshootResultResponse): string | null {
+  const preferredKeys = ['generate', 'output', 'generate_image', 'prepare'];
+  const orderedKeys = [
+    ...preferredKeys.filter(k => k in result),
+    ...Object.keys(result).filter(k => !preferredKeys.includes(k)),
+  ];
+  for (const key of orderedKeys) {
+    const items = result[key];
+    if (!Array.isArray(items)) continue;
+    for (const item of items) {
+      if (item && typeof item === 'object' && !Array.isArray(item)) {
+        const r = item as Record<string, unknown>;
+        const desc = r.description ?? r.jewelry_description;
+        if (typeof desc === 'string' && desc.length > 0) return desc;
+      }
+    }
+  }
   return null;
 }
 
@@ -233,6 +254,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
         // Extract images first — if we got output images the generation succeeded regardless
         // of what other keys exist in the result (handles _2k/_4k workflows with different node names).
         const resultImages = extractResultImages(result);
+        const jewelryDescription = gen.isProductShot ? (extractJewelryDescription(result) ?? undefined) : undefined;
 
         // Only check for activity errors when no images were produced.
         // Prefer targeted key lookup; only fall back to scanning all values when those keys are absent.
@@ -301,7 +323,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
 
         setGenerations(prev => prev.map(g =>
           g.workflowId === gen.workflowId
-            ? { ...g, status: 'completed', progress: 100, resultImages }
+            ? { ...g, status: 'completed', progress: 100, resultImages, jewelryDescription }
             : g
         ));
         markGenerationCompleted(gen.workflowId, startTime);

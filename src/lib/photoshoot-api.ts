@@ -246,7 +246,7 @@ export interface FixShotRequest {
   category: string;
   aspect_ratio?: string;
   idempotency_key?: string;
-  // TODO: pass jewelry_description from original pipeline run — not yet stored on frontend
+  jewelry_description?: string;
 }
 
 export async function startFixShot(request: FixShotRequest): Promise<PhotoshootStartResponse> {
@@ -270,10 +270,12 @@ export async function startFixShot(request: FixShotRequest): Promise<PhotoshootS
     ...(request.fix_instruction ? { fix_instruction: request.fix_instruction } : {}),
     ...(request.aspect_ratio ? { aspect_ratio: request.aspect_ratio } : {}),
     ...(request.idempotency_key ? { idempotency_key: request.idempotency_key } : {}),
+    // Product shot requires jewelry_description from the original run result
+    ...(request.isProductShot && request.jewelry_description ? { jewelry_description: request.jewelry_description } : {}),
   };
 
-  if (!request.jewelryImageUrl.startsWith('data:')) {
-    // Both model and product shot fix workflows expect jewelry as an array (mirrors startPhotoshoot/startPdpShot)
+  if (!request.isProductShot && !request.jewelryImageUrl.startsWith('data:')) {
+    // Model shot describe step needs jewelry as an array; product shot does not use this field
     payload.jewelry_image_urls = [request.jewelryImageUrl];
   }
 
