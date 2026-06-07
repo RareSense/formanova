@@ -289,7 +289,7 @@ export async function startFixShot(request: FixShotRequest): Promise<PhotoshootS
     : `${API_BASE}/run/state/${workflowName}`;
 
   const body = request.isProductShot
-    ? JSON.stringify({ data: payload })
+    ? JSON.stringify({ payload: { data: payload } })
     : JSON.stringify({ payload });
 
   const res = await authenticatedFetch(endpoint, {
