@@ -122,7 +122,6 @@ export function useStudioGeneration({
       aspectRatio: string;
       resolution: Resolution;
       generationCost: number | null;
-      jewelryDescription?: string;
     }>
   >({});
 
@@ -152,14 +151,7 @@ export function useStudioGeneration({
   useEffect(() => {
     if (!myGeneration) return;
     if (myGeneration.status === 'completed') {
-      const { resultImages: imgs, jewelryDescription } = myGeneration;
-      setResultImages(imgs);
-      if (jewelryDescription && workflowId) {
-        setGenerationInputUrlsMap(prev => ({
-          ...prev,
-          [workflowId]: { ...prev[workflowId], jewelryDescription },
-        }));
-      }
+      setResultImages(myGeneration.resultImages);
       clearGeneration(workflowId!);
       const isFirst = consumeFirstGeneration();
       trackGenerationComplete({
@@ -362,7 +354,6 @@ export function useStudioGeneration({
         category,
         aspect_ratio: fixAspectRatio,
         idempotency_key: `fix-${Date.now()}-${effectiveJewelryType}`,
-        jewelry_description: isProductShot ? (prevData?.jewelryDescription ?? undefined) : undefined,
       });
 
       const _workflowId = startResponse.workflow_id;

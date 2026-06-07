@@ -246,7 +246,6 @@ export interface FixShotRequest {
   category: string;
   aspect_ratio?: string;
   idempotency_key?: string;
-  jewelry_description?: string;
 }
 
 export async function startFixShot(request: FixShotRequest): Promise<PhotoshootStartResponse> {
@@ -270,8 +269,6 @@ export async function startFixShot(request: FixShotRequest): Promise<PhotoshootS
     ...(request.fix_instruction ? { fix_instruction: request.fix_instruction } : {}),
     ...(request.aspect_ratio ? { aspect_ratio: request.aspect_ratio } : {}),
     ...(request.idempotency_key ? { idempotency_key: request.idempotency_key } : {}),
-    // Product shot requires jewelry_description from the original run result
-    ...(request.isProductShot && request.jewelry_description ? { jewelry_description: request.jewelry_description } : {}),
   };
 
   if (!request.isProductShot && !request.jewelryImageUrl.startsWith('data:')) {
