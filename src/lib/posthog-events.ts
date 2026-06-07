@@ -260,25 +260,6 @@ export function setUserProfession(profession: UserProfession) {
   }
 }
 
-// ─── A/B EXPERIMENT: button-labels-experiment ───────────────────────────────
-// Cleanup instructions (both outcomes): docs/superpowers/plans/2026-05-09-button-labels-experiment.md → Task 6
-// TO REMOVE when experiment ends: delete trackButtonLabelExperimentExposure,
-// getButtonLabelVariant, their tests in posthog-events.test.ts,
-// the call in AuthContext.tsx, and the isNewLabels logic in StudioResultsStep.tsx.
-// ────────────────────────────────────────────────────────────────────────────
-
-export function trackButtonLabelExperimentExposure() {
-  if (!posthog.__loaded) return;
-  posthog.onFeatureFlags(() => {
-    posthog.getFeatureFlag('button-labels-experiment');
-  });
-}
-
-export function getButtonLabelVariant(): string | undefined {
-  if (!posthog.__loaded) return undefined;
-  return posthog.getFeatureFlag('button-labels-experiment') as string | undefined;
-}
-
 // ─── A/B EXPERIMENT: tooltip-first-gen-experiment ────────────────────────────
 // Owner: frontend dev
 // Reason: test whether nudging first-time users toward the human-edit workflow

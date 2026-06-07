@@ -4,7 +4,6 @@ import {
   trackLogin,
   trackLogout,
   identifyUser,
-  trackButtonLabelExperimentExposure,
   trackTooltipExperimentExposure,
 } from '@/lib/posthog-events';
 import { 
@@ -42,7 +41,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(u);
       if (u) {
         identifyUser(u.id, { email: u.email, name: u.full_name });
-        trackButtonLabelExperimentExposure();
         trackTooltipExperimentExposure();
         trackLogin('google', u.email);
       }

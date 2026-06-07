@@ -10,14 +10,14 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Diamond, RefreshCw, Wrench } from 'lucide-react';
+import { Diamond } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { ResultImageItem } from '@/components/studio/ResultImageItem';
 import { FeedbackModal } from '@/components/studio/FeedbackModal';
 import { AIFixModal } from '@/components/studio/AIFixModal';
 import { PostGenerationCoachmark } from '@/components/studio/PostGenerationCoachmark';
-import { getButtonLabelVariant, getTooltipExperimentVariant, trackTooltipShown, trackFeedbackModalOpened, hasClickedFixButton, markFixButtonClicked } from '@/lib/posthog-events';
+import { getTooltipExperimentVariant, trackTooltipShown, trackFeedbackModalOpened, hasClickedFixButton, markFixButtonClicked } from '@/lib/posthog-events';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
 import { type FeedbackCategory, checkHasSubmittedFeedback } from '@/lib/feedback-api';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
@@ -57,7 +57,6 @@ export function StudioResultsStep({
   generationCost,
   isFirstGeneration = false,
 }: StudioResultsStepProps) {
-  const isNewLabels = getButtonLabelVariant() === 'treatment';
   const [fixButtonEverClicked, setFixButtonEverClicked] = useState(() => hasClickedFixButton());
   const [tooltipReady, setTooltipReady] = useState<'loading' | 'show' | 'blocked'>(() =>
     hasClickedFixButton() ? 'blocked' : 'loading'
@@ -81,7 +80,7 @@ export function StudioResultsStep({
   useEffect(() => {
     if (showTooltip) trackTooltipShown();
   }, [showTooltip]);
-  const humanButtonLabel = isNewLabels ? 'Redo with human' : 'Fix this result';
+  const humanButtonLabel = 'Fix with human';
   const [aiFixOpen, setAiFixOpen] = useState(false);
   const [coachmarkVisible, setCoachmarkVisible] = useState(false);
   const [coachmarkDismissSignal, setCoachmarkDismissSignal] = useState(0);
@@ -170,7 +169,6 @@ export function StudioResultsStep({
                 coachmarkVisible && "shadow-[0_0_4px_hsl(var(--formanova-hero-accent)/0.10)]"
               )}
             >
-              <Wrench className="h-4 w-4" />
               {humanButtonLabel}
             </Button>
           </div>
@@ -182,8 +180,7 @@ export function StudioResultsStep({
             }}
             className="h-10 flex-1 gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] bg-background px-3 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"
           >
-            <RefreshCw className="h-4 w-4" />
-            {isNewLabels ? 'Redo with AI' : 'Regenerate'}
+            Fix with AI
             <span className="ml-1 flex items-center gap-1 text-xs normal-case tracking-normal opacity-70">
               <img src={creditCoinIcon} alt="" className="h-4 w-4 object-contain" /> {generationCost ?? 10}
             </span>
