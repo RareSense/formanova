@@ -315,21 +315,19 @@ describe('trackUploadGuideAcknowledged', () => {
 })
 
 describe('trackFeedbackModalOpened', () => {
-  it('captures feedback_modal_opened with via_tooltip true', () => {
-    trackFeedbackModalOpened({ category: 'ring', workflow_id: 'wf-123', via_tooltip: true })
+  it('captures feedback_modal_opened with correct shape', () => {
+    trackFeedbackModalOpened({ category: 'ring', workflow_id: 'wf-123' })
     expect(posthog.capture).toHaveBeenCalledWith('feedback_modal_opened', {
       category: 'ring',
       workflow_id: 'wf-123',
-      via_tooltip: true,
     })
   })
 
-  it('captures feedback_modal_opened with via_tooltip false', () => {
-    trackFeedbackModalOpened({ category: 'earring', workflow_id: null, via_tooltip: false })
+  it('accepts null workflow_id', () => {
+    trackFeedbackModalOpened({ category: 'earring', workflow_id: null })
     expect(posthog.capture).toHaveBeenCalledWith('feedback_modal_opened', {
       category: 'earring',
       workflow_id: null,
-      via_tooltip: false,
     })
   })
 })

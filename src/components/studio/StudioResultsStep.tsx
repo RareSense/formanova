@@ -88,7 +88,6 @@ export function StudioResultsStep({
               trackFeedbackModalOpened({
                 category: TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType,
                 workflow_id: workflowId,
-                via_tooltip: false,
               });
             }}
             className="h-10 flex-1 gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] px-3 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"

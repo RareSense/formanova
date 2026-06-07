@@ -90,7 +90,6 @@ export interface FeedbackSubmittedProps {
 export interface FeedbackModalOpenedProps {
   category: string;
   workflow_id: string | null;
-  via_tooltip: boolean;
 }
 
 // ═══════ Feedback ═══════════════════════════════════════════════════
