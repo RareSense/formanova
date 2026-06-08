@@ -271,7 +271,8 @@ export async function startFixShot(request: FixShotRequest): Promise<PhotoshootS
     ...(request.aspect_ratio ? { aspect_ratio: request.aspect_ratio } : {}),
     ...(request.idempotency_key ? { idempotency_key: request.idempotency_key } : {}),
     ...(request.isProductShot ? { generation_type: 'product_shot_v1', image_size: request.resolution ?? '1K' } : {}),
-    ...(request.isProductShot && request.jewelry_description ? { jewelry_description: request.jewelry_description } : {}),
+    // jewelry_description required by PrepareFixRequest; send extracted value or empty string as fallback
+    ...(request.isProductShot ? { jewelry_description: request.jewelry_description ?? '' } : {}),
   };
 
   if (!request.isProductShot && !request.jewelryImageUrl.startsWith('data:')) {

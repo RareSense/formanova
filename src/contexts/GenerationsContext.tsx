@@ -250,6 +250,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
         // Extract images first — if we got output images the generation succeeded regardless
         // of what other keys exist in the result (handles _2k/_4k workflows with different node names).
         const resultImages = extractResultImages(result);
+        if (gen.isProductShot) console.log('[product-shot result keys]', Object.keys(result), result);
         const jewelryDescription = gen.isProductShot ? extractJewelryDescription(result) : undefined;
 
         // Only check for activity errors when no images were produced.
