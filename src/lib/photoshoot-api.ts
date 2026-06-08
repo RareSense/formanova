@@ -287,7 +287,7 @@ export async function startFixShot(request: FixShotRequest): Promise<PhotoshootS
     body = JSON.stringify({
       payload: {
         data,
-        jewelry_description: request.jewelry_description ?? '',
+        ...(request.jewelry_description ? { jewelry_description: request.jewelry_description } : {}),
       },
     });
   } else {

@@ -55,6 +55,8 @@ import { uploadToAzure } from '@/lib/microservices-api';
 import { compressImageBlob, imageSourceToBlob } from '@/lib/image-compression';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
 import { markGenerationStarted } from '@/lib/generation-lifecycle';
+import { getWorkflowDetails } from '@/lib/generation-history-api';
+import { extractDescriptionFromSteps } from '@/lib/generation-enrichment';
 import {
   trackPaywallHit,
   trackGenerationComplete,
@@ -314,7 +316,17 @@ export function useStudioGeneration({
     const fixAspectRatio = prevData?.aspectRatio ?? aspectRatio;
     const resultImageUrl = resultImages[0];
     const jewelryImageUrl = prevData?.jewelryUrl ?? jewelryUploadedUrl;
-    const jewelryDescription = prevData?.jewelryDescription;
+    let jewelryDescription = prevData?.jewelryDescription;
+
+    // If not stored at generation time, fetch it from the original workflow steps
+    if (!jewelryDescription && isProductShot && workflowId) {
+      try {
+        const details = await getWorkflowDetails(workflowId);
+        jewelryDescription = extractDescriptionFromSteps(details.steps ?? []);
+      } catch {
+        // non-fatal — fix will proceed without description
+      }
+    }
 
     if (!resultImageUrl || !jewelryImageUrl) {
       toast({ variant: 'destructive', title: 'Missing images', description: 'Cannot fix — original images are not available.' });
