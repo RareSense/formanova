@@ -10,7 +10,7 @@ import { azureUriToUrl } from '@/lib/azure-utils';
 import type { PhotoshootResultResponse } from '@/lib/photoshoot-api';
 import type { Resolution } from '@/components/studio/OutputSettingsPills';
 import { getWorkflowDetails } from '@/lib/generation-history-api';
-import { extractDescriptionFromSteps, extractPhotoThumbnail, extractProductShotThumbnail } from '@/lib/generation-enrichment';
+import { extractPhotoThumbnail, extractProductShotThumbnail } from '@/lib/generation-enrichment';
 
 const STUDIO_RESULT_RETRY_DELAY_MS = 3000;
 // 4K workflows can reach "completed" before the result payload is readable.
@@ -103,10 +103,11 @@ function extractJewelryDescription(result: PhotoshootResultResponse): string | u
   for (const [key, items] of Object.entries(result)) {
     if (!Array.isArray(items)) continue;
     for (const item of items) {
-      const description = extractDescriptionFromSteps([{ tool: key, output: item }]);
-      if (description) {
-        console.log(`[extractJewelryDescription] found in node "${key}":`, description);
-        return description;
+      if (!item || typeof item !== 'object') continue;
+      const rec = item as Record<string, unknown>;
+      if (typeof rec['description'] === 'string' && rec['description'].length > 0) {
+        console.log(`[extractJewelryDescription] found in node "${key}":`, rec['description']);
+        return rec['description'];
       }
     }
   }

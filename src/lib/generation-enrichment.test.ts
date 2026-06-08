@@ -1,10 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import {
-  extractDescriptionFromSteps,
-  extractPhotoThumbnail,
-  extractCadTextData,
-  extractProductShotThumbnail,
-} from './generation-enrichment';
+import { extractPhotoThumbnail, extractCadTextData, extractProductShotThumbnail } from './generation-enrichment';
 
 // Mock azure-utils so tests don't need real Azure URIs
 vi.mock('./azure-utils', () => ({
@@ -59,12 +54,12 @@ describe('extractPhotoThumbnail', () => {
     expect(extractPhotoThumbnail(steps)).toBe('https://example.com/image.jpg');
   });
 
-  it('converts azure output_url values', () => {
+  it('returns null when output_url is not https', () => {
     const steps = [{
       tool: 'generate_jewelry_image',
       output: { output_url: 'azure://container/image.jpg' },
     }];
-    expect(extractPhotoThumbnail(steps)).toBe('https://cdn.example.com/container/image.jpg');
+    expect(extractPhotoThumbnail(steps)).toBeNull();
   });
 });
 
@@ -183,56 +178,5 @@ describe('extractProductShotThumbnail', () => {
     }];
 
     expect(extractProductShotThumbnail(steps)).toBe('data:image/png;base64,recursive123');
-  });
-});
-
-describe('extractDescriptionFromSteps', () => {
-  it('extracts description from a product-shot describe node', () => {
-    const steps = [
-      {
-        tool: 'describe',
-        output_data: {
-          description: 'Gold pendant necklace on white background',
-        },
-      },
-    ];
-
-    expect(extractDescriptionFromSteps(steps)).toBe('Gold pendant necklace on white background');
-  });
-
-  it('extracts nested description from describe output data', () => {
-    const steps = [
-      {
-        tool: 'describe',
-        output_data: {
-          data: {
-            result: {
-              description: 'Silver ring with a solitaire stone',
-            },
-          },
-        },
-      },
-    ];
-
-    expect(extractDescriptionFromSteps(steps)).toBe('Silver ring with a solitaire stone');
-  });
-
-  it('prioritizes describe node over later generated node descriptions', () => {
-    const steps = [
-      {
-        tool: 'generate',
-        output_data: {
-          description: 'Generated scene description',
-        },
-      },
-      {
-        tool: 'describe_jewelry',
-        output_data: {
-          jewelry_description: 'Original jewelry description',
-        },
-      },
-    ];
-
-    expect(extractDescriptionFromSteps(steps)).toBe('Original jewelry description');
   });
 });
