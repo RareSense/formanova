@@ -130,9 +130,13 @@ function extractResultImages(result: PhotoshootResultResponse): string[] {
 
   for (const key of orderedResultKeys) {
     const items = result[key];
-    if (!Array.isArray(items)) continue;
-    for (const item of items) {
-      const found = findNestedResultImage(item);
+    if (Array.isArray(items)) {
+      for (const item of items) {
+        const found = findNestedResultImage(item);
+        if (found) return [found];
+      }
+    } else if (items && typeof items === 'object') {
+      const found = findNestedResultImage(items);
       if (found) return [found];
     }
   }
