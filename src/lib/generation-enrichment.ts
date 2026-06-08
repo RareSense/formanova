@@ -118,12 +118,42 @@ export function extractProductShotThumbnail(steps: any[]): string | null {
 
 // ── Jewelry description extraction from workflow steps ───────────────
 
+function findDescription(obj: unknown): string | undefined {
+  if (!obj) return undefined;
+  if (Array.isArray(obj)) {
+    for (const item of obj) {
+      const found = findDescription(item);
+      if (found) return found;
+    }
+    return undefined;
+  }
+  if (typeof obj !== 'object') return undefined;
+
+  const record = obj as Record<string, unknown>;
+  for (const key of ['description', 'jewelry_description']) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value;
+    }
+  }
+
+  for (const value of Object.values(record)) {
+    const found = findDescription(value);
+    if (found) return found;
+  }
+  return undefined;
+}
+
 export function extractDescriptionFromSteps(steps: any[]): string | undefined {
-  for (const step of steps) {
+  const describeSteps = steps.filter((step) =>
+    typeof step?.tool === 'string' && step.tool.toLowerCase().includes('describe')
+  );
+  const orderedSteps = [...describeSteps, ...steps.filter((step) => !describeSteps.includes(step))];
+
+  for (const step of orderedSteps) {
     const out = step?.output_data ?? step?.output ?? {};
-    if (typeof out?.description === 'string' && out.description.length > 0) return out.description;
-    // Some steps nest it under result
-    if (typeof out?.result?.description === 'string' && out.result.description.length > 0) return out.result.description;
+    const found = findDescription(out);
+    if (found) return found;
   }
   return undefined;
 }
