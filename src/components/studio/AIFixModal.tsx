@@ -139,7 +139,7 @@ export function AIFixModal({
             onClick={handleConfirm}
           >
             <RefreshCw className="h-4 w-4" />
-            Fix with AI
+            Fix it with AI
             <span className="ml-1 flex items-center gap-1 text-xs normal-case tracking-normal opacity-70">
               <img src={creditCoinIcon} alt="" className="h-4 w-4 object-contain" /> {generationCost ?? 10}
             </span>

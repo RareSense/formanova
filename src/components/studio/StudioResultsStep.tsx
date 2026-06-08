@@ -92,14 +92,14 @@ export function StudioResultsStep({
             }}
             className="h-10 flex-1 gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] px-3 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"
           >
-            Fix with human
+            Fix it with human
           </Button>
           <Button
             size="sm"
             onClick={() => setAiFixOpen(true)}
             className="h-10 flex-1 gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] bg-background px-3 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"
           >
-            Fix with AI
+            Fix it with AI
             <span className="ml-1 flex items-center gap-1 text-xs normal-case tracking-normal opacity-70">
               <img src={creditCoinIcon} alt="" className="h-4 w-4 object-contain" /> {generationCost ?? 10}
             </span>
