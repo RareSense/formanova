@@ -55,8 +55,7 @@ import { uploadToAzure } from '@/lib/microservices-api';
 import { compressImageBlob, imageSourceToBlob } from '@/lib/image-compression';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
 import { markGenerationStarted } from '@/lib/generation-lifecycle';
-import { getWorkflowDetails } from '@/lib/generation-history-api';
-import { extractDescriptionFromSteps } from '@/lib/generation-enrichment';
+import { getJewelryDescription } from '@/lib/photoshoot-api';
 import {
   trackPaywallHit,
   trackGenerationComplete,
@@ -318,15 +317,11 @@ export function useStudioGeneration({
     const jewelryImageUrl = prevData?.jewelryUrl ?? jewelryUploadedUrl;
     let jewelryDescription = prevData?.jewelryDescription;
 
-    // If not stored at generation time, fetch it from the original workflow steps
     if (!jewelryDescription && isProductShot && workflowId) {
       try {
-        const details = await getWorkflowDetails(workflowId);
-        console.log('[handleAIFix] workflow details steps:', details.steps?.map((s: any) => ({ tool: s.tool, outputKeys: Object.keys(s.output_data ?? s.output ?? {}) })));
-        jewelryDescription = extractDescriptionFromSteps(details.steps ?? []);
-        console.log('[handleAIFix] extracted jewelryDescription:', jewelryDescription);
+        jewelryDescription = await getJewelryDescription(workflowId) ?? undefined;
       } catch (e) {
-        console.warn('[handleAIFix] failed to fetch workflow details:', e);
+        // non-fatal — fix shot proceeds without the description
       }
     }
 

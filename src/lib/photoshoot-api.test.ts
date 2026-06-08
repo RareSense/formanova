@@ -22,6 +22,7 @@ import {
   getPhotoshootResult,
   startPdpShot,
   startFixShot,
+  getJewelryDescription,
 } from './photoshoot-api';
 
 // ── Response helpers ──────────────────────────────────────────────────────────
@@ -257,6 +258,54 @@ describe('startPdpShot', () => {
     const err = await startPdpShot(BASE_PDP_REQUEST).catch(e => e);
     expect(err.name).toBe('AuthExpiredError');
     expect(err.message).not.toContain('Failed to start PDP shot');
+  });
+});
+
+// ── getJewelryDescription ─────────────────────────────────────────────────────
+
+describe('getJewelryDescription', () => {
+  it('calls the correct endpoint', async () => {
+    mockAuthFetch.mockReturnValueOnce(okResponse({ jewelry_description: 'Gold ring with diamond' }));
+
+    await getJewelryDescription('wf-abc');
+
+    expect(mockAuthFetch).toHaveBeenCalledWith('/api/jewelry-description/wf-abc');
+  });
+
+  it('returns the jewelry_description string on 200', async () => {
+    mockAuthFetch.mockReturnValueOnce(okResponse({ jewelry_description: 'Gold ring with diamond' }));
+
+    const result = await getJewelryDescription('wf-abc');
+    expect(result).toBe('Gold ring with diamond');
+  });
+
+  it('returns null on 404', async () => {
+    mockAuthFetch.mockReturnValueOnce(errorResponse(404));
+
+    const result = await getJewelryDescription('wf-missing');
+    expect(result).toBeNull();
+  });
+
+  it('throws a descriptive error on non-404 failure', async () => {
+    mockAuthFetch.mockReturnValueOnce(errorResponse(500, 'server error'));
+
+    await expect(getJewelryDescription('wf-err')).rejects.toThrow('Failed to fetch jewelry description: 500');
+  });
+
+  it('propagates AuthExpiredError without wrapping it', async () => {
+    const authErr = Object.assign(new Error('AUTH_EXPIRED'), { name: 'AuthExpiredError' });
+    mockAuthFetch.mockRejectedValueOnce(authErr);
+
+    const err = await getJewelryDescription('wf-auth').catch(e => e);
+    expect(err.name).toBe('AuthExpiredError');
+    expect(err.message).not.toContain('Failed to fetch jewelry description');
+  });
+
+  it('returns null when response has no jewelry_description field', async () => {
+    mockAuthFetch.mockReturnValueOnce(okResponse({}));
+
+    const result = await getJewelryDescription('wf-empty');
+    expect(result).toBeNull();
   });
 });
 
