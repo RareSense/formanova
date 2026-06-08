@@ -320,8 +320,9 @@ export function useStudioGeneration({
     if (!jewelryDescription && isProductShot && workflowId) {
       try {
         jewelryDescription = await getJewelryDescription(workflowId) ?? undefined;
+        console.log('[handleAIFix] description from endpoint:', jewelryDescription, 'workflowId:', workflowId);
       } catch (e) {
-        // non-fatal — fix shot proceeds without the description
+        console.warn('[handleAIFix] getJewelryDescription failed:', e);
       }
     }
 
