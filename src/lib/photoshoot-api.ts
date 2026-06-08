@@ -263,10 +263,9 @@ export async function startFixShot(request: FixShotRequest): Promise<PhotoshootS
     ? { jewelry_image_b64: request.jewelryImageUrl.replace(/^data:[^;]+;base64,/, '') }
     : { jewelry_image_url: request.jewelryImageUrl };
 
-  // Model shot: standard { payload } envelope → /run/state/
-  // Product shot: GraphFlowRunEnvelope → /run/
-  //   - fields for prepare_fix_request go inside payload.data
-  //   - jewelry_description goes at payload root (__root__ in GraphFlow YAML wiring)
+  // Model shot: standard { payload } envelope -> /run/state/
+  // Product shot: GraphFlowRunEnvelope -> /run/
+  // Keep product fields flat in payload so prepare_fix_request receives them directly.
   const endpoint = request.isProductShot
     ? `${API_BASE}/run/${workflowName}`
     : `${API_BASE}/run/state/${workflowName}`;
@@ -274,7 +273,7 @@ export async function startFixShot(request: FixShotRequest): Promise<PhotoshootS
   let body: string;
 
   if (request.isProductShot) {
-    // Flat payload — same pattern as startPdpShot. API layer handles GraphFlow envelope.
+    // Same shape as startPdpShot. The API layer handles the GraphFlow envelope.
     const productPayload: Record<string, unknown> = {
       ...resultImageField,
       ...jewelryImageField,
