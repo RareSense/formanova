@@ -263,32 +263,47 @@ export async function startFixShot(request: FixShotRequest): Promise<PhotoshootS
     ? { jewelry_image_b64: request.jewelryImageUrl.replace(/^data:[^;]+;base64,/, '') }
     : { jewelry_image_url: request.jewelryImageUrl };
 
-  const payload: Record<string, unknown> = {
-    ...resultImageField,
-    ...jewelryImageField,
-    category: request.category,
-    ...(request.prompt ? { fix_instruction: request.prompt } : {}),
-    ...(request.aspect_ratio ? { aspect_ratio: request.aspect_ratio } : {}),
-    ...(request.idempotency_key ? { idempotency_key: request.idempotency_key } : {}),
-    ...(request.isProductShot ? { generation_type: 'product_shot_v1', image_size: request.resolution ?? '1K' } : {}),
-    // jewelry_description required by PrepareFixRequest; send extracted value or empty string as fallback
-    ...(request.isProductShot ? { jewelry_description: request.jewelry_description ?? '' } : {}),
-  };
-
-  if (!request.isProductShot && !request.jewelryImageUrl.startsWith('data:')) {
-    // Model shot describe step needs jewelry as an array
-    payload.jewelry_image_urls = [request.jewelryImageUrl];
-  }
-
-  // Model shot: /run/state/ with { payload } envelope
-  // Product shot: /run/ with { data } envelope (GraphFlowRunEnvelope)
+  // Model shot: standard { payload } envelope → /run/state/
+  // Product shot: GraphFlowRunEnvelope → /run/
+  //   - fields for prepare_fix_request go inside payload.data
+  //   - jewelry_description goes at payload root (__root__ in GraphFlow YAML wiring)
   const endpoint = request.isProductShot
     ? `${API_BASE}/run/${workflowName}`
     : `${API_BASE}/run/state/${workflowName}`;
 
-  const body = request.isProductShot
-    ? JSON.stringify({ payload: { data: payload } })
-    : JSON.stringify({ payload });
+  let body: string;
+
+  if (request.isProductShot) {
+    const data: Record<string, unknown> = {
+      ...resultImageField,
+      ...jewelryImageField,
+      category: request.category,
+      generation_type: 'product_shot_v1',
+      ...(request.prompt ? { fix_instruction: request.prompt } : {}),
+      ...(request.aspect_ratio ? { aspect_ratio: request.aspect_ratio } : {}),
+      ...(request.idempotency_key ? { idempotency_key: request.idempotency_key } : {}),
+    };
+    // jewelry_description lives at GraphFlow envelope root (__root__ wiring), not inside data
+    body = JSON.stringify({
+      payload: {
+        data,
+        jewelry_description: request.jewelry_description ?? '',
+      },
+    });
+  } else {
+    const payload: Record<string, unknown> = {
+      ...resultImageField,
+      ...jewelryImageField,
+      category: request.category,
+      ...(request.prompt ? { fix_instruction: request.prompt } : {}),
+      ...(request.aspect_ratio ? { aspect_ratio: request.aspect_ratio } : {}),
+      ...(request.idempotency_key ? { idempotency_key: request.idempotency_key } : {}),
+    };
+    if (!request.jewelryImageUrl.startsWith('data:')) {
+      payload.jewelry_image_urls = [request.jewelryImageUrl];
+    }
+    body = JSON.stringify({ payload });
+  }
 
   const res = await authenticatedFetch(endpoint, {
     method: 'POST',
