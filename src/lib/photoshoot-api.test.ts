@@ -21,6 +21,8 @@ import {
   getPhotoshootStatus,
   getPhotoshootResult,
   startPdpShot,
+  startFixShot,
+  getJewelryDescription,
 } from './photoshoot-api';
 
 // ── Response helpers ──────────────────────────────────────────────────────────
@@ -256,5 +258,135 @@ describe('startPdpShot', () => {
     const err = await startPdpShot(BASE_PDP_REQUEST).catch(e => e);
     expect(err.name).toBe('AuthExpiredError');
     expect(err.message).not.toContain('Failed to start PDP shot');
+  });
+});
+
+// ── getJewelryDescription ─────────────────────────────────────────────────────
+
+describe('getJewelryDescription', () => {
+  it('calls the correct endpoint', async () => {
+    mockAuthFetch.mockReturnValueOnce(okResponse({ jewelry_description: 'Gold ring with diamond' }));
+
+    await getJewelryDescription('wf-abc');
+
+    expect(mockAuthFetch).toHaveBeenCalledWith('/api/jewelry-description/wf-abc');
+  });
+
+  it('returns the jewelry_description string on 200', async () => {
+    mockAuthFetch.mockReturnValueOnce(okResponse({ jewelry_description: 'Gold ring with diamond' }));
+
+    const result = await getJewelryDescription('wf-abc');
+    expect(result).toBe('Gold ring with diamond');
+  });
+
+  it('returns null on 404', async () => {
+    mockAuthFetch.mockReturnValueOnce(errorResponse(404));
+
+    const result = await getJewelryDescription('wf-missing');
+    expect(result).toBeNull();
+  });
+
+  it('throws a descriptive error on non-404 failure', async () => {
+    mockAuthFetch.mockReturnValueOnce(errorResponse(500, 'server error'));
+
+    await expect(getJewelryDescription('wf-err')).rejects.toThrow('Failed to fetch jewelry description: 500');
+  });
+
+  it('propagates AuthExpiredError without wrapping it', async () => {
+    const authErr = Object.assign(new Error('AUTH_EXPIRED'), { name: 'AuthExpiredError' });
+    mockAuthFetch.mockRejectedValueOnce(authErr);
+
+    const err = await getJewelryDescription('wf-auth').catch(e => e);
+    expect(err.name).toBe('AuthExpiredError');
+    expect(err.message).not.toContain('Failed to fetch jewelry description');
+  });
+
+  it('returns null when response has no jewelry_description field', async () => {
+    mockAuthFetch.mockReturnValueOnce(okResponse({}));
+
+    const result = await getJewelryDescription('wf-empty');
+    expect(result).toBeNull();
+  });
+});
+
+// Fix shot
+
+describe('startFixShot', () => {
+  it('sends product-shot fix fields directly inside payload', async () => {
+    mockAuthFetch.mockReturnValueOnce(okResponse({ workflow_id: 'wf-fix', status_url: '/s', result_url: '/r' }));
+
+    await startFixShot({
+      isProductShot: true,
+      resolution: '1K',
+      resultImageUrl: 'https://example.com/result.jpg',
+      jewelryImageUrl: 'https://example.com/jewelry.jpg',
+      prompt: 'Make the chain brighter',
+      category: 'necklace',
+      aspect_ratio: '1:1',
+      idempotency_key: 'fix-key',
+      jewelry_description: 'Gold necklace with a pendant',
+    });
+
+    expect(mockAuthFetch).toHaveBeenCalledWith(
+      '/api/run/fix_product_shot',
+      expect.objectContaining({ method: 'POST' }),
+    );
+
+    const [, options] = mockAuthFetch.mock.calls[0];
+    const body = JSON.parse(options.body as string);
+
+    expect(body.payload).toEqual({
+      result_image_url: 'https://example.com/result.jpg',
+      jewelry_image_url: 'https://example.com/jewelry.jpg',
+      category: 'necklace',
+      generation_type: 'product_shot_v1',
+      fix_instruction: 'Make the chain brighter',
+      aspect_ratio: '1:1',
+      idempotency_key: 'fix-key',
+      jewelry_description: 'Gold necklace with a pendant',
+    });
+    expect(body.payload.data).toBeUndefined();
+  });
+
+  it('sends exactly one result image field for product-shot data URLs', async () => {
+    mockAuthFetch.mockReturnValueOnce(okResponse({ workflow_id: 'wf-fix', status_url: '/s', result_url: '/r' }));
+
+    await startFixShot({
+      isProductShot: true,
+      resolution: '2K',
+      resultImageUrl: 'data:image/png;base64,RESULT_B64',
+      jewelryImageUrl: 'data:image/jpeg;base64,JEWELRY_B64',
+      category: 'ring',
+    });
+
+    const [, options] = mockAuthFetch.mock.calls[0];
+    const body = JSON.parse(options.body as string);
+
+    expect(mockAuthFetch).toHaveBeenCalledWith(
+      '/api/run/fix_product_shot_2k',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    expect(body.payload.result_image_b64).toBe('RESULT_B64');
+    expect(body.payload.result_image_url).toBeUndefined();
+    expect(body.payload.jewelry_image_b64).toBe('JEWELRY_B64');
+    expect(body.payload.jewelry_image_url).toBeUndefined();
+    expect(body.payload.data).toBeUndefined();
+  });
+
+  it('uses state endpoint for model-shot fixes', async () => {
+    mockAuthFetch.mockReturnValueOnce(okResponse({ workflow_id: 'wf-fix', status_url: '/s', result_url: '/r' }));
+
+    await startFixShot({
+      isProductShot: false,
+      resolution: '4K',
+      resultImageUrl: 'https://example.com/result.jpg',
+      jewelryImageUrl: 'https://example.com/jewelry.jpg',
+      category: 'ring',
+    });
+
+    expect(mockAuthFetch).toHaveBeenCalledWith(
+      '/api/run/state/fix_model_shot_4k',
+      expect.objectContaining({ method: 'POST' }),
+    );
   });
 });

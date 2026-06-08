@@ -90,7 +90,6 @@ export interface FeedbackSubmittedProps {
 export interface FeedbackModalOpenedProps {
   category: string;
   workflow_id: string | null;
-  via_tooltip: boolean;
 }
 
 // ═══════ Feedback ═══════════════════════════════════════════════════
@@ -260,66 +259,6 @@ export function setUserProfession(profession: UserProfession) {
   }
 }
 
-// ─── A/B EXPERIMENT: button-labels-experiment ───────────────────────────────
-// Cleanup instructions (both outcomes): docs/superpowers/plans/2026-05-09-button-labels-experiment.md → Task 6
-// TO REMOVE when experiment ends: delete trackButtonLabelExperimentExposure,
-// getButtonLabelVariant, their tests in posthog-events.test.ts,
-// the call in AuthContext.tsx, and the isNewLabels logic in StudioResultsStep.tsx.
-// ────────────────────────────────────────────────────────────────────────────
-
-export function trackButtonLabelExperimentExposure() {
-  if (!posthog.__loaded) return;
-  posthog.onFeatureFlags(() => {
-    posthog.getFeatureFlag('button-labels-experiment');
-  });
-}
-
-export function getButtonLabelVariant(): string | undefined {
-  if (!posthog.__loaded) return undefined;
-  return posthog.getFeatureFlag('button-labels-experiment') as string | undefined;
-}
-
-// ─── A/B EXPERIMENT: tooltip-first-gen-experiment ────────────────────────────
-// Owner: frontend dev
-// Reason: test whether nudging first-time users toward the human-edit workflow
-//         increases subsequent credit purchases (payment_success).
-// Removal: when experiment concludes — delete trackTooltipExperimentExposure,
-//          getTooltipExperimentVariant, trackTooltipShown, and their tests in
-//          posthog-events.test.ts, plus the exposure call in AuthContext.tsx, and
-//          the isFirstGeneration + tooltipVariant logic in useStudioGeneration.ts,
-//          UnifiedStudio.tsx, and StudioResultsStep.tsx.
-// ─────────────────────────────────────────────────────────────────────────────
-
-export function trackTooltipExperimentExposure() {
-  if (!posthog.__loaded) return;
-  posthog.onFeatureFlags(() => {
-    posthog.getFeatureFlag('tooltip-first-gen-experiment');
-  });
-}
-
-export function getTooltipExperimentVariant(): string | undefined {
-  if (!posthog.__loaded) return undefined;
-  return posthog.getFeatureFlag('tooltip-first-gen-experiment') as string | undefined;
-}
-
-export function trackTooltipShown() {
-  capture('tooltip_shown', { experiment: 'tooltip-first-gen-experiment' });
-}
-
-export function trackTooltipDismissed() {
-  capture('tooltip_dismissed', { experiment: 'tooltip-first-gen-experiment' });
-}
-
-const FIX_BUTTON_CLICKED_KEY = 'formanova_fix_button_ever_clicked';
-
-export function hasClickedFixButton(): boolean {
-  return localStorage.getItem(FIX_BUTTON_CLICKED_KEY) === '1';
-}
-
-export function markFixButtonClicked() {
-  localStorage.setItem(FIX_BUTTON_CLICKED_KEY, '1');
-}
-
 // ═══════ Studio Actions ══════════════════════════════════════════════
 
 // No breaking change — new optional `category` property added
@@ -340,4 +279,15 @@ export function trackRegenerateClicked(props?: {
   regeneration_number?: number;
 }) {
   capture('regenerate_clicked', props ?? {});
+}
+
+export interface AIFixSubmittedProps {
+  category: string;
+  prompt_length: number;
+  workflow_id: string | null;
+  regeneration_number: number;
+}
+
+export function trackAIFixSubmitted(props: AIFixSubmittedProps) {
+  capture('ai_fix_submitted', { ...props });
 }

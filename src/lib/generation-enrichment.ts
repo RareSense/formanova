@@ -116,6 +116,18 @@ export function extractProductShotThumbnail(steps: any[]): string | null {
   return null;
 }
 
+// ── Jewelry description extraction from workflow steps ───────────────
+
+export function extractDescriptionFromSteps(steps: any[]): string | undefined {
+  for (const step of steps) {
+    const out = step?.output_data ?? step?.output ?? {};
+    if (typeof out?.description === 'string' && out.description.length > 0) return out.description;
+    // Some steps nest it under result
+    if (typeof out?.result?.description === 'string' && out.result.description.length > 0) return out.result.description;
+  }
+  return undefined;
+}
+
 // ── CAD text data extraction ─────────────────────────────────────────
 
 export function extractCadTextData(steps: any[]) {

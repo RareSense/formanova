@@ -35,6 +35,7 @@ export type FeedbackRequest = {
 export type FeedbackResponse = {
   success: boolean;
   feedback_id: string;
+  fix_workflow_id?: string;
 };
 
 /**

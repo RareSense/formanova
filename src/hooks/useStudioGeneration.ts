@@ -49,14 +49,18 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   startPhotoshoot,
   startPdpShot,
+  startFixShot,
 } from '@/lib/photoshoot-api';
 import { uploadToAzure } from '@/lib/microservices-api';
 import { compressImageBlob, imageSourceToBlob } from '@/lib/image-compression';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
 import { markGenerationStarted } from '@/lib/generation-lifecycle';
+import { getJewelryDescription } from '@/lib/photoshoot-api';
 import {
   trackPaywallHit,
   trackGenerationComplete,
+  trackRegenerateClicked,
+  trackAIFixSubmitted,
   consumeFirstGeneration,
 } from '@/lib/posthog-events';
 import { useGenerations } from '@/contexts/GenerationsContext';
@@ -106,7 +110,6 @@ export function useStudioGeneration({
   clearStudioSession,
 }: UseStudioGenerationOptions) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isFirstGeneration, setIsFirstGeneration] = useState(false);
   const [rotatingMsgIdx, setRotatingMsgIdx] = useState(0);
   const [workflowId, setWorkflowId] = useState<string | null>(null);
   const [resultImages, setResultImages] = useState<string[]>([]);
@@ -120,6 +123,7 @@ export function useStudioGeneration({
       aspectRatio: string;
       resolution: Resolution;
       generationCost: number | null;
+      jewelryDescription?: string;
     }>
   >({});
 
@@ -150,9 +154,14 @@ export function useStudioGeneration({
     if (!myGeneration) return;
     if (myGeneration.status === 'completed') {
       setResultImages(myGeneration.resultImages);
+      if (myGeneration.jewelryDescription) {
+        setGenerationInputUrlsMap(prev => ({
+          ...prev,
+          [workflowId!]: { ...prev[workflowId!], jewelryDescription: myGeneration.jewelryDescription },
+        }));
+      }
       clearGeneration(workflowId!);
       const isFirst = consumeFirstGeneration();
-      setIsFirstGeneration(isFirst);
       trackGenerationComplete({
         source: 'unified-studio',
         category: TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType,
@@ -298,6 +307,110 @@ export function useStudioGeneration({
     clearStudioSession,
   ]);
 
+  const handleAIFix = useCallback(async (prompt: string) => {
+    if (isSubmitting) return;
+
+    const prevData = generationInputUrlsMap[workflowId ?? ''];
+    const fixResolution = prevData?.resolution ?? resolution;
+    const fixAspectRatio = prevData?.aspectRatio ?? aspectRatio;
+    const resultImageUrl = resultImages[0];
+    const jewelryImageUrl = prevData?.jewelryUrl ?? jewelryUploadedUrl;
+    let jewelryDescription = prevData?.jewelryDescription;
+
+    if (!jewelryDescription && isProductShot && workflowId) {
+      try {
+        jewelryDescription = await getJewelryDescription(workflowId) ?? undefined;
+        console.log('[handleAIFix] description from endpoint:', jewelryDescription, 'workflowId:', workflowId);
+      } catch (e) {
+        console.warn('[handleAIFix] getJewelryDescription failed:', e);
+      }
+    }
+
+    if (!resultImageUrl || !jewelryImageUrl) {
+      toast({ variant: 'destructive', title: 'Missing images', description: 'Cannot fix — original images are not available.' });
+      return;
+    }
+
+    const FIX_MODEL_SHOT: Record<string, string> = { '1K': 'fix_model_shot', '2K': 'fix_model_shot_2k', '4K': 'fix_model_shot_4k' };
+    const FIX_PRODUCT_SHOT: Record<string, string> = { '1K': 'fix_product_shot', '2K': 'fix_product_shot_2k', '4K': 'fix_product_shot_4k' };
+    const fixWorkflowName = isProductShot
+      ? (FIX_PRODUCT_SHOT[fixResolution] ?? 'fix_product_shot')
+      : (FIX_MODEL_SHOT[fixResolution] ?? 'fix_model_shot');
+
+    const hasCredits = await checkCredits(fixWorkflowName);
+    if (!hasCredits) {
+      trackPaywallHit({ category: TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType, steps_completed: 3 });
+      return;
+    }
+
+    const category = TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType;
+    const newRegenerationNumber = regenerationCount + 1;
+
+    setIsSubmitting(true);
+    setGenerationError(null);
+    hasNavigatedAway.current = false;
+    setRegenerationCount(c => c + 1);
+    trackRegenerateClicked({ context: 'unified-studio', category, regeneration_number: newRegenerationNumber });
+    trackAIFixSubmitted({ category, prompt_length: prompt.length, workflow_id: workflowId, regeneration_number: newRegenerationNumber });
+    // Show result image in the second slot while the fix API call is in flight
+    if (workflowId) {
+      setGenerationInputUrlsMap(prev => ({
+        ...prev,
+        [workflowId]: { ...prev[workflowId], modelUrl: resultImageUrl },
+      }));
+    }
+    setResultImages([]);
+    setCurrentStep('generating');
+
+    try {
+      const startResponse = await startFixShot({
+        isProductShot,
+        resolution: fixResolution,
+        resultImageUrl,
+        jewelryImageUrl,
+        prompt,
+        category,
+        aspect_ratio: fixAspectRatio,
+        idempotency_key: `fix-${Date.now()}-${effectiveJewelryType}`,
+        ...(isProductShot && jewelryDescription ? { jewelry_description: jewelryDescription } : {}),
+      });
+
+      const _workflowId = startResponse.workflow_id;
+      setGenerationInputUrlsMap(prev => ({
+        ...prev,
+        [_workflowId]: {
+          jewelryUrl: jewelryImageUrl,
+          modelUrl: resultImageUrl,
+          aspectRatio: fixAspectRatio,
+          resolution: fixResolution,
+          generationCost: prevData?.generationCost ?? generationCost,
+          ...(jewelryDescription ? { jewelryDescription } : {}),
+        },
+      }));
+      setWorkflowId(_workflowId);
+      trackGeneration({
+        workflowId: _workflowId,
+        isProductShot,
+        jewelryType: category,
+        jewelryUrl: jewelryImageUrl,
+        modelUrl: resultImageUrl,
+        aspectRatio: fixAspectRatio,
+        resolution: fixResolution,
+        generationCost: prevData?.generationCost ?? generationCost,
+      });
+      markGenerationStarted(_workflowId);
+    } catch {
+      setGenerationError('unavailable');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [
+    isSubmitting, resultImages, workflowId, generationInputUrlsMap,
+    jewelryUploadedUrl, isProductShot, effectiveJewelryType,
+    resolution, aspectRatio, generationCost, checkCredits,
+    toast, setCurrentStep, trackGeneration, regenerationCount,
+  ]);
+
   const handleKeepBrowsing = useCallback(() => {
     hasNavigatedAway.current = true;
     setCurrentStep('model');
@@ -372,10 +485,10 @@ export function useStudioGeneration({
     setFeedbackOpen,
     generationInputUrls,
     handleGenerate,
+    handleAIFix,
     handleKeepBrowsing,
     resumeGeneration,
     restoreAsyncResult,
     resetGeneration,
-    isFirstGeneration,
   };
 }

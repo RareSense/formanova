@@ -1,48 +1,30 @@
-/**
- * StudioResultsStep
- *
- * Pure render component for the 'results' step of UnifiedStudio.
- * Displays result images in a flex grid, New Photoshoot / Regenerate action
- * buttons, and the optional feedback link + FeedbackModal.
- *
- * Generation values flow in as props from UnifiedStudio; local state is limited
- * to transient, client-only coachmark visibility.
- */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Diamond, RefreshCw, Wrench } from 'lucide-react';
+import { Diamond } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 import { ResultImageItem } from '@/components/studio/ResultImageItem';
 import { FeedbackModal } from '@/components/studio/FeedbackModal';
-import { PostGenerationCoachmark } from '@/components/studio/PostGenerationCoachmark';
-import { trackRegenerateClicked, getButtonLabelVariant, getTooltipExperimentVariant, trackTooltipShown, trackFeedbackModalOpened, hasClickedFixButton, markFixButtonClicked } from '@/lib/posthog-events';
+import { AIFixModal } from '@/components/studio/AIFixModal';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
-import { type FeedbackCategory, checkHasSubmittedFeedback } from '@/lib/feedback-api';
-import creditCoinIcon from '@/assets/icons/credit-coin.png';
-
-type StudioStep = 'upload' | 'model' | 'generating' | 'results';
+import { type FeedbackCategory } from '@/lib/feedback-api';
 
 interface StudioResultsStepProps {
   resultImages: string[];
   workflowId: string | null;
   effectiveJewelryType: string;
   isProductShot: boolean;
-  regenerationCount: number;
-  setRegenerationCount: (fn: (c: number) => number) => void;
-  setResultImages: (imgs: string[]) => void;
-  setCurrentStep: (step: StudioStep) => void;
-  handleGenerate: () => void;
+  onAIFix: (prompt: string) => void;
   handleStartOver: () => void;
   feedbackOpen: boolean;
   setFeedbackOpen: (open: boolean) => void;
+  onRequestHumanFix: () => void;
   jewelryUploadedUrl: string | null;
   jewelrySasUrl: string | null;
   jewelryImage: string | null;
   activeModelUrl: string | null;
   userEmail?: string | null;
   generationCost?: number | null;
-  isFirstGeneration?: boolean;
+  humanFixCost?: number | null;
 }
 
 export function StudioResultsStep({
@@ -50,61 +32,20 @@ export function StudioResultsStep({
   workflowId,
   effectiveJewelryType,
   isProductShot,
-  regenerationCount,
-  setRegenerationCount,
-  setResultImages,
-  setCurrentStep,
-  handleGenerate,
+  onAIFix,
   handleStartOver,
   feedbackOpen,
   setFeedbackOpen,
+  onRequestHumanFix,
   jewelryUploadedUrl,
   jewelrySasUrl,
   jewelryImage,
   activeModelUrl,
   userEmail,
   generationCost,
-  isFirstGeneration = false,
+  humanFixCost,
 }: StudioResultsStepProps) {
-  const isNewLabels = getButtonLabelVariant() === 'treatment';
-  const [fixButtonEverClicked, setFixButtonEverClicked] = useState(() => hasClickedFixButton());
-  const [tooltipReady, setTooltipReady] = useState<'loading' | 'show' | 'blocked'>(() =>
-    hasClickedFixButton() ? 'blocked' : 'loading'
-  );
-  const isTreatment = getTooltipExperimentVariant() === 'treatment';
-  const showTooltip = isTreatment && tooltipReady === 'show';
-
-  useEffect(() => {
-    if (tooltipReady !== 'loading') return;
-    checkHasSubmittedFeedback().then(hasSubmitted => {
-      if (hasSubmitted) {
-        markFixButtonClicked();
-        setFixButtonEverClicked(true);
-        setTooltipReady('blocked');
-      } else {
-        setTooltipReady('show');
-      }
-    });
-  }, []);
-
-  useEffect(() => {
-    if (showTooltip) trackTooltipShown();
-  }, [showTooltip]);
-  const humanButtonLabel = isNewLabels ? 'Redo with human' : 'Fix this result';
-  const [coachmarkVisible, setCoachmarkVisible] = useState(false);
-  const [coachmarkDismissSignal, setCoachmarkDismissSignal] = useState(0);
-  const actionAreaRef = useRef<HTMLDivElement>(null);
-  const humanButtonRef = useRef<HTMLDivElement>(null);
-  const resultsContainerRef = useRef<HTMLDivElement>(null);
-  const generationKey = useMemo(
-    () => workflowId ?? resultImages[0] ?? '',
-    [workflowId, resultImages[0]],
-  );
-
-  const dismissCoachmarkForGeneration = () => {
-    setCoachmarkDismissSignal(signal => signal + 1);
-    setCoachmarkVisible(false);
-  };
+  const [aiFixOpen, setAiFixOpen] = useState(false);
 
   return (
     <motion.div
@@ -119,7 +60,7 @@ export function StudioResultsStep({
       </div>
 
       {resultImages.length > 0 ? (
-        <div ref={resultsContainerRef} className="flex flex-wrap justify-center gap-4 max-w-5xl mx-auto">
+        <div className="flex flex-wrap justify-center gap-4 max-w-5xl mx-auto">
           {resultImages.map((url, i) => (
             <ResultImageItem key={i} url={url} index={i} workflowId={workflowId} jewelryType={effectiveJewelryType} naturalAspect />
           ))}
@@ -130,24 +71,7 @@ export function StudioResultsStep({
         </div>
       )}
 
-      {/* Action buttons directly under results */}
-      <div
-        ref={actionAreaRef}
-        className={cn(
-          "relative mx-auto flex w-full max-w-[360px] flex-col gap-4 pt-2",
-          coachmarkVisible ? "z-[70]" : "z-40",
-        )}
-      >
-        <PostGenerationCoachmark
-          enabled={showTooltip && resultImages.length > 0}
-          generationKey={generationKey}
-          dismissSignal={coachmarkDismissSignal}
-          targetRef={humanButtonRef}
-          anchorRef={actionAreaRef}
-          observeRef={resultsContainerRef}
-          onVisibilityChange={setCoachmarkVisible}
-          onPermanentDismiss={() => { markFixButtonClicked(); setFixButtonEverClicked(true); }}
-        />
+      <div className="relative z-40 mx-auto flex w-full max-w-[360px] flex-col gap-4 pt-2">
         <Button
           size="lg"
           onClick={handleStartOver}
@@ -157,52 +81,21 @@ export function StudioResultsStep({
           New Photoshoot
         </Button>
         <div className="flex items-center justify-center gap-3">
-          <div ref={humanButtonRef} className="relative flex-1">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                markFixButtonClicked();
-                setFixButtonEverClicked(true);
-                dismissCoachmarkForGeneration();
-                setFeedbackOpen(true);
-                trackFeedbackModalOpened({
-                  category: TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType,
-                  workflow_id: workflowId,
-                  via_tooltip: coachmarkVisible,
-                });
-              }}
-              className={cn(
-                "relative z-10 h-10 w-full gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] px-3 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]",
-                coachmarkVisible && "shadow-[0_0_4px_hsl(var(--formanova-hero-accent)/0.10)]"
-              )}
-            >
-              <Wrench className="h-4 w-4" />
-              {humanButtonLabel}
-            </Button>
-          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onRequestHumanFix}
+            className="h-10 flex-1 gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] px-3 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"
+          >
+            Fix it with human
+          </Button>
           <Button
             size="sm"
-            onClick={() => {
-              dismissCoachmarkForGeneration();
-              setRegenerationCount(c => c + 1);
-              trackRegenerateClicked({
-                context: 'unified-studio',
-                category: TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType,
-                regeneration_number: regenerationCount + 1,
-              });
-              setResultImages([]);
-              setCurrentStep('generating');
-              handleGenerate();
-            }}
+            onClick={() => setAiFixOpen(true)}
             className="h-10 flex-1 gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] bg-background px-3 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"
           >
-            <RefreshCw className="h-4 w-4" />
-            {isNewLabels ? 'Redo with AI' : 'Regenerate'}
-            <span className="ml-1 flex items-center gap-1 text-xs normal-case tracking-normal opacity-70">
-              <img src={creditCoinIcon} alt="" className="h-4 w-4 object-contain" /> {generationCost ?? 10}
-            </span>
+            Fix it with AI
           </Button>
         </div>
       </div>
@@ -217,6 +110,17 @@ export function StudioResultsStep({
         resultImageUrl={resultImages[0] ?? null}
         category={(TO_SINGULAR[effectiveJewelryType] ?? 'other') as FeedbackCategory}
         userEmail={userEmail}
+        humanFixCost={humanFixCost}
+      />
+
+      <AIFixModal
+        open={aiFixOpen}
+        onClose={() => setAiFixOpen(false)}
+        onConfirm={onAIFix}
+        jewelryDisplayUrl={jewelrySasUrl || jewelryImage}
+        resultImageUrl={resultImages[0] ?? null}
+        isProductShot={isProductShot}
+        generationCost={generationCost}
       />
     </motion.div>
   );

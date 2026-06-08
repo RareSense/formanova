@@ -14,6 +14,9 @@ export const TOOL_COSTS: Record<string, number> = {
   Product_shot_pipeline: 10,              // product-shot 1K
   Product_shot_pipeline_2k: 15,           // product-shot 2K
   Product_shot_pipeline_4k: 25,           // product-shot 4K
+  human_fix_photoshoot: 10,          // human fix 1K
+  human_fix_photoshoot_2k: 13,       // human fix 2K
+  human_fix_photoshoot_4k: 18,       // human fix 4K
   cad_generation: 85,
   ring_full_pipeline: 85,
   ring_generate_v1: 85,

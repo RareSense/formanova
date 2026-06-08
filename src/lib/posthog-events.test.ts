@@ -18,20 +18,15 @@ import {
   trackGenerationComplete,
   trackDownloadClicked,
   trackRegenerateClicked,
+  trackAIFixSubmitted,
   trackPaymentSuccess,
   trackStarterPackPurchased,
   trackUploadGuideViewed,
   trackUploadGuideAcknowledged,
   trackUserTypeSelected,
   trackFeedbackModalOpened,
-  trackTooltipDismissed,
   trackFeedbackSubmitted,
   setUserProfession,
-  trackButtonLabelExperimentExposure,
-  getButtonLabelVariant,
-  trackTooltipExperimentExposure,
-  getTooltipExperimentVariant,
-  trackTooltipShown,
 } from './posthog-events'
 
 beforeEach(() => {
@@ -266,6 +261,25 @@ describe('trackRegenerateClicked', () => {
   })
 })
 
+describe('trackAIFixSubmitted', () => {
+  it('captures ai_fix_submitted with correct shape', () => {
+    trackAIFixSubmitted({ category: 'ring', prompt_length: 42, workflow_id: 'wf-abc', regeneration_number: 2 })
+    expect(posthog.capture).toHaveBeenCalledWith('ai_fix_submitted', {
+      category: 'ring',
+      prompt_length: 42,
+      workflow_id: 'wf-abc',
+      regeneration_number: 2,
+    })
+  })
+
+  it('accepts null workflow_id', () => {
+    trackAIFixSubmitted({ category: 'necklace', prompt_length: 10, workflow_id: null, regeneration_number: 1 })
+    expect(posthog.capture).toHaveBeenCalledWith('ai_fix_submitted', expect.objectContaining({
+      workflow_id: null,
+    }))
+  })
+})
+
 describe('trackPaymentSuccess', () => {
   it('captures payment_success with correct shape', () => {
     trackPaymentSuccess({ package: '$9', amount_usd: 9, currency_shown: 'USD' })
@@ -301,21 +315,19 @@ describe('trackUploadGuideAcknowledged', () => {
 })
 
 describe('trackFeedbackModalOpened', () => {
-  it('captures feedback_modal_opened with via_tooltip true', () => {
-    trackFeedbackModalOpened({ category: 'ring', workflow_id: 'wf-123', via_tooltip: true })
+  it('captures feedback_modal_opened with correct shape', () => {
+    trackFeedbackModalOpened({ category: 'ring', workflow_id: 'wf-123' })
     expect(posthog.capture).toHaveBeenCalledWith('feedback_modal_opened', {
       category: 'ring',
       workflow_id: 'wf-123',
-      via_tooltip: true,
     })
   })
 
-  it('captures feedback_modal_opened with via_tooltip false', () => {
-    trackFeedbackModalOpened({ category: 'earring', workflow_id: null, via_tooltip: false })
+  it('accepts null workflow_id', () => {
+    trackFeedbackModalOpened({ category: 'earring', workflow_id: null })
     expect(posthog.capture).toHaveBeenCalledWith('feedback_modal_opened', {
       category: 'earring',
       workflow_id: null,
-      via_tooltip: false,
     })
   })
 })
@@ -385,110 +397,4 @@ describe('setUserProfession', () => {
   })
 })
 
-// ── trackButtonLabelExperimentExposure ──────────────────────────────
 
-describe('trackButtonLabelExperimentExposure', () => {
-  it('calls onFeatureFlags and then getFeatureFlag with button-labels-experiment', () => {
-    let captured: (() => void) | undefined;
-    (posthog.onFeatureFlags as any).mockImplementation((fn: () => void) => {
-      captured = fn;
-    });
-    trackButtonLabelExperimentExposure();
-    expect(posthog.onFeatureFlags).toHaveBeenCalled();
-    captured!();
-    expect(posthog.getFeatureFlag).toHaveBeenCalledWith('button-labels-experiment');
-  });
-
-  it('does nothing when posthog is not loaded', () => {
-    ;(posthog as any).__loaded = false
-    trackButtonLabelExperimentExposure()
-    expect(posthog.onFeatureFlags).not.toHaveBeenCalled()
-    ;(posthog as any).__loaded = true
-  });
-})
-
-// ── trackTooltipExperimentExposure ─────────────────────────────────
-
-describe('trackTooltipExperimentExposure', () => {
-  it('calls onFeatureFlags and then getFeatureFlag with tooltip-first-gen-experiment', () => {
-    let captured: (() => void) | undefined;
-    (posthog.onFeatureFlags as any).mockImplementation((fn: () => void) => {
-      captured = fn;
-    });
-    trackTooltipExperimentExposure();
-    expect(posthog.onFeatureFlags).toHaveBeenCalled();
-    captured!();
-    expect(posthog.getFeatureFlag).toHaveBeenCalledWith('tooltip-first-gen-experiment');
-  });
-
-  it('does nothing when posthog is not loaded', () => {
-    ;(posthog as any).__loaded = false
-    trackTooltipExperimentExposure()
-    expect(posthog.onFeatureFlags).not.toHaveBeenCalled()
-    ;(posthog as any).__loaded = true
-  });
-})
-
-// ── getTooltipExperimentVariant ────────────────────────────────────
-
-describe('getTooltipExperimentVariant', () => {
-  it('returns the flag value when treatment', () => {
-    (posthog.getFeatureFlag as any).mockReturnValue('treatment');
-    expect(getTooltipExperimentVariant()).toBe('treatment');
-    expect(posthog.getFeatureFlag).toHaveBeenCalledWith('tooltip-first-gen-experiment');
-  });
-
-  it('returns undefined when flag is not yet loaded', () => {
-    (posthog.getFeatureFlag as any).mockReturnValue(undefined);
-    expect(getTooltipExperimentVariant()).toBeUndefined();
-  });
-
-  it('returns undefined when posthog is not loaded', () => {
-    ;(posthog as any).__loaded = false
-    expect(getTooltipExperimentVariant()).toBeUndefined()
-    expect(posthog.getFeatureFlag).not.toHaveBeenCalled()
-    ;(posthog as any).__loaded = true
-  });
-})
-
-// ── trackTooltipShown ──────────────────────────────────────────────
-
-describe('trackTooltipShown', () => {
-  it('calls capture with correct event name and properties', () => {
-    trackTooltipShown();
-    expect(posthog.capture).toHaveBeenCalledWith('tooltip_shown', {
-      experiment: 'tooltip-first-gen-experiment',
-    });
-  });
-})
-
-describe('trackTooltipDismissed', () => {
-  it('calls capture with correct event name and properties', () => {
-    trackTooltipDismissed();
-    expect(posthog.capture).toHaveBeenCalledWith('tooltip_dismissed', {
-      experiment: 'tooltip-first-gen-experiment',
-    });
-  });
-})
-
-// ── getButtonLabelVariant ───────────────────────────────────────────
-
-describe('getButtonLabelVariant', () => {
-  it('returns the flag value when treatment', () => {
-    (posthog.getFeatureFlag as any).mockReturnValue('treatment');
-    expect(getButtonLabelVariant()).toBe('treatment');
-    expect(posthog.getFeatureFlag).toHaveBeenCalledWith('button-labels-experiment');
-  });
-
-  it('returns undefined when flag is not yet loaded', () => {
-    (posthog.getFeatureFlag as any).mockReturnValue(undefined);
-    expect(getButtonLabelVariant()).toBeUndefined();
-  });
-
-  it('returns undefined when posthog is not loaded', () => {
-    ;(posthog as any).__loaded = false
-    expect(getButtonLabelVariant()).toBeUndefined()
-    expect(posthog.getFeatureFlag).not.toHaveBeenCalled()
-    ;(posthog as any).__loaded = true
-  });
-})
