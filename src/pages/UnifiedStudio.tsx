@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useParams, useLocation, useSearchParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,7 @@ import { StudioResultsStep } from '@/components/studio/StudioResultsStep';
 import { StudioModelStep } from '@/components/studio/StudioModelStep';
 import { StudioHeader } from '@/components/studio/StudioHeader';
 import { StudioUploadStep } from '@/components/studio/StudioUploadStep';
+import { trackFeedbackModalOpened } from '@/lib/posthog-events';
 // ExampleGuidePanel removed — guide is inline
 
 const CATEGORY_TYPE_MAP: Record<string, string> = {
@@ -463,6 +464,24 @@ export default function UnifiedStudio() {
   const resolvedGeneratingJewelryImage = useAuthenticatedImage(generatingJewelryImage);
   const resolvedGeneratingActiveModelUrl = useAuthenticatedImage(generatingActiveModelUrl);
 
+  const HUMAN_FIX_WORKFLOWS: Record<string, string> = {
+    '1K': 'human_fix_photoshoot',
+    '2K': 'human_fix_photoshoot_2k',
+    '4K': 'human_fix_photoshoot_4k',
+  };
+
+  const handleRequestHumanFix = useCallback(async () => {
+    const activeResolution = generationInputUrls?.resolution ?? resolution;
+    const workflowName = HUMAN_FIX_WORKFLOWS[activeResolution] ?? 'human_fix_photoshoot';
+    const approved = await checkCredits(workflowName);
+    if (!approved) return;
+    setFeedbackOpen(true);
+    trackFeedbackModalOpened({
+      category: TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType,
+      workflow_id: workflowId,
+    });
+  }, [generationInputUrls, resolution, checkCredits, setFeedbackOpen, effectiveJewelryType, workflowId]);
+
   // Paste handler — supports jewelry upload (step 1) AND model upload (step 2 empty state)
   useEffect(() => {
     const handler = (e: ClipboardEvent) => {
@@ -645,6 +664,7 @@ export default function UnifiedStudio() {
             handleStartOver={handleStartOver}
             feedbackOpen={feedbackOpen}
             setFeedbackOpen={setFeedbackOpen}
+            onRequestHumanFix={handleRequestHumanFix}
             jewelryUploadedUrl={generationInputUrls?.jewelryUrl ?? jewelryUploadedUrl}
             jewelrySasUrl={jewelrySasUrl}
             jewelryImage={jewelryImage}
