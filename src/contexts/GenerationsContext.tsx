@@ -100,16 +100,18 @@ function findNestedResultImage(item: unknown): string | null {
 }
 
 function extractJewelryDescription(result: PhotoshootResultResponse): string | undefined {
-  for (const items of Object.values(result)) {
+  for (const [key, items] of Object.entries(result)) {
     if (!Array.isArray(items)) continue;
     for (const item of items) {
       if (!item || typeof item !== 'object') continue;
       const rec = item as Record<string, unknown>;
       if (typeof rec['description'] === 'string' && rec['description'].length > 0) {
+        console.log(`[extractJewelryDescription] found in node "${key}":`, rec['description']);
         return rec['description'];
       }
     }
   }
+  console.warn('[extractJewelryDescription] no description found in result. Keys:', Object.keys(result));
   return undefined;
 }
 

@@ -270,16 +270,13 @@ export async function startFixShot(request: FixShotRequest): Promise<PhotoshootS
     ...(request.prompt ? { fix_instruction: request.prompt } : {}),
     ...(request.aspect_ratio ? { aspect_ratio: request.aspect_ratio } : {}),
     ...(request.idempotency_key ? { idempotency_key: request.idempotency_key } : {}),
-    ...(request.isProductShot ? { generation_type: 'product_shot_v1' } : {}),
+    ...(request.isProductShot ? { generation_type: 'product_shot_v1', image_size: request.resolution ?? '1K' } : {}),
+    ...(request.isProductShot && request.jewelry_description ? { jewelry_description: request.jewelry_description } : {}),
   };
 
   if (!request.isProductShot && !request.jewelryImageUrl.startsWith('data:')) {
     // Model shot describe step needs jewelry as an array
     payload.jewelry_image_urls = [request.jewelryImageUrl];
-  }
-
-  if (request.isProductShot && request.jewelry_description) {
-    payload.jewelry_description = request.jewelry_description;
   }
 
   // Model shot: /run/state/ with { payload } envelope
