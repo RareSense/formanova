@@ -469,6 +469,7 @@ export default function UnifiedStudio() {
     '2K': 'human_fix_photoshoot_2k',
     '4K': 'human_fix_photoshoot_4k',
   };
+  const HUMAN_FIX_COSTS: Record<string, number> = { '1K': 10, '2K': 13, '4K': 18 };
 
   const handleRequestHumanFix = useCallback(async () => {
     const activeResolution = generationInputUrls?.resolution ?? resolution;
@@ -671,6 +672,7 @@ export default function UnifiedStudio() {
             activeModelUrl={generationInputUrls?.modelUrl ?? activeModelUrl}
             userEmail={user?.email}
             generationCost={generationInputUrls?.generationCost ?? generationCost}
+            humanFixCost={HUMAN_FIX_COSTS[generationInputUrls?.resolution ?? resolution] ?? 10}
           />
         )}
       </div>

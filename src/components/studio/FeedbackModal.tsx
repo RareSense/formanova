@@ -8,6 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, CheckCircle2 } from 'lucide-react';
+import creditCoinIcon from '@/assets/icons/credit-coin.png';
 import { submitFeedback, type FeedbackCategory } from '@/lib/feedback-api';
 import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
 import { azureUriToUrl } from '@/lib/azure-utils';
@@ -60,6 +61,7 @@ interface Props {
   resultImageUrl: string | null;
   category: FeedbackCategory;
   userEmail?: string | null;
+  humanFixCost?: number | null;
 }
 
 export function FeedbackModal({
@@ -72,6 +74,7 @@ export function FeedbackModal({
   resultImageUrl,
   category,
   userEmail,
+  humanFixCost,
 }: Props) {
   const [text, setText] = useState('');
   const [profanityError, setProfanityError] = useState(false);
@@ -205,6 +208,11 @@ export function FeedbackModal({
             >
               {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Request Fix
+              {humanFixCost != null && (
+                <span className="ml-1 flex items-center gap-1 text-xs normal-case tracking-normal opacity-70">
+                  <img src={creditCoinIcon} alt="" className="h-4 w-4 object-contain" /> {humanFixCost}
+                </span>
+              )}
             </Button>
           </div>
         )}

@@ -7,7 +7,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
 
@@ -138,7 +138,6 @@ export function AIFixModal({
             disabled={!prompt.trim()}
             onClick={handleConfirm}
           >
-            <RefreshCw className="h-4 w-4" />
             Fix it with AI
             <span className="ml-1 flex items-center gap-1 text-xs normal-case tracking-normal opacity-70">
               <img src={creditCoinIcon} alt="" className="h-4 w-4 object-contain" /> {generationCost ?? 10}

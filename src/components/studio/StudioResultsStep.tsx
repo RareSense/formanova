@@ -7,7 +7,6 @@ import { FeedbackModal } from '@/components/studio/FeedbackModal';
 import { AIFixModal } from '@/components/studio/AIFixModal';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
 import { type FeedbackCategory } from '@/lib/feedback-api';
-import creditCoinIcon from '@/assets/icons/credit-coin.png';
 
 interface StudioResultsStepProps {
   resultImages: string[];
@@ -25,6 +24,7 @@ interface StudioResultsStepProps {
   activeModelUrl: string | null;
   userEmail?: string | null;
   generationCost?: number | null;
+  humanFixCost?: number | null;
 }
 
 export function StudioResultsStep({
@@ -43,6 +43,7 @@ export function StudioResultsStep({
   activeModelUrl,
   userEmail,
   generationCost,
+  humanFixCost,
 }: StudioResultsStepProps) {
   const [aiFixOpen, setAiFixOpen] = useState(false);
 
@@ -95,9 +96,6 @@ export function StudioResultsStep({
             className="h-10 flex-1 gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] bg-background px-3 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"
           >
             Fix it with AI
-            <span className="ml-1 flex items-center gap-1 text-xs normal-case tracking-normal opacity-70">
-              <img src={creditCoinIcon} alt="" className="h-4 w-4 object-contain" /> {generationCost ?? 10}
-            </span>
           </Button>
         </div>
       </div>
@@ -112,6 +110,7 @@ export function StudioResultsStep({
         resultImageUrl={resultImages[0] ?? null}
         category={(TO_SINGULAR[effectiveJewelryType] ?? 'other') as FeedbackCategory}
         userEmail={userEmail}
+        humanFixCost={humanFixCost}
       />
 
       <AIFixModal
