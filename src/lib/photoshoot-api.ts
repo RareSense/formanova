@@ -274,7 +274,8 @@ export async function startFixShot(request: FixShotRequest): Promise<PhotoshootS
   let body: string;
 
   if (request.isProductShot) {
-    const data: Record<string, unknown> = {
+    // Flat payload — same pattern as startPdpShot. API layer handles GraphFlow envelope.
+    const productPayload: Record<string, unknown> = {
       ...resultImageField,
       ...jewelryImageField,
       category: request.category,
@@ -282,14 +283,9 @@ export async function startFixShot(request: FixShotRequest): Promise<PhotoshootS
       ...(request.prompt ? { fix_instruction: request.prompt } : {}),
       ...(request.aspect_ratio ? { aspect_ratio: request.aspect_ratio } : {}),
       ...(request.idempotency_key ? { idempotency_key: request.idempotency_key } : {}),
+      ...(request.jewelry_description ? { jewelry_description: request.jewelry_description } : {}),
     };
-    // jewelry_description lives at GraphFlow envelope root (__root__ wiring), not inside data
-    body = JSON.stringify({
-      payload: {
-        data,
-        ...(request.jewelry_description ? { jewelry_description: request.jewelry_description } : {}),
-      },
-    });
+    body = JSON.stringify({ payload: productPayload });
   } else {
     const payload: Record<string, unknown> = {
       ...resultImageField,
