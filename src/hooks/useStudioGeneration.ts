@@ -322,9 +322,11 @@ export function useStudioGeneration({
     if (!jewelryDescription && isProductShot && workflowId) {
       try {
         const details = await getWorkflowDetails(workflowId);
+        console.log('[handleAIFix] workflow details steps:', details.steps?.map((s: any) => ({ tool: s.tool, outputKeys: Object.keys(s.output_data ?? s.output ?? {}) })));
         jewelryDescription = extractDescriptionFromSteps(details.steps ?? []);
-      } catch {
-        // non-fatal — fix will proceed without description
+        console.log('[handleAIFix] extracted jewelryDescription:', jewelryDescription);
+      } catch (e) {
+        console.warn('[handleAIFix] failed to fetch workflow details:', e);
       }
     }
 
