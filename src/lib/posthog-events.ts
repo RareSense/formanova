@@ -92,7 +92,16 @@ export interface FeedbackModalOpenedProps {
   workflow_id: string | null;
 }
 
+export interface AIFixModalOpenedProps {
+  category: string;
+  workflow_id: string | null;
+}
+
 // ═══════ Feedback ═══════════════════════════════════════════════════
+
+export function trackAIFixModalOpened(props: AIFixModalOpenedProps) {
+  capture('ai_fix_modal_opened', { ...props });
+}
 
 export function trackFeedbackModalOpened(props: FeedbackModalOpenedProps) {
   capture('feedback_modal_opened', { ...props });
