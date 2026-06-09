@@ -19,6 +19,7 @@ import {
   trackDownloadClicked,
   trackRegenerateClicked,
   trackAIFixSubmitted,
+  trackAIFixModalOpened,
   trackPaymentSuccess,
   trackStarterPackPurchased,
   trackUploadGuideViewed,
@@ -311,6 +312,24 @@ describe('trackUploadGuideAcknowledged', () => {
   it('captures upload_guide_acknowledged', () => {
     trackUploadGuideAcknowledged()
     expect(posthog.capture).toHaveBeenCalledWith('upload_guide_acknowledged', undefined)
+  })
+})
+
+describe('trackAIFixModalOpened', () => {
+  it('captures ai_fix_modal_opened with correct shape', () => {
+    trackAIFixModalOpened({ category: 'ring', workflow_id: 'wf-123' })
+    expect(posthog.capture).toHaveBeenCalledWith('ai_fix_modal_opened', {
+      category: 'ring',
+      workflow_id: 'wf-123',
+    })
+  })
+
+  it('accepts null workflow_id', () => {
+    trackAIFixModalOpened({ category: 'earring', workflow_id: null })
+    expect(posthog.capture).toHaveBeenCalledWith('ai_fix_modal_opened', {
+      category: 'earring',
+      workflow_id: null,
+    })
   })
 })
 

@@ -351,7 +351,6 @@ export function useStudioGeneration({
     hasNavigatedAway.current = false;
     setRegenerationCount(c => c + 1);
     trackRegenerateClicked({ context: 'unified-studio', category, regeneration_number: newRegenerationNumber });
-    trackAIFixSubmitted({ category, prompt_length: prompt.length, workflow_id: workflowId, regeneration_number: newRegenerationNumber });
     // Show result image in the second slot while the fix API call is in flight
     if (workflowId) {
       setGenerationInputUrlsMap(prev => ({
@@ -376,6 +375,7 @@ export function useStudioGeneration({
       });
 
       const _workflowId = startResponse.workflow_id;
+      trackAIFixSubmitted({ category, prompt_length: prompt.length, workflow_id: workflowId, regeneration_number: newRegenerationNumber });
       setGenerationInputUrlsMap(prev => ({
         ...prev,
         [_workflowId]: {

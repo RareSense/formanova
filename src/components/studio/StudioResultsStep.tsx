@@ -7,6 +7,7 @@ import { FeedbackModal } from '@/components/studio/FeedbackModal';
 import { AIFixModal } from '@/components/studio/AIFixModal';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
 import { type FeedbackCategory } from '@/lib/feedback-api';
+import { trackAIFixModalOpened } from '@/lib/posthog-events';
 
 interface StudioResultsStepProps {
   resultImages: string[];
@@ -92,7 +93,13 @@ export function StudioResultsStep({
           </Button>
           <Button
             size="sm"
-            onClick={() => setAiFixOpen(true)}
+            onClick={() => {
+              setAiFixOpen(true);
+              trackAIFixModalOpened({
+                category: TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType,
+                workflow_id: workflowId,
+              });
+            }}
             className="h-10 flex-1 gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] bg-background px-3 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"
           >
             Fix it with AI
