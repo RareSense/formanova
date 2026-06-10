@@ -17,7 +17,6 @@ import {
   trackCadGenerationCompleted,
   trackGenerationComplete,
   trackDownloadClicked,
-  trackRegenerateClicked,
   trackAIFixSubmitted,
   trackAIFixModalOpened,
   trackPaymentSuccess,
@@ -247,17 +246,6 @@ describe('trackDownloadClicked', () => {
     expect(posthog.capture).toHaveBeenCalledWith('download_clicked', {
       file_type: 'glb',
       context: 'text-to-cad',
-    })
-  })
-})
-
-describe('trackRegenerateClicked', () => {
-  it('captures regenerate_clicked with enriched props', () => {
-    trackRegenerateClicked({ context: 'unified-studio', category: 'ring', regeneration_number: 1 })
-    expect(posthog.capture).toHaveBeenCalledWith('regenerate_clicked', {
-      context: 'unified-studio',
-      category: 'ring',
-      regeneration_number: 1,
     })
   })
 })

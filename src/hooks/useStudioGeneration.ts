@@ -59,7 +59,6 @@ import { getJewelryDescription } from '@/lib/photoshoot-api';
 import {
   trackPaywallHit,
   trackGenerationComplete,
-  trackRegenerateClicked,
   trackAIFixSubmitted,
   consumeFirstGeneration,
 } from '@/lib/posthog-events';
@@ -350,7 +349,6 @@ export function useStudioGeneration({
     setGenerationError(null);
     hasNavigatedAway.current = false;
     setRegenerationCount(c => c + 1);
-    trackRegenerateClicked({ context: 'unified-studio', category, regeneration_number: newRegenerationNumber });
     // Show result image in the second slot while the fix API call is in flight
     if (workflowId) {
       setGenerationInputUrlsMap(prev => ({
