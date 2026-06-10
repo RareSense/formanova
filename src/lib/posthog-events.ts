@@ -280,16 +280,6 @@ export function trackDownloadClicked(props?: {
   capture('download_clicked', props ?? {});
 }
 
-// Signature change: was trackRegenerateClicked(context?: string)
-// Only called in UnifiedStudio.tsx — update it alongside this change.
-export function trackRegenerateClicked(props?: {
-  context?: string;
-  category?: string;
-  regeneration_number?: number;
-}) {
-  capture('regenerate_clicked', props ?? {});
-}
-
 export interface AIFixSubmittedProps {
   category: string;
   prompt_length: number;
