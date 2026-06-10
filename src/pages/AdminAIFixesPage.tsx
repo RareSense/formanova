@@ -202,7 +202,7 @@ function DetailSheet({ item, notFound, open, onClose }: DetailSheetProps) {
                   const isProductShot = item.workflow_name.startsWith('fix_product_shot');
                   const label = i === 0
                     ? (isProductShot ? 'Product shot' : 'Model shot')
-                    : 'Your jewelry';
+                    : 'Input jewelry';
                   return <ImageThumbnail key={url} url={url} label={label} />;
                 })}
                 {item.output_image_url ? (
