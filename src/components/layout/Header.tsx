@@ -160,7 +160,7 @@ export function Header() {
   return (
     <>
       <header
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        className={`fixed top-9 left-0 right-0 z-50 transition-all duration-300 ${
           isScrolled
             ? 'bg-background/95 backdrop-blur-md border-b border-border/20 shadow-sm'
             : 'bg-background'
@@ -425,8 +425,8 @@ export function Header() {
         </nav>
       </div>
 
-      {/* Spacer for fixed header */}
-      <div className="h-16 lg:h-20" />
+      {/* Spacer for fixed banner (h-9) + fixed header (h-16/h-20) */}
+      <div className="h-[6.25rem] lg:h-[7.25rem]" />
     </>
   );
 }
