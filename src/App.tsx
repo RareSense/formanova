@@ -75,6 +75,7 @@ import { AdminLayout } from './components/admin/AdminLayout';
 import { PresetLibraryLayout } from './components/admin/PresetLibraryLayout';
 const PromoAdminPage = lazyWithRetry(() => import("./pages/PromoAdminPage"));
 const AdminFeedbackPage = lazyWithRetry(() => import("./pages/AdminFeedbackPage"));
+const AdminAIFixesPage = lazyWithRetry(() => import("./pages/AdminAIFixesPage"));
 const AdminModelsPage = lazyWithRetry(() => import("./pages/AdminModelsPage"));
 const AdminInspirationsPage = lazyWithRetry(() => import("./pages/AdminInspirationsPage"));
 const AdminGenerationsPage = lazyWithRetry(() => import("./pages/AdminGenerationsPage"));
@@ -241,6 +242,7 @@ const App = () => (
                     <Route path="promo-codes" element={<PromoAdminPage />} />
                     <Route path="generations" element={<AdminGenerationsPage />} />
                     <Route path="feedback" element={<AdminFeedbackPage />} />
+                    <Route path="ai-fixes" element={<AdminAIFixesPage />} />
                     <Route path="preset-library" element={<PresetLibraryLayout />}>
                       <Route index element={<Navigate to="/admin/preset-library/models" replace />} />
                       <Route path="models" element={<AdminModelsPage />} />
