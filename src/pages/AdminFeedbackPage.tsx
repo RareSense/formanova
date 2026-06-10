@@ -1,15 +1,12 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import {
   Download, X, ChevronLeft, ChevronRight,
-  Loader2, Upload, ImageOff, AlertTriangle, Mail, Clock,
+  Loader2, ImageOff, AlertTriangle, Mail, Clock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import {
@@ -22,17 +19,11 @@ import {
 } from '@/components/ui/table';
 import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
-import { useToast } from '@/hooks/use-toast';
 import {
   type FeedbackItem,
-  type FeedbackListResponse,
   type EmailStatus,
-  type AdminFeedbackItem,
-  type FeedbackStatus,
   listFeedback,
   getAdminFeedbackById,
-  updateAdminFeedback,
-  uploadRevisedOutput,
 } from '@/lib/feedback-api';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -46,12 +37,6 @@ const EMAIL_STATUS_CFG: Record<EmailStatus, { label: string; pill: string; Icon:
   sent:    { label: 'Sent',    pill: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',  Icon: Mail },
   failed:  { label: 'Failed',  pill: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',         Icon: AlertTriangle },
   pending: { label: 'Pending', pill: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400', Icon: Clock },
-};
-
-const FEEDBACK_STATUS_CFG: Record<FeedbackStatus, { label: string; pill: string }> = {
-  open:       { label: 'Open',       pill: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' },
-  looks_fine: { label: 'Looks Fine', pill: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' },
-  resolved:   { label: 'Resolved',   pill: 'bg-muted text-muted-foreground' },
 };
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -91,17 +76,6 @@ function EmailStatusBadge({ status }: { status: EmailStatus }) {
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-sm font-mono text-[10px] uppercase tracking-widest whitespace-nowrap ${cfg.pill}`}>
       <Icon className="h-2.5 w-2.5" />
-      {cfg.label}
-    </span>
-  );
-}
-
-// ─── FeedbackStatusBadge ──────────────────────────────────────────────────────
-
-function FeedbackStatusBadge({ status }: { status: FeedbackStatus }) {
-  const cfg = FEEDBACK_STATUS_CFG[status] ?? { label: status ?? 'unknown', pill: 'bg-muted text-muted-foreground' };
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-sm font-mono text-[10px] uppercase tracking-widest whitespace-nowrap ${cfg.pill}`}>
       {cfg.label}
     </span>
   );
@@ -163,56 +137,12 @@ function ImageThumbnail({ url, label }: { url: string | null; label: string }) {
 // ─── DetailSheet ──────────────────────────────────────────────────────────────
 
 interface DetailSheetProps {
-  item: AdminFeedbackItem | null;
+  item: FeedbackItem | null;
   open: boolean;
   onClose: () => void;
-  onUpdated: (item: AdminFeedbackItem) => void;
 }
 
-function DetailSheet({ item, open, onClose, onUpdated }: DetailSheetProps) {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const [status, setStatus] = useState<FeedbackStatus>('open');
-  const [contacted, setContacted] = useState(false);
-  const [adminNotes, setAdminNotes] = useState('');
-  const [uploading, setUploading] = useState(false);
-
-  useEffect(() => {
-    if (item) {
-      setStatus(item.status);
-      setContacted(item.contacted);
-      setAdminNotes(item.admin_notes ?? '');
-    }
-  }, [item?.id]);
-
-  const saveMutation = useMutation({
-    mutationFn: () => updateAdminFeedback(item!.id, { status, contacted, admin_notes: adminNotes }),
-    onSuccess: (updated) => {
-      onUpdated(updated);
-      queryClient.invalidateQueries({ queryKey: ['feedback-list'] });
-      toast({ title: 'Saved' });
-    },
-    onError: () => toast({ variant: 'destructive', title: 'Failed to save' }),
-  });
-
-  async function handleRevisedUpload(file: File) {
-    if (!item) return;
-    setUploading(true);
-    try {
-      const result = await uploadRevisedOutput(item.id, file);
-      const updated = { ...item, revised_output_url: result.revised_output_url };
-      onUpdated(updated);
-      queryClient.invalidateQueries({ queryKey: ['feedback-list'] });
-      toast({ title: 'Revised output uploaded' });
-    } catch {
-      toast({ variant: 'destructive', title: 'Upload failed' });
-    } finally {
-      setUploading(false);
-    }
-  }
-
+function DetailSheet({ item, open, onClose }: DetailSheetProps) {
   if (!item) return null;
 
   return (
@@ -228,10 +158,7 @@ function DetailSheet({ item, open, onClose, onUpdated }: DetailSheetProps) {
 
           {/* User & Meta */}
           <div className="space-y-1">
-            <p className="font-medium text-sm break-all">{item.user_email}</p>
-            {item.username && (
-              <p className="text-xs text-muted-foreground">{item.username}</p>
-            )}
+            <p className="font-medium text-sm break-all">{item.reporter_email}</p>
             <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1">
               <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground capitalize">
                 {item.category}
@@ -254,32 +181,6 @@ function DetailSheet({ item, open, onClose, onUpdated }: DetailSheetProps) {
                 <ImageThumbnail url={item.input_image_urls[1]} label="Reference" />
               ) : null}
               <ImageThumbnail url={item.output_image_url} label="Output" />
-
-              {item.revised_output_url ? (
-                <ImageThumbnail url={item.revised_output_url} label="Revised" />
-              ) : (
-                <div className="flex flex-col items-center gap-1.5 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploading}
-                    className="w-20 h-20 border border-dashed border-border bg-muted/10 flex items-center justify-center hover:border-foreground/40 transition-colors disabled:opacity-50"
-                  >
-                    {uploading
-                      ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground/50" />
-                      : <Upload className="h-4 w-4 text-muted-foreground/40" />
-                    }
-                  </button>
-                  <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">Revised</span>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handleRevisedUpload(f); }}
-                  />
-                </div>
-              )}
             </div>
           </div>
 
@@ -289,49 +190,6 @@ function DetailSheet({ item, open, onClose, onUpdated }: DetailSheetProps) {
             <p className="text-sm leading-relaxed text-justify">{item.complaint}</p>
           </div>
 
-          {/* Status & Contacted */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Status</Label>
-              <Select value={status} onValueChange={(v) => setStatus(v as FeedbackStatus)}>
-                <SelectTrigger className="h-9 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(Object.keys(FEEDBACK_STATUS_CFG) as FeedbackStatus[]).map((s) => (
-                    <SelectItem key={s} value={s}>{FEEDBACK_STATUS_CFG[s].label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Contacted User</Label>
-              <div className="flex items-center h-9">
-                <Switch checked={contacted} onCheckedChange={setContacted} />
-              </div>
-            </div>
-          </div>
-
-          {/* Admin Notes */}
-          <div className="space-y-1.5">
-            <Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Admin Notes</Label>
-            <Textarea
-              value={adminNotes}
-              onChange={(e) => setAdminNotes(e.target.value)}
-              placeholder="Internal notes visible only to admins..."
-              rows={3}
-              className="resize-none text-sm"
-            />
-          </div>
-
-          <Button
-            className="w-full"
-            onClick={() => saveMutation.mutate()}
-            disabled={saveMutation.isPending}
-          >
-            {saveMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Save Changes
-          </Button>
         </div>
       </SheetContent>
     </Sheet>
@@ -341,7 +199,6 @@ function DetailSheet({ item, open, onClose, onUpdated }: DetailSheetProps) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function AdminFeedbackPage() {
-  const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
 
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -351,7 +208,7 @@ export default function AdminFeedbackPage() {
   const [toDate, setToDate] = useState('');
   const [offset, setOffset] = useState(0);
 
-  const [activeItem, setActiveItem] = useState<AdminFeedbackItem | null>(null);
+  const [activeItem, setActiveItem] = useState<FeedbackItem | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
@@ -615,9 +472,6 @@ export default function AdminFeedbackPage() {
         item={activeItem}
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
-        onUpdated={(updated) => {
-          setActiveItem(updated);
-        }}
       />
     </>
   );
