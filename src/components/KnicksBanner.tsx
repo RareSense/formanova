@@ -9,7 +9,7 @@ export function KnicksBanner() {
       className="fixed top-0 left-0 right-0 h-9 px-4 flex items-center justify-center text-center text-sm font-semibold tracking-wide z-[60]"
     >
       <span className="text-white">
-        {"🏀 NYC jewelers — your jewelry's about to go pro "}
+        {"🏀 Calling all NYC jewelers in the Diamond District — your jewelry's about to go pro "}
         <span style={{ color: "#F58426" }}>{"→"}</span>
       </span>
     </div>
