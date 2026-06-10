@@ -5,12 +5,13 @@
 export function KnicksBanner() {
   return (
     <div
-      style={{ backgroundColor: "#006BB6" }}
+      style={{ backgroundColor: "#0a0a0a" }}
       className="fixed top-0 left-0 right-0 h-9 px-4 flex items-center justify-center text-center text-sm font-semibold tracking-wide z-[60]"
     >
-      <span className="text-white">
-        {"🏀 Everybody's chasing a ring. Yours deserves a shot that sells "}
-        <span style={{ color: "#F58426" }}>{"→"}</span>
+      <span style={{ color: "#F58426" }}>
+        {"🏀 Everybody's chasing a ring. "}
+        <span className="text-white">{"Yours deserves a shot that sells "}</span>
+        {"→"}
       </span>
     </div>
   );
