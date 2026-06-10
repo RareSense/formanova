@@ -206,7 +206,7 @@ function DetailSheet({ item, notFound, open, onClose }: DetailSheetProps) {
                   return <ImageThumbnail key={url} url={url} label={label} />;
                 })}
                 {item.output_image_url ? (
-                  <ImageThumbnail url={item.output_image_url} label="Output" />
+                  <ImageThumbnail url={item.output_image_url} label="Fixed image" />
                 ) : (
                   <div className="flex flex-col items-center gap-1.5 shrink-0">
                     <div className="w-20 h-20 border border-border bg-muted/20 flex items-center justify-center">
