@@ -198,13 +198,13 @@ function DetailSheet({ item, notFound, open, onClose }: DetailSheetProps) {
             <div className="border-t border-b border-border py-5">
               <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-3">Images</p>
               <div className="flex flex-wrap gap-4">
-                {item.input_image_urls.map((url, i) => (
-                  <ImageThumbnail
-                    key={url}
-                    url={url}
-                    label={i === 0 ? 'Input (fixed)' : 'Reference'}
-                  />
-                ))}
+                {item.input_image_urls.map((url, i) => {
+                  const isProductShot = item.workflow_name.startsWith('fix_product_shot');
+                  const label = i === 0
+                    ? (isProductShot ? 'Product shot' : 'Model shot')
+                    : 'Your jewelry';
+                  return <ImageThumbnail key={url} url={url} label={label} />;
+                })}
                 {item.output_image_url ? (
                   <ImageThumbnail url={item.output_image_url} label="Output" />
                 ) : (
