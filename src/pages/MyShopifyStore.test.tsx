@@ -40,10 +40,6 @@ vi.mock('@/hooks/use-toast', () => ({
   }),
 }));
 
-vi.mock('@/contexts/AuthContext', () => ({
-  useAuth: () => ({ user: null, initializing: false }),
-}));
-
 vi.mock('@/contexts/ThemeContext', () => ({
   useTheme: () => ({ theme: 'light' }),
 }));

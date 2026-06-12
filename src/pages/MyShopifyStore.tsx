@@ -14,7 +14,6 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useAuth } from '@/contexts/AuthContext';
 import { useInvalidateShopifyStatus, useShopifyStatus } from '@/hooks/useShopify';
 import {
   disconnectShopify,
@@ -38,7 +37,6 @@ const DARK_THEMES = new Set(['dark', 'cyberpunk', 'retro', 'fashion', 'luxury', 
 export default function MyShopifyStore() {
   const { toast } = useToast();
   const { theme } = useTheme();
-  const { user, initializing } = useAuth();
   const logoSrc = DARK_THEMES.has(theme) ? logoWhite : logoBlack;
   const invalidateStatus = useInvalidateShopifyStatus();
   const { data: status, isLoading, isError } = useShopifyStatus();
@@ -55,9 +53,37 @@ export default function MyShopifyStore() {
     const linkToken = params.get('link_token');
 
     if (shopifyConnected === 'true' && linkToken) {
-      // Persist before any navigation so the token survives a login redirect
+      // Persist before navigating so it survives any auth redirect
       sessionStorage.setItem('shopify_link_token', linkToken);
       navigate('/my-shopify-store', { replace: true });
+      return;
+    }
+
+    // Recover pending token (set above then re-entered via clean URL, or post-login redirect)
+    const storedToken = sessionStorage.getItem('shopify_link_token');
+    if (storedToken && !linkingRef.current) {
+      linkingRef.current = true;
+      setLinkState('checking');
+      linkShopify(storedToken)
+        .then(async () => {
+          sessionStorage.removeItem('shopify_link_token');
+          await invalidateStatus();
+          setLinkState('idle');
+          setShowSuccessModal(true);
+        })
+        .catch((err) => {
+          sessionStorage.removeItem('shopify_link_token');
+          setLinkState('idle');
+          linkingRef.current = false;
+          if (err instanceof LinkTokenExpiredError) {
+            setShowLinkExpired(true);
+          } else {
+            toast({
+              title: "Couldn't link your store. Try installing again from Shopify.",
+              variant: 'destructive',
+            });
+          }
+        });
       return;
     }
 
@@ -68,36 +94,6 @@ export default function MyShopifyStore() {
       setShowSuccessModal(true);
     }
   }, [location.search]);
-
-  useEffect(() => {
-    if (initializing || !user || linkingRef.current) return;
-
-    const token = sessionStorage.getItem('shopify_link_token');
-    if (!token) return;
-
-    linkingRef.current = true;
-    setLinkState('checking');
-    linkShopify(token)
-      .then(async () => {
-        sessionStorage.removeItem('shopify_link_token');
-        await invalidateStatus();
-        setLinkState('idle');
-        setShowSuccessModal(true);
-      })
-      .catch((err) => {
-        sessionStorage.removeItem('shopify_link_token');
-        setLinkState('idle');
-        linkingRef.current = false;
-        if (err instanceof LinkTokenExpiredError) {
-          setShowLinkExpired(true);
-        } else {
-          toast({
-            title: "Couldn't link your store. Try installing again from Shopify.",
-            variant: 'destructive',
-          });
-        }
-      });
-  }, [user, initializing]);
 
   const disconnectMutation = useMutation({
     mutationFn: disconnectShopify,
