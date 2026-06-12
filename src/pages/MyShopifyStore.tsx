@@ -156,8 +156,8 @@ export default function MyShopifyStore() {
                     <span className="flex items-center gap-1">
                       {[0, 1, 2].map((i) => <span key={i} className="block h-1.5 w-1.5 rounded-full bg-border" />)}
                     </span>
-                    <div className="flex h-12 w-12 items-center justify-center">
-                      <img src={fnLogo} alt="FormaNova" className={`h-10 w-10 object-contain${DARK_THEMES.has(theme) ? ' invert' : ''}`} />
+                    <div className="flex h-14 w-14 items-center justify-center">
+                      <img src={fnLogo} alt="FormaNova" className={`h-14 w-14 object-contain${DARK_THEMES.has(theme) ? ' invert' : ''}`} />
                     </div>
                   </div>
                 </div>
