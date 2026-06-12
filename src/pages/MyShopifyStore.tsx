@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '@/contexts/ThemeContext';
 import logoBlack from '@/assets/formanova-logo-black.png';
 import logoWhite from '@/assets/formanova-logo-white.png';
+import fnLogo from '@/assets/fn-logo-black.webp';
 import { ArrowLeft, Check, Info, Lock, Loader2, Store } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 
@@ -139,7 +140,7 @@ export default function MyShopifyStore() {
                 {/* Connection graphic: Shopify → ··· → ✓ → ··· → FormaNova */}
                 <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-3">
                   <div className="flex items-center justify-end gap-3">
-                    <div className="flex h-12 w-20 items-center justify-center">
+                    <div className="flex h-12 w-12 items-center justify-center">
                       <ShopifyBagIcon className="h-10 w-10 shrink-0" />
                     </div>
                     <span className="flex items-center gap-1">
@@ -153,8 +154,8 @@ export default function MyShopifyStore() {
                     <span className="flex items-center gap-1">
                       {[0, 1, 2].map((i) => <span key={i} className="block h-1.5 w-1.5 rounded-full bg-border" />)}
                     </span>
-                    <div className="flex h-12 w-20 items-center justify-center">
-                      <img src={logoSrc} alt="FormaNova" className="max-h-8 w-auto object-contain" />
+                    <div className="flex h-12 w-12 items-center justify-center">
+                      <img src={fnLogo} alt="FormaNova" className={`h-10 w-10 object-contain${DARK_THEMES.has(theme) ? ' invert' : ''}`} />
                     </div>
                   </div>
                 </div>
@@ -336,7 +337,7 @@ function ConnectedCard({
           </div>
 
           {/* Export CTA */}
-          <div className="px-8 py-6">
+          <div className="flex justify-center px-8 py-6">
             <Link to="/dashboard">
               <Button className="h-11 w-full gap-2.5 font-mono text-[10px] uppercase tracking-[0.2em] sm:w-auto">
                 <ShopifyBagIcon className="h-4 w-4 shrink-0" />

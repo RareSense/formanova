@@ -173,7 +173,7 @@ export function ShopifyExportDialog({
 
               <div className="space-y-2">
                 <label htmlFor="shopify-description" className="block font-mono text-[11px] uppercase tracking-[0.2em] text-foreground">
-                  Description optional
+                  Description [optional]
                 </label>
                 <p className="font-mono text-[9px] tracking-[0.15em] text-muted-foreground">
                   Add the key details customers should see first.
@@ -192,7 +192,7 @@ export function ShopifyExportDialog({
 
               <div className="space-y-2">
                 <label htmlFor="shopify-alt-text" className="block font-mono text-[11px] uppercase tracking-[0.2em] text-foreground">
-                  Alt text optional
+                  Alt text [optional]
                 </label>
                 <p className="font-mono text-[9px] tracking-[0.15em] text-muted-foreground">
                   Describe what is visible in the image.
