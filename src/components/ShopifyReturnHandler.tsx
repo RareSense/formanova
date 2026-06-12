@@ -40,6 +40,7 @@ export function ShopifyReturnHandler() {
   // Handle pending export (user was trying to publish an asset)
   useEffect(() => {
     if (!status?.connected) return;
+    if (location.pathname === '/my-shopify-store') return; // MyShopifyStore shows success popup first
     const raw = sessionStorage.getItem('shopify_pending_export');
     if (!raw) return;
     try {
@@ -57,7 +58,7 @@ export function ShopifyReturnHandler() {
     } catch {
       sessionStorage.removeItem('shopify_pending_export');
     }
-  }, [status?.connected, status?.shop_domain, status?.shop_name, navigate]);
+  }, [status?.connected, status?.shop_domain, status?.shop_name, navigate, location.pathname]);
 
   return pendingExport ? (
     <ShopifyExportDialog
