@@ -1,5 +1,9 @@
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 
+export class LinkTokenExpiredError extends Error {
+  constructor() { super('link_token_expired'); }
+}
+
 export interface ShopifyStatus {
   connected: boolean;
   shop_domain?: string;
@@ -33,23 +37,13 @@ export async function getShopifyStatus(): Promise<ShopifyStatus> {
   return res.json();
 }
 
-export async function initiateShopifyConnect(subdomain: string): Promise<string> {
-  const res = await authenticatedFetch('/api/shopify/initiate', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ shop: subdomain }),
-  });
-  if (!res.ok) throw new Error('Failed to initiate Shopify connect');
-  const data = await res.json();
-  return data.install_url;
-}
-
 export async function linkShopify(linkToken: string): Promise<void> {
   const res = await authenticatedFetch('/api/shopify/link', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ link_token: linkToken }),
   });
+  if (res.status === 410) throw new LinkTokenExpiredError();
   if (!res.ok) throw new Error('Failed to link Shopify store');
 }
 

@@ -6,7 +6,7 @@ vi.mock('@/lib/authenticated-fetch', () => ({
   authenticatedFetch: (...args: unknown[]) => authenticatedFetch(...args),
 }));
 
-import { getShopifyStatus, initiateShopifyConnect, linkShopify } from './shopify-api';
+import { getShopifyStatus, linkShopify, LinkTokenExpiredError } from './shopify-api';
 
 function jsonResponse(status: number, body: unknown): Response {
   return {
@@ -52,32 +52,6 @@ describe('shopify-api', () => {
   });
 });
 
-describe('initiateShopifyConnect', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('posts to /api/shopify/initiate with the full shop domain and returns install_url', async () => {
-    authenticatedFetch.mockResolvedValueOnce(jsonResponse(200, {
-      install_url: 'https://shopify.com/oauth/authorize?shop=test-store.myshopify.com',
-    }));
-
-    const url = await initiateShopifyConnect('test-store');
-
-    expect(authenticatedFetch).toHaveBeenCalledWith('/api/shopify/initiate', expect.objectContaining({
-      method: 'POST',
-      body: JSON.stringify({ shop: 'test-store' }),
-    }));
-    expect(url).toBe('https://shopify.com/oauth/authorize?shop=test-store.myshopify.com');
-  });
-
-  it('throws on non-ok response', async () => {
-    authenticatedFetch.mockResolvedValueOnce(jsonResponse(500, {}));
-
-    await expect(initiateShopifyConnect('test-store')).rejects.toThrow('Failed to initiate Shopify connect');
-  });
-});
-
 describe('linkShopify', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -100,7 +74,13 @@ describe('linkShopify', () => {
     await expect(linkShopify('tok_abc123')).resolves.toBeUndefined();
   });
 
-  it('throws on non-ok response', async () => {
+  it('throws LinkTokenExpiredError on 410', async () => {
+    authenticatedFetch.mockResolvedValueOnce(jsonResponse(410, { detail: 'link_token_expired' }));
+
+    await expect(linkShopify('tok_expired')).rejects.toBeInstanceOf(LinkTokenExpiredError);
+  });
+
+  it('throws on non-ok, non-410 response', async () => {
     authenticatedFetch.mockResolvedValueOnce(jsonResponse(400, {}));
 
     await expect(linkShopify('tok_bad')).rejects.toThrow('Failed to link Shopify store');

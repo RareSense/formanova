@@ -75,19 +75,10 @@ export function ShopifyConnectDialog({ open, onOpenChange }: ShopifyConnectDialo
                 aria-label="Connect with Shopify — opens the App Store listing"
               >
                 <ShopifyBagIcon className="h-4 w-4 shrink-0" />
-                Connect with Shopify
+                Connect your Shopify store
               </Button>
 
-              <p className="text-center font-mono text-[9px] leading-relaxed tracking-[0.12em] text-muted-foreground">
-                You'll install FormaNova on your store from Shopify — no need to type your store address.
-              </p>
 
-              <div className="flex items-center justify-center gap-1.5">
-                <Lock className="h-3 w-3 shrink-0 text-muted-foreground" aria-hidden="true" />
-                <p className="font-mono text-[8px] tracking-[0.1em] text-muted-foreground">
-                  We only use this to create draft products from your finished photos.
-                </p>
-              </div>
             </div>
           )}
         </div>

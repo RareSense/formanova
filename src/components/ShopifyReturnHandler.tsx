@@ -22,6 +22,9 @@ export function ShopifyReturnHandler() {
     const params = new URLSearchParams(location.search);
     if (params.get('shopify_connected') !== 'true') return;
 
+    // New OAuth flow: link_token present — MyShopifyStore handles the full handshake
+    if (params.get('link_token')) return;
+
     // If there's a pending export, that effect handles navigation — just clean the param
     if (sessionStorage.getItem('shopify_pending_export')) {
       navigate(location.pathname, { replace: true });

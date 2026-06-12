@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -14,10 +14,12 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { useAuth } from '@/contexts/AuthContext';
 import { useInvalidateShopifyStatus, useShopifyStatus } from '@/hooks/useShopify';
 import {
   disconnectShopify,
   linkShopify,
+  LinkTokenExpiredError,
 } from '@/services/shopify-api';
 import { useToast } from '@/hooks/use-toast';
 
@@ -36,39 +38,26 @@ const DARK_THEMES = new Set(['dark', 'cyberpunk', 'retro', 'fashion', 'luxury', 
 export default function MyShopifyStore() {
   const { toast } = useToast();
   const { theme } = useTheme();
+  const { user, initializing } = useAuth();
   const logoSrc = DARK_THEMES.has(theme) ? logoWhite : logoBlack;
   const invalidateStatus = useInvalidateShopifyStatus();
   const { data: status, isLoading, isError } = useShopifyStatus();
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showLinkExpired, setShowLinkExpired] = useState(false);
   const [linkState, setLinkState] = useState<'idle' | 'checking'>('idle');
   const location = useLocation();
   const navigate = useNavigate();
+  const linkingRef = useRef(false);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-
-    // New flow: backend callback with link_token after App Store install
     const shopifyConnected = params.get('shopify_connected');
     const linkToken = params.get('link_token');
+
     if (shopifyConnected === 'true' && linkToken) {
-      setLinkState('checking');
-      linkShopify(linkToken)
-        .then(async () => {
-          await invalidateStatus();
-          setLinkState('idle');
-          setShowSuccessModal(true);
-          navigate('/my-shopify-store', { replace: true });
-        })
-        .catch(() => {
-          // If AuthExpiredError, authenticated-fetch already redirected to login
-          // (full URL including link_token is preserved as the redirect target)
-          setLinkState('idle');
-          toast({
-            title: "Couldn't link your store. Try installing again from Shopify.",
-            variant: 'destructive',
-          });
-          navigate('/my-shopify-store', { replace: true });
-        });
+      // Persist before any navigation so the token survives a login redirect
+      sessionStorage.setItem('shopify_link_token', linkToken);
+      navigate('/my-shopify-store', { replace: true });
       return;
     }
 
@@ -79,6 +68,36 @@ export default function MyShopifyStore() {
       setShowSuccessModal(true);
     }
   }, [location.search]);
+
+  useEffect(() => {
+    if (initializing || !user || linkingRef.current) return;
+
+    const token = sessionStorage.getItem('shopify_link_token');
+    if (!token) return;
+
+    linkingRef.current = true;
+    setLinkState('checking');
+    linkShopify(token)
+      .then(async () => {
+        sessionStorage.removeItem('shopify_link_token');
+        await invalidateStatus();
+        setLinkState('idle');
+        setShowSuccessModal(true);
+      })
+      .catch((err) => {
+        sessionStorage.removeItem('shopify_link_token');
+        setLinkState('idle');
+        linkingRef.current = false;
+        if (err instanceof LinkTokenExpiredError) {
+          setShowLinkExpired(true);
+        } else {
+          toast({
+            title: "Couldn't link your store. Try installing again from Shopify.",
+            variant: 'destructive',
+          });
+        }
+      });
+  }, [user, initializing]);
 
   const disconnectMutation = useMutation({
     mutationFn: disconnectShopify,
@@ -196,6 +215,8 @@ export default function MyShopifyStore() {
                 </p>
               )}
             </div>
+          ) : showLinkExpired ? (
+            <LinkExpiredCard />
           ) : isError ? (
             <ErrorCard onRetry={() => invalidateStatus()} />
           ) : status?.connected ? (
@@ -260,19 +281,10 @@ function ConnectCard() {
             aria-label="Connect with Shopify — opens the App Store listing"
           >
             <ShopifyBagIcon className="h-4 w-4 shrink-0" />
-            Connect with Shopify
+            Connect your Shopify store
           </Button>
 
-          <p className="font-mono text-[9px] leading-relaxed tracking-[0.12em] text-muted-foreground">
-            You'll install FormaNova on your store from Shopify — no need to type your store address.
-          </p>
 
-          <div className="flex items-center justify-center gap-1.5 pt-1">
-            <Lock className="h-3 w-3 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <p className="font-mono text-[8px] tracking-[0.1em] text-muted-foreground">
-              We only use this to create draft products from your finished photos.
-            </p>
-          </div>
         </motion.div>
 
       </div>
@@ -398,6 +410,34 @@ function ConnectedCard({
   );
 }
 
+/* ---------- Link expired ---------- */
+
+function LinkExpiredCard() {
+  return (
+    <div className="border border-border/30 p-8">
+      <div className="flex flex-col items-start gap-6">
+        <ShopifyBagIcon className="h-8 w-8 text-muted-foreground" />
+        <div className="space-y-1">
+          <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">Connection timed out</p>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            Your Shopify connection timed out. Please reinstall from the Shopify App Store.
+          </p>
+        </div>
+        {SHOPIFY_LISTING_URL && (
+          <Button
+            onClick={() => { window.location.href = SHOPIFY_LISTING_URL!; }}
+            className="h-10 gap-2 font-mono text-[10px] uppercase tracking-[0.2em]"
+            aria-label="Connect with Shopify — opens the App Store listing"
+          >
+            <ShopifyBagIcon className="h-4 w-4 shrink-0" />
+            Connect Shopify
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ---------- Error ---------- */
 
 function ErrorCard({ onRetry }: { onRetry: () => void }) {
@@ -406,14 +446,24 @@ function ErrorCard({ onRetry }: { onRetry: () => void }) {
       <div className="flex flex-col items-start gap-6">
         <ShopifyBagIcon className="h-8 w-8 text-muted-foreground" />
         <div className="space-y-1">
-          <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">Can't reach Shopify</p>
-          <p className="font-mono text-[9px] leading-relaxed tracking-[0.1em] text-muted-foreground">
-            Couldn't load your Shopify status. Check your connection and try again.
+          <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">Status unavailable</p>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            Could not confirm your Shopify connection right now. Check your connection and try again.
           </p>
         </div>
-        <Button variant="outline" onClick={onRetry} className="h-10 font-mono text-[10px] uppercase tracking-[0.2em]">
-          Try again
-        </Button>
+        <div className="flex flex-wrap gap-3">
+          <Button variant="outline" onClick={onRetry} className="h-10 font-mono text-[10px] uppercase tracking-[0.2em]">
+            Retry
+          </Button>
+          <Button
+            onClick={() => { if (SHOPIFY_LISTING_URL) window.location.href = SHOPIFY_LISTING_URL; }}
+            disabled={!SHOPIFY_LISTING_URL}
+            className="h-10 gap-2 font-mono text-[10px] uppercase tracking-[0.2em]"
+          >
+            <ShopifyBagIcon className="h-4 w-4 shrink-0" />
+            Connect Shopify
+          </Button>
+        </div>
       </div>
     </div>
   );

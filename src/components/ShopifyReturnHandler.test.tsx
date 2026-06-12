@@ -65,4 +65,21 @@ describe('ShopifyReturnHandler', () => {
     expect(screen.getByText('export-dialog:asset-42:Necklace Shot')).toBeTruthy();
     expect(sessionStorage.getItem('shopify_pending_export')).toBeNull();
   });
+
+  it('does not redirect when link_token is present — MyShopifyStore owns that flow', async () => {
+    mockUseShopifyStatus.mockReturnValue({ data: undefined, isLoading: false });
+
+    const { container } = render(
+      <MemoryRouter initialEntries={['/my-shopify-store?shopify_connected=true&link_token=tok-abc']}>
+        <ShopifyReturnHandler />
+        <Routes>
+          <Route path="*" element={<LocationProbe />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    // URL must be unchanged after a tick
+    await new Promise((r) => setTimeout(r, 0));
+    expect(container.textContent).toContain('/my-shopify-store?shopify_connected=true&link_token=tok-abc');
+  });
 });
