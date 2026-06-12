@@ -44,6 +44,7 @@ export default function MyShopifyStore() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showLinkExpired, setShowLinkExpired] = useState(false);
   const [linkState, setLinkState] = useState<'idle' | 'checking'>('idle');
+  const [hasPendingExport, setHasPendingExport] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const linkingRef = useRef(false);
@@ -68,6 +69,7 @@ export default function MyShopifyStore() {
       linkShopify(storedToken)
         .then(async () => {
           sessionStorage.removeItem('shopify_link_token');
+          if (sessionStorage.getItem('shopify_pending_export')) setHasPendingExport(true);
           await invalidateStatus();
           setLinkState('idle');
           setShowSuccessModal(true);
@@ -186,10 +188,13 @@ export default function MyShopifyStore() {
                 )}
 
                 <Button
-                  onClick={() => setShowSuccessModal(false)}
+                  onClick={() => {
+                    setShowSuccessModal(false);
+                    if (hasPendingExport) navigate('/dashboard?shopify_connected=true');
+                  }}
                   className="h-12 w-full font-mono text-[10px] uppercase tracking-[0.2em]"
                 >
-                  Got it
+                  {hasPendingExport ? 'Continue to export' : 'Got it'}
                 </Button>
 
                 <div className="flex items-center justify-center gap-1.5 pb-1">
