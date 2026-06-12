@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { ArrowRight, Check, Loader2 } from 'lucide-react';
+import { Check, Lock } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -8,8 +7,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useShopifyStatus } from '@/hooks/useShopify';
-import { initiateShopifyConnect } from '@/services/shopify-api';
-import { isValidShopifySubdomain, normalizeShopifySubdomain } from '@/lib/shopify-utils';
+
+// INTEGRATION POINT: set VITE_SHOPIFY_APP_LISTING_URL in .env
+// Production: https://apps.shopify.com/<your-handle>
+// Review/staging: use the Partner Dashboard direct install link
+const SHOPIFY_LISTING_URL = import.meta.env.VITE_SHOPIFY_APP_LISTING_URL as string | undefined;
 
 function ShopifyBagIcon({ className }: { className?: string }) {
   return (
@@ -28,37 +30,6 @@ interface ShopifyConnectDialogProps {
 
 export function ShopifyConnectDialog({ open, onOpenChange }: ShopifyConnectDialogProps) {
   const { data: status } = useShopifyStatus();
-  const [shop, setShop] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [connecting, setConnecting] = useState(false);
-
-  const handleConnect = async () => {
-    const normalizedShop = normalizeShopifySubdomain(shop);
-
-    if (!normalizedShop) {
-      setError('Enter your store name to continue.');
-      return;
-    }
-
-    if (!isValidShopifySubdomain(normalizedShop)) {
-      setError('Use lowercase letters, numbers, and hyphens only.');
-      return;
-    }
-
-    setError(null);
-    setConnecting(true);
-    try {
-      const installUrl = await initiateShopifyConnect(normalizedShop);
-      window.location.href = installUrl;
-    } catch {
-      setError('Could not start Shopify connection. Try again.');
-      setConnecting(false);
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') handleConnect();
-  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -93,63 +64,30 @@ export function ShopifyConnectDialog({ open, onOpenChange }: ShopifyConnectDialo
             </div>
           ) : (
             <div className="w-full space-y-5">
-              <div className="space-y-2">
-                <label
-                  htmlFor="shopify-dialog-domain"
-                  className="block font-mono text-[11px] uppercase tracking-[0.2em] text-foreground"
-                >
-                  Shopify store name
-                </label>
-
-                <p id="shopify-dialog-helper" className="font-mono text-[9px] tracking-[0.15em] text-muted-foreground">
-                  Use the name before .myshopify.com in your Shopify URL.
-                </p>
-
-                <div className="flex h-11 border border-input bg-background ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
-                  <input
-                    id="shopify-dialog-domain"
-                    type="text"
-                    value={shop}
-                    onChange={(e) => {
-                      setShop(normalizeShopifySubdomain(e.target.value));
-                      if (error) setError(null);
-                    }}
-                    onKeyDown={handleKeyDown}
-                    placeholder="maevori-jewelry"
-                    autoComplete="on"
-                    autoCorrect="off"
-                    autoCapitalize="none"
-                    spellCheck={false}
-                    disabled={connecting}
-                    aria-describedby="shopify-dialog-helper shopify-dialog-error"
-                    aria-invalid={!!error}
-                    className="min-w-0 flex-1 bg-transparent px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50"
-                  />
-                  <div className="flex items-center border-l border-input bg-muted/30 px-3">
-                    <span className="whitespace-nowrap font-mono text-[10px] tracking-[0.1em] text-muted-foreground">.myshopify.com</span>
-                  </div>
-                </div>
-
-                {error && (
-                  <p id="shopify-dialog-error" role="alert" className="font-mono text-[10px] tracking-[0.1em] text-destructive">
-                    {error}
-                  </p>
-                )}
-              </div>
+              <p className="text-center text-sm leading-relaxed text-muted-foreground">
+                Send your finished photos to Shopify as draft products ready to publish.
+              </p>
 
               <Button
-                onClick={handleConnect}
-                disabled={connecting}
+                onClick={() => { if (SHOPIFY_LISTING_URL) window.location.href = SHOPIFY_LISTING_URL; }}
+                disabled={!SHOPIFY_LISTING_URL}
                 className="h-11 w-full gap-2.5 font-mono text-[10px] uppercase tracking-[0.2em]"
+                aria-label="Connect with Shopify — opens the App Store listing"
               >
-                {connecting ? (
-                  <Loader2 className="h-4 w-4 animate-spin shrink-0" />
-                ) : (
-                  <ShopifyBagIcon className="h-4 w-4 shrink-0" />
-                )}
-                {connecting ? 'Connecting...' : 'Continue to Shopify'}
-                {!connecting && <ArrowRight className="h-4 w-4 shrink-0" />}
+                <ShopifyBagIcon className="h-4 w-4 shrink-0" />
+                Connect with Shopify
               </Button>
+
+              <p className="text-center font-mono text-[9px] leading-relaxed tracking-[0.12em] text-muted-foreground">
+                You'll install FormaNova on your store from Shopify — no need to type your store address.
+              </p>
+
+              <div className="flex items-center justify-center gap-1.5">
+                <Lock className="h-3 w-3 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <p className="font-mono text-[8px] tracking-[0.1em] text-muted-foreground">
+                  We only use this to create draft products from your finished photos.
+                </p>
+              </div>
             </div>
           )}
         </div>

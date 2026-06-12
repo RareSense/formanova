@@ -44,6 +44,15 @@ export async function initiateShopifyConnect(subdomain: string): Promise<string>
   return data.install_url;
 }
 
+export async function linkShopify(linkToken: string): Promise<void> {
+  const res = await authenticatedFetch('/api/shopify/link', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ link_token: linkToken }),
+  });
+  if (!res.ok) throw new Error('Failed to link Shopify store');
+}
+
 export async function disconnectShopify(): Promise<{ disconnected: true }> {
   const res = await authenticatedFetch('/api/shopify/disconnect', { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to disconnect Shopify');

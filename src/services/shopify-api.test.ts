@@ -6,7 +6,7 @@ vi.mock('@/lib/authenticated-fetch', () => ({
   authenticatedFetch: (...args: unknown[]) => authenticatedFetch(...args),
 }));
 
-import { getShopifyStatus, initiateShopifyConnect } from './shopify-api';
+import { getShopifyStatus, initiateShopifyConnect, linkShopify } from './shopify-api';
 
 function jsonResponse(status: number, body: unknown): Response {
   return {
@@ -75,5 +75,34 @@ describe('initiateShopifyConnect', () => {
     authenticatedFetch.mockResolvedValueOnce(jsonResponse(500, {}));
 
     await expect(initiateShopifyConnect('test-store')).rejects.toThrow('Failed to initiate Shopify connect');
+  });
+});
+
+describe('linkShopify', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('posts link_token to /api/shopify/link', async () => {
+    authenticatedFetch.mockResolvedValueOnce(jsonResponse(200, {}));
+
+    await linkShopify('tok_abc123');
+
+    expect(authenticatedFetch).toHaveBeenCalledWith('/api/shopify/link', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ link_token: 'tok_abc123' }),
+    }));
+  });
+
+  it('resolves without a value on success', async () => {
+    authenticatedFetch.mockResolvedValueOnce(jsonResponse(200, {}));
+
+    await expect(linkShopify('tok_abc123')).resolves.toBeUndefined();
+  });
+
+  it('throws on non-ok response', async () => {
+    authenticatedFetch.mockResolvedValueOnce(jsonResponse(400, {}));
+
+    await expect(linkShopify('tok_bad')).rejects.toThrow('Failed to link Shopify store');
   });
 });

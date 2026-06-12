@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '@/contexts/ThemeContext';
 import logoBlack from '@/assets/formanova-logo-black.png';
 import logoWhite from '@/assets/formanova-logo-white.png';
-import { ArrowLeft, ArrowRight, Check, Info, Lock, Loader2, Store } from 'lucide-react';
+import { ArrowLeft, Check, Info, Lock, Loader2, Store } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
@@ -17,13 +17,9 @@ import {
 import { useInvalidateShopifyStatus, useShopifyStatus } from '@/hooks/useShopify';
 import {
   disconnectShopify,
-  initiateShopifyConnect,
+  linkShopify,
 } from '@/services/shopify-api';
 import { useToast } from '@/hooks/use-toast';
-import {
-  isValidShopifySubdomain,
-  normalizeShopifySubdomain,
-} from '@/lib/shopify-utils';
 
 function ShopifyBagIcon({ className }: { className?: string }) {
   return (
@@ -44,15 +40,44 @@ export default function MyShopifyStore() {
   const invalidateStatus = useInvalidateShopifyStatus();
   const { data: status, isLoading, isError } = useShopifyStatus();
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [linkState, setLinkState] = useState<'idle' | 'checking'>('idle');
   const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    if (params.get('shopify') !== 'connected') return;
-    navigate('/my-shopify-store', { replace: true });
-    invalidateStatus();
-    setShowSuccessModal(true);
+
+    // New flow: backend callback with link_token after App Store install
+    const shopifyConnected = params.get('shopify_connected');
+    const linkToken = params.get('link_token');
+    if (shopifyConnected === 'true' && linkToken) {
+      setLinkState('checking');
+      linkShopify(linkToken)
+        .then(async () => {
+          await invalidateStatus();
+          setLinkState('idle');
+          setShowSuccessModal(true);
+          navigate('/my-shopify-store', { replace: true });
+        })
+        .catch(() => {
+          // If AuthExpiredError, authenticated-fetch already redirected to login
+          // (full URL including link_token is preserved as the redirect target)
+          setLinkState('idle');
+          toast({
+            title: "Couldn't link your store. Try installing again from Shopify.",
+            variant: 'destructive',
+          });
+          navigate('/my-shopify-store', { replace: true });
+        });
+      return;
+    }
+
+    // Legacy callback param
+    if (params.get('shopify') === 'connected') {
+      navigate('/my-shopify-store', { replace: true });
+      invalidateStatus();
+      setShowSuccessModal(true);
+    }
   }, [location.search]);
 
   const disconnectMutation = useMutation({
@@ -162,9 +187,14 @@ export default function MyShopifyStore() {
           </Dialog>
 
           {/* Card */}
-          {isLoading ? (
-            <div className="flex h-64 items-center justify-center border border-border/30">
+          {isLoading || linkState === 'checking' ? (
+            <div className="flex h-64 flex-col items-center justify-center gap-3 border border-border/30">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              {linkState === 'checking' && (
+                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                  Connecting store...
+                </p>
+              )}
             </div>
           ) : isError ? (
             <ErrorCard onRetry={() => invalidateStatus()} />
@@ -183,133 +213,68 @@ export default function MyShopifyStore() {
   );
 }
 
-/* ---------- Connect (inline form) ---------- */
+/* ---------- Connect (App Store listing flow — no domain input) ---------- */
+
+// INTEGRATION POINT: set VITE_SHOPIFY_APP_LISTING_URL in .env
+// Production: https://apps.shopify.com/<your-handle>
+// Review/staging: use the Partner Dashboard direct install link
+const SHOPIFY_LISTING_URL = import.meta.env.VITE_SHOPIFY_APP_LISTING_URL as string | undefined;
 
 function ConnectCard() {
-  const [shop, setShop] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [connecting, setConnecting] = useState(false);
-
-  const isValid = shop.length > 0 && isValidShopifySubdomain(shop);
-
-  const handleConnect = async () => {
-    const normalizedShop = normalizeShopifySubdomain(shop);
-
-    if (!normalizedShop) {
-      setError('Enter your store URL to continue.');
-      return;
-    }
-
-    if (!isValidShopifySubdomain(normalizedShop)) {
-      setError('Use lowercase letters, numbers, and hyphens only.');
-      return;
-    }
-
-    setError(null);
-    setConnecting(true);
-    try {
-      const installUrl = await initiateShopifyConnect(normalizedShop);
-      sessionStorage.setItem('shopify_connect_return', '/my-shopify-store');
-      window.location.href = installUrl;
-    } catch {
-      setError('Could not start Shopify connection. Try again.');
-      setConnecting(false);
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') handleConnect();
-  };
-
   return (
-    <div className="border border-foreground px-8 py-8 md:px-10 md:py-10">
-      <div className="flex flex-col items-center">
+    <div className="border border-foreground px-8 py-10 md:px-10 md:py-14">
+      <div className="flex flex-col items-center text-center">
 
-      {/* Card heading */}
-      <div className="mb-6 flex flex-col items-center gap-2 text-center">
-        <ShopifyBagIcon className="h-10 w-10" />
-        <p className="font-display text-xl uppercase tracking-wide text-foreground leading-none">Enter your Shopify URL</p>
-      </div>
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.08, duration: 0.35 }}
+        >
+          <ShopifyBagIcon className="h-14 w-14" />
+        </motion.div>
 
-      {/* Form + CTA — constrained width */}
-      <div className="w-full max-w-sm space-y-4">
-
-        {/* Label + input */}
-        <div className="space-y-2">
-          <label htmlFor="shopify-subdomain" className="block font-mono text-[11px] uppercase tracking-[0.2em] text-foreground">
-            Shopify URL
-          </label>
-
-          <p id="shopify-helper" className="font-mono text-[9px] tracking-[0.15em] text-muted-foreground">
-            Use the first part of your .myshopify.com URL.
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.18, duration: 0.35 }}
+          className="mt-7 space-y-3"
+        >
+          <h2 className="font-display text-2xl uppercase tracking-wide text-foreground leading-none">
+            Connect your Shopify store
+          </h2>
+          <p className="mx-auto max-w-[22rem] text-sm leading-relaxed text-muted-foreground">
+            Send your finished photos to Shopify as draft products ready to publish.
           </p>
+        </motion.div>
 
-          <div className="flex h-11 border border-foreground bg-background ring-offset-background focus-within:ring-2 focus-within:ring-foreground focus-within:ring-offset-2">
-            <input
-              id="shopify-subdomain"
-              type="text"
-              value={shop}
-              onChange={(e) => {
-                setShop(normalizeShopifySubdomain(e.target.value));
-                if (error) setError(null);
-              }}
-              onKeyDown={handleKeyDown}
-              placeholder="maevori-jewelry"
-              autoComplete="on"
-              autoCorrect="off"
-              autoCapitalize="none"
-              spellCheck={false}
-              disabled={connecting}
-              aria-describedby="shopify-helper shopify-error"
-              aria-invalid={!!error}
-              className="min-w-0 flex-1 bg-transparent px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50"
-            />
-            <div className="flex items-center border-l border-foreground bg-muted/30 px-3">
-              <span className="whitespace-nowrap font-mono text-[10px] tracking-[0.1em] text-muted-foreground">.myshopify.com</span>
-            </div>
-          </div>
-
-          {isValid && !error && (
-            <div className="flex items-center gap-1.5">
-              <Check className="h-3 w-3 shrink-0 text-[#008060]" />
-              <span className="font-mono text-[9px] tracking-[0.1em] text-muted-foreground">
-                You'll connect: <span className="text-foreground">{shop}.myshopify.com</span>
-              </span>
-            </div>
-          )}
-
-          {error && (
-            <p id="shopify-error" role="alert" className="font-mono text-[10px] tracking-[0.1em] text-destructive">
-              {error}
-            </p>
-          )}
-        </div>
-
-        {/* CTA */}
-        <div className="space-y-3">
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.30, duration: 0.35 }}
+          className="mt-8 w-full max-w-xs space-y-4"
+        >
           <Button
-            onClick={handleConnect}
-            disabled={connecting}
-            className="h-11 w-full gap-2.5 font-mono text-[10px] uppercase tracking-[0.2em]"
+            onClick={() => { if (SHOPIFY_LISTING_URL) window.location.href = SHOPIFY_LISTING_URL; }}
+            disabled={!SHOPIFY_LISTING_URL}
+            className="h-12 w-full gap-2.5 font-mono text-[10px] uppercase tracking-[0.2em]"
+            aria-label="Connect with Shopify — opens the App Store listing"
           >
-            {connecting ? (
-              <Loader2 className="h-4 w-4 animate-spin shrink-0" />
-            ) : (
-              <ShopifyBagIcon className="h-4 w-4 shrink-0" />
-            )}
-            {connecting ? 'Connecting...' : 'Connect to Shopify'}
-            {!connecting && <ArrowRight className="h-4 w-4 shrink-0" />}
+            <ShopifyBagIcon className="h-4 w-4 shrink-0" />
+            Connect with Shopify
           </Button>
 
-          <div className="flex items-center justify-center gap-1.5">
-            <Lock className="h-3 w-3 shrink-0 text-muted-foreground" />
+          <p className="font-mono text-[9px] leading-relaxed tracking-[0.12em] text-muted-foreground">
+            You'll install FormaNova on your store from Shopify — no need to type your store address.
+          </p>
+
+          <div className="flex items-center justify-center gap-1.5 pt-1">
+            <Lock className="h-3 w-3 shrink-0 text-muted-foreground" aria-hidden="true" />
             <p className="font-mono text-[8px] tracking-[0.1em] text-muted-foreground">
-              We'll only use this to create draft products from your finished photos.
+              We only use this to create draft products from your finished photos.
             </p>
           </div>
-        </div>
+        </motion.div>
 
-      </div>
       </div>
     </div>
   );
@@ -359,7 +324,17 @@ function ConnectedCard({
           {/* Connected store */}
           <div className="px-8 py-6">
             <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">Connected to</p>
-            <p className="mt-2 text-base font-medium text-foreground">{status.shop_domain}</p>
+            <p className="mt-2 text-base font-medium text-foreground">{status.shop_name || status.shop_domain}</p>
+          </div>
+
+          {/* Export CTA */}
+          <div className="px-8 py-6">
+            <Link to="/dashboard">
+              <Button className="h-11 w-full gap-2.5 font-mono text-[10px] uppercase tracking-[0.2em] sm:w-auto">
+                <ShopifyBagIcon className="h-4 w-4 shrink-0" />
+                Export now
+              </Button>
+            </Link>
           </div>
         </div>
 
