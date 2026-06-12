@@ -338,12 +338,13 @@ function ConnectedCard({
 
           {/* Export CTA */}
           <div className="flex justify-center px-8 py-6">
-            <Link to="/dashboard">
-              <Button className="h-11 w-full gap-2.5 font-mono text-[10px] uppercase tracking-[0.2em] sm:w-auto">
-                <ShopifyBagIcon className="h-4 w-4 shrink-0" />
-                Export now
-              </Button>
-            </Link>
+            <Button
+              disabled
+              className="h-11 gap-2.5 font-mono text-[10px] uppercase tracking-[0.2em] opacity-40"
+            >
+              <ShopifyBagIcon className="h-4 w-4 shrink-0" />
+              Connect your Shopify store
+            </Button>
           </div>
         </div>
 
