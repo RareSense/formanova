@@ -51,11 +51,23 @@ export async function getUserProfile(): Promise<UserProfile> {
  *   Body: { "user_type": "jewelry_brand" | "freelancer" | "researcher_student" | "content_creator" | "other" }
  *   Response 200: { "success": true }
  */
-export async function saveUserType(userType: UserType): Promise<void> {
+export interface BrandDetails {
+  brand_name: string;
+  website_url?: string;
+  social_links?: string[];
+}
+
+export async function saveUserType(userType: UserType, brandDetails?: BrandDetails | null): Promise<void> {
+  const body: Record<string, unknown> = { user_type: userType };
+  if (brandDetails) {
+    body.brand_name = brandDetails.brand_name;
+    if (brandDetails.website_url) body.website_url = brandDetails.website_url;
+    if (brandDetails.social_links?.length) body.social_links = brandDetails.social_links;
+  }
   const res = await authenticatedFetch('/api/user/profile', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_type: userType }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     throw new Error(`Failed to save user type: ${res.status}`);

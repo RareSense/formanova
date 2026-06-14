@@ -68,6 +68,7 @@ const TextToCAD = lazyWithRetry(() => import("./pages/TextToCAD"));
 const ImageToCAD = lazyWithRetry(() => import("./pages/ImageToCAD"));
 const Generations = lazyWithRetry(() => import("./pages/Generations"));
 const Credits = lazyWithRetry(() => import("./pages/Credits"));
+const BrandDetails = lazyWithRetry(() => import("./pages/BrandDetails"));
 const Pricing = lazyWithRetry(() => import("./pages/Pricing"));
 const PaymentSuccess = lazyWithRetry(() => import("./pages/PaymentSuccess"));
 const PaymentCancel = lazyWithRetry(() => import("./pages/PaymentCancel"));
@@ -219,6 +220,7 @@ const App = () => (
                   <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                   <Route path="/generations" element={<ProtectedRoute><Generations /></ProtectedRoute>} />
                   <Route path="/credits" element={<ProtectedRoute><Credits /></ProtectedRoute>} />
+                  <Route path="/brand-details" element={<ProtectedRoute><BrandDetails /></ProtectedRoute>} />
                   <Route path="/pricing" element={<ProtectedRoute><Pricing /></ProtectedRoute>} />
                   <Route path="/payment-success" element={<ProtectedRoute><PaymentSuccess /></ProtectedRoute>} />
                   <Route path="/success" element={<ProtectedRoute><PaymentSuccess /></ProtectedRoute>} />
