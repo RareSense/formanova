@@ -18,7 +18,6 @@ import { ChunkErrorBoundary } from '@/components/ChunkErrorBoundary';
 import { RouteErrorBoundary } from '@/components/RouteErrorBoundary';
 import { UpdateBanner } from '@/components/UpdateBanner';
 import { useVersionPolling } from '@/hooks/use-version-polling';
-import { KnicksBanner } from '@/components/KnicksBanner'; // KNICKS CAMPAIGN — remove per KNICKS_BANNER_REMOVAL.md
 
 import { lazyWithRetry } from '@/utils/lazyWithRetry';
 import { Loader2 } from "lucide-react";
@@ -193,7 +192,6 @@ const App = () => (
                 </Suspense>
               </DeferredDecorations>
               <div className="min-h-screen flex flex-col relative z-10">
-                <KnicksBanner />{/* KNICKS CAMPAIGN — remove per KNICKS_BANNER_REMOVAL.md */}
                 <Header />
                 <main className="flex-1">
                 <RouteErrorBoundary>
