@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { authenticatedFetch, AuthExpiredError } from '@/lib/authenticated-fetch';
 import { useCredits } from '@/contexts/CreditsContext';
-import { trackPaymentSuccess, trackStarterPackPurchased } from '@/lib/posthog-events';
+import { trackPaymentSuccess, trackStarterPackPurchased, markStarterPackForCoachmark } from '@/lib/posthog-events';
 import { useBillingLocale } from '@/hooks/use-billing-locale';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
 
@@ -76,7 +76,10 @@ export default function PaymentSuccess() {
           amount_usd: pkg.amount_usd,
           currency_shown: currencyRef.current, // ref — always reads current value at call time, not stale closure
         });
-        if (data.credits_added <= 50) trackStarterPackPurchased();
+        if (data.credits_added <= 50) {
+          trackStarterPackPurchased();
+          markStarterPackForCoachmark();
+        }
         setState({ type: 'fulfilled', creditsAdded: data.credits_added });
         stopPolling();
         return 'done';

@@ -268,6 +268,78 @@ export function setUserProfession(profession: UserProfession) {
   }
 }
 
+// ═══════ Coachmark A/B experiment ════════════════════════════════════
+
+export const COACHMARK_EXPERIMENT_FLAG = 'coachmark-experiment';
+
+/**
+ * Variant for the post-generation coachmark experiment: 'treatment' shows the
+ * coachmark, 'control' (or undefined) hides it.
+ *
+ * The flag is read only after the session is identified. An unidentified read
+ * would bucket an anonymous visitor on the wrong distinct_id, so callers get
+ * `undefined` (treated as "do not show") until identify() has run. Reading the
+ * flag here is also what records the PostHog exposure ($feature_flag_called).
+ */
+export function getCoachmarkVariant(): string | undefined {
+  if (!posthog.__loaded || !posthog._isIdentified()) return undefined;
+  return posthog.getFeatureFlag(COACHMARK_EXPERIMENT_FLAG) as string | undefined;
+}
+
+// --- Eligibility (localStorage targeting) ---
+//
+// The experiment only runs for users who bought a starter pack and have not yet
+// been shown the coachmark. localStorage decides *who is eligible* (the frontend
+// knows these facts; PostHog does not), while PostHog assigns the bucket and
+// measures outcomes. Both flags are per-browser, so a user is captured only if
+// they buy and generate on the same browser.
+
+const COACHMARK_STARTER_PACK_KEY = 'formanova_coachmark_starter_pack';
+const COACHMARK_SHOWN_KEY = 'formanova_coachmark_shown';
+
+/** Marks the user as a starter-pack buyer, making them eligible for the
+ *  coachmark experiment. Called from the payment-success flow. */
+export function markStarterPackForCoachmark() {
+  try {
+    localStorage.setItem(COACHMARK_STARTER_PACK_KEY, '1');
+  } catch {
+    // Ignore storage write failures (quota exceeded / disabled storage).
+  }
+}
+
+/** Permanently stops the coachmark from showing again on this browser. Called
+ *  once it has been shown (it appears on the first generation only). */
+export function suppressCoachmark() {
+  try {
+    localStorage.setItem(COACHMARK_SHOWN_KEY, '1');
+  } catch {
+    // Ignore storage write failures (quota exceeded / disabled storage).
+  }
+}
+
+/** True only for starter-pack buyers who have not yet been shown the coachmark. */
+export function isCoachmarkEligible(): boolean {
+  try {
+    return (
+      localStorage.getItem(COACHMARK_STARTER_PACK_KEY) === '1' &&
+      localStorage.getItem(COACHMARK_SHOWN_KEY) !== '1'
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Variant for eligible users only. Returns undefined (do not show, do not
+ * bucket) for anyone who is not a starter-pack buyer on their first generation.
+ * The eligibility check runs first so the PostHog flag is read (and the
+ * exposure recorded) only for the experiment's real population.
+ */
+export function getEligibleCoachmarkVariant(): string | undefined {
+  if (!isCoachmarkEligible()) return undefined;
+  return getCoachmarkVariant();
+}
+
 // ═══════ Studio Actions ══════════════════════════════════════════════
 
 // No breaking change — new optional `category` property added

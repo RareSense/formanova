@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Mock posthog-js BEFORE importing posthog-events
 vi.mock('posthog-js', () => ({
-  default: { capture: vi.fn(), setPersonProperties: vi.fn(), reset: vi.fn(), identify: vi.fn(), onFeatureFlags: vi.fn(), getFeatureFlag: vi.fn(), __loaded: true },
+  default: { capture: vi.fn(), setPersonProperties: vi.fn(), reset: vi.fn(), identify: vi.fn(), onFeatureFlags: vi.fn(), getFeatureFlag: vi.fn(), _isIdentified: vi.fn(), __loaded: true },
 }))
 
 import posthog from 'posthog-js'
@@ -27,6 +27,11 @@ import {
   trackFeedbackModalOpened,
   trackFeedbackSubmitted,
   setUserProfession,
+  getCoachmarkVariant,
+  getEligibleCoachmarkVariant,
+  isCoachmarkEligible,
+  markStarterPackForCoachmark,
+  suppressCoachmark,
 } from './posthog-events'
 
 beforeEach(() => {
@@ -62,6 +67,83 @@ describe('__loaded guard', () => {
     trackJewelryUploaded({ category: 'ring', upload_type: 'mannequin', was_flagged: false })
     expect(posthog.capture).not.toHaveBeenCalled()
     ;(posthog as any).__loaded = true
+  })
+})
+
+// ── getCoachmarkVariant (A/B experiment) ────────────────────────────
+
+describe('getCoachmarkVariant', () => {
+  it('returns the flag variant when loaded and identified', () => {
+    ;(posthog as any).__loaded = true
+    ;(posthog._isIdentified as any).mockReturnValue(true)
+    ;(posthog.getFeatureFlag as any).mockReturnValue('treatment')
+    expect(getCoachmarkVariant()).toBe('treatment')
+    expect(posthog.getFeatureFlag).toHaveBeenCalledWith('coachmark-experiment')
+  })
+
+  it('passes through the control variant unchanged', () => {
+    ;(posthog._isIdentified as any).mockReturnValue(true)
+    ;(posthog.getFeatureFlag as any).mockReturnValue('control')
+    expect(getCoachmarkVariant()).toBe('control')
+  })
+
+  it('returns undefined and never reads the flag when not identified', () => {
+    ;(posthog._isIdentified as any).mockReturnValue(false)
+    expect(getCoachmarkVariant()).toBeUndefined()
+    expect(posthog.getFeatureFlag).not.toHaveBeenCalled()
+  })
+
+  it('returns undefined and never reads the flag when posthog is not loaded', () => {
+    ;(posthog as any).__loaded = false
+    ;(posthog._isIdentified as any).mockReturnValue(true)
+    expect(getCoachmarkVariant()).toBeUndefined()
+    expect(posthog.getFeatureFlag).not.toHaveBeenCalled()
+    ;(posthog as any).__loaded = true
+  })
+})
+
+// --- Coachmark eligibility (localStorage targeting) ---
+
+describe('coachmark eligibility', () => {
+  it('is not eligible by default (no starter pack purchased)', () => {
+    expect(isCoachmarkEligible()).toBe(false)
+  })
+
+  it('becomes eligible after a starter pack purchase', () => {
+    markStarterPackForCoachmark()
+    expect(isCoachmarkEligible()).toBe(true)
+  })
+
+  it('is no longer eligible once suppressed, even with a starter pack', () => {
+    markStarterPackForCoachmark()
+    suppressCoachmark()
+    expect(isCoachmarkEligible()).toBe(false)
+  })
+})
+
+describe('getEligibleCoachmarkVariant', () => {
+  it('returns undefined and never reads the flag when not eligible', () => {
+    ;(posthog._isIdentified as any).mockReturnValue(true)
+    ;(posthog.getFeatureFlag as any).mockReturnValue('treatment')
+    expect(getEligibleCoachmarkVariant()).toBeUndefined()
+    expect(posthog.getFeatureFlag).not.toHaveBeenCalled()
+  })
+
+  it('returns the variant for an eligible, identified user', () => {
+    markStarterPackForCoachmark()
+    ;(posthog._isIdentified as any).mockReturnValue(true)
+    ;(posthog.getFeatureFlag as any).mockReturnValue('treatment')
+    expect(getEligibleCoachmarkVariant()).toBe('treatment')
+    expect(posthog.getFeatureFlag).toHaveBeenCalledWith('coachmark-experiment')
+  })
+
+  it('returns undefined and never reads the flag once the user is suppressed', () => {
+    markStarterPackForCoachmark()
+    suppressCoachmark()
+    ;(posthog._isIdentified as any).mockReturnValue(true)
+    ;(posthog.getFeatureFlag as any).mockReturnValue('treatment')
+    expect(getEligibleCoachmarkVariant()).toBeUndefined()
+    expect(posthog.getFeatureFlag).not.toHaveBeenCalled()
   })
 })
 
