@@ -14,6 +14,11 @@ export const TOOL_COSTS: Record<string, number> = {
   Product_shot_pipeline: 10,              // product-shot 1K
   Product_shot_pipeline_2k: 15,           // product-shot 2K
   Product_shot_pipeline_4k: 25,           // product-shot 4K
+  // Upscale — real cost depends on tier + factor (sent via pricing_context to the
+  // estimate endpoint). This flat key is only a last-resort gate fallback when the
+  // estimate call fails; set mid-grid so it neither blocks cheap nor approves the
+  // most expensive runs blindly.
+  upscale_image: 30,
   human_fix_photoshoot: 10,          // human fix 1K
   human_fix_photoshoot_2k: 13,       // human fix 2K
   human_fix_photoshoot_4k: 18,       // human fix 4K

@@ -436,6 +436,7 @@ export default function UnifiedStudio() {
     generationInputUrls,
     handleGenerate,
     handleAIFix,
+    handleUpscale,
     handleKeepBrowsing,
     resumeGeneration,
     restoreAsyncResult,
@@ -662,6 +663,8 @@ export default function UnifiedStudio() {
             effectiveJewelryType={effectiveJewelryType}
             isProductShot={isProductShot}
             onAIFix={handleAIFix}
+            onUpscale={handleUpscale}
+            upscaleResolution={generationInputUrls?.resolution ?? resolution}
             handleStartOver={handleStartOver}
             feedbackOpen={feedbackOpen}
             setFeedbackOpen={setFeedbackOpen}

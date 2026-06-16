@@ -51,6 +51,7 @@ import {
   startPdpShot,
   startFixShot,
 } from '@/lib/photoshoot-api';
+import { startUpscale, tierForUpscale, UPSCALE_POLL_TIMEOUT_MS } from '@/lib/upscale-api';
 import { uploadToAzure } from '@/lib/microservices-api';
 import { compressImageBlob, imageSourceToBlob } from '@/lib/image-compression';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
@@ -82,7 +83,11 @@ interface UseStudioGenerationOptions {
   aspectRatio: string;
   resolution: Resolution;
   generationCost: number | null;
-  checkCredits: (tool: string) => Promise<boolean>;
+  checkCredits: (
+    tool: string,
+    numVariations?: number,
+    metadata?: { model?: string; pricingContext?: Record<string, unknown> },
+  ) => Promise<boolean>;
   toast: ReturnType<typeof useToast>['toast'];
   setCurrentStep: (step: StudioStep) => void;
   setJewelryAssetId: (id: string | null) => void;
@@ -409,6 +414,88 @@ export function useStudioGeneration({
     toast, setCurrentStep, trackGeneration, regenerationCount,
   ]);
 
+  const handleUpscale = useCallback(async (factor: number) => {
+    if (isSubmitting) return;
+
+    const prevData = generationInputUrlsMap[workflowId ?? ''];
+    const upscaleResolution = prevData?.resolution ?? resolution;
+    const upscaleAspectRatio = prevData?.aspectRatio ?? aspectRatio;
+    // The image to enlarge is the current result. image.uri accepts the SAS https
+    // URL we already render (or an azure:// URI) per the backend contract.
+    const sourceImageUrl = resultImages[0];
+
+    if (!sourceImageUrl) {
+      toast({ variant: 'destructive', title: 'Missing image', description: 'Cannot upscale — the result image is not available.' });
+      return;
+    }
+
+    const hasCredits = await checkCredits('upscale_image', 1, {
+      pricingContext: { image_size: tierForUpscale(upscaleResolution), factor },
+    });
+    if (!hasCredits) {
+      trackPaywallHit({ category: TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType, steps_completed: 3 });
+      return;
+    }
+
+    const category = TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType;
+
+    setIsSubmitting(true);
+    setGenerationError(null);
+    hasNavigatedAway.current = false;
+    // Show the source image in the second slot while the upscale runs.
+    if (workflowId) {
+      setGenerationInputUrlsMap(prev => ({
+        ...prev,
+        [workflowId]: { ...prev[workflowId], modelUrl: sourceImageUrl },
+      }));
+    }
+    setResultImages([]);
+    setCurrentStep('generating');
+
+    try {
+      const startResponse = await startUpscale({
+        imageUri: sourceImageUrl,
+        factor,
+        resolution: upscaleResolution,
+        idempotency_key: `upscale-${Date.now()}-${effectiveJewelryType}`,
+      });
+
+      const _workflowId = startResponse.workflow_id;
+      setGenerationInputUrlsMap(prev => ({
+        ...prev,
+        [_workflowId]: {
+          jewelryUrl: prevData?.jewelryUrl,
+          modelUrl: sourceImageUrl,
+          aspectRatio: upscaleAspectRatio,
+          resolution: upscaleResolution,
+          generationCost: prevData?.generationCost ?? generationCost,
+        },
+      }));
+      setWorkflowId(_workflowId);
+      trackGeneration({
+        workflowId: _workflowId,
+        isProductShot,
+        jewelryType: category,
+        jewelryUrl: prevData?.jewelryUrl ?? '',
+        modelUrl: sourceImageUrl,
+        aspectRatio: upscaleAspectRatio,
+        resolution: upscaleResolution,
+        generationCost: prevData?.generationCost ?? generationCost,
+        // Upscale can be much slower than a normal generation — give the poller room.
+        timeoutMs: UPSCALE_POLL_TIMEOUT_MS,
+      });
+      markGenerationStarted(_workflowId);
+    } catch {
+      setGenerationError('unavailable');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [
+    isSubmitting, resultImages, workflowId, generationInputUrlsMap,
+    isProductShot, effectiveJewelryType, resolution, aspectRatio,
+    generationCost, checkCredits, toast, setCurrentStep, trackGeneration,
+  ]);
+
   const handleKeepBrowsing = useCallback(() => {
     hasNavigatedAway.current = true;
     setCurrentStep('model');
@@ -484,6 +571,7 @@ export function useStudioGeneration({
     generationInputUrls,
     handleGenerate,
     handleAIFix,
+    handleUpscale,
     handleKeepBrowsing,
     resumeGeneration,
     restoreAsyncResult,

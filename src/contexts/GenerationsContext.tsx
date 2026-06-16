@@ -16,6 +16,9 @@ const STUDIO_RESULT_RETRY_DELAY_MS = 3000;
 // 4K workflows can reach "completed" before the result payload is readable.
 // Keep the status poll bounded separately and only extend this post-completion lag window.
 const STUDIO_RESULT_MAX_RETRIES = 100;
+// Default poll ceiling for photoshoot/fix runs. Slow workflows (e.g. upscale)
+// override this via TrackGenerationParams.timeoutMs.
+const DEFAULT_POLL_TIMEOUT_MS = 720_000;
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -34,6 +37,8 @@ export interface TrackedGeneration {
   resolution: Resolution;
   generationCost: number | null;
   jewelryDescription?: string;
+  /** Poll ceiling for this run. Defaults to DEFAULT_POLL_TIMEOUT_MS when omitted. */
+  timeoutMs?: number;
 }
 
 export interface TrackGenerationParams {
@@ -45,6 +50,8 @@ export interface TrackGenerationParams {
   aspectRatio: string;
   resolution: Resolution;
   generationCost: number | null;
+  /** Override the poll ceiling for slow workflows (e.g. upscale). */
+  timeoutMs?: number;
 }
 
 export interface GenerationsContextValue {
@@ -177,6 +184,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
         aspectRatio: params.aspectRatio,
         resolution: params.resolution,
         generationCost: params.generationCost,
+        ...(params.timeoutMs ? { timeoutMs: params.timeoutMs } : {}),
       },
     ]);
   }, []);
@@ -235,7 +243,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
         },
         parseResult: (d) => d as PhotoshootResultResponse,
         intervalMs: 3000,
-        timeoutMs: 720_000,
+        timeoutMs: gen.timeoutMs ?? DEFAULT_POLL_TIMEOUT_MS,
         max404s: Number.MAX_SAFE_INTEGER,
         maxPollErrors: 1,
         maxResultRetries: STUDIO_RESULT_MAX_RETRIES,
