@@ -161,8 +161,8 @@ export function StudioResultsStep({
           <Diamond className="h-4 w-4" />
           New Photoshoot
         </Button>
-        <div className="flex items-center justify-center gap-3">
-          <div ref={humanButtonRef} className="relative flex-1">
+        <div className="grid grid-cols-2 items-center gap-3">
+          <div ref={humanButtonRef} className="relative min-w-0">
             <Button
               type="button"
               variant="outline"
@@ -186,7 +186,7 @@ export function StudioResultsStep({
                 workflow_id: workflowId,
               });
             }}
-            className="h-10 flex-1 gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] bg-background px-3 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"
+            className="h-10 w-full gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] bg-background px-3 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"
           >
             Fix it with AI
           </Button>

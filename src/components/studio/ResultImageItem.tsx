@@ -10,26 +10,12 @@ function safeFetch(src: string): Promise<Response> {
   return src.includes('/artifacts/') ? authenticatedFetch(src) : fetch(src);
 }
 
-async function openImageInNewTab(src: string) {
-  if (src.startsWith('blob:') || src.startsWith('data:')) {
-    window.open(src, '_blank', 'noopener,noreferrer');
-    return;
-  }
-
-  const newTab = window.open('', '_blank', 'noopener,noreferrer');
-  if (!newTab) throw new Error('Popup blocked');
-
-  try {
-    const resp = await safeFetch(src);
-    if (!resp.ok) throw new Error('Fetch failed');
-    const blob = await resp.blob();
-    const blobUrl = URL.createObjectURL(blob);
-    newTab.location.href = blobUrl;
-    window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
-  } catch (error) {
-    newTab.close();
-    throw error;
-  }
+function openImageInNewTab(src: string) {
+  // Direct navigation works for blob:, data:, artifact-resolved blob URLs, and
+  // public/SAS https URLs alike — and unlike fetch() it is not subject to CORS,
+  // so cross-origin Azure result images open reliably.
+  const win = window.open(src, '_blank', 'noopener,noreferrer');
+  if (!win) throw new Error('Popup blocked');
 }
 
 export function ResultImageItem({ url, index, workflowId, jewelryType, naturalAspect }: {
@@ -54,8 +40,8 @@ export function ResultImageItem({ url, index, workflowId, jewelryType, naturalAs
           className="h-8 w-8 bg-background/80 backdrop-blur-sm border-border/40 hover:bg-background"
           onClick={async (e) => {
             e.stopPropagation();
+            const src = resolvedSrc ?? url;
             try {
-              const src = resolvedSrc ?? url;
               let blobUrl: string;
               if (src.startsWith('blob:') || src.startsWith('data:')) {
                 blobUrl = src;
@@ -77,7 +63,16 @@ export function ResultImageItem({ url, index, workflowId, jewelryType, naturalAs
                 context: 'unified-studio',
                 category: TO_SINGULAR[jewelryType] ?? jewelryType,
               }));
-            } catch { alert('Download failed. Please try again.'); }
+            } catch {
+              // A cross-origin image (e.g. an Azure blob without CORS) blocks the
+              // fetch-to-blob path. Fall back to opening it so the user can save it
+              // manually instead of showing a dead-end error.
+              try {
+                openImageInNewTab(src);
+              } catch {
+                alert('Download failed. Please try again.');
+              }
+            }
           }}
         >
           <Download className="h-3.5 w-3.5" />
