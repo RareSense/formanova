@@ -437,6 +437,8 @@ export default function UnifiedStudio() {
     handleGenerate,
     handleAIFix,
     handleUpscale,
+    upscaleStatus,
+    upscaleError,
     handleKeepBrowsing,
     resumeGeneration,
     restoreAsyncResult,
@@ -665,6 +667,8 @@ export default function UnifiedStudio() {
             onAIFix={handleAIFix}
             onUpscale={handleUpscale}
             upscaleResolution={generationInputUrls?.resolution ?? resolution}
+            upscaleRunStatus={upscaleStatus}
+            upscaleError={upscaleError}
             handleStartOver={handleStartOver}
             feedbackOpen={feedbackOpen}
             setFeedbackOpen={setFeedbackOpen}

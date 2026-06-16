@@ -1,11 +1,11 @@
 import { useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Diamond, Maximize2 } from 'lucide-react';
+import { Diamond } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ResultImageItem } from '@/components/studio/ResultImageItem';
 import { FeedbackModal } from '@/components/studio/FeedbackModal';
 import { AIFixModal } from '@/components/studio/AIFixModal';
-import { UpscaleModal } from '@/components/studio/UpscaleModal';
+import { UpscaleControl, type UpscaleRunStatus } from '@/components/studio/UpscaleControl';
 import { PostGenerationCoachmark } from '@/components/studio/PostGenerationCoachmark';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
 import { type FeedbackCategory } from '@/lib/feedback-api';
@@ -22,6 +22,8 @@ interface StudioResultsStepProps {
   onUpscale: (factor: number) => void;
   /** The generation's tier — drives upscale billing and the factor menu. */
   upscaleResolution: Resolution;
+  upscaleRunStatus: UpscaleRunStatus;
+  upscaleError?: string | null;
   handleStartOver: () => void;
   feedbackOpen: boolean;
   setFeedbackOpen: (open: boolean) => void;
@@ -43,6 +45,8 @@ export function StudioResultsStep({
   onAIFix,
   onUpscale,
   upscaleResolution,
+  upscaleRunStatus,
+  upscaleError,
   handleStartOver,
   feedbackOpen,
   setFeedbackOpen,
@@ -56,7 +60,6 @@ export function StudioResultsStep({
   humanFixCost,
 }: StudioResultsStepProps) {
   const [aiFixOpen, setAiFixOpen] = useState(false);
-  const [upscaleOpen, setUpscaleOpen] = useState(false);
 
   // --- Post-generation coachmark ---------------------------------------------
   // A small floating card that points at the "Fix it with human" button once a
@@ -139,16 +142,17 @@ export function StudioResultsStep({
           observeRef={resultsContainerRef}
           onVisibilityChange={handleCoachmarkVisibility}
         />
-        <Button
-          variant="outline"
-          size="lg"
-          disabled={resultImages.length === 0}
-          onClick={() => { dismissCoachmarkForGeneration(); setUpscaleOpen(true); }}
-          className="h-12 w-full gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] px-6 font-display text-base uppercase tracking-wide text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"
-        >
-          <Maximize2 className="h-4 w-4" />
-          Upscale
-        </Button>
+        {/* Inline upscale: pick a multiplier and start, no modal, directly below
+            the generated image. Hides itself when the image can't be enlarged. */}
+        {resultImages.length > 0 && (
+          <UpscaleControl
+            resultImageUrl={resultImages[0]}
+            resolution={upscaleResolution}
+            onUpscale={(factor) => { dismissCoachmarkForGeneration(); onUpscale(factor); }}
+            runStatus={upscaleRunStatus}
+            error={upscaleError}
+          />
+        )}
         <Button
           size="lg"
           onClick={() => { dismissCoachmarkForGeneration(); handleStartOver(); }}
@@ -210,14 +214,6 @@ export function StudioResultsStep({
         resultImageUrl={resultImages[0] ?? null}
         isProductShot={isProductShot}
         generationCost={generationCost}
-      />
-
-      <UpscaleModal
-        open={upscaleOpen}
-        onClose={() => setUpscaleOpen(false)}
-        onConfirm={onUpscale}
-        resultImageUrl={resultImages[0] ?? null}
-        resolution={upscaleResolution}
       />
     </motion.div>
   );

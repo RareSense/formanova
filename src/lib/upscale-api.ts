@@ -108,6 +108,27 @@ export async function estimateUpscaleCost(
   }
 }
 
+// Estimates are stable per (tier, factor) for the session, so cache successful
+// lookups. Failures are NOT cached so the caller can retry (and show that one
+// option as temporarily unavailable in the meantime).
+const estimateCache = new Map<string, number>();
+
+/** Session cache key for an estimate. Exported for cache-aware tests. */
+export function upscaleEstimateKey(resolution: Resolution, factor: number): string {
+  return `${tierForUpscale(resolution)}:${Math.trunc(factor)}`;
+}
+
+export async function estimateUpscaleCostCached(
+  req: UpscaleEstimateRequest,
+): Promise<number | null> {
+  const key = upscaleEstimateKey(req.resolution, req.factor);
+  const hit = estimateCache.get(key);
+  if (hit !== undefined) return hit;
+  const cost = await estimateUpscaleCost(req);
+  if (cost != null) estimateCache.set(key, cost);
+  return cost;
+}
+
 // ─── Start upscale ──────────────────────────────────────────────────────────
 
 export interface UpscaleStartRequest {

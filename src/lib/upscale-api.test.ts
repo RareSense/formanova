@@ -17,6 +17,8 @@ import {
   computeUpscaleFactors,
   tierForUpscale,
   estimateUpscaleCost,
+  estimateUpscaleCostCached,
+  upscaleEstimateKey,
   startUpscale,
   UPSCALE_MAX_FACTOR,
   UPSCALE_MAX_LONG_EDGE,
@@ -149,6 +151,39 @@ describe('estimateUpscaleCost', () => {
   it('returns null when the fetch throws', async () => {
     mockAuthFetch.mockRejectedValueOnce(new Error('network'));
     expect(await estimateUpscaleCost({ resolution: '1K', factor: 2 })).toBeNull();
+  });
+});
+
+// ── estimateUpscaleCostCached ───────────────────────────────────────────────
+
+describe('estimateUpscaleCostCached', () => {
+  it('builds a tier:factor key', () => {
+    expect(upscaleEstimateKey('2K', 4)).toBe('2k:4');
+    expect(upscaleEstimateKey('1K', 2.7 as unknown as number)).toBe('1k:2');
+  });
+
+  it('caches a successful estimate (one network call for repeats)', async () => {
+    mockAuthFetch.mockReturnValueOnce(okResponse({ projected_max_hold: 60 }));
+
+    // Use a unique tier+factor to avoid cross-test cache pollution.
+    const first = await estimateUpscaleCostCached({ resolution: '4K', factor: 3 });
+    const second = await estimateUpscaleCostCached({ resolution: '4K', factor: 3 });
+
+    expect(first).toBe(60);
+    expect(second).toBe(60);
+    expect(mockAuthFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('does NOT cache a failed estimate (retries on next call)', async () => {
+    mockAuthFetch.mockReturnValueOnce(errorResponse(500));
+    mockAuthFetch.mockReturnValueOnce(okResponse({ projected_max_hold: 20 }));
+
+    const first = await estimateUpscaleCostCached({ resolution: '2K', factor: 7 });
+    const second = await estimateUpscaleCostCached({ resolution: '2K', factor: 7 });
+
+    expect(first).toBeNull();
+    expect(second).toBe(20);
+    expect(mockAuthFetch).toHaveBeenCalledTimes(2);
   });
 });
 
