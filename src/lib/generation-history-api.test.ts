@@ -134,6 +134,11 @@ describe('inferSourceType', () => {
     expect(inferSourceType('agentic_pipeline')).toBe('photo');
   });
 
+  it('identifies upscale workflows as photo entries', () => {
+    expect(inferSourceType('upscale_image')).toBe('photo');
+    expect(inferSourceType('Upscale')).toBe('photo');
+  });
+
   it('product_shot takes priority over photo keywords', () => {
     expect(inferSourceType('product_shot_jewelry')).toBe('product_shot');
   });

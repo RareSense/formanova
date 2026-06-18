@@ -24,6 +24,7 @@ import {
   upscaleEtaLabel,
   fallbackUpscalePrice,
   maxUpscaleFactorForTier,
+  inferResolutionTier,
   UPSCALE_MAX_FACTOR,
   UPSCALE_MAX_LONG_EDGE,
 } from './upscale-api';
@@ -153,6 +154,26 @@ describe('fallbackUpscalePrice', () => {
   it('returns null for pairs outside the grid', () => {
     expect(fallbackUpscalePrice('2K', 7)).toBeNull();
     expect(fallbackUpscalePrice('4K', 4)).toBeNull();
+  });
+});
+
+// ── inferResolutionTier ─────────────────────────────────────────────────────
+
+describe('inferResolutionTier', () => {
+  it('maps a long edge to the nearest priced billing tier', () => {
+    expect(inferResolutionTier(1024)).toBe('1K');
+    expect(inferResolutionTier(2048)).toBe('2K');
+    expect(inferResolutionTier(4096)).toBe('4K');
+    // Portrait variants still land on the right tier via the midpoints.
+    expect(inferResolutionTier(1365)).toBe('1K');
+    expect(inferResolutionTier(2400)).toBe('2K');
+  });
+
+  it('returns null past 4K (no priced tier) and for invalid input', () => {
+    expect(inferResolutionTier(6144)).toBeNull(); // 6K - already upscaled
+    expect(inferResolutionTier(8192)).toBeNull();
+    expect(inferResolutionTier(0)).toBeNull();
+    expect(inferResolutionTier(-10)).toBeNull();
   });
 });
 
