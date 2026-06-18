@@ -34,6 +34,8 @@ interface Props {
   runStatus: UpscaleRunStatus;
   /** Concise retryable error to show near the control. */
   error?: string | null;
+  /** Tight layout for narrow contexts (history cards): no icon, slimmer widths. */
+  compact?: boolean;
 }
 
 function CoinPrice({ status, cost }: { status: EstimateStatus; cost?: number }) {
@@ -57,6 +59,7 @@ export function UpscaleControl({
   onUpscale,
   runStatus,
   error,
+  compact = false,
 }: Props) {
   const resolvedSrc = useAuthenticatedImage(resultImageUrl);
 
@@ -177,7 +180,8 @@ export function UpscaleControl({
               aria-haspopup="listbox"
               disabled={busy}
               className={cn(
-                'flex h-11 w-24 items-center justify-between gap-1.5 rounded-md border border-primary/60 bg-background px-3',
+                'flex h-11 items-center justify-between gap-1.5 rounded-md border border-primary/60 bg-background',
+                compact ? 'w-16 px-2' : 'w-24 px-3',
                 'font-mono text-sm transition-colors hover:border-primary',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
                 'disabled:cursor-not-allowed disabled:opacity-50',
@@ -213,7 +217,10 @@ export function UpscaleControl({
             }
             onUpscale(selectedFactor);
           }}
-          className="h-11 flex-1 gap-2 border-0 bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] px-6 font-display text-base uppercase tracking-wide text-background transition-opacity hover:opacity-90"
+          className={cn(
+            'h-11 flex-1 gap-2 border-0 bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] font-display uppercase tracking-wide text-background transition-opacity hover:opacity-90',
+            compact ? 'px-3 text-sm' : 'px-6 text-base',
+          )}
         >
           {busy ? (
             <>
@@ -222,7 +229,7 @@ export function UpscaleControl({
             </>
           ) : (
             <>
-              <Maximize2 className="h-4 w-4" />
+              {!compact && <Maximize2 className="h-4 w-4" />}
               {buttonLabel()}
               <span className="ml-1 flex items-center gap-1 text-sm normal-case tracking-normal opacity-90">
                 {selectedStatus === 'success' ? (

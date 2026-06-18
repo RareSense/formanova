@@ -207,6 +207,7 @@ export function PhotoCard({ workflow, index, onUpscaled }: { workflow: WorkflowS
         {upscaleEligible && upscaleTier && (
           <div className="mx-2 sm:mx-3 mt-2">
             <UpscaleControl
+              compact
               resultImageUrl={workflow.thumbnail_url ?? null}
               resolution={upscaleTier}
               runStatus={upscaleStatus}
