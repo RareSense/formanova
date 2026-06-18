@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { Download, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
+import { resolutionTierLabel } from '@/lib/upscale-api';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
 
 function safeFetch(src: string): Promise<Response> {
@@ -10,43 +12,62 @@ function safeFetch(src: string): Promise<Response> {
   return src.includes('/artifacts/') ? authenticatedFetch(src) : fetch(src);
 }
 
-async function openImageInNewTab(src: string) {
-  if (src.startsWith('blob:') || src.startsWith('data:')) {
-    window.open(src, '_blank', 'noopener,noreferrer');
-    return;
-  }
-
-  const newTab = window.open('', '_blank', 'noopener,noreferrer');
-  if (!newTab) throw new Error('Popup blocked');
-
-  try {
-    const resp = await safeFetch(src);
-    if (!resp.ok) throw new Error('Fetch failed');
-    const blob = await resp.blob();
-    const blobUrl = URL.createObjectURL(blob);
-    newTab.location.href = blobUrl;
-    window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
-  } catch (error) {
-    newTab.close();
-    throw error;
-  }
+function openImageInNewTab(src: string) {
+  // Direct navigation works for blob:, data:, artifact-resolved blob URLs, and
+  // public/SAS https URLs alike, and unlike fetch() it is not subject to CORS,
+  // so cross-origin Azure result images open reliably.
+  const win = window.open(src, '_blank', 'noopener,noreferrer');
+  if (!win) throw new Error('Popup blocked');
 }
 
-export function ResultImageItem({ url, index, workflowId, jewelryType, naturalAspect }: {
+export interface ResultImageMeta {
+  tier: string | null;
+  width: number;
+  height: number;
+}
+
+export function ResultImageItem({ url, index, workflowId, jewelryType, naturalAspect, hero, onMeta }: {
   url: string;
   index: number;
   workflowId: string | null;
   jewelryType: string;
   naturalAspect?: boolean;
+  /** Single-result mode: render large and centered as the screen's hero. */
+  hero?: boolean;
+  /** Reports the loaded image's tier + pixel dimensions (for a details line). */
+  onMeta?: (meta: ResultImageMeta) => void;
 }) {
   const resolvedSrc = useAuthenticatedImage(url);
+  // Resolution badge ("1K"/"2K"/"4K"/"6K"...) derived from the rendered image's
+  // real pixels. Re-fires whenever resolvedSrc changes, so swapping in an
+  // upscaled result automatically updates the badge to its new tier.
+  const [tier, setTier] = useState<string | null>(null);
   return (
-    <div className="relative group border border-border/30 overflow-hidden w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.75rem)] max-w-xs">
+    <div
+      className={`relative group border border-border/30 overflow-hidden ${
+        hero
+          ? 'w-full max-w-2xl mx-auto'
+          : 'w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.75rem)]'
+      }`}
+    >
       <img
         src={resolvedSrc ?? ""}
         alt={`Result ${index + 1}`}
-        className={`w-full object-contain bg-muted/30 max-h-[70vh]${naturalAspect ? '' : ' aspect-[3/4]'}`}
+        onLoad={(e) => {
+          const el = e.currentTarget;
+          const width = el.naturalWidth;
+          const height = el.naturalHeight;
+          const nextTier = resolutionTierLabel(Math.max(width, height));
+          setTier(nextTier);
+          onMeta?.({ tier: nextTier, width, height });
+        }}
+        className={`w-full object-contain bg-muted/30 ${hero ? 'max-h-[72vh]' : 'max-h-[70vh]'}${naturalAspect ? '' : ' aspect-[3/4]'}`}
       />
+      {tier && (
+        <span className="absolute top-3 left-3 rounded-md border border-foreground/15 bg-background/90 px-2.5 py-1 font-mono text-xs font-semibold tracking-wider text-foreground shadow-sm backdrop-blur-sm">
+          {tier}
+        </span>
+      )}
       <div className="absolute top-2 right-2 flex gap-1.5">
         <Button
           variant="outline"
@@ -54,8 +75,8 @@ export function ResultImageItem({ url, index, workflowId, jewelryType, naturalAs
           className="h-8 w-8 bg-background/80 backdrop-blur-sm border-border/40 hover:bg-background"
           onClick={async (e) => {
             e.stopPropagation();
+            const src = resolvedSrc ?? url;
             try {
-              const src = resolvedSrc ?? url;
               let blobUrl: string;
               if (src.startsWith('blob:') || src.startsWith('data:')) {
                 blobUrl = src;
@@ -77,7 +98,16 @@ export function ResultImageItem({ url, index, workflowId, jewelryType, naturalAs
                 context: 'unified-studio',
                 category: TO_SINGULAR[jewelryType] ?? jewelryType,
               }));
-            } catch { alert('Download failed. Please try again.'); }
+            } catch {
+              // A cross-origin image (e.g. an Azure blob without CORS) blocks the
+              // fetch-to-blob path. Fall back to opening it so the user can save it
+              // manually instead of showing a dead-end error.
+              try {
+                openImageInNewTab(src);
+              } catch {
+                alert('Download failed. Please try again.');
+              }
+            }
           }}
         >
           <Download className="h-3.5 w-3.5" />

@@ -2,6 +2,7 @@ import React, { act } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { HelmetProvider } from 'react-helmet-async';
 
 import UnifiedStudio from './UnifiedStudio';
 
@@ -203,6 +204,7 @@ function renderStudio(path = '/studio/necklace') {
   root = createRoot(container);
   act(() => {
     root?.render(
+      <HelmetProvider>
       <MemoryRouter
         initialEntries={[path]}
         future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
@@ -210,7 +212,8 @@ function renderStudio(path = '/studio/necklace') {
         <Routes>
           <Route path="/studio/:type" element={<UnifiedStudio />} />
         </Routes>
-      </MemoryRouter>,
+      </MemoryRouter>
+      </HelmetProvider>,
     );
   });
   return container;

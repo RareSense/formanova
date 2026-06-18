@@ -20,6 +20,8 @@ interface WorkflowSectionProps {
   columns?: 2 | 3 | 4 | 5;
   onPageChange: (page: number) => void;
   onWorkflowClick: (id: string) => void;
+  /** Forwarded to cards so an inline upscale completion can refresh the list. */
+  onUpscaled?: () => void;
 }
 
 const containerVariants = {
@@ -39,6 +41,7 @@ export function WorkflowSection({
   columns = 2,
   onPageChange,
   onWorkflowClick,
+  onUpscaled,
 }: WorkflowSectionProps) {
   const gridClass =
     columns === 5
@@ -108,6 +111,7 @@ export function WorkflowSection({
                 workflow={w}
                 index={indexOffset + i + 1}
                 onClick={onWorkflowClick}
+                onUpscaled={onUpscaled}
               />
             ))}
           </motion.div>

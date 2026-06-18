@@ -51,6 +51,7 @@ import {
   startPdpShot,
   startFixShot,
 } from '@/lib/photoshoot-api';
+import { startUpscale, tierForUpscale, UPSCALE_POLL_TIMEOUT_MS } from '@/lib/upscale-api';
 import { uploadToAzure } from '@/lib/microservices-api';
 import { compressImageBlob, imageSourceToBlob } from '@/lib/image-compression';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
@@ -82,7 +83,11 @@ interface UseStudioGenerationOptions {
   aspectRatio: string;
   resolution: Resolution;
   generationCost: number | null;
-  checkCredits: (tool: string) => Promise<boolean>;
+  checkCredits: (
+    tool: string,
+    numVariations?: number,
+    metadata?: { model?: string; pricingContext?: Record<string, unknown> },
+  ) => Promise<boolean>;
   toast: ReturnType<typeof useToast>['toast'];
   setCurrentStep: (step: StudioStep) => void;
   setJewelryAssetId: (id: string | null) => void;
@@ -115,6 +120,12 @@ export function useStudioGeneration({
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [regenerationCount, setRegenerationCount] = useState(0);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  // Inline upscale runs ON the results screen without navigating away. It is
+  // tracked separately from the main workflow so completion does not trigger the
+  // generate/fix completion path (which transitions steps and clears the image).
+  const [upscaleStatus, setUpscaleStatus] = useState<'idle' | 'starting' | 'processing' | 'completed' | 'error'>('idle');
+  const [upscaleError, setUpscaleError] = useState<string | null>(null);
+  const [activeUpscaleId, setActiveUpscaleId] = useState<string | null>(null);
   const [generationInputUrlsMap, setGenerationInputUrlsMap] = useState<
     Record<string, {
       jewelryUrl?: string;
@@ -129,6 +140,7 @@ export function useStudioGeneration({
   const { generations, trackGeneration, clearGeneration } = useGenerations();
 
   const myGeneration = generations.find(g => g.workflowId === workflowId);
+  const upscaleGeneration = generations.find(g => g.workflowId === activeUpscaleId);
   const isGenerating = isSubmitting || myGeneration?.status === 'running';
   const generationProgress = myGeneration?.progress ?? 0;
   const generationStep = myGeneration?.generationStep ?? '';
@@ -187,6 +199,38 @@ export function useStudioGeneration({
     // myGeneration becomes undefined and the effect is a no-op — safe because the new generation
     // will trigger its own completion effect when it resolves.
   }, [myGeneration?.status]);
+
+  // React to inline-upscale completion/failure. Swaps the result image in place
+  // (so its download action just works) without leaving the results screen.
+  useEffect(() => {
+    if (!upscaleGeneration) return;
+    if (upscaleGeneration.status === 'completed') {
+      setResultImages(upscaleGeneration.resultImages);
+      setUpscaleStatus('completed');
+      trackGenerationComplete({
+        source: 'unified-studio',
+        category: TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType,
+        upload_type: null,
+        duration_ms: Date.now() - (upscaleGeneration.startedAt ?? Date.now()),
+        is_first_ever: false,
+        aspect_ratio: upscaleGeneration.aspectRatio,
+        resolution: upscaleGeneration.resolution,
+      });
+      clearGeneration(activeUpscaleId!);
+      setActiveUpscaleId(null);
+    }
+    if (upscaleGeneration.status === 'failed') {
+      setUpscaleStatus('error');
+      setUpscaleError('Upscale failed. Please try again.');
+      clearGeneration(activeUpscaleId!);
+      setActiveUpscaleId(null);
+    }
+    // Deps: upscaleGeneration.status only. activeUpscaleId, setters, clearGeneration,
+    // and effectiveJewelryType are stable refs/setters/hook constants. Mirrors the
+    // main completion effect above. Watch: if activeUpscaleId changes mid-flight the
+    // lookup yields undefined and the effect no-ops, which is safe.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [upscaleGeneration?.status]);
 
   const handleGenerate = useCallback(async () => {
     if (isSubmitting) return;
@@ -409,6 +453,84 @@ export function useStudioGeneration({
     toast, setCurrentStep, trackGeneration, regenerationCount,
   ]);
 
+  const handleUpscale = useCallback(async (factor: number) => {
+    // Prevent duplicate submissions while one is starting or processing.
+    if (upscaleStatus === 'starting' || upscaleStatus === 'processing') return;
+
+    const prevData = generationInputUrlsMap[workflowId ?? ''];
+    const upscaleResolution = prevData?.resolution ?? resolution;
+    const upscaleAspectRatio = prevData?.aspectRatio ?? aspectRatio;
+    // The image to enlarge is the current result. image.uri accepts the SAS https
+    // URL we already render (or an azure:// URI) per the backend contract.
+    const sourceImageUrl = resultImages[0];
+
+    if (!sourceImageUrl) {
+      toast({ variant: 'destructive', title: 'Missing image', description: 'Cannot upscale — the result image is not available.' });
+      return;
+    }
+
+    setUpscaleStatus('starting');
+    setUpscaleError(null);
+
+    const hasCredits = await checkCredits('upscale_image', 1, {
+      pricingContext: { image_size: tierForUpscale(upscaleResolution), factor },
+    });
+    if (!hasCredits) {
+      // Existing insufficient-credit modal is raised by checkCredits; just reset.
+      setUpscaleStatus('idle');
+      trackPaywallHit({ category: TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType, steps_completed: 3 });
+      return;
+    }
+
+    const category = TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType;
+
+    try {
+      const startResponse = await startUpscale({
+        imageUri: sourceImageUrl,
+        factor,
+        resolution: upscaleResolution,
+        idempotency_key: `upscale-${Date.now()}-${effectiveJewelryType}`,
+      });
+
+      const _upscaleId = startResponse.workflow_id;
+      // Record input urls so a restore (e.g. via the header indicator) keeps context.
+      setGenerationInputUrlsMap(prev => ({
+        ...prev,
+        [_upscaleId]: {
+          jewelryUrl: prevData?.jewelryUrl,
+          modelUrl: sourceImageUrl,
+          aspectRatio: upscaleAspectRatio,
+          resolution: upscaleResolution,
+          generationCost: prevData?.generationCost ?? generationCost,
+        },
+      }));
+      setActiveUpscaleId(_upscaleId);
+      setUpscaleStatus('processing');
+      // Track via GenerationsContext so polling, the header indicator, and
+      // leave-and-return all work. The completion effect above swaps the image in.
+      trackGeneration({
+        workflowId: _upscaleId,
+        isProductShot,
+        jewelryType: category,
+        jewelryUrl: prevData?.jewelryUrl ?? '',
+        modelUrl: sourceImageUrl,
+        aspectRatio: upscaleAspectRatio,
+        resolution: upscaleResolution,
+        generationCost: prevData?.generationCost ?? generationCost,
+        // Upscale can be much slower than a normal generation — give the poller room.
+        timeoutMs: UPSCALE_POLL_TIMEOUT_MS,
+      });
+      markGenerationStarted(_upscaleId);
+    } catch {
+      setUpscaleStatus('error');
+      setUpscaleError('Could not start the upscale. Please try again.');
+    }
+  }, [
+    upscaleStatus, resultImages, workflowId, generationInputUrlsMap,
+    isProductShot, effectiveJewelryType, resolution, aspectRatio,
+    generationCost, checkCredits, toast, trackGeneration,
+  ]);
+
   const handleKeepBrowsing = useCallback(() => {
     hasNavigatedAway.current = true;
     setCurrentStep('model');
@@ -466,6 +588,9 @@ export function useStudioGeneration({
     setRegenerationCount(0);
     setFeedbackOpen(false);
     setGenerationInputUrlsMap({});
+    setUpscaleStatus('idle');
+    setUpscaleError(null);
+    setActiveUpscaleId(null);
   }, []);
 
   return {
@@ -484,6 +609,9 @@ export function useStudioGeneration({
     generationInputUrls,
     handleGenerate,
     handleAIFix,
+    handleUpscale,
+    upscaleStatus,
+    upscaleError,
     handleKeepBrowsing,
     resumeGeneration,
     restoreAsyncResult,

@@ -353,6 +353,9 @@ export function inferSourceType(name: string): SourceType {
   if (lower.includes('product_shot') || lower.includes('product-shot'))
     return 'product_shot';
 
+  // Post-generation upscales surface as their own photo entries in history.
+  if (lower.includes('upscale')) return 'photo';
+
   // Photo workflows (jewelry photoshoot, masking, flux gen, etc.)
   if (
     lower.includes('photo') ||
