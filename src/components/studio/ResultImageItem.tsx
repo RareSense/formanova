@@ -14,7 +14,7 @@ function safeFetch(src: string): Promise<Response> {
 
 function openImageInNewTab(src: string) {
   // Direct navigation works for blob:, data:, artifact-resolved blob URLs, and
-  // public/SAS https URLs alike — and unlike fetch() it is not subject to CORS,
+  // public/SAS https URLs alike, and unlike fetch() it is not subject to CORS,
   // so cross-origin Azure result images open reliably.
   const win = window.open(src, '_blank', 'noopener,noreferrer');
   if (!win) throw new Error('Popup blocked');

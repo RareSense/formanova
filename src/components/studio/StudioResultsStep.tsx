@@ -33,7 +33,7 @@ interface StudioResultsStepProps {
   isProductShot: boolean;
   onAIFix: (prompt: string) => void;
   onUpscale: (factor: number) => void;
-  /** The generation's tier — drives upscale billing and the factor menu. */
+  /** The generation's tier - drives upscale billing and the factor menu. */
   upscaleResolution: Resolution;
   upscaleRunStatus: UpscaleRunStatus;
   upscaleError?: string | null;
