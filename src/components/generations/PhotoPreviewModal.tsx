@@ -34,14 +34,33 @@ export function PhotoPreviewModal({ imageUrl, alt, onClose, assetId }: PhotoPrev
     const ext = filename.lastIndexOf('.') > 0 ? filename.slice(filename.lastIndexOf('.') + 1) : 'jpg';
 
     import('@/lib/posthog-events').then(m => m.trackDownloadClicked({ file_name: filename, file_type: ext, context: 'generations-photo' }));
-    const res = await authenticatedFetch(imageUrl);
-    const blob = await res.blob();
-    const objectUrl = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = objectUrl;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(objectUrl);
+
+    // Mirror the studio result download: artifact paths need the Bearer token,
+    // but a cross-origin CDN/SAS URL must use a plain fetch (adding Authorization
+    // triggers a CORS preflight failure). Fall back to opening the image so the
+    // user can save it manually instead of a dead-end.
+    const src = resolvedSrc ?? imageUrl;
+    try {
+      let blobUrl: string;
+      if (src.startsWith('blob:') || src.startsWith('data:')) {
+        blobUrl = src;
+      } else {
+        const res = src.includes('/artifacts/') ? await authenticatedFetch(src) : await fetch(src);
+        if (!res.ok) throw new Error('Fetch failed');
+        const blob = await res.blob();
+        blobUrl = URL.createObjectURL(blob);
+      }
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      if (!src.startsWith('blob:') && !src.startsWith('data:')) URL.revokeObjectURL(blobUrl);
+    } catch {
+      const win = window.open(src, '_blank', 'noopener,noreferrer');
+      if (!win) alert('Download failed. Please try again.');
+    }
   };
 
   return (

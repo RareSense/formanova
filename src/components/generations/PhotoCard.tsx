@@ -14,7 +14,7 @@ import { renameAsset } from '@/lib/assets-api';
 import { UpscaleControl } from '@/components/studio/UpscaleControl';
 import { CreditPreflightModal } from '@/components/CreditPreflightModal';
 import { useUpscaleLauncher } from '@/hooks/useUpscaleLauncher';
-import { inferResolutionTier, upscaleEtaLabel } from '@/lib/upscale-api';
+import { inferResolutionTier, resolutionTierLabel, upscaleEtaLabel } from '@/lib/upscale-api';
 import type { Resolution } from '@/components/studio/OutputSettingsPills';
 import { truncateDisplayName, formatLocal, formatLocalDateOnly, itemVariants, CreditsBadge } from './workflow-card-shared';
 
@@ -83,6 +83,8 @@ export function PhotoCard({ workflow, index, onUpscaled }: { workflow: WorkflowS
   // Billing tier is inferred from the result's real pixels; null = already past
   // 4K (no priced tier) so the control hides itself.
   const [upscaleTier, setUpscaleTier] = useState<Resolution | null>(null);
+  // Resolution badge label (1K/2K/4K/6K/8K...) from the result's real pixels.
+  const [badgeTier, setBadgeTier] = useState<string | null>(null);
   const [activeFactor, setActiveFactor] = useState<number | null>(null);
   const {
     status: upscaleStatus, error: upscaleError, launch,
@@ -91,13 +93,18 @@ export function PhotoCard({ workflow, index, onUpscaled }: { workflow: WorkflowS
 
   useEffect(() => {
     setUpscaleTier(null);
-    if (!resolvedThumbnail || !upscaleEligible) return;
+    setBadgeTier(null);
+    if (!resolvedThumbnail) return;
     let cancelled = false;
     const img = new Image();
     img.onload = () => {
-      if (!cancelled) setUpscaleTier(inferResolutionTier(Math.max(img.naturalWidth, img.naturalHeight)));
+      if (cancelled) return;
+      const longEdge = Math.max(img.naturalWidth, img.naturalHeight);
+      setBadgeTier(resolutionTierLabel(longEdge));
+      // Billing tier only for upscale-eligible cards (null past 4K hides control).
+      setUpscaleTier(upscaleEligible ? inferResolutionTier(longEdge) : null);
     };
-    img.onerror = () => { /* leave null -> control hidden */ };
+    img.onerror = () => { /* leave null -> badge/control hidden */ };
     img.src = resolvedThumbnail;
     return () => { cancelled = true; };
   }, [resolvedThumbnail, upscaleEligible]);
@@ -122,6 +129,12 @@ export function PhotoCard({ workflow, index, onUpscaled }: { workflow: WorkflowS
             <span className="font-mono text-[9px] uppercase tracking-widest text-foreground">Upscaling</span>
             <span className="font-mono text-[9px] text-foreground/70">{etaLabel ?? 'a few minutes'}</span>
           </div>
+        )}
+        {/* Resolution badge (1K/2K/4K...) from the image's real pixels. */}
+        {badgeTier && hasThumbnail && (
+          <span className="absolute top-1.5 right-1.5 z-10 rounded border border-foreground/15 bg-background/90 px-1.5 py-0.5 font-mono text-[9px] font-semibold tracking-wider text-foreground backdrop-blur-sm">
+            {badgeTier}
+          </span>
         )}
         {hasThumbnail ? (
           <button

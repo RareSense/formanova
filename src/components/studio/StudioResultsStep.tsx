@@ -182,7 +182,7 @@ export function StudioResultsStep({
 
           {/* Details line directly under the preview: tier . dimensions . shot type. */}
           {resultImages.length === 1 && primaryMeta && (
-            <p className="text-center font-mono text-xs tracking-wider text-foreground/80">
+            <p className="text-center font-mono text-xs tracking-wider text-foreground">
               {primaryMeta.tier && <>{primaryMeta.tier} &middot; </>}
               {primaryMeta.width} x {primaryMeta.height} &middot; {isProductShot ? 'Product shot' : 'Model shot'}
             </p>

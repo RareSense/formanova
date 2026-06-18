@@ -25,8 +25,8 @@ export interface UpscaleLaunchArgs {
   factor: number;
   isProductShot: boolean;
   jewelryType: string;
-  /** Fired once the tracked upscale completes, with the result image URLs. */
-  onCompleted?: (resultImages: string[]) => void;
+  /** Fired once the tracked upscale completes (e.g. to refresh the history list). */
+  onCompleted?: () => void;
 }
 
 export interface UseUpscaleLauncherReturn {
@@ -46,7 +46,7 @@ export function useUpscaleLauncher(): UseUpscaleLauncherReturn {
   const [status, setStatus] = useState<UpscaleRunStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const onCompletedRef = useRef<((images: string[]) => void) | undefined>(undefined);
+  const onCompletedRef = useRef<(() => void) | undefined>(undefined);
 
   const tracked = generations.find(g => g.workflowId === activeId);
 
@@ -55,7 +55,7 @@ export function useUpscaleLauncher(): UseUpscaleLauncherReturn {
     if (!tracked || !activeId) return;
     if (tracked.status === 'completed') {
       setStatus('completed');
-      onCompletedRef.current?.(tracked.resultImages);
+      onCompletedRef.current?.();
       clearGeneration(activeId);
       setActiveId(null);
     } else if (tracked.status === 'failed') {
