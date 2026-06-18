@@ -115,6 +115,19 @@ export function fallbackUpscalePrice(resolution: Resolution, factor: number): nu
 }
 
 /**
+ * Highest factor the backend pricing policy allows for a source tier. The
+ * policy only prices 1k up to x9, 2k up to x6, and 4k up to x3 - so we must not
+ * OFFER factors above this even when the 16K physical cap would permit them
+ * (e.g. a 4096px 4K image fits x4 physically but x4 is unpriced). Derived from
+ * the price grid so it can never drift from what we can actually bill.
+ */
+export function maxUpscaleFactorForTier(resolution: Resolution): number {
+  const grid = UPSCALE_FALLBACK_PRICE[tierForUpscale(resolution)];
+  if (!grid) return UPSCALE_MAX_FACTOR;
+  return Math.max(...Object.keys(grid).map(Number));
+}
+
+/**
  * Human-facing resolution badge derived from the ACTUAL long edge in pixels:
  * "1K", "2K", "4K", "6K", "8K", ... It rounds to the nearest 1024 so an upscaled
  * image reports its new tier automatically (e.g. x3 of a 2K image -> "6K").

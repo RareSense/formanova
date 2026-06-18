@@ -130,7 +130,7 @@ export function StudioResultsStep({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
-      className="relative space-y-8"
+      className="relative space-y-6"
     >
       {/* Non-blocking upscale overlay. Mirrors the generation spinner: the result
           stays visible but dimmed behind it, and the user can keep browsing while
@@ -142,7 +142,7 @@ export function StudioResultsStep({
             <Gem className="absolute inset-0 m-auto h-10 w-10 text-primary" />
           </div>
           <h2 className="mb-3 font-display text-3xl uppercase tracking-tight">Upscaling</h2>
-          <p className="mb-6 font-mono text-[11px] italic text-muted-foreground">
+          <p className="mb-6 font-mono text-xs italic text-foreground/80">
             This usually takes {etaLabel ?? 'a few minutes'}.
           </p>
           <button
@@ -152,8 +152,8 @@ export function StudioResultsStep({
             Keep browsing
             <ArrowRight className="h-3 w-3 shrink-0" />
           </button>
-          <p className="max-w-xs font-mono text-[10px] leading-relaxed text-muted-foreground">
-            Grab a coffee or keep browsing. We'll save your result in your generations history.
+          <p className="max-w-xs font-mono text-[11px] leading-relaxed text-foreground/70">
+            It's saved to your generations history, so grab a coffee or keep browsing.
           </p>
         </div>
       )}
@@ -164,32 +164,34 @@ export function StudioResultsStep({
       </div>
 
       {resultImages.length > 0 ? (
-        <div ref={resultsContainerRef} className="flex flex-wrap justify-center gap-4 max-w-5xl mx-auto">
-          {resultImages.map((url, i) => (
-            <ResultImageItem
-              key={i}
-              url={url}
-              index={i}
-              workflowId={workflowId}
-              jewelryType={effectiveJewelryType}
-              naturalAspect
-              hero={resultImages.length === 1}
-              onMeta={i === 0 ? setPrimaryMeta : undefined}
-            />
-          ))}
+        <div className="space-y-2.5">
+          <div ref={resultsContainerRef} className="flex flex-wrap justify-center gap-4 max-w-5xl mx-auto">
+            {resultImages.map((url, i) => (
+              <ResultImageItem
+                key={i}
+                url={url}
+                index={i}
+                workflowId={workflowId}
+                jewelryType={effectiveJewelryType}
+                naturalAspect
+                hero={resultImages.length === 1}
+                onMeta={i === 0 ? setPrimaryMeta : undefined}
+              />
+            ))}
+          </div>
+
+          {/* Details line directly under the preview: tier . dimensions . shot type. */}
+          {resultImages.length === 1 && primaryMeta && (
+            <p className="text-center font-mono text-xs tracking-wider text-foreground/80">
+              {primaryMeta.tier && <>{primaryMeta.tier} &middot; </>}
+              {primaryMeta.width} x {primaryMeta.height} &middot; {isProductShot ? 'Product shot' : 'Model shot'}
+            </p>
+          )}
         </div>
       ) : (
         <div className="text-center py-16">
           <p className="text-muted-foreground">No result images found. The workflow may still be processing.</p>
         </div>
-      )}
-
-      {/* Details line below the preview: tier . dimensions . shot type. */}
-      {resultImages.length === 1 && primaryMeta && (
-        <p className="text-center font-mono text-[11px] tracking-wider text-muted-foreground">
-          {primaryMeta.tier && <>{primaryMeta.tier} &middot; </>}
-          {primaryMeta.width} x {primaryMeta.height} &middot; {isProductShot ? 'Product shot' : 'Model shot'}
-        </p>
       )}
 
       {/* Action area. While the coachmark is visible we lift this block above the

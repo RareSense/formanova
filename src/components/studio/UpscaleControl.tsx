@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
-import { computeUpscaleFactors, estimateUpscaleCostCached } from '@/lib/upscale-api';
+import { computeUpscaleFactors, estimateUpscaleCostCached, maxUpscaleFactorForTier } from '@/lib/upscale-api';
 import type { Resolution } from '@/components/studio/OutputSettingsPills';
 import { cn } from '@/lib/utils';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
@@ -41,11 +41,11 @@ function CoinPrice({ status, cost }: { status: EstimateStatus; cost?: number }) 
     return <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />;
   }
   if (status === 'error' || cost == null) {
-    return <span className="text-[10px] text-muted-foreground">Unavailable</span>;
+    return <span className="text-xs text-muted-foreground">Unavailable</span>;
   }
   return (
-    <span className="flex items-center gap-1 text-xs text-muted-foreground">
-      <img src={creditCoinIcon} alt="" className="h-3.5 w-3.5 object-contain" />
+    <span className="flex items-center gap-1 text-sm font-medium text-foreground">
+      <img src={creditCoinIcon} alt="" className="h-4 w-4 object-contain" />
       {cost}
     </span>
   );
@@ -80,9 +80,12 @@ export function UpscaleControl({
   }, [resolvedSrc]);
 
   const longestSide = dims ? Math.max(dims.w, dims.h) : null;
+  // Offer only factors that are BOTH physically possible (16K long-edge cap) and
+  // priced by the policy for this source tier (1k<=x9, 2k<=x6, 4k<=x3).
+  const tierMaxFactor = maxUpscaleFactorForTier(resolution);
   const availableFactors = useMemo(
-    () => (longestSide ? computeUpscaleFactors(longestSide) : []),
-    [longestSide],
+    () => (longestSide ? computeUpscaleFactors(longestSide).filter(f => f <= tierMaxFactor) : []),
+    [longestSide, tierMaxFactor],
   );
 
   const [selectedFactor, setSelectedFactor] = useState<number>(2);
@@ -150,7 +153,7 @@ export function UpscaleControl({
       )}
     >
       <span className="font-medium">x{factor}</span>
-      <span className="text-[11px] tabular-nums text-muted-foreground">
+      <span className="text-xs tabular-nums text-foreground/70">
         {dims ? `${dims.w * factor}x${dims.h * factor}` : ''}
       </span>
       <CoinPrice status={estimateStatus[factor] ?? 'idle'} cost={estimates[factor]} />
@@ -221,7 +224,7 @@ export function UpscaleControl({
             <>
               <Maximize2 className="h-4 w-4" />
               {buttonLabel()}
-              <span className="ml-1 flex items-center gap-1 text-xs normal-case tracking-normal opacity-80">
+              <span className="ml-1 flex items-center gap-1 text-sm normal-case tracking-normal opacity-90">
                 {selectedStatus === 'success' ? (
                   <>
                     <img src={creditCoinIcon} alt="" className="h-4 w-4 object-contain" />

@@ -23,6 +23,7 @@ import {
   resolutionTierLabel,
   upscaleEtaLabel,
   fallbackUpscalePrice,
+  maxUpscaleFactorForTier,
   UPSCALE_MAX_FACTOR,
   UPSCALE_MAX_LONG_EDGE,
 } from './upscale-api';
@@ -152,6 +153,18 @@ describe('fallbackUpscalePrice', () => {
   it('returns null for pairs outside the grid', () => {
     expect(fallbackUpscalePrice('2K', 7)).toBeNull();
     expect(fallbackUpscalePrice('4K', 4)).toBeNull();
+  });
+});
+
+// ── maxUpscaleFactorForTier ─────────────────────────────────────────────────
+
+describe('maxUpscaleFactorForTier', () => {
+  it('caps each tier at the highest priced factor in the policy', () => {
+    expect(maxUpscaleFactorForTier('1K')).toBe(9);
+    expect(maxUpscaleFactorForTier('2K')).toBe(6);
+    // 4K is priced only up to x3 - x4 must never be offered even though a 4096px
+    // image fits x4 under the 16K physical cap.
+    expect(maxUpscaleFactorForTier('4K')).toBe(3);
   });
 });
 
