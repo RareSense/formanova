@@ -51,7 +51,7 @@ import {
   startPdpShot,
   startFixShot,
 } from '@/lib/photoshoot-api';
-import { startUpscale, tierForUpscale, UPSCALE_POLL_TIMEOUT_MS } from '@/lib/upscale-api';
+import { startUpscale, tierForUpscale, estimateUpscaleCostCached, UPSCALE_POLL_TIMEOUT_MS } from '@/lib/upscale-api';
 import { uploadToAzure } from '@/lib/microservices-api';
 import { compressImageBlob, imageSourceToBlob } from '@/lib/image-compression';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
@@ -62,6 +62,9 @@ import {
   trackGenerationComplete,
   trackAIFixSubmitted,
   consumeFirstGeneration,
+  trackUpscaleStarted,
+  trackUpscaleCompleted,
+  trackUpscalePaywallHit,
 } from '@/lib/posthog-events';
 import { useGenerations } from '@/contexts/GenerationsContext';
 import type { PresetModel } from '@/lib/models-api';
@@ -126,6 +129,14 @@ export function useStudioGeneration({
   const [upscaleStatus, setUpscaleStatus] = useState<'idle' | 'starting' | 'processing' | 'completed' | 'error'>('idle');
   const [upscaleError, setUpscaleError] = useState<string | null>(null);
   const [activeUpscaleId, setActiveUpscaleId] = useState<string | null>(null);
+  // Captured at launch so the upscale completion effect emits the upscale's OWN
+  // cost/tier/factor — NOT the tracked generation's generationCost (original gen).
+  const upscalePropsRef = useRef<{
+    source_tier: Resolution;
+    factor: number;
+    credits_cost: number;
+    category: string;
+  } | null>(null);
   const [generationInputUrlsMap, setGenerationInputUrlsMap] = useState<
     Record<string, {
       jewelryUrl?: string;
@@ -216,6 +227,13 @@ export function useStudioGeneration({
         aspect_ratio: upscaleGeneration.aspectRatio,
         resolution: upscaleGeneration.resolution,
       });
+      if (upscalePropsRef.current) {
+        trackUpscaleCompleted({
+          ...upscalePropsRef.current,
+          is_product_shot: isProductShot,
+          surface: 'studio',
+        });
+      }
       clearGeneration(activeUpscaleId!);
       setActiveUpscaleId(null);
     }
@@ -472,6 +490,9 @@ export function useStudioGeneration({
     setUpscaleStatus('starting');
     setUpscaleError(null);
 
+    // Quoted hold price at launch (policy-driven, cache warm from UpscaleControl).
+    const upscaleCreditsCost = (await estimateUpscaleCostCached({ resolution: upscaleResolution, factor })) ?? 0;
+
     const hasCredits = await checkCredits('upscale_image', 1, {
       pricingContext: { image_size: tierForUpscale(upscaleResolution), factor },
     });
@@ -479,6 +500,13 @@ export function useStudioGeneration({
       // Existing insufficient-credit modal is raised by checkCredits; just reset.
       setUpscaleStatus('idle');
       trackPaywallHit({ category: TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType, steps_completed: 3 });
+      trackUpscalePaywallHit({
+        source_tier: upscaleResolution,
+        factor,
+        credits_cost: upscaleCreditsCost,
+        category: TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType,
+        surface: 'studio',
+      });
       return;
     }
 
@@ -493,6 +521,13 @@ export function useStudioGeneration({
       });
 
       const _upscaleId = startResponse.workflow_id;
+      upscalePropsRef.current = {
+        source_tier: upscaleResolution, factor, credits_cost: upscaleCreditsCost, category,
+      };
+      trackUpscaleStarted({
+        source_tier: upscaleResolution, factor, credits_cost: upscaleCreditsCost, category,
+        is_product_shot: isProductShot, surface: 'studio',
+      });
       // Record input urls so a restore (e.g. via the header indicator) keeps context.
       setGenerationInputUrlsMap(prev => ({
         ...prev,

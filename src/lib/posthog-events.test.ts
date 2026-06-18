@@ -32,6 +32,9 @@ import {
   isCoachmarkEligible,
   markStarterPackForCoachmark,
   suppressCoachmark,
+  trackUpscaleStarted,
+  trackUpscaleCompleted,
+  trackUpscalePaywallHit,
 } from './posthog-events'
 
 beforeEach(() => {
@@ -483,6 +486,79 @@ describe('setUserProfession', () => {
     setUserProfession('freelancer')
     expect((posthog as any).setPersonProperties).not.toHaveBeenCalled()
     ;(posthog as any).__loaded = true
+  })
+})
+
+// ── Upscale events ──────────────────────────────────────────────────
+
+describe('trackUpscaleStarted', () => {
+  it('captures upscale_started with the full prop shape', () => {
+    trackUpscaleStarted({
+      source_tier: '2K',
+      factor: 3,
+      credits_cost: 20,
+      category: 'ring',
+      is_product_shot: true,
+      surface: 'studio',
+    })
+    expect(posthog.capture).toHaveBeenCalledWith('upscale_started', {
+      source_tier: '2K',
+      factor: 3,
+      credits_cost: 20,
+      category: 'ring',
+      is_product_shot: true,
+      surface: 'studio',
+    })
+  })
+
+  it('does not capture when __loaded is false', () => {
+    ;(posthog as any).__loaded = false
+    trackUpscaleStarted({
+      source_tier: '1K', factor: 2, credits_cost: 6, category: 'ring',
+      is_product_shot: false, surface: 'history',
+    })
+    expect(posthog.capture).not.toHaveBeenCalled()
+    ;(posthog as any).__loaded = true
+  })
+})
+
+describe('trackUpscaleCompleted', () => {
+  it('captures upscale_completed with the full prop shape', () => {
+    trackUpscaleCompleted({
+      source_tier: '1K',
+      factor: 4,
+      credits_cost: 12,
+      category: 'necklace',
+      is_product_shot: false,
+      surface: 'history',
+    })
+    expect(posthog.capture).toHaveBeenCalledWith('upscale_completed', {
+      source_tier: '1K',
+      factor: 4,
+      credits_cost: 12,
+      category: 'necklace',
+      is_product_shot: false,
+      surface: 'history',
+    })
+  })
+})
+
+describe('trackUpscalePaywallHit', () => {
+  it('captures upscale_paywall_hit with the full prop shape', () => {
+    trackUpscalePaywallHit({
+      source_tier: '4K',
+      factor: 2,
+      credits_cost: 40,
+      category: 'earring',
+      surface: 'studio',
+    })
+    expect(posthog.capture).toHaveBeenCalledWith('upscale_paywall_hit', {
+      source_tier: '4K',
+      factor: 2,
+      credits_cost: 40,
+      category: 'earring',
+      surface: 'studio',
+    })
   })
 })
 

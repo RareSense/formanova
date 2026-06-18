@@ -11,7 +11,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useGenerations } from '@/contexts/GenerationsContext';
 import { useCreditPreflight } from '@/hooks/use-credit-preflight';
 import { markGenerationStarted } from '@/lib/generation-lifecycle';
-import { startUpscale, tierForUpscale, UPSCALE_POLL_TIMEOUT_MS } from '@/lib/upscale-api';
+import { startUpscale, tierForUpscale, estimateUpscaleCostCached, UPSCALE_POLL_TIMEOUT_MS } from '@/lib/upscale-api';
+import { TO_SINGULAR } from '@/lib/jewelry-utils';
+import { trackUpscaleStarted, trackUpscaleCompleted, trackUpscalePaywallHit } from '@/lib/posthog-events';
 import type { Resolution } from '@/components/studio/OutputSettingsPills';
 
 export type UpscaleRunStatus = 'idle' | 'starting' | 'processing' | 'completed' | 'error';
@@ -48,6 +50,16 @@ export function useUpscaleLauncher(): UseUpscaleLauncherReturn {
   const [activeId, setActiveId] = useState<string | null>(null);
   const onCompletedRef = useRef<(() => void) | undefined>(undefined);
 
+  // Props captured at launch so the completion effect can emit upscale_completed
+  // with the upscale's OWN dimensions (never the tracked generation's cost).
+  const completedPropsRef = useRef<{
+    source_tier: Resolution;
+    factor: number;
+    credits_cost: number;
+    category: string;
+    is_product_shot: boolean;
+  } | null>(null);
+
   const tracked = generations.find(g => g.workflowId === activeId);
 
   // React to completion/failure of the tracked upscale.
@@ -55,6 +67,9 @@ export function useUpscaleLauncher(): UseUpscaleLauncherReturn {
     if (!tracked || !activeId) return;
     if (tracked.status === 'completed') {
       setStatus('completed');
+      if (completedPropsRef.current) {
+        trackUpscaleCompleted({ ...completedPropsRef.current, surface: 'history' });
+      }
       onCompletedRef.current?.();
       clearGeneration(activeId);
       setActiveId(null);
@@ -85,10 +100,15 @@ export function useUpscaleLauncher(): UseUpscaleLauncherReturn {
     setStatus('starting');
     setError(null);
 
+    // Quoted hold price at launch (policy-driven, cache is warm from UpscaleControl).
+    const credits_cost = (await estimateUpscaleCostCached({ resolution, factor })) ?? 0;
+    const category = TO_SINGULAR[jewelryType] ?? jewelryType;
+
     const approved = await checkCredits('upscale_image', 1, {
       pricingContext: { image_size: tierForUpscale(resolution), factor },
     });
     if (!approved) {
+      trackUpscalePaywallHit({ source_tier: resolution, factor, credits_cost, category, surface: 'history' });
       setStatus('idle');
       return;
     }
@@ -102,6 +122,13 @@ export function useUpscaleLauncher(): UseUpscaleLauncherReturn {
       });
       const id = res.workflow_id;
       onCompletedRef.current = onCompleted;
+      completedPropsRef.current = {
+        source_tier: resolution, factor, credits_cost, category, is_product_shot: isProductShot,
+      };
+      trackUpscaleStarted({
+        source_tier: resolution, factor, credits_cost, category,
+        is_product_shot: isProductShot, surface: 'history',
+      });
       setActiveId(id);
       setStatus('processing');
       trackGeneration({
