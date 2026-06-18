@@ -128,6 +128,20 @@ export function maxUpscaleFactorForTier(resolution: Resolution): number {
 }
 
 /**
+ * Map an image's actual long edge to the billing tier the upscale policy prices
+ * ('1K' | '2K' | '4K'), or null when it is already larger than 4K (no priced
+ * tier - the caller should hide the upscale control). Uses midpoints between the
+ * canonical 1024 / 2048 / 4096 long edges.
+ */
+export function inferResolutionTier(longestSide: number): Resolution | null {
+  if (!Number.isFinite(longestSide) || longestSide <= 0) return null;
+  if (longestSide <= 1536) return '1K';
+  if (longestSide <= 3072) return '2K';
+  if (longestSide <= 5120) return '4K';
+  return null;
+}
+
+/**
  * Human-facing resolution badge derived from the ACTUAL long edge in pixels:
  * "1K", "2K", "4K", "6K", "8K", ... It rounds to the nearest 1024 so an upscaled
  * image reports its new tier automatically (e.g. x3 of a 2K image -> "6K").

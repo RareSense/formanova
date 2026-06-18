@@ -13,6 +13,12 @@ import { PhotoPreviewModal } from './PhotoPreviewModal';
 import { GLBPreviewSlot } from './ScissorGLBGrid';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { downloadAsset, isShaLikeName, renameAsset } from '@/lib/assets-api';
+import { Gem } from 'lucide-react';
+import { UpscaleControl } from '@/components/studio/UpscaleControl';
+import { CreditPreflightModal } from '@/components/CreditPreflightModal';
+import { useUpscaleLauncher } from '@/hooks/useUpscaleLauncher';
+import { inferResolutionTier, upscaleEtaLabel } from '@/lib/upscale-api';
+import type { Resolution } from '@/components/studio/OutputSettingsPills';
 
 const CAD_RENAMES_KEY = 'formanova_cad_renames';
 const DISPLAY_NAME_MAX_CHARS = 50;
@@ -65,6 +71,8 @@ interface WorkflowCardProps {
   workflow: WorkflowSummary;
   index?: number;
   onClick: (id: string) => void;
+  /** Called after an inline upscale completes, so the page can refresh the list. */
+  onUpscaled?: () => void;
 }
 
 const itemVariants = {
@@ -348,7 +356,7 @@ function savePhotoRename(id: string, name: string) {
   } catch { /* quota */ }
 }
 
-function PhotoCard({ workflow, index }: { workflow: WorkflowSummary; index: number }) {
+function PhotoCard({ workflow, index, onUpscaled }: { workflow: WorkflowSummary; index: number; onUpscaled?: () => void }) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [displayName, setDisplayName] = useState<string | null>(
@@ -394,10 +402,53 @@ function PhotoCard({ workflow, index }: { workflow: WorkflowSummary; index: numb
   const hasThumbnail = !!workflow.thumbnail_url;
   const resolvedThumbnail = useAuthenticatedImage(workflow.thumbnail_url);
 
+  // ── Inline upscale (photo / product shot results only) ──────────────────────
+  const isProductShot = workflow.source_type === 'product_shot';
+  const upscaleEligible =
+    (workflow.source_type === 'photo' || workflow.source_type === 'product_shot') && hasThumbnail;
+  // Billing tier is inferred from the result's real pixels; null = already past
+  // 4K (no priced tier) so the control hides itself.
+  const [upscaleTier, setUpscaleTier] = useState<Resolution | null>(null);
+  const [activeFactor, setActiveFactor] = useState<number | null>(null);
+  const {
+    status: upscaleStatus, error: upscaleError, launch,
+    showInsufficientModal, dismissModal, preflightResult,
+  } = useUpscaleLauncher();
+
+  useEffect(() => {
+    setUpscaleTier(null);
+    if (!resolvedThumbnail || !upscaleEligible) return;
+    let cancelled = false;
+    const img = new Image();
+    img.onload = () => {
+      if (!cancelled) setUpscaleTier(inferResolutionTier(Math.max(img.naturalWidth, img.naturalHeight)));
+    };
+    img.onerror = () => { /* leave null -> control hidden */ };
+    img.src = resolvedThumbnail;
+    return () => { cancelled = true; };
+  }, [resolvedThumbnail, upscaleEligible]);
+
+  const upscaling = upscaleStatus === 'starting' || upscaleStatus === 'processing';
+  const etaLabel = activeFactor && upscaleTier ? upscaleEtaLabel(upscaleTier, activeFactor) : null;
+
   return (
     <>
       <motion.div variants={itemVariants} className="marta-frame overflow-hidden">
         {/* Thumbnail — sharp rectangle, image-first */}
+        <div className="relative">
+        {/* Non-blocking upscale overlay over the thumbnail: dim + spinner + ETA,
+            mirroring the studio overlay. The job is tracked in the header
+            indicator so the user can keep browsing while it runs. */}
+        {upscaling && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-background/75 px-3 text-center backdrop-blur-sm">
+            <div className="relative">
+              <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
+              <Gem className="absolute inset-0 m-auto h-5 w-5 text-primary" />
+            </div>
+            <span className="font-mono text-[9px] uppercase tracking-widest text-foreground">Upscaling</span>
+            <span className="font-mono text-[9px] text-foreground/70">{etaLabel ?? 'a few minutes'}</span>
+          </div>
+        )}
         {hasThumbnail ? (
           <button
             onClick={() => setPreviewOpen(true)}
@@ -430,6 +481,7 @@ function PhotoCard({ workflow, index }: { workflow: WorkflowSummary; index: numb
             <div className="w-6 h-6 border-2 border-muted-foreground/20 border-t-muted-foreground/60 rounded-full animate-spin" />
           </div>
         ) : null}
+        </div>
 
         {/* Rename row — only when asset is linked */}
         {workflow.output_asset_id && (
@@ -477,6 +529,29 @@ function PhotoCard({ workflow, index }: { workflow: WorkflowSummary; index: numb
           </div>
         )}
 
+        {/* Inline upscale — under the thumbnail, above the credits/date footer. */}
+        {upscaleEligible && upscaleTier && (
+          <div className="mx-2 sm:mx-3 mt-2">
+            <UpscaleControl
+              resultImageUrl={workflow.thumbnail_url ?? null}
+              resolution={upscaleTier}
+              runStatus={upscaleStatus}
+              error={upscaleError}
+              onUpscale={(factor) => {
+                setActiveFactor(factor);
+                launch({
+                  imageUri: workflow.thumbnail_url ?? '',
+                  resolution: upscaleTier,
+                  factor,
+                  isProductShot,
+                  jewelryType: 'other',
+                  onCompleted: () => onUpscaled?.(),
+                });
+              }}
+            />
+          </div>
+        )}
+
         {/* Card footer: index · credits · date */}
         <div className="flex items-center justify-end sm:justify-between px-3 pt-3 pb-3 gap-2">
           <span className="hidden sm:inline font-mono text-[10px] tracking-[0.15em] text-muted-foreground/70 select-none min-w-0">
@@ -491,6 +566,16 @@ function PhotoCard({ workflow, index }: { workflow: WorkflowSummary; index: numb
           </div>
         </div>
       </motion.div>
+
+      {/* Insufficient-credit modal for the inline upscale */}
+      {showInsufficientModal && preflightResult && (
+        <CreditPreflightModal
+          open={showInsufficientModal}
+          onOpenChange={(open) => !open && dismissModal()}
+          estimatedCredits={preflightResult.estimatedCredits}
+          currentBalance={preflightResult.currentBalance}
+        />
+      )}
 
       {/* Enlarged preview modal */}
       {previewOpen && hasThumbnail && (
@@ -507,11 +592,11 @@ function PhotoCard({ workflow, index }: { workflow: WorkflowSummary; index: numb
 
 // ─── Exported card dispatcher ───────────────────────────────────────────────
 
-export function WorkflowCard({ workflow, index = 0, onClick: _onClick }: WorkflowCardProps) {
+export function WorkflowCard({ workflow, index = 0, onClick: _onClick, onUpscaled }: WorkflowCardProps) {
   if (workflow.source_type === 'cad_text') {
     return <CadTextCard workflow={workflow} index={index} />;
   }
 
   // photo and cad_render both use the new image-first card
-  return <PhotoCard workflow={workflow} index={index} />;
+  return <PhotoCard workflow={workflow} index={index} onUpscaled={onUpscaled} />;
 }
