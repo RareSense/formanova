@@ -362,3 +362,48 @@ export interface AIFixSubmittedProps {
 export function trackAIFixSubmitted(props: AIFixSubmittedProps) {
   capture('ai_fix_submitted', { ...props });
 }
+
+// ═══════ Upscale Events ══════════════════════════════════════════════
+
+export interface UpscaleStartedProps {
+  /** Source image tier that drives billing: '1K' | '2K' | '4K'. */
+  source_tier: string;
+  /** Integer multiplier the user chose (2-9). */
+  factor: number;
+  /** Quoted hold price at launch (from estimateUpscaleCostCached), not a settled charge. */
+  credits_cost: number;
+  /** Singular jewelry category. */
+  category: string;
+  is_product_shot: boolean;
+  /** Where the upscale was launched from. */
+  surface: 'studio' | 'history';
+}
+
+export function trackUpscaleStarted(props: UpscaleStartedProps) {
+  capture('upscale_started', { ...props });
+}
+
+export interface UpscaleCompletedProps {
+  source_tier: string;
+  factor: number;
+  credits_cost: number;
+  category: string;
+  is_product_shot: boolean;
+  surface: 'studio' | 'history';
+}
+
+export function trackUpscaleCompleted(props: UpscaleCompletedProps) {
+  capture('upscale_completed', { ...props });
+}
+
+export interface UpscalePaywallHitProps {
+  source_tier: string;
+  factor: number;
+  credits_cost: number;
+  category: string;
+  surface: 'studio' | 'history';
+}
+
+export function trackUpscalePaywallHit(props: UpscalePaywallHitProps) {
+  capture('upscale_paywall_hit', { ...props });
+}
