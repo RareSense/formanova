@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Diamond, Gem, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ResultImageItem } from '@/components/studio/ResultImageItem';
+import { ResultImageItem, type ResultImageMeta } from '@/components/studio/ResultImageItem';
 import { FeedbackModal } from '@/components/studio/FeedbackModal';
 import { AIFixModal } from '@/components/studio/AIFixModal';
 import { UpscaleControl, type UpscaleRunStatus } from '@/components/studio/UpscaleControl';
@@ -80,6 +80,9 @@ export function StudioResultsStep({
   // Remember which factor the user launched so the in-progress overlay can show
   // an accurate ETA for that (source tier, factor) pair.
   const [activeFactor, setActiveFactor] = useState<number | null>(null);
+  // Pixel meta of the primary result, reported by ResultImageItem on load, used
+  // for the details line below the preview (tier . W x H . shot type).
+  const [primaryMeta, setPrimaryMeta] = useState<ResultImageMeta | null>(null);
   const upscaling = upscaleRunStatus === 'starting' || upscaleRunStatus === 'processing';
   const etaLabel = activeFactor ? upscaleEtaLabel(upscaleResolution, activeFactor) : null;
 
@@ -163,7 +166,16 @@ export function StudioResultsStep({
       {resultImages.length > 0 ? (
         <div ref={resultsContainerRef} className="flex flex-wrap justify-center gap-4 max-w-5xl mx-auto">
           {resultImages.map((url, i) => (
-            <ResultImageItem key={i} url={url} index={i} workflowId={workflowId} jewelryType={effectiveJewelryType} naturalAspect hero={resultImages.length === 1} />
+            <ResultImageItem
+              key={i}
+              url={url}
+              index={i}
+              workflowId={workflowId}
+              jewelryType={effectiveJewelryType}
+              naturalAspect
+              hero={resultImages.length === 1}
+              onMeta={i === 0 ? setPrimaryMeta : undefined}
+            />
           ))}
         </div>
       ) : (
@@ -172,12 +184,20 @@ export function StudioResultsStep({
         </div>
       )}
 
+      {/* Details line below the preview: tier . dimensions . shot type. */}
+      {resultImages.length === 1 && primaryMeta && (
+        <p className="text-center font-mono text-[11px] tracking-wider text-muted-foreground">
+          {primaryMeta.tier && <>{primaryMeta.tier} &middot; </>}
+          {primaryMeta.width} x {primaryMeta.height} &middot; {isProductShot ? 'Product shot' : 'Model shot'}
+        </p>
+      )}
+
       {/* Action area. While the coachmark is visible we lift this block above the
           rest of the page so the highlighted "Fix it with human" button sits on top. */}
       <div
         ref={actionAreaRef}
         className={cn(
-          "relative mx-auto flex w-full max-w-[360px] flex-col gap-4 pt-2",
+          "relative mx-auto flex w-full max-w-2xl flex-col gap-4 pt-2",
           coachmarkVisible ? "z-[70]" : "z-40",
         )}
       >
@@ -217,7 +237,7 @@ export function StudioResultsStep({
               size="sm"
               onClick={() => { dismissCoachmarkForGeneration(); onRequestHumanFix(); }}
               className={cn(
-                "relative z-10 h-10 w-full gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] px-3 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]",
+                "relative z-10 h-11 w-full gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] px-4 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]",
                 coachmarkVisible && "shadow-[0_0_4px_hsl(var(--formanova-hero-accent)/0.10)]"
               )}
             >
@@ -235,7 +255,7 @@ export function StudioResultsStep({
                 workflow_id: workflowId,
               });
             }}
-            className="h-10 w-full gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] bg-background px-3 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"
+            className="h-11 w-full gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] bg-background px-4 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"
           >
             Fix it with AI
             <ButtonCost cost={generationCost} />

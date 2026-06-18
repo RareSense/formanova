@@ -20,7 +20,13 @@ function openImageInNewTab(src: string) {
   if (!win) throw new Error('Popup blocked');
 }
 
-export function ResultImageItem({ url, index, workflowId, jewelryType, naturalAspect, hero }: {
+export interface ResultImageMeta {
+  tier: string | null;
+  width: number;
+  height: number;
+}
+
+export function ResultImageItem({ url, index, workflowId, jewelryType, naturalAspect, hero, onMeta }: {
   url: string;
   index: number;
   workflowId: string | null;
@@ -28,6 +34,8 @@ export function ResultImageItem({ url, index, workflowId, jewelryType, naturalAs
   naturalAspect?: boolean;
   /** Single-result mode: render large and centered as the screen's hero. */
   hero?: boolean;
+  /** Reports the loaded image's tier + pixel dimensions (for a details line). */
+  onMeta?: (meta: ResultImageMeta) => void;
 }) {
   const resolvedSrc = useAuthenticatedImage(url);
   // Resolution badge ("1K"/"2K"/"4K"/"6K"...) derived from the rendered image's
@@ -47,12 +55,16 @@ export function ResultImageItem({ url, index, workflowId, jewelryType, naturalAs
         alt={`Result ${index + 1}`}
         onLoad={(e) => {
           const el = e.currentTarget;
-          setTier(resolutionTierLabel(Math.max(el.naturalWidth, el.naturalHeight)));
+          const width = el.naturalWidth;
+          const height = el.naturalHeight;
+          const nextTier = resolutionTierLabel(Math.max(width, height));
+          setTier(nextTier);
+          onMeta?.({ tier: nextTier, width, height });
         }}
         className={`w-full object-contain bg-muted/30 ${hero ? 'max-h-[72vh]' : 'max-h-[70vh]'}${naturalAspect ? '' : ' aspect-[3/4]'}`}
       />
       {tier && (
-        <span className="absolute top-2 left-2 rounded-md border border-border/40 bg-background/80 px-2 py-0.5 font-mono text-[10px] font-medium tracking-wider text-foreground backdrop-blur-sm">
+        <span className="absolute top-3 left-3 rounded-md border border-foreground/15 bg-background/90 px-2.5 py-1 font-mono text-xs font-semibold tracking-wider text-foreground shadow-sm backdrop-blur-sm">
           {tier}
         </span>
       )}
