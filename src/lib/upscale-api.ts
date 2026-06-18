@@ -72,6 +72,60 @@ export function tierForUpscale(resolution: Resolution): string {
   return resolution.toLowerCase();
 }
 
+/**
+ * Measured upscale runtime in SECONDS, keyed by [source tier][factor]. Used only
+ * to set expectations while a job runs. Source: backend timing runs. Factors not
+ * listed fall through to generic copy.
+ */
+const UPSCALE_ETA_SECONDS: Record<string, Record<number, number>> = {
+  '1k': { 2: 12.4, 3: 9.9, 4: 108, 5: 114, 6: 114, 7: 114, 8: 114, 9: 108 },
+  '2k': { 2: 31, 3: 28.2, 4: 306, 5: 306, 6: 312 },
+  '4k': { 2: 102, 3: 96 },
+};
+
+/**
+ * Friendly upper-bound ETA copy for the in-progress overlay, e.g. "under a
+ * minute" or "up to 6 minutes". We pad the measured time by ~20% and round the
+ * minutes up so the quote always sits a little ABOVE reality (never under-
+ * promise). Returns null when the (tier, factor) pair is unknown.
+ */
+export function upscaleEtaLabel(resolution: Resolution, factor: number): string | null {
+  const seconds = UPSCALE_ETA_SECONDS[tierForUpscale(resolution)]?.[Math.trunc(factor)];
+  if (seconds == null) return null;
+  const padded = seconds * 1.2;
+  if (padded < 55) return 'under a minute';
+  const minutes = Math.ceil(padded / 60);
+  return `up to ${minutes} minute${minutes > 1 ? 's' : ''}`;
+}
+
+/**
+ * Fallback credit price keyed by [source tier][factor]. Used when the live
+ * estimate endpoint is unavailable, so the menu shows a real number instead of
+ * "Unavailable". Mirrors the backend pricing grid.
+ */
+const UPSCALE_FALLBACK_PRICE: Record<string, Record<number, number>> = {
+  '1k': { 2: 6, 3: 8, 4: 12, 5: 20, 6: 26, 7: 40, 8: 52, 9: 60 },
+  '2k': { 2: 6, 3: 20, 4: 46, 5: 70, 6: 86 },
+  '4k': { 2: 40, 3: 80 },
+};
+
+/** Fallback price for a (tier, factor) pair, or null if not in the grid. */
+export function fallbackUpscalePrice(resolution: Resolution, factor: number): number | null {
+  return UPSCALE_FALLBACK_PRICE[tierForUpscale(resolution)]?.[Math.trunc(factor)] ?? null;
+}
+
+/**
+ * Human-facing resolution badge derived from the ACTUAL long edge in pixels:
+ * "1K", "2K", "4K", "6K", "8K", ... It rounds to the nearest 1024 so an upscaled
+ * image reports its new tier automatically (e.g. x3 of a 2K image -> "6K").
+ * Returns null for non-positive input so callers can hide the badge until the
+ * real pixel size is known.
+ */
+export function resolutionTierLabel(longestSide: number): string | null {
+  if (!Number.isFinite(longestSide) || longestSide <= 0) return null;
+  return `${Math.max(1, Math.round(longestSide / 1024))}K`;
+}
+
 // ─── Per-factor price estimate ──────────────────────────────────────────────
 
 export interface UpscaleEstimateRequest {
@@ -99,12 +153,12 @@ export async function estimateUpscaleCost(
         pricing_context: { image_size: tierForUpscale(resolution), factor: Math.trunc(factor) },
       }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) return fallbackUpscalePrice(resolution, factor);
     const data = await res.json();
     const cost = data.projected_max_hold ?? data.estimated_credits;
-    return cost && cost > 0 ? cost : null;
+    return cost && cost > 0 ? cost : fallbackUpscalePrice(resolution, factor);
   } catch {
-    return null;
+    return fallbackUpscalePrice(resolution, factor);
   }
 }
 

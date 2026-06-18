@@ -669,6 +669,7 @@ export default function UnifiedStudio() {
             upscaleResolution={generationInputUrls?.resolution ?? resolution}
             upscaleRunStatus={upscaleStatus}
             upscaleError={upscaleError}
+            onKeepBrowsing={handleKeepBrowsing}
             handleStartOver={handleStartOver}
             feedbackOpen={feedbackOpen}
             setFeedbackOpen={setFeedbackOpen}

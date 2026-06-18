@@ -1,17 +1,30 @@
 import { useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Diamond } from 'lucide-react';
+import { Diamond, Gem, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ResultImageItem } from '@/components/studio/ResultImageItem';
 import { FeedbackModal } from '@/components/studio/FeedbackModal';
 import { AIFixModal } from '@/components/studio/AIFixModal';
 import { UpscaleControl, type UpscaleRunStatus } from '@/components/studio/UpscaleControl';
 import { PostGenerationCoachmark } from '@/components/studio/PostGenerationCoachmark';
+import { upscaleEtaLabel } from '@/lib/upscale-api';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
 import { type FeedbackCategory } from '@/lib/feedback-api';
 import { type Resolution } from '@/components/studio/OutputSettingsPills';
 import { trackAIFixModalOpened, getEligibleCoachmarkVariant, suppressCoachmark } from '@/lib/posthog-events';
 import { cn } from '@/lib/utils';
+import creditCoinIcon from '@/assets/icons/credit-coin.png';
+
+/** Inline coin + credit cost shown on a credit-spending action button. */
+function ButtonCost({ cost }: { cost?: number | null }) {
+  if (cost == null) return null;
+  return (
+    <span className="flex items-center gap-1 normal-case">
+      <img src={creditCoinIcon} alt="" className="h-3.5 w-3.5 object-contain" />
+      {cost}
+    </span>
+  );
+}
 
 interface StudioResultsStepProps {
   resultImages: string[];
@@ -24,6 +37,8 @@ interface StudioResultsStepProps {
   upscaleResolution: Resolution;
   upscaleRunStatus: UpscaleRunStatus;
   upscaleError?: string | null;
+  /** Mirror of the generation "keep browsing" action, used by the upscale overlay. */
+  onKeepBrowsing: () => void;
   handleStartOver: () => void;
   feedbackOpen: boolean;
   setFeedbackOpen: (open: boolean) => void;
@@ -47,6 +62,7 @@ export function StudioResultsStep({
   upscaleResolution,
   upscaleRunStatus,
   upscaleError,
+  onKeepBrowsing,
   handleStartOver,
   feedbackOpen,
   setFeedbackOpen,
@@ -60,6 +76,12 @@ export function StudioResultsStep({
   humanFixCost,
 }: StudioResultsStepProps) {
   const [aiFixOpen, setAiFixOpen] = useState(false);
+
+  // Remember which factor the user launched so the in-progress overlay can show
+  // an accurate ETA for that (source tier, factor) pair.
+  const [activeFactor, setActiveFactor] = useState<number | null>(null);
+  const upscaling = upscaleRunStatus === 'starting' || upscaleRunStatus === 'processing';
+  const etaLabel = activeFactor ? upscaleEtaLabel(upscaleResolution, activeFactor) : null;
 
   // --- Post-generation coachmark ---------------------------------------------
   // A small floating card that points at the "Fix it with human" button once a
@@ -107,6 +129,32 @@ export function StudioResultsStep({
       transition={{ duration: 0.4 }}
       className="relative space-y-8"
     >
+      {/* Non-blocking upscale overlay. Mirrors the generation spinner: the result
+          stays visible but dimmed behind it, and the user can keep browsing while
+          the job finishes in the background (tracked via the header indicator). */}
+      {upscaling && (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-background/70 px-6 text-center backdrop-blur-sm">
+          <div className="relative mb-8">
+            <div className="h-24 w-24 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
+            <Gem className="absolute inset-0 m-auto h-10 w-10 text-primary" />
+          </div>
+          <h2 className="mb-3 font-display text-3xl uppercase tracking-tight">Upscaling</h2>
+          <p className="mb-6 font-mono text-[11px] italic text-muted-foreground">
+            This usually takes {etaLabel ?? 'a few minutes'}.
+          </p>
+          <button
+            onClick={onKeepBrowsing}
+            className="mb-4 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-foreground transition-colors hover:text-foreground/70"
+          >
+            Keep browsing
+            <ArrowRight className="h-3 w-3 shrink-0" />
+          </button>
+          <p className="max-w-xs font-mono text-[10px] leading-relaxed text-muted-foreground">
+            Grab a coffee or keep browsing. We'll save your result in your generations history.
+          </p>
+        </div>
+      )}
+
       <div className="text-center">
         <span className="font-mono text-[9px] tracking-[0.3em] text-muted-foreground uppercase block mb-1">Complete</span>
         <h2 className="font-display text-4xl uppercase tracking-tight">Your Result{resultImages.length !== 1 ? 's' : ''}</h2>
@@ -115,7 +163,7 @@ export function StudioResultsStep({
       {resultImages.length > 0 ? (
         <div ref={resultsContainerRef} className="flex flex-wrap justify-center gap-4 max-w-5xl mx-auto">
           {resultImages.map((url, i) => (
-            <ResultImageItem key={i} url={url} index={i} workflowId={workflowId} jewelryType={effectiveJewelryType} naturalAspect />
+            <ResultImageItem key={i} url={url} index={i} workflowId={workflowId} jewelryType={effectiveJewelryType} naturalAspect hero={resultImages.length === 1} />
           ))}
         </div>
       ) : (
@@ -148,7 +196,7 @@ export function StudioResultsStep({
           <UpscaleControl
             resultImageUrl={resultImages[0]}
             resolution={upscaleResolution}
-            onUpscale={(factor) => { dismissCoachmarkForGeneration(); onUpscale(factor); }}
+            onUpscale={(factor) => { setActiveFactor(factor); dismissCoachmarkForGeneration(); onUpscale(factor); }}
             runStatus={upscaleRunStatus}
             error={upscaleError}
           />
@@ -174,6 +222,7 @@ export function StudioResultsStep({
               )}
             >
               Fix it with human
+              <ButtonCost cost={humanFixCost} />
             </Button>
           </div>
           <Button
@@ -189,6 +238,7 @@ export function StudioResultsStep({
             className="h-10 w-full gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] bg-background px-3 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"
           >
             Fix it with AI
+            <ButtonCost cost={generationCost} />
           </Button>
         </div>
       </div>

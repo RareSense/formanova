@@ -61,16 +61,17 @@ export function UpscaleControl({
   const resolvedSrc = useAuthenticatedImage(resultImageUrl);
 
   // Decode the real source pixels so the factor menu uses the true long edge
-  // (aspect ratio changes it), not the tier label.
-  const [longestSide, setLongestSide] = useState<number | null>(null);
+  // (aspect ratio changes it), not the tier label, and so each factor can show
+  // its exact target dimensions (base WxH multiplied by the factor).
+  const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
   useEffect(() => {
-    setLongestSide(null);
+    setDims(null);
     if (!resolvedSrc) return;
     let cancelled = false;
     const img = new Image();
     img.onload = () => {
       if (!cancelled && img.naturalWidth > 0 && img.naturalHeight > 0) {
-        setLongestSide(Math.max(img.naturalWidth, img.naturalHeight));
+        setDims({ w: img.naturalWidth, h: img.naturalHeight });
       }
     };
     img.onerror = () => { /* leave null -> control hidden */ };
@@ -78,6 +79,7 @@ export function UpscaleControl({
     return () => { cancelled = true; };
   }, [resolvedSrc]);
 
+  const longestSide = dims ? Math.max(dims.w, dims.h) : null;
   const availableFactors = useMemo(
     () => (longestSide ? computeUpscaleFactors(longestSide) : []),
     [longestSide],
@@ -143,11 +145,14 @@ export function UpscaleControl({
       key={factor}
       onClick={() => setSelectedFactor(factor)}
       className={cn(
-        'flex items-center justify-between gap-6 font-mono text-sm',
+        'grid grid-cols-[2.25rem_1fr_auto] items-center gap-3 font-mono text-sm',
         factor === selectedFactor ? 'bg-muted text-foreground' : 'text-muted-foreground',
       )}
     >
       <span className="font-medium">x{factor}</span>
+      <span className="text-[11px] tabular-nums text-muted-foreground">
+        {dims ? `${dims.w * factor}x${dims.h * factor}` : ''}
+      </span>
       <CoinPrice status={estimateStatus[factor] ?? 'idle'} cost={estimates[factor]} />
     </DropdownMenuItem>
   );
@@ -179,7 +184,7 @@ export function UpscaleControl({
               <ChevronDown className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-44 bg-popover border-border">
+          <DropdownMenuContent align="start" className="w-64 bg-popover border-border">
             {lowerFactors.map(renderItem)}
             {higherFactors.length > 0 && (
               <>

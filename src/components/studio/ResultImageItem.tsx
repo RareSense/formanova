@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { Download, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
+import { resolutionTierLabel } from '@/lib/upscale-api';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
 
 function safeFetch(src: string): Promise<Response> {
@@ -18,21 +20,42 @@ function openImageInNewTab(src: string) {
   if (!win) throw new Error('Popup blocked');
 }
 
-export function ResultImageItem({ url, index, workflowId, jewelryType, naturalAspect }: {
+export function ResultImageItem({ url, index, workflowId, jewelryType, naturalAspect, hero }: {
   url: string;
   index: number;
   workflowId: string | null;
   jewelryType: string;
   naturalAspect?: boolean;
+  /** Single-result mode: render large and centered as the screen's hero. */
+  hero?: boolean;
 }) {
   const resolvedSrc = useAuthenticatedImage(url);
+  // Resolution badge ("1K"/"2K"/"4K"/"6K"...) derived from the rendered image's
+  // real pixels. Re-fires whenever resolvedSrc changes, so swapping in an
+  // upscaled result automatically updates the badge to its new tier.
+  const [tier, setTier] = useState<string | null>(null);
   return (
-    <div className="relative group border border-border/30 overflow-hidden w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.75rem)] max-w-xs">
+    <div
+      className={`relative group border border-border/30 overflow-hidden ${
+        hero
+          ? 'w-full max-w-2xl mx-auto'
+          : 'w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.75rem)]'
+      }`}
+    >
       <img
         src={resolvedSrc ?? ""}
         alt={`Result ${index + 1}`}
-        className={`w-full object-contain bg-muted/30 max-h-[70vh]${naturalAspect ? '' : ' aspect-[3/4]'}`}
+        onLoad={(e) => {
+          const el = e.currentTarget;
+          setTier(resolutionTierLabel(Math.max(el.naturalWidth, el.naturalHeight)));
+        }}
+        className={`w-full object-contain bg-muted/30 ${hero ? 'max-h-[72vh]' : 'max-h-[70vh]'}${naturalAspect ? '' : ' aspect-[3/4]'}`}
       />
+      {tier && (
+        <span className="absolute top-2 left-2 rounded-md border border-border/40 bg-background/80 px-2 py-0.5 font-mono text-[10px] font-medium tracking-wider text-foreground backdrop-blur-sm">
+          {tier}
+        </span>
+      )}
       <div className="absolute top-2 right-2 flex gap-1.5">
         <Button
           variant="outline"

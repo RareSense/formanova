@@ -20,6 +20,9 @@ import {
   estimateUpscaleCostCached,
   upscaleEstimateKey,
   startUpscale,
+  resolutionTierLabel,
+  upscaleEtaLabel,
+  fallbackUpscalePrice,
   UPSCALE_MAX_FACTOR,
   UPSCALE_MAX_LONG_EDGE,
 } from './upscale-api';
@@ -97,6 +100,61 @@ describe('tierForUpscale', () => {
   });
 });
 
+// ── resolutionTierLabel ─────────────────────────────────────────────────────
+
+describe('resolutionTierLabel', () => {
+  it('rounds the long edge to the nearest 1024 and labels it as "<n>K"', () => {
+    expect(resolutionTierLabel(1024)).toBe('1K');
+    expect(resolutionTierLabel(2048)).toBe('2K');
+    expect(resolutionTierLabel(4096)).toBe('4K');
+    expect(resolutionTierLabel(6144)).toBe('6K'); // x3 of a 2K source
+    expect(resolutionTierLabel(8192)).toBe('8K'); // x4 of a 2K source
+  });
+
+  it('never reports below 1K and rejects non-positive input', () => {
+    expect(resolutionTierLabel(400)).toBe('1K');
+    expect(resolutionTierLabel(0)).toBeNull();
+    expect(resolutionTierLabel(-5)).toBeNull();
+    expect(resolutionTierLabel(NaN)).toBeNull();
+  });
+});
+
+// ── upscaleEtaLabel ─────────────────────────────────────────────────────────
+
+describe('upscaleEtaLabel', () => {
+  it('reports sub-minute jobs as "under a minute"', () => {
+    expect(upscaleEtaLabel('1K', 2)).toBe('under a minute'); // 12.4s
+    expect(upscaleEtaLabel('2K', 2)).toBe('under a minute'); // 31s
+  });
+
+  it('rounds padded minutes up so the quote sits above the measured time', () => {
+    expect(upscaleEtaLabel('1K', 4)).toBe('up to 3 minutes'); // 108s padded
+    expect(upscaleEtaLabel('2K', 4)).toBe('up to 7 minutes'); // 306s padded
+    expect(upscaleEtaLabel('4K', 2)).toBe('up to 3 minutes'); // 102s padded
+  });
+
+  it('returns null for an unknown (tier, factor) pair', () => {
+    expect(upscaleEtaLabel('4K', 9)).toBeNull();
+    expect(upscaleEtaLabel('2K', 8)).toBeNull();
+  });
+});
+
+// ── fallbackUpscalePrice ────────────────────────────────────────────────────
+
+describe('fallbackUpscalePrice', () => {
+  it('returns the grid price for supported pairs', () => {
+    expect(fallbackUpscalePrice('1K', 2)).toBe(6);
+    expect(fallbackUpscalePrice('1K', 9)).toBe(60);
+    expect(fallbackUpscalePrice('2K', 6)).toBe(86);
+    expect(fallbackUpscalePrice('4K', 3)).toBe(80);
+  });
+
+  it('returns null for pairs outside the grid', () => {
+    expect(fallbackUpscalePrice('2K', 7)).toBeNull();
+    expect(fallbackUpscalePrice('4K', 4)).toBeNull();
+  });
+});
+
 // ── estimateUpscaleCost ─────────────────────────────────────────────────────
 
 describe('estimateUpscaleCost', () => {
@@ -138,19 +196,26 @@ describe('estimateUpscaleCost', () => {
     expect(await estimateUpscaleCost({ resolution: '4K', factor: 2 })).toBe(40);
   });
 
-  it('returns null on a non-ok response', async () => {
+  it('falls back to the grid price on a non-ok response', async () => {
     mockAuthFetch.mockReturnValueOnce(errorResponse(500));
-    expect(await estimateUpscaleCost({ resolution: '1K', factor: 2 })).toBeNull();
+    // 1K x2 = 6 credits in the fallback grid.
+    expect(await estimateUpscaleCost({ resolution: '1K', factor: 2 })).toBe(6);
   });
 
-  it('returns null on a non-positive cost', async () => {
+  it('falls back to the grid price on a non-positive cost', async () => {
     mockAuthFetch.mockReturnValueOnce(okResponse({ projected_max_hold: 0 }));
-    expect(await estimateUpscaleCost({ resolution: '1K', factor: 2 })).toBeNull();
+    expect(await estimateUpscaleCost({ resolution: '1K', factor: 2 })).toBe(6);
   });
 
-  it('returns null when the fetch throws', async () => {
+  it('falls back to the grid price when the fetch throws', async () => {
     mockAuthFetch.mockRejectedValueOnce(new Error('network'));
-    expect(await estimateUpscaleCost({ resolution: '1K', factor: 2 })).toBeNull();
+    expect(await estimateUpscaleCost({ resolution: '1K', factor: 2 })).toBe(6);
+  });
+
+  it('returns null when the estimate fails and the pair is not in the fallback grid', async () => {
+    mockAuthFetch.mockRejectedValueOnce(new Error('network'));
+    // 4K x9 is not a supported (tier, factor) pair -> no fallback.
+    expect(await estimateUpscaleCost({ resolution: '4K', factor: 9 })).toBeNull();
   });
 });
 
