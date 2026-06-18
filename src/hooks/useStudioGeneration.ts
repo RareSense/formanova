@@ -490,6 +490,9 @@ export function useStudioGeneration({
     setUpscaleStatus('starting');
     setUpscaleError(null);
 
+    // Quoted hold price at launch (policy-driven, cache warm from UpscaleControl).
+    const upscaleCreditsCost = (await estimateUpscaleCostCached({ resolution: upscaleResolution, factor })) ?? 0;
+
     const hasCredits = await checkCredits('upscale_image', 1, {
       pricingContext: { image_size: tierForUpscale(upscaleResolution), factor },
     });
@@ -500,7 +503,7 @@ export function useStudioGeneration({
       trackUpscalePaywallHit({
         source_tier: upscaleResolution,
         factor,
-        credits_cost: (await estimateUpscaleCostCached({ resolution: upscaleResolution, factor })) ?? 0,
+        credits_cost: upscaleCreditsCost,
         category: TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType,
         surface: 'studio',
       });
@@ -518,8 +521,6 @@ export function useStudioGeneration({
       });
 
       const _upscaleId = startResponse.workflow_id;
-      // Quoted hold price at launch (policy-driven, cache warm from UpscaleControl).
-      const upscaleCreditsCost = (await estimateUpscaleCostCached({ resolution: upscaleResolution, factor })) ?? 0;
       upscalePropsRef.current = {
         source_tier: upscaleResolution, factor, credits_cost: upscaleCreditsCost, category,
       };
