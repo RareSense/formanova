@@ -153,7 +153,7 @@ export function StudioResultsStep({
             <ArrowRight className="h-3 w-3 shrink-0" />
           </button>
           <p className="max-w-xs font-mono text-[11px] leading-relaxed text-foreground/70">
-            It's saved to your generations history, so grab a coffee or keep browsing.
+            It's saved to your generations history, so you can grab a coffee or keep browsing.
           </p>
         </div>
       )}
@@ -182,7 +182,7 @@ export function StudioResultsStep({
 
           {/* Details line directly under the preview: tier . dimensions . shot type. */}
           {resultImages.length === 1 && primaryMeta && (
-            <p className="text-center font-mono text-xs tracking-wider text-foreground">
+            <p className="text-center font-mono text-xs font-bold tracking-wider text-foreground">
               {primaryMeta.tier && <>{primaryMeta.tier} &middot; </>}
               {primaryMeta.width} x {primaryMeta.height} &middot; {isProductShot ? 'Product shot' : 'Model shot'}
             </p>
@@ -257,7 +257,7 @@ export function StudioResultsStep({
                 workflow_id: workflowId,
               });
             }}
-            className="h-11 w-full gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] bg-background px-4 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"
+            className="h-11 w-full min-w-0 gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] bg-background px-4 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"
           >
             Fix it with AI
             <ButtonCost cost={generationCost} />
