@@ -24,7 +24,7 @@ import goldHoopEarringModelImg from '@/assets/starter-pack/gold-hoop-earring-mod
 import goldChandelierEarringSariImg from '@/assets/starter-pack/gold-chandelier-earring-sari.webp';
 import bridalFormanovaImg from '@/assets/starter-pack/bridal-formanova.webp';
 import starfishSetBeachImg from '@/assets/starter-pack/starfish-set-beach.webp';
-import reel6ModelImg from '@/assets/starter-pack/reel6-model.webp';
+import metgalaEditorialImg from '@/assets/starter-pack/metgala-editorial.webp';
 import heartPendantImg from '@/assets/starter-pack/heart-pendant.webp';
 import heartSetFlatlayImg from '@/assets/starter-pack/heart-set-flatlay.webp';
 import pinkEarringsFlatlayImg from '@/assets/starter-pack/pink-earrings-flatlay.webp';
@@ -79,7 +79,7 @@ const GALLERY: { src: string; alt: string }[] = [
   { src: goldGemstoneNecklaceImg, alt: 'Gold gemstone necklace product shot' },
   { src: weddingSetRingImg, alt: 'Lab-grown diamond wedding set ring' },
   { src: deepVNecklaceModelImg, alt: 'Necklace on model, deep neckline' },
-  { src: reel6ModelImg, alt: 'Starfish jewelry set on model at the beach' },
+  { src: metgalaEditorialImg, alt: 'Editorial gown and gold jewelry on the red carpet' },
 ];
 
 function OfferCard({ tier, isINR, loadingTier, unavailableTier, errorTier, onCheckout }: Props) {
