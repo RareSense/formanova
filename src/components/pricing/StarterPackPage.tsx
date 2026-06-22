@@ -10,7 +10,7 @@
 // images carry no labels - they are meant to be felt, not read. Click any image
 // to view it large.
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import type { BillingTier } from '@/lib/starter-pack';
@@ -51,6 +51,11 @@ interface Props {
   unavailableTier: string | null;
   errorTier: string | null;
   onCheckout: (tierId: string) => void;
+  /** Optional content rendered above the top offer card (e.g. credit balance or
+   *  an insufficient-credits message). The page decides what to show; this stays
+   *  pure presentation. When omitted (e.g. on the public Pricing page) nothing
+   *  renders here and only the offer shows. */
+  aboveOffer?: ReactNode;
 }
 
 // Interleaved so the masonry mixes tall and square shapes column to column.
@@ -146,21 +151,24 @@ export function StarterPackPage(props: Props) {
   return (
     <div className="mx-auto flex max-w-5xl flex-col items-center px-1 pb-12">
 
-      {/* Headline */}
-      <h1 className="text-center font-display text-4xl uppercase leading-[0.95] tracking-wide text-foreground sm:text-5xl lg:text-6xl">
-        See what FormaNova can do for you.
+      {/* Optional heading above the offer (credit balance / insufficient-credits message) */}
+      {props.aboveOffer ? <div className="mb-2 mt-2 w-full">{props.aboveOffer}</div> : null}
+
+      {/* Offer - top */}
+      <div className="mt-4 flex w-full justify-center">
+        <OfferCard {...props} />
+      </div>
+
+      {/* Headline - sits directly above the gallery */}
+      <h1 className="mt-16 text-center font-display text-4xl uppercase leading-[0.95] tracking-wide text-foreground sm:text-5xl lg:text-6xl">
+        Creations made with FormaNova.
       </h1>
       <p className="mt-3 text-center text-sm text-muted-foreground sm:text-base">
         Create magazine-grade jewelry photoshoots.
       </p>
 
-      {/* Offer - top */}
-      <div className="mt-8 flex w-full justify-center">
-        <OfferCard {...props} />
-      </div>
-
       {/* Pinterest-style masonry gallery (no labels) */}
-      <div className="mt-12 w-full columns-2 gap-3 sm:columns-3 lg:columns-4">
+      <div className="mt-8 w-full columns-2 gap-3 sm:columns-3 lg:columns-4">
         {GALLERY.map((item) => (
           <button
             key={item.src}
@@ -190,7 +198,7 @@ export function StarterPackPage(props: Props) {
 
       {/* Click-to-zoom lightbox (image shown at its natural aspect) */}
       <Dialog open={zoomed !== null} onOpenChange={(open) => !open && setZoomed(null)}>
-        <DialogContent className="w-auto max-w-[92vw] overflow-hidden border-border bg-card p-0 sm:max-w-3xl">
+        <DialogContent className="w-auto max-w-[92vw] overflow-hidden border-border bg-card p-0 sm:max-w-3xl [&>button]:right-3 [&>button]:top-3 [&>button]:rounded-full [&>button]:bg-black/60 [&>button]:p-1.5 [&>button]:opacity-100 [&>button]:backdrop-blur-sm [&>button]:!text-white hover:[&>button]:bg-black/80">
           {zoomed && (
             <div className="flex items-center justify-center bg-muted">
               <img src={zoomed} alt="" className="block max-h-[82vh] w-auto max-w-full object-contain" />

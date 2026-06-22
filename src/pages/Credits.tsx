@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Loader2, Check, AlertCircle, Gift } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -85,6 +85,7 @@ const itemVariants = {
 
 export default function Credits() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, loading: authLoading } = useAuth();
   const { credits, loading: creditsLoading, refreshCredits } = useCredits();
 
@@ -221,6 +222,32 @@ export default function Credits() {
   // of the full credits/plans page. Once purchased the backend stops returning
   // the starter tier, so the normal page returns automatically.
   const starterTier = selectStarterTier(tiers);
+
+  // Heading shown above the starter offer. If the user arrived after a generate
+  // attempt they couldn't afford, the originating flow passes `requiredCredits`
+  // in router state and we show a shortfall message; otherwise we just show
+  // their balance ("My Credits"), like the header. (A/B-test entry point.)
+  const requiredCredits = (location.state as { requiredCredits?: number } | null)?.requiredCredits;
+  const isShort = typeof requiredCredits === 'number' && credits !== null && credits < requiredCredits;
+  const starterHeading = isShort ? (
+    <div className="text-center">
+      <h1 className="font-display text-3xl uppercase leading-[0.95] tracking-wide text-foreground sm:text-4xl">
+        You need a few more credits
+      </h1>
+      <p className="mx-auto mt-3 max-w-md text-sm text-muted-foreground">
+        This generation needs {requiredCredits} credits and you have {credits}. Grab the starter pack below to finish it.
+      </p>
+    </div>
+  ) : (
+    <div className="flex flex-col items-center">
+      <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">My Credits</p>
+      <div className="mt-2 flex items-center gap-2">
+        <img src={creditCoinIcon} alt="" className="h-9 w-9 object-contain" width={36} height={36} />
+        <span className="font-display text-5xl uppercase tracking-tight text-foreground">{credits ?? '—'}</span>
+      </div>
+    </div>
+  );
+
   if (!tiersLoading && starterTier) {
     return (
       <>
@@ -240,11 +267,6 @@ export default function Credits() {
                 <ArrowLeft className="h-3 w-3" />
                 Dashboard
               </Link>
-              {credits !== null && (
-                <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
-                  Balance: {credits} credits
-                </p>
-              )}
             </div>
             <StarterPackPage
               tier={starterTier}
@@ -253,6 +275,7 @@ export default function Credits() {
               unavailableTier={unavailableTier}
               errorTier={errorTier}
               onCheckout={handleCheckout}
+              aboveOffer={starterHeading}
             />
 
             {/* Promo Code Section - same redeem flow as the main Credits page */}
