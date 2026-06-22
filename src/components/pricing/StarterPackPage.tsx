@@ -104,7 +104,7 @@ function OfferCard({ tier, isINR, loadingTier, unavailableTier, errorTier, onChe
       </div>
 
       <p className="max-w-md text-left text-sm italic leading-relaxed text-[hsl(var(--formanova-hero-accent))]">
-        Perfect for your first project: on-model, ecommerce, editorial, and product shots. A simple way to try FormaNova before moving to a larger pack.
+        Perfect for jewelry brands to try FormaNova across their key SKU needs, from on-model and product shots to ecommerce and editorial visuals.
       </p>
 
       <div className="w-full max-w-md space-y-2 border-t border-border/30 pt-5">
