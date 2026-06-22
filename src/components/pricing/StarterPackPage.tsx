@@ -4,24 +4,26 @@
 // Pure presentation. All billing state (tier, checkout, loading) is passed in
 // from the page so this file stays free of API/state concerns (AI_RULES rule 8).
 //
-// Deliberately simple: headline, then the $2 offer as the centered anchor, then
-// a small clean grid of output examples, then a single reassurance line. No
-// dashboards, no busy side panels, no tutorials.
+// Layout, by hierarchy:
+//   1. Headline (the promise)
+//   2. Offer card (the anchor) - mirrors the existing Starter card on the normal
+//      pricing page so it feels native.
+//   3. One horizontal row of big output examples (scroll to see more). Labels are
+//      truthful to each image: product shot, on-model, editorial, catalog set,
+//      vertical 9:16 - the 3-5 style mix jewelry listings convert with.
+//   4. One reassurance line.
 //
-// IMAGES + LABELS ARE PLACEHOLDERS. Each card art is a theme-token gradient.
-// To go live, give each EXAMPLE a `.webp` `src` and it renders as an <img>;
-// labels live in the EXAMPLES array and are not final copy yet.
+// Click any card to view it large at its natural aspect.
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import type { BillingTier } from '@/lib/starter-pack';
-import onModelImg from '@/assets/starter-pack/on-model.webp';
-import productShotImg from '@/assets/starter-pack/product-shot.webp';
-import instagramStoryImg from '@/assets/starter-pack/instagram-story.webp';
-import instagramPostImg from '@/assets/starter-pack/instagram-post.webp';
 import editorialImg from '@/assets/starter-pack/editorial.webp';
-import websiteProductImg from '@/assets/starter-pack/website-product.webp';
+import lifestyleImg from '@/assets/starter-pack/lifestyle.webp';
+import ecommerceImg from '@/assets/starter-pack/ecommerce.webp';
+import catalogImg from '@/assets/starter-pack/catalog.webp';
+import socialImg from '@/assets/starter-pack/social-vertical.webp';
 
 interface Props {
   tier: BillingTier;
@@ -33,28 +35,29 @@ interface Props {
 }
 
 interface Example {
-  /** Main label shown on the image. */
+  /** Label shown on the image - truthful to what the image actually is. */
   title: string;
   /** Optional short detail (e.g. an aspect ratio). */
   meta?: string;
-  /** Real asset goes here later; until then a placeholder renders. */
-  src?: string;
+  src: string;
 }
 
-// Labels are not final copy. Edit freely once curated.
+// Labels are use cases, not "on-model" (most shots have a model, so that would
+// not distinguish them). This is the 3-5 style mix jewelry listings convert
+// with: editorial and lifestyle for desire, ecommerce and catalog for trust,
+// plus a vertical social format.
 const EXAMPLES: Example[] = [
-  { title: 'On-model', src: onModelImg },
-  { title: 'Product shot', src: productShotImg },
-  { title: 'Instagram Story', meta: '9:16', src: instagramStoryImg },
-  { title: 'Instagram Post', meta: '4:5', src: instagramPostImg },
   { title: 'Editorial', src: editorialImg },
-  { title: 'Website / Product Page', src: websiteProductImg },
+  { title: 'Lifestyle', src: lifestyleImg },
+  { title: 'Ecommerce', src: ecommerceImg },
+  { title: 'Catalog', src: catalogImg },
+  { title: 'Social', meta: '9:16', src: socialImg },
 ];
 
 function ExampleLabel({ example }: { example: Example }) {
   return (
-    <div className="flex items-baseline gap-1.5 rounded-full bg-background/85 px-2.5 py-1 backdrop-blur-sm">
-      <span className="truncate text-[11px] font-medium text-foreground">{example.title}</span>
+    <div className="flex items-baseline gap-1.5 rounded-full bg-background/85 px-3 py-1.5 backdrop-blur-sm">
+      <span className="text-xs font-medium text-foreground">{example.title}</span>
       {example.meta && (
         <span className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">
           {example.meta}
@@ -64,31 +67,20 @@ function ExampleLabel({ example }: { example: Example }) {
   );
 }
 
-function ExampleArt({ example }: { example: Example }) {
-  if (example.src) {
-    return (
-      <img
-        src={example.src}
-        alt={example.title}
-        className="absolute inset-0 h-full w-full object-cover"
-      />
-    );
-  }
-  return <div className="absolute inset-0 bg-gradient-to-br from-muted via-muted to-muted-foreground/20" />;
-}
-
 function ExampleCard({ example, onZoom }: { example: Example; onZoom: (e: Example) => void }) {
   return (
     <button
       type="button"
       onClick={() => onZoom(example)}
-      className="group relative block aspect-[4/5] w-full overflow-hidden rounded-lg border border-border bg-card text-left shadow-sm transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      className="group relative aspect-[3/4] w-[260px] shrink-0 snap-start overflow-hidden rounded-xl border border-border bg-card text-left shadow-sm transition-shadow hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:w-[300px]"
     >
-      <div className="absolute inset-0 transition-transform duration-500 group-hover:scale-[1.04]">
-        <ExampleArt example={example} />
-      </div>
-      {/* Label directly on the image, kept readable on any background. */}
-      <div className="absolute bottom-2 left-2 z-10">
+      <img
+        src={example.src}
+        alt={example.title}
+        className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+      />
+      {/* Label kept low-left where it rarely sits over the jewelry. */}
+      <div className="absolute bottom-3 left-3 z-10">
         <ExampleLabel example={example} />
       </div>
     </button>
@@ -107,7 +99,7 @@ export function StarterPackPage({
   const [zoomed, setZoomed] = useState<Example | null>(null);
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col items-center px-1 pb-10">
+    <div className="mx-auto flex max-w-5xl flex-col items-center px-1 pb-10">
 
       {/* 1. Headline */}
       <h1 className="text-center font-display text-4xl uppercase leading-[0.95] tracking-wide text-foreground sm:text-5xl lg:text-6xl">
@@ -117,61 +109,79 @@ export function StarterPackPage({
         Try your first FormaNova shoot for {isINR ? '₹199' : '$2'}.
       </p>
 
-      {/* 2. Offer (the anchor) */}
-      <div className="mt-8 w-full max-w-sm rounded-2xl border-2 border-[hsl(var(--formanova-hero-accent))] bg-[hsl(var(--formanova-hero-accent))]/10 p-7 text-center shadow-lg sm:p-8">
-        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[hsl(var(--formanova-hero-accent))]">
-          Starter Pack
-        </span>
-
-        <div className="mt-3 flex items-baseline justify-center gap-2">
-          <span
-            className="font-display text-2xl tracking-tight text-muted-foreground"
-            style={{ textDecoration: 'line-through', textDecorationThickness: '1.5px' }}
-          >
-            {isINR ? '₹499' : '$5'}
-          </span>
-          <span className="font-display text-6xl tracking-tight text-foreground sm:text-7xl">
-            {isINR ? '₹199' : '$2'}
-          </span>
-          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-            {isINR ? 'INR' : 'USD'}
+      {/* 2. Offer (the anchor) - mirrors the normal pricing Starter card */}
+      <div className="mt-8 flex w-full max-w-sm flex-col gap-6 border-2 border-[hsl(var(--formanova-hero-accent))] bg-[hsl(var(--formanova-hero-accent))]/10 p-8 shadow-sm">
+        <div>
+          <span className="inline-block whitespace-nowrap font-mono text-[20px] font-bold uppercase italic tracking-[0.15em] text-[hsl(var(--formanova-hero-accent))]">
+            One-time offer
           </span>
         </div>
 
-        <p className="mt-3 font-mono text-xs uppercase tracking-[0.16em] text-foreground">
-          50 credits / up to 6 photos
+        <div>
+          <div className="flex items-baseline gap-1">
+            <span
+              className="font-display text-2xl uppercase tracking-tight text-muted-foreground"
+              style={{ textDecoration: 'line-through', textDecorationThickness: '1.5px' }}
+            >
+              {isINR ? '₹499' : '$5'}
+            </span>
+            <span className="font-display text-5xl uppercase tracking-tight text-foreground">
+              {isINR ? '₹199' : '$2'}
+            </span>
+            <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+              {isINR ? 'INR' : 'USD'}
+            </span>
+          </div>
+          <p className="mt-1 font-mono text-[10px] tracking-wider text-muted-foreground">
+            {isINR ? '₹3.98' : '$0.40'} per photo
+          </p>
+        </div>
+
+        <p className="text-sm italic leading-relaxed text-[hsl(var(--formanova-hero-accent))]">
+          Perfect for your first project. A simple way to try FormaNova before moving to a larger pack. Available once per account.
         </p>
 
-        <Button
-          className="mt-6 w-full font-mono text-[11px] uppercase tracking-[0.2em]"
-          size="lg"
-          disabled={loadingTier !== null}
-          onClick={() => onCheckout(tier.tier_id)}
-        >
-          {isLoading ? 'Starting checkout...' : 'Start my first shoot'}
-        </Button>
+        <div className="space-y-2 border-t border-border/30 pt-5">
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">You get</p>
+          <p className="font-mono text-xl text-foreground">50 credits</p>
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            Generate up to 6 photos
+          </p>
+        </div>
 
-        {unavailableTier === tier.tier_id && (
-          <p className="mt-2 font-mono text-[9px] uppercase tracking-wider text-destructive">
-            Offer unavailable.
-          </p>
-        )}
-        {errorTier === tier.tier_id && (
-          <p className="mt-2 font-mono text-[9px] uppercase tracking-wider text-destructive">
-            Checkout failed. Please try again.
-          </p>
-        )}
+        <div>
+          <Button
+            className="w-full font-mono text-[10px] uppercase tracking-[0.2em]"
+            size="lg"
+            disabled={loadingTier !== null}
+            onClick={() => onCheckout(tier.tier_id)}
+          >
+            {isLoading ? 'Starting checkout...' : 'Buy 50 Credits'}
+          </Button>
+          {unavailableTier === tier.tier_id && (
+            <p className="mt-2 font-mono text-[9px] uppercase tracking-wider text-destructive">
+              Offer unavailable.
+            </p>
+          )}
+          {errorTier === tier.tier_id && (
+            <p className="mt-2 font-mono text-[9px] uppercase tracking-wider text-destructive">
+              Checkout failed. Please try again.
+            </p>
+          )}
+        </div>
       </div>
 
-      {/* 3. Output examples (click to view large) */}
-      <div className="mt-12 grid w-full grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
-        {EXAMPLES.map((example) => (
-          <ExampleCard key={example.title} example={example} onZoom={setZoomed} />
-        ))}
+      {/* 3. Output examples: one big-card row, scroll for more */}
+      <div className="mt-12 w-full">
+        <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-3 [scrollbar-width:thin]">
+          {EXAMPLES.map((example) => (
+            <ExampleCard key={example.title} example={example} onZoom={setZoomed} />
+          ))}
+        </div>
       </div>
 
       {/* 4. Reassurance */}
-      <p className="mt-8 max-w-xl text-center text-xs leading-relaxed text-muted-foreground">
+      <p className="mt-6 max-w-xl text-center text-xs leading-relaxed text-muted-foreground">
         Use your own model or background, or choose from FormaNova libraries. High-res upscaling available.
       </p>
 
@@ -180,15 +190,11 @@ export function StarterPackPage({
         <DialogContent className="w-auto max-w-[92vw] overflow-hidden border-border bg-card p-0 sm:max-w-3xl">
           {zoomed && (
             <div className="relative flex items-center justify-center bg-muted">
-              {zoomed.src ? (
-                <img
-                  src={zoomed.src}
-                  alt={zoomed.title}
-                  className="block max-h-[82vh] w-auto max-w-full object-contain"
-                />
-              ) : (
-                <div className="aspect-[4/5] w-full max-w-sm bg-gradient-to-br from-muted to-muted-foreground/20" />
-              )}
+              <img
+                src={zoomed.src}
+                alt={zoomed.title}
+                className="block max-h-[82vh] w-auto max-w-full object-contain"
+              />
               <div className="absolute bottom-3 left-3">
                 <ExampleLabel example={zoomed} />
               </div>
