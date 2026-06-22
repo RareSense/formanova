@@ -256,7 +256,7 @@ export default function Credits() {
             />
 
             {/* Promo Code Section - same redeem flow as the main Credits page */}
-            <div className="mx-auto mt-12 max-w-md border border-border/30 p-8">
+            <div className="mx-auto mt-12 w-full max-w-5xl border border-border/30 p-8">
               <div className="mb-6 flex items-center gap-3">
                 <Gift className="h-5 w-5 text-muted-foreground" />
                 <span className="font-mono text-[9px] uppercase tracking-[0.3em] text-muted-foreground">

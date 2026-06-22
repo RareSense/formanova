@@ -22,6 +22,9 @@ import necklaceCloseupImg from '@/assets/starter-pack/necklace-closeup.webp';
 import modelGoldenHourImg from '@/assets/starter-pack/model-golden-hour.webp';
 import goldHoopEarringModelImg from '@/assets/starter-pack/gold-hoop-earring-model.webp';
 import goldChandelierEarringSariImg from '@/assets/starter-pack/gold-chandelier-earring-sari.webp';
+import bridalFormanovaImg from '@/assets/starter-pack/bridal-formanova.webp';
+import starfishSetBeachImg from '@/assets/starter-pack/starfish-set-beach.webp';
+import reel6ModelImg from '@/assets/starter-pack/reel6-model.webp';
 import heartPendantImg from '@/assets/starter-pack/heart-pendant.webp';
 import heartSetFlatlayImg from '@/assets/starter-pack/heart-set-flatlay.webp';
 import pinkEarringsFlatlayImg from '@/assets/starter-pack/pink-earrings-flatlay.webp';
@@ -55,6 +58,7 @@ const GALLERY: { src: string; alt: string }[] = [
   { src: ecommerceImg, alt: 'Pave hoop earrings, clean product shot' },
   { src: emeraldEarringsBeachImg, alt: 'Emerald drop earrings on model at the beach' },
   { src: heroEmeraldEarringsImg, alt: 'Editorial emerald earrings shot' },
+  { src: starfishSetBeachImg, alt: 'Starfish jewelry set on model at the beach' },
   { src: magentaEarringsModelImg, alt: 'Magenta drop earrings on model' },
   { src: heartSetFlatlayImg, alt: 'Sapphire heart necklace and earring set' },
   { src: goldHoopEarringModelImg, alt: 'Gold hoop earring on model' },
@@ -62,6 +66,7 @@ const GALLERY: { src: string; alt: string }[] = [
   { src: modelGoldenHourImg, alt: 'Golden-hour on-model jewelry portrait' },
   { src: heroVneckNecklaceImg, alt: 'Editorial diamond necklace shot' },
   { src: editorialImg, alt: 'Editorial necklace portrait' },
+  { src: bridalFormanovaImg, alt: 'Bridal model with pearl drop earrings' },
   { src: goldNecklaceFlatlayImg, alt: 'Gold necklace product shot' },
   { src: cascadeEarringModelImg, alt: 'Cascade drop earrings on model' },
   { src: necklaceCloseupImg, alt: 'Necklace close-up' },
@@ -74,6 +79,7 @@ const GALLERY: { src: string; alt: string }[] = [
   { src: goldGemstoneNecklaceImg, alt: 'Gold gemstone necklace product shot' },
   { src: weddingSetRingImg, alt: 'Lab-grown diamond wedding set ring' },
   { src: deepVNecklaceModelImg, alt: 'Necklace on model, deep neckline' },
+  { src: reel6ModelImg, alt: 'Starfish jewelry set on model at the beach' },
 ];
 
 function OfferCard({ tier, isINR, loadingTier, unavailableTier, errorTier, onCheckout }: Props) {
@@ -81,18 +87,12 @@ function OfferCard({ tier, isINR, loadingTier, unavailableTier, errorTier, onChe
   return (
     <div className="flex w-full flex-col items-center gap-6 border-2 border-[hsl(var(--formanova-hero-accent))] bg-[hsl(var(--formanova-hero-accent))]/10 p-8 text-center shadow-sm">
       <div>
-        <span className="inline-block whitespace-nowrap font-mono text-[20px] font-bold uppercase italic tracking-[0.15em] text-[hsl(var(--formanova-hero-accent))]">
+        <span className="inline-block whitespace-nowrap font-mono text-[22px] font-bold uppercase italic tracking-[0.15em] text-[hsl(var(--formanova-hero-accent))]">
           One-time offer
         </span>
       </div>
 
       <div className="flex items-baseline justify-center gap-1">
-        <span
-          className="font-display text-2xl uppercase tracking-tight text-muted-foreground"
-          style={{ textDecoration: 'line-through', textDecorationThickness: '1.5px' }}
-        >
-          {isINR ? '₹499' : '$5'}
-        </span>
         <span className="font-display text-5xl uppercase tracking-tight text-foreground">
           {isINR ? '₹199' : '$2'}
         </span>
@@ -108,7 +108,7 @@ function OfferCard({ tier, isINR, loadingTier, unavailableTier, errorTier, onChe
       <div className="w-full max-w-md space-y-2 border-t border-border/30 pt-5">
         <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">You get</p>
         <p className="font-mono text-xl text-foreground">50 credits</p>
-        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-foreground">
           Generate up to 6 photos
         </p>
       </div>
