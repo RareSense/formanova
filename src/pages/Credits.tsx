@@ -20,7 +20,7 @@ const PLANS = [
     name: 'Basic',
     price: 9,
     credits: 100,
-    photos: 10,
+    photos: 12,
     perPhoto: '$0.99',
     inrPrice: 999,
     inrPerPhoto: '₹99.9',
@@ -31,7 +31,7 @@ const PLANS = [
     name: 'Standard',
     price: 39,
     credits: 500,
-    photos: 50,
+    photos: 62,
     perPhoto: '$0.78',
     inrPrice: 3499,
     inrPerPhoto: '₹69.9',
@@ -42,7 +42,7 @@ const PLANS = [
     name: 'Pro',
     price: 99,
     credits: 1500,
-    photos: 150,
+    photos: 187,
     perPhoto: '$0.66',
     inrPrice: 8999,
     inrPerPhoto: '₹59.9',
@@ -263,7 +263,7 @@ export default function Credits() {
             </span>
           </div>
           <p className="font-mono text-[9px] tracking-wider text-muted-foreground mt-3">
-            Each photo generation costs ~10 credits
+            Each photo generation costs ~8 credits
           </p>
         </motion.div>
 
@@ -330,7 +330,7 @@ export default function Credits() {
                             50 credits
                           </p>
                           <p className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground uppercase">
-                            Generate up to 5 photos
+                            Generate up to 6 photos
                           </p>
                         </div>
 
@@ -434,7 +434,7 @@ export default function Credits() {
                 })}
               </div>
               <p className="font-mono text-sm tracking-wider text-muted-foreground mt-4 text-center">
-                1 standard photo = 10 credits.&nbsp;&nbsp;Higher-resolution photos use more credits.
+                1 standard photo = 8 credits.&nbsp;&nbsp;Higher-resolution photos use more credits.
               </p>
             </>
           )}

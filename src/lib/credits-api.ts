@@ -7,11 +7,11 @@ import { authenticatedFetch } from '@/lib/authenticated-fetch';
 // The backend estimate is always preferred; these are last-resort guards only.
 // Keys must match the workflow_name sent to the backend.
 export const TOOL_COSTS: Record<string, number> = {
-  // Photoshoot workflows — confirmed fallback: 10 credits each
-  jewelry_photoshoots_generator: 10,      // model-shot 1K
+  // Photoshoot workflows — standard (1K) photo is 8 credits; higher tiers cost more.
+  jewelry_photoshoots_generator: 8,       // model-shot 1K
   jewelry_photoshoots_generator_2k: 15,   // model-shot 2K
   jewelry_photoshoots_generator_4k: 25,   // model-shot 4K
-  Product_shot_pipeline: 10,              // product-shot 1K
+  Product_shot_pipeline: 8,               // product-shot 1K
   Product_shot_pipeline_2k: 15,           // product-shot 2K
   Product_shot_pipeline_4k: 25,           // product-shot 4K
   // Upscale — real cost depends on tier + factor (sent via pricing_context to the

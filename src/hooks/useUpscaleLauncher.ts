@@ -14,6 +14,7 @@ import { markGenerationStarted } from '@/lib/generation-lifecycle';
 import { startUpscale, tierForUpscale, estimateUpscaleCostCached, UPSCALE_POLL_TIMEOUT_MS } from '@/lib/upscale-api';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
 import { trackUpscaleStarted, trackUpscaleCompleted, trackUpscalePaywallHit } from '@/lib/posthog-events';
+import { saveUpscaleIntent, clearUpscaleIntent } from '@/lib/upscale-intent';
 import type { Resolution } from '@/components/studio/OutputSettingsPills';
 
 export type UpscaleRunStatus = 'idle' | 'starting' | 'processing' | 'completed' | 'error';
@@ -109,9 +110,15 @@ export function useUpscaleLauncher(): UseUpscaleLauncherReturn {
     });
     if (!approved) {
       trackUpscalePaywallHit({ source_tier: resolution, factor, credits_cost, category, surface: 'history' });
+      // Stash the exact selection so a credits purchase round-trip (pricing ->
+      // Stripe -> back) returns the user to their choice instead of starting
+      // over. Consumed + cleared by the surface that re-arms it on return.
+      saveUpscaleIntent({ imageUri, resolution, factor, isProductShot, jewelryType });
       setStatus('idle');
       return;
     }
+    // Approved: drop any stale pending intent so it can't re-arm a later visit.
+    clearUpscaleIntent();
 
     try {
       const res = await startUpscale({

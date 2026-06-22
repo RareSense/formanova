@@ -2,6 +2,7 @@ import React, { act } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
+import { HelmetProvider } from 'react-helmet-async';
 
 import Dashboard from './Dashboard';
 
@@ -55,9 +56,11 @@ describe('Dashboard CAD entry copy', () => {
 
     act(() => {
       root?.render(
-        <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-          <Dashboard />
-        </MemoryRouter>,
+        <HelmetProvider>
+          <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+            <Dashboard />
+          </MemoryRouter>
+        </HelmetProvider>,
       );
     });
 
