@@ -15,17 +15,25 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import type { BillingTier } from '@/lib/starter-pack';
 import editorialImg from '@/assets/starter-pack/editorial.webp';
-import lifestyleImg from '@/assets/starter-pack/lifestyle.webp';
 import ecommerceImg from '@/assets/starter-pack/ecommerce.webp';
-import catalogImg from '@/assets/starter-pack/catalog.webp';
 import socialImg from '@/assets/starter-pack/social-vertical.webp';
 import necklaceCloseupImg from '@/assets/starter-pack/necklace-closeup.webp';
-import necklacePortraitImg from '@/assets/starter-pack/necklace-portrait.webp';
-import earringStudioImg from '@/assets/starter-pack/earring-studio.webp';
-import pendantImg from '@/assets/starter-pack/pendant.webp';
-import bridalImg from '@/assets/starter-pack/bridal.webp';
-import earringModelImg from '@/assets/starter-pack/earring-model.webp';
-import ringDetailImg from '@/assets/starter-pack/ring-detail.webp';
+import modelGoldenHourImg from '@/assets/starter-pack/model-golden-hour.webp';
+import charmBraceletImg from '@/assets/starter-pack/charm-bracelet.webp';
+import heartPendantImg from '@/assets/starter-pack/heart-pendant.webp';
+import heartSetFlatlayImg from '@/assets/starter-pack/heart-set-flatlay.webp';
+import pinkEarringsFlatlayImg from '@/assets/starter-pack/pink-earrings-flatlay.webp';
+import goldNecklaceFlatlayImg from '@/assets/starter-pack/gold-necklace-flatlay.webp';
+import modelPinkEditorialImg from '@/assets/starter-pack/model-pink-editorial.webp';
+import tennisBraceletWristImg from '@/assets/starter-pack/tennis-bracelet-wrist.webp';
+import goldGemstoneNecklaceImg from '@/assets/starter-pack/gold-gemstone-necklace.webp';
+import cascadeEarringModelImg from '@/assets/starter-pack/cascade-earring-model.webp';
+import satinNecklaceModelImg from '@/assets/starter-pack/satin-necklace-model.webp';
+import redCharmNecklaceModelImg from '@/assets/starter-pack/red-charm-necklace-model.webp';
+import deepVNecklaceModelImg from '@/assets/starter-pack/deep-v-necklace-model.webp';
+import emeraldEarringsBeachImg from '@/assets/starter-pack/emerald-earrings-beach.webp';
+import magentaEarringsModelImg from '@/assets/starter-pack/magenta-earrings-model.webp';
+import weddingSetRingImg from '@/assets/starter-pack/wedding-set-ring.webp';
 // Landscape editorial shots reused from the hero set for masonry variety.
 import heroEmeraldEarringsImg from '@/assets/jewelry/hero-emerald-earrings.webp';
 import heroVneckNecklaceImg from '@/assets/jewelry/hero-vneck-necklace.webp';
@@ -42,25 +50,33 @@ interface Props {
 // Interleaved so the masonry mixes tall and square shapes column to column.
 const GALLERY: { src: string; alt: string }[] = [
   { src: socialImg, alt: 'Vertical on-model jewelry shot' },
-  { src: ecommerceImg, alt: 'Clean ecommerce earring shot' },
+  { src: ecommerceImg, alt: 'Pave hoop earrings, clean product shot' },
+  { src: emeraldEarringsBeachImg, alt: 'Emerald drop earrings on model at the beach' },
   { src: heroEmeraldEarringsImg, alt: 'Editorial emerald earrings shot' },
-  { src: editorialImg, alt: 'Editorial necklace portrait' },
-  { src: necklaceCloseupImg, alt: 'Necklace close-up' },
-  { src: catalogImg, alt: 'Styled jewelry set' },
-  { src: earringModelImg, alt: 'On-model earring shot' },
+  { src: magentaEarringsModelImg, alt: 'Magenta drop earrings on model' },
+  { src: heartSetFlatlayImg, alt: 'Sapphire heart necklace and earring set' },
+  { src: charmBraceletImg, alt: 'Shell and starfish charm bracelet on model' },
+  { src: pinkEarringsFlatlayImg, alt: 'Pink gemstone earrings product shot' },
+  { src: modelGoldenHourImg, alt: 'Golden-hour on-model jewelry portrait' },
   { src: heroVneckNecklaceImg, alt: 'Editorial diamond necklace shot' },
-  { src: pendantImg, alt: 'Pendant detail' },
-  { src: lifestyleImg, alt: 'Lifestyle jewelry shot' },
-  { src: necklacePortraitImg, alt: 'Necklace portrait' },
-  { src: bridalImg, alt: 'Bridal jewelry set' },
-  { src: ringDetailImg, alt: 'Ring detail' },
-  { src: earringStudioImg, alt: 'Studio earring shot' },
+  { src: editorialImg, alt: 'Editorial necklace portrait' },
+  { src: goldNecklaceFlatlayImg, alt: 'Gold necklace product shot' },
+  { src: cascadeEarringModelImg, alt: 'Cascade drop earrings on model' },
+  { src: necklaceCloseupImg, alt: 'Necklace close-up' },
+  { src: tennisBraceletWristImg, alt: 'Tennis bracelet on the wrist' },
+  { src: redCharmNecklaceModelImg, alt: 'Charm necklace on model, red backdrop' },
+  { src: heartPendantImg, alt: 'Heart pendant choker on model' },
+  { src: modelPinkEditorialImg, alt: 'Editorial jewelry shot on model' },
+  { src: satinNecklaceModelImg, alt: 'Necklace on model in satin' },
+  { src: goldGemstoneNecklaceImg, alt: 'Gold gemstone necklace product shot' },
+  { src: weddingSetRingImg, alt: 'Lab-grown diamond wedding set ring' },
+  { src: deepVNecklaceModelImg, alt: 'Necklace on model, deep neckline' },
 ];
 
 function OfferCard({ tier, isINR, loadingTier, unavailableTier, errorTier, onCheckout }: Props) {
   const isLoading = loadingTier === tier.tier_id;
   return (
-    <div className="flex w-full max-w-sm flex-col gap-6 border-2 border-[hsl(var(--formanova-hero-accent))] bg-[hsl(var(--formanova-hero-accent))]/10 p-8 shadow-sm">
+    <div className="flex w-full flex-col gap-6 border-2 border-[hsl(var(--formanova-hero-accent))] bg-[hsl(var(--formanova-hero-accent))]/10 p-8 shadow-sm">
       <div>
         <span className="inline-block whitespace-nowrap font-mono text-[20px] font-bold uppercase italic tracking-[0.15em] text-[hsl(var(--formanova-hero-accent))]">
           One-time offer
@@ -83,7 +99,7 @@ function OfferCard({ tier, isINR, loadingTier, unavailableTier, errorTier, onChe
       </div>
 
       <p className="text-sm italic leading-relaxed text-[hsl(var(--formanova-hero-accent))]">
-        Use it on a real jewelry SKU: model shots, product shots, styled sets, and vertical portraits. Available once per account.
+        Perfect for your first project. A simple way to try FormaNova before moving to a larger pack.
       </p>
 
       <div className="space-y-2 border-t border-border/30 pt-5">
@@ -127,10 +143,10 @@ export function StarterPackPage(props: Props) {
 
       {/* Headline */}
       <h1 className="text-center font-display text-4xl uppercase leading-[0.95] tracking-wide text-foreground sm:text-5xl lg:text-6xl">
-        One jewelry photo. Beautiful outputs.
+        See what FormaNova can do for you.
       </h1>
       <p className="mt-3 text-center text-sm text-muted-foreground sm:text-base">
-        Try your first FormaNova shoot for {isINR ? '₹199' : '$2'}.
+        Your first jewelry photoshoot for {isINR ? '₹199' : '$2'} — 50 credits, up to 6 studio-quality photos.
       </p>
 
       {/* Offer - top */}
