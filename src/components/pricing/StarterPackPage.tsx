@@ -25,6 +25,7 @@ import goldChandelierEarringSariImg from '@/assets/starter-pack/gold-chandelier-
 import bridalFormanovaImg from '@/assets/starter-pack/bridal-formanova.webp';
 import starfishSetBeachImg from '@/assets/starter-pack/starfish-set-beach.webp';
 import metgalaEditorialImg from '@/assets/starter-pack/metgala-editorial.webp';
+import ringGemstoneMoodyImg from '@/assets/starter-pack/ring-gemstone-moody.webp';
 import heartPendantImg from '@/assets/starter-pack/heart-pendant.webp';
 import heartSetFlatlayImg from '@/assets/starter-pack/heart-set-flatlay.webp';
 import pinkEarringsFlatlayImg from '@/assets/starter-pack/pink-earrings-flatlay.webp';
@@ -80,6 +81,7 @@ const GALLERY: { src: string; alt: string }[] = [
   { src: weddingSetRingImg, alt: 'Lab-grown diamond wedding set ring' },
   { src: deepVNecklaceModelImg, alt: 'Necklace on model, deep neckline' },
   { src: metgalaEditorialImg, alt: 'Editorial gown and gold jewelry on the red carpet' },
+  { src: ringGemstoneMoodyImg, alt: 'Ruby and emerald ring, moody product shot' },
 ];
 
 function OfferCard({ tier, isINR, loadingTier, unavailableTier, errorTier, onCheckout }: Props) {
