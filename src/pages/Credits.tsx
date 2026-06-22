@@ -239,11 +239,12 @@ export default function Credits() {
       </p>
     </div>
   ) : (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center gap-3">
       <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">My Credits</p>
-      <div className="mt-2 flex items-center gap-2">
-        <img src={creditCoinIcon} alt="" className="h-9 w-9 object-contain" width={36} height={36} />
-        <span className="font-display text-5xl uppercase tracking-tight text-foreground">{credits ?? '—'}</span>
+      {/* Mirrors the Header credit pill: rounded border + coin icon + number */}
+      <div className="flex items-center gap-2 rounded-full border border-border/40 px-5 py-2">
+        <img src={creditCoinIcon} alt="" className="h-8 w-8 object-contain" width={32} height={32} />
+        <span className="text-3xl font-medium text-foreground">{credits ?? '—'}</span>
       </div>
     </div>
   );

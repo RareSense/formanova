@@ -161,11 +161,8 @@ export function StarterPackPage(props: Props) {
 
       {/* Headline - sits directly above the gallery */}
       <h1 className="mt-16 text-center font-display text-4xl uppercase leading-[0.95] tracking-wide text-foreground sm:text-5xl lg:text-6xl">
-        Creations made with FormaNova.
+        Every photo here was made with FormaNova.
       </h1>
-      <p className="mt-3 text-center text-sm text-muted-foreground sm:text-base">
-        Create magazine-grade jewelry photoshoots.
-      </p>
 
       {/* Pinterest-style masonry gallery (no labels) */}
       <div className="mt-8 w-full columns-2 gap-3 sm:columns-3 lg:columns-4">
@@ -174,7 +171,7 @@ export function StarterPackPage(props: Props) {
             key={item.src}
             type="button"
             onClick={() => setZoomed(item.src)}
-            className="group mb-3 block w-full break-inside-avoid overflow-hidden rounded-xl border border-border bg-card shadow-sm transition-shadow hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="group mb-3 block w-full break-inside-avoid overflow-hidden border border-border bg-card shadow-sm transition-shadow hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <img
               src={item.src}
@@ -198,7 +195,7 @@ export function StarterPackPage(props: Props) {
 
       {/* Click-to-zoom lightbox (image shown at its natural aspect) */}
       <Dialog open={zoomed !== null} onOpenChange={(open) => !open && setZoomed(null)}>
-        <DialogContent className="w-auto max-w-[92vw] overflow-hidden border-border bg-card p-0 sm:max-w-3xl [&>button]:right-3 [&>button]:top-3 [&>button]:rounded-full [&>button]:bg-black/60 [&>button]:p-1.5 [&>button]:opacity-100 [&>button]:backdrop-blur-sm [&>button]:!text-white hover:[&>button]:bg-black/80">
+        <DialogContent className="w-auto max-w-[92vw] overflow-hidden rounded-none border-border bg-card p-0 sm:max-w-3xl sm:rounded-none [&>button]:right-3 [&>button]:top-3 [&>button]:rounded-none [&>button]:bg-black/60 [&>button]:p-1.5 [&>button]:opacity-100 [&>button]:backdrop-blur-sm [&>button]:!text-white hover:[&>button]:bg-black/80">
           {zoomed && (
             <div className="flex items-center justify-center bg-muted">
               <img src={zoomed} alt="" className="block max-h-[82vh] w-auto max-w-full object-contain" />
