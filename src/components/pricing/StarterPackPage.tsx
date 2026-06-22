@@ -87,7 +87,7 @@ const GALLERY: { src: string; alt: string }[] = [
 function OfferCard({ tier, isINR, loadingTier, unavailableTier, errorTier, onCheckout }: Props) {
   const isLoading = loadingTier === tier.tier_id;
   return (
-    <div className="flex w-full flex-col items-center gap-6 border-2 border-[hsl(var(--formanova-hero-accent))] bg-[hsl(var(--formanova-hero-accent))]/10 p-8 text-center shadow-sm">
+    <div className="flex w-full max-w-sm flex-col items-center gap-6 border-2 border-[hsl(var(--formanova-hero-accent))] bg-[hsl(var(--formanova-hero-accent))]/10 p-8 text-center shadow-sm">
       <div>
         <span className="inline-block whitespace-nowrap font-mono text-[22px] font-bold uppercase italic tracking-[0.15em] text-[hsl(var(--formanova-hero-accent))]">
           One-time offer
