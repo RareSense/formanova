@@ -14,12 +14,14 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import type { BillingTier } from '@/lib/starter-pack';
+import creditCoinIcon from '@/assets/icons/credit-coin.webp';
 import editorialImg from '@/assets/starter-pack/editorial.webp';
 import ecommerceImg from '@/assets/starter-pack/ecommerce.webp';
 import socialImg from '@/assets/starter-pack/social-vertical.webp';
 import necklaceCloseupImg from '@/assets/starter-pack/necklace-closeup.webp';
 import modelGoldenHourImg from '@/assets/starter-pack/model-golden-hour.webp';
-import charmBraceletImg from '@/assets/starter-pack/charm-bracelet.webp';
+import goldHoopEarringModelImg from '@/assets/starter-pack/gold-hoop-earring-model.webp';
+import goldChandelierEarringSariImg from '@/assets/starter-pack/gold-chandelier-earring-sari.webp';
 import heartPendantImg from '@/assets/starter-pack/heart-pendant.webp';
 import heartSetFlatlayImg from '@/assets/starter-pack/heart-set-flatlay.webp';
 import pinkEarringsFlatlayImg from '@/assets/starter-pack/pink-earrings-flatlay.webp';
@@ -55,7 +57,7 @@ const GALLERY: { src: string; alt: string }[] = [
   { src: heroEmeraldEarringsImg, alt: 'Editorial emerald earrings shot' },
   { src: magentaEarringsModelImg, alt: 'Magenta drop earrings on model' },
   { src: heartSetFlatlayImg, alt: 'Sapphire heart necklace and earring set' },
-  { src: charmBraceletImg, alt: 'Shell and starfish charm bracelet on model' },
+  { src: goldHoopEarringModelImg, alt: 'Gold hoop earring on model' },
   { src: pinkEarringsFlatlayImg, alt: 'Pink gemstone earrings product shot' },
   { src: modelGoldenHourImg, alt: 'Golden-hour on-model jewelry portrait' },
   { src: heroVneckNecklaceImg, alt: 'Editorial diamond necklace shot' },
@@ -68,6 +70,7 @@ const GALLERY: { src: string; alt: string }[] = [
   { src: heartPendantImg, alt: 'Heart pendant choker on model' },
   { src: modelPinkEditorialImg, alt: 'Editorial jewelry shot on model' },
   { src: satinNecklaceModelImg, alt: 'Necklace on model in satin' },
+  { src: goldChandelierEarringSariImg, alt: 'Gold chandelier earrings on model in sari' },
   { src: goldGemstoneNecklaceImg, alt: 'Gold gemstone necklace product shot' },
   { src: weddingSetRingImg, alt: 'Lab-grown diamond wedding set ring' },
   { src: deepVNecklaceModelImg, alt: 'Necklace on model, deep neckline' },
@@ -76,14 +79,14 @@ const GALLERY: { src: string; alt: string }[] = [
 function OfferCard({ tier, isINR, loadingTier, unavailableTier, errorTier, onCheckout }: Props) {
   const isLoading = loadingTier === tier.tier_id;
   return (
-    <div className="flex w-full flex-col gap-6 border-2 border-[hsl(var(--formanova-hero-accent))] bg-[hsl(var(--formanova-hero-accent))]/10 p-8 shadow-sm">
+    <div className="flex w-full flex-col items-center gap-6 border-2 border-[hsl(var(--formanova-hero-accent))] bg-[hsl(var(--formanova-hero-accent))]/10 p-8 text-center shadow-sm">
       <div>
         <span className="inline-block whitespace-nowrap font-mono text-[20px] font-bold uppercase italic tracking-[0.15em] text-[hsl(var(--formanova-hero-accent))]">
           One-time offer
         </span>
       </div>
 
-      <div className="flex items-baseline gap-1">
+      <div className="flex items-baseline justify-center gap-1">
         <span
           className="font-display text-2xl uppercase tracking-tight text-muted-foreground"
           style={{ textDecoration: 'line-through', textDecorationThickness: '1.5px' }}
@@ -98,11 +101,11 @@ function OfferCard({ tier, isINR, loadingTier, unavailableTier, errorTier, onChe
         </span>
       </div>
 
-      <p className="text-sm italic leading-relaxed text-[hsl(var(--formanova-hero-accent))]">
-        Perfect for your first project. A simple way to try FormaNova before moving to a larger pack.
+      <p className="max-w-md text-left text-sm italic leading-relaxed text-[hsl(var(--formanova-hero-accent))]">
+        Perfect for your first project: on-model, ecommerce, editorial, and product shots. A simple way to try FormaNova before moving to a larger pack.
       </p>
 
-      <div className="space-y-2 border-t border-border/30 pt-5">
+      <div className="w-full max-w-md space-y-2 border-t border-border/30 pt-5">
         <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">You get</p>
         <p className="font-mono text-xl text-foreground">50 credits</p>
         <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
@@ -110,13 +113,14 @@ function OfferCard({ tier, isINR, loadingTier, unavailableTier, errorTier, onChe
         </p>
       </div>
 
-      <div>
+      <div className="w-full max-w-md">
         <Button
-          className="w-full font-mono text-[10px] uppercase tracking-[0.2em]"
+          className="w-full gap-2 font-mono text-[10px] uppercase tracking-[0.2em]"
           size="lg"
           disabled={loadingTier !== null}
           onClick={() => onCheckout(tier.tier_id)}
         >
+          <img src={creditCoinIcon} alt="" className="h-4 w-4 object-contain" width={16} height={16} />
           {isLoading ? 'Starting checkout...' : 'Buy 50 Credits'}
         </Button>
         {unavailableTier === tier.tier_id && (
@@ -135,7 +139,6 @@ function OfferCard({ tier, isINR, loadingTier, unavailableTier, errorTier, onChe
 }
 
 export function StarterPackPage(props: Props) {
-  const { isINR } = props;
   const [zoomed, setZoomed] = useState<string | null>(null);
 
   return (
@@ -146,7 +149,7 @@ export function StarterPackPage(props: Props) {
         See what FormaNova can do for you.
       </h1>
       <p className="mt-3 text-center text-sm text-muted-foreground sm:text-base">
-        Your first jewelry photoshoot for {isINR ? '₹199' : '$2'} — 50 credits, up to 6 studio-quality photos.
+        Create magazine-grade jewelry photoshoots.
       </p>
 
       {/* Offer - top */}

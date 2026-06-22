@@ -254,6 +254,52 @@ export default function Credits() {
               errorTier={errorTier}
               onCheckout={handleCheckout}
             />
+
+            {/* Promo Code Section - same redeem flow as the main Credits page */}
+            <div className="mx-auto mt-12 max-w-md border border-border/30 p-8">
+              <div className="mb-6 flex items-center gap-3">
+                <Gift className="h-5 w-5 text-muted-foreground" />
+                <span className="font-mono text-[9px] uppercase tracking-[0.3em] text-muted-foreground">
+                  Redeem Promo Code
+                </span>
+              </div>
+
+              <div className="flex gap-3">
+                <Input
+                  placeholder="Enter promo code"
+                  value={promoCode}
+                  onChange={(e) => {
+                    setPromoCode(e.target.value);
+                    setPromoResult(null);
+                  }}
+                  onKeyDown={(e) => e.key === 'Enter' && handleRedeemPromo()}
+                  className="font-mono text-sm uppercase tracking-wider bg-background border-border/50"
+                />
+                <Button
+                  onClick={handleRedeemPromo}
+                  disabled={promoLoading || !promoCode.trim()}
+                  variant="default"
+                  className="px-6 font-mono text-[10px] uppercase tracking-[0.2em]"
+                >
+                  {promoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Redeem'}
+                </Button>
+              </div>
+
+              {promoResult && (
+                <div
+                  className={`mt-4 flex items-start gap-2 ${
+                    promoResult.type === 'success' ? 'text-[hsl(var(--formanova-success))]' : 'text-destructive'
+                  }`}
+                >
+                  {promoResult.type === 'success' ? (
+                    <Check className="mt-0.5 h-4 w-4 shrink-0" />
+                  ) : (
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  )}
+                  <p className="font-mono text-[11px] tracking-wider">{promoResult.message}</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </>
