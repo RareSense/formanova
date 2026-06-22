@@ -1,7 +1,7 @@
 // Photo / CAD-render history card: image-first, minimal metadata, with an
 // inline upscale control under the thumbnail.
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
 import { Maximize2, Pencil, Check, X, Gem } from 'lucide-react';
@@ -14,6 +14,7 @@ import { renameAsset } from '@/lib/assets-api';
 import { UpscaleControl } from '@/components/studio/UpscaleControl';
 import { CreditPreflightModal } from '@/components/CreditPreflightModal';
 import { useUpscaleLauncher } from '@/hooks/useUpscaleLauncher';
+import { loadUpscaleIntent, clearUpscaleIntent } from '@/lib/upscale-intent';
 import { inferResolutionTier, resolutionTierLabel, upscaleEtaLabel } from '@/lib/upscale-api';
 import type { Resolution } from '@/components/studio/OutputSettingsPills';
 import { truncateDisplayName, formatLocal, formatLocalDateOnly, itemVariants, CreditsBadge } from './workflow-card-shared';
@@ -86,10 +87,27 @@ export function PhotoCard({ workflow, index, onUpscaled }: { workflow: WorkflowS
   // Resolution badge label (1K/2K/4K/6K/8K...) from the result's real pixels.
   const [badgeTier, setBadgeTier] = useState<string | null>(null);
   const [activeFactor, setActiveFactor] = useState<number | null>(null);
+  // Resumed factor after a credits purchase: re-arm the dropdown to the user's
+  // prior choice so finishing the upscale is a single click, not a restart.
+  const [resumeFactor, setResumeFactor] = useState<number | null>(null);
+  const intentConsumedRef = useRef(false);
   const {
     status: upscaleStatus, error: upscaleError, launch,
     showInsufficientModal, dismissModal, preflightResult,
   } = useUpscaleLauncher();
+
+  // Once the thumbnail is known, claim a matching pending upscale intent (one
+  // card consumes it). thumbnail_url can arrive after mount via enrichment, so
+  // this keys off it rather than running only on mount.
+  useEffect(() => {
+    if (intentConsumedRef.current || !workflow.thumbnail_url) return;
+    const intent = loadUpscaleIntent();
+    if (intent && intent.imageUri === workflow.thumbnail_url) {
+      intentConsumedRef.current = true;
+      setResumeFactor(intent.factor);
+      clearUpscaleIntent();
+    }
+  }, [workflow.thumbnail_url]);
 
   useEffect(() => {
     setUpscaleTier(null);
@@ -225,6 +243,7 @@ export function PhotoCard({ workflow, index, onUpscaled }: { workflow: WorkflowS
               resolution={upscaleTier}
               runStatus={upscaleStatus}
               error={upscaleError}
+              initialFactor={resumeFactor ?? undefined}
               onUpscale={(factor) => {
                 setActiveFactor(factor);
                 launch({

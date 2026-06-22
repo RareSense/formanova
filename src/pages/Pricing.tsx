@@ -21,7 +21,7 @@ const PLANS = [
     name: 'Basic',
     price: 9,
     credits: 100,
-    photos: 10,
+    photos: 12,
     perPhoto: '$0.99',
     inrPrice: 999,
     inrPerPhoto: '₹99.9',
@@ -32,7 +32,7 @@ const PLANS = [
     name: 'Standard',
     price: 39,
     credits: 500,
-    photos: 50,
+    photos: 62,
     perPhoto: '$0.78',
     inrPrice: 3499,
     inrPerPhoto: '₹69.9',
@@ -43,7 +43,7 @@ const PLANS = [
     name: 'Pro',
     price: 99,
     credits: 1500,
-    photos: 150,
+    photos: 187,
     perPhoto: '$0.66',
     inrPrice: 8999,
     inrPerPhoto: '₹59.9',
@@ -76,6 +76,12 @@ export default function Pricing() {
   const isINR = currency === 'INR';
 
   const returnTo = searchParams.get('redirect') || '/studio';
+  // Back affordance returns the user to wherever the credit gate interrupted them
+  // (the studio / history page), not a generic Dashboard, so in-progress work is
+  // never a dead-end. Falls back to Dashboard for direct visits with no redirect.
+  const redirectParam = searchParams.get('redirect');
+  const backTo = redirectParam && redirectParam.startsWith('/') ? redirectParam : '/dashboard';
+  const backLabel = redirectParam ? 'Back' : 'Dashboard';
 
   const fetchTiers = useCallback(async () => {
     setTiersLoading(true);
@@ -208,11 +214,11 @@ export default function Pricing() {
         <div className="mb-10 flex items-end justify-between">
           <div>
             <Link
-              to="/dashboard"
+              to={backTo}
               className="inline-flex items-center gap-1.5 font-mono text-[9px] tracking-[0.3em] text-muted-foreground uppercase hover:text-foreground transition-colors mb-2"
             >
               <ArrowLeft className="h-3 w-3" />
-              Dashboard
+              {backLabel}
             </Link>
             <div className="flex items-center gap-4 mt-1">
               <img src={creditCoinIcon} alt="" className="h-10 w-10 object-contain" />
@@ -287,7 +293,7 @@ export default function Pricing() {
                           50 credits
                         </p>
                         <p className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground uppercase">
-                          Generate up to 5 photos
+                          Generate up to 6 photos
                         </p>
                       </div>
 
@@ -395,7 +401,7 @@ export default function Pricing() {
               })}
             </div>
             <p className="font-mono text-sm tracking-wider text-muted-foreground mt-4 text-center">
-              1 standard photo = 10 credits.&nbsp;&nbsp;Higher-resolution photos use more credits.
+              1 standard photo = 8 credits.&nbsp;&nbsp;Higher-resolution photos use more credits.
             </p>
           </>
         )}

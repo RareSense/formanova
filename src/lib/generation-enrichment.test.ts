@@ -54,10 +54,18 @@ describe('extractPhotoThumbnail', () => {
     expect(extractPhotoThumbnail(steps)).toBe('https://example.com/image.jpg');
   });
 
-  it('returns null when output_url is not https', () => {
+  it('resolves an azure:// output_url to a blob URL', () => {
     const steps = [{
       tool: 'generate_jewelry_image',
       output: { output_url: 'azure://container/image.jpg' },
+    }];
+    expect(extractPhotoThumbnail(steps)).toBe('https://cdn.example.com/container/image.jpg');
+  });
+
+  it('returns null for an unsupported url scheme', () => {
+    const steps = [{
+      tool: 'generate_jewelry_image',
+      output: { output_url: 'ftp://container/image.jpg' },
     }];
     expect(extractPhotoThumbnail(steps)).toBeNull();
   });
