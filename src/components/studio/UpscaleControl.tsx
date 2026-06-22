@@ -36,6 +36,8 @@ interface Props {
   error?: string | null;
   /** Tight layout for narrow contexts (history cards): no icon, slimmer widths. */
   compact?: boolean;
+  /** Pre-select this factor on mount/when it changes (e.g. resuming after a credits purchase). */
+  initialFactor?: number;
 }
 
 function CoinPrice({ status, cost }: { status: EstimateStatus; cost?: number }) {
@@ -60,6 +62,7 @@ export function UpscaleControl({
   runStatus,
   error,
   compact = false,
+  initialFactor,
 }: Props) {
   const resolvedSrc = useAuthenticatedImage(resultImageUrl);
 
@@ -91,9 +94,16 @@ export function UpscaleControl({
     [longestSide, tierMaxFactor],
   );
 
-  const [selectedFactor, setSelectedFactor] = useState<number>(2);
+  const [selectedFactor, setSelectedFactor] = useState<number>(initialFactor ?? 2);
   const [estimates, setEstimates] = useState<Record<number, number>>({});
   const [estimateStatus, setEstimateStatus] = useState<Record<number, EstimateStatus>>({});
+
+  // Apply a resumed factor that arrives after mount (e.g. PhotoCard re-arms it
+  // once the result thumbnail enriches). The validity effect below still clamps
+  // it to an available factor if the resumed value isn't offered for this image.
+  useEffect(() => {
+    if (initialFactor != null) setSelectedFactor(initialFactor);
+  }, [initialFactor]);
 
   // Keep the selected factor valid: default to x2, reset to the lowest available
   // factor whenever it leaves the menu (e.g. the source image changed).
