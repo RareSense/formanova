@@ -236,28 +236,35 @@ export default function Credits() {
   // their balance ("My Credits"), like the header. (A/B-test entry point.)
   const requiredCredits = (location.state as { requiredCredits?: number } | null)?.requiredCredits;
   const isShort = typeof requiredCredits === 'number' && credits !== null && credits < requiredCredits;
-  const starterHeading = isShort ? (
-    // State A: arrived from a generation they couldn't afford. Clean shortfall
-    // notice with a warning icon; their shoot is saved so they resume after buying.
+  // Shortfall notice shown when the user arrived from a generation they couldn't
+  // afford (requiredCredits in router state). Reused on the starter page and the
+  // normal credits page; a normal visit (no requiredCredits) shows the balance.
+  const insufficientNotice = (
     <div className="w-full">
-      <div className="flex items-start gap-4">
-        <AlertCircle className="h-12 w-12 shrink-0 text-destructive" />
+      <div className="flex items-start gap-3">
+        <AlertCircle className="h-7 w-7 shrink-0 text-destructive" />
         <div>
-          <h1 className="font-display text-4xl uppercase leading-none tracking-wide text-foreground md:text-5xl lg:text-6xl">
+          <h2 className="font-display text-2xl uppercase leading-none tracking-wide text-foreground md:text-3xl">
             Not enough credits
-          </h1>
-          <p className="mt-3 text-base font-medium text-foreground md:text-lg">
+          </h2>
+          <p className="mt-2 text-sm font-medium text-foreground md:text-base">
             You have {credits ?? 0} credits. This generation needs {requiredCredits}. Buy some to finish it.
           </p>
         </div>
       </div>
     </div>
-  ) : (
-    // State B: normal visit. Balance card mirroring the main Credits page.
+  );
+
+  const starterHeading = isShort ? insufficientNotice : (
+    // State B: normal visit. Mirrors the main Credits header (coin icon + My
+    // Credits, left-aligned) and balance card.
     <div className="w-full">
-      <h1 className="text-center font-display text-4xl uppercase leading-none tracking-wide text-foreground md:text-5xl lg:text-6xl">
-        My Credits
-      </h1>
+      <div className="flex items-center gap-4">
+        <img src={creditCoinIcon} alt="" className="h-16 w-16 object-contain" />
+        <h1 className="font-display text-4xl uppercase leading-none tracking-wide text-foreground md:text-5xl lg:text-6xl">
+          My Credits
+        </h1>
+      </div>
       <div className="mt-6 border border-border/30 p-6">
         <span className="mb-2 block font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground">
           Credit Balance
@@ -269,7 +276,7 @@ export default function Credits() {
           <span className="font-mono text-[10px] tracking-wider text-muted-foreground">credits remaining</span>
         </div>
         <p className="mt-3 font-mono text-[9px] tracking-wider text-muted-foreground">
-          Each photo generation costs ~8 credits
+          Each standard photo generation costs ~8 credits
         </p>
       </div>
     </div>
@@ -372,25 +379,28 @@ export default function Credits() {
         className={`${maxWidthClass} mx-auto`}
       >
         {/* Header */}
-        <motion.div variants={itemVariants} className="mb-10 flex items-end justify-between">
-          <div>
-            <Link
-              to="/dashboard"
-              className="inline-flex items-center gap-1.5 font-mono text-[9px] tracking-[0.3em] text-muted-foreground uppercase hover:text-foreground transition-colors mb-2"
-            >
-              <ArrowLeft className="h-3 w-3" />
-              Dashboard
-            </Link>
-            <div className="flex items-center gap-4 mt-1">
+        <motion.div variants={itemVariants} className="mb-10">
+          <Link
+            to="/dashboard"
+            className="mb-2 inline-flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.3em] text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="h-3 w-3" />
+            Dashboard
+          </Link>
+          {isShort ? (
+            <div className="mt-1">{insufficientNotice}</div>
+          ) : (
+            <div className="mt-1 flex items-center gap-4">
               <img src={creditCoinIcon} alt="" className="h-16 w-16 object-contain" />
               <h1 className="font-display text-4xl md:text-5xl lg:text-6xl uppercase tracking-wide text-foreground leading-none">
                 My Credits
               </h1>
             </div>
-          </div>
+          )}
         </motion.div>
 
-        {/* Plan + Balance row */}
+        {/* Plan + Balance row — only on a normal visit; the shortfall notice covers it otherwise */}
+        {!isShort && (
         <motion.div variants={itemVariants} className="border border-border/30 p-6 mb-12">
           <span className="font-mono text-[9px] tracking-[0.25em] text-muted-foreground uppercase block mb-2">
             Credit Balance
@@ -404,9 +414,10 @@ export default function Credits() {
             </span>
           </div>
           <p className="font-mono text-[9px] tracking-wider text-muted-foreground mt-3">
-            Each photo generation costs ~8 credits
+            Each standard photo generation costs ~8 credits
           </p>
         </motion.div>
+        )}
 
         {/* Plans */}
         <motion.div variants={itemVariants} className="mb-12">
