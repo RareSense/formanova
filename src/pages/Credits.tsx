@@ -237,37 +237,19 @@ export default function Credits() {
   const requiredCredits = (location.state as { requiredCredits?: number } | null)?.requiredCredits;
   const isShort = typeof requiredCredits === 'number' && credits !== null && credits < requiredCredits;
   const starterHeading = isShort ? (
-    // State A: arrived from a generation they couldn't afford. Same balance card
-    // as the main Credits page, plus what this run needs. Their shoot is saved.
+    // State A: arrived from a generation they couldn't afford. Clean shortfall
+    // notice with a warning icon; their shoot is saved so they resume after buying.
     <div className="w-full">
-      <h1 className="text-center font-display text-4xl uppercase leading-none tracking-wide text-foreground md:text-5xl lg:text-6xl">
-        Not enough credits
-      </h1>
-      <div className="mt-6 border border-border/30 p-6">
-        <div className="flex flex-wrap items-end justify-between gap-6">
-          <div>
-            <span className="mb-2 block font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground">
-              Credit Balance
-            </span>
-            <div className="flex items-baseline gap-2">
-              <span className="font-display text-5xl uppercase tracking-tight text-foreground">
-                {creditsLoading ? '...' : credits !== null ? credits.toLocaleString() : '—'}
-              </span>
-              <span className="font-mono text-[10px] tracking-wider text-muted-foreground">credits remaining</span>
-            </div>
-          </div>
-          <div className="text-right">
-            <span className="mb-2 block font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground">
-              This shoot needs
-            </span>
-            <span className="font-display text-5xl uppercase tracking-tight text-foreground">
-              {requiredCredits?.toLocaleString()}
-            </span>
-          </div>
+      <div className="flex items-start gap-4">
+        <AlertCircle className="h-12 w-12 shrink-0 text-destructive" />
+        <div>
+          <h1 className="font-display text-4xl uppercase leading-none tracking-wide text-foreground md:text-5xl lg:text-6xl">
+            Not enough credits
+          </h1>
+          <p className="mt-3 font-mono text-xs tracking-wider text-muted-foreground">
+            You have {credits ?? 0} of the {requiredCredits} credits this shoot needs. Add credits to run it. Your setup is saved.
+          </p>
         </div>
-        <p className="mt-4 font-mono text-[9px] tracking-wider text-muted-foreground">
-          Top up below to run it. Your shoot is saved, so you pick up right where you left off.
-        </p>
       </div>
     </div>
   ) : (
