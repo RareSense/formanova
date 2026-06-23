@@ -12,6 +12,7 @@ import { toast } from '@/hooks/use-toast';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { useBillingLocale } from '@/hooks/use-billing-locale';
 import { selectStarterTier } from '@/lib/starter-pack';
+import { getPostPurchaseReturn, clearPostPurchaseReturn } from '@/lib/post-purchase-return';
 import { StarterPackPage } from '@/components/pricing/StarterPackPage';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
 
@@ -147,11 +148,16 @@ export default function Credits() {
     setErrorTier(null);
     setUnavailableTier(null);
 
+    // Door-out: if the user arrived from a generation they couldn't afford, the
+    // studio stored where to return. Send them back there after purchase so they
+    // resume the shoot; otherwise stay on the credits page.
+    const returnTo = getPostPurchaseReturn('/credits');
+
     try {
       const response = await authenticatedFetch(CHECKOUT_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tier_id: tierId, redirect: '/credits', ...(country ? { country } : {}) }),
+        body: JSON.stringify({ tier_id: tierId, redirect: returnTo, ...(country ? { country } : {}) }),
       });
 
       if (response.status === 404) {
@@ -163,6 +169,7 @@ export default function Credits() {
       if (!response.ok) throw new Error('Checkout failed');
       const data = await response.json();
       if (!data.url) throw new Error('No checkout URL');
+      clearPostPurchaseReturn();
       window.location.href = data.url;
     } catch {
       setErrorTier(tierId);
@@ -230,21 +237,58 @@ export default function Credits() {
   const requiredCredits = (location.state as { requiredCredits?: number } | null)?.requiredCredits;
   const isShort = typeof requiredCredits === 'number' && credits !== null && credits < requiredCredits;
   const starterHeading = isShort ? (
-    <div className="text-center">
-      <h1 className="font-display text-3xl uppercase leading-[0.95] tracking-wide text-foreground sm:text-4xl">
-        You need a few more credits
+    // State A: arrived from a generation they couldn't afford. Same balance card
+    // as the main Credits page, plus what this run needs. Their shoot is saved.
+    <div className="w-full">
+      <h1 className="text-center font-display text-4xl uppercase leading-none tracking-wide text-foreground md:text-5xl lg:text-6xl">
+        Not enough credits
       </h1>
-      <p className="mx-auto mt-3 max-w-md text-sm text-muted-foreground">
-        This generation needs {requiredCredits} credits and you have {credits}. Grab the starter pack below to finish it.
-      </p>
+      <div className="mt-6 border border-border/30 p-6">
+        <div className="flex flex-wrap items-end justify-between gap-6">
+          <div>
+            <span className="mb-2 block font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground">
+              Credit Balance
+            </span>
+            <div className="flex items-baseline gap-2">
+              <span className="font-display text-5xl uppercase tracking-tight text-foreground">
+                {creditsLoading ? '...' : credits !== null ? credits.toLocaleString() : '—'}
+              </span>
+              <span className="font-mono text-[10px] tracking-wider text-muted-foreground">credits remaining</span>
+            </div>
+          </div>
+          <div className="text-right">
+            <span className="mb-2 block font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground">
+              This shoot needs
+            </span>
+            <span className="font-display text-5xl uppercase tracking-tight text-foreground">
+              {requiredCredits?.toLocaleString()}
+            </span>
+          </div>
+        </div>
+        <p className="mt-4 font-mono text-[9px] tracking-wider text-muted-foreground">
+          Top up below to run it. Your shoot is saved, so you pick up right where you left off.
+        </p>
+      </div>
     </div>
   ) : (
-    <div className="flex flex-col items-center gap-3">
-      <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">My Credits</p>
-      {/* Mirrors the Header credit pill: rounded border + coin icon + number */}
-      <div className="flex items-center gap-2 rounded-full border border-border/40 px-5 py-2">
-        <img src={creditCoinIcon} alt="" className="h-8 w-8 object-contain" width={32} height={32} />
-        <span className="text-3xl font-medium text-foreground">{credits ?? '—'}</span>
+    // State B: normal visit. Balance card mirroring the main Credits page.
+    <div className="w-full">
+      <h1 className="text-center font-display text-4xl uppercase leading-none tracking-wide text-foreground md:text-5xl lg:text-6xl">
+        My Credits
+      </h1>
+      <div className="mt-6 border border-border/30 p-6">
+        <span className="mb-2 block font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground">
+          Credit Balance
+        </span>
+        <div className="flex items-baseline gap-2">
+          <span className="font-display text-5xl uppercase tracking-tight text-foreground">
+            {creditsLoading ? '...' : credits !== null ? credits.toLocaleString() : '—'}
+          </span>
+          <span className="font-mono text-[10px] tracking-wider text-muted-foreground">credits remaining</span>
+        </div>
+        <p className="mt-3 font-mono text-[9px] tracking-wider text-muted-foreground">
+          Each photo generation costs ~8 credits
+        </p>
       </div>
     </div>
   );

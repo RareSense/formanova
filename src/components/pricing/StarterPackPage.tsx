@@ -161,7 +161,7 @@ export function StarterPackPage(props: Props) {
 
       {/* Headline - sits directly above the gallery */}
       <h1 className="mt-16 text-center font-display text-4xl uppercase leading-[0.95] tracking-wide text-foreground sm:text-5xl lg:text-6xl">
-        Every photo here was made with FormaNova.
+        Visuals created with FormaNova.
       </h1>
 
       {/* Pinterest-style masonry gallery (no labels) */}

@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { fetchPresetModels, fetchPresetInspirations, type PresetModel, type PresetModelsResponse, type PresetInspirationsResponse } from '@/lib/models-api';
 import { useQuery } from '@tanstack/react-query';
 import { useCreditPreflight } from '@/hooks/use-credit-preflight';
+import { savePostPurchaseReturn } from '@/lib/post-purchase-return';
 import { useAuth } from '@/contexts/AuthContext';
 import { azureUriToUrl } from '@/lib/azure-utils';
 import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
@@ -491,7 +492,7 @@ export default function UnifiedStudio() {
   // return here and resume. The return path is stored for the post-purchase redirect.
   useEffect(() => {
     if (showInsufficientModal && preflightResult) {
-      sessionStorage.setItem('formanova_post_purchase_return', `${location.pathname}${location.search}`);
+      savePostPurchaseReturn(`${location.pathname}${location.search}`);
       dismissModal();
       navigate('/credits', { state: { requiredCredits: preflightResult.estimatedCredits } });
     }
