@@ -270,27 +270,23 @@ export default function Credits() {
       </p>
     </div>
   ) : (
-    <div className="mx-auto w-full max-w-sm">
-      <div className="mb-4 flex items-center justify-center gap-3">
-        <img src={creditCoinIcon} alt="" className="h-10 w-10 object-contain" />
-        <h1 className="font-display text-3xl uppercase tracking-wide text-foreground sm:text-4xl">
-          My Credits
-        </h1>
+    // One self-contained balance card (coin + "My Credits" label, the number, the
+    // cost). No separate floating title / double label. Centered and width-matched
+    // to the offer card below so they share one spine.
+    <div className="mx-auto w-full max-w-sm border border-border/30 p-6 text-center">
+      <div className="flex items-center justify-center gap-2">
+        <img src={creditCoinIcon} alt="" className="h-7 w-7 object-contain" />
+        <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">My Credits</span>
       </div>
-      <div className="border border-border/30 p-6 text-center">
-        <span className="mb-2 block font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground">
-          Credit Balance
+      <div className="mt-3 flex items-baseline justify-center gap-2">
+        <span className="font-display text-6xl uppercase tracking-tight text-foreground">
+          {creditsLoading ? '...' : credits !== null ? credits.toLocaleString() : '—'}
         </span>
-        <div className="flex items-baseline justify-center gap-2">
-          <span className="font-display text-5xl uppercase tracking-tight text-foreground">
-            {creditsLoading ? '...' : credits !== null ? credits.toLocaleString() : '—'}
-          </span>
-          <span className="font-mono text-[10px] tracking-wider text-muted-foreground">credits remaining</span>
-        </div>
-        <p className="mt-3 font-mono text-[9px] tracking-wider text-muted-foreground">
-          Each standard photo generation costs ~8 credits
-        </p>
+        <span className="font-mono text-[10px] tracking-wider text-muted-foreground">credits left</span>
       </div>
+      <p className="mt-3 font-mono text-[9px] tracking-wider text-muted-foreground">
+        Each standard photo generation costs ~8 credits
+      </p>
     </div>
   );
 
