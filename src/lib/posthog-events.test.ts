@@ -35,6 +35,8 @@ import {
   trackUpscaleStarted,
   trackUpscaleCompleted,
   trackUpscalePaywallHit,
+  getStarterPackPricingVariant,
+  onPostHogFlagsLoaded,
 } from './posthog-events'
 
 beforeEach(() => {
@@ -559,6 +561,68 @@ describe('trackUpscalePaywallHit', () => {
       category: 'earring',
       surface: 'studio',
     })
+  })
+})
+
+// ── getStarterPackPricingVariant (A/B experiment) ───────────────────
+
+describe('getStarterPackPricingVariant', () => {
+  it('returns the flag value (treatment) when loaded and identified', () => {
+    ;(posthog as any).__loaded = true
+    ;(posthog._isIdentified as any).mockReturnValue(true)
+    ;(posthog.getFeatureFlag as any).mockReturnValue('treatment')
+    expect(getStarterPackPricingVariant()).toBe('treatment')
+    expect(posthog.getFeatureFlag).toHaveBeenCalledWith('starter-pack-pricing-experiment')
+  })
+
+  it('returns control when bucketed to control', () => {
+    ;(posthog as any).__loaded = true
+    ;(posthog._isIdentified as any).mockReturnValue(true)
+    ;(posthog.getFeatureFlag as any).mockReturnValue('control')
+    expect(getStarterPackPricingVariant()).toBe('control')
+  })
+
+  it('returns undefined and does not read the flag when not identified', () => {
+    ;(posthog as any).__loaded = true
+    ;(posthog._isIdentified as any).mockReturnValue(false)
+    expect(getStarterPackPricingVariant()).toBeUndefined()
+    expect(posthog.getFeatureFlag).not.toHaveBeenCalled()
+  })
+
+  it('returns undefined and does not read the flag when posthog is not loaded', () => {
+    ;(posthog as any).__loaded = false
+    ;(posthog._isIdentified as any).mockReturnValue(true)
+    expect(getStarterPackPricingVariant()).toBeUndefined()
+    expect(posthog.getFeatureFlag).not.toHaveBeenCalled()
+    ;(posthog as any).__loaded = true
+  })
+})
+
+// ── onPostHogFlagsLoaded ────────────────────────────────────────────
+
+describe('onPostHogFlagsLoaded', () => {
+  it('subscribes via posthog.onFeatureFlags when loaded and runs cb on flags', () => {
+    ;(posthog as any).__loaded = true
+    let captured: (() => void) | undefined
+    ;(posthog.onFeatureFlags as any).mockImplementation((fn: () => void) => {
+      captured = fn
+      return () => {}
+    })
+    const cb = vi.fn()
+    onPostHogFlagsLoaded(cb)
+    expect(posthog.onFeatureFlags).toHaveBeenCalled()
+    captured!()
+    expect(cb).toHaveBeenCalledTimes(1)
+  })
+
+  it('runs cb immediately (fallback) when posthog is not loaded', () => {
+    ;(posthog as any).__loaded = false
+    const cb = vi.fn()
+    const unsub = onPostHogFlagsLoaded(cb)
+    expect(cb).toHaveBeenCalledTimes(1)
+    expect(posthog.onFeatureFlags).not.toHaveBeenCalled()
+    expect(typeof unsub).toBe('function')
+    ;(posthog as any).__loaded = true
   })
 })
 

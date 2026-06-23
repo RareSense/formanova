@@ -8,6 +8,9 @@ import { useCredits } from '@/contexts/CreditsContext';
 import { toast } from '@/hooks/use-toast';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { useBillingLocale } from '@/hooks/use-billing-locale';
+import { selectStarterTier } from '@/lib/starter-pack';
+import { StarterPackPage } from '@/components/pricing/StarterPackPage';
+import { useStarterPackPricingVariant } from '@/hooks/use-starter-pack-experiment';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
 
 const CHECKOUT_URL = '/billing/checkout';
@@ -72,6 +75,13 @@ export default function Pricing() {
   const [unavailableTier, setUnavailableTier] = useState<string | null>(null);
   const { currency, symbol, country } = useBillingLocale();
   const isINR = currency === 'INR';
+
+  // Starter-pack pricing A/B (same as Credits). Eligibility-gated flag read,
+  // before any early return; default-safe (anything but 'control' = Starter Pack).
+  const starterTier = selectStarterTier(tiers);
+  const starterEligible = !tiersLoading && !!starterTier;
+  const { variant: starterPricingVariant, ready: starterPricingReady } =
+    useStarterPackPricingVariant(starterEligible);
 
   const returnTo = searchParams.get('redirect') || '/studio';
   // Back affordance returns the user to wherever the credit gate interrupted them
@@ -155,6 +165,56 @@ export default function Pricing() {
 
   const colsClass = gridTiers.length === 4 ? 'md:grid-cols-4' : 'md:grid-cols-3';
   const maxWidthClass = gridTiers.length === 4 ? 'max-w-7xl' : 'max-w-5xl';
+
+  // Eligible (never purchased) users get the one-time Starter Pack page instead
+  // of the normal grid. The backend stops returning the starter tier once it is
+  // bought, so this branch naturally turns off afterwards. `starterTier` +
+  // `starterEligible` are computed above (before the early returns).
+  // A/B: hold for eligible users until the flag loads (no control->treatment flash).
+  if (starterEligible && !starterPricingReady) {
+    return (
+      <div className="min-h-[calc(100vh-5rem)] flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+  if (starterEligible && starterPricingVariant !== 'control') {
+    return (
+      <>
+        <Helmet>
+          <title>Starter Pack | FormaNova AI Jewelry Studio</title>
+          <meta name="description" content="One jewelry photo, beautiful outputs. Try your first FormaNova shoot for $2." />
+          <link rel="canonical" href="/pricing" />
+        </Helmet>
+        <div className="min-h-[calc(100vh-5rem)] bg-background px-4 py-6 sm:px-6 lg:px-10">
+          <div className="mx-auto max-w-4xl">
+            <div className="mb-6 flex items-center justify-between gap-4">
+              <Link
+                to="/dashboard"
+                className="inline-flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.3em] text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <ArrowLeft className="h-3 w-3" />
+                Dashboard
+              </Link>
+              {credits !== null && (
+                <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+                  Balance: {credits} credits
+                </p>
+              )}
+            </div>
+            <StarterPackPage
+              tier={starterTier}
+              isINR={isINR}
+              loadingTier={loadingTier}
+              unavailableTier={unavailableTier}
+              errorTier={errorTier}
+              onCheckout={handleCheckout}
+            />
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>

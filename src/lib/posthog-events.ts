@@ -340,6 +340,46 @@ export function getEligibleCoachmarkVariant(): string | undefined {
   return getCoachmarkVariant();
 }
 
+// ═══════ Starter Pack pricing A/B experiment ═════════════════════════
+// control = old multi-plan grid; treatment = new single-offer Starter Pack page.
+// Default-safe: callers treat anything except 'control' as the Starter Pack page,
+// so behaviour is unchanged until the PostHog flag actively buckets a user (no
+// regression before the experiment is configured / after it ends).
+//
+// TO REMOVE when experiment ends: delete STARTER_PACK_EXPERIMENT_FLAG,
+// getStarterPackPricingVariant, onPostHogFlagsLoaded, their tests, the
+// useStarterPackPricingVariant hook, and the gating in Credits.tsx / Pricing.tsx.
+
+export const STARTER_PACK_EXPERIMENT_FLAG = 'starter-pack-pricing-experiment';
+
+/**
+ * Variant for the starter-pack pricing experiment: 'control' = old multi-plan
+ * grid, 'treatment' (or undefined) = new single-offer Starter Pack page.
+ *
+ * Read only after identify so eligible buyers bucket on the right distinct_id;
+ * reading the flag here is also what records the PostHog exposure
+ * ($feature_flag_called). Callers gate this behind eligibility so exposure fires
+ * only for the experiment's real population.
+ */
+export function getStarterPackPricingVariant(): string | undefined {
+  if (!posthog.__loaded || !posthog._isIdentified()) return undefined;
+  return posthog.getFeatureFlag(STARTER_PACK_EXPERIMENT_FLAG) as string | undefined;
+}
+
+/**
+ * Run `cb` once PostHog feature flags are available (and on later changes),
+ * returning an unsubscribe fn. Lets a full-page A/B wait for flags before
+ * choosing a variant, avoiding a control->treatment flash. If PostHog never
+ * loaded, `cb` runs immediately so callers fall back to the default variant.
+ */
+export function onPostHogFlagsLoaded(cb: () => void): () => void {
+  if (!posthog.__loaded) {
+    cb();
+    return () => {};
+  }
+  return posthog.onFeatureFlags(() => cb());
+}
+
 // ═══════ Studio Actions ══════════════════════════════════════════════
 
 // No breaking change — new optional `category` property added
