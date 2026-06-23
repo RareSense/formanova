@@ -270,23 +270,13 @@ export default function Credits() {
       </p>
     </div>
   ) : (
-    // One self-contained balance card (coin + "My Credits" label, the number, the
-    // cost). No separate floating title / double label. Centered and width-matched
-    // to the offer card below so they share one spine.
-    <div className="mx-auto w-full max-w-sm border border-border/30 p-6 text-center">
-      <div className="flex items-center justify-center gap-2">
-        <img src={creditCoinIcon} alt="" className="h-7 w-7 object-contain" />
-        <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">My Credits</span>
-      </div>
-      <div className="mt-3 flex items-baseline justify-center gap-2">
-        <span className="font-display text-6xl uppercase tracking-tight text-foreground">
-          {creditsLoading ? '...' : credits !== null ? credits.toLocaleString() : '—'}
-        </span>
-        <span className="font-mono text-[10px] tracking-wider text-muted-foreground">credits left</span>
-      </div>
-      <p className="mt-3 font-mono text-[9px] tracking-wider text-muted-foreground">
-        Each standard photo generation costs ~8 credits
-      </p>
+    // Simple one-line balance (the typical pattern): coin + label + count.
+    <div className="flex items-center justify-center gap-2 font-mono text-sm tracking-wider">
+      <img src={creditCoinIcon} alt="" className="h-6 w-6 object-contain" />
+      <span className="uppercase tracking-[0.2em] text-muted-foreground">My Credits</span>
+      <span className="font-semibold text-foreground">
+        {creditsLoading ? '...' : credits !== null ? credits.toLocaleString() : '—'} credits
+      </span>
     </div>
   );
 
