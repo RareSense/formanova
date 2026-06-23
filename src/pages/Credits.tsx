@@ -261,10 +261,12 @@ export default function Credits() {
   // (Gestalt: common region, proximity, alignment).
   const starterHeading = isShort ? (
     <div className="mx-auto w-full max-w-sm text-center">
-      <AlertCircle className="mx-auto h-7 w-7 text-destructive" />
-      <h2 className="mt-3 font-display text-2xl uppercase tracking-wide text-foreground md:text-3xl">
-        Not enough credits
-      </h2>
+      <div className="flex items-center justify-center gap-2">
+        <AlertCircle className="h-6 w-6 shrink-0 text-destructive" />
+        <h2 className="font-display text-2xl uppercase tracking-wide text-foreground md:text-3xl">
+          Not enough credits
+        </h2>
+      </div>
       <p className="mt-2 text-sm font-medium text-foreground md:text-base">
         You have {credits ?? 0} credits. This generation needs {requiredCredits}. Buy some to finish it.
       </p>
