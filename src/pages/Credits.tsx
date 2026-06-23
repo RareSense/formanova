@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Loader2, Check, AlertCircle, Gift } from 'lucide-react';
+import { ArrowLeft, Loader2, Check, AlertCircle, AlertTriangle, Gift } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCredits } from '@/contexts/CreditsContext';
 import { Button } from '@/components/ui/button';
@@ -262,7 +262,7 @@ export default function Credits() {
   const starterHeading = isShort ? (
     <div className="mx-auto w-full max-w-sm text-center">
       <div className="flex items-center justify-center gap-2">
-        <AlertCircle className="h-6 w-6 shrink-0 text-destructive" />
+        <AlertTriangle className="h-6 w-6 shrink-0 text-[hsl(var(--formanova-warning))]" />
         <h2 className="font-display text-2xl uppercase tracking-wide text-foreground md:text-3xl">
           Not enough credits
         </h2>
