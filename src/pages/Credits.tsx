@@ -273,9 +273,9 @@ export default function Credits() {
     // Simple one-line balance (the typical pattern): coin + label + count.
     <div className="flex items-center justify-center gap-2 font-mono text-sm tracking-wider">
       <img src={creditCoinIcon} alt="" className="h-6 w-6 object-contain" />
-      <span className="uppercase tracking-[0.2em] text-muted-foreground">My Credits</span>
+      <span className="uppercase tracking-[0.2em] text-muted-foreground">My Credits:</span>
       <span className="font-semibold text-foreground">
-        {creditsLoading ? '...' : credits !== null ? credits.toLocaleString() : '—'} credits
+        {creditsLoading ? '...' : credits !== null ? credits.toLocaleString() : '—'}
       </span>
     </div>
   );
