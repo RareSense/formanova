@@ -246,8 +246,8 @@ export default function Credits() {
           <h1 className="font-display text-4xl uppercase leading-none tracking-wide text-foreground md:text-5xl lg:text-6xl">
             Not enough credits
           </h1>
-          <p className="mt-3 font-mono text-xs tracking-wider text-muted-foreground">
-            You have {credits ?? 0} of the {requiredCredits} credits this shoot needs. Buy some credits to finish your generation.
+          <p className="mt-3 text-base font-medium text-foreground md:text-lg">
+            You have {credits ?? 0} credits. This generation needs {requiredCredits}. Buy some to finish it.
           </p>
         </div>
       </div>
