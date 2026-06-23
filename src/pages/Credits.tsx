@@ -247,7 +247,7 @@ export default function Credits() {
             Not enough credits
           </h1>
           <p className="mt-3 font-mono text-xs tracking-wider text-muted-foreground">
-            You have {credits ?? 0} of the {requiredCredits} credits this shoot needs. Add credits to run it. Your setup is saved.
+            You have {credits ?? 0} of the {requiredCredits} credits this shoot needs. Buy some credits to finish your generation.
           </p>
         </div>
       </div>
