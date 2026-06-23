@@ -13,6 +13,7 @@ import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { useBillingLocale } from '@/hooks/use-billing-locale';
 import { selectStarterTier } from '@/lib/starter-pack';
 import { getPostPurchaseReturn, clearPostPurchaseReturn } from '@/lib/post-purchase-return';
+import { useStarterPackPricingVariant } from '@/hooks/use-starter-pack-experiment';
 import { StarterPackPage } from '@/components/pricing/StarterPackPage';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
 
@@ -101,6 +102,14 @@ export default function Credits() {
   const [tiers, setTiers] = useState<BillingTier[]>([]);
   const [tiersLoading, setTiersLoading] = useState(true);
   const [unavailableTier, setUnavailableTier] = useState<string | null>(null);
+
+  // Starter-pack pricing A/B. Computed before any early return (React hook order).
+  // Eligibility gates the flag read so exposure fires only for the real population;
+  // default-safe: anything but explicit 'control' renders the Starter Pack page.
+  const starterTier = selectStarterTier(tiers);
+  const starterEligible = !tiersLoading && !!starterTier;
+  const { variant: starterPricingVariant, ready: starterPricingReady } =
+    useStarterPackPricingVariant(starterEligible);
 
   const fetchTiers = useCallback(async () => {
     setTiersLoading(true);
@@ -227,8 +236,8 @@ export default function Credits() {
 
   // Eligible (never purchased) users get the one-time Starter Pack page in place
   // of the full credits/plans page. Once purchased the backend stops returning
-  // the starter tier, so the normal page returns automatically.
-  const starterTier = selectStarterTier(tiers);
+  // the starter tier, so the normal page returns automatically. `starterTier` +
+  // `starterEligible` are computed above (before the early returns).
 
   // Heading shown above the starter offer. If the user arrived after a generate
   // attempt they couldn't afford, the originating flow passes `requiredCredits`
@@ -282,7 +291,15 @@ export default function Credits() {
     </div>
   );
 
-  if (!tiersLoading && starterTier) {
+  // A/B: hold for eligible users until the flag loads (no control->treatment flash).
+  if (starterEligible && !starterPricingReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+  if (starterEligible && starterPricingVariant !== 'control') {
     return (
       <>
         <Helmet>

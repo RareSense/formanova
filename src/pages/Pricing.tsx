@@ -10,6 +10,7 @@ import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { useBillingLocale } from '@/hooks/use-billing-locale';
 import { selectStarterTier } from '@/lib/starter-pack';
 import { StarterPackPage } from '@/components/pricing/StarterPackPage';
+import { useStarterPackPricingVariant } from '@/hooks/use-starter-pack-experiment';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
 
 const CHECKOUT_URL = '/billing/checkout';
@@ -74,6 +75,13 @@ export default function Pricing() {
   const [unavailableTier, setUnavailableTier] = useState<string | null>(null);
   const { currency, symbol, country } = useBillingLocale();
   const isINR = currency === 'INR';
+
+  // Starter-pack pricing A/B (same as Credits). Eligibility-gated flag read,
+  // before any early return; default-safe (anything but 'control' = Starter Pack).
+  const starterTier = selectStarterTier(tiers);
+  const starterEligible = !tiersLoading && !!starterTier;
+  const { variant: starterPricingVariant, ready: starterPricingReady } =
+    useStarterPackPricingVariant(starterEligible);
 
   const returnTo = searchParams.get('redirect') || '/studio';
   // Back affordance returns the user to wherever the credit gate interrupted them
@@ -160,9 +168,17 @@ export default function Pricing() {
 
   // Eligible (never purchased) users get the one-time Starter Pack page instead
   // of the normal grid. The backend stops returning the starter tier once it is
-  // bought, so this branch naturally turns off afterwards.
-  const starterTier = selectStarterTier(tiers);
-  if (!tiersLoading && starterTier) {
+  // bought, so this branch naturally turns off afterwards. `starterTier` +
+  // `starterEligible` are computed above (before the early returns).
+  // A/B: hold for eligible users until the flag loads (no control->treatment flash).
+  if (starterEligible && !starterPricingReady) {
+    return (
+      <div className="min-h-[calc(100vh-5rem)] flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+  if (starterEligible && starterPricingVariant !== 'control') {
     return (
       <>
         <Helmet>
