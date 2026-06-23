@@ -255,21 +255,33 @@ export default function Credits() {
     </div>
   );
 
-  const starterHeading = isShort ? insufficientNotice : (
-    // State B: normal visit. Mirrors the main Credits header (coin icon + My
-    // Credits, left-aligned) and balance card.
-    <div className="w-full">
-      <div className="flex items-center gap-4">
-        <img src={creditCoinIcon} alt="" className="h-16 w-16 object-contain" />
-        <h1 className="font-display text-4xl uppercase leading-none tracking-wide text-foreground md:text-5xl lg:text-6xl">
+  // On the starter page everything (offer card, gallery) is centered, so the top
+  // credits block is centered and width-matched to the offer card (max-w-sm) too,
+  // grouping the title + balance into one module that shares the same spine
+  // (Gestalt: common region, proximity, alignment).
+  const starterHeading = isShort ? (
+    <div className="mx-auto w-full max-w-sm text-center">
+      <AlertCircle className="mx-auto h-7 w-7 text-destructive" />
+      <h2 className="mt-3 font-display text-2xl uppercase tracking-wide text-foreground md:text-3xl">
+        Not enough credits
+      </h2>
+      <p className="mt-2 text-sm font-medium text-foreground md:text-base">
+        You have {credits ?? 0} credits. This generation needs {requiredCredits}. Buy some to finish it.
+      </p>
+    </div>
+  ) : (
+    <div className="mx-auto w-full max-w-sm">
+      <div className="mb-4 flex items-center justify-center gap-3">
+        <img src={creditCoinIcon} alt="" className="h-10 w-10 object-contain" />
+        <h1 className="font-display text-3xl uppercase tracking-wide text-foreground sm:text-4xl">
           My Credits
         </h1>
       </div>
-      <div className="mt-6 border border-border/30 p-6">
+      <div className="border border-border/30 p-6 text-center">
         <span className="mb-2 block font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground">
           Credit Balance
         </span>
-        <div className="flex items-baseline gap-2">
+        <div className="flex items-baseline justify-center gap-2">
           <span className="font-display text-5xl uppercase tracking-tight text-foreground">
             {creditsLoading ? '...' : credits !== null ? credits.toLocaleString() : '—'}
           </span>
