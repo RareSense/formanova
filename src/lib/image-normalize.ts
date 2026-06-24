@@ -29,6 +29,27 @@ export function isSupportedImageFormat(file: File): boolean {
   return SUPPORTED_TYPES.has(file.type);
 }
 
+// Image extensions that browsers sometimes report with an empty or non-image/*
+// MIME type (notably .jfif on Windows, which is byte-identical JPEG). Used as a
+// fallback gate so these aren't wrongly rejected. normalizeImageFile() converts
+// any non-native format to JPEG afterward, so accepting them is safe.
+const IMAGE_EXTENSIONS = new Set([
+  'jpg', 'jpeg', 'jpe', 'jfif', 'pjpeg', 'pjp',
+  'png', 'webp', 'gif', 'bmp', 'tif', 'tiff', 'avif', 'heic', 'heif',
+]);
+
+/**
+ * True if the file looks like an image — by MIME (image/*) or, when the browser
+ * reports an empty/odd MIME (e.g. .jfif), by a known image file extension.
+ * Use this for upload validation instead of a raw `file.type` check so valid
+ * images aren't rejected on MIME quirks.
+ */
+export function isLikelyImageFile(file: File): boolean {
+  if (file.type.startsWith('image/')) return true;
+  const ext = file.name.split('.').pop()?.toLowerCase();
+  return !!ext && IMAGE_EXTENSIONS.has(ext);
+}
+
 function isHeicFile(file: File): boolean {
   if (HEIC_TYPES.has(file.type)) return true;
   // Some browsers report HEIC as empty type — check extension

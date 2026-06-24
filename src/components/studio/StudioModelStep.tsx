@@ -154,7 +154,7 @@ export function StudioModelStep({
       <input
         ref={modelInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,.jfif,.pjpeg,.jpe"
         className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; if (f) handleModelUpload(f); }}
       />
