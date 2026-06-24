@@ -163,7 +163,7 @@ export function StudioUploadStep({
                   <input
                     ref={jewelryInputRef}
                     type="file"
-                    accept="image/*"
+                    accept="image/*,.jfif,.pjpeg,.jpe"
                     className="hidden"
                     onChange={(e) => { const f = e.target.files?.[0]; if (f) handleJewelryUpload(f); }}
                   />

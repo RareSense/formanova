@@ -462,7 +462,7 @@ export function StudioVaultUploadStep({
               <ImageIcon className="h-4 w-4" />
               Browse {categoryCopy.singular} files
             </Button>
-            <input ref={jewelryInputRef} type="file" accept="image/*" className="hidden"
+            <input ref={jewelryInputRef} type="file" accept="image/*,.jfif,.pjpeg,.jpe" className="hidden"
                    onChange={(e) => { const f = e.target.files?.[0]; if (f) onFileUpload(f); }} />
 
             {!showGuide && (
