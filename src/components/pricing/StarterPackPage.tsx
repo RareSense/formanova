@@ -12,7 +12,7 @@
 
 import { useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import type { BillingTier } from '@/lib/starter-pack';
 import creditCoinIcon from '@/assets/icons/credit-coin.webp';
 import editorialImg from '@/assets/starter-pack/editorial.webp';
@@ -196,6 +196,7 @@ export function StarterPackPage(props: Props) {
       {/* Click-to-zoom lightbox (image shown at its natural aspect) */}
       <Dialog open={zoomed !== null} onOpenChange={(open) => !open && setZoomed(null)}>
         <DialogContent className="w-auto max-w-[92vw] overflow-hidden rounded-none border-border bg-card p-0 sm:max-w-3xl sm:rounded-none [&>button]:right-3 [&>button]:top-3 [&>button]:rounded-none [&>button]:bg-black/60 [&>button]:p-1.5 [&>button]:opacity-100 [&>button]:backdrop-blur-sm [&>button]:!text-white hover:[&>button]:bg-black/80">
+          <DialogTitle className="sr-only">Enlarged jewelry photo</DialogTitle>
           {zoomed && (
             <div className="flex items-center justify-center bg-muted">
               <img src={zoomed} alt="" className="block max-h-[82vh] w-auto max-w-full object-contain" />
