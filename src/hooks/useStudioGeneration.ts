@@ -53,6 +53,7 @@ import {
 } from '@/lib/photoshoot-api';
 import { startUpscale, tierForUpscale, estimateUpscaleCostCached, UPSCALE_POLL_TIMEOUT_MS } from '@/lib/upscale-api';
 import { uploadToAzure } from '@/lib/microservices-api';
+import { azureUriToUrl } from '@/lib/azure-utils';
 import { compressImageBlob, imageSourceToBlob } from '@/lib/image-compression';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
 import { markGenerationStarted } from '@/lib/generation-lifecycle';
@@ -374,8 +375,11 @@ export function useStudioGeneration({
     const prevData = generationInputUrlsMap[workflowId ?? ''];
     const fixResolution = prevData?.resolution ?? resolution;
     const fixAspectRatio = prevData?.aspectRatio ?? aspectRatio;
-    const resultImageUrl = resultImages[0];
-    const jewelryImageUrl = prevData?.jewelryUrl ?? jewelryUploadedUrl;
+    // Fix workflow expects https blob URLs, not raw azure:// URIs. jewelryUploadedUrl
+    // stores the raw URI, so convert it; fall back to the original if no blob base is set.
+    const rawJewelryUrl = prevData?.jewelryUrl ?? jewelryUploadedUrl;
+    const resultImageUrl = azureUriToUrl(resultImages[0]) || resultImages[0];
+    const jewelryImageUrl = azureUriToUrl(rawJewelryUrl) || rawJewelryUrl;
     let jewelryDescription = prevData?.jewelryDescription;
 
     if (!jewelryDescription && isProductShot && workflowId) {
