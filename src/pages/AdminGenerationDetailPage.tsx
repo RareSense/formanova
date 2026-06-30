@@ -364,7 +364,9 @@ function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
   const outputImageUrl = firstRenderableUrl([
     detail.feedback?.output_image_url ?? null,
     findString(detail.input_payload, ['output_image_url', 'output_url', 'image_url', 'result_url']),
-    stepOutputImageUrls[0],
+    // Final render is the LAST image produced across steps; earlier steps now emit
+    // intermediate images (e.g. the model image), so [0] would mislabel them as output.
+    stepOutputImageUrls[stepOutputImageUrls.length - 1],
   ]);
   const category =
     detail.feedback?.category ??

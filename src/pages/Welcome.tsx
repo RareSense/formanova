@@ -13,6 +13,7 @@ const CinematicShowcase = lazy(() => import('@/components/CinematicShowcase').th
 
 // Assets
 import { ThemeLogo } from '@/components/ThemeLogo';
+import rareSenseLogo from '@/assets/rare-sense-logo.webp';
 const heroDiamondChoker = '/hero-diamond-choker.webp';
 import heroVneckNecklace from '@/assets/jewelry/hero-vneck-necklace.webp';
 import heroChokerBack from '@/assets/jewelry/hero-choker-back.webp';
@@ -213,7 +214,15 @@ export default function Welcome() {
               <Link to="/tutorial" className="marta-label marta-link hover:text-foreground">Tutorial</Link>
               <a href="https://linkedin.com/company/rare-sense-inc" target="_blank" rel="noopener noreferrer" className="marta-label marta-link hover:text-foreground">LinkedIn</a>
             </nav>
-            <p className="marta-label">© {new Date().getFullYear()} FormaNova</p>
+            <div className="flex items-center gap-3">
+              <img
+                src={rareSenseLogo}
+                alt="Rare Sense Inc. logo"
+                className="h-10 w-auto object-contain"
+                loading="lazy"
+              />
+              <p className="marta-label">© {new Date().getFullYear()} FormaNova, a product of Rare Sense Inc.</p>
+            </div>
           </div>
         </div>
       </footer>
