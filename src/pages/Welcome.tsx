@@ -218,9 +218,7 @@ export default function Welcome() {
               <img
                 src={rareSenseLogo}
                 alt="Rare Sense Inc. logo"
-                className="h-8 w-8 rounded-md object-contain"
-                width={32}
-                height={32}
+                className="h-10 w-auto object-contain"
                 loading="lazy"
               />
               <p className="marta-label">© {new Date().getFullYear()} FormaNova, a product of Rare Sense Inc.</p>
