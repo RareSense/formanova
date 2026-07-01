@@ -282,6 +282,8 @@ export default function UnifiedStudio() {
         aspectRatio?: string;
         resolution?: Resolution;
         generationCost?: number | null;
+        jewelryUrl?: string;
+        modelUrl?: string;
       };
       viewGenerating?: string | {
         workflowId: string;
@@ -298,6 +300,8 @@ export default function UnifiedStudio() {
         aspectRatio: state.asyncResult.aspectRatio,
         resolution: state.asyncResult.resolution,
         generationCost: state.asyncResult.generationCost,
+        jewelryUrl: state.asyncResult.jewelryUrl,
+        modelUrl: state.asyncResult.modelUrl,
       });
       setCurrentStep('results');
     } else if (state.viewGenerating) {

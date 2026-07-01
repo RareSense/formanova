@@ -58,12 +58,17 @@ function GenerationIndicator() {
       navigate(`/studio/${mostRecent.jewelryType}`, {
         state: {
           asyncResult: {
-            workflowId: mostRecent.workflowId,
+            // Derivative runs (upscale) re-anchor to the source generation so
+            // feedback/category/inputs stay tied to the original photoshoot.
+            workflowId: mostRecent.parentWorkflowId ?? mostRecent.workflowId,
             resultImages: mostRecent.resultImages,
             aspectRatio: mostRecent.aspectRatio,
             resolution: mostRecent.resolution,
             generationCost: mostRecent.generationCost,
+            jewelryUrl: mostRecent.jewelryUrl,
+            modelUrl: mostRecent.parentModelUrl ?? mostRecent.modelUrl,
           },
+          mode: mostRecent.isProductShot ? 'product-shot' : 'model-shot',
         },
       });
     } else {
