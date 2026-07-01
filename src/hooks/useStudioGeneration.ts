@@ -558,6 +558,12 @@ export function useStudioGeneration({
         generationCost: prevData?.generationCost ?? generationCost,
         // Upscale can be much slower than a normal generation — give the poller room.
         timeoutMs: UPSCALE_POLL_TIMEOUT_MS,
+        // Anchor the upscale to the source generation so restore paths (toast/header)
+        // bring the studio back to the original workflow, keeping feedback/category/
+        // inputs correct. The upscale's own modelUrl is the source image being enlarged,
+        // so carry the original reference model separately for feedback attribution.
+        parentWorkflowId: workflowId ?? undefined,
+        parentModelUrl: prevData?.modelUrl ?? activeModelUrl ?? undefined,
       });
       markGenerationStarted(_upscaleId);
     } catch {
@@ -567,7 +573,7 @@ export function useStudioGeneration({
   }, [
     upscaleStatus, resultImages, workflowId, generationInputUrlsMap,
     isProductShot, effectiveJewelryType, resolution, aspectRatio,
-    generationCost, checkCredits, toast, trackGeneration,
+    generationCost, activeModelUrl, checkCredits, toast, trackGeneration,
   ]);
 
   const handleKeepBrowsing = useCallback(() => {
@@ -601,13 +607,20 @@ export function useStudioGeneration({
     aspectRatio?: string;
     resolution?: Resolution;
     generationCost?: number | null;
+    // Original inputs, carried when re-anchoring a derivative (upscale) run back to
+    // its source generation so feedback keeps the real jewelry/reference inputs.
+    jewelryUrl?: string;
+    modelUrl?: string;
   }) => {
-    if (meta?.resolution || meta?.aspectRatio || meta?.generationCost !== undefined) {
+    if (
+      meta?.resolution || meta?.aspectRatio || meta?.generationCost !== undefined ||
+      meta?.jewelryUrl !== undefined || meta?.modelUrl !== undefined
+    ) {
       setGenerationInputUrlsMap(prev => ({
         ...prev,
         [id]: {
-          jewelryUrl: prev[id]?.jewelryUrl,
-          modelUrl: prev[id]?.modelUrl,
+          jewelryUrl: meta?.jewelryUrl ?? prev[id]?.jewelryUrl,
+          modelUrl: meta?.modelUrl ?? prev[id]?.modelUrl,
           aspectRatio: meta?.aspectRatio ?? prev[id]?.aspectRatio ?? '3:4',
           resolution: meta?.resolution ?? prev[id]?.resolution ?? '1K',
           generationCost: meta?.generationCost ?? prev[id]?.generationCost ?? null,

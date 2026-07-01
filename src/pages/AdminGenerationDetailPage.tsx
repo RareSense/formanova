@@ -344,11 +344,23 @@ function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
       .map((value) => normalizeRenderableUrl(value))
       .filter((value): value is string => Boolean(value)),
   );
+  // Derivative runs (upscale) store their source under `image` — either a bare
+  // string or `{ uri }` — with no jewelry_image_url. Surface it so the workflow's
+  // input still renders in the admin detail.
+  const derivativeSourceUrl = (() => {
+    const img = (detail.input_payload as Record<string, unknown> | null)?.image;
+    if (typeof img === 'string') return img;
+    if (img && typeof img === 'object' && typeof (img as Record<string, unknown>).uri === 'string') {
+      return (img as Record<string, unknown>).uri as string;
+    }
+    return null;
+  })();
   const jewelryInputUrls = [
     ...findStringArray(detail.input_payload, ['jewelry_image_urls', 'input_image_urls', 'input_images']),
-    ...['jewelry_image_url', 'input_image_url']
+    ...['jewelry_image_url', 'input_image_url', 'image_url', 'source_image_url']
       .map((key) => findString(detail.input_payload, [key]))
       .filter((value): value is string => Boolean(value)),
+    ...(derivativeSourceUrl ? [derivativeSourceUrl] : []),
   ]
     .map((value) => normalizeRenderableUrl(value))
     .filter((value): value is string => Boolean(value));

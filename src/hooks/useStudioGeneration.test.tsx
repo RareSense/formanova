@@ -261,6 +261,29 @@ describe('useStudioGeneration', () => {
     expect(result.current.generationInputUrls?.generationCost).toBe(40);
   });
 
+  it('restoreAsyncResult adopts carried jewelry/model inputs (upscale re-anchor to source generation)', () => {
+    const ctx = makeContextValue();
+    const { result } = renderHook(() => useStudioGeneration(baseOptions()), { wrapper: wrapper(ctx) });
+
+    // Simulate the toast/header re-anchoring a finished upscale back to its parent
+    // generation: workflowId is the ORIGINAL, images are the UPSCALED output, and the
+    // original jewelry/model inputs are carried through so feedback stays correct.
+    act(() => {
+      result.current.restoreAsyncResult('wf-original', ['https://example.com/upscaled.jpg'], {
+        aspectRatio: '3:4',
+        resolution: '1K',
+        generationCost: 10,
+        jewelryUrl: 'https://example.com/original-jewelry.jpg',
+        modelUrl: 'https://example.com/original-model.jpg',
+      });
+    });
+
+    expect(result.current.workflowId).toBe('wf-original');
+    expect(result.current.resultImages).toEqual(['https://example.com/upscaled.jpg']);
+    expect(result.current.generationInputUrls?.jewelryUrl).toBe('https://example.com/original-jewelry.jpg');
+    expect(result.current.generationInputUrls?.modelUrl).toBe('https://example.com/original-model.jpg');
+  });
+
   it('captures generationInputUrls from the URLs actually sent to startPhotoshoot', async () => {
     const ctx = makeContextValue();
     mockStartPhotoshoot.mockResolvedValue({ workflow_id: 'wf-inputs', status_url: '', result_url: '' });

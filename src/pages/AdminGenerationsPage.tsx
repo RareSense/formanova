@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, ExternalLink, Loader2, MessageSquareWarning, Search } from 'lucide-react';
@@ -119,20 +119,40 @@ export default function AdminGenerationsPage() {
 
   const status = searchParams.get('status') ?? '';
   const search = searchParams.get('search') ?? searchParams.get('workflow_name') ?? '';
+  // Which server-side field the search box targets. Both `user_email` and
+  // `workflow_name` are substring-filtered by the backend across ALL records, so
+  // partial/close matches surface without loading every page into the browser.
+  const searchField = searchParams.get('field') === 'workflow' ? 'workflow' : 'email';
   const hasFeedback = searchParams.get('has_feedback') ?? '';
   const userType = searchParams.get('user_type') ?? '';
   const isPaying = searchParams.get('is_paying') ?? '';
   const offset = Number(searchParams.get('offset') ?? '0') || 0;
-  const hasSearch = search.trim().length > 0;
-  const isEmailSearch = hasSearch && search.includes('@');
+  const trimmedSearch = search.trim();
+  const hasSearch = trimmedSearch.length > 0;
+
+  // Local, immediately-responsive input value. Writes to the `search` URL param
+  // (which drives the query) are debounced so we don't hit the API per keystroke.
+  const [searchInput, setSearchInput] = useState(search);
+  // Keep the input in sync when `search` changes from outside (clear filters, back/forward).
+  useEffect(() => { setSearchInput(search); }, [search]);
+  useEffect(() => {
+    if (searchInput === search) return;
+    const t = setTimeout(() => updateParam('search', searchInput), 300);
+    return () => clearTimeout(t);
+    // Deps: only searchInput. `search`/`updateParam` are read fresh; adding them would
+    // re-arm the timer on every param change. Regression to watch: if updateParam starts
+    // closing over stale state, revisit. Guarded by the early return above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchInput]);
 
   const query = useQuery({
-    queryKey: ['admin-generations', { status, search, hasFeedback, userType, isPaying, offset }],
+    queryKey: ['admin-generations', { status, search, searchField, hasFeedback, userType, isPaying, offset }],
     queryFn: () => listAdminGenerations({
       limit: PAGE_SIZE,
       offset,
       status: status || undefined,
-      user_email: isEmailSearch ? search.trim() : undefined,
+      user_email: hasSearch && searchField === 'email' ? trimmedSearch : undefined,
+      workflow_name: hasSearch && searchField === 'workflow' ? trimmedSearch : undefined,
       has_feedback: hasFeedback === '' ? undefined : hasFeedback === 'true',
       user_type: userType || undefined,
       is_paying: isPaying === '' ? undefined : isPaying === 'true',
@@ -187,12 +207,22 @@ export default function AdminGenerationsPage() {
     <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 sm:py-8">
 
         <div className="mb-5 flex flex-wrap gap-2">
+          <Select value={searchField} onValueChange={(value) => updateParam('field', value === 'email' ? '' : value)}>
+            <SelectTrigger className="h-9 w-full shrink-0 text-sm sm:w-32">
+              <SelectValue placeholder="Search by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="email">Email</SelectItem>
+              <SelectItem value="workflow">Workflow</SelectItem>
+            </SelectContent>
+          </Select>
+
           <div className="relative w-full shrink-0 sm:w-64">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
-              value={search}
-              onChange={(event) => updateParam('search', event.target.value)}
-              placeholder="Search by email, workflow, or ID..."
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              placeholder={searchField === 'email' ? 'Search by email...' : 'Search by workflow name...'}
               className="h-9 pl-8 text-sm"
             />
           </div>

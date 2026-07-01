@@ -39,6 +39,14 @@ export interface TrackedGeneration {
   jewelryDescription?: string;
   /** Poll ceiling for this run. Defaults to DEFAULT_POLL_TIMEOUT_MS when omitted. */
   timeoutMs?: number;
+  /**
+   * For derivative runs (e.g. upscale): the original generation this was derived
+   * from. Restore paths re-anchor the studio to this id so feedback, category, and
+   * inputs stay tied to the source photoshoot rather than the upscale workflow.
+   */
+  parentWorkflowId?: string;
+  /** Original model/reference image of the parent generation (upscale carries this). */
+  parentModelUrl?: string;
 }
 
 export interface TrackGenerationParams {
@@ -52,6 +60,10 @@ export interface TrackGenerationParams {
   generationCost: number | null;
   /** Override the poll ceiling for slow workflows (e.g. upscale). */
   timeoutMs?: number;
+  /** Original generation id when this run is a derivative (upscale). */
+  parentWorkflowId?: string;
+  /** Original model/reference image of the parent generation. */
+  parentModelUrl?: string;
 }
 
 export interface GenerationsContextValue {
@@ -185,6 +197,8 @@ export function GenerationsContextProvider({ children }: { children: React.React
         resolution: params.resolution,
         generationCost: params.generationCost,
         ...(params.timeoutMs ? { timeoutMs: params.timeoutMs } : {}),
+        ...(params.parentWorkflowId ? { parentWorkflowId: params.parentWorkflowId } : {}),
+        ...(params.parentModelUrl ? { parentModelUrl: params.parentModelUrl } : {}),
       },
     ]);
   }, []);
@@ -296,12 +310,15 @@ export function GenerationsContextProvider({ children }: { children: React.React
                     onClick={() => navigate(`/studio/${gen.jewelryType}`, {
                       state: {
                         asyncResult: {
-                          workflowId: gen.workflowId,
+                          workflowId: gen.parentWorkflowId ?? gen.workflowId,
                           resultImages: fallbackImages,
                           aspectRatio: gen.aspectRatio,
                           resolution: gen.resolution,
                           generationCost: gen.generationCost,
+                          jewelryUrl: gen.jewelryUrl,
+                          modelUrl: gen.parentModelUrl ?? gen.modelUrl,
                         },
+                        mode: gen.isProductShot ? 'product-shot' : 'model-shot',
                       },
                     })}
                   >
@@ -344,12 +361,17 @@ export function GenerationsContextProvider({ children }: { children: React.React
               onClick={() => navigate(`/studio/${gen.jewelryType}`, {
                 state: {
                   asyncResult: {
-                    workflowId: gen.workflowId,
+                    // Derivative runs (upscale) re-anchor to the source generation so
+                    // feedback/category/inputs stay tied to the original photoshoot.
+                    workflowId: gen.parentWorkflowId ?? gen.workflowId,
                     resultImages,
                     aspectRatio: gen.aspectRatio,
                     resolution: gen.resolution,
                     generationCost: gen.generationCost,
+                    jewelryUrl: gen.jewelryUrl,
+                    modelUrl: gen.parentModelUrl ?? gen.modelUrl,
                   },
+                  mode: gen.isProductShot ? 'product-shot' : 'model-shot',
                 },
               })}
             >
