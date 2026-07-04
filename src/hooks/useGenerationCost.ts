@@ -27,6 +27,12 @@ export function useGenerationCost(workflowName: string, resolution: Resolution):
       body: JSON.stringify({
         workflow_name: workflowName,
         num_variations: 1,
+        // Tell the estimator which resolution tier we will actually request, mirroring
+        // the run payload's image_size. Without it the endpoint conservatively quotes the
+        // worst-case tier (e.g. 20 credits) even for a 1K request that will charge 8 —
+        // a display-only mismatch on the now data-driven jewelry_photoshoots_generator /
+        // Product_shot_pipeline workflows. See tool/workflow consolidation Step 4.
+        pricing_context: { image_size: resolution },
       }),
       signal: controller.signal,
     })

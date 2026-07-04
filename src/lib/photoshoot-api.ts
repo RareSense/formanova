@@ -60,7 +60,16 @@ export interface PhotoshootStatusResponse {
 }
 
 export interface PhotoshootResultResponse {
-  [key: string]: unknown[];
+  /**
+   * Vault asset id produced by this run, present top-level on every /result
+   * response (generic across model-shot/PDP/fix/upscale — a plain DB lookup keyed
+   * on workflow id, not aware of which tool ran). It sits OUTSIDE the node-keyed
+   * arrays, so the index signature below is widened from `unknown[]` to `unknown`:
+   * result-image / description extraction already guards each node value with
+   * Array.isArray, and this scalar is read directly as a sibling field.
+   */
+  output_asset_id?: string | null;
+  [key: string]: unknown;
 }
 
 // ─── Start Photoshoot ───────────────────────────────────────────────
@@ -247,12 +256,25 @@ export interface FixShotRequest {
   aspect_ratio?: string;
   idempotency_key?: string;
   jewelry_description?: string;
+  /**
+   * Vault asset id of the exact image being fixed (its output_asset_id, or the
+   * upscaled asset's id when fixing an already-upscaled image). The backend
+   * resolves image_size/tier from this, so it drives fix price + routing. Sent as
+   * a TOP-LEVEL sibling of `payload`, never nested inside it. When absent we fall
+   * back to `image_size` in the payload (see below).
+   */
+  sourceAssetId?: string | null;
 }
 
 export async function startFixShot(request: FixShotRequest): Promise<PhotoshootStartResponse> {
   const workflowName = request.isProductShot
     ? (FIX_PRODUCT_SHOT_WORKFLOWS[request.resolution] ?? 'fix_product_shot')
     : (FIX_MODEL_SHOT_WORKFLOWS[request.resolution] ?? 'fix_model_shot');
+
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const sourceAssetId = request.sourceAssetId && UUID_RE.test(request.sourceAssetId)
+    ? request.sourceAssetId
+    : undefined;
 
   // Strip data: prefix → send as b64; otherwise send as URL
   const resultImageField = request.resultImageUrl.startsWith('data:')
@@ -284,7 +306,13 @@ export async function startFixShot(request: FixShotRequest): Promise<PhotoshootS
       ...(request.idempotency_key ? { idempotency_key: request.idempotency_key } : {}),
       ...(request.jewelry_description ? { jewelry_description: request.jewelry_description } : {}),
     };
-    body = JSON.stringify({ payload: productPayload });
+    // Fallback only: when we can't resolve the asset, let the backend tier from
+    // image_size. Not sent on the normal path — source_asset_id drives it there.
+    if (!sourceAssetId) productPayload.image_size = request.resolution;
+    body = JSON.stringify({
+      payload: productPayload,
+      ...(sourceAssetId ? { source_asset_id: sourceAssetId } : {}),
+    });
   } else {
     const payload: Record<string, unknown> = {
       ...resultImageField,
@@ -297,7 +325,12 @@ export async function startFixShot(request: FixShotRequest): Promise<PhotoshootS
     if (!request.jewelryImageUrl.startsWith('data:')) {
       payload.jewelry_image_urls = [request.jewelryImageUrl];
     }
-    body = JSON.stringify({ payload });
+    // Fallback only (see product branch): tier from image_size when no asset id.
+    if (!sourceAssetId) payload.image_size = request.resolution;
+    body = JSON.stringify({
+      payload,
+      ...(sourceAssetId ? { source_asset_id: sourceAssetId } : {}),
+    });
   }
 
   const res = await authenticatedFetch(endpoint, {
