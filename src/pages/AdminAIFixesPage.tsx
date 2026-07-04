@@ -199,7 +199,11 @@ function DetailSheet({ item, notFound, open, onClose }: DetailSheetProps) {
               <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-3">Images</p>
               <div className="flex flex-wrap gap-4">
                 {item.input_image_urls.map((url, i) => {
-                  const isProductShot = item.workflow_name.startsWith('fix_product_shot');
+                  // Prefer the backend source_type; fall back to the workflow-name prefix
+                  // (still correct for the consolidated base name fix_product_shot) (Step 6).
+                  const isProductShot = item.source_type
+                    ? item.source_type === 'product_fix'
+                    : item.workflow_name.startsWith('fix_product_shot');
                   const label = i === 0
                     ? (isProductShot ? 'Product shot' : 'Model shot')
                     : 'Input jewelry';
