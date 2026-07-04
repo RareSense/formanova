@@ -10,17 +10,32 @@ import { authenticatedFetch } from '@/lib/authenticated-fetch';
 
 const API_BASE = '/api';
 
-const MODEL_SHOT_WORKFLOWS: Record<string, string> = {
-  '1K': 'jewelry_photoshoots_generator',
-  '2K': 'jewelry_photoshoots_generator_2k',
-  '4K': 'jewelry_photoshoots_generator_4k',
-};
+/**
+ * Canonical data-driven workflow names — one per family (Step 5 of the tool/workflow
+ * consolidation). Resolution is no longer encoded in the name; it travels as data:
+ * `image_size` in the payload for generate/PDP, and `source_asset_id` (fallback
+ * `image_size`) for fix. The old `_2k`/`_4k` suffixed names still work server-side,
+ * but the frontend no longer constructs them.
+ *
+ * Single source of truth for CLAUDE.md invariant #4: useStudioGeneration and
+ * UnifiedStudio import from here instead of keeping their own literal tables.
+ */
+export const WORKFLOW_NAMES = {
+  modelShot: 'jewelry_photoshoots_generator',
+  productShot: 'Product_shot_pipeline',
+  modelFix: 'fix_model_shot',
+  productFix: 'fix_product_shot',
+} as const;
 
-const PRODUCT_SHOT_WORKFLOWS: Record<string, string> = {
-  '1K': 'Product_shot_pipeline',
-  '2K': 'Product_shot_pipeline_2k',
-  '4K': 'Product_shot_pipeline_4k',
-};
+/** Base generate workflow name for a shot type (no resolution suffix). */
+export function generateWorkflowFor(isProductShot: boolean): string {
+  return isProductShot ? WORKFLOW_NAMES.productShot : WORKFLOW_NAMES.modelShot;
+}
+
+/** Base fix workflow name for a shot type (no resolution suffix). */
+export function fixWorkflowFor(isProductShot: boolean): string {
+  return isProductShot ? WORKFLOW_NAMES.productFix : WORKFLOW_NAMES.modelFix;
+}
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -86,7 +101,7 @@ export async function startPhotoshoot(
 
   const { input_jewelry_asset_id, input_model_asset_id, input_preset_model_id, resolution, ...rest } = request;
 
-  const workflowName = MODEL_SHOT_WORKFLOWS[resolution ?? '1K'] ?? MODEL_SHOT_WORKFLOWS['1K'];
+  const workflowName = WORKFLOW_NAMES.modelShot;
   const payload = { ...rest, image_size: resolution ?? '1K' };
 
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -197,7 +212,7 @@ export async function startPdpShot(
     ...rest
   } = request;
 
-  const workflowName = PRODUCT_SHOT_WORKFLOWS[resolution ?? '1K'] ?? PRODUCT_SHOT_WORKFLOWS['1K'];
+  const workflowName = WORKFLOW_NAMES.productShot;
 
   // Backend expects jewelry_image_urls as an array
   const payload = { ...rest, jewelry_image_urls: [jewelry_image_url], image_size: resolution ?? '1K' };
@@ -234,18 +249,6 @@ export async function startPdpShot(
 
 // ─── Fix Shot ───────────────────────────────────────────────────────
 
-const FIX_MODEL_SHOT_WORKFLOWS: Record<string, string> = {
-  '1K': 'fix_model_shot',
-  '2K': 'fix_model_shot_2k',
-  '4K': 'fix_model_shot_4k',
-};
-
-const FIX_PRODUCT_SHOT_WORKFLOWS: Record<string, string> = {
-  '1K': 'fix_product_shot',
-  '2K': 'fix_product_shot_2k',
-  '4K': 'fix_product_shot_4k',
-};
-
 export interface FixShotRequest {
   isProductShot: boolean;
   resolution: string;
@@ -267,9 +270,9 @@ export interface FixShotRequest {
 }
 
 export async function startFixShot(request: FixShotRequest): Promise<PhotoshootStartResponse> {
-  const workflowName = request.isProductShot
-    ? (FIX_PRODUCT_SHOT_WORKFLOWS[request.resolution] ?? 'fix_product_shot')
-    : (FIX_MODEL_SHOT_WORKFLOWS[request.resolution] ?? 'fix_model_shot');
+  // Base fix workflow, no resolution suffix — tier is resolved server-side from
+  // source_asset_id (fallback image_size in the payload). Step 5 cutover.
+  const workflowName = fixWorkflowFor(request.isProductShot);
 
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const sourceAssetId = request.sourceAssetId && UUID_RE.test(request.sourceAssetId)

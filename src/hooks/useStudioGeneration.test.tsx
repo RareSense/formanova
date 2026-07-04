@@ -11,6 +11,11 @@ vi.mock('@/lib/photoshoot-api', () => ({
   startPdpShot: vi.fn(),
   startFixShot: vi.fn(),
   getJewelryDescription: vi.fn(),
+  // Real base-name logic (pure helpers) so gate assertions see the actual names.
+  generateWorkflowFor: (isProductShot: boolean) =>
+    isProductShot ? 'Product_shot_pipeline' : 'jewelry_photoshoots_generator',
+  fixWorkflowFor: (isProductShot: boolean) =>
+    isProductShot ? 'fix_product_shot' : 'fix_model_shot',
 }));
 vi.mock('@/lib/authenticated-fetch', () => ({ authenticatedFetch: vi.fn() }));
 vi.mock('@/lib/microservices-api', () => ({ uploadToAzure: vi.fn() }));
@@ -140,7 +145,7 @@ describe('useStudioGeneration', () => {
     );
   });
 
-  it('sends the correct tier to the gate for a 4K request', async () => {
+  it('gates a 4K request on the BASE workflow name with the tier in pricingContext (Step 5)', async () => {
     const ctx = makeContextValue();
     mockStartPhotoshoot.mockResolvedValue({ workflow_id: 'wf-gate-4k', status_url: '', result_url: '' });
 
@@ -150,8 +155,9 @@ describe('useStudioGeneration', () => {
     );
     await act(async () => { await result.current.handleGenerate(); });
 
+    // No _4k suffix anymore — base name, tier carried by pricingContext/image_size.
     expect(mockCheckCredits).toHaveBeenCalledWith(
-      'jewelry_photoshoots_generator_4k',
+      'jewelry_photoshoots_generator',
       1,
       { pricingContext: { image_size: '4K' } },
     );

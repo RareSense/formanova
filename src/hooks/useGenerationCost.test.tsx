@@ -36,7 +36,8 @@ describe('useGenerationCost', () => {
   });
 
   it('reflects the tier in pricing_context for a 4K request', async () => {
-    renderHook(() => useGenerationCost('jewelry_photoshoots_generator_4k', '4K'));
+    // Step 5: the base workflow name is used for every tier; the tier is carried in pricing_context.
+    renderHook(() => useGenerationCost('jewelry_photoshoots_generator', '4K'));
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalled());
 

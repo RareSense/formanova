@@ -16,6 +16,7 @@ import { ProductShotGuideModal } from '@/components/studio/ProductShotGuideModal
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
 import { type Resolution } from '@/components/studio/OutputSettingsPills';
 import { useGenerationCost } from '@/hooks/useGenerationCost';
+import { generateWorkflowFor } from '@/lib/photoshoot-api';
 import { useStudioOnboarding } from '@/hooks/useStudioOnboarding';
 import { useStudioModels } from '@/hooks/useStudioModels';
 import { useStudioGeneration } from '@/hooks/useStudioGeneration';
@@ -144,9 +145,8 @@ export default function UnifiedStudio() {
     setResolution(v);
     sessionStorage.setItem('formanova_studio_resolution', v);
   };
-  const MODEL_SHOT_WORKFLOWS: Record<string, string> = { '1K': 'jewelry_photoshoots_generator', '2K': 'jewelry_photoshoots_generator_2k', '4K': 'jewelry_photoshoots_generator_4k' };
-  const PRODUCT_SHOT_WORKFLOWS: Record<string, string> = { '1K': 'Product_shot_pipeline', '2K': 'Product_shot_pipeline_2k', '4K': 'Product_shot_pipeline_4k' };
-  const generationWorkflow = isProductShot ? (PRODUCT_SHOT_WORKFLOWS[resolution] ?? 'Product_shot_pipeline') : (MODEL_SHOT_WORKFLOWS[resolution] ?? 'jewelry_photoshoots_generator');
+  // Base workflow name (no _2k/_4k suffix); resolution drives price via pricing_context. Step 5.
+  const generationWorkflow = generateWorkflowFor(isProductShot);
   const { cost: generationCost } = useGenerationCost(generationWorkflow, resolution);
 
   // Fetch preset models from the backend. No local fallback catalog is used.
