@@ -559,7 +559,10 @@ export default function UnifiedStudio() {
         <link rel="canonical" href={location.pathname} />
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
-    <div className="h-screen bg-background relative overflow-hidden flex flex-col">
+    {/* Results step fits the space under the fixed global header (spacer h-16/h-20)
+        so the window doesn't gain a second scrollbar on top of the inner scroller.
+        Other steps keep the original h-screen to avoid changing their layout. */}
+    <div className={`${currentStep === 'results' ? 'h-[calc(100vh-4rem)] lg:h-[calc(100vh-5rem)]' : 'h-screen'} bg-background relative overflow-hidden flex flex-col`}>
 
       {/* ── Mode Switcher + Step Progress Bar ── */}
       <StudioHeader
