@@ -75,6 +75,20 @@ describe('startPhotoshoot', () => {
     );
   });
 
+  it('targets the base workflow (no _2k/_4k) at every tier, sending the tier as image_size', async () => {
+    for (const tier of ['2K', '4K'] as const) {
+      mockAuthFetch.mockReset();
+      mockAuthFetch.mockReturnValueOnce(okResponse({ workflow_id: 'wf', status_url: '/s', result_url: '/r' }));
+
+      await startPhotoshoot({ ...BASE_PHOTO_REQUEST, resolution: tier });
+
+      const [url, options] = mockAuthFetch.mock.calls[0];
+      expect(url).toBe('/api/run/state/jewelry_photoshoots_generator');
+      const body = JSON.parse((options as RequestInit).body as string);
+      expect(body.payload.image_size).toBe(tier);
+    }
+  });
+
   it('sends Content-Type: application/json header', async () => {
     mockAuthFetch.mockReturnValueOnce(okResponse({ workflow_id: 'wf1', status_url: '/s', result_url: '/r' }));
 
@@ -224,6 +238,20 @@ describe('startPdpShot', () => {
     );
   });
 
+  it('targets the base workflow (no _2k/_4k) at every tier, sending the tier as image_size', async () => {
+    for (const tier of ['2K', '4K'] as const) {
+      mockAuthFetch.mockReset();
+      mockAuthFetch.mockReturnValueOnce(okResponse({ workflow_id: 'wf', status_url: '/s', result_url: '/r' }));
+
+      await startPdpShot({ ...BASE_PDP_REQUEST, resolution: tier });
+
+      const [url, options] = mockAuthFetch.mock.calls[0];
+      expect(url).toBe('/api/run/Product_shot_pipeline');
+      const body = JSON.parse((options as RequestInit).body as string);
+      expect(body.payload.image_size).toBe(tier);
+    }
+  });
+
   it('maps jewelry_image_url to jewelry_image_urls array in the body', async () => {
     mockAuthFetch.mockReturnValueOnce(okResponse({ workflow_id: 'wf2', status_url: '/s', result_url: '/r' }));
 
@@ -365,8 +393,9 @@ describe('startFixShot', () => {
     const [, options] = mockAuthFetch.mock.calls[0];
     const body = JSON.parse(options.body as string);
 
+    // Step 5: base workflow name, no _2k suffix even for a 2K fix (tier is data-driven).
     expect(mockAuthFetch).toHaveBeenCalledWith(
-      '/api/run/fix_product_shot_2k',
+      '/api/run/fix_product_shot',
       expect.objectContaining({ method: 'POST' }),
     );
     expect(body.payload.result_image_b64).toBe('RESULT_B64');
@@ -376,7 +405,7 @@ describe('startFixShot', () => {
     expect(body.payload.data).toBeUndefined();
   });
 
-  it('uses state endpoint for model-shot fixes', async () => {
+  it('uses the state endpoint and base workflow name for model-shot fixes (no 4K suffix)', async () => {
     mockAuthFetch.mockReturnValueOnce(okResponse({ workflow_id: 'wf-fix', status_url: '/s', result_url: '/r' }));
 
     await startFixShot({
@@ -387,8 +416,9 @@ describe('startFixShot', () => {
       category: 'ring',
     });
 
+    // Step 5: base name even at 4K — tier is resolved server-side, not from the name.
     expect(mockAuthFetch).toHaveBeenCalledWith(
-      '/api/run/state/fix_model_shot_4k',
+      '/api/run/state/fix_model_shot',
       expect.objectContaining({ method: 'POST' }),
     );
   });

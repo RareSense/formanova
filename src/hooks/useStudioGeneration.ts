@@ -50,6 +50,8 @@ import {
   startPhotoshoot,
   startPdpShot,
   startFixShot,
+  generateWorkflowFor,
+  fixWorkflowFor,
 } from '@/lib/photoshoot-api';
 import { startUpscale, tierForUpscale, estimateUpscaleCostCached, UPSCALE_POLL_TIMEOUT_MS } from '@/lib/upscale-api';
 import { uploadToAzure } from '@/lib/microservices-api';
@@ -267,9 +269,8 @@ export function useStudioGeneration({
       return;
     }
 
-    const MODEL_SHOT_WORKFLOWS: Record<string, string> = { '1K': 'jewelry_photoshoots_generator', '2K': 'jewelry_photoshoots_generator_2k', '4K': 'jewelry_photoshoots_generator_4k' };
-    const PRODUCT_SHOT_WORKFLOWS: Record<string, string> = { '1K': 'Product_shot_pipeline', '2K': 'Product_shot_pipeline_2k', '4K': 'Product_shot_pipeline_4k' };
-    const workflowName = isProductShot ? (PRODUCT_SHOT_WORKFLOWS[resolution] ?? 'Product_shot_pipeline') : (MODEL_SHOT_WORKFLOWS[resolution] ?? 'jewelry_photoshoots_generator');
+    // Base workflow name (no _2k/_4k suffix); tier travels as image_size. Step 5.
+    const workflowName = generateWorkflowFor(isProductShot);
     // Send the resolution tier so the preflight hold matches the actual per-tier charge
     // (mirrors the run payload's image_size). Otherwise the gate authorizes the worst-case
     // tier and could wrongly block a user near their balance. See consolidation Step 4.
@@ -414,11 +415,8 @@ export function useStudioGeneration({
       return;
     }
 
-    const FIX_MODEL_SHOT: Record<string, string> = { '1K': 'fix_model_shot', '2K': 'fix_model_shot_2k', '4K': 'fix_model_shot_4k' };
-    const FIX_PRODUCT_SHOT: Record<string, string> = { '1K': 'fix_product_shot', '2K': 'fix_product_shot_2k', '4K': 'fix_product_shot_4k' };
-    const fixWorkflowName = isProductShot
-      ? (FIX_PRODUCT_SHOT[fixResolution] ?? 'fix_product_shot')
-      : (FIX_MODEL_SHOT[fixResolution] ?? 'fix_model_shot');
+    // Base fix workflow (no _2k/_4k suffix); tier resolves from source_asset_id. Step 5.
+    const fixWorkflowName = fixWorkflowFor(isProductShot);
 
     // After fix cuts over to the base workflow_name, price is driven by source_asset_id
     // (not the name), so send it as pricing_context to keep the preflight quote accurate.
