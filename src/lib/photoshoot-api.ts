@@ -60,7 +60,16 @@ export interface PhotoshootStatusResponse {
 }
 
 export interface PhotoshootResultResponse {
-  [key: string]: unknown[];
+  /**
+   * Vault asset id produced by this run, present top-level on every /result
+   * response (generic across model-shot/PDP/fix/upscale — a plain DB lookup keyed
+   * on workflow id, not aware of which tool ran). It sits OUTSIDE the node-keyed
+   * arrays, so the index signature below is widened from `unknown[]` to `unknown`:
+   * result-image / description extraction already guards each node value with
+   * Array.isArray, and this scalar is read directly as a sibling field.
+   */
+  output_asset_id?: string | null;
+  [key: string]: unknown;
 }
 
 // ─── Start Photoshoot ───────────────────────────────────────────────
