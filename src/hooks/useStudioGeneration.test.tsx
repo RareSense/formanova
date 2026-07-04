@@ -122,6 +122,37 @@ describe('useStudioGeneration', () => {
     expect(mockSetCurrentStep).toHaveBeenCalledWith('generating');
   });
 
+  it('passes the resolution tier as pricingContext.image_size to the credit gate', async () => {
+    const ctx = makeContextValue();
+    mockStartPhotoshoot.mockResolvedValue({ workflow_id: 'wf-gate-1k', status_url: '', result_url: '' });
+
+    const { result } = renderHook(() => useStudioGeneration(baseOptions()), { wrapper: wrapper(ctx) });
+    await act(async () => { await result.current.handleGenerate(); });
+
+    expect(mockCheckCredits).toHaveBeenCalledWith(
+      'jewelry_photoshoots_generator',
+      1,
+      { pricingContext: { image_size: '1K' } },
+    );
+  });
+
+  it('sends the correct tier to the gate for a 4K request', async () => {
+    const ctx = makeContextValue();
+    mockStartPhotoshoot.mockResolvedValue({ workflow_id: 'wf-gate-4k', status_url: '', result_url: '' });
+
+    const { result } = renderHook(
+      () => useStudioGeneration({ ...baseOptions(), resolution: '4K' as const, generationCost: 20 }),
+      { wrapper: wrapper(ctx) },
+    );
+    await act(async () => { await result.current.handleGenerate(); });
+
+    expect(mockCheckCredits).toHaveBeenCalledWith(
+      'jewelry_photoshoots_generator_4k',
+      1,
+      { pricingContext: { image_size: '4K' } },
+    );
+  });
+
   it('transitions to results step when generation completes in Context', async () => {
     const mockClearGeneration = vi.fn();
     mockStartPhotoshoot.mockResolvedValue({ workflow_id: 'wf-test-2', status_url: '', result_url: '' });

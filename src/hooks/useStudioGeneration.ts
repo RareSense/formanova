@@ -261,7 +261,10 @@ export function useStudioGeneration({
     const MODEL_SHOT_WORKFLOWS: Record<string, string> = { '1K': 'jewelry_photoshoots_generator', '2K': 'jewelry_photoshoots_generator_2k', '4K': 'jewelry_photoshoots_generator_4k' };
     const PRODUCT_SHOT_WORKFLOWS: Record<string, string> = { '1K': 'Product_shot_pipeline', '2K': 'Product_shot_pipeline_2k', '4K': 'Product_shot_pipeline_4k' };
     const workflowName = isProductShot ? (PRODUCT_SHOT_WORKFLOWS[resolution] ?? 'Product_shot_pipeline') : (MODEL_SHOT_WORKFLOWS[resolution] ?? 'jewelry_photoshoots_generator');
-    const hasCredits = await checkCredits(workflowName);
+    // Send the resolution tier so the preflight hold matches the actual per-tier charge
+    // (mirrors the run payload's image_size). Otherwise the gate authorizes the worst-case
+    // tier and could wrongly block a user near their balance. See consolidation Step 4.
+    const hasCredits = await checkCredits(workflowName, 1, { pricingContext: { image_size: resolution } });
     if (!hasCredits) {
       trackPaywallHit({
         category: TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType,
