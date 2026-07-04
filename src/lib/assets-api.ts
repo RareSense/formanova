@@ -43,6 +43,12 @@ export interface UserAsset {
   generation_workflow_id?: string | null;
   metadata?: {
     category?: string;
+    /** Resolution tier of a generated asset (e.g. '1K' | '2K' | '4K'). Populated by
+     * the backend for anything generated after the consolidation cutover; absent
+     * (metadata null) for older assets and uploads. Step 7. */
+    image_size?: string;
+    /** Aspect ratio of a generated asset (e.g. '3:4'). Same availability as image_size. */
+    aspect_ratio?: string;
     name?: string;
     display_name?: string;
     asset_name?: string;
