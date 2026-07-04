@@ -344,7 +344,10 @@ describe('startFixShot', () => {
       aspect_ratio: '1:1',
       idempotency_key: 'fix-key',
       jewelry_description: 'Gold necklace with a pendant',
+      // No source_asset_id supplied -> image_size fallback lands in the payload.
+      image_size: '1K',
     });
+    expect(body.source_asset_id).toBeUndefined();
     expect(body.payload.data).toBeUndefined();
   });
 
@@ -388,5 +391,86 @@ describe('startFixShot', () => {
       '/api/run/state/fix_model_shot_4k',
       expect.objectContaining({ method: 'POST' }),
     );
+  });
+
+  const ASSET_ID = 'a1b2c3d4-0000-1111-2222-333344445555';
+
+  it('sends source_asset_id as a TOP-LEVEL sibling of payload for product-shot fixes', async () => {
+    mockAuthFetch.mockReturnValueOnce(okResponse({ workflow_id: 'wf-fix', status_url: '/s', result_url: '/r' }));
+
+    await startFixShot({
+      isProductShot: true,
+      resolution: '2K',
+      resultImageUrl: 'https://example.com/result.jpg',
+      jewelryImageUrl: 'https://example.com/jewelry.jpg',
+      category: 'ring',
+      sourceAssetId: ASSET_ID,
+    });
+
+    const [, options] = mockAuthFetch.mock.calls[0];
+    const body = JSON.parse(options.body as string);
+
+    // Top-level sibling, NOT nested in payload.
+    expect(body.source_asset_id).toBe(ASSET_ID);
+    expect(body.payload.source_asset_id).toBeUndefined();
+    // Normal path: no image_size fallback when the asset id is present.
+    expect(body.payload.image_size).toBeUndefined();
+  });
+
+  it('sends source_asset_id top-level for model-shot fixes (state endpoint)', async () => {
+    mockAuthFetch.mockReturnValueOnce(okResponse({ workflow_id: 'wf-fix', status_url: '/s', result_url: '/r' }));
+
+    await startFixShot({
+      isProductShot: false,
+      resolution: '1K',
+      resultImageUrl: 'https://example.com/result.jpg',
+      jewelryImageUrl: 'https://example.com/jewelry.jpg',
+      category: 'ring',
+      sourceAssetId: ASSET_ID,
+    });
+
+    const [, options] = mockAuthFetch.mock.calls[0];
+    const body = JSON.parse(options.body as string);
+
+    expect(body.source_asset_id).toBe(ASSET_ID);
+    expect(body.payload.source_asset_id).toBeUndefined();
+    expect(body.payload.image_size).toBeUndefined();
+  });
+
+  it('falls back to image_size in payload when no source_asset_id (model-shot)', async () => {
+    mockAuthFetch.mockReturnValueOnce(okResponse({ workflow_id: 'wf-fix', status_url: '/s', result_url: '/r' }));
+
+    await startFixShot({
+      isProductShot: false,
+      resolution: '4K',
+      resultImageUrl: 'https://example.com/result.jpg',
+      jewelryImageUrl: 'https://example.com/jewelry.jpg',
+      category: 'ring',
+    });
+
+    const [, options] = mockAuthFetch.mock.calls[0];
+    const body = JSON.parse(options.body as string);
+
+    expect(body.source_asset_id).toBeUndefined();
+    expect(body.payload.image_size).toBe('4K');
+  });
+
+  it('ignores a non-UUID source_asset_id and uses the image_size fallback', async () => {
+    mockAuthFetch.mockReturnValueOnce(okResponse({ workflow_id: 'wf-fix', status_url: '/s', result_url: '/r' }));
+
+    await startFixShot({
+      isProductShot: true,
+      resolution: '1K',
+      resultImageUrl: 'https://example.com/result.jpg',
+      jewelryImageUrl: 'https://example.com/jewelry.jpg',
+      category: 'ring',
+      sourceAssetId: 'not-a-uuid',
+    });
+
+    const [, options] = mockAuthFetch.mock.calls[0];
+    const body = JSON.parse(options.body as string);
+
+    expect(body.source_asset_id).toBeUndefined();
+    expect(body.payload.image_size).toBe('1K');
   });
 });
