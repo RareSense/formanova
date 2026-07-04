@@ -6,6 +6,9 @@ export type AIFixShotType = 'model_shot' | 'product_shot';
 export interface AIFixListItem {
   workflow_id: string;
   workflow_name: string;
+  /** Backend source_type enum (e.g. 'model_fix' | 'product_fix'), when provided.
+   * Preferred over parsing workflow_name; falls back to the name when absent (Step 6). */
+  source_type?: string;
   status: AIFixStatus;
   created_at: string;
   finished_at: string | null;

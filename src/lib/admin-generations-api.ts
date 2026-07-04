@@ -81,6 +81,9 @@ export interface AdminGenerationFeedback {
 export interface AdminGenerationDetail {
   workflow_id: string;
   workflow_name: string;
+  /** Backend source_type enum, when the endpoint provides it (Step 6). Consumers
+   * prefer this over parsing workflow_name, falling back to the name when absent. */
+  source_type?: string;
   status: AdminGenerationStatus;
   user_email: string;
   user_type: AdminGenerationUserType | null;
@@ -267,6 +270,7 @@ export async function getAdminGenerationDetail(workflowId: string): Promise<Admi
   return {
     workflow_id: payload.workflow_id ?? payload.id ?? workflowId,
     workflow_name: payload.workflow_name ?? payload.name ?? '',
+    source_type: typeof payload.source_type === 'string' ? payload.source_type : undefined,
     status: payload.status ?? 'unknown',
     user_email: payload.user_email ?? payload.email ?? '',
     user_type: payload.user_type ?? null,

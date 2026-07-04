@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { inferSourceType } from './generation-history-api';
+import { inferSourceType, resolveSourceType } from './generation-history-api';
 
 // -- URL tests: verify no hardcoded production domain --
 
@@ -151,5 +151,41 @@ describe('inferSourceType', () => {
     expect(inferSourceType('')).toBe('unknown');
     expect(inferSourceType('my_custom_workflow')).toBe('unknown');
     expect(inferSourceType('test')).toBe('unknown');
+  });
+});
+
+describe('resolveSourceType', () => {
+  it('maps backend generate/fix/upscale families to the coarse UI bucket', () => {
+    // name is intentionally empty to prove the backend value is what drives it.
+    expect(resolveSourceType('model_shot', '')).toBe('photo');
+    expect(resolveSourceType('model_fix', '')).toBe('photo');
+    expect(resolveSourceType('upscale', '')).toBe('photo');
+    expect(resolveSourceType('product_shot', '')).toBe('product_shot');
+    expect(resolveSourceType('product_fix', '')).toBe('product_shot');
+    expect(resolveSourceType('cad_text', '')).toBe('cad_text');
+    expect(resolveSourceType('cad_sketch', '')).toBe('cad_sketch');
+    expect(resolveSourceType('cad_render', '')).toBe('cad_render');
+  });
+
+  it('prefers the backend value over the workflow name', () => {
+    // Name would parse to photo, but the backend says product -> backend wins.
+    expect(resolveSourceType('product_shot', 'jewelry_photoshoot')).toBe('product_shot');
+    // Consolidated base name that no longer encodes the fix family; backend disambiguates.
+    expect(resolveSourceType('product_fix', 'fix')).toBe('product_shot');
+  });
+
+  it('falls back to name parsing when the field is absent', () => {
+    expect(resolveSourceType(undefined, 'jewelry_photoshoots_generator')).toBe('photo');
+    expect(resolveSourceType(null, 'Product_shot_pipeline')).toBe('product_shot');
+    expect(resolveSourceType(undefined, 'ring_full_pipeline')).toBe('cad_text');
+  });
+
+  it('falls back to name parsing when the backend value is unknown or unrecognised', () => {
+    // Backend could not classify, but the name still can.
+    expect(resolveSourceType('unknown', 'jewelry_photoshoot')).toBe('photo');
+    // A future backend enum the UI does not know yet -> parse the name instead of breaking.
+    expect(resolveSourceType('cad_video', 'render_workflow')).toBe('cad_render');
+    // Neither side can classify -> unknown, gracefully.
+    expect(resolveSourceType('unknown', 'my_custom_workflow')).toBe('unknown');
   });
 });
