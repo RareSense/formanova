@@ -15,6 +15,10 @@ import { UploadGuideModal } from '@/components/studio/UploadGuideModal';
 import { ProductShotGuideModal } from '@/components/studio/ProductShotGuideModal';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
 import { type Resolution } from '@/components/studio/OutputSettingsPills';
+import { type EffortLevel } from '@/components/studio/EffortToggle';
+import { workflowFor } from '@/lib/photoshoot-api';
+import { useSupportingImages } from '@/hooks/useSupportingImages';
+import { isHighEffortEnabled } from '@/lib/feature-flags';
 import { useGenerationCost } from '@/hooks/useGenerationCost';
 import { useStudioOnboarding } from '@/hooks/useStudioOnboarding';
 import { useStudioModels } from '@/hooks/useStudioModels';
@@ -144,9 +148,38 @@ export default function UnifiedStudio() {
     setResolution(v);
     sessionStorage.setItem('formanova_studio_resolution', v);
   };
-  const MODEL_SHOT_WORKFLOWS: Record<string, string> = { '1K': 'jewelry_photoshoots_generator', '2K': 'jewelry_photoshoots_generator_2k', '4K': 'jewelry_photoshoots_generator_4k' };
-  const PRODUCT_SHOT_WORKFLOWS: Record<string, string> = { '1K': 'Product_shot_pipeline', '2K': 'Product_shot_pipeline_2k', '4K': 'Product_shot_pipeline_4k' };
-  const generationWorkflow = isProductShot ? (PRODUCT_SHOT_WORKFLOWS[resolution] ?? 'Product_shot_pipeline') : (MODEL_SHOT_WORKFLOWS[resolution] ?? 'jewelry_photoshoots_generator');
+  // Effort defaults to Standard. A user's explicit choice is remembered durably
+  // (localStorage, not sessionStorage) so it sticks across sessions until they
+  // change it themselves.
+  const [effort, setEffort] = useState<EffortLevel>(() => {
+    const saved = localStorage.getItem('formanova_studio_effort');
+    return saved === 'high' ? 'high' : 'standard';
+  });
+  const handleEffortChange = (v: EffortLevel) => {
+    setEffort(v);
+    localStorage.setItem('formanova_studio_effort', v);
+  };
+  // Rollout gate: when High Effort is not enabled for this user, clamp to Standard
+  // so a stored/session 'high' can never leak the paid feature into generation/cost.
+  const highEffortEnabled = isHighEffortEnabled(user?.email);
+  const effectiveEffort: EffortLevel = highEffortEnabled ? effort : 'standard';
+  // High Effort supporting-angle images (primary + up to 2 = 3 total). Lifted here
+  // so handleGenerate can read the uploaded URLs/asset-ids at call time.
+  const {
+    supporting: supportingImages,
+    addFiles: addSupportingImages,
+    removeAt: removeSupportingImage,
+    clear: clearSupportingImages,
+  } = useSupportingImages({
+    isProductShot,
+    category: effectiveJewelryType,
+    onReject: (message) => toast({ title: message }),
+  });
+  // Standard is always single-image: drop supporting images when leaving High.
+  useEffect(() => {
+    if (effectiveEffort !== 'high') clearSupportingImages();
+  }, [effectiveEffort, clearSupportingImages]);
+  const generationWorkflow = workflowFor(isProductShot, resolution, effectiveEffort);
   const { cost: generationCost } = useGenerationCost(generationWorkflow, resolution);
 
   // Fetch preset models from the backend. No local fallback catalog is used.
@@ -450,6 +483,8 @@ export default function UnifiedStudio() {
   } = useStudioGeneration({
     isProductShot,
     effectiveJewelryType,
+    effort: effectiveEffort,
+    supportingImages: supportingImages.map(s => ({ url: s.url, assetId: s.assetId })),
     jewelryImage,
     activeModelUrl,
     jewelryUploadedUrl,
@@ -578,6 +613,12 @@ export default function UnifiedStudio() {
         <StudioUploadStep
           user={user}
           isProductShot={isProductShot}
+          effort={effectiveEffort}
+          onEffortChange={handleEffortChange}
+          effortModeEnabled={highEffortEnabled}
+          supportingImages={supportingImages}
+          addSupportingImages={addSupportingImages}
+          removeSupportingImage={removeSupportingImage}
           effectiveJewelryType={effectiveJewelryType}
           exampleCategoryType={exampleCategoryType}
           currentStep={currentStep}

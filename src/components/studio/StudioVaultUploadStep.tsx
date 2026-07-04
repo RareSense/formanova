@@ -22,6 +22,9 @@ import { MasonryGrid } from '@/components/ui/masonry-grid';
 import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
 import { getAssetDisplayName, renameAsset } from '@/lib/assets-api';
 import type { UserAsset } from '@/lib/assets-api';
+import { EffortToggle, type EffortLevel } from '@/components/studio/EffortToggle';
+import { HighEffortUploadCanvas } from '@/components/studio/HighEffortUploadCanvas';
+import type { SupportingImage } from '@/hooks/useSupportingImages';
 
 const DISPLAY_NAME_MAX_CHARS = 50;
 
@@ -329,6 +332,12 @@ export interface StudioVaultUploadStepProps {
   onProductSelect: (thumbnailUrl: string, assetId: string) => void;
   onCategoryChange?: (category: string) => void;
   isProductShot?: boolean;
+  effort: EffortLevel;
+  onEffortChange: (v: EffortLevel) => void;
+  effortModeEnabled: boolean;
+  supportingImages: SupportingImage[];
+  addSupportingImages: (files: File[]) => void;
+  removeSupportingImage: (index: number) => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -345,6 +354,12 @@ export function StudioVaultUploadStep({
   onProductSelect,
   onCategoryChange,
   isProductShot,
+  effort,
+  onEffortChange,
+  effortModeEnabled,
+  supportingImages,
+  addSupportingImages,
+  removeSupportingImage,
 }: StudioVaultUploadStepProps) {
   const examples = CATEGORY_EXAMPLES[exampleCategoryType] ?? CATEGORY_EXAMPLES['necklace'];
   const categoryCopy = {
@@ -368,6 +383,17 @@ export function StudioVaultUploadStep({
   const [productSearch, setProductSearch] = useState('');
 
   const resolvedJewelryImage = useAuthenticatedImage(jewelryImage);
+
+  // Primary drop zone accepts multi-select: first file -> primary, rest -> supporting.
+  const handlePrimaryFiles = (files: File[]) => {
+    if (!files.length) return;
+    if (!jewelryImage) {
+      onFileUpload(files[0]);
+      if (files.length > 1) addSupportingImages(files.slice(1));
+    } else {
+      addSupportingImages(files);
+    }
+  };
 
   const PAGE_SIZE = 10;
   const activeCategory = selectedCategory ?? undefined;
@@ -425,20 +451,43 @@ export function StudioVaultUploadStep({
           ══════════════════════════════════════════════════════════════ */}
       <div className="lg:col-span-2 flex flex-col gap-4">
 
-        <div>
-          <span className="marta-label block mb-1">Step 1</span>
-          <h1 className="font-display text-3xl md:text-4xl uppercase tracking-tight mt-2">
-            Upload Your {categoryCopy.singular}
-          </h1>
-          <p className="text-muted-foreground mt-1.5 text-sm">
-            {isProductShot
-              ? `Upload a high quality photo of your ${categoryCopy.singular}.`
-              : <>Upload a photo of your {categoryCopy.singular} <strong>worn on a person or mannequin</strong></>}
-          </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <span className="marta-label block mb-1">Step 1</span>
+            <h1 className="font-display text-3xl md:text-4xl uppercase tracking-tight mt-2">
+              Upload Your {categoryCopy.singular}
+            </h1>
+            <p className="text-muted-foreground mt-1.5 text-sm">
+              {isProductShot
+                ? `Upload a high quality photo of your ${categoryCopy.singular}.`
+                : <>Upload a photo of your {categoryCopy.singular} <strong>worn on a person or mannequin</strong></>}
+            </p>
+          </div>
+          {/* Effort toggle — aligned on the same baseline as the "Show all" toggle in the right column.
+              Only shown when High Effort is enabled for the user (rollout gate). */}
+          {effortModeEnabled && (
+            <EffortToggle value={effort} onChange={onEffortChange} className="mt-8 shrink-0" />
+          )}
         </div>
 
-        {/* Drop zone — empty state */}
-        {!jewelryImage && (
+        {/* ── High Effort canvas: primary + up to 2 supporting angles ── */}
+        {effort === 'high' && (
+          <HighEffortUploadCanvas
+            singular={categoryCopy.singular}
+            canvasH={CANVAS_H}
+            primaryImage={jewelryImage}
+            resolvedPrimaryImage={resolvedJewelryImage}
+            primaryInputRef={jewelryInputRef}
+            onPrimaryFiles={handlePrimaryFiles}
+            onPrimaryClear={onClearImage}
+            supporting={supportingImages}
+            onSupportingFile={(_i, file) => addSupportingImages([file])}
+            onSupportingRemove={removeSupportingImage}
+          />
+        )}
+
+        {/* Drop zone — empty state (Standard) */}
+        {effort !== 'high' && !jewelryImage && (
           <div
             onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) onFileUpload(f); }}
             onDragOver={(e) => e.preventDefault()}
@@ -482,45 +531,44 @@ export function StudioVaultUploadStep({
           </div>
         )}
 
-        {/* Uploaded preview */}
-        {jewelryImage && (
-          <div className="space-y-4">
-            <div className={`relative border overflow-hidden flex items-center justify-center bg-muted/20 border-border/30 ${CANVAS_H}`}>
-              <img src={resolvedJewelryImage ?? undefined} alt="Jewelry" className="max-w-full max-h-full object-contain" />
+        {/* Uploaded preview (Standard) */}
+        {effort !== 'high' && jewelryImage && (
+          <div className={`relative border overflow-hidden flex items-center justify-center bg-muted/20 border-border/30 ${CANVAS_H}`}>
+            <img src={resolvedJewelryImage ?? undefined} alt="Jewelry" className="max-w-full max-h-full object-contain" />
 
-              {!showGuide && (
-                <button
-                  type="button"
-                  onClick={() => setGuideDialogOpen(true)}
-                  className="absolute top-3 right-12 flex items-center gap-1.5 border border-foreground/30
-                             bg-muted px-2.5 py-1
-                             font-mono text-[10px] tracking-widest uppercase
-                             text-foreground hover:bg-foreground/10 hover:border-foreground/60
-                             transition-colors z-10"
-                >
-                  <Lightbulb className="h-3 w-3" />
-                  View Guide
-                </button>
-              )}
-
-              <button onClick={onClearImage}
-                      className="absolute top-3 right-3 w-7 h-7 bg-background/80 backdrop-blur-sm
-                                 flex items-center justify-center border border-border/40
-                                 hover:bg-destructive hover:text-destructive-foreground transition-colors z-10">
-                <X className="h-3.5 w-3.5" />
+            {!showGuide && (
+              <button
+                type="button"
+                onClick={() => setGuideDialogOpen(true)}
+                className="absolute top-3 right-12 flex items-center gap-1.5 border border-foreground/30
+                           bg-muted px-2.5 py-1
+                           font-mono text-[10px] tracking-widest uppercase
+                           text-foreground hover:bg-foreground/10 hover:border-foreground/60
+                           transition-colors z-10"
+              >
+                <Lightbulb className="h-3 w-3" />
+                View Guide
               </button>
+            )}
 
-            </div>
+            <button onClick={onClearImage}
+                    className="absolute top-3 right-3 w-7 h-7 bg-background/80 backdrop-blur-sm
+                               flex items-center justify-center border border-border/40
+                               hover:bg-destructive hover:text-destructive-foreground transition-colors z-10">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
 
-            {/* Action area — normal Next button */}
-            <div className="flex items-center justify-end gap-3">
-              <Button size="lg" onClick={onNextStep} disabled={!canProceed}
-                      className="gap-2.5 font-display text-base uppercase tracking-wide px-10
-                                 bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))]
-                                 text-background hover:opacity-90 transition-opacity border-0 disabled:opacity-60">
-                Next <ArrowRight className="h-4 w-4" />
-              </Button>
-            </div>
+        {/* Action area — Next, shown once a primary image is present (both modes) */}
+        {jewelryImage && (
+          <div className="flex items-center justify-end gap-3">
+            <Button size="lg" onClick={onNextStep} disabled={!canProceed}
+                    className="gap-2.5 font-display text-base uppercase tracking-wide px-10
+                               bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))]
+                               text-background hover:opacity-90 transition-opacity border-0 disabled:opacity-60">
+              Next <ArrowRight className="h-4 w-4" />
+            </Button>
           </div>
         )}
       </div>

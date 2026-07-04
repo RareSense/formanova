@@ -50,7 +50,10 @@ import {
   startPhotoshoot,
   startPdpShot,
   startFixShot,
+  workflowFor,
+  buildJewelryRequestFields,
 } from '@/lib/photoshoot-api';
+import type { EffortLevel } from '@/components/studio/EffortToggle';
 import { startUpscale, tierForUpscale, estimateUpscaleCostCached, UPSCALE_POLL_TIMEOUT_MS } from '@/lib/upscale-api';
 import { uploadToAzure } from '@/lib/microservices-api';
 import { azureUriToUrl } from '@/lib/azure-utils';
@@ -77,6 +80,9 @@ type StudioStep = 'upload' | 'model' | 'generating' | 'results';
 interface UseStudioGenerationOptions {
   isProductShot: boolean;
   effectiveJewelryType: string;
+  effort: EffortLevel;
+  /** High Effort supporting angles (already uploaded). Cover is the primary jewelry image. */
+  supportingImages: Array<{ url: string | null; assetId: string | null }>;
   jewelryImage: string | null;
   activeModelUrl: string | null;
   jewelryUploadedUrl: string | null;
@@ -101,6 +107,8 @@ interface UseStudioGenerationOptions {
 export function useStudioGeneration({
   isProductShot,
   effectiveJewelryType,
+  effort,
+  supportingImages,
   jewelryImage,
   activeModelUrl,
   jewelryUploadedUrl,
@@ -258,9 +266,7 @@ export function useStudioGeneration({
       return;
     }
 
-    const MODEL_SHOT_WORKFLOWS: Record<string, string> = { '1K': 'jewelry_photoshoots_generator', '2K': 'jewelry_photoshoots_generator_2k', '4K': 'jewelry_photoshoots_generator_4k' };
-    const PRODUCT_SHOT_WORKFLOWS: Record<string, string> = { '1K': 'Product_shot_pipeline', '2K': 'Product_shot_pipeline_2k', '4K': 'Product_shot_pipeline_4k' };
-    const workflowName = isProductShot ? (PRODUCT_SHOT_WORKFLOWS[resolution] ?? 'Product_shot_pipeline') : (MODEL_SHOT_WORKFLOWS[resolution] ?? 'jewelry_photoshoots_generator');
+    const workflowName = workflowFor(isProductShot, resolution, effort);
     const hasCredits = await checkCredits(workflowName);
     if (!hasCredits) {
       trackPaywallHit({
@@ -314,6 +320,15 @@ export function useStudioGeneration({
       const idempotencyKey = `${Date.now()}-${effectiveJewelryType}-${selectedModel?.id || 'custom'}`;
       const category = TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType;
 
+      // High Effort: send cover-first arrays of jewelry images + asset ids (1-3).
+      // Standard: keep the singular jewelry asset id path unchanged.
+      const jewelryReqFields = buildJewelryRequestFields({
+        effort,
+        coverUrl: jewelryUrl,
+        coverAssetId: jewelryAssetId,
+        supporting: supportingImages,
+      });
+
       const startResponse = isProductShot
         ? await startPdpShot({
             jewelry_image_url: jewelryUrl,
@@ -322,7 +337,7 @@ export function useStudioGeneration({
             idempotency_key: idempotencyKey,
             aspect_ratio: aspectRatio,
             resolution,
-            ...(jewelryAssetId ? { input_jewelry_asset_id: jewelryAssetId } : {}),
+            ...jewelryReqFields,
             ...(selectedModel?.id ? { input_preset_inspiration_id: selectedModel.id }
                 : modelAssetId ? { input_inspiration_asset_id: modelAssetId } : {}),
           })
@@ -333,7 +348,7 @@ export function useStudioGeneration({
             idempotency_key: idempotencyKey,
             aspect_ratio: aspectRatio,
             resolution,
-            ...(jewelryAssetId ? { input_jewelry_asset_id: jewelryAssetId } : {}),
+            ...jewelryReqFields,
             ...(modelAssetId ? { input_model_asset_id: modelAssetId } : {}),
             ...(selectedModel?.id && !modelAssetId ? { input_preset_model_id: selectedModel.id } : {}),
           });
@@ -363,6 +378,7 @@ export function useStudioGeneration({
     }
   }, [
     isSubmitting, jewelryImage, activeModelUrl, isProductShot, effectiveJewelryType,
+    effort, supportingImages,
     jewelryUploadedUrl, jewelryAssetId, selectedModel, customModelImage, modelAssetId,
     aspectRatio, resolution,
     generationCost, checkCredits, toast, setCurrentStep, setJewelryAssetId, trackGeneration,

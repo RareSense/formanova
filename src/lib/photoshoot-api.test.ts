@@ -23,6 +23,8 @@ import {
   startPdpShot,
   startFixShot,
   getJewelryDescription,
+  workflowFor,
+  buildJewelryRequestFields,
 } from './photoshoot-api';
 
 // ── Response helpers ──────────────────────────────────────────────────────────
@@ -306,6 +308,149 @@ describe('getJewelryDescription', () => {
 
     const result = await getJewelryDescription('wf-empty');
     expect(result).toBeNull();
+  });
+});
+
+// ── workflowFor resolver (canonical name table) ───────────────────────────────
+
+describe('workflowFor', () => {
+  it('resolves standard model + product workflows by resolution', () => {
+    expect(workflowFor(false, '1K', 'standard')).toBe('jewelry_photoshoots_generator');
+    expect(workflowFor(false, '4K', 'standard')).toBe('jewelry_photoshoots_generator_4k');
+    expect(workflowFor(true, '2K', 'standard')).toBe('Product_shot_pipeline_2k');
+  });
+
+  it('resolves High Effort (higher-tier) workflows by resolution', () => {
+    expect(workflowFor(false, '1K', 'high')).toBe('jewelry_photoshoot_higher_tier');
+    expect(workflowFor(false, '4K', 'high')).toBe('jewelry_photoshoot_higher_tier_4k');
+    expect(workflowFor(true, '1K', 'high')).toBe('pdp_product_shot_higher_tier');
+    expect(workflowFor(true, '2K', 'high')).toBe('pdp_product_shot_higher_tier_2k');
+  });
+
+  it('defaults to standard when effort is omitted', () => {
+    expect(workflowFor(false, '1K')).toBe('jewelry_photoshoots_generator');
+  });
+});
+
+// ── buildJewelryRequestFields (glue tested by handleGenerate) ──────────────────
+
+describe('buildJewelryRequestFields', () => {
+  it('Standard: sends only the singular asset id', () => {
+    const fields = buildJewelryRequestFields({
+      effort: 'standard',
+      coverUrl: 'https://a',
+      coverAssetId: 'asset-a',
+      supporting: [{ url: 'https://b', assetId: 'asset-b' }],
+    });
+    expect(fields).toEqual({ input_jewelry_asset_id: 'asset-a' });
+    // Never leaks supporting images into a Standard generation
+    expect(fields.jewelry_image_urls).toBeUndefined();
+    expect(fields.tier).toBeUndefined();
+  });
+
+  it('Standard with no asset id sends nothing', () => {
+    expect(buildJewelryRequestFields({
+      effort: 'standard', coverUrl: 'https://a', coverAssetId: null, supporting: [],
+    })).toEqual({});
+  });
+
+  it('High: builds cover-first url + asset-id arrays', () => {
+    const fields = buildJewelryRequestFields({
+      effort: 'high',
+      coverUrl: 'https://a',
+      coverAssetId: 'asset-a',
+      supporting: [
+        { url: 'https://b', assetId: 'asset-b' },
+        { url: 'https://c', assetId: 'asset-c' },
+      ],
+    });
+    expect(fields.tier).toBe('high');
+    expect(fields.jewelry_image_urls).toEqual(['https://a', 'https://b', 'https://c']);
+    expect(fields.input_jewelry_asset_ids).toEqual(['asset-a', 'asset-b', 'asset-c']);
+  });
+
+  it('High: drops supporting entries that have not finished uploading', () => {
+    const fields = buildJewelryRequestFields({
+      effort: 'high',
+      coverUrl: 'https://a',
+      coverAssetId: 'asset-a',
+      supporting: [
+        { url: null, assetId: null },              // still uploading
+        { url: 'https://c', assetId: 'asset-c' },
+      ],
+    });
+    expect(fields.jewelry_image_urls).toEqual(['https://a', 'https://c']);
+    expect(fields.input_jewelry_asset_ids).toEqual(['asset-a', 'asset-c']);
+  });
+});
+
+// ── High Effort multi-image ───────────────────────────────────────────────────
+
+const UUID_A = '11111111-1111-4111-8111-111111111111';
+const UUID_B = '22222222-2222-4222-8222-222222222222';
+const UUID_C = '33333333-3333-4333-8333-333333333333';
+
+describe('startPhotoshoot High Effort', () => {
+  it('routes to the higher-tier workflow and sends jewelry arrays (cover first)', async () => {
+    mockAuthFetch.mockReturnValueOnce(okResponse({ workflow_id: 'wf', status_url: '/s', result_url: '/r' }));
+
+    await startPhotoshoot({
+      ...BASE_PHOTO_REQUEST,
+      tier: 'high',
+      jewelry_image_urls: ['https://a', 'https://b', 'https://c'],
+      input_jewelry_asset_ids: [UUID_A, UUID_B, UUID_C],
+    });
+
+    expect(mockAuthFetch).toHaveBeenCalledWith(
+      '/api/run/state/jewelry_photoshoot_higher_tier',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    const [, options] = mockAuthFetch.mock.calls[0];
+    const body = JSON.parse(options.body as string);
+    expect(body.payload.jewelry_image_url).toBe('https://a'); // cover kept for compat
+    expect(body.payload.jewelry_image_urls).toEqual(['https://a', 'https://b', 'https://c']);
+    expect(body.input_jewelry_asset_ids).toEqual([UUID_A, UUID_B, UUID_C]);
+    expect(body.input_jewelry_asset_id).toBeUndefined();
+  });
+
+  it('drops non-UUID asset ids and uses the singular field for a lone id', async () => {
+    mockAuthFetch.mockReturnValueOnce(okResponse({ workflow_id: 'wf', status_url: '/s', result_url: '/r' }));
+
+    await startPhotoshoot({
+      ...BASE_PHOTO_REQUEST,
+      tier: 'high',
+      jewelry_image_urls: ['https://a'],
+      input_jewelry_asset_ids: [UUID_A, 'not-a-uuid'],
+    });
+
+    const [, options] = mockAuthFetch.mock.calls[0];
+    const body = JSON.parse(options.body as string);
+    expect(body.input_jewelry_asset_id).toBe(UUID_A);
+    expect(body.input_jewelry_asset_ids).toBeUndefined();
+    // single url -> no plural field
+    expect(body.payload.jewelry_image_urls).toBeUndefined();
+  });
+});
+
+describe('startPdpShot High Effort', () => {
+  it('routes to the higher-tier PDP workflow with a 3-image array', async () => {
+    mockAuthFetch.mockReturnValueOnce(okResponse({ workflow_id: 'wf', status_url: '/s', result_url: '/r' }));
+
+    await startPdpShot({
+      ...BASE_PDP_REQUEST,
+      tier: 'high',
+      jewelry_image_urls: ['https://a', 'https://b', 'https://c'],
+      input_jewelry_asset_ids: [UUID_A, UUID_B, UUID_C],
+    });
+
+    expect(mockAuthFetch).toHaveBeenCalledWith(
+      '/api/run/pdp_product_shot_higher_tier',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    const [, options] = mockAuthFetch.mock.calls[0];
+    const body = JSON.parse(options.body as string);
+    expect(body.payload.jewelry_image_urls).toEqual(['https://a', 'https://b', 'https://c']);
+    expect(body.input_jewelry_asset_ids).toEqual([UUID_A, UUID_B, UUID_C]);
   });
 });
 

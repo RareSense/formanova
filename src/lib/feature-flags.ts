@@ -58,6 +58,18 @@ export function isImageToCadEnabled(email: string | undefined | null): boolean {
 }
 
 /**
+ * High Effort studio mode — up to 3 jewelry images routed to the higher-tier
+ * workflows (more credits, better results).
+ * Owner: engineering. Reason: paid higher-tier pipeline in staged rollout while
+ * backend pricing is finalized. Removal: when High Effort ships to all users —
+ * delete this flag and render the effort toggle unconditionally.
+ * Allowlist: VITE_HIGH_EFFORT_ALLOWLIST_EMAILS (comma-separated emails in .env).
+ */
+export function isHighEffortEnabled(email: string | undefined | null): boolean {
+  return isAllowlistedEmail(email, 'VITE_HIGH_EFFORT_ALLOWLIST_EMAILS');
+}
+
+/**
  * "What best describes you?" onboarding screen — enabled for all users.
  */
 /**
