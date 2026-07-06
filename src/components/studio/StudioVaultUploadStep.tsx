@@ -486,7 +486,7 @@ export function StudioVaultUploadStep({
           />
         )}
 
-        {/* Drop zone — empty state (Standard) */}
+        {/* Drop zone — empty state (Low effort) */}
         {effort !== 'high' && !jewelryImage && (
           <div
             onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) onFileUpload(f); }}
@@ -531,7 +531,7 @@ export function StudioVaultUploadStep({
           </div>
         )}
 
-        {/* Uploaded preview (Standard) */}
+        {/* Uploaded preview (Low effort) */}
         {effort !== 'high' && jewelryImage && (
           <div className={`relative border overflow-hidden flex items-center justify-center bg-muted/20 border-border/30 ${CANVAS_H}`}>
             <img src={resolvedJewelryImage ?? undefined} alt="Jewelry" className="max-w-full max-h-full object-contain" />

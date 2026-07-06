@@ -37,6 +37,14 @@ export interface TrackedGeneration {
   resolution: Resolution;
   generationCost: number | null;
   jewelryDescription?: string;
+  /**
+   * Vault asset id of this run's output image, read top-level from /result on
+   * completion (generic across model-shot/PDP/fix/upscale). Undefined for
+   * history-fallback / error paths and for old items whose /result predates the
+   * field. Consumed as the fix `source_asset_id` so a fix prices/runs at the tier
+   * of the exact asset being fixed (including an already-upscaled one).
+   */
+  outputAssetId?: string | null;
   /** Poll ceiling for this run. Defaults to DEFAULT_POLL_TIMEOUT_MS when omitted. */
   timeoutMs?: number;
   /**
@@ -274,6 +282,9 @@ export function GenerationsContextProvider({ children }: { children: React.React
         const resultImages = extractResultImages(result);
         if (gen.isProductShot) console.log('[product-shot result keys]', Object.keys(result), result);
         const jewelryDescription = gen.isProductShot ? extractJewelryDescription(result) : undefined;
+        // Top-level sibling scalar (not a node-keyed array). Undefined for old /result
+        // payloads that predate the field; consumers treat that as "unavailable".
+        const outputAssetId = typeof result.output_asset_id === 'string' ? result.output_asset_id : null;
 
         // Only check for activity errors when no images were produced.
         // Prefer targeted key lookup; only fall back to scanning all values when those keys are absent.
@@ -345,7 +356,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
 
         setGenerations(prev => prev.map(g =>
           g.workflowId === gen.workflowId
-            ? { ...g, status: 'completed', progress: 100, resultImages, ...(jewelryDescription ? { jewelryDescription } : {}) }
+            ? { ...g, status: 'completed', progress: 100, resultImages, outputAssetId, ...(jewelryDescription ? { jewelryDescription } : {}) }
             : g
         ));
         markGenerationCompleted(gen.workflowId, startTime);

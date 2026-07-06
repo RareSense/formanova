@@ -17,7 +17,7 @@ import {
   getAdminGenerationDetail,
   type AdminGenerationDetail,
 } from '@/lib/admin-generations-api';
-import { inferSourceType } from '@/lib/generation-history-api';
+import { resolveSourceType } from '@/lib/generation-history-api';
 import type { AdminGenerationStep } from '@/lib/admin-generations-api';
 import { ScissorGLBGrid, GLBPreviewSlot } from '@/components/generations/ScissorGLBGrid';
 import { Badge } from '@/components/ui/badge';
@@ -333,7 +333,7 @@ function InvalidRequestState({ message }: { message: string }) {
 }
 
 function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
-  const isCadText = inferSourceType(detail.workflow_name) === 'cad_text';
+  const isCadText = resolveSourceType(detail.source_type, detail.workflow_name) === 'cad_text';
   const textPrompt = isCadText
     ? findText(detail.input_payload, ['prompt', 'description', 'ring_description', 'text_input', 'input_text', 'text', 'query'])
     : null;

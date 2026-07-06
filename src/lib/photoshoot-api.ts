@@ -10,54 +10,62 @@ import { authenticatedFetch } from '@/lib/authenticated-fetch';
 
 const API_BASE = '/api';
 
-export type EffortTier = 'standard' | 'high';
-
-const MODEL_SHOT_WORKFLOWS: Record<string, string> = {
-  '1K': 'jewelry_photoshoots_generator',
-  '2K': 'jewelry_photoshoots_generator_2k',
-  '4K': 'jewelry_photoshoots_generator_4k',
-};
-
-const PRODUCT_SHOT_WORKFLOWS: Record<string, string> = {
-  '1K': 'Product_shot_pipeline',
-  '2K': 'Product_shot_pipeline_2k',
-  '4K': 'Product_shot_pipeline_4k',
-};
-
-// High Effort ("higher-tier") workflows — accept up to 3 jewelry images and
-// spend more compute for better results. See FRONTEND_HIGHER_TIER_API_HANDOFF.
-const MODEL_SHOT_WORKFLOWS_HIGH: Record<string, string> = {
-  '1K': 'jewelry_photoshoot_higher_tier',
-  '2K': 'jewelry_photoshoot_higher_tier_2k',
-  '4K': 'jewelry_photoshoot_higher_tier_4k',
-};
-
-const PRODUCT_SHOT_WORKFLOWS_HIGH: Record<string, string> = {
-  '1K': 'pdp_product_shot_higher_tier',
-  '2K': 'pdp_product_shot_higher_tier_2k',
-  '4K': 'pdp_product_shot_higher_tier_4k',
-};
+export type EffortTier = 'low' | 'high';
 
 /**
- * Canonical workflow-name resolver. This is the single source of truth referenced
- * by CLAUDE.md invariant #4 — useStudioGeneration and UnifiedStudio call THIS
- * rather than keeping their own literal tables, so the four dimensions
- * (shot type x resolution x effort) never drift.
+ * Canonical data-driven workflow names — one per family (Step 5 of the tool/workflow
+ * consolidation). Resolution is no longer encoded in the low-effort name; it travels
+ * as data: `image_size` in the payload for generate/PDP, and `source_asset_id`
+ * (fallback `image_size`) for fix. High-effort names are resolved by workflowFor below.
+ *
+ * Single source of truth for CLAUDE.md invariant #4: useStudioGeneration and
+ * UnifiedStudio import from here instead of keeping their own literal tables.
+ */
+export const WORKFLOW_NAMES = {
+  modelShot: 'jewelry_photoshoots_generator',
+  productShot: 'Product_shot_pipeline',
+  modelFix: 'fix_model_shot',
+  productFix: 'fix_product_shot',
+} as const;
+
+/** Base generate workflow name for a shot type (no resolution suffix). */
+export function generateWorkflowFor(isProductShot: boolean): string {
+  return isProductShot ? WORKFLOW_NAMES.productShot : WORKFLOW_NAMES.modelShot;
+}
+
+/** Base fix workflow name for a shot type (no resolution suffix). */
+export function fixWorkflowFor(isProductShot: boolean): string {
+  return isProductShot ? WORKFLOW_NAMES.productFix : WORKFLOW_NAMES.modelFix;
+}
+
+// High-effort ("higher tier") generate workflow names. Effort is chosen purely by
+// which workflow_name we POST — the payload shape is identical to low effort
+// (resolution still travels as `image_size`). On-model splits 1K/2K vs 4K because the
+// polish step caps at 2K, so 4K needs an extra upscale node; PDP's generate service
+// natively covers all three tiers, so PDP is a single name. Up to 3 jewelry images are
+// accepted on the high path. See Pricing Restructure handoff (2026-07-06).
+const MODEL_SHOT_GENERATE_HIGH = 'jewelry_photoshoots_generator_higher_tier';
+const MODEL_SHOT_GENERATE_HIGH_4K = 'jewelry_photoshoots_generator_higher_tier_4k';
+const PRODUCT_SHOT_GENERATE_HIGH = 'Product_shot_pipeline_higher_tier';
+
+/**
+ * Canonical generate workflow-name resolver. Single source of truth referenced by
+ * CLAUDE.md invariant #4 — useStudioGeneration and UnifiedStudio call THIS rather than
+ * keeping their own literal tables, so (shot type x resolution x effort) never drift.
+ * Low effort → unsuffixed WORKFLOW_NAMES (resolution travels as image_size); high
+ * effort → the higher-tier names above.
  */
 export function workflowFor(
   isProductShot: boolean,
   resolution: string,
-  effort: EffortTier = 'standard',
+  effort: EffortTier = 'low',
 ): string {
   const res = resolution || '1K';
   if (effort === 'high') {
-    return isProductShot
-      ? (PRODUCT_SHOT_WORKFLOWS_HIGH[res] ?? PRODUCT_SHOT_WORKFLOWS_HIGH['1K'])
-      : (MODEL_SHOT_WORKFLOWS_HIGH[res] ?? MODEL_SHOT_WORKFLOWS_HIGH['1K']);
+    if (isProductShot) return PRODUCT_SHOT_GENERATE_HIGH;
+    return res === '4K' ? MODEL_SHOT_GENERATE_HIGH_4K : MODEL_SHOT_GENERATE_HIGH;
   }
-  return isProductShot
-    ? (PRODUCT_SHOT_WORKFLOWS[res] ?? PRODUCT_SHOT_WORKFLOWS['1K'])
-    : (MODEL_SHOT_WORKFLOWS[res] ?? MODEL_SHOT_WORKFLOWS['1K']);
+  return isProductShot ? WORKFLOW_NAMES.productShot : WORKFLOW_NAMES.modelShot;
 }
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -69,7 +77,7 @@ export interface PhotoshootStartRequest {
   idempotency_key?: string;
   aspect_ratio?: string;
   resolution?: string;
-  /** 'high' routes to the higher-tier workflow (up to 3 jewelry images). Defaults to 'standard'. */
+  /** 'high' routes to the higher-tier workflow (up to 3 jewelry images). Defaults to 'low'. */
   tier?: EffortTier;
   /** High Effort: 1-3 jewelry image URLs, cover first. Falls back to jewelry_image_url when absent. */
   jewelry_image_urls?: string[];
@@ -158,7 +166,16 @@ export interface PhotoshootStatusResponse {
 }
 
 export interface PhotoshootResultResponse {
-  [key: string]: unknown[];
+  /**
+   * Vault asset id produced by this run, present top-level on every /result
+   * response (generic across model-shot/PDP/fix/upscale — a plain DB lookup keyed
+   * on workflow id, not aware of which tool ran). It sits OUTSIDE the node-keyed
+   * arrays, so the index signature below is widened from `unknown[]` to `unknown`:
+   * result-image / description extraction already guards each node value with
+   * Array.isArray, and this scalar is read directly as a sibling field.
+   */
+  output_asset_id?: string | null;
+  [key: string]: unknown;
 }
 
 // ─── Start Photoshoot ───────────────────────────────────────────────
@@ -178,7 +195,7 @@ export async function startPhotoshoot(
     input_model_asset_id, input_preset_model_id, resolution, tier, ...rest
   } = request;
 
-  const workflowName = workflowFor(false, resolution ?? '1K', tier ?? 'standard');
+  const workflowName = workflowFor(false, resolution ?? '1K', tier ?? 'low');
   const { payloadFields, envelopeFields } = buildJewelryFields({
     coverUrl: jewelry_image_url,
     urls: jewelry_image_urls,
@@ -273,7 +290,7 @@ export interface PdpStartRequest {
   idempotency_key?: string;
   aspect_ratio?: string;
   resolution?: string;
-  /** 'high' routes to the higher-tier PDP workflow. Defaults to 'standard'. */
+  /** 'high' routes to the higher-tier PDP workflow. Defaults to 'low'. */
   tier?: EffortTier;
   input_jewelry_asset_id?: string;
   /** High Effort: 1-3 jewelry asset ids, cover first. Replaces input_jewelry_asset_id when present. */
@@ -302,7 +319,7 @@ export async function startPdpShot(
     ...rest
   } = request;
 
-  const workflowName = workflowFor(true, resolution ?? '1K', tier ?? 'standard');
+  const workflowName = workflowFor(true, resolution ?? '1K', tier ?? 'low');
 
   // Backend expects jewelry_image_urls as an array (cover first), 1-3 entries.
   const jewelryUrls = (jewelry_image_urls && jewelry_image_urls.length ? jewelry_image_urls : [jewelry_image_url]).filter(Boolean);
@@ -348,18 +365,6 @@ export async function startPdpShot(
 
 // ─── Fix Shot ───────────────────────────────────────────────────────
 
-const FIX_MODEL_SHOT_WORKFLOWS: Record<string, string> = {
-  '1K': 'fix_model_shot',
-  '2K': 'fix_model_shot_2k',
-  '4K': 'fix_model_shot_4k',
-};
-
-const FIX_PRODUCT_SHOT_WORKFLOWS: Record<string, string> = {
-  '1K': 'fix_product_shot',
-  '2K': 'fix_product_shot_2k',
-  '4K': 'fix_product_shot_4k',
-};
-
 export interface FixShotRequest {
   isProductShot: boolean;
   resolution: string;
@@ -370,12 +375,25 @@ export interface FixShotRequest {
   aspect_ratio?: string;
   idempotency_key?: string;
   jewelry_description?: string;
+  /**
+   * Vault asset id of the exact image being fixed (its output_asset_id, or the
+   * upscaled asset's id when fixing an already-upscaled image). The backend
+   * resolves image_size/tier from this, so it drives fix price + routing. Sent as
+   * a TOP-LEVEL sibling of `payload`, never nested inside it. When absent we fall
+   * back to `image_size` in the payload (see below).
+   */
+  sourceAssetId?: string | null;
 }
 
 export async function startFixShot(request: FixShotRequest): Promise<PhotoshootStartResponse> {
-  const workflowName = request.isProductShot
-    ? (FIX_PRODUCT_SHOT_WORKFLOWS[request.resolution] ?? 'fix_product_shot')
-    : (FIX_MODEL_SHOT_WORKFLOWS[request.resolution] ?? 'fix_model_shot');
+  // Base fix workflow, no resolution suffix — tier is resolved server-side from
+  // source_asset_id (fallback image_size in the payload). Step 5 cutover.
+  const workflowName = fixWorkflowFor(request.isProductShot);
+
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const sourceAssetId = request.sourceAssetId && UUID_RE.test(request.sourceAssetId)
+    ? request.sourceAssetId
+    : undefined;
 
   // Strip data: prefix → send as b64; otherwise send as URL
   const resultImageField = request.resultImageUrl.startsWith('data:')
@@ -407,7 +425,13 @@ export async function startFixShot(request: FixShotRequest): Promise<PhotoshootS
       ...(request.idempotency_key ? { idempotency_key: request.idempotency_key } : {}),
       ...(request.jewelry_description ? { jewelry_description: request.jewelry_description } : {}),
     };
-    body = JSON.stringify({ payload: productPayload });
+    // Fallback only: when we can't resolve the asset, let the backend tier from
+    // image_size. Not sent on the normal path — source_asset_id drives it there.
+    if (!sourceAssetId) productPayload.image_size = request.resolution;
+    body = JSON.stringify({
+      payload: productPayload,
+      ...(sourceAssetId ? { source_asset_id: sourceAssetId } : {}),
+    });
   } else {
     const payload: Record<string, unknown> = {
       ...resultImageField,
@@ -420,7 +444,12 @@ export async function startFixShot(request: FixShotRequest): Promise<PhotoshootS
     if (!request.jewelryImageUrl.startsWith('data:')) {
       payload.jewelry_image_urls = [request.jewelryImageUrl];
     }
-    body = JSON.stringify({ payload });
+    // Fallback only (see product branch): tier from image_size when no asset id.
+    if (!sourceAssetId) payload.image_size = request.resolution;
+    body = JSON.stringify({
+      payload,
+      ...(sourceAssetId ? { source_asset_id: sourceAssetId } : {}),
+    });
   }
 
   const res = await authenticatedFetch(endpoint, {

@@ -52,6 +52,7 @@ import {
   startFixShot,
   workflowFor,
   buildJewelryRequestFields,
+  fixWorkflowFor,
 } from '@/lib/photoshoot-api';
 import type { EffortLevel } from '@/components/studio/EffortToggle';
 import { startUpscale, tierForUpscale, estimateUpscaleCostCached, UPSCALE_POLL_TIMEOUT_MS } from '@/lib/upscale-api';
@@ -129,6 +130,11 @@ export function useStudioGeneration({
   const [rotatingMsgIdx, setRotatingMsgIdx] = useState(0);
   const [workflowId, setWorkflowId] = useState<string | null>(null);
   const [resultImages, setResultImages] = useState<string[]>([]);
+  // Vault asset id of the currently displayed result. Tracks whatever produced
+  // resultImages[0] — the generation, a fix, or (crucially) an upscale that swapped
+  // the image in place. Consumed as the fix source_asset_id so a fix prices/runs at
+  // the tier of the exact asset on screen, including an already-upscaled one.
+  const [resultAssetId, setResultAssetId] = useState<string | null>(null);
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [regenerationCount, setRegenerationCount] = useState(0);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -185,6 +191,7 @@ export function useStudioGeneration({
     if (!myGeneration) return;
     if (myGeneration.status === 'completed') {
       setResultImages(myGeneration.resultImages);
+      setResultAssetId(myGeneration.outputAssetId ?? null);
       if (myGeneration.jewelryDescription) {
         setGenerationInputUrlsMap(prev => ({
           ...prev,
@@ -226,6 +233,9 @@ export function useStudioGeneration({
     if (!upscaleGeneration) return;
     if (upscaleGeneration.status === 'completed') {
       setResultImages(upscaleGeneration.resultImages);
+      // The upscaled asset replaces the on-screen result, so a subsequent fix must
+      // anchor to IT, not the pre-upscale generation.
+      setResultAssetId(upscaleGeneration.outputAssetId ?? null);
       setUpscaleStatus('completed');
       trackGenerationComplete({
         source: 'unified-studio',
@@ -266,8 +276,12 @@ export function useStudioGeneration({
       return;
     }
 
+    // Effort chooses the workflow_name (low → unsuffixed, high → higher-tier); the
+    // resolution tier travels as image_size both in the run payload and the preflight
+    // pricing_context, so the credit hold matches the actual per-tier charge instead of
+    // authorizing the worst-case tier. Step 5 + effort toggle.
     const workflowName = workflowFor(isProductShot, resolution, effort);
-    const hasCredits = await checkCredits(workflowName);
+    const hasCredits = await checkCredits(workflowName, 1, { pricingContext: { image_size: resolution } });
     if (!hasCredits) {
       trackPaywallHit({
         category: TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType,
@@ -321,7 +335,7 @@ export function useStudioGeneration({
       const category = TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType;
 
       // High Effort: send cover-first arrays of jewelry images + asset ids (1-3).
-      // Standard: keep the singular jewelry asset id path unchanged.
+      // Low effort: keep the singular jewelry asset id path unchanged.
       const jewelryReqFields = buildJewelryRequestFields({
         effort,
         coverUrl: jewelryUrl,
@@ -389,6 +403,12 @@ export function useStudioGeneration({
     if (isSubmitting) return;
 
     const prevData = generationInputUrlsMap[workflowId ?? ''];
+    // Asset id of the exact image on screen (generation / prior fix / upscale). This
+    // is the source of truth for fix tier + price now; fixResolution below stays only
+    // as a UI/fallback resolution, not a billing driver. Undefined for restored async
+    // results whose asset id wasn't carried through nav state -> backend falls back to
+    // image_size (safe, same tier as today).
+    const sourceAssetId = resultAssetId;
     const fixResolution = prevData?.resolution ?? resolution;
     const fixAspectRatio = prevData?.aspectRatio ?? aspectRatio;
     // Fix workflow expects https blob URLs, not raw azure:// URIs. jewelryUploadedUrl
@@ -412,13 +432,16 @@ export function useStudioGeneration({
       return;
     }
 
-    const FIX_MODEL_SHOT: Record<string, string> = { '1K': 'fix_model_shot', '2K': 'fix_model_shot_2k', '4K': 'fix_model_shot_4k' };
-    const FIX_PRODUCT_SHOT: Record<string, string> = { '1K': 'fix_product_shot', '2K': 'fix_product_shot_2k', '4K': 'fix_product_shot_4k' };
-    const fixWorkflowName = isProductShot
-      ? (FIX_PRODUCT_SHOT[fixResolution] ?? 'fix_product_shot')
-      : (FIX_MODEL_SHOT[fixResolution] ?? 'fix_model_shot');
+    // Base fix workflow (no _2k/_4k suffix); tier resolves from source_asset_id. Step 5.
+    const fixWorkflowName = fixWorkflowFor(isProductShot);
 
-    const hasCredits = await checkCredits(fixWorkflowName);
+    // After fix cuts over to the base workflow_name, price is driven by source_asset_id
+    // (not the name), so send it as pricing_context to keep the preflight quote accurate.
+    const hasCredits = await checkCredits(
+      fixWorkflowName,
+      1,
+      sourceAssetId ? { pricingContext: { source_asset_id: sourceAssetId } } : undefined,
+    );
     if (!hasCredits) {
       trackPaywallHit({ category: TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType, steps_completed: 3 });
       return;
@@ -451,6 +474,7 @@ export function useStudioGeneration({
         category,
         aspect_ratio: fixAspectRatio,
         idempotency_key: `fix-${Date.now()}-${effectiveJewelryType}`,
+        sourceAssetId,
         ...(isProductShot && jewelryDescription ? { jewelry_description: jewelryDescription } : {}),
       });
 
@@ -485,7 +509,7 @@ export function useStudioGeneration({
       setIsSubmitting(false);
     }
   }, [
-    isSubmitting, resultImages, workflowId, generationInputUrlsMap,
+    isSubmitting, resultImages, resultAssetId, workflowId, generationInputUrlsMap,
     jewelryUploadedUrl, isProductShot, effectiveJewelryType,
     resolution, aspectRatio, generationCost, checkCredits,
     toast, setCurrentStep, trackGeneration, regenerationCount,
@@ -651,6 +675,7 @@ export function useStudioGeneration({
   const resetGeneration = useCallback(() => {
     hasNavigatedAway.current = false;
     setResultImages([]);
+    setResultAssetId(null);
     setWorkflowId(null);
     setGenerationError(null);
     setRegenerationCount(0);

@@ -5,7 +5,7 @@ import { EffortToggle } from './EffortToggle';
 
 describe('EffortToggle', () => {
   it('renders "Low" inside the track when off and marks the switch unchecked', () => {
-    render(<EffortToggle value="standard" onChange={() => {}} />);
+    render(<EffortToggle value="low" onChange={() => {}} />);
     expect(screen.getByText('Low')).toBeTruthy();
     expect(screen.getByRole('switch').getAttribute('aria-checked')).toBe('false');
   });
@@ -16,17 +16,17 @@ describe('EffortToggle', () => {
     expect(screen.getByRole('switch').getAttribute('aria-checked')).toBe('true');
   });
 
-  it('toggles standard -> high on click', () => {
+  it('toggles low -> high on click', () => {
     const onChange = vi.fn();
-    render(<EffortToggle value="standard" onChange={onChange} />);
+    render(<EffortToggle value="low" onChange={onChange} />);
     fireEvent.click(screen.getByRole('switch'));
     expect(onChange).toHaveBeenCalledWith('high');
   });
 
-  it('toggles high -> standard on click', () => {
+  it('toggles high -> low on click', () => {
     const onChange = vi.fn();
     render(<EffortToggle value="high" onChange={onChange} />);
     fireEvent.click(screen.getByRole('switch'));
-    expect(onChange).toHaveBeenCalledWith('standard');
+    expect(onChange).toHaveBeenCalledWith('low');
   });
 });

@@ -77,6 +77,20 @@ describe('startPhotoshoot', () => {
     );
   });
 
+  it('targets the base workflow (no _2k/_4k) at every tier, sending the tier as image_size', async () => {
+    for (const tier of ['2K', '4K'] as const) {
+      mockAuthFetch.mockReset();
+      mockAuthFetch.mockReturnValueOnce(okResponse({ workflow_id: 'wf', status_url: '/s', result_url: '/r' }));
+
+      await startPhotoshoot({ ...BASE_PHOTO_REQUEST, resolution: tier });
+
+      const [url, options] = mockAuthFetch.mock.calls[0];
+      expect(url).toBe('/api/run/state/jewelry_photoshoots_generator');
+      const body = JSON.parse((options as RequestInit).body as string);
+      expect(body.payload.image_size).toBe(tier);
+    }
+  });
+
   it('sends Content-Type: application/json header', async () => {
     mockAuthFetch.mockReturnValueOnce(okResponse({ workflow_id: 'wf1', status_url: '/s', result_url: '/r' }));
 
@@ -226,6 +240,20 @@ describe('startPdpShot', () => {
     );
   });
 
+  it('targets the base workflow (no _2k/_4k) at every tier, sending the tier as image_size', async () => {
+    for (const tier of ['2K', '4K'] as const) {
+      mockAuthFetch.mockReset();
+      mockAuthFetch.mockReturnValueOnce(okResponse({ workflow_id: 'wf', status_url: '/s', result_url: '/r' }));
+
+      await startPdpShot({ ...BASE_PDP_REQUEST, resolution: tier });
+
+      const [url, options] = mockAuthFetch.mock.calls[0];
+      expect(url).toBe('/api/run/Product_shot_pipeline');
+      const body = JSON.parse((options as RequestInit).body as string);
+      expect(body.payload.image_size).toBe(tier);
+    }
+  });
+
   it('maps jewelry_image_url to jewelry_image_urls array in the body', async () => {
     mockAuthFetch.mockReturnValueOnce(okResponse({ workflow_id: 'wf2', status_url: '/s', result_url: '/r' }));
 
@@ -314,17 +342,22 @@ describe('getJewelryDescription', () => {
 // ── workflowFor resolver (canonical name table) ───────────────────────────────
 
 describe('workflowFor', () => {
-  it('resolves standard model + product workflows by resolution', () => {
-    expect(workflowFor(false, '1K', 'standard')).toBe('jewelry_photoshoots_generator');
-    expect(workflowFor(false, '4K', 'standard')).toBe('jewelry_photoshoots_generator_4k');
-    expect(workflowFor(true, '2K', 'standard')).toBe('Product_shot_pipeline_2k');
+  it('resolves standard (low-effort) workflows to the unsuffixed name for every tier', () => {
+    // Low effort: resolution travels as image_size, so the name never carries a suffix.
+    expect(workflowFor(false, '1K', 'low')).toBe('jewelry_photoshoots_generator');
+    expect(workflowFor(false, '4K', 'low')).toBe('jewelry_photoshoots_generator');
+    expect(workflowFor(true, '2K', 'low')).toBe('Product_shot_pipeline');
   });
 
-  it('resolves High Effort (higher-tier) workflows by resolution', () => {
-    expect(workflowFor(false, '1K', 'high')).toBe('jewelry_photoshoot_higher_tier');
-    expect(workflowFor(false, '4K', 'high')).toBe('jewelry_photoshoot_higher_tier_4k');
-    expect(workflowFor(true, '1K', 'high')).toBe('pdp_product_shot_higher_tier');
-    expect(workflowFor(true, '2K', 'high')).toBe('pdp_product_shot_higher_tier_2k');
+  it('resolves High Effort (higher-tier) workflows per the pricing handoff', () => {
+    // On-model high: 1K/2K share one name, 4K needs the extra upscale-node workflow.
+    expect(workflowFor(false, '1K', 'high')).toBe('jewelry_photoshoots_generator_higher_tier');
+    expect(workflowFor(false, '2K', 'high')).toBe('jewelry_photoshoots_generator_higher_tier');
+    expect(workflowFor(false, '4K', 'high')).toBe('jewelry_photoshoots_generator_higher_tier_4k');
+    // PDP high: one name across all three tiers.
+    expect(workflowFor(true, '1K', 'high')).toBe('Product_shot_pipeline_higher_tier');
+    expect(workflowFor(true, '2K', 'high')).toBe('Product_shot_pipeline_higher_tier');
+    expect(workflowFor(true, '4K', 'high')).toBe('Product_shot_pipeline_higher_tier');
   });
 
   it('defaults to standard when effort is omitted', () => {
@@ -335,22 +368,22 @@ describe('workflowFor', () => {
 // ── buildJewelryRequestFields (glue tested by handleGenerate) ──────────────────
 
 describe('buildJewelryRequestFields', () => {
-  it('Standard: sends only the singular asset id', () => {
+  it('Low: sends only the singular asset id', () => {
     const fields = buildJewelryRequestFields({
-      effort: 'standard',
+      effort: 'low',
       coverUrl: 'https://a',
       coverAssetId: 'asset-a',
       supporting: [{ url: 'https://b', assetId: 'asset-b' }],
     });
     expect(fields).toEqual({ input_jewelry_asset_id: 'asset-a' });
-    // Never leaks supporting images into a Standard generation
+    // Never leaks supporting images into a Low-effort generation
     expect(fields.jewelry_image_urls).toBeUndefined();
     expect(fields.tier).toBeUndefined();
   });
 
-  it('Standard with no asset id sends nothing', () => {
+  it('Low with no asset id sends nothing', () => {
     expect(buildJewelryRequestFields({
-      effort: 'standard', coverUrl: 'https://a', coverAssetId: null, supporting: [],
+      effort: 'low', coverUrl: 'https://a', coverAssetId: null, supporting: [],
     })).toEqual({});
   });
 
@@ -402,7 +435,7 @@ describe('startPhotoshoot High Effort', () => {
     });
 
     expect(mockAuthFetch).toHaveBeenCalledWith(
-      '/api/run/state/jewelry_photoshoot_higher_tier',
+      '/api/run/state/jewelry_photoshoots_generator_higher_tier',
       expect.objectContaining({ method: 'POST' }),
     );
     const [, options] = mockAuthFetch.mock.calls[0];
@@ -444,7 +477,7 @@ describe('startPdpShot High Effort', () => {
     });
 
     expect(mockAuthFetch).toHaveBeenCalledWith(
-      '/api/run/pdp_product_shot_higher_tier',
+      '/api/run/Product_shot_pipeline_higher_tier',
       expect.objectContaining({ method: 'POST' }),
     );
     const [, options] = mockAuthFetch.mock.calls[0];
@@ -489,7 +522,10 @@ describe('startFixShot', () => {
       aspect_ratio: '1:1',
       idempotency_key: 'fix-key',
       jewelry_description: 'Gold necklace with a pendant',
+      // No source_asset_id supplied -> image_size fallback lands in the payload.
+      image_size: '1K',
     });
+    expect(body.source_asset_id).toBeUndefined();
     expect(body.payload.data).toBeUndefined();
   });
 
@@ -507,8 +543,9 @@ describe('startFixShot', () => {
     const [, options] = mockAuthFetch.mock.calls[0];
     const body = JSON.parse(options.body as string);
 
+    // Step 5: base workflow name, no _2k suffix even for a 2K fix (tier is data-driven).
     expect(mockAuthFetch).toHaveBeenCalledWith(
-      '/api/run/fix_product_shot_2k',
+      '/api/run/fix_product_shot',
       expect.objectContaining({ method: 'POST' }),
     );
     expect(body.payload.result_image_b64).toBe('RESULT_B64');
@@ -518,7 +555,7 @@ describe('startFixShot', () => {
     expect(body.payload.data).toBeUndefined();
   });
 
-  it('uses state endpoint for model-shot fixes', async () => {
+  it('uses the state endpoint and base workflow name for model-shot fixes (no 4K suffix)', async () => {
     mockAuthFetch.mockReturnValueOnce(okResponse({ workflow_id: 'wf-fix', status_url: '/s', result_url: '/r' }));
 
     await startFixShot({
@@ -529,9 +566,91 @@ describe('startFixShot', () => {
       category: 'ring',
     });
 
+    // Step 5: base name even at 4K — tier is resolved server-side, not from the name.
     expect(mockAuthFetch).toHaveBeenCalledWith(
-      '/api/run/state/fix_model_shot_4k',
+      '/api/run/state/fix_model_shot',
       expect.objectContaining({ method: 'POST' }),
     );
+  });
+
+  const ASSET_ID = 'a1b2c3d4-0000-1111-2222-333344445555';
+
+  it('sends source_asset_id as a TOP-LEVEL sibling of payload for product-shot fixes', async () => {
+    mockAuthFetch.mockReturnValueOnce(okResponse({ workflow_id: 'wf-fix', status_url: '/s', result_url: '/r' }));
+
+    await startFixShot({
+      isProductShot: true,
+      resolution: '2K',
+      resultImageUrl: 'https://example.com/result.jpg',
+      jewelryImageUrl: 'https://example.com/jewelry.jpg',
+      category: 'ring',
+      sourceAssetId: ASSET_ID,
+    });
+
+    const [, options] = mockAuthFetch.mock.calls[0];
+    const body = JSON.parse(options.body as string);
+
+    // Top-level sibling, NOT nested in payload.
+    expect(body.source_asset_id).toBe(ASSET_ID);
+    expect(body.payload.source_asset_id).toBeUndefined();
+    // Normal path: no image_size fallback when the asset id is present.
+    expect(body.payload.image_size).toBeUndefined();
+  });
+
+  it('sends source_asset_id top-level for model-shot fixes (state endpoint)', async () => {
+    mockAuthFetch.mockReturnValueOnce(okResponse({ workflow_id: 'wf-fix', status_url: '/s', result_url: '/r' }));
+
+    await startFixShot({
+      isProductShot: false,
+      resolution: '1K',
+      resultImageUrl: 'https://example.com/result.jpg',
+      jewelryImageUrl: 'https://example.com/jewelry.jpg',
+      category: 'ring',
+      sourceAssetId: ASSET_ID,
+    });
+
+    const [, options] = mockAuthFetch.mock.calls[0];
+    const body = JSON.parse(options.body as string);
+
+    expect(body.source_asset_id).toBe(ASSET_ID);
+    expect(body.payload.source_asset_id).toBeUndefined();
+    expect(body.payload.image_size).toBeUndefined();
+  });
+
+  it('falls back to image_size in payload when no source_asset_id (model-shot)', async () => {
+    mockAuthFetch.mockReturnValueOnce(okResponse({ workflow_id: 'wf-fix', status_url: '/s', result_url: '/r' }));
+
+    await startFixShot({
+      isProductShot: false,
+      resolution: '4K',
+      resultImageUrl: 'https://example.com/result.jpg',
+      jewelryImageUrl: 'https://example.com/jewelry.jpg',
+      category: 'ring',
+    });
+
+    const [, options] = mockAuthFetch.mock.calls[0];
+    const body = JSON.parse(options.body as string);
+
+    expect(body.source_asset_id).toBeUndefined();
+    expect(body.payload.image_size).toBe('4K');
+  });
+
+  it('ignores a non-UUID source_asset_id and uses the image_size fallback', async () => {
+    mockAuthFetch.mockReturnValueOnce(okResponse({ workflow_id: 'wf-fix', status_url: '/s', result_url: '/r' }));
+
+    await startFixShot({
+      isProductShot: true,
+      resolution: '1K',
+      resultImageUrl: 'https://example.com/result.jpg',
+      jewelryImageUrl: 'https://example.com/jewelry.jpg',
+      category: 'ring',
+      sourceAssetId: 'not-a-uuid',
+    });
+
+    const [, options] = mockAuthFetch.mock.calls[0];
+    const body = JSON.parse(options.body as string);
+
+    expect(body.source_asset_id).toBeUndefined();
+    expect(body.payload.image_size).toBe('1K');
   });
 });

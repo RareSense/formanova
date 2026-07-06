@@ -1,7 +1,7 @@
 /**
  * EffortToggle
  *
- * Standard <-> High effort switch for Step 1 of the studio.
+ * Low <-> High effort switch for Step 1 of the studio.
  *
  * Design (per product spec):
  * - The state word lives INSIDE the track ("Low" when off, "High" when on),
@@ -14,7 +14,7 @@
  */
 import { cn } from '@/lib/utils';
 
-export type EffortLevel = 'standard' | 'high';
+export type EffortLevel = 'low' | 'high';
 
 interface EffortToggleProps {
   value: EffortLevel;
@@ -34,7 +34,7 @@ export function EffortToggle({ value, onChange, className }: EffortToggleProps) 
         role="switch"
         aria-checked={on}
         aria-label={`Effort mode: ${on ? 'High' : 'Low'}`}
-        onClick={() => onChange(on ? 'standard' : 'high')}
+        onClick={() => onChange(on ? 'low' : 'high')}
         className={cn(
           'relative inline-flex h-7 w-[120px] shrink-0 items-center rounded-full border transition-colors',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',

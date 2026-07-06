@@ -148,21 +148,21 @@ export default function UnifiedStudio() {
     setResolution(v);
     sessionStorage.setItem('formanova_studio_resolution', v);
   };
-  // Effort defaults to Standard. A user's explicit choice is remembered durably
+  // Effort defaults to Low. A user's explicit choice is remembered durably
   // (localStorage, not sessionStorage) so it sticks across sessions until they
   // change it themselves.
   const [effort, setEffort] = useState<EffortLevel>(() => {
     const saved = localStorage.getItem('formanova_studio_effort');
-    return saved === 'high' ? 'high' : 'standard';
+    return saved === 'high' ? 'high' : 'low';
   });
   const handleEffortChange = (v: EffortLevel) => {
     setEffort(v);
     localStorage.setItem('formanova_studio_effort', v);
   };
-  // Rollout gate: when High Effort is not enabled for this user, clamp to Standard
+  // Rollout gate: when High Effort is not enabled for this user, clamp to Low
   // so a stored/session 'high' can never leak the paid feature into generation/cost.
   const highEffortEnabled = isHighEffortEnabled(user?.email);
-  const effectiveEffort: EffortLevel = highEffortEnabled ? effort : 'standard';
+  const effectiveEffort: EffortLevel = highEffortEnabled ? effort : 'low';
   // High Effort supporting-angle images (primary + up to 2 = 3 total). Lifted here
   // so handleGenerate can read the uploaded URLs/asset-ids at call time.
   const {
@@ -175,7 +175,7 @@ export default function UnifiedStudio() {
     category: effectiveJewelryType,
     onReject: (message) => toast({ title: message }),
   });
-  // Standard is always single-image: drop supporting images when leaving High.
+  // Low effort is always single-image: drop supporting images when leaving High.
   useEffect(() => {
     if (effectiveEffort !== 'high') clearSupportingImages();
   }, [effectiveEffort, clearSupportingImages]);
@@ -594,7 +594,10 @@ export default function UnifiedStudio() {
         <link rel="canonical" href={location.pathname} />
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
-    <div className="h-screen bg-background relative overflow-hidden flex flex-col">
+    {/* Results step fits the space under the fixed global header (spacer h-16/h-20)
+        so the window doesn't gain a second scrollbar on top of the inner scroller.
+        Other steps keep the original h-screen to avoid changing their layout. */}
+    <div className={`${currentStep === 'results' ? 'h-[calc(100vh-4rem)] lg:h-[calc(100vh-5rem)]' : 'h-screen'} bg-background relative overflow-hidden flex flex-col`}>
 
       {/* ── Mode Switcher + Step Progress Bar ── */}
       <StudioHeader

@@ -9,6 +9,37 @@ import type { TrackedGeneration, GenerationsContextValue } from '@/contexts/Gene
 vi.mock('@/lib/photoshoot-api', () => ({
   startPhotoshoot: vi.fn(),
   startPdpShot: vi.fn(),
+  startFixShot: vi.fn(),
+  getJewelryDescription: vi.fn(),
+  // Real base-name logic (pure helpers) so gate assertions see the actual names.
+  generateWorkflowFor: (isProductShot: boolean) =>
+    isProductShot ? 'Product_shot_pipeline' : 'jewelry_photoshoots_generator',
+  fixWorkflowFor: (isProductShot: boolean) =>
+    isProductShot ? 'fix_product_shot' : 'fix_model_shot',
+  // Effort-aware generate resolver: low → unsuffixed; high → higher-tier names
+  // (on-model splits 4K, PDP is one name across tiers). Mirrors photoshoot-api.
+  workflowFor: (isProductShot: boolean, resolution: string, effort: string = 'low') => {
+    if (effort === 'high') {
+      if (isProductShot) return 'Product_shot_pipeline_higher_tier';
+      return resolution === '4K'
+        ? 'jewelry_photoshoots_generator_higher_tier_4k'
+        : 'jewelry_photoshoots_generator_higher_tier';
+    }
+    return isProductShot ? 'Product_shot_pipeline' : 'jewelry_photoshoots_generator';
+  },
+  buildJewelryRequestFields: (opts: {
+    effort: string;
+    coverUrl: string;
+    coverAssetId: string | null;
+    supporting: Array<{ url: string | null; assetId: string | null }>;
+  }) => {
+    if (opts.effort !== 'high') {
+      return opts.coverAssetId ? { input_jewelry_asset_id: opts.coverAssetId } : {};
+    }
+    const urls = [opts.coverUrl, ...opts.supporting.map((s) => s.url)].filter(Boolean);
+    const ids = [opts.coverAssetId, ...opts.supporting.map((s) => s.assetId)].filter(Boolean);
+    return { tier: 'high', jewelry_image_urls: urls, input_jewelry_asset_ids: ids };
+  },
 }));
 vi.mock('@/lib/authenticated-fetch', () => ({ authenticatedFetch: vi.fn() }));
 vi.mock('@/lib/microservices-api', () => ({ uploadToAzure: vi.fn() }));
@@ -24,16 +55,18 @@ vi.mock('@/lib/generation-lifecycle', () => ({
 vi.mock('@/lib/posthog-events', () => ({
   trackPaywallHit: vi.fn(),
   trackGenerationComplete: vi.fn(),
+  trackAIFixSubmitted: vi.fn(),
   consumeFirstGeneration: vi.fn().mockReturnValue(false),
 }));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: vi.fn() }) }));
 
-import { startPhotoshoot } from '@/lib/photoshoot-api';
+import { startPhotoshoot, startFixShot } from '@/lib/photoshoot-api';
 import { markGenerationStarted } from '@/lib/generation-lifecycle';
 import { trackGenerationComplete } from '@/lib/posthog-events';
 import { useStudioGeneration } from './useStudioGeneration';
 
 const mockStartPhotoshoot = vi.mocked(startPhotoshoot);
+const mockStartFixShot = vi.mocked(startFixShot);
 const mockMarkGenerationStarted = vi.mocked(markGenerationStarted);
 
 // ── Context helpers ────────────────────────────────────────────────────────
@@ -83,6 +116,8 @@ function baseOptions() {
     aspectRatio: '3:4',
     resolution: '1K' as const,
     generationCost: 10,
+    effort: 'low' as const,
+    supportingImages: [],
     checkCredits: mockCheckCredits,
     toast: vi.fn(),
     setCurrentStep: mockSetCurrentStep,
@@ -120,6 +155,38 @@ describe('useStudioGeneration', () => {
     });
     expect(mockMarkGenerationStarted).toHaveBeenCalledWith('wf-test-1');
     expect(mockSetCurrentStep).toHaveBeenCalledWith('generating');
+  });
+
+  it('passes the resolution tier as pricingContext.image_size to the credit gate', async () => {
+    const ctx = makeContextValue();
+    mockStartPhotoshoot.mockResolvedValue({ workflow_id: 'wf-gate-1k', status_url: '', result_url: '' });
+
+    const { result } = renderHook(() => useStudioGeneration(baseOptions()), { wrapper: wrapper(ctx) });
+    await act(async () => { await result.current.handleGenerate(); });
+
+    expect(mockCheckCredits).toHaveBeenCalledWith(
+      'jewelry_photoshoots_generator',
+      1,
+      { pricingContext: { image_size: '1K' } },
+    );
+  });
+
+  it('gates a 4K request on the BASE workflow name with the tier in pricingContext (Step 5)', async () => {
+    const ctx = makeContextValue();
+    mockStartPhotoshoot.mockResolvedValue({ workflow_id: 'wf-gate-4k', status_url: '', result_url: '' });
+
+    const { result } = renderHook(
+      () => useStudioGeneration({ ...baseOptions(), resolution: '4K' as const, generationCost: 20 }),
+      { wrapper: wrapper(ctx) },
+    );
+    await act(async () => { await result.current.handleGenerate(); });
+
+    // No _4k suffix anymore — base name, tier carried by pricingContext/image_size.
+    expect(mockCheckCredits).toHaveBeenCalledWith(
+      'jewelry_photoshoots_generator',
+      1,
+      { pricingContext: { image_size: '4K' } },
+    );
   });
 
   it('transitions to results step when generation completes in Context', async () => {
@@ -499,5 +566,48 @@ describe('useStudioGeneration', () => {
     act(() => { rerender(); });
 
     await waitFor(() => expect(mockClearStudioSession).toHaveBeenCalled());
+  });
+
+  it('forwards the completed result asset id as fix sourceAssetId and estimate pricingContext', async () => {
+    const ASSET_ID = 'a1b2c3d4-0000-1111-2222-333344445555';
+    mockStartPhotoshoot.mockResolvedValue({ workflow_id: 'wf-fixsrc', status_url: '', result_url: '' });
+    mockStartFixShot.mockResolvedValue({ workflow_id: 'wf-fixsrc-2', status_url: '', result_url: '' });
+
+    const completedGeneration: TrackedGeneration = {
+      workflowId: 'wf-fixsrc', status: 'completed', progress: 100,
+      generationStep: 'Done', resultImages: ['https://example.com/result.jpg'],
+      jewelryUrl: 'https://example.com/jewelry.jpg',
+      modelUrl: 'https://example.com/model.jpg',
+      isProductShot: false, jewelryType: 'ring', startedAt: Date.now() - 30000,
+      aspectRatio: '3:4', resolution: '1K', generationCost: 10,
+      outputAssetId: ASSET_ID,
+    };
+
+    let ctxGenerations: TrackedGeneration[] = [];
+    const ctx = makeContextValue({
+      get generations() { return ctxGenerations; },
+      trackGeneration: vi.fn(),
+      clearGeneration: vi.fn(),
+    });
+
+    const { result, rerender } = renderHook(() => useStudioGeneration(baseOptions()), { wrapper: wrapper(ctx) });
+
+    await act(async () => { await result.current.handleGenerate(); });
+    ctxGenerations = [completedGeneration];
+    act(() => { rerender(); });
+
+    // Completion effect must have captured the asset id.
+    await waitFor(() => expect(result.current.resultImages).toEqual(['https://example.com/result.jpg']));
+
+    await act(async () => { await result.current.handleAIFix('make it brighter'); });
+
+    expect(mockStartFixShot).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceAssetId: ASSET_ID, isProductShot: false }),
+    );
+    expect(mockCheckCredits).toHaveBeenCalledWith(
+      'fix_model_shot',
+      1,
+      { pricingContext: { source_asset_id: ASSET_ID } },
+    );
   });
 });

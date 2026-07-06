@@ -43,6 +43,12 @@ export interface UserAsset {
   generation_workflow_id?: string | null;
   metadata?: {
     category?: string;
+    /** Resolution tier of a generated asset (e.g. '1K' | '2K' | '4K'). Populated by
+     * the backend for anything generated after the consolidation cutover; absent
+     * (metadata null) for older assets and uploads. Step 7. */
+    image_size?: string;
+    /** Aspect ratio of a generated asset (e.g. '3:4'). Same availability as image_size. */
+    aspect_ratio?: string;
     name?: string;
     display_name?: string;
     asset_name?: string;
@@ -88,6 +94,21 @@ export async function fetchUserAssets(
   if (intendedUse) params.set('intended_use', intendedUse);
   const response = await fetchWithRetry(`${API_BASE}/assets?${params}`);
   return response.json();
+}
+
+/**
+ * GET /assets/{asset_id} — fetch a single asset by id.
+ *
+ * Returns null on 404 (asset_id isn't a valid UUID, doesn't exist, or isn't
+ * owned by the caller) so callers can fall back gracefully (e.g. to
+ * pixel-inferred resolution) instead of throwing. A valid asset with no
+ * metadata comes back as 200 with `metadata: null`, distinct from a 404.
+ */
+export async function getAsset(assetId: string): Promise<UserAsset | null> {
+  const res = await authenticatedFetch(`${API_BASE}/assets/${assetId}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`Failed to fetch asset: ${res.status}`);
+  return res.json();
 }
 
 export async function updateAssetMetadata(

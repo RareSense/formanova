@@ -125,9 +125,10 @@ export async function listMyWorkflows(
 
   const mapped = raw.map((w: any) => {
     const name = w.name ?? '';
-    const sourceType = inferSourceType(name);
+    // Prefer the backend source_type; fall back to name parsing only when absent/unknown.
+    const sourceType = resolveSourceType(w.source_type, name);
     if (sourceType === 'unknown' && __DEV__) {
-      console.warn('[HistoryAPI] unknown source_type for workflow:', { id: w.workflow_id ?? w.id, name, status: w.status });
+      console.warn('[HistoryAPI] unknown source_type for workflow:', { id: w.workflow_id ?? w.id, name, status: w.status, backend_source_type: w.source_type });
     }
     return {
       workflow_id: w.workflow_id ?? w.id,
@@ -371,4 +372,38 @@ export function inferSourceType(name: string): SourceType {
     return 'photo';
 
   return 'unknown';
+}
+
+/**
+ * Backend `source_type` enum -> the app's coarser SourceType bucket.
+ * The backend distinguishes generate vs fix vs upscale within a family; the UI only
+ * cares about the family bucket (photo / product_shot / cad_*), so fixes and upscales
+ * collapse into their generate family. Unrecognized/future values are intentionally
+ * absent here so they fall through to unknown (or the name-parse fallback).
+ */
+const BACKEND_SOURCE_TYPE_MAP: Record<string, SourceType> = {
+  model_shot: 'photo',
+  model_fix: 'photo',
+  upscale: 'photo',
+  product_shot: 'product_shot',
+  product_fix: 'product_shot',
+  cad_text: 'cad_text',
+  cad_sketch: 'cad_sketch',
+  cad_render: 'cad_render',
+};
+
+/**
+ * Resolve a workflow's SourceType, preferring the backend `source_type` field (Step 6
+ * of the tool/workflow consolidation) over parsing the workflow name. The name-based
+ * inferSourceType is kept ONLY as a fallback for items where the field is absent
+ * (older API responses) or the backend itself returned `unknown`/an unrecognized value.
+ * This is strictly >= the old name-only behavior: a good backend value wins, otherwise
+ * we do exactly what we did before, so nothing that classified before can regress.
+ */
+export function resolveSourceType(rawSourceType: unknown, workflowName: string): SourceType {
+  if (typeof rawSourceType === 'string') {
+    const mapped = BACKEND_SOURCE_TYPE_MAP[rawSourceType];
+    if (mapped) return mapped;
+  }
+  return inferSourceType(workflowName);
 }
