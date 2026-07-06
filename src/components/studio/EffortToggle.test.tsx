@@ -4,9 +4,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { EffortToggle } from './EffortToggle';
 
 describe('EffortToggle', () => {
-  it('renders "Standard" inside the track when off and marks the switch unchecked', () => {
+  it('renders "Low" inside the track when off and marks the switch unchecked', () => {
     render(<EffortToggle value="standard" onChange={() => {}} />);
-    expect(screen.getByText('Standard')).toBeTruthy();
+    expect(screen.getByText('Low')).toBeTruthy();
     expect(screen.getByRole('switch').getAttribute('aria-checked')).toBe('false');
   });
 

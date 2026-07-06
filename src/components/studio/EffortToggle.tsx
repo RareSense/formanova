@@ -4,7 +4,7 @@
  * Standard <-> High effort switch for Step 1 of the studio.
  *
  * Design (per product spec):
- * - The state word lives INSIDE the track ("Standard" when off, "High" when on),
+ * - The state word lives INSIDE the track ("Low" when off, "High" when on),
  *   sitting in the space opposite the knob (mirrors a native OFF/ON switch).
  * - When ON (High), the track gets a `primary` border + glow so it pops on screen.
  *   Uses the theme `primary` token (not a fixed colour) so it adapts across all
@@ -33,7 +33,7 @@ export function EffortToggle({ value, onChange, className }: EffortToggleProps) 
         type="button"
         role="switch"
         aria-checked={on}
-        aria-label={`Effort mode: ${on ? 'High' : 'Standard'}`}
+        aria-label={`Effort mode: ${on ? 'High' : 'Low'}`}
         onClick={() => onChange(on ? 'standard' : 'high')}
         className={cn(
           'relative inline-flex h-7 w-[120px] shrink-0 items-center rounded-full border transition-colors',
@@ -50,7 +50,7 @@ export function EffortToggle({ value, onChange, className }: EffortToggleProps) 
             on ? 'left-0 right-7 text-primary' : 'left-7 right-0 text-muted-foreground',
           )}
         >
-          {on ? 'High' : 'Standard'}
+          {on ? 'High' : 'Low'}
         </span>
         {/* Knob */}
         <span
