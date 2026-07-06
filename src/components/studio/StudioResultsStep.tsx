@@ -83,6 +83,11 @@ export function StudioResultsStep({
   const [primaryMeta, setPrimaryMeta] = useState<ResultImageMeta | null>(null);
   const upscaling = upscaleRunStatus === 'starting' || upscaleRunStatus === 'processing';
   const etaLabel = activeFactor ? upscaleEtaLabel(upscaleResolution, activeFactor) : null;
+  // Once the result has been upscaled, the on-screen image is an upscale output.
+  // Only native 1K/2K/4K generations can be fixed (backend 422s otherwise), so we
+  // hide both fix actions until the user starts a new photoshoot. See Pricing
+  // Restructure handoff — "no fixing an upscaled image".
+  const isUpscaledResult = upscaleRunStatus === 'completed';
 
   return (
     <motion.div
@@ -174,34 +179,40 @@ export function StudioResultsStep({
           <Diamond className="h-4 w-4" />
           New Photoshoot
         </Button>
-        <div className="grid grid-cols-2 items-center gap-3">
-          <div className="relative min-w-0">
+        {isUpscaledResult ? (
+          <p className="text-center font-mono text-[11px] leading-relaxed text-muted-foreground">
+            Fixes aren&apos;t available on upscaled images. Start a new photoshoot to fix a native result.
+          </p>
+        ) : (
+          <div className="grid grid-cols-2 items-center gap-3">
+            <div className="relative min-w-0">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => { onRequestHumanFix(); }}
+                className="relative z-10 h-11 w-full gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] px-4 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"
+              >
+                Fix it with human
+                <ButtonCost cost={humanFixCost} />
+              </Button>
+            </div>
             <Button
-              type="button"
-              variant="outline"
               size="sm"
-              onClick={() => { onRequestHumanFix(); }}
-              className="relative z-10 h-11 w-full gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] px-4 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"
+              onClick={() => {
+                setAiFixOpen(true);
+                trackAIFixModalOpened({
+                  category: TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType,
+                  workflow_id: workflowId,
+                });
+              }}
+              className="h-11 w-full min-w-0 gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] bg-background px-4 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"
             >
-              Fix it with human
-              <ButtonCost cost={humanFixCost} />
+              Fix it with AI
+              <ButtonCost cost={generationCost} />
             </Button>
           </div>
-          <Button
-            size="sm"
-            onClick={() => {
-              setAiFixOpen(true);
-              trackAIFixModalOpened({
-                category: TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType,
-                workflow_id: workflowId,
-              });
-            }}
-            className="h-11 w-full min-w-0 gap-2 border-2 border-[hsl(var(--formanova-hero-accent))] bg-background px-4 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"
-          >
-            Fix it with AI
-            <ButtonCost cost={generationCost} />
-          </Button>
-        </div>
+        )}
       </div>
 
       <FeedbackModal

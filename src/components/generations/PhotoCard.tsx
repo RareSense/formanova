@@ -10,7 +10,7 @@ import { OptimizedImage } from '@/components/ui/optimized-image';
 import { Input } from '@/components/ui/input';
 import type { WorkflowSummary } from '@/lib/generation-history-api';
 import { PhotoPreviewModal } from './PhotoPreviewModal';
-import { renameAsset } from '@/lib/assets-api';
+import { renameAsset, getAsset } from '@/lib/assets-api';
 import { UpscaleControl } from '@/components/studio/UpscaleControl';
 import { CreditPreflightModal } from '@/components/CreditPreflightModal';
 import { useUpscaleLauncher } from '@/hooks/useUpscaleLauncher';
@@ -112,20 +112,51 @@ export function PhotoCard({ workflow, index, onUpscaled }: { workflow: WorkflowS
   useEffect(() => {
     setUpscaleTier(null);
     setBadgeTier(null);
-    if (!resolvedThumbnail) return;
     let cancelled = false;
-    const img = new Image();
-    img.onload = () => {
+
+    // Authoritative tier from the asset's own metadata.image_size — independent of
+    // whether the thumbnail actually loads. This avoids the failure where a raw/
+    // expired image 403s (img.onerror) and the badge + upscale control silently
+    // vanish. Only used when the asset reports a real 1K/2K/4K tier.
+    const applyTier = (tier: Resolution) => {
       if (cancelled) return;
-      const longEdge = Math.max(img.naturalWidth, img.naturalHeight);
-      setBadgeTier(resolutionTierLabel(longEdge));
-      // Billing tier only for upscale-eligible cards (null past 4K hides control).
-      setUpscaleTier(upscaleEligible ? inferResolutionTier(longEdge) : null);
+      setBadgeTier(tier);
+      // Billing tier only for upscale-eligible cards.
+      setUpscaleTier(upscaleEligible ? tier : null);
     };
-    img.onerror = () => { /* leave null -> badge/control hidden */ };
-    img.src = resolvedThumbnail;
+
+    // Fallback: infer the tier from the rendered image's real pixels. Used when the
+    // card has no linked asset or the asset lacks metadata (older/ungrouped items),
+    // and it's the only path that can surface tiers beyond 4K (6K/8K upscales).
+    const inferFromPixels = () => {
+      if (!resolvedThumbnail) return;
+      const img = new Image();
+      img.onload = () => {
+        if (cancelled) return;
+        const longEdge = Math.max(img.naturalWidth, img.naturalHeight);
+        setBadgeTier(resolutionTierLabel(longEdge));
+        // null past 4K hides the control.
+        setUpscaleTier(upscaleEligible ? inferResolutionTier(longEdge) : null);
+      };
+      img.onerror = () => { /* leave null -> badge/control hidden */ };
+      img.src = resolvedThumbnail;
+    };
+
+    if (workflow.output_asset_id) {
+      getAsset(workflow.output_asset_id)
+        .then((asset) => {
+          if (cancelled) return;
+          const size = asset?.metadata?.image_size;
+          if (size === '1K' || size === '2K' || size === '4K') applyTier(size);
+          else inferFromPixels();
+        })
+        .catch(() => { if (!cancelled) inferFromPixels(); });
+    } else {
+      inferFromPixels();
+    }
+
     return () => { cancelled = true; };
-  }, [resolvedThumbnail, upscaleEligible]);
+  }, [resolvedThumbnail, upscaleEligible, workflow.output_asset_id]);
 
   const upscaling = upscaleStatus === 'starting' || upscaleStatus === 'processing';
   const etaLabel = activeFactor && upscaleTier ? upscaleEtaLabel(upscaleTier, activeFactor) : null;

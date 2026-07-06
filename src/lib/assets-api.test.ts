@@ -10,7 +10,7 @@ vi.mock('@/lib/auth-api', () => ({
   getStoredToken: () => 'test-token',
 }));
 
-import { fetchUserAssets } from './assets-api';
+import { fetchUserAssets, getAsset } from './assets-api';
 
 describe('fetchUserAssets retry logic', () => {
   beforeEach(() => {
@@ -79,5 +79,29 @@ describe('fetchUserAssets retry logic', () => {
 
     expect(result).toEqual(fakeAssets);
     expect(mockAuthenticatedFetch).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('getAsset', () => {
+  beforeEach(() => mockAuthenticatedFetch.mockReset());
+
+  it('returns the asset on 200', async () => {
+    const asset = { id: 'a1', asset_type: 'generated_photo', metadata: { image_size: '4K' } };
+    mockAuthenticatedFetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => asset } as Response);
+
+    const result = await getAsset('a1');
+
+    expect(result).toEqual(asset);
+    expect(mockAuthenticatedFetch).toHaveBeenCalledWith(expect.stringContaining('/assets/a1'));
+  });
+
+  it('returns null on 404 (missing / not owned / bad id) instead of throwing', async () => {
+    mockAuthenticatedFetch.mockResolvedValueOnce({ ok: false, status: 404 } as Response);
+    await expect(getAsset('missing')).resolves.toBeNull();
+  });
+
+  it('throws on other non-ok responses', async () => {
+    mockAuthenticatedFetch.mockResolvedValueOnce({ ok: false, status: 500 } as Response);
+    await expect(getAsset('a1')).rejects.toThrow('Failed to fetch asset: 500');
   });
 });
