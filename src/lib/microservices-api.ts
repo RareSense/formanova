@@ -72,18 +72,27 @@ export interface BulkJewelryUploadResponse {
  * Single-image uploads keep using uploadToAzure. See Multi-Image Jewelry Input
  * handoff (2026-06-27).
  *
- * Send group_jewelry=true and the files only. Do NOT send input_group_id on the
- * write path (the server mints it). The endpoint does not accept category /
- * intended_use, so grouped assets carry no jewelry metadata yet - flagged to
- * backend; the per-file uploadToAzure path is unaffected.
+ * Send group_jewelry=true and the files. Do NOT send input_group_id on the
+ * write path (the server mints it). Optionally pass category / intended_use:
+ * these are group-level scalars (one piece per grouped call), applied to every
+ * jewelry asset the call mints, so the PhotoCard tier/category badge reads the
+ * same metadata the single-file uploadToAzure path already persists. Only send a
+ * key when it has a real value - the backend writes no metadata key otherwise.
  */
-export async function bulkUploadJewelry(files: File[]): Promise<BulkJewelryUploadResponse> {
+export async function bulkUploadJewelry(
+  files: File[],
+  meta?: { category?: string; intended_use?: string },
+): Promise<BulkJewelryUploadResponse> {
   if (files.length < 1 || files.length > MAX_BULK_JEWELRY_FILES) {
     throw new Error(`bulkUploadJewelry accepts 1-${MAX_BULK_JEWELRY_FILES} files (cover first).`);
   }
   const form = new FormData();
   files.forEach((f) => form.append('jewelry_files', f));
   form.append('group_jewelry', 'true');
+  // Truthy guard (not !== undefined): keeps empty strings off the wire so the
+  // backend's Form(None) default applies and no blank metadata key is written.
+  if (meta?.category) form.append('category', meta.category);
+  if (meta?.intended_use) form.append('intended_use', meta.intended_use);
 
   // No explicit Content-Type: the browser sets the multipart boundary; authenticatedFetch
   // still attaches the Bearer token.

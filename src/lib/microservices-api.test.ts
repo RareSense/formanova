@@ -50,6 +50,30 @@ describe('bulkUploadJewelry', () => {
     expect(res.jewelry.map((j) => j.uri)).toEqual(['azure://a', 'azure://b']);
   });
 
+  it('appends category and intended_use only when provided (truthy)', async () => {
+    mockAuthFetch.mockReturnValueOnce(okJson(BULK_RESPONSE));
+    await bulkUploadJewelry([imageFile('a.jpg')], { category: 'necklace', intended_use: 'on_model' });
+    let form = mockAuthFetch.mock.calls[0][1].body as FormData;
+    expect(form.get('category')).toBe('necklace');
+    expect(form.get('intended_use')).toBe('on_model');
+
+    // Omitted entirely: no keys on the wire (backend Form(None) default applies).
+    mockAuthFetch.mockReset();
+    mockAuthFetch.mockReturnValueOnce(okJson(BULK_RESPONSE));
+    await bulkUploadJewelry([imageFile('a.jpg')]);
+    form = mockAuthFetch.mock.calls[0][1].body as FormData;
+    expect(form.get('category')).toBeNull();
+    expect(form.get('intended_use')).toBeNull();
+
+    // Empty strings are falsy: still nothing sent.
+    mockAuthFetch.mockReset();
+    mockAuthFetch.mockReturnValueOnce(okJson(BULK_RESPONSE));
+    await bulkUploadJewelry([imageFile('a.jpg')], { category: '', intended_use: '' });
+    form = mockAuthFetch.mock.calls[0][1].body as FormData;
+    expect(form.get('category')).toBeNull();
+    expect(form.get('intended_use')).toBeNull();
+  });
+
   it('rejects an empty set and more than the max without calling the API', async () => {
     await expect(bulkUploadJewelry([])).rejects.toThrow(/1-3/);
     await expect(

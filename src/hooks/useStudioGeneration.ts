@@ -371,7 +371,10 @@ export function useStudioGeneration({
         // cover-first set (grouping just excludes the pre-existing cover asset).
         const setFiles = [...(jewelryFile ? [jewelryFile] : []), ...supportingFiles].slice(0, MAX_BULK_JEWELRY_FILES);
         const compressed = await Promise.all(setFiles.map(compressToJpegFile));
-        const bulk = await bulkUploadJewelry(compressed);
+        // Persist the same jewelry metadata the single-file path sets, so grouped
+        // assets get a correct tier/category badge (matches useStudioUpload.ts).
+        const intendedUse = isProductShot ? 'pdp' : 'on_model';
+        const bulk = await bulkUploadJewelry(compressed, { category, intended_use: intendedUse });
         const bulkUrls = bulk.jewelry.map(j => j.uri);
         const bulkIds = bulk.jewelry.map(j => j.asset_id);
         const urls = (jewelryFile ? bulkUrls : [jewelryUrl, ...bulkUrls]).slice(0, MAX_BULK_JEWELRY_FILES);
