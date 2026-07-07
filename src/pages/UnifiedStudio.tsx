@@ -18,7 +18,6 @@ import { type Resolution } from '@/components/studio/OutputSettingsPills';
 import { type EffortLevel } from '@/components/studio/EffortToggle';
 import { workflowFor } from '@/lib/photoshoot-api';
 import { useSupportingImages } from '@/hooks/useSupportingImages';
-import { isHighEffortEnabled } from '@/lib/feature-flags';
 import { useGenerationCost } from '@/hooks/useGenerationCost';
 import { useStudioOnboarding } from '@/hooks/useStudioOnboarding';
 import { useStudioModels } from '@/hooks/useStudioModels';
@@ -159,10 +158,8 @@ export default function UnifiedStudio() {
     setEffort(v);
     localStorage.setItem('formanova_studio_effort', v);
   };
-  // Rollout gate: when High Effort is not enabled for this user, clamp to Low
-  // so a stored/session 'high' can never leak the paid feature into generation/cost.
-  const highEffortEnabled = isHighEffortEnabled(user?.email);
-  const effectiveEffort: EffortLevel = highEffortEnabled ? effort : 'low';
+  // High Effort is available to all users (rollout flag removed post-staging).
+  const effectiveEffort: EffortLevel = effort;
   // High Effort supporting-angle images (primary + up to 2 = 3 total). Lifted here
   // so handleGenerate can read the uploaded URLs/asset-ids at call time.
   const {
@@ -626,7 +623,7 @@ export default function UnifiedStudio() {
           isProductShot={isProductShot}
           effort={effectiveEffort}
           onEffortChange={handleEffortChange}
-          effortModeEnabled={highEffortEnabled}
+          effortModeEnabled={true}
           supportingImages={supportingImages}
           addSupportingImages={addSupportingImages}
           removeSupportingImage={removeSupportingImage}
