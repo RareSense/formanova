@@ -70,9 +70,9 @@ export function HighEffortUploadCanvas({
   const supportingInputRefs = React.useRef<Array<HTMLInputElement | null>>([]);
 
   return (
-    <div className={`grid grid-cols-3 gap-4 ${canvasH}`}>
-      {/* ── Primary slot (col-span-2) ── */}
-      <div className="col-span-2">
+    <div className="grid grid-cols-3 gap-4">
+      {/* Primary slot (col-span-2) - fixed full canvas height, image object-contain */}
+      <div className={`col-span-2 ${canvasH}`}>
         {!primaryImage ? (
           <div
             onDrop={(e) => { e.preventDefault(); const fs = Array.from(e.dataTransfer.files); if (fs.length) onPrimaryFiles(fs); }}
@@ -113,12 +113,12 @@ export function HighEffortUploadCanvas({
         )}
       </div>
 
-      {/* ── Supporting slots (right column, 2 stacked) ── */}
-      <div className="grid grid-rows-2 gap-4">
+      {/* Supporting slots (right column) - same fixed height, two equal halves */}
+      <div className={`flex flex-col gap-4 ${canvasH}`}>
         {Array.from({ length: MAX_SUPPORTING }).map((_, i) => {
           const item = supporting[i];
           return (
-            <div key={i} className="relative">
+            <div key={i} className="relative flex-1 min-h-0">
               {!item ? (
                 <button
                   type="button"
