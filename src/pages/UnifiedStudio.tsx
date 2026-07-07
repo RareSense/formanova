@@ -171,8 +171,6 @@ export default function UnifiedStudio() {
     removeAt: removeSupportingImage,
     clear: clearSupportingImages,
   } = useSupportingImages({
-    isProductShot,
-    category: effectiveJewelryType,
     onReject: (message) => toast({ title: message }),
   });
   // Low effort is always single-image: drop supporting images when leaving High.
@@ -484,7 +482,8 @@ export default function UnifiedStudio() {
     isProductShot,
     effectiveJewelryType,
     effort: effectiveEffort,
-    supportingImages: supportingImages.map(s => ({ url: s.url, assetId: s.assetId })),
+    supportingFiles: supportingImages.map(s => s.file),
+    jewelryFile,
     jewelryImage,
     activeModelUrl,
     jewelryUploadedUrl,
@@ -505,6 +504,15 @@ export default function UnifiedStudio() {
   const generatingActiveModelUrl = generationInputUrls?.modelUrl ?? activeModelUrl;
   const resolvedGeneratingJewelryImage = useAuthenticatedImage(generatingJewelryImage);
   const resolvedGeneratingActiveModelUrl = useAuthenticatedImage(generatingActiveModelUrl);
+
+  // High Effort fix preview: the jewelry angle set + the model/inspiration reference the
+  // generation used, shown in the AI Fix modal. Only surfaced for high-effort generations.
+  const fixIsHighEffort = (generationInputUrls?.effort ?? effectiveEffort) === 'high';
+  const fixJewelryDisplayUrls = fixIsHighEffort
+    ? generationInputUrls?.jewelryUrls?.map((u) => azureUriToUrl(u) || u)
+    : undefined;
+  const fixReferenceRaw = fixIsHighEffort ? (generationInputUrls?.referenceModelUrl ?? activeModelUrl) : null;
+  const fixReferenceUrl = fixReferenceRaw ? (azureUriToUrl(fixReferenceRaw) || fixReferenceRaw) : null;
 
   const HUMAN_FIX_WORKFLOWS: Record<string, string> = {
     '1K': 'human_fix_photoshoot',
@@ -730,6 +738,8 @@ export default function UnifiedStudio() {
             jewelrySasUrl={jewelrySasUrl}
             jewelryImage={jewelryImage}
             activeModelUrl={generationInputUrls?.modelUrl ?? activeModelUrl}
+            fixJewelryDisplayUrls={fixJewelryDisplayUrls}
+            fixReferenceUrl={fixReferenceUrl}
             userEmail={user?.email}
             generationCost={generationInputUrls?.generationCost ?? generationCost}
             humanFixCost={HUMAN_FIX_COSTS[generationInputUrls?.resolution ?? resolution] ?? 10}

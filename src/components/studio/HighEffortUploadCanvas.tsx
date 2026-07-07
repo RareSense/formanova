@@ -22,7 +22,7 @@
  * - Previews use object-contain so the whole image is visible (never cropped/zoomed).
  */
 import React from 'react';
-import { Diamond, X, Loader2, ImageIcon } from 'lucide-react';
+import { Diamond, X, ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MAX_SUPPORTING_IMAGES, type SupportingImage } from '@/hooks/useSupportingImages';
 
@@ -135,11 +135,6 @@ export function HighEffortUploadCanvas({
               ) : (
                 <div className="relative h-full border border-border/30 overflow-hidden flex items-center justify-center bg-muted/20">
                   <img src={item.preview} alt={`${singular} angle ${i + 1}`} className="max-w-full max-h-full object-contain" />
-                  {item.uploading && (
-                    <div className="absolute inset-0 bg-background/50 backdrop-blur-[1px] flex items-center justify-center">
-                      <Loader2 className="h-5 w-5 animate-spin text-foreground/70" />
-                    </div>
-                  )}
                   <button
                     onClick={() => onSupportingRemove(i)}
                     aria-label={`Remove supporting image ${i + 1}`}

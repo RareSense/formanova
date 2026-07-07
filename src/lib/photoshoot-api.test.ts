@@ -24,6 +24,7 @@ import {
   startFixShot,
   getJewelryDescription,
   workflowFor,
+  fixWorkflowFor,
   buildJewelryRequestFields,
 } from './photoshoot-api';
 
@@ -652,5 +653,126 @@ describe('startFixShot', () => {
 
     expect(body.source_asset_id).toBeUndefined();
     expect(body.payload.image_size).toBe('1K');
+  });
+});
+
+describe('fixWorkflowFor', () => {
+  it('returns base names for low effort', () => {
+    expect(fixWorkflowFor(false)).toBe('fix_model_shot');
+    expect(fixWorkflowFor(true)).toBe('fix_product_shot');
+  });
+
+  it('returns the higher-tier family for high effort, with _4k at 4K', () => {
+    expect(fixWorkflowFor(false, 'high', '1K')).toBe('fix_model_shot_higher_tier');
+    expect(fixWorkflowFor(false, 'high', '4K')).toBe('fix_model_shot_higher_tier_4k');
+    expect(fixWorkflowFor(true, 'high', '2K')).toBe('fix_product_shot_higher_tier');
+    expect(fixWorkflowFor(true, 'high', '4K')).toBe('fix_product_shot_higher_tier_4k');
+  });
+});
+
+describe('startFixShot High Effort (higher tier)', () => {
+  it('model shot: higher-tier state endpoint, cover-first jewelry array, model reference, generation_type', async () => {
+    mockAuthFetch.mockReturnValueOnce(okResponse({ workflow_id: 'wf-hf', status_url: '/s', result_url: '/r' }));
+
+    await startFixShot({
+      isProductShot: false,
+      tier: 'high',
+      resolution: '2K',
+      resultImageUrl: 'https://example.com/result.jpg',
+      jewelryImageUrl: 'https://example.com/a.jpg',
+      jewelryImageUrls: ['https://example.com/a.jpg', 'https://example.com/b.jpg'],
+      modelImageUrl: 'https://example.com/model.jpg',
+      jewelry_description: 'A gold ring',
+      prompt: 'brighten the stone',
+      category: 'ring',
+    });
+
+    expect(mockAuthFetch).toHaveBeenCalledWith(
+      '/api/run/state/fix_model_shot_higher_tier',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    const [, options] = mockAuthFetch.mock.calls[0];
+    const body = JSON.parse(options.body as string);
+    expect(body.payload.generation_type).toBe('model_shot_v1');
+    expect(body.payload.jewelry_image_urls).toEqual(['https://example.com/a.jpg', 'https://example.com/b.jpg']);
+    expect(body.payload.model_image_url).toBe('https://example.com/model.jpg');
+    expect(body.payload.inspiration_image_url).toBeUndefined();
+    expect(body.payload.jewelry_description).toBe('A gold ring');
+    expect(body.payload.fix_instruction).toBe('brighten the stone');
+    expect(body.payload.image_size).toBe('2K');
+    expect(body.payload.client).toBe('gpt_openai');
+  });
+
+  it('product shot: higher-tier /run endpoint, inspiration reference, no model image', async () => {
+    mockAuthFetch.mockReturnValueOnce(okResponse({ workflow_id: 'wf-hf', status_url: '/s', result_url: '/r' }));
+
+    await startFixShot({
+      isProductShot: true,
+      tier: 'high',
+      resolution: '1K',
+      resultImageUrl: 'https://example.com/result.jpg',
+      jewelryImageUrl: 'https://example.com/a.jpg',
+      inspirationImageUrl: 'https://example.com/inspo.jpg',
+      jewelry_description: 'A gold ring',
+      category: 'ring',
+    });
+
+    expect(mockAuthFetch).toHaveBeenCalledWith(
+      '/api/run/fix_product_shot_higher_tier',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    const [, options] = mockAuthFetch.mock.calls[0];
+    const body = JSON.parse(options.body as string);
+    expect(body.payload.generation_type).toBe('product_shot_v1');
+    expect(body.payload.inspiration_image_url).toBe('https://example.com/inspo.jpg');
+    expect(body.payload.model_image_url).toBeUndefined();
+  });
+
+  it('4K high-effort model fix uses the _4k workflow and forwards upscale_factor', async () => {
+    mockAuthFetch.mockReturnValueOnce(okResponse({ workflow_id: 'wf-hf', status_url: '/s', result_url: '/r' }));
+
+    await startFixShot({
+      isProductShot: false,
+      tier: 'high',
+      resolution: '4K',
+      resultImageUrl: 'https://example.com/result.jpg',
+      jewelryImageUrl: 'https://example.com/a.jpg',
+      modelImageUrl: 'https://example.com/model.jpg',
+      jewelry_description: 'A gold ring',
+      upscaleFactor: 2,
+      category: 'ring',
+    });
+
+    expect(mockAuthFetch).toHaveBeenCalledWith(
+      '/api/run/state/fix_model_shot_higher_tier_4k',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    const [, options] = mockAuthFetch.mock.calls[0];
+    const body = JSON.parse(options.body as string);
+    expect(body.payload.upscale_factor).toBe(2);
+  });
+
+  it('enforces the family rules client-side (model needs a model image; product needs inspiration)', async () => {
+    await expect(startFixShot({
+      isProductShot: false,
+      tier: 'high',
+      resolution: '1K',
+      resultImageUrl: 'https://example.com/result.jpg',
+      jewelryImageUrl: 'https://example.com/a.jpg',
+      jewelry_description: 'A gold ring',
+      category: 'ring',
+    })).rejects.toThrow(/model image/i);
+
+    await expect(startFixShot({
+      isProductShot: true,
+      tier: 'high',
+      resolution: '1K',
+      resultImageUrl: 'https://example.com/result.jpg',
+      jewelryImageUrl: 'https://example.com/a.jpg',
+      jewelry_description: 'A gold ring',
+      category: 'ring',
+    })).rejects.toThrow(/inspiration image/i);
+
+    expect(mockAuthFetch).not.toHaveBeenCalled();
   });
 });

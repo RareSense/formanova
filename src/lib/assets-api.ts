@@ -41,6 +41,10 @@ export interface UserAsset {
   workflow_id?: string | null;
   workflow_run_id?: string | null;
   generation_workflow_id?: string | null;
+  /** UUID of the grouped multi-image jewelry set this asset belongs to. null for
+   * older/ungrouped uploads. Set by POST /upload/bulk with group_jewelry=true.
+   * Group vault items by this value; filter a single set via the input_group_id param. */
+  input_group_id?: string | null;
   metadata?: {
     category?: string;
     /** Resolution tier of a generated asset (e.g. '1K' | '2K' | '4K'). Populated by
@@ -88,10 +92,12 @@ export async function fetchUserAssets(
   pageSize = 20,
   category?: string,
   intendedUse?: 'on_model' | 'pdp',
+  inputGroupId?: string,
 ): Promise<AssetsPage> {
   const params = new URLSearchParams({ asset_type: type, page: String(page), page_size: String(pageSize) });
   if (category) params.set('category', category);
   if (intendedUse) params.set('intended_use', intendedUse);
+  if (inputGroupId) params.set('input_group_id', inputGroupId);
   const response = await fetchWithRetry(`${API_BASE}/assets?${params}`);
   return response.json();
 }

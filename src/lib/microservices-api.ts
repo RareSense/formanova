@@ -45,6 +45,57 @@ export async function uploadToAzure(
   return data;
 }
 
+// ========== Bulk Jewelry Upload (grouped multi-image) ==========
+const BULK_UPLOAD_URL = `${import.meta.env.VITE_PIPELINE_API_URL}/upload/bulk`;
+
+/** Max photos of the same piece in one grouped upload. Backend 422s on 4+. */
+export const MAX_BULK_JEWELRY_FILES = 3;
+
+export interface BulkJewelryItem {
+  asset_id: string;
+  uri: string;      // azure:// form; accepted directly as a jewelry_image_urls[] entry on the run call
+  sha256: string;
+}
+
+export interface BulkJewelryUploadResponse {
+  jewelry: BulkJewelryItem[];   // cover first, matches upload order
+  model: BulkJewelryItem[];
+  background: BulkJewelryItem[];
+  input_group_id: string;       // server-minted UUID for the set; read-only, never sent on upload
+}
+
+/**
+ * POST /upload/bulk - upload 1-3 photos of the SAME jewelry piece as one grouped
+ * set (multipart). The server mints input_group_id and returns it; the first file
+ * is the cover (used for thumbnails/history). Returns per-file {asset_id, uri,
+ * sha256} in upload order. Enforce max-3 client-side (backend 422s on 4+).
+ * Single-image uploads keep using uploadToAzure. See Multi-Image Jewelry Input
+ * handoff (2026-06-27).
+ *
+ * Send group_jewelry=true and the files only. Do NOT send input_group_id on the
+ * write path (the server mints it). The endpoint does not accept category /
+ * intended_use, so grouped assets carry no jewelry metadata yet - flagged to
+ * backend; the per-file uploadToAzure path is unaffected.
+ */
+export async function bulkUploadJewelry(files: File[]): Promise<BulkJewelryUploadResponse> {
+  if (files.length < 1 || files.length > MAX_BULK_JEWELRY_FILES) {
+    throw new Error(`bulkUploadJewelry accepts 1-${MAX_BULK_JEWELRY_FILES} files (cover first).`);
+  }
+  const form = new FormData();
+  files.forEach((f) => form.append('jewelry_files', f));
+  form.append('group_jewelry', 'true');
+
+  // No explicit Content-Type: the browser sets the multipart boundary; authenticatedFetch
+  // still attaches the Bearer token.
+  const response = await authenticatedFetch(BULK_UPLOAD_URL, { method: 'POST', body: form });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Bulk jewelry upload failed: ${response.status} - ${error.substring(0, 200)}`);
+  }
+  return response.json();
+}
+
 // ========== Polling Utility ==========
 export interface PollOptions {
   maxAttempts?: number;

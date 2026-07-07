@@ -10,8 +10,8 @@
 
 import React, { useState } from 'react';
 import {
-  Check, X, Diamond, Upload, ArrowRight, Loader2,
-  ChevronLeft, ChevronRight, ImageIcon, Lightbulb, Pencil, Search,
+  X, Diamond, Upload, ArrowRight, Loader2,
+  ChevronLeft, ChevronRight, ImageIcon, Lightbulb, Search,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -20,153 +20,12 @@ import { TO_SINGULAR } from '@/lib/jewelry-utils';
 import { trackMyProductsCategoryFiltered } from '@/lib/posthog-events';
 import { MasonryGrid } from '@/components/ui/masonry-grid';
 import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
-import { getAssetDisplayName, renameAsset } from '@/lib/assets-api';
+import { getAssetDisplayName } from '@/lib/assets-api';
 import type { UserAsset } from '@/lib/assets-api';
 import { EffortToggle, type EffortLevel } from '@/components/studio/EffortToggle';
 import { HighEffortUploadCanvas } from '@/components/studio/HighEffortUploadCanvas';
+import { ProductCard, GroupedProductCard, buildVaultCards } from '@/components/studio/VaultProductCards';
 import type { SupportingImage } from '@/hooks/useSupportingImages';
-
-const DISPLAY_NAME_MAX_CHARS = 50;
-
-function truncateDisplayName(name: string): string {
-  return name.length > DISPLAY_NAME_MAX_CHARS
-    ? `${name.slice(0, DISPLAY_NAME_MAX_CHARS)}...`
-    : name;
-}
-
-function ProductThumb({ src, alt }: { src: string; alt: string }) {
-  const resolved = useAuthenticatedImage(src);
-  return (
-    <img
-      src={resolved ?? ""}
-      alt={alt}
-      loading="lazy"
-      className="w-full block transition-transform duration-300 group-hover:scale-105"
-    />
-  );
-}
-
-function ProductCard({
-  asset,
-  isSelected,
-  onSelect,
-}: {
-  asset: UserAsset;
-  isSelected: boolean;
-  onSelect: () => void;
-}) {
-  const displayName = getAssetDisplayName(asset) || 'Product';
-  const [editing, setEditing] = useState(false);
-  const [nameInput, setNameInput] = useState(displayName ?? '');
-  const [localName, setLocalName] = useState(displayName ?? '');
-  const [saved, setSaved] = useState(false);
-  const syncedDisplayNameRef = React.useRef(displayName);
-
-  React.useEffect(() => {
-    if (displayName && displayName !== syncedDisplayNameRef.current) {
-      syncedDisplayNameRef.current = displayName;
-      setLocalName(displayName);
-      setNameInput(displayName);
-    }
-  }, [displayName]);
-
-  const handleRenameCommit = async () => {
-    setEditing(false);
-    const trimmed = nameInput.trim();
-    if (trimmed && trimmed !== localName) {
-      try {
-        await renameAsset(asset.id, trimmed);
-        setLocalName(trimmed);
-        setSaved(true);
-        setTimeout(() => setSaved(false), 1800);
-      } catch {
-        setNameInput(localName);
-      }
-    }
-  };
-
-  const cancel = () => {
-    setEditing(false);
-    setNameInput(localName);
-  };
-
-  return (
-    <div className="break-inside-avoid mb-2">
-      <button
-        type="button"
-        onClick={() => !editing && onSelect()}
-        className={`relative overflow-hidden border transition-all group w-full
-          ${isSelected
-            ? 'border-[hsl(var(--formanova-hero-accent))]'
-            : 'border-border/20 hover:border-foreground/30'}`}
-      >
-        <ProductThumb src={asset.thumbnail_url} alt={localName || 'Product'} />
-        {isSelected && (
-          <div className="absolute inset-0 flex items-center justify-center"
-               style={{ background: 'hsl(var(--formanova-hero-accent)/0.15)' }}>
-            <div className="w-6 h-6 flex items-center justify-center"
-                 style={{ background: 'hsl(var(--formanova-hero-accent))' }}>
-              <Check className="h-3.5 w-3.5 text-background" />
-            </div>
-          </div>
-        )}
-        {!isSelected && (
-          <div className="absolute inset-0 bg-foreground/0 group-hover:bg-foreground/10
-                          transition-colors flex items-center justify-center">
-            <span className="opacity-0 group-hover:opacity-100 transition-opacity
-                             font-mono text-[9px] tracking-[0.15em] uppercase
-                             text-background bg-foreground/70 px-2 py-1">
-              Use
-            </span>
-          </div>
-        )}
-      </button>
-
-      {/* Naming row — fixed height matches ModelCard, never overlaps image */}
-      <div className="h-10 sm:h-11 flex items-center px-2 overflow-hidden">
-        {editing ? (
-          <div className="flex items-center gap-1.5 w-full" onClick={e => e.stopPropagation()}>
-            <input
-              autoFocus
-              className="font-mono text-[11px] text-foreground bg-muted/30 border border-foreground/20 focus:border-formanova-glow rounded px-2 py-1 outline-none flex-1 min-w-0 transition-colors"
-              value={nameInput}
-              onChange={e => setNameInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') handleRenameCommit(); if (e.key === 'Escape') cancel(); }}
-              maxLength={50}
-              placeholder="Enter a name..."
-            />
-            <button onClick={cancel} className="flex-shrink-0 p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors" aria-label="Cancel">
-              <X className="h-3 w-3" />
-            </button>
-            <button onClick={handleRenameCommit} className="flex-shrink-0 p-1.5 rounded text-foreground hover:bg-muted/30 transition-colors" aria-label="Save">
-              <Check className="h-3 w-3" />
-            </button>
-          </div>
-        ) : (
-          <button
-            className="flex items-center justify-center gap-2 sm:gap-2.5 w-full h-full rounded hover:bg-muted/20 transition-colors group/rename"
-            title="Click to rename"
-            onClick={e => { e.stopPropagation(); setEditing(true); setNameInput(localName); }}
-          >
-            {saved ? (
-              <>
-                <Check className="h-3 w-3 text-formanova-success flex-shrink-0" />
-                <span className="font-mono text-[11px] text-formanova-success truncate">Saved!</span>
-              </>
-            ) : (
-              <>
-                <span className="font-mono text-[11px] truncate text-foreground transition-colors" title={localName || undefined}>
-                  {localName ? truncateDisplayName(localName) : <span className="italic text-muted-foreground/60">Click to name</span>}
-                </span>
-                <Pencil className="h-3 w-3 flex-shrink-0 text-muted-foreground/40 group-hover/rename:text-foreground/60 transition-colors" />
-              </>
-            )}
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
 
 // ── Example images ────────────────────────────────────────────────────────────
 import necklaceAllowed1    from '@/assets/examples/necklace-allowed-1.jpg';
@@ -431,6 +290,9 @@ export function StudioVaultUploadStep({
       })
     : assets;
 
+  // Collapse multi-angle sets (shared input_group_id) into single grouped cards.
+  const vaultCards = buildVaultCards(displayAssets);
+
   // Show upload guide if user has no uploads matching the current context
   const showGuide = !isLoading && assets.length === 0;
 
@@ -640,13 +502,23 @@ export function StudioVaultUploadStep({
                     </p>
                   ) : (
                     <div className="columns-3 gap-2">
-                      {displayAssets.map((asset) => (
-                        <ProductCard
-                          key={asset.id}
-                          asset={asset}
-                          isSelected={asset.id === activeProductAssetId}
-                          onSelect={() => onProductSelect(asset.thumbnail_url, asset.id)}
-                        />
+                      {vaultCards.map((card) => (
+                        card.members.length > 1 ? (
+                          <GroupedProductCard
+                            key={card.groupId}
+                            members={card.members}
+                            cover={card.cover}
+                            isSelected={card.members.some((m) => m.id === activeProductAssetId)}
+                            onSelect={() => onProductSelect(card.cover.thumbnail_url, card.cover.id)}
+                          />
+                        ) : (
+                          <ProductCard
+                            key={card.cover.id}
+                            asset={card.cover}
+                            isSelected={card.cover.id === activeProductAssetId}
+                            onSelect={() => onProductSelect(card.cover.thumbnail_url, card.cover.id)}
+                          />
+                        )
                       ))}
                     </div>
                   )}

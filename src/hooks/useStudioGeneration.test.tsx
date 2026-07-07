@@ -42,7 +42,11 @@ vi.mock('@/lib/photoshoot-api', () => ({
   },
 }));
 vi.mock('@/lib/authenticated-fetch', () => ({ authenticatedFetch: vi.fn() }));
-vi.mock('@/lib/microservices-api', () => ({ uploadToAzure: vi.fn() }));
+vi.mock('@/lib/microservices-api', () => ({
+  uploadToAzure: vi.fn(),
+  bulkUploadJewelry: vi.fn(),
+  MAX_BULK_JEWELRY_FILES: 3,
+}));
 vi.mock('@/lib/image-compression', () => ({
   compressImageBlob: vi.fn().mockResolvedValue({ blob: new Blob() }),
   imageSourceToBlob: vi.fn().mockResolvedValue(new Blob()),
@@ -61,12 +65,14 @@ vi.mock('@/lib/posthog-events', () => ({
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: vi.fn() }) }));
 
 import { startPhotoshoot, startFixShot } from '@/lib/photoshoot-api';
+import { bulkUploadJewelry } from '@/lib/microservices-api';
 import { markGenerationStarted } from '@/lib/generation-lifecycle';
 import { trackGenerationComplete } from '@/lib/posthog-events';
 import { useStudioGeneration } from './useStudioGeneration';
 
 const mockStartPhotoshoot = vi.mocked(startPhotoshoot);
 const mockStartFixShot = vi.mocked(startFixShot);
+const mockBulkUploadJewelry = vi.mocked(bulkUploadJewelry);
 const mockMarkGenerationStarted = vi.mocked(markGenerationStarted);
 
 // ── Context helpers ────────────────────────────────────────────────────────
@@ -117,7 +123,8 @@ function baseOptions() {
     resolution: '1K' as const,
     generationCost: 10,
     effort: 'low' as const,
-    supportingImages: [],
+    supportingFiles: [],
+    jewelryFile: null,
     checkCredits: mockCheckCredits,
     toast: vi.fn(),
     setCurrentStep: mockSetCurrentStep,
@@ -155,6 +162,35 @@ describe('useStudioGeneration', () => {
     });
     expect(mockMarkGenerationStarted).toHaveBeenCalledWith('wf-test-1');
     expect(mockSetCurrentStep).toHaveBeenCalledWith('generating');
+  });
+
+  it('High effort with supporting files bulk-uploads the set and sends cover-first arrays', async () => {
+    const ctx = makeContextValue();
+    mockStartPhotoshoot.mockResolvedValue({ workflow_id: 'wf-bulk', status_url: '', result_url: '' });
+    mockBulkUploadJewelry.mockResolvedValue({
+      jewelry: [
+        { asset_id: 'id-a', uri: 'azure://a', sha256: 'sa' },
+        { asset_id: 'id-b', uri: 'azure://b', sha256: 'sb' },
+      ],
+      model: [],
+      background: [],
+      input_group_id: 'grp-1',
+    });
+
+    const cover = new File(['c'], 'cover.png', { type: 'image/png' });
+    const support = new File(['s'], 'support.png', { type: 'image/png' });
+
+    const { result } = renderHook(
+      () => useStudioGeneration({ ...baseOptions(), effort: 'high' as const, jewelryFile: cover, supportingFiles: [support] }),
+      { wrapper: wrapper(ctx) },
+    );
+
+    await act(async () => { await result.current.handleGenerate(); });
+
+    expect(mockBulkUploadJewelry).toHaveBeenCalledTimes(1);
+    const startArg = mockStartPhotoshoot.mock.calls[0][0] as Record<string, unknown>;
+    expect(startArg.jewelry_image_urls).toEqual(['azure://a', 'azure://b']);
+    expect(startArg.input_jewelry_asset_ids).toEqual(['id-a', 'id-b']);
   });
 
   it('passes the resolution tier as pricingContext.image_size to the credit gate', async () => {

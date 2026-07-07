@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { useSupportingImages, MAX_SUPPORTING_IMAGES } from './useSupportingImages';
 
@@ -7,29 +7,15 @@ vi.mock('@/lib/image-normalize', () => ({
   normalizeImageFile: async (f: File) => f,
   isLikelyImageFile: (f: File) => typeof f?.type === 'string' && f.type.startsWith('image/'),
 }));
-vi.mock('@/lib/image-compression', () => ({
-  compressImageBlob: async (b: Blob) => ({ blob: b }),
-}));
-vi.mock('@/lib/jewelry-utils', () => ({ TO_SINGULAR: {} }));
-
-const uploadToAzure = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/microservices-api', () => ({ uploadToAzure }));
 
 function imageFile(name: string) {
   return new File(['x'], name, { type: 'image/png' });
 }
 
 describe('useSupportingImages', () => {
-  beforeEach(() => {
-    uploadToAzure.mockReset();
-    uploadToAzure.mockResolvedValue({ sas_url: 'https://az/sas', https_url: 'https://az/https', asset_id: 'asset-1' });
-  });
-
   it('caps supporting images at MAX_SUPPORTING_IMAGES and rejects the overflow', async () => {
     const onReject = vi.fn();
-    const { result } = renderHook(() =>
-      useSupportingImages({ isProductShot: false, category: 'earrings', onReject }),
-    );
+    const { result } = renderHook(() => useSupportingImages({ onReject }));
 
     await act(async () => {
       result.current.addFiles([imageFile('a.png'), imageFile('b.png'), imageFile('c.png')]);
@@ -39,25 +25,21 @@ describe('useSupportingImages', () => {
     expect(onReject).toHaveBeenCalled(); // third file over the 3-image total
   });
 
-  it('fills url + assetId after the upload resolves', async () => {
-    const { result } = renderHook(() =>
-      useSupportingImages({ isProductShot: false, category: 'earrings' }),
-    );
+  it('retains the normalized file and a preview per entry (no per-file upload)', async () => {
+    const { result } = renderHook(() => useSupportingImages());
 
     await act(async () => {
       result.current.addFiles([imageFile('a.png')]);
     });
 
-    await waitFor(() => expect(result.current.supporting[0]?.uploading).toBe(false));
-    expect(result.current.supporting[0]?.url).toBe('https://az/sas');
-    expect(result.current.supporting[0]?.assetId).toBe('asset-1');
+    await waitFor(() => expect(result.current.supporting.length).toBe(1));
+    expect(result.current.supporting[0]?.file).toBeInstanceOf(File);
+    expect(typeof result.current.supporting[0]?.preview).toBe('string');
   });
 
   it('skips non-image files and reports them', async () => {
     const onReject = vi.fn();
-    const { result } = renderHook(() =>
-      useSupportingImages({ isProductShot: false, category: 'earrings', onReject }),
-    );
+    const { result } = renderHook(() => useSupportingImages({ onReject }));
 
     await act(async () => {
       result.current.addFiles([new File(['x'], 'notes.txt', { type: 'text/plain' })]);
@@ -68,9 +50,7 @@ describe('useSupportingImages', () => {
   });
 
   it('removes and clears supporting images', async () => {
-    const { result } = renderHook(() =>
-      useSupportingImages({ isProductShot: false, category: 'earrings' }),
-    );
+    const { result } = renderHook(() => useSupportingImages());
 
     await act(async () => {
       result.current.addFiles([imageFile('a.png'), imageFile('b.png')]);

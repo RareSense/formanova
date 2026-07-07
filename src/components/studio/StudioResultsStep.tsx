@@ -45,6 +45,10 @@ interface StudioResultsStepProps {
   jewelrySasUrl: string | null;
   jewelryImage: string | null;
   activeModelUrl: string | null;
+  /** High Effort: the jewelry angles used (cover first), for the AI Fix modal preview. */
+  fixJewelryDisplayUrls?: string[];
+  /** High Effort: the model (model shot) / inspiration (product shot) reference used. */
+  fixReferenceUrl?: string | null;
   userEmail?: string | null;
   generationCost?: number | null;
   humanFixCost?: number | null;
@@ -69,6 +73,8 @@ export function StudioResultsStep({
   jewelrySasUrl,
   jewelryImage,
   activeModelUrl,
+  fixJewelryDisplayUrls,
+  fixReferenceUrl,
   userEmail,
   generationCost,
   humanFixCost,
@@ -221,6 +227,7 @@ export function StudioResultsStep({
         workflowId={workflowId}
         jewelryImageUrl={jewelryUploadedUrl}
         jewelryDisplayUrl={jewelrySasUrl || jewelryImage}
+        jewelryInputUrls={fixJewelryDisplayUrls}
         modelImageUrl={activeModelUrl}
         resultImageUrl={resultImages[0] ?? null}
         category={(TO_SINGULAR[effectiveJewelryType] ?? 'other') as FeedbackCategory}
@@ -233,6 +240,8 @@ export function StudioResultsStep({
         onClose={() => setAiFixOpen(false)}
         onConfirm={onAIFix}
         jewelryDisplayUrl={jewelrySasUrl || jewelryImage}
+        jewelryDisplayUrls={fixJewelryDisplayUrls}
+        referenceUrl={fixReferenceUrl}
         resultImageUrl={resultImages[0] ?? null}
         isProductShot={isProductShot}
         generationCost={generationCost}

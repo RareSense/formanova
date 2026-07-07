@@ -105,3 +105,32 @@ describe('getAsset', () => {
     await expect(getAsset('a1')).rejects.toThrow('Failed to fetch asset: 500');
   });
 });
+
+describe('fetchUserAssets query params', () => {
+  beforeEach(() => mockAuthenticatedFetch.mockReset());
+
+  it('includes the input_group_id filter in the query when provided', async () => {
+    mockAuthenticatedFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ items: [], total: 0, page: 0, page_size: 20 }),
+    } as Response);
+
+    await fetchUserAssets('jewelry_photo', 0, 20, 'ring', 'on_model', 'grp-123');
+
+    const url = mockAuthenticatedFetch.mock.calls[0][0] as string;
+    expect(url).toContain('asset_type=jewelry_photo');
+    expect(url).toContain('input_group_id=grp-123');
+  });
+
+  it('omits input_group_id when not provided', async () => {
+    mockAuthenticatedFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ items: [], total: 0, page: 0, page_size: 20 }),
+    } as Response);
+
+    await fetchUserAssets('jewelry_photo');
+
+    const url = mockAuthenticatedFetch.mock.calls[0][0] as string;
+    expect(url).not.toContain('input_group_id');
+  });
+});
