@@ -78,8 +78,8 @@ export function HighEffortUploadCanvas({
             onDrop={(e) => { e.preventDefault(); const fs = Array.from(e.dataTransfer.files); if (fs.length) onPrimaryFiles(fs); }}
             onDragOver={(e) => e.preventDefault()}
             onClick={() => primaryInputRef.current?.click()}
-            className="relative h-full border border-dashed border-border/40 text-center cursor-pointer
-                       hover:border-foreground/40 hover:bg-foreground/5 transition-all
+            className="relative h-full border-2 border-dashed border-border/70 text-center cursor-pointer
+                       hover:border-foreground/70 hover:bg-foreground/5 transition-all
                        flex flex-col items-center justify-center"
           >
             <FlickerDiamond size="lg" />
@@ -99,7 +99,7 @@ export function HighEffortUploadCanvas({
             />
           </div>
         ) : (
-          <div className="relative h-full border border-border/30 overflow-hidden flex items-center justify-center bg-muted/20">
+          <div className="relative h-full border-2 border-border/70 overflow-hidden flex items-center justify-center bg-muted/20">
             <img src={resolvedPrimaryImage ?? undefined} alt={`${singular} primary`} className="max-w-full max-h-full object-contain" />
             <button
               onClick={onPrimaryClear}
@@ -123,8 +123,8 @@ export function HighEffortUploadCanvas({
                 <button
                   type="button"
                   onClick={() => supportingInputRefs.current[i]?.click()}
-                  className="h-full w-full border border-dashed border-border/40 text-center cursor-pointer
-                             hover:border-foreground/40 hover:bg-foreground/5 transition-all
+                  className="h-full w-full border-2 border-dashed border-border/70 text-center cursor-pointer
+                             hover:border-foreground/70 hover:bg-foreground/5 transition-all
                              flex flex-col items-center justify-center px-3"
                 >
                   <FlickerDiamond size="sm" />
@@ -133,7 +133,7 @@ export function HighEffortUploadCanvas({
                   </p>
                 </button>
               ) : (
-                <div className="relative h-full border border-border/30 overflow-hidden flex items-center justify-center bg-muted/20">
+                <div className="relative h-full border-2 border-border/70 overflow-hidden flex items-center justify-center bg-muted/20">
                   <img src={item.preview} alt={`${singular} angle ${i + 1}`} className="max-w-full max-h-full object-contain" />
                   <button
                     onClick={() => onSupportingRemove(i)}
