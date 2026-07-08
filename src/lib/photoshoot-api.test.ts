@@ -23,6 +23,7 @@ import {
   startPdpShot,
   startFixShot,
   getJewelryDescription,
+  getAnalyzeOutput,
   workflowFor,
   fixWorkflowFor,
   buildJewelryRequestFields,
@@ -774,5 +775,53 @@ describe('startFixShot High Effort (higher tier)', () => {
     })).rejects.toThrow(/inspiration image/i);
 
     expect(mockAuthFetch).not.toHaveBeenCalled();
+  });
+});
+
+// ── getAnalyzeOutput ──────────────────────────────────────────────────────────
+
+describe('getAnalyzeOutput', () => {
+  function jsonError(status: number, body: unknown): Promise<Response> {
+    return Promise.resolve({
+      ok: false,
+      status,
+      json: () => Promise.resolve(body),
+      text: () => Promise.resolve(JSON.stringify(body)),
+    } as unknown as Response);
+  }
+
+  it('returns ok with the analyze data on 200', async () => {
+    const data = { jewelry_description: 'a ring', model_description: '', generation_type: 'product_shot_v1' };
+    mockAuthFetch.mockReturnValueOnce(okResponse(data));
+
+    const res = await getAnalyzeOutput('wf-1');
+    const [url] = mockAuthFetch.mock.calls[0];
+    expect(url).toMatch(/\/analyze-output\/wf-1$/);
+    expect(res).toEqual({ status: 'ok', data });
+  });
+
+  it('returns pending with the detail on 409 (analyze still running)', async () => {
+    mockAuthFetch.mockReturnValueOnce(jsonError(409, { detail: 'still running' }));
+    expect(await getAnalyzeOutput('wf-2')).toEqual({ status: 'pending', detail: 'still running' });
+  });
+
+  it('returns pending with empty detail when the 409 body has none', async () => {
+    mockAuthFetch.mockReturnValueOnce(errorResponse(409));
+    expect(await getAnalyzeOutput('wf-2b')).toEqual({ status: 'pending', detail: '' });
+  });
+
+  it('returns unavailable on 404 (not found / not owned)', async () => {
+    mockAuthFetch.mockReturnValueOnce(errorResponse(404));
+    expect(await getAnalyzeOutput('wf-3')).toEqual({ status: 'unavailable' });
+  });
+
+  it('returns unavailable on 422 (not a higher-tier generation)', async () => {
+    mockAuthFetch.mockReturnValueOnce(errorResponse(422));
+    expect(await getAnalyzeOutput('wf-4')).toEqual({ status: 'unavailable' });
+  });
+
+  it('throws on an unexpected status (e.g. 500)', async () => {
+    mockAuthFetch.mockReturnValueOnce(errorResponse(500, 'boom'));
+    await expect(getAnalyzeOutput('wf-5')).rejects.toThrow(/500/);
   });
 });

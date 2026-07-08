@@ -518,18 +518,31 @@ export function useStudioGeneration({
 
     if (isHighFix && workflowId) {
       // Higher-tier fix: pull jewelry + model descriptions and generation_type from the
-      // analyze output the original generation already produced (works for both shot
-      // types). generation_type is required downstream and forwarded as-is.
+      // analyze output the original generation produced (both shot types). generation_type
+      // is required as-is downstream (never reconstruct it), so if analyze isn't ready or
+      // available we stop with a clear message instead of sending a wrong/omitted value.
+      let analyze: Awaited<ReturnType<typeof getAnalyzeOutput>>;
       try {
-        const analyze = await getAnalyzeOutput(workflowId);
-        if (analyze) {
-          jewelryDescription = jewelryDescription ?? analyze.jewelry_description;
-          modelDescription = analyze.model_description || undefined;
-          generationType = analyze.generation_type;
-        }
+        analyze = await getAnalyzeOutput(workflowId);
       } catch (e) {
         console.warn('[handleAIFix] getAnalyzeOutput failed:', e);
+        toast({ variant: 'destructive', title: "Couldn't prepare the fix", description: 'Something went wrong loading this image. Please try again in a moment.' });
+        return;
       }
+      if (analyze.status === 'pending') {
+        // 409 - right image, analysis just isn't finished. In-progress, not an error.
+        toast({ title: 'Still preparing your image', description: analyze.detail || 'This image is still being analyzed for fixing. Please try again in a moment.' });
+        return;
+      }
+      if (analyze.status === 'unavailable') {
+        // 404/422 - shouldn't happen in the normal fix flow; without generation_type the
+        // higher-tier fix can't run, so stop rather than fail downstream.
+        toast({ variant: 'destructive', title: "Can't fix this image", description: 'We couldn\'t load the details needed to fix it. Try starting a new photoshoot.' });
+        return;
+      }
+      jewelryDescription = jewelryDescription ?? analyze.data.jewelry_description;
+      modelDescription = analyze.data.model_description || undefined;
+      generationType = analyze.data.generation_type;
     } else if (!jewelryDescription && isProductShot && workflowId) {
       // Low-effort product fix keeps the PDP-only jewelry-description endpoint.
       try {

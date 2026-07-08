@@ -620,24 +620,43 @@ export interface AnalyzeOutput {
 }
 
 /**
+ * Outcome of GET /analyze-output. The backend distinguishes three non-200 states and
+ * asks callers to handle them distinctly rather than checking only for 200:
+ * - `pending` (409): right workflow, but analyze hasn't produced output yet. A
+ *   legitimate in-progress state (detail: "still running" vs "produced no output
+ *   (status: X)") to surface, NOT a generic error.
+ * - `unavailable` (404 not found/not owned, or 422 not a higher-tier generation):
+ *   shouldn't happen in the normal fix flow, but don't assume it can't.
+ */
+export type AnalyzeOutputResult =
+  | { status: 'ok'; data: AnalyzeOutput }
+  | { status: 'pending'; detail: string }
+  | { status: 'unavailable' };
+
+/**
  * GET /analyze-output/{workflowId} - the jewelry + model descriptions the original
  * higher-tier generation already produced, plus its generation_type. Works for BOTH
  * model-shot and product-shot runs (unlike /jewelry-description, which is PDP-only).
  * Feeds the higher-tier fix so it can run without re-analyzing.
  *
- * Returns null on the three non-200 cases the backend distinguishes (404 not found /
- * not owned, 422 not a higher-tier generation, 409 analyze not ready yet) so the caller
- * can fall back gracefully. generation_type must be forwarded as-is to the fix, not
- * reconstructed client-side.
+ * generation_type must be forwarded as-is to the fix, never reconstructed client-side.
+ * Throws only on unexpected non-2xx statuses (e.g. 5xx); the 404/422/409 cases are
+ * returned as typed results so the caller can react to each.
  */
-export async function getAnalyzeOutput(workflowId: string): Promise<AnalyzeOutput | null> {
+export async function getAnalyzeOutput(workflowId: string): Promise<AnalyzeOutputResult> {
   const res = await authenticatedFetch(`${API_BASE}/analyze-output/${workflowId}`);
-  if (res.status === 404 || res.status === 422 || res.status === 409) return null;
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Failed to fetch analyze output: ${res.status} - ${text.substring(0, 200)}`);
+  if (res.ok) return { status: 'ok', data: await res.json() };
+  if (res.status === 409) {
+    let detail = '';
+    try {
+      const body = await res.json();
+      if (body && typeof body.detail === 'string') detail = body.detail;
+    } catch { /* no JSON body */ }
+    return { status: 'pending', detail };
   }
-  return res.json();
+  if (res.status === 404 || res.status === 422) return { status: 'unavailable' };
+  const text = await res.text();
+  throw new Error(`Failed to fetch analyze output: ${res.status} - ${text.substring(0, 200)}`);
 }
 
 /**
