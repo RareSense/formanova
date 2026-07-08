@@ -114,7 +114,7 @@ export function StudioGeneratingStep({
                      font-mono text-xs font-semibold tracking-[0.2em] uppercase text-foreground
                      hover:bg-primary/10 hover:border-primary transition-colors"
         >
-          Keep working
+          Keep creating
           <ArrowRight className="h-4 w-4 shrink-0" />
         </button>
 
