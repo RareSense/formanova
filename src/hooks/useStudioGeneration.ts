@@ -323,6 +323,13 @@ export function useStudioGeneration({
     setIsSubmitting(true);
     setGenerationError(null);
     hasNavigatedAway.current = false;
+    // A fresh generation is never an upscaled result. Clear any stale upscale
+    // state so its 'completed' status can't carry over from a prior upscale
+    // (e.g. done in the other studio, then switched here) and wrongly hide the
+    // fix actions on this new result.
+    setUpscaleStatus('idle');
+    setUpscaleError(null);
+    setActiveUpscaleId(null);
 
     try {
       let jewelryUrl: string;

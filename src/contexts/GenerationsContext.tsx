@@ -29,6 +29,9 @@ export interface TrackedGeneration {
   generationStep: string;
   resultImages: string[];
   jewelryUrl: string;
+  /** High Effort: the full cover-first jewelry angle set, when known. Falls back
+   *  to [jewelryUrl] downstream. Optional — absent on older/simple runs. */
+  jewelryUrls?: string[];
   modelUrl: string;
   isProductShot: boolean;
   jewelryType: string;
