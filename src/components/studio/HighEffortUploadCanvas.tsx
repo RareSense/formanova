@@ -2,23 +2,22 @@
  * HighEffortUploadCanvas
  *
  * Step 1 upload canvas shown when Effort = High. Lets the user add up to 3 images
- * of the SAME piece: one primary + two supporting angles.
+ * of the SAME piece: one cover + up to two supporting angles.
  *
- * Layout (per spec):
- *   +----------------+  +--------+
- *   |                |  | slot 1 |
- *   |    primary     |  +--------+
- *   |   (col-span-2) |  | slot 2 |
- *   +----------------+  +--------+
- * Horizontal and vertical gaps are equal (single `gap-4` on both grids) so the
- * three slots read as one evenly-spaced block, top- and bottom-aligned.
+ * Layout: a single row of EQUAL-SIZE boxes that grows as the user adds images, so
+ * it reads clean like the low-effort canvas but makes the "up to 3" affordance
+ * obvious:
+ *   - 0 images -> one full-width drop zone (looks like low effort; copy says up to 3).
+ *   - 1 image  -> two equal boxes: the cover + one empty "add supporting" box.
+ *   - 2 images -> three equal boxes: cover + supporting + one empty box.
+ *   - 3 images -> three equal filled boxes (no empty slot; max reached).
+ * Only ever one trailing empty box is shown (the next slot), never dead boxes.
  *
  * Behaviour:
- * - Primary drop zone accepts multi-select: dropping/browsing several files fills
- *   primary then the supporting slots in order. More than 3 files are rejected.
- * - Each supporting slot also accepts multi-select (browse or drop several).
- * - Empty supporting slots show the flickering Diamond + "Add supporting image of
- *   same {piece}".
+ * - Every box accepts multi-select via browse or drag-drop; paste (Ctrl+V) is
+ *   handled globally by the studio page, so all three input methods work.
+ * - Empty supporting box shows the flickering Diamond + "Add supporting image of
+ *   same {piece} (optional)".
  * - Vault entries (a grouped set clicked in My Products) carry no File; their
  *   thumbnail is auth-resolved for display. Fresh uploads use their data-URL preview.
  * - Previews use object-contain so the whole image is visible (never cropped/zoomed).
@@ -30,6 +29,7 @@ import { MAX_SUPPORTING_IMAGES, type SupportingImage } from '@/hooks/useSupporti
 import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
 
 const MAX_SUPPORTING = MAX_SUPPORTING_IMAGES;
+const MAX_TOTAL = MAX_SUPPORTING + 1; // cover + supporting = 3
 
 interface HighEffortUploadCanvasProps {
   singular: string;
@@ -70,7 +70,7 @@ export function HighEffortUploadCanvas({
   onSupportingFiles,
   onSupportingRemove,
 }: HighEffortUploadCanvasProps) {
-  const supportingInputRefs = React.useRef<Array<HTMLInputElement | null>>([]);
+  const emptyInputRef = React.useRef<HTMLInputElement | null>(null);
 
   // Vault entries (assetId set) carry no data-URL preview; auth-resolve their
   // thumbnail for display. Fresh uploads use `preview` directly. Hooks run at a
@@ -79,10 +79,20 @@ export function HighEffortUploadCanvas({
   const resolvedSlot1 = useAuthenticatedImage(supporting[1]?.assetId ? supporting[1].url : null);
   const resolvedSupporting = [resolvedSlot0, resolvedSlot1];
 
+  const primaryFilled = !!primaryImage;
+  const totalFilled = (primaryFilled ? 1 : 0) + supporting.length;
+  // Reveal the next empty box only once there's a cover and we're under the max.
+  const showEmptySlot = primaryFilled && totalFilled < MAX_TOTAL;
+  const visibleCount = 1 + supporting.length + (showEmptySlot ? 1 : 0);
+
   return (
-    <div className="grid grid-cols-3 gap-4">
-      {/* Primary slot (col-span-2) - fixed full canvas height, image object-contain */}
-      <div className={`col-span-2 ${canvasH}`}>
+    <div
+      className={`grid gap-4 ${canvasH}`}
+      style={{ gridTemplateColumns: `repeat(${visibleCount}, minmax(0, 1fr))` }}
+    >
+      {/* Cover box - drop zone when empty, image when filled. Full width when it is
+          the only box (empty state), which reads like the low-effort canvas. */}
+      <div className="relative h-full">
         {!primaryImage ? (
           <div
             onDrop={(e) => { e.preventDefault(); const fs = Array.from(e.dataTransfer.files); if (fs.length) onPrimaryFiles(fs); }}
@@ -90,7 +100,7 @@ export function HighEffortUploadCanvas({
             onClick={() => primaryInputRef.current?.click()}
             className="relative h-full border-2 border-dashed border-border/70 text-center cursor-pointer
                        hover:border-foreground/70 hover:bg-foreground/5 transition-all
-                       flex flex-col items-center justify-center"
+                       flex flex-col items-center justify-center px-4"
           >
             <FlickerDiamond size="lg" />
             <p className="text-lg font-display font-medium mb-1.5">Drop your {singular} images here</p>
@@ -111,10 +121,10 @@ export function HighEffortUploadCanvas({
           </div>
         ) : (
           <div className="relative h-full border-2 border-border/70 overflow-hidden flex items-center justify-center bg-muted/20">
-            <img src={resolvedPrimaryImage ?? undefined} alt={`${singular} primary`} className="max-w-full max-h-full object-contain" />
+            <img src={resolvedPrimaryImage ?? undefined} alt={`${singular} cover`} className="max-w-full max-h-full object-contain" />
             <button
               onClick={onPrimaryClear}
-              aria-label="Remove primary image"
+              aria-label="Remove cover image"
               className="absolute top-3 right-3 w-7 h-7 bg-background/80 backdrop-blur-sm flex items-center justify-center
                          border border-border/40 hover:bg-destructive hover:text-destructive-foreground transition-colors z-10"
             >
@@ -124,54 +134,54 @@ export function HighEffortUploadCanvas({
         )}
       </div>
 
-      {/* Supporting slots (right column) - same fixed height, two equal halves */}
-      <div className={`flex flex-col gap-4 ${canvasH}`}>
-        {Array.from({ length: MAX_SUPPORTING }).map((_, i) => {
-          const item = supporting[i];
-          return (
-            <div key={i} className="relative flex-1 min-h-0">
-              {!item ? (
-                <button
-                  type="button"
-                  onClick={() => supportingInputRefs.current[i]?.click()}
-                  className="h-full w-full border-2 border-dashed border-border/70 text-center cursor-pointer
-                             hover:border-foreground/70 hover:bg-foreground/5 transition-all
-                             flex flex-col items-center justify-center px-3"
-                >
-                  <FlickerDiamond size="sm" />
-                  <p className="text-xs text-muted-foreground leading-snug">
-                    Add supporting image of same {singular} (optional)
-                  </p>
-                </button>
-              ) : (
-                <div className="relative h-full border-2 border-border/70 overflow-hidden flex items-center justify-center bg-muted/20">
-                  <img
-                    src={(item.assetId ? resolvedSupporting[i] : item.preview) ?? undefined}
-                    alt={`${singular} angle ${i + 1}`}
-                    className="max-w-full max-h-full object-contain"
-                  />
-                  <button
-                    onClick={() => onSupportingRemove(i)}
-                    aria-label={`Remove supporting image ${i + 1}`}
-                    className="absolute top-2 right-2 w-6 h-6 bg-background/80 backdrop-blur-sm flex items-center justify-center
-                               border border-border/40 hover:bg-destructive hover:text-destructive-foreground transition-colors z-10"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              )}
-              <input
-                ref={(el) => { supportingInputRefs.current[i] = el; }}
-                type="file"
-                multiple
-                accept="image/*,.jfif,.pjpeg,.jpe"
-                className="hidden"
-                onChange={(e) => { const fs = Array.from(e.target.files ?? []); if (fs.length) onSupportingFiles(fs); e.currentTarget.value = ''; }}
-              />
-            </div>
-          );
-        })}
-      </div>
+      {/* Filled supporting angles - one equal box each. */}
+      {supporting.map((item, i) => (
+        <div key={item.id ?? i} className="relative h-full">
+          <div className="relative h-full border-2 border-border/70 overflow-hidden flex items-center justify-center bg-muted/20">
+            <img
+              src={(item.assetId ? resolvedSupporting[i] : item.preview) ?? undefined}
+              alt={`${singular} angle ${i + 1}`}
+              className="max-w-full max-h-full object-contain"
+            />
+            <button
+              onClick={() => onSupportingRemove(i)}
+              aria-label={`Remove supporting image ${i + 1}`}
+              className="absolute top-2 right-2 w-6 h-6 bg-background/80 backdrop-blur-sm flex items-center justify-center
+                         border border-border/40 hover:bg-destructive hover:text-destructive-foreground transition-colors z-10"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        </div>
+      ))}
+
+      {/* One trailing empty box for the next angle - same size as the rest. */}
+      {showEmptySlot && (
+        <div className="relative h-full">
+          <button
+            type="button"
+            onDrop={(e) => { e.preventDefault(); const fs = Array.from(e.dataTransfer.files); if (fs.length) onSupportingFiles(fs); }}
+            onDragOver={(e) => e.preventDefault()}
+            onClick={() => emptyInputRef.current?.click()}
+            className="h-full w-full border-2 border-dashed border-border/70 text-center cursor-pointer
+                       hover:border-foreground/70 hover:bg-foreground/5 transition-all
+                       flex flex-col items-center justify-center px-3"
+          >
+            <FlickerDiamond size="sm" />
+            <p className="text-xs text-muted-foreground leading-snug">
+              Add supporting image of same {singular} (optional)
+            </p>
+          </button>
+          <input
+            ref={emptyInputRef}
+            type="file"
+            multiple
+            accept="image/*,.jfif,.pjpeg,.jpe"
+            className="hidden"
+            onChange={(e) => { const fs = Array.from(e.target.files ?? []); if (fs.length) onSupportingFiles(fs); e.currentTarget.value = ''; }}
+          />
+        </div>
+      )}
     </div>
   );
 }
