@@ -16,15 +16,18 @@
  * Behaviour:
  * - Primary drop zone accepts multi-select: dropping/browsing several files fills
  *   primary then the supporting slots in order. More than 3 files are rejected.
- * - Each supporting slot can also be filled individually.
+ * - Each supporting slot also accepts multi-select (browse or drop several).
  * - Empty supporting slots show the flickering Diamond + "Add supporting image of
  *   same {piece}".
+ * - Vault entries (a grouped set clicked in My Products) carry no File; their
+ *   thumbnail is auth-resolved for display. Fresh uploads use their data-URL preview.
  * - Previews use object-contain so the whole image is visible (never cropped/zoomed).
  */
 import React from 'react';
 import { Diamond, X, ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MAX_SUPPORTING_IMAGES, type SupportingImage } from '@/hooks/useSupportingImages';
+import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
 
 const MAX_SUPPORTING = MAX_SUPPORTING_IMAGES;
 
@@ -37,7 +40,7 @@ interface HighEffortUploadCanvasProps {
   onPrimaryFiles: (files: File[]) => void;
   onPrimaryClear: () => void;
   supporting: SupportingImage[];         // 0..2 entries
-  onSupportingFile: (index: number, file: File) => void;
+  onSupportingFiles: (files: File[]) => void;
   onSupportingRemove: (index: number) => void;
 }
 
@@ -64,10 +67,17 @@ export function HighEffortUploadCanvas({
   onPrimaryFiles,
   onPrimaryClear,
   supporting,
-  onSupportingFile,
+  onSupportingFiles,
   onSupportingRemove,
 }: HighEffortUploadCanvasProps) {
   const supportingInputRefs = React.useRef<Array<HTMLInputElement | null>>([]);
+
+  // Vault entries (assetId set) carry no data-URL preview; auth-resolve their
+  // thumbnail for display. Fresh uploads use `preview` directly. Hooks run at a
+  // fixed count, so resolve each of the MAX_SUPPORTING (2) slots unconditionally.
+  const resolvedSlot0 = useAuthenticatedImage(supporting[0]?.assetId ? supporting[0].url : null);
+  const resolvedSlot1 = useAuthenticatedImage(supporting[1]?.assetId ? supporting[1].url : null);
+  const resolvedSupporting = [resolvedSlot0, resolvedSlot1];
 
   return (
     <div className="grid grid-cols-3 gap-4">
@@ -83,7 +93,8 @@ export function HighEffortUploadCanvas({
                        flex flex-col items-center justify-center"
           >
             <FlickerDiamond size="lg" />
-            <p className="text-lg font-display font-medium mb-1.5">Drop your {singular} image here</p>
+            <p className="text-lg font-display font-medium mb-1.5">Drop your {singular} images here</p>
+            <p className="text-sm text-muted-foreground mb-1.5">Add up to 3 photos of the same {singular} (different angles)</p>
             <p className="text-sm text-muted-foreground mb-6">Drag &amp; drop &middot; click to browse &middot; paste (Ctrl+V)</p>
             <Button variant="outline" size="lg" className="gap-2 pointer-events-none">
               <ImageIcon className="h-4 w-4" />
@@ -134,7 +145,11 @@ export function HighEffortUploadCanvas({
                 </button>
               ) : (
                 <div className="relative h-full border-2 border-border/70 overflow-hidden flex items-center justify-center bg-muted/20">
-                  <img src={item.preview} alt={`${singular} angle ${i + 1}`} className="max-w-full max-h-full object-contain" />
+                  <img
+                    src={(item.assetId ? resolvedSupporting[i] : item.preview) ?? undefined}
+                    alt={`${singular} angle ${i + 1}`}
+                    className="max-w-full max-h-full object-contain"
+                  />
                   <button
                     onClick={() => onSupportingRemove(i)}
                     aria-label={`Remove supporting image ${i + 1}`}
@@ -148,9 +163,10 @@ export function HighEffortUploadCanvas({
               <input
                 ref={(el) => { supportingInputRefs.current[i] = el; }}
                 type="file"
+                multiple
                 accept="image/*,.jfif,.pjpeg,.jpe"
                 className="hidden"
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) onSupportingFile(i, f); e.currentTarget.value = ''; }}
+                onChange={(e) => { const fs = Array.from(e.target.files ?? []); if (fs.length) onSupportingFiles(fs); e.currentTarget.value = ''; }}
               />
             </div>
           );

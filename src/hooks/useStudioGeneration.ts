@@ -90,11 +90,12 @@ interface UseStudioGenerationOptions {
   effectiveJewelryType: string;
   effort: EffortLevel;
   /**
-   * High Effort supporting-angle files. These upload together with the cover as
-   * one grouped POST /upload/bulk set at generate time (so the backend mints a
-   * single input_group_id). Empty for Low effort or single-image High.
+   * High Effort supporting angles, cover-excluded, in slot order. Each is either
+   * a fresh `file` (bulk-uploaded with the cover at generate time so the backend
+   * mints one input_group_id) or a pre-existing vault member (`url` + `assetId`,
+   * reused as-is with no re-upload). Empty for Low effort or single-image High.
    */
-  supportingFiles: File[];
+  supportingItems: { file?: File; url?: string; assetId?: string }[];
   /** Cover file for the bulk set (the primary jewelry image). */
   jewelryFile: File | null;
   jewelryImage: string | null;
@@ -122,7 +123,7 @@ export function useStudioGeneration({
   isProductShot,
   effectiveJewelryType,
   effort,
-  supportingFiles,
+  supportingItems,
   jewelryFile,
   jewelryImage,
   activeModelUrl,
@@ -356,32 +357,49 @@ export function useStudioGeneration({
       const idempotencyKey = `${Date.now()}-${effectiveJewelryType}-${selectedModel?.id || 'custom'}`;
       const category = TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType;
 
-      // High Effort with supporting angles: upload the whole set (cover +
-      // supporting) as one grouped POST /upload/bulk call so the backend mints a
-      // single input_group_id (grouped display in My Products). The run then sends
-      // the cover-first jewelry_image_urls + input_jewelry_asset_ids arrays.
+      // High Effort with supporting angles: send the cover-first
+      // jewelry_image_urls + input_jewelry_asset_ids arrays for the whole set.
+      // Each set member is either a fresh File (needs upload) or a pre-existing
+      // vault asset (url + assetId, reused as-is with no re-upload, no duplicate
+      // grouped set). The fresh Files upload together as ONE grouped
+      // POST /upload/bulk call so the backend mints a single input_group_id.
+      // When every member is from the vault (a grouped set clicked in My
+      // Products), nothing is uploaded and the original input_group_id is kept.
       // Low effort, or High with just the cover, keeps the singular/existing path.
       let jewelryReqFields;
-      if (effort === 'high' && supportingFiles.length > 0) {
-        // Upload the set (cover + supporting) as one grouped bulk call so the
-        // backend mints a single input_group_id (grouped display in My Products).
-        // When the cover is a fresh File it leads the bulk set. When it came from
-        // the vault (no File) only the supporting files are bulk-uploaded and the
-        // vault cover url/id is prepended, so the run still gets the full
-        // cover-first set (grouping just excludes the pre-existing cover asset).
-        const setFiles = [...(jewelryFile ? [jewelryFile] : []), ...supportingFiles].slice(0, MAX_BULK_JEWELRY_FILES);
-        const compressed = await Promise.all(setFiles.map(compressToJpegFile));
-        // Persist the same jewelry metadata the single-file path sets, so grouped
-        // assets get a correct tier/category badge (matches useStudioUpload.ts).
-        const intendedUse = isProductShot ? 'pdp' : 'on_model';
-        const bulk = await bulkUploadJewelry(compressed, { category, intended_use: intendedUse });
-        const bulkUrls = bulk.jewelry.map(j => j.uri);
-        const bulkIds = bulk.jewelry.map(j => j.asset_id);
-        const urls = (jewelryFile ? bulkUrls : [jewelryUrl, ...bulkUrls]).slice(0, MAX_BULK_JEWELRY_FILES);
-        const ids = (jewelryFile
-          ? bulkIds
-          : [jewelryAssetId, ...bulkIds].filter((id): id is string => !!id)
-        ).slice(0, MAX_BULK_JEWELRY_FILES);
+      if (effort === 'high' && supportingItems.length > 0) {
+        type SetEntry = { file?: File; url?: string; assetId?: string };
+        const coverEntry: SetEntry = jewelryFile
+          ? { file: jewelryFile }
+          : { url: jewelryUrl ?? undefined, assetId: jewelryAssetId ?? undefined };
+        const entries: SetEntry[] = [coverEntry, ...supportingItems].slice(0, MAX_BULK_JEWELRY_FILES);
+
+        // Upload only the fresh Files, in one grouped bulk call. Persist the same
+        // jewelry metadata the single-file path sets so grouped assets get a
+        // correct tier/category badge (matches useStudioUpload.ts).
+        const fileEntries = entries.filter(e => e.file);
+        let uploaded: { uri: string; asset_id: string }[] = [];
+        if (fileEntries.length > 0) {
+          const compressed = await Promise.all(fileEntries.map(e => compressToJpegFile(e.file!)));
+          const intendedUse = isProductShot ? 'pdp' : 'on_model';
+          const bulk = await bulkUploadJewelry(compressed, { category, intended_use: intendedUse });
+          uploaded = bulk.jewelry;
+        }
+
+        // Reassemble cover-first: File entries take the next uploaded result (bulk
+        // preserves order); vault entries use their own url/id. Push url+id together
+        // so the two arrays stay index-aligned.
+        let u = 0;
+        const urls: string[] = [];
+        const ids: string[] = [];
+        for (const e of entries) {
+          if (e.file) {
+            const up = uploaded[u++];
+            if (up?.uri && up?.asset_id) { urls.push(up.uri); ids.push(up.asset_id); }
+          } else if (e.url && e.assetId) {
+            urls.push(e.url); ids.push(e.assetId);
+          }
+        }
         jewelryReqFields = { tier: 'high' as const, jewelry_image_urls: urls, input_jewelry_asset_ids: ids };
       } else {
         jewelryReqFields = buildJewelryRequestFields({
@@ -446,7 +464,7 @@ export function useStudioGeneration({
     }
   }, [
     isSubmitting, jewelryImage, activeModelUrl, isProductShot, effectiveJewelryType,
-    effort, supportingFiles, jewelryFile,
+    effort, supportingItems, jewelryFile,
     jewelryUploadedUrl, jewelryAssetId, selectedModel, customModelImage, modelAssetId,
     aspectRatio, resolution,
     generationCost, checkCredits, toast, setCurrentStep, setJewelryAssetId, trackGeneration,

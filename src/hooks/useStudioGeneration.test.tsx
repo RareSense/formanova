@@ -123,7 +123,7 @@ function baseOptions() {
     resolution: '1K' as const,
     generationCost: 10,
     effort: 'low' as const,
-    supportingFiles: [],
+    supportingItems: [],
     jewelryFile: null,
     checkCredits: mockCheckCredits,
     toast: vi.fn(),
@@ -181,7 +181,7 @@ describe('useStudioGeneration', () => {
     const support = new File(['s'], 'support.png', { type: 'image/png' });
 
     const { result } = renderHook(
-      () => useStudioGeneration({ ...baseOptions(), effort: 'high' as const, jewelryFile: cover, supportingFiles: [support] }),
+      () => useStudioGeneration({ ...baseOptions(), effort: 'high' as const, jewelryFile: cover, supportingItems: [{ file: support }] }),
       { wrapper: wrapper(ctx) },
     );
 
@@ -191,6 +191,68 @@ describe('useStudioGeneration', () => {
     const startArg = mockStartPhotoshoot.mock.calls[0][0] as Record<string, unknown>;
     expect(startArg.jewelry_image_urls).toEqual(['azure://a', 'azure://b']);
     expect(startArg.input_jewelry_asset_ids).toEqual(['id-a', 'id-b']);
+  });
+
+  it('High effort with an all-vault set reuses member urls/ids and uploads nothing', async () => {
+    const ctx = makeContextValue();
+    mockStartPhotoshoot.mockResolvedValue({ workflow_id: 'wf-vault', status_url: '', result_url: '' });
+
+    // Cover came from the vault (no jewelryFile); supporting angles are vault
+    // members too. Nothing should be bulk-uploaded; the run gets the existing
+    // cover-first urls/ids as-is.
+    const { result } = renderHook(
+      () => useStudioGeneration({
+        ...baseOptions(),
+        effort: 'high' as const,
+        jewelryFile: null,
+        jewelryUploadedUrl: 'azure://cover',
+        jewelryAssetId: 'id-cover',
+        supportingItems: [
+          { url: 'azure://m2', assetId: 'id-m2' },
+          { url: 'azure://m3', assetId: 'id-m3' },
+        ],
+      }),
+      { wrapper: wrapper(ctx) },
+    );
+
+    await act(async () => { await result.current.handleGenerate(); });
+
+    expect(mockBulkUploadJewelry).not.toHaveBeenCalled();
+    const startArg = mockStartPhotoshoot.mock.calls[0][0] as Record<string, unknown>;
+    expect(startArg.jewelry_image_urls).toEqual(['azure://cover', 'azure://m2', 'azure://m3']);
+    expect(startArg.input_jewelry_asset_ids).toEqual(['id-cover', 'id-m2', 'id-m3']);
+  });
+
+  it('High effort mixing a vault cover with a fresh supporting file uploads only the fresh one', async () => {
+    const ctx = makeContextValue();
+    mockStartPhotoshoot.mockResolvedValue({ workflow_id: 'wf-mixed', status_url: '', result_url: '' });
+    mockBulkUploadJewelry.mockResolvedValue({
+      jewelry: [{ asset_id: 'id-fresh', uri: 'azure://fresh', sha256: 'sf' }],
+      model: [],
+      background: [],
+      input_group_id: 'grp-mixed',
+    });
+
+    const support = new File(['s'], 'support.png', { type: 'image/png' });
+
+    const { result } = renderHook(
+      () => useStudioGeneration({
+        ...baseOptions(),
+        effort: 'high' as const,
+        jewelryFile: null,
+        jewelryUploadedUrl: 'azure://cover',
+        jewelryAssetId: 'id-cover',
+        supportingItems: [{ file: support }],
+      }),
+      { wrapper: wrapper(ctx) },
+    );
+
+    await act(async () => { await result.current.handleGenerate(); });
+
+    expect(mockBulkUploadJewelry).toHaveBeenCalledTimes(1);
+    const startArg = mockStartPhotoshoot.mock.calls[0][0] as Record<string, unknown>;
+    expect(startArg.jewelry_image_urls).toEqual(['azure://cover', 'azure://fresh']);
+    expect(startArg.input_jewelry_asset_ids).toEqual(['id-cover', 'id-fresh']);
   });
 
   it('passes the resolution tier as pricingContext.image_size to the credit gate', async () => {

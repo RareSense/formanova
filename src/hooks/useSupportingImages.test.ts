@@ -49,6 +49,39 @@ describe('useSupportingImages', () => {
     expect(onReject).toHaveBeenCalled();
   });
 
+  it('setVaultSupporting loads reusable vault entries (no file) and replaces prior entries', async () => {
+    const { result } = renderHook(() => useSupportingImages());
+
+    await act(async () => {
+      result.current.addFiles([imageFile('a.png')]);
+    });
+    await waitFor(() => expect(result.current.supporting.length).toBe(1));
+
+    // Clicking a grouped set replaces the list with its non-cover members.
+    act(() => result.current.setVaultSupporting([
+      { url: 'azure://m2', assetId: 'id-m2' },
+      { url: 'azure://m3', assetId: 'id-m3' },
+    ]));
+
+    expect(result.current.supporting.length).toBe(2);
+    expect(result.current.supporting[0]).toMatchObject({ assetId: 'id-m2', url: 'azure://m2' });
+    expect(result.current.supporting[0]?.file).toBeUndefined();
+
+    // Selecting an ungrouped product clears the angles.
+    act(() => result.current.setVaultSupporting([]));
+    expect(result.current.supporting.length).toBe(0);
+  });
+
+  it('setVaultSupporting caps at MAX_SUPPORTING_IMAGES', () => {
+    const { result } = renderHook(() => useSupportingImages());
+    act(() => result.current.setVaultSupporting([
+      { url: 'u1', assetId: 'i1' },
+      { url: 'u2', assetId: 'i2' },
+      { url: 'u3', assetId: 'i3' },
+    ]));
+    expect(result.current.supporting.length).toBe(MAX_SUPPORTING_IMAGES);
+  });
+
   it('removes and clears supporting images', async () => {
     const { result } = renderHook(() => useSupportingImages());
 

@@ -8,20 +8,33 @@
  * state. It has no rendering and does not touch the primary jewelry image
  * (which stays on the existing single-image path in UnifiedStudio).
  *
- * Upload model: entries are NOT uploaded individually. The whole jewelry set
- * (cover + supporting) is uploaded together via POST /upload/bulk at generate
- * time so the backend can mint one input_group_id for the set (grouped display
- * in My Products). This hook therefore retains the normalized File per entry;
- * `preview` shows immediately from a data URL while the file waits for submit.
- * Cap is enforced so total images never exceed 3.
+ * Two kinds of entry share one list:
+ * - Fresh uploads carry a normalized `file`; they are NOT uploaded individually.
+ *   The whole fresh set (cover + supporting) is uploaded together via POST
+ *   /upload/bulk at generate time so the backend mints one input_group_id.
+ *   `preview` shows immediately from a data URL while the file waits for submit.
+ * - Vault entries (added by clicking a grouped set in the vault) carry `assetId`
+ *   + `url` and NO file. They are reused as-is at generate time (no re-upload, no
+ *   duplicate grouped set); their preview is the asset thumbnail, auth-resolved
+ *   by the canvas for display.
+ *
+ * Cap is enforced so total images never exceed 3 (primary + MAX_SUPPORTING).
  */
 import { useCallback, useState } from 'react';
 import { normalizeImageFile, isLikelyImageFile } from '@/lib/image-normalize';
 
 export interface SupportingImage {
   id: string;
-  file: File;             // normalized file, uploaded as part of the bulk set at submit
-  preview: string;        // data URL for immediate display
+  /** Present for fresh uploads (bulk-uploaded as part of the set at submit).
+   *  Absent for vault entries, which are reused via assetId/url instead. */
+  file?: File;
+  /** Immediate display source: a data URL for fresh uploads, or the asset
+   *  thumbnail url for vault entries (the canvas auth-resolves the latter). */
+  preview: string;
+  /** Vault member asset id — present => reuse this existing asset, no re-upload. */
+  assetId?: string;
+  /** Vault member url (asset thumbnail) forwarded to the run for reuse. */
+  url?: string;
 }
 
 /** Primary + this many supporting = 3 total. */
@@ -50,7 +63,7 @@ export function useSupportingImages({ onReject }: UseSupportingImagesOptions = {
     setSupporting(prev => [...prev, { id, file: normalized, preview }]);
   }, []);
 
-  /** Add one or more files, respecting the remaining-slot cap. */
+  /** Add one or more fresh files, respecting the remaining-slot cap. */
   const addFiles = useCallback((files: File[]) => {
     const images = files.filter(isLikelyImageFile);
     if (images.length < files.length) onReject?.('Some files were not images and were skipped.');
@@ -64,11 +77,25 @@ export function useSupportingImages({ onReject }: UseSupportingImagesOptions = {
     images.slice(0, slots).forEach(f => { void addOne(f); });
   }, [supporting.length, onReject, addOne]);
 
+  /**
+   * Replace the supporting list with pre-existing vault members (a grouped set's
+   * non-cover angles). Reused as-is at generate time; never re-uploaded. Pass []
+   * to clear (e.g. when selecting an ungrouped product). Capped to MAX_SUPPORTING.
+   */
+  const setVaultSupporting = useCallback((entries: { url: string; assetId: string }[]) => {
+    setSupporting(entries.slice(0, MAX_SUPPORTING_IMAGES).map(e => ({
+      id: e.assetId,
+      preview: e.url,
+      url: e.url,
+      assetId: e.assetId,
+    })));
+  }, []);
+
   const removeAt = useCallback((index: number) => {
     setSupporting(prev => prev.filter((_, i) => i !== index));
   }, []);
 
   const clear = useCallback(() => setSupporting([]), []);
 
-  return { supporting, addFiles, removeAt, clear };
+  return { supporting, addFiles, setVaultSupporting, removeAt, clear };
 }

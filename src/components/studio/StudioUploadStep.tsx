@@ -48,6 +48,7 @@ interface StudioUploadStepProps {
   effortModeEnabled: boolean;
   supportingImages: SupportingImage[];
   addSupportingImages: (files: File[]) => void;
+  setVaultSupporting: (entries: { url: string; assetId: string }[]) => void;
   removeSupportingImage: (index: number) => void;
   effectiveJewelryType: string;
   exampleCategoryType: string;
@@ -77,6 +78,7 @@ export function StudioUploadStep({
   effortModeEnabled,
   supportingImages,
   addSupportingImages,
+  setVaultSupporting,
   removeSupportingImage,
   effectiveJewelryType,
   exampleCategoryType,
@@ -134,11 +136,14 @@ export function StudioUploadStep({
               supportingImages={supportingImages}
               addSupportingImages={addSupportingImages}
               removeSupportingImage={removeSupportingImage}
-              onProductSelect={(thumbnailUrl, assetId) => {
+              onProductSelect={(thumbnailUrl, assetId, supportingMembers) => {
                 setJewelryImage(thumbnailUrl);
                 setJewelryUploadedUrl(thumbnailUrl);
                 setJewelryAssetId(assetId);
                 setJewelryFile(null);
+                // Grouped set: load its other angles as reusable vault supporting
+                // entries. Ungrouped product: clear any lingering angles.
+                setVaultSupporting(supportingMembers ?? []);
               }}
             />
           ) : (

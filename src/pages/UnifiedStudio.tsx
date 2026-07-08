@@ -165,6 +165,7 @@ export default function UnifiedStudio() {
   const {
     supporting: supportingImages,
     addFiles: addSupportingImages,
+    setVaultSupporting,
     removeAt: removeSupportingImage,
     clear: clearSupportingImages,
   } = useSupportingImages({
@@ -479,7 +480,7 @@ export default function UnifiedStudio() {
     isProductShot,
     effectiveJewelryType,
     effort: effectiveEffort,
-    supportingFiles: supportingImages.map(s => s.file),
+    supportingItems: supportingImages.map(s => ({ file: s.file, url: s.url, assetId: s.assetId })),
     jewelryFile,
     jewelryImage,
     activeModelUrl,
@@ -626,6 +627,7 @@ export default function UnifiedStudio() {
           effortModeEnabled={true}
           supportingImages={supportingImages}
           addSupportingImages={addSupportingImages}
+          setVaultSupporting={setVaultSupporting}
           removeSupportingImage={removeSupportingImage}
           effectiveJewelryType={effectiveJewelryType}
           exampleCategoryType={exampleCategoryType}

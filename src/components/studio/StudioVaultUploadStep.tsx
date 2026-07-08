@@ -188,7 +188,14 @@ export interface StudioVaultUploadStepProps {
   onFileUpload: (file: File) => void;
   onClearImage: () => void;
   onNextStep: () => void;
-  onProductSelect: (thumbnailUrl: string, assetId: string) => void;
+  /** Select a vault product for generation. `supportingMembers` carries a grouped
+   *  set's non-cover angles (url + assetId) so High Effort can load all of them
+   *  onto the canvas; omitted/empty for an ungrouped single product. */
+  onProductSelect: (
+    thumbnailUrl: string,
+    assetId: string,
+    supportingMembers?: { url: string; assetId: string }[],
+  ) => void;
   onCategoryChange?: (category: string) => void;
   isProductShot?: boolean;
   effort: EffortLevel;
@@ -343,7 +350,7 @@ export function StudioVaultUploadStep({
             onPrimaryFiles={handlePrimaryFiles}
             onPrimaryClear={onClearImage}
             supporting={supportingImages}
-            onSupportingFile={(_i, file) => addSupportingImages([file])}
+            onSupportingFiles={addSupportingImages}
             onSupportingRemove={removeSupportingImage}
           />
         )}
@@ -509,7 +516,13 @@ export function StudioVaultUploadStep({
                             members={card.members}
                             cover={card.cover}
                             isSelected={card.members.some((m) => m.id === activeProductAssetId)}
-                            onSelect={() => onProductSelect(card.cover.thumbnail_url, card.cover.id)}
+                            onSelect={() => onProductSelect(
+                              card.cover.thumbnail_url,
+                              card.cover.id,
+                              card.members
+                                .filter((m) => m.id !== card.cover.id)
+                                .map((m) => ({ url: m.thumbnail_url, assetId: m.id })),
+                            )}
                           />
                         ) : (
                           <ProductCard
