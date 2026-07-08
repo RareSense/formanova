@@ -38,11 +38,8 @@ export function EffortIntroModal({ open, defaultEffort, onConfirm }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) confirm(); }}>
-      <DialogContent
-        className="max-w-lg w-[calc(100vw-2rem)] p-0 overflow-hidden rounded-none sm:rounded-none"
-        onInteractOutside={(e) => e.preventDefault()}
-      >
-        <div className="flex flex-col px-6 sm:px-10 pt-10 pb-8">
+      <DialogContent className="max-w-lg w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto p-0 rounded-none sm:rounded-none">
+        <div className="flex flex-col px-5 sm:px-10 pt-10 pb-8">
           {/* Title */}
           <DialogTitle className="mx-auto max-w-md text-center font-display text-2xl sm:text-3xl uppercase tracking-tight leading-tight [text-shadow:none]">
             Do you want to generate with low effort or high effort?
@@ -53,8 +50,9 @@ export function EffortIntroModal({ open, defaultEffort, onConfirm }: Props) {
             High effort means we try more to make a better image, but also cost you more.
           </p>
 
-          {/* Effort selector — label + segmented pill, centered as one unit */}
-          <div className="mt-9 flex items-center justify-center gap-4 sm:gap-5">
+          {/* Effort selector — label + segmented pill, centered as one unit.
+              Wraps to two centered rows only on the narrowest phones. */}
+          <div className="mt-9 flex flex-wrap items-center justify-center gap-x-4 gap-y-3 sm:gap-5">
             <span className="font-mono text-xs font-semibold uppercase tracking-widest text-muted-foreground">
               Effort
             </span>
@@ -73,7 +71,7 @@ export function EffortIntroModal({ open, defaultEffort, onConfirm }: Props) {
                     aria-checked={active}
                     onClick={() => setSelected(level)}
                     className={cn(
-                      'min-w-[100px] rounded-full px-6 py-2.5 text-sm font-bold uppercase tracking-widest transition-all',
+                      'min-w-[84px] sm:min-w-[100px] rounded-full px-5 sm:px-6 py-2.5 text-sm font-bold uppercase tracking-widest transition-all',
                       'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
                       active
                         ? level === 'high'
