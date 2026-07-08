@@ -61,7 +61,7 @@ import { azureUriToUrl } from '@/lib/azure-utils';
 import { compressImageBlob, imageSourceToBlob } from '@/lib/image-compression';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
 import { markGenerationStarted } from '@/lib/generation-lifecycle';
-import { getJewelryDescription, getAnalyzeOutput } from '@/lib/photoshoot-api';
+import { getJewelryDescription, getAnalyzeOutput, type AnalyzeOutputResult } from '@/lib/photoshoot-api';
 import {
   trackPaywallHit,
   trackGenerationComplete,
@@ -521,7 +521,7 @@ export function useStudioGeneration({
       // analyze output the original generation produced (both shot types). generation_type
       // is required as-is downstream (never reconstruct it), so if analyze isn't ready or
       // available we stop with a clear message instead of sending a wrong/omitted value.
-      let analyze: Awaited<ReturnType<typeof getAnalyzeOutput>>;
+      let analyze: AnalyzeOutputResult;
       try {
         analyze = await getAnalyzeOutput(workflowId);
       } catch (e) {
@@ -530,8 +530,11 @@ export function useStudioGeneration({
         return;
       }
       if (analyze.status === 'pending') {
-        // 409 - right image, analysis just isn't finished. In-progress, not an error.
-        toast({ title: 'Still preparing your image', description: analyze.detail || 'This image is still being analyzed for fixing. Please try again in a moment.' });
+        // 409 - right image, analysis just isn't finished (still running, or it failed
+        // to produce output). In-progress, not an app error. Log the backend detail
+        // (running vs no-output) but show the user a plain, non-jargon message.
+        console.info('[handleAIFix] analyze not ready:', analyze.detail);
+        toast({ title: 'Almost ready', description: 'This image is still being prepared for editing. Please try again in a moment.' });
         return;
       }
       if (analyze.status === 'unavailable') {
