@@ -48,11 +48,7 @@ const MY_MODELS_VERSION = 2; // bump to invalidate stale cache
 // ─── Studio session persistence (survives reloads, cleared on reset) ──────────
 const STUDIO_SESSION_KEY = 'formanova_studio_session_v1';
 
-const HUMAN_FIX_WORKFLOWS: Record<string, string> = {
-  '1K': 'human_fix_photoshoot',
-  '2K': 'human_fix_photoshoot_2k',
-  '4K': 'human_fix_photoshoot_4k',
-};
+const HUMAN_FIX_WORKFLOW = 'human_fix_photoshoot';
 
 interface StudioSession {
   jewelryType: string;
@@ -473,6 +469,7 @@ export default function UnifiedStudio() {
     setRegenerationCount,
     feedbackOpen,
     setFeedbackOpen,
+    resultAssetId,
     generationInputUrls,
     handleGenerate,
     handleAIFix,
@@ -524,19 +521,25 @@ export default function UnifiedStudio() {
   const fixReferenceUrl = fixReferenceRaw ? (azureUriToUrl(fixReferenceRaw) || fixReferenceRaw) : null;
 
   const activeHumanFixResolution = generationInputUrls?.resolution ?? resolution;
-  const humanFixWorkflowName = HUMAN_FIX_WORKFLOWS[activeHumanFixResolution] ?? 'human_fix_photoshoot';
+  const humanFixSourceEffort = generationInputUrls?.effort ?? effectiveEffort;
   const humanFixPricingContext = useMemo(
-    () => ({ image_size: activeHumanFixResolution }),
-    [activeHumanFixResolution],
+    () => ({
+      image_size: activeHumanFixResolution,
+      effort: humanFixSourceEffort,
+      shot_type: isProductShot ? 'product_shot' : 'model_shot',
+      ...(workflowId ? { workflow_id: workflowId } : {}),
+      ...(resultAssetId ? { source_asset_id: resultAssetId } : {}),
+    }),
+    [activeHumanFixResolution, humanFixSourceEffort, isProductShot, workflowId, resultAssetId],
   );
   const { cost: humanFixCost } = useEstimatedCost({
-    workflowName: humanFixWorkflowName,
+    workflowName: HUMAN_FIX_WORKFLOW,
     pricingContext: humanFixPricingContext,
   });
 
   const handleRequestHumanFix = useCallback(async () => {
     const approved = await checkCredits(
-      humanFixWorkflowName,
+      HUMAN_FIX_WORKFLOW,
       1,
       { pricingContext: humanFixPricingContext },
     );
@@ -546,7 +549,7 @@ export default function UnifiedStudio() {
       category: TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType,
       workflow_id: workflowId,
     });
-  }, [humanFixWorkflowName, humanFixPricingContext, checkCredits, setFeedbackOpen, effectiveJewelryType, workflowId]);
+  }, [humanFixPricingContext, checkCredits, setFeedbackOpen, effectiveJewelryType, workflowId]);
 
   // Door-in: a generation blocked by insufficient credits sends the user to the
   // credits/starter-pack page (with the shortfall) instead of showing a popup.
