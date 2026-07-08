@@ -139,12 +139,16 @@ function extractJewelryDescription(result: PhotoshootResultResponse): string | u
       if (!item || typeof item !== 'object') continue;
       const rec = item as Record<string, unknown>;
       if (typeof rec['description'] === 'string' && rec['description'].length > 0) {
-        console.log(`[extractJewelryDescription] found in node "${key}":`, rec['description']);
+        if (import.meta.env.DEV) console.log(`[extractJewelryDescription] found in node "${key}":`, rec['description']);
         return rec['description'];
       }
     }
   }
-  console.warn('[extractJewelryDescription] no description found in result. Keys:', Object.keys(result));
+  // Absent is the normal case for upscale/fix/PDP results (no description node);
+  // only some model-shot generations emit one. Dev-only, not a production warning.
+  if (import.meta.env.DEV) {
+    console.debug('[extractJewelryDescription] no description node in result (expected for upscale/fix/pdp). Keys:', Object.keys(result));
+  }
   return undefined;
 }
 
@@ -286,7 +290,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
         // Extract images first — if we got output images the generation succeeded regardless
         // of what other keys exist in the result (handles _2k/_4k workflows with different node names).
         const resultImages = extractResultImages(result);
-        if (gen.isProductShot) console.log('[product-shot result keys]', Object.keys(result), result);
+        if (import.meta.env.DEV && gen.isProductShot) console.log('[product-shot result keys]', Object.keys(result), result);
         const jewelryDescription = gen.isProductShot ? extractJewelryDescription(result) : undefined;
         // Top-level sibling scalar (not a node-keyed array). Undefined for old /result
         // payloads that predate the field; consumers treat that as "unavailable".
