@@ -355,24 +355,37 @@ function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
     }
     return null;
   })();
-  const jewelryInputUrls = [
-    ...findStringArray(detail.input_payload, ['jewelry_image_urls', 'input_image_urls', 'input_images']),
-    ...['jewelry_image_url', 'input_image_url', 'image_url', 'source_image_url']
-      .map((key) => findString(detail.input_payload, [key]))
+  // The request wraps everything as { payload: {...} }, so image fields live one
+  // level down (input_payload.payload.*) - the shallow finders miss them at the top
+  // level. Search the raw payload, its nested payload, and the first step's resolved
+  // input so the full jewelry_image_urls array (High Effort) is always found.
+  const payloadRoots: unknown[] = [
+    detail.input_payload,
+    (detail.input_payload as Record<string, unknown> | null)?.payload,
+    detail.steps[0]?.input,
+  ];
+  const jewelryInputUrls = [...new Set(
+    [
+      ...payloadRoots.flatMap((root) => [
+        ...findStringArray(root, ['jewelry_image_urls', 'input_image_urls', 'input_images']),
+        ...['jewelry_image_url', 'input_image_url', 'image_url', 'source_image_url']
+          .map((key) => findString(root, [key]))
+          .filter((value): value is string => Boolean(value)),
+      ]),
+      ...(derivativeSourceUrl ? [derivativeSourceUrl] : []),
+    ]
+      .map((value) => normalizeRenderableUrl(value))
       .filter((value): value is string => Boolean(value)),
-    ...(derivativeSourceUrl ? [derivativeSourceUrl] : []),
-  ]
-    .map((value) => normalizeRenderableUrl(value))
-    .filter((value): value is string => Boolean(value));
-  const inspirationImageUrl = firstRenderableUrl([
-    findString(detail.input_payload, ['inspiration_image_url']),
-    ...findStringArray(detail.input_payload, ['inspiration_image_urls']),
-    findString(detail.steps[0]?.input, ['inspiration_image_url']),
-  ]);
-  const modelImageUrl = firstRenderableUrl([
-    findString(detail.input_payload, ['model_image_url', 'model_url']),
-    findString(detail.steps[0]?.input, ['model_image_url', 'model_url']),
-  ]);
+  )];
+  const inspirationImageUrl = firstRenderableUrl(
+    payloadRoots.flatMap((root) => [
+      findString(root, ['inspiration_image_url']),
+      ...findStringArray(root, ['inspiration_image_urls']),
+    ]),
+  );
+  const modelImageUrl = firstRenderableUrl(
+    payloadRoots.map((root) => findString(root, ['model_image_url', 'model_url'])),
+  );
   const outputImageUrl = firstRenderableUrl([
     detail.feedback?.output_image_url ?? null,
     findString(detail.input_payload, ['output_image_url', 'output_url', 'image_url', 'result_url']),
@@ -389,8 +402,16 @@ function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
     : modelImageUrl
       ? { url: modelImageUrl, label: 'Model Image' }
       : null;
+  // Show every jewelry input the workflow received (High Effort sends up to 3),
+  // not just the cover. Keep a single labeled placeholder when none resolved.
+  const jewelryEntries = jewelryInputUrls.length
+    ? jewelryInputUrls.map((url, i) => ({
+        url,
+        label: jewelryInputUrls.length > 1 ? `Jewelry Input ${i + 1}` : 'Jewelry Input',
+      }))
+    : [{ url: null, label: 'Jewelry Input' }];
   const visualSummaryImages = [
-    { url: jewelryInputUrls[0] ?? null, label: 'Jewelry Input' },
+    ...jewelryEntries,
     ...(referenceImage ? [referenceImage] : []),
     { url: outputImageUrl, label: 'Output Image' },
   ];
