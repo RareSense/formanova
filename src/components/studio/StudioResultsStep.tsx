@@ -119,11 +119,11 @@ export function StudioResultsStep({
             onClick={onKeepBrowsing}
             className="mb-4 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-foreground transition-colors hover:text-foreground/70"
           >
-            Keep browsing
+            Keep creating
             <ArrowRight className="h-3 w-3 shrink-0" />
           </button>
           <p className="max-w-xs font-mono text-[11px] leading-relaxed text-foreground/70">
-            It's saved to your generations history, so you can grab a coffee or keep browsing.
+            It's saved to your generations history, so you can grab a coffee or keep creating.
           </p>
         </div>
       )}
@@ -185,11 +185,7 @@ export function StudioResultsStep({
           <Diamond className="h-4 w-4" />
           New Photoshoot
         </Button>
-        {isUpscaledResult ? (
-          <p className="text-center font-mono text-[11px] leading-relaxed text-muted-foreground">
-            Fixes aren&apos;t available on upscaled images. Start a new photoshoot to fix a native result.
-          </p>
-        ) : (
+        {!isUpscaledResult && (
           <div className="grid grid-cols-2 items-center gap-3">
             <div className="relative min-w-0">
               <Button
