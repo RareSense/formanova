@@ -1,5 +1,5 @@
 // Live credit estimate hook — calls POST /api/credits/estimate
-// whenever workflow_name, model, or numVariations changes.
+// whenever workflow_name, model, numVariations, or pricing context changes.
 
 import { useState, useEffect, useRef } from 'react';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
@@ -9,6 +9,7 @@ interface UseEstimatedCostOptions {
   workflowName: string;
   model?: string;
   numVariations?: number;
+  pricingContext?: Record<string, unknown>;
 }
 
 interface EstimatedCostState {
@@ -25,10 +26,12 @@ export function useEstimatedCost({
   workflowName,
   model,
   numVariations = 1,
+  pricingContext,
 }: UseEstimatedCostOptions): EstimatedCostState {
   const [cost, setCost] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const pricingContextKey = JSON.stringify(pricingContext ?? {});
 
   useEffect(() => {
     // Abort previous in-flight request
@@ -47,6 +50,7 @@ export function useEstimatedCost({
           body: JSON.stringify({
             workflow_name: workflowName,
             num_variations: numVariations,
+            ...(pricingContext ? { pricing_context: pricingContext } : {}),
           }),
           signal: controller.signal,
         });
@@ -78,7 +82,7 @@ export function useEstimatedCost({
       cancelled = true;
       controller.abort();
     };
-  }, [workflowName, model, numVariations]);
+  }, [workflowName, model, numVariations, pricingContextKey]);
 
   return { cost, loading };
 }
