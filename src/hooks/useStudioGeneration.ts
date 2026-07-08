@@ -229,6 +229,11 @@ export function useStudioGeneration({
       }
       clearGeneration(workflowId!);
       const isFirst = consumeFirstGeneration();
+      // Effort tier + jewelry image count for this generation, read from what was
+      // actually sent at generate time (stored per-workflow at start). This only
+      // fires on a completed generation, so uploading images without generating
+      // never counts. Low effort is always 1 image; high effort is 1-3.
+      const genMeta = generationInputUrlsMap[workflowId!];
       trackGenerationComplete({
         source: 'unified-studio',
         category: TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType,
@@ -237,6 +242,8 @@ export function useStudioGeneration({
         is_first_ever: isFirst,
         aspect_ratio: aspectRatio,
         resolution,
+        effort: genMeta?.effort ?? effectiveEffort,
+        jewelry_image_count: genMeta?.jewelryUrls?.length ?? 1,
       });
       clearStudioSession();
       if (!hasNavigatedAway.current) {

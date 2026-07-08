@@ -68,6 +68,13 @@ export interface GenerationCompleteProps {
   is_first_ever: boolean;
   aspect_ratio?: string;
   resolution?: string;
+  /** Effort tier of this generation: 'low' or 'high'. Only set for real photoshoot
+   *  generations (not upscales), so low-vs-high counts exclude upscales. */
+  effort?: 'low' | 'high';
+  /** How many jewelry images were actually used for this generation (1-3). 1 for
+   *  low effort; up to 3 for high effort. Captured at generate time, so uploading
+   *  N images without generating never counts. */
+  jewelry_image_count?: number;
 }
 
 export interface PaymentSuccessProps {

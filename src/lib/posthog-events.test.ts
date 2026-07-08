@@ -203,6 +203,35 @@ describe('trackGenerationComplete', () => {
     }))
   })
 
+  it('includes effort and jewelry_image_count when provided (high effort, 3 images)', () => {
+    trackGenerationComplete({
+      source: 'unified-studio',
+      category: 'ring',
+      upload_type: null,
+      duration_ms: 3000,
+      is_first_ever: false,
+      effort: 'high',
+      jewelry_image_count: 3,
+    })
+    expect(posthog.capture).toHaveBeenCalledWith('generation_completed', expect.objectContaining({
+      effort: 'high',
+      jewelry_image_count: 3,
+    }))
+  })
+
+  it('omits effort and jewelry_image_count when not provided (e.g. upscale completion)', () => {
+    trackGenerationComplete({
+      source: 'unified-studio',
+      category: 'ring',
+      upload_type: null,
+      duration_ms: 3000,
+      is_first_ever: false,
+    })
+    const props = (posthog.capture as ReturnType<typeof vi.fn>).mock.calls.at(-1)![1]
+    expect(props).not.toHaveProperty('effort')
+    expect(props).not.toHaveProperty('jewelry_image_count')
+  })
+
   it('includes aspect_ratio and resolution when provided', () => {
     trackGenerationComplete({
       source: 'unified-studio',
