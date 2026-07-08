@@ -140,7 +140,7 @@ export function HighEffortUploadCanvas({
                 >
                   <FlickerDiamond size="sm" />
                   <p className="text-xs text-muted-foreground leading-snug">
-                    Add supporting image of same {singular}
+                    (Optional) Add supporting image of same {singular}
                   </p>
                 </button>
               ) : (
