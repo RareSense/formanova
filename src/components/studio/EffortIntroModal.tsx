@@ -13,7 +13,8 @@
  * Layout: a single centered column with equal horizontal padding on every row, so
  * the two divider rules, the title/subtitle, the effort selector, the checkbox and
  * the CTA all share one alignment spine. Colors come from theme tokens (primary for
- * the active High segment + CTA), so it reads correctly across all 12 themes.
+ * the active High segment + CTA), with a neutral Low fill that stays visible in
+ * pure dark mode.
  */
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -80,7 +81,7 @@ export function EffortIntroModal({ open, defaultEffort, onConfirm, onDismiss }: 
                       active
                         ? level === 'high'
                           ? 'bg-primary text-primary-foreground shadow-[0_0_16px_-4px_hsl(var(--primary)/0.6)]'
-                          : 'bg-background text-foreground shadow'
+                          : 'bg-muted-foreground/15 text-foreground shadow-sm ring-1 ring-foreground/15 dark:bg-white/15 dark:ring-white/25'
                         : 'text-muted-foreground hover:text-foreground',
                     )}
                   >

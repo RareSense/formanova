@@ -6,7 +6,9 @@ import { EffortToggle } from './EffortToggle';
 describe('EffortToggle', () => {
   it('renders both segments and marks Low active when value is low', () => {
     render(<EffortToggle value="low" onChange={() => {}} />);
-    expect(screen.getByRole('radio', { name: 'Low' }).getAttribute('aria-checked')).toBe('true');
+    const lowSegment = screen.getByRole('radio', { name: 'Low' });
+    expect(lowSegment.getAttribute('aria-checked')).toBe('true');
+    expect(lowSegment.getAttribute('class')).toContain('dark:bg-white/15');
     expect(screen.getByRole('radio', { name: 'High' }).getAttribute('aria-checked')).toBe('false');
   });
 

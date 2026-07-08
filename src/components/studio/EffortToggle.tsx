@@ -8,7 +8,8 @@
  *   in their own segment, so the choice reads at a glance (clearer than a single
  *   word opposite a knob).
  * - The active segment is filled; High uses the theme `primary` token + glow so it
- *   pops, and adapts across all 12 themes. Low uses a neutral raised fill.
+ *   pops, and adapts across all 12 themes. Low uses a neutral raised fill that
+ *   stays visible in pure dark mode.
  * - A mono "Effort" field label sits to the left, consistent with the "SHOW ALL"
  *   control it aligns to.
  */
@@ -51,7 +52,7 @@ export function EffortToggle({ value, onChange, className }: EffortToggleProps) 
                 active
                   ? level === 'high'
                     ? 'bg-primary text-primary-foreground shadow-[0_0_16px_-4px_hsl(var(--primary)/0.6)]'
-                    : 'bg-background text-foreground shadow'
+                    : 'bg-muted-foreground/15 text-foreground shadow-sm ring-1 ring-foreground/15 dark:bg-white/15 dark:ring-white/25'
                   : 'text-muted-foreground hover:text-foreground',
               )}
             >
