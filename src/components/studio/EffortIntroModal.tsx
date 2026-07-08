@@ -51,7 +51,7 @@ export function EffortIntroModal({ open, defaultEffort, onConfirm, onDismiss }: 
 
           {/* Subtitle */}
           <p className="mx-auto mt-5 max-w-sm text-center text-sm sm:text-base leading-relaxed text-muted-foreground">
-            High effort means we try harder to make a better image, but also costs you more.
+            High effort means we try harder to make a better image.
           </p>
 
           {/* Effort selector — label + segmented pill, centered as one unit.
