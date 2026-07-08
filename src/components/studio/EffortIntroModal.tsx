@@ -38,7 +38,7 @@ export function EffortIntroModal({ open, defaultEffort, onConfirm }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) confirm(); }}>
-      <DialogContent className="max-w-lg w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto p-0 rounded-none sm:rounded-none">
+      <DialogContent className="max-w-lg w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto p-0 rounded-none sm:rounded-none shadow-none">
         <div className="flex flex-col px-5 sm:px-10 pt-10 pb-8">
           {/* Title */}
           <DialogTitle className="mx-auto max-w-md text-center font-display text-2xl sm:text-3xl uppercase tracking-tight leading-tight [text-shadow:none]">
