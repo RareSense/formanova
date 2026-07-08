@@ -19,6 +19,7 @@ import { type EffortLevel } from '@/components/studio/EffortToggle';
 import { workflowFor } from '@/lib/photoshoot-api';
 import { useSupportingImages } from '@/hooks/useSupportingImages';
 import { useGenerationCost } from '@/hooks/useGenerationCost';
+import { useEstimatedCost } from '@/hooks/use-estimated-cost';
 import { useStudioOnboarding } from '@/hooks/useStudioOnboarding';
 import { useStudioModels } from '@/hooks/useStudioModels';
 import { useStudioGeneration } from '@/hooks/useStudioGeneration';
@@ -46,6 +47,12 @@ const MY_MODELS_VERSION = 2; // bump to invalidate stale cache
 
 // ─── Studio session persistence (survives reloads, cleared on reset) ──────────
 const STUDIO_SESSION_KEY = 'formanova_studio_session_v1';
+
+const HUMAN_FIX_WORKFLOWS: Record<string, string> = {
+  '1K': 'human_fix_photoshoot',
+  '2K': 'human_fix_photoshoot_2k',
+  '4K': 'human_fix_photoshoot_4k',
+};
 
 interface StudioSession {
   jewelryType: string;
@@ -516,24 +523,30 @@ export default function UnifiedStudio() {
   const fixReferenceRaw = fixIsHighEffort ? (generationInputUrls?.referenceModelUrl ?? activeModelUrl) : null;
   const fixReferenceUrl = fixReferenceRaw ? (azureUriToUrl(fixReferenceRaw) || fixReferenceRaw) : null;
 
-  const HUMAN_FIX_WORKFLOWS: Record<string, string> = {
-    '1K': 'human_fix_photoshoot',
-    '2K': 'human_fix_photoshoot_2k',
-    '4K': 'human_fix_photoshoot_4k',
-  };
-  const HUMAN_FIX_COSTS: Record<string, number> = { '1K': 10, '2K': 13, '4K': 18 };
+  const activeHumanFixResolution = generationInputUrls?.resolution ?? resolution;
+  const humanFixWorkflowName = HUMAN_FIX_WORKFLOWS[activeHumanFixResolution] ?? 'human_fix_photoshoot';
+  const humanFixPricingContext = useMemo(
+    () => ({ image_size: activeHumanFixResolution }),
+    [activeHumanFixResolution],
+  );
+  const { cost: humanFixCost } = useEstimatedCost({
+    workflowName: humanFixWorkflowName,
+    pricingContext: humanFixPricingContext,
+  });
 
   const handleRequestHumanFix = useCallback(async () => {
-    const activeResolution = generationInputUrls?.resolution ?? resolution;
-    const workflowName = HUMAN_FIX_WORKFLOWS[activeResolution] ?? 'human_fix_photoshoot';
-    const approved = await checkCredits(workflowName);
+    const approved = await checkCredits(
+      humanFixWorkflowName,
+      1,
+      { pricingContext: humanFixPricingContext },
+    );
     if (!approved) return;
     setFeedbackOpen(true);
     trackFeedbackModalOpened({
       category: TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType,
       workflow_id: workflowId,
     });
-  }, [generationInputUrls, resolution, checkCredits, setFeedbackOpen, effectiveJewelryType, workflowId]);
+  }, [humanFixWorkflowName, humanFixPricingContext, checkCredits, setFeedbackOpen, effectiveJewelryType, workflowId]);
 
   // Door-in: a generation blocked by insufficient credits sends the user to the
   // credits/starter-pack page (with the shortfall) instead of showing a popup.
@@ -743,7 +756,7 @@ export default function UnifiedStudio() {
             fixReferenceUrl={fixReferenceUrl}
             userEmail={user?.email}
             generationCost={generationInputUrls?.generationCost ?? generationCost}
-            humanFixCost={HUMAN_FIX_COSTS[generationInputUrls?.resolution ?? resolution] ?? 10}
+            humanFixCost={humanFixCost}
           />
         )}
       </div>

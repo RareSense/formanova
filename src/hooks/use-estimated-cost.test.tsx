@@ -68,4 +68,27 @@ describe('useEstimatedCost', () => {
     });
     expect(estimateBody).not.toHaveProperty('pricing_context');
   });
+
+  it('forwards pricing context when provided', async () => {
+    mockAuthFetch.mockResolvedValueOnce(okJson({ projected_max_hold: 44 }));
+
+    function Harness() {
+      useEstimatedCost({
+        workflowName: 'human_fix_photoshoot',
+        pricingContext: { image_size: '1K' },
+      });
+      return null;
+    }
+
+    await act(async () => {
+      root.render(<Harness />);
+    });
+
+    const estimateBody = JSON.parse(mockAuthFetch.mock.calls[0][1].body);
+    expect(estimateBody).toEqual({
+      workflow_name: 'human_fix_photoshoot',
+      num_variations: 1,
+      pricing_context: { image_size: '1K' },
+    });
+  });
 });
