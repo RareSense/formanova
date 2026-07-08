@@ -75,7 +75,13 @@ describe('useEstimatedCost', () => {
     function Harness() {
       useEstimatedCost({
         workflowName: 'human_fix_photoshoot',
-        pricingContext: { image_size: '1K' },
+        pricingContext: {
+          image_size: '4K',
+          effort: 'high',
+          shot_type: 'model_shot',
+          workflow_id: 'wf-123',
+          source_asset_id: 'asset-123',
+        },
       });
       return null;
     }
@@ -88,7 +94,13 @@ describe('useEstimatedCost', () => {
     expect(estimateBody).toEqual({
       workflow_name: 'human_fix_photoshoot',
       num_variations: 1,
-      pricing_context: { image_size: '1K' },
+      pricing_context: {
+        image_size: '4K',
+        effort: 'high',
+        shot_type: 'model_shot',
+        workflow_id: 'wf-123',
+        source_asset_id: 'asset-123',
+      },
     });
   });
 });
