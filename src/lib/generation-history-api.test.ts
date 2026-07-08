@@ -188,6 +188,15 @@ describe('resolveSourceType', () => {
     expect(resolveSourceType('product_fix', 'fix')).toBe('product_shot');
   });
 
+  it('classifies High Effort (higher_tier) by name even if the backend mislabels it', () => {
+    // Backend label is wrong/unknown, but the higher_tier name is authoritative:
+    // model high -> model-shot section, product high -> product-shot section.
+    expect(resolveSourceType('product_shot', 'jewelry_photoshoots_generator_higher_tier')).toBe('photo');
+    expect(resolveSourceType('unknown', 'fix_model_shot_higher_tier')).toBe('photo');
+    expect(resolveSourceType('model_shot', 'Product_shot_pipeline_higher_tier')).toBe('product_shot');
+    expect(resolveSourceType('cad_text', 'fix_product_shot_higher_tier_4k')).toBe('product_shot');
+  });
+
   it('falls back to name parsing when the field is absent', () => {
     expect(resolveSourceType(undefined, 'jewelry_photoshoots_generator')).toBe('photo');
     expect(resolveSourceType(null, 'Product_shot_pipeline')).toBe('product_shot');
