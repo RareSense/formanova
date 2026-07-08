@@ -13,7 +13,6 @@ import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
 import { ModelGuideModal } from '@/components/studio/ModelGuideModal';
 import { UploadGuideModal } from '@/components/studio/UploadGuideModal';
 import { ProductShotGuideModal } from '@/components/studio/ProductShotGuideModal';
-import { EffortIntroModal } from '@/components/studio/EffortIntroModal';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
 import { type Resolution } from '@/components/studio/OutputSettingsPills';
 import { type EffortLevel } from '@/components/studio/EffortToggle';
@@ -159,15 +158,6 @@ export default function UnifiedStudio() {
     setEffort(v);
     localStorage.setItem('formanova_studio_effort', v);
   };
-  // First-time effort chooser: shown once on model-shot entry so users make a
-  // deliberate Low/High choice up front (saved to the same effort toggle). The
-  // "don't show again" checkbox sets the seen flag; product shot never triggers it.
-  const [showEffortIntro, setShowEffortIntro] = useState(false);
-  const handleEffortIntroConfirm = (chosen: EffortLevel, dontShowAgain: boolean) => {
-    handleEffortChange(chosen);
-    if (dontShowAgain) localStorage.setItem('formanova_effort_intro_seen', 'true');
-    setShowEffortIntro(false);
-  };
   // High Effort is available to all users (rollout flag removed post-staging).
   const effectiveEffort: EffortLevel = effort;
   // High Effort supporting-angle images (primary + up to 2 = 3 total). Lifted here
@@ -278,18 +268,6 @@ export default function UnifiedStudio() {
     hasCheckedUploadGuide,
     hasCheckedProductShotGuide,
   } = useStudioOnboarding({ currentStep, isProductShot, user, initializing });
-
-  // First-time effort chooser trigger. Step 1 for both model and product shots,
-  // once ever. Yields to the onboarding guide modals (upload/product) so two
-  // dialogs never stack: the short defer lets the guide's async open decision
-  // win; if a guide is (or becomes) open the effect bails and re-runs when it closes.
-  useEffect(() => {
-    if (currentStep !== 'upload') return;
-    if (uploadGuideOpen || productShotGuideOpen) return;
-    if (localStorage.getItem('formanova_effort_intro_seen')) return;
-    const t = setTimeout(() => setShowEffortIntro(true), 400);
-    return () => clearTimeout(t);
-  }, [currentStep, uploadGuideOpen, productShotGuideOpen]);
 
   const activeModelUrl = customModelImage || selectedModel?.url || null;
   const resolvedJewelryImage = useAuthenticatedImage(jewelryImage);
@@ -786,11 +764,6 @@ export default function UnifiedStudio() {
         onClose={() => setModelGuideOpen(false)}
       />
 
-      <EffortIntroModal
-        open={showEffortIntro}
-        defaultEffort={effort}
-        onConfirm={handleEffortIntroConfirm}
-      />
 
       {(
         <StudioTestMenu

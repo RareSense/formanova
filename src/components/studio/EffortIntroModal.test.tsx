@@ -21,6 +21,16 @@ describe('EffortIntroModal', () => {
     expect(onConfirm).toHaveBeenCalledWith('high', true);
   });
 
+  it('dismissing via the close (X) calls onDismiss, not onConfirm', () => {
+    const onConfirm = vi.fn();
+    const onDismiss = vi.fn();
+    render(<EffortIntroModal open defaultEffort="low" onConfirm={onConfirm} onDismiss={onDismiss} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /close/i }));
+    expect(onDismiss).toHaveBeenCalled();
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
   it('passes dontShowAgain=false when the checkbox is unticked', () => {
     const onConfirm = vi.fn();
     render(<EffortIntroModal open defaultEffort="high" onConfirm={onConfirm} />);

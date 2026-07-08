@@ -26,18 +26,22 @@ interface Props {
   open: boolean;
   defaultEffort: EffortLevel;
   onConfirm: (effort: EffortLevel, dontShowAgain: boolean) => void;
+  /** Dismiss without choosing (X / Escape / click-outside). When the popup gates a
+   *  navigation this means "cancel, stay here". If omitted, a dismiss is treated as
+   *  a confirm with the current selection. */
+  onDismiss?: () => void;
 }
 
 const LEVELS: EffortLevel[] = ['low', 'high'];
 
-export function EffortIntroModal({ open, defaultEffort, onConfirm }: Props) {
+export function EffortIntroModal({ open, defaultEffort, onConfirm, onDismiss }: Props) {
   const [selected, setSelected] = useState<EffortLevel>(defaultEffort);
   const [dontShowAgain, setDontShowAgain] = useState(true);
 
   const confirm = () => onConfirm(selected, dontShowAgain);
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) confirm(); }}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) (onDismiss ?? confirm)(); }}>
       <DialogContent className="max-w-lg w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto p-0 rounded-none sm:rounded-none shadow-none">
         <div className="flex flex-col px-6 sm:px-12 pt-12 pb-10">
           {/* Title */}
