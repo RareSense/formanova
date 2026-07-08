@@ -91,8 +91,11 @@ export const GenerationsContext = createContext<GenerationsContextValue | null>(
 
 function normalizeResultImage(value: string): string | null {
   if (!value) return null;
-  if (value.startsWith('azure://')) return azureUriToUrl(value);
-  if (value.startsWith('http') || value.startsWith('data:') || value.startsWith('blob:')) return value;
+  // Route every candidate through azureUriToUrl so a content-addressed blob URL
+  // (azure:// OR a raw https blob host) collapses to the same-origin artifact
+  // proxy. data:/blob:/non-artifact URLs pass through unchanged.
+  if (value.startsWith('azure://') || value.startsWith('http')) return azureUriToUrl(value);
+  if (value.startsWith('data:') || value.startsWith('blob:')) return value;
   return null;
 }
 
