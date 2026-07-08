@@ -357,9 +357,14 @@ export function inferSourceType(name: string): SourceType {
   // Post-generation upscales surface as their own photo entries in history.
   if (lower.includes('upscale')) return 'photo';
 
-  // Photo workflows (jewelry photoshoot, masking, flux gen, etc.)
+  // Photo workflows (jewelry photoshoot, masking, flux gen, etc.). Includes
+  // model_shot so High Effort model runs and their fixes classify here even when
+  // the backend source_type is unrecognized: the generate name carries 'photo'/
+  // 'jewelry', but 'fix_model_shot_higher_tier' has neither, so match model_shot.
   if (
     lower.includes('photo') ||
+    lower.includes('model_shot') ||
+    lower.includes('model-shot') ||
     lower.includes('masking') ||
     lower.includes('flux') ||
     lower.includes('necklace') ||
