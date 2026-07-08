@@ -1,19 +1,25 @@
 /**
  * EffortIntroModal
  *
- * First-time-only popup shown when a user enters the model-shot studio. Lets them
- * pick Low (standard) vs High effort up front; the choice is saved to the same
- * studio effort toggle (localStorage 'formanova_studio_effort'), so it is not a
- * separate setting. A "Don't show this again" checkbox (default on) suppresses it
- * for good. Users can always change effort later via the in-studio EffortToggle.
+ * First-time-only popup shown when a user enters Step 1 of the studio (model or
+ * product shot). Lets them pick Low (standard) vs High effort up front; the choice
+ * is saved to the same studio effort toggle (localStorage 'formanova_studio_effort'),
+ * so it is not a separate setting. A "Don't show this again" checkbox (default on)
+ * suppresses it for good. Users can always change effort later via the in-studio
+ * EffortToggle.
  *
  * Presentation only: the parent (UnifiedStudio) owns the seen-flag + persistence.
- * Matches the existing guide-modal dialog design (see ProductShotGuideModal).
+ *
+ * Layout: a single centered column with equal horizontal padding on every row, so
+ * the two divider rules, the title/subtitle, the effort selector, the checkbox and
+ * the CTA all share one alignment spine. Colors come from theme tokens (primary for
+ * the active High segment + CTA), so it reads correctly across all 12 themes.
  */
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Sparkles, Zap } from 'lucide-react';
+import { Info, Check } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { EffortLevel } from '@/components/studio/EffortToggle';
 
 interface Props {
@@ -22,96 +28,94 @@ interface Props {
   onConfirm: (effort: EffortLevel, dontShowAgain: boolean) => void;
 }
 
-interface OptionCardProps {
-  active: boolean;
-  onSelect: () => void;
-  icon: React.ReactNode;
-  label: string;
-  description: string;
-  highlight?: boolean;
-}
-
-function OptionCard({ active, onSelect, icon, label, description, highlight }: OptionCardProps) {
-  return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={active}
-      onClick={onSelect}
-      className={`flex flex-col items-start gap-2 p-4 border-2 text-left transition-all focus:outline-none
-        ${active
-          ? highlight
-            ? 'border-primary bg-primary/5 shadow-[0_0_16px_-6px_hsl(var(--primary)/0.6)]'
-            : 'border-foreground bg-foreground/5'
-          : 'border-border/60 hover:border-foreground/40'}`}
-    >
-      <div className="flex items-center gap-2">
-        <span className={active && highlight ? 'text-primary' : 'text-foreground'}>{icon}</span>
-        <span className="font-display text-lg uppercase tracking-wide">{label}</span>
-      </div>
-      <p className="text-sm text-muted-foreground leading-snug">{description}</p>
-    </button>
-  );
-}
+const LEVELS: EffortLevel[] = ['low', 'high'];
 
 export function EffortIntroModal({ open, defaultEffort, onConfirm }: Props) {
   const [selected, setSelected] = useState<EffortLevel>(defaultEffort);
   const [dontShowAgain, setDontShowAgain] = useState(true);
 
+  const confirm = () => onConfirm(selected, dontShowAgain);
+
   return (
-    <Dialog open={open} onOpenChange={() => {}}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) confirm(); }}>
       <DialogContent
-        className="w-[calc(100vw-2rem)] max-w-md p-0 flex flex-col overflow-hidden gap-0 [&>button:last-of-type]:hidden"
+        className="max-w-lg w-[calc(100vw-2rem)] p-0 overflow-hidden rounded-none sm:rounded-none"
         onInteractOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={(e) => e.preventDefault()}
       >
-        {/* Header */}
-        <div className="px-5 sm:px-6 py-4 border-b border-border">
-          <DialogTitle className="font-display text-xl sm:text-2xl uppercase tracking-wide">
-            Standard or high effort?
+        <div className="flex flex-col px-6 sm:px-10 pt-10 pb-8">
+          {/* Title */}
+          <DialogTitle className="mx-auto max-w-md text-center font-display text-2xl sm:text-3xl uppercase tracking-tight leading-tight [text-shadow:none]">
+            Do you want to generate with low effort or high effort?
           </DialogTitle>
-          <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
-            High effort means we try more to make a better image, but it also costs you more.
+
+          {/* Subtitle */}
+          <p className="mx-auto mt-4 max-w-sm text-center text-sm sm:text-base leading-relaxed text-muted-foreground">
+            High effort means we try more to make a better image, but also cost you more.
           </p>
-        </div>
 
-        {/* Options */}
-        <div className="px-5 sm:px-6 py-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <OptionCard
-            active={selected === 'low'}
-            onSelect={() => setSelected('low')}
-            icon={<Zap className="h-5 w-5" />}
-            label="Low"
-            description="Standard effort. Faster and costs less."
-          />
-          <OptionCard
-            active={selected === 'high'}
-            onSelect={() => setSelected('high')}
-            icon={<Sparkles className="h-5 w-5" />}
-            label="High"
-            description="We try harder for a better image. Costs more."
-            highlight
-          />
-        </div>
+          {/* Effort selector — label + segmented pill, centered as one unit */}
+          <div className="mt-9 flex items-center justify-center gap-4 sm:gap-5">
+            <span className="font-mono text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              Effort
+            </span>
+            <div
+              role="radiogroup"
+              aria-label="Effort mode"
+              className="inline-flex items-center rounded-full border border-border/60 bg-muted p-1"
+            >
+              {LEVELS.map((level) => {
+                const active = selected === level;
+                return (
+                  <button
+                    key={level}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => setSelected(level)}
+                    className={cn(
+                      'min-w-[100px] rounded-full px-6 py-2.5 text-sm font-bold uppercase tracking-widest transition-all',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                      active
+                        ? level === 'high'
+                          ? 'bg-primary text-primary-foreground shadow-[0_0_16px_-4px_hsl(var(--primary)/0.6)]'
+                          : 'bg-background text-foreground shadow'
+                        : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {level === 'high' ? 'High' : 'Low'}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
-        {/* Footer */}
-        <div className="px-5 sm:px-6 py-4 border-t border-border flex items-center justify-between gap-4">
+          {/* Helper line */}
+          <div className="mt-4 flex items-center justify-center gap-2">
+            <Info className="h-4 w-4 shrink-0 text-primary" />
+            <span className="text-sm text-muted-foreground">You can always change this setting in Studio.</span>
+          </div>
+
+          {/* Don't show again */}
           <button
             type="button"
             onClick={() => setDontShowAgain((v) => !v)}
-            className="inline-flex items-center gap-2 focus:outline-none group"
+            className="group mx-auto mt-9 flex items-center gap-3 focus:outline-none"
           >
-            <span className={`h-5 w-5 shrink-0 border-2 flex items-center justify-center transition-colors
-              ${dontShowAgain ? 'bg-primary border-primary' : 'bg-background border-foreground group-hover:border-primary'}`}>
-              {dontShowAgain && (
-                <svg className="h-3 w-3 text-primary-foreground" viewBox="0 0 10 8" fill="none">
-                  <path d="M1 4l3 3 5-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+            <span
+              className={cn(
+                'flex h-5 w-5 shrink-0 items-center justify-center border-2 transition-colors',
+                dontShowAgain
+                  ? 'border-primary bg-primary'
+                  : 'border-foreground/40 bg-background group-hover:border-primary',
               )}
+            >
+              {dontShowAgain && <Check className="h-3.5 w-3.5 text-primary-foreground" strokeWidth={3} />}
             </span>
-            <span className="text-sm text-muted-foreground leading-snug">Don't show this again</span>
+            <span className="text-sm text-foreground">Don't show this again</span>
           </button>
-          <Button size="default" className="min-w-[110px]" onClick={() => onConfirm(selected, dontShowAgain)}>
+
+          {/* CTA */}
+          <Button size="lg" className="mt-6 h-12 w-full text-base font-semibold" onClick={confirm}>
             Continue
           </Button>
         </div>
