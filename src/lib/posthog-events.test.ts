@@ -27,11 +27,6 @@ import {
   trackFeedbackModalOpened,
   trackFeedbackSubmitted,
   setUserProfession,
-  getCoachmarkVariant,
-  getEligibleCoachmarkVariant,
-  isCoachmarkEligible,
-  markStarterPackForCoachmark,
-  suppressCoachmark,
   trackUpscaleStarted,
   trackUpscaleCompleted,
   trackUpscalePaywallHit,
@@ -75,82 +70,6 @@ describe('__loaded guard', () => {
   })
 })
 
-// ── getCoachmarkVariant (A/B experiment) ────────────────────────────
-
-describe('getCoachmarkVariant', () => {
-  it('returns the flag variant when loaded and identified', () => {
-    ;(posthog as any).__loaded = true
-    ;(posthog._isIdentified as any).mockReturnValue(true)
-    ;(posthog.getFeatureFlag as any).mockReturnValue('treatment')
-    expect(getCoachmarkVariant()).toBe('treatment')
-    expect(posthog.getFeatureFlag).toHaveBeenCalledWith('coachmark-experiment')
-  })
-
-  it('passes through the control variant unchanged', () => {
-    ;(posthog._isIdentified as any).mockReturnValue(true)
-    ;(posthog.getFeatureFlag as any).mockReturnValue('control')
-    expect(getCoachmarkVariant()).toBe('control')
-  })
-
-  it('returns undefined and never reads the flag when not identified', () => {
-    ;(posthog._isIdentified as any).mockReturnValue(false)
-    expect(getCoachmarkVariant()).toBeUndefined()
-    expect(posthog.getFeatureFlag).not.toHaveBeenCalled()
-  })
-
-  it('returns undefined and never reads the flag when posthog is not loaded', () => {
-    ;(posthog as any).__loaded = false
-    ;(posthog._isIdentified as any).mockReturnValue(true)
-    expect(getCoachmarkVariant()).toBeUndefined()
-    expect(posthog.getFeatureFlag).not.toHaveBeenCalled()
-    ;(posthog as any).__loaded = true
-  })
-})
-
-// --- Coachmark eligibility (localStorage targeting) ---
-
-describe('coachmark eligibility', () => {
-  it('is not eligible by default (no starter pack purchased)', () => {
-    expect(isCoachmarkEligible()).toBe(false)
-  })
-
-  it('becomes eligible after a starter pack purchase', () => {
-    markStarterPackForCoachmark()
-    expect(isCoachmarkEligible()).toBe(true)
-  })
-
-  it('is no longer eligible once suppressed, even with a starter pack', () => {
-    markStarterPackForCoachmark()
-    suppressCoachmark()
-    expect(isCoachmarkEligible()).toBe(false)
-  })
-})
-
-describe('getEligibleCoachmarkVariant', () => {
-  it('returns undefined and never reads the flag when not eligible', () => {
-    ;(posthog._isIdentified as any).mockReturnValue(true)
-    ;(posthog.getFeatureFlag as any).mockReturnValue('treatment')
-    expect(getEligibleCoachmarkVariant()).toBeUndefined()
-    expect(posthog.getFeatureFlag).not.toHaveBeenCalled()
-  })
-
-  it('returns the variant for an eligible, identified user', () => {
-    markStarterPackForCoachmark()
-    ;(posthog._isIdentified as any).mockReturnValue(true)
-    ;(posthog.getFeatureFlag as any).mockReturnValue('treatment')
-    expect(getEligibleCoachmarkVariant()).toBe('treatment')
-    expect(posthog.getFeatureFlag).toHaveBeenCalledWith('coachmark-experiment')
-  })
-
-  it('returns undefined and never reads the flag once the user is suppressed', () => {
-    markStarterPackForCoachmark()
-    suppressCoachmark()
-    ;(posthog._isIdentified as any).mockReturnValue(true)
-    ;(posthog.getFeatureFlag as any).mockReturnValue('treatment')
-    expect(getEligibleCoachmarkVariant()).toBeUndefined()
-    expect(posthog.getFeatureFlag).not.toHaveBeenCalled()
-  })
-})
 
 // ── New event functions ─────────────────────────────────────────────
 
@@ -282,6 +201,35 @@ describe('trackGenerationComplete', () => {
     expect(posthog.capture).toHaveBeenCalledWith('generation_completed', expect.objectContaining({
       upload_type: null,
     }))
+  })
+
+  it('includes effort and jewelry_image_count when provided (high effort, 3 images)', () => {
+    trackGenerationComplete({
+      source: 'unified-studio',
+      category: 'ring',
+      upload_type: null,
+      duration_ms: 3000,
+      is_first_ever: false,
+      effort: 'high',
+      jewelry_image_count: 3,
+    })
+    expect(posthog.capture).toHaveBeenCalledWith('generation_completed', expect.objectContaining({
+      effort: 'high',
+      jewelry_image_count: 3,
+    }))
+  })
+
+  it('omits effort and jewelry_image_count when not provided (e.g. upscale completion)', () => {
+    trackGenerationComplete({
+      source: 'unified-studio',
+      category: 'ring',
+      upload_type: null,
+      duration_ms: 3000,
+      is_first_ever: false,
+    })
+    const props = (posthog.capture as ReturnType<typeof vi.fn>).mock.calls.at(-1)![1]
+    expect(props).not.toHaveProperty('effort')
+    expect(props).not.toHaveProperty('jewelry_image_count')
   })
 
   it('includes aspect_ratio and resolution when provided', () => {

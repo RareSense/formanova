@@ -35,12 +35,21 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StudioVaultUploadStep } from '@/components/studio/StudioVaultUploadStep';
+import type { EffortLevel } from '@/components/studio/EffortToggle';
+import type { SupportingImage } from '@/hooks/useSupportingImages';
 import { CATEGORY_EXAMPLES } from '@/lib/studio-examples';
 import type { AuthUser } from '@/lib/auth-api';
 
 interface StudioUploadStepProps {
   user: AuthUser | null;
   isProductShot: boolean;
+  effort: EffortLevel;
+  onEffortChange: (v: EffortLevel) => void;
+  effortModeEnabled: boolean;
+  supportingImages: SupportingImage[];
+  addSupportingImages: (files: File[]) => void;
+  setVaultSupporting: (entries: { url: string; assetId: string }[]) => void;
+  removeSupportingImage: (index: number) => void;
   effectiveJewelryType: string;
   exampleCategoryType: string;
   currentStep: string;
@@ -64,6 +73,13 @@ interface StudioUploadStepProps {
 export function StudioUploadStep({
   user,
   isProductShot,
+  effort,
+  onEffortChange,
+  effortModeEnabled,
+  supportingImages,
+  addSupportingImages,
+  setVaultSupporting,
+  removeSupportingImage,
   effectiveJewelryType,
   exampleCategoryType,
   currentStep,
@@ -114,11 +130,20 @@ export function StudioUploadStep({
               onNextStep={handleNextStep}
               onCategoryChange={(cat) => setOverrideJewelryType(cat)}
               isProductShot={isProductShot}
-              onProductSelect={(thumbnailUrl, assetId) => {
+              effort={effort}
+              onEffortChange={onEffortChange}
+              effortModeEnabled={effortModeEnabled}
+              supportingImages={supportingImages}
+              addSupportingImages={addSupportingImages}
+              removeSupportingImage={removeSupportingImage}
+              onProductSelect={(thumbnailUrl, assetId, supportingMembers) => {
                 setJewelryImage(thumbnailUrl);
                 setJewelryUploadedUrl(thumbnailUrl);
                 setJewelryAssetId(assetId);
                 setJewelryFile(null);
+                // Grouped set: load its other angles as reusable vault supporting
+                // entries. Ungrouped product: clear any lingering angles.
+                setVaultSupporting(supportingMembers ?? []);
               }}
             />
           ) : (

@@ -57,6 +57,8 @@ interface Props {
   workflowId: string | null;
   jewelryImageUrl: string | null;   // Azure/API URL — used in the feedback payload
   jewelryDisplayUrl: string | null; // Local data/blob URL — used for the thumbnail
+  /** High Effort: all jewelry angle URLs (cover first). Attached in place of the single cover. */
+  jewelryInputUrls?: string[];
   modelImageUrl: string | null;
   resultImageUrl: string | null;
   category: FeedbackCategory;
@@ -70,6 +72,7 @@ export function FeedbackModal({
   workflowId,
   jewelryImageUrl,
   jewelryDisplayUrl,
+  jewelryInputUrls,
   modelImageUrl,
   resultImageUrl,
   category,
@@ -108,8 +111,13 @@ export function FeedbackModal({
       return;
     }
 
+    // High Effort attaches every jewelry angle (cover first); low effort attaches the
+    // single cover. The model/inspiration reference and output are attached in both.
     const inputUrls: string[] = [];
-    if (jewelryImageUrl) inputUrls.push(jewelryImageUrl);
+    const jewelryUrls = (jewelryInputUrls && jewelryInputUrls.length)
+      ? jewelryInputUrls
+      : (jewelryImageUrl ? [jewelryImageUrl] : []);
+    jewelryUrls.forEach((u) => inputUrls.push(u));
     if (normalizedReferenceUrl) inputUrls.push(normalizedReferenceUrl);
 
     setSubmitting(true);
@@ -137,7 +145,16 @@ export function FeedbackModal({
     }
   };
 
-  const hasImages = jewelryDisplayUrl || modelImageUrl || resultImageUrl;
+  // Thumbnails: High Effort shows every jewelry angle attached, then the reference, then
+  // the result. Low effort shows the single cover. Mirrors what handleSubmit attaches.
+  const angleThumbs = (jewelryInputUrls && jewelryInputUrls.length)
+    ? jewelryInputUrls
+    : (jewelryDisplayUrl ? [jewelryDisplayUrl] : []);
+  const thumbItems: { url: string | null; label: string }[] = [];
+  angleThumbs.forEach((u, i) => thumbItems.push({ url: u, label: angleThumbs.length > 1 ? `Jewelry ${i + 1}` : 'Jewelry input' }));
+  if (normalizedReferenceUrl) thumbItems.push({ url: normalizedReferenceUrl, label: 'Reference input' });
+  if (resultImageUrl) thumbItems.push({ url: resultImageUrl, label: 'Result' });
+  const hasImages = thumbItems.length > 0;
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose(); }}>
@@ -172,12 +189,15 @@ export function FeedbackModal({
               </DialogTitle>
             </div>
 
-            {/* Images */}
+            {/* Images - up to 3 per row so an angle set + reference + result stay uncramped */}
             {hasImages && (
-              <div className="flex gap-3">
-                <Thumbnail url={jewelryDisplayUrl} label="Jewelry input" />
-                <Thumbnail url={normalizedReferenceUrl} label="Reference input" />
-                <Thumbnail url={resultImageUrl} label="Result" />
+              <div
+                className="grid gap-2"
+                style={{ gridTemplateColumns: `repeat(${Math.min(thumbItems.length, 3)}, minmax(0, 1fr))` }}
+              >
+                {thumbItems.map((t, i) => (
+                  <Thumbnail key={`${t.label}-${i}`} url={t.url} label={t.label} />
+                ))}
               </div>
             )}
 

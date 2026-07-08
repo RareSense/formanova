@@ -357,9 +357,14 @@ export function inferSourceType(name: string): SourceType {
   // Post-generation upscales surface as their own photo entries in history.
   if (lower.includes('upscale')) return 'photo';
 
-  // Photo workflows (jewelry photoshoot, masking, flux gen, etc.)
+  // Photo workflows (jewelry photoshoot, masking, flux gen, etc.). Includes
+  // model_shot so High Effort model runs and their fixes classify here even when
+  // the backend source_type is unrecognized: the generate name carries 'photo'/
+  // 'jewelry', but 'fix_model_shot_higher_tier' has neither, so match model_shot.
   if (
     lower.includes('photo') ||
+    lower.includes('model_shot') ||
+    lower.includes('model-shot') ||
     lower.includes('masking') ||
     lower.includes('flux') ||
     lower.includes('necklace') ||
@@ -401,6 +406,14 @@ const BACKEND_SOURCE_TYPE_MAP: Record<string, SourceType> = {
  * we do exactly what we did before, so nothing that classified before can regress.
  */
 export function resolveSourceType(rawSourceType: unknown, workflowName: string): SourceType {
+  // High Effort ("higher_tier") runs are classified by their workflow name, which
+  // is unambiguous (jewelry_photoshoots_generator_higher_tier -> photo,
+  // Product_shot_pipeline_higher_tier -> product_shot, likewise the fixes). Name
+  // wins here so these always land in their shot-type section like the normal
+  // flows, even if the backend source_type is missing OR mislabeled.
+  if ((workflowName ?? '').toLowerCase().includes('higher_tier')) {
+    return inferSourceType(workflowName);
+  }
   if (typeof rawSourceType === 'string') {
     const mapped = BACKEND_SOURCE_TYPE_MAP[rawSourceType];
     if (mapped) return mapped;

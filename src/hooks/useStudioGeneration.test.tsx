@@ -16,9 +16,37 @@ vi.mock('@/lib/photoshoot-api', () => ({
     isProductShot ? 'Product_shot_pipeline' : 'jewelry_photoshoots_generator',
   fixWorkflowFor: (isProductShot: boolean) =>
     isProductShot ? 'fix_product_shot' : 'fix_model_shot',
+  // Effort-aware generate resolver: low → unsuffixed; high → higher-tier names
+  // (on-model splits 4K, PDP is one name across tiers). Mirrors photoshoot-api.
+  workflowFor: (isProductShot: boolean, resolution: string, effort: string = 'low') => {
+    if (effort === 'high') {
+      if (isProductShot) return 'Product_shot_pipeline_higher_tier';
+      return resolution === '4K'
+        ? 'jewelry_photoshoots_generator_higher_tier_4k'
+        : 'jewelry_photoshoots_generator_higher_tier';
+    }
+    return isProductShot ? 'Product_shot_pipeline' : 'jewelry_photoshoots_generator';
+  },
+  buildJewelryRequestFields: (opts: {
+    effort: string;
+    coverUrl: string;
+    coverAssetId: string | null;
+    supporting: Array<{ url: string | null; assetId: string | null }>;
+  }) => {
+    if (opts.effort !== 'high') {
+      return opts.coverAssetId ? { input_jewelry_asset_id: opts.coverAssetId } : {};
+    }
+    const urls = [opts.coverUrl, ...opts.supporting.map((s) => s.url)].filter(Boolean);
+    const ids = [opts.coverAssetId, ...opts.supporting.map((s) => s.assetId)].filter(Boolean);
+    return { tier: 'high', jewelry_image_urls: urls, input_jewelry_asset_ids: ids };
+  },
 }));
 vi.mock('@/lib/authenticated-fetch', () => ({ authenticatedFetch: vi.fn() }));
-vi.mock('@/lib/microservices-api', () => ({ uploadToAzure: vi.fn() }));
+vi.mock('@/lib/microservices-api', () => ({
+  uploadToAzure: vi.fn(),
+  bulkUploadJewelry: vi.fn(),
+  MAX_BULK_JEWELRY_FILES: 3,
+}));
 vi.mock('@/lib/image-compression', () => ({
   compressImageBlob: vi.fn().mockResolvedValue({ blob: new Blob() }),
   imageSourceToBlob: vi.fn().mockResolvedValue(new Blob()),
@@ -37,12 +65,14 @@ vi.mock('@/lib/posthog-events', () => ({
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: vi.fn() }) }));
 
 import { startPhotoshoot, startFixShot } from '@/lib/photoshoot-api';
+import { bulkUploadJewelry } from '@/lib/microservices-api';
 import { markGenerationStarted } from '@/lib/generation-lifecycle';
 import { trackGenerationComplete } from '@/lib/posthog-events';
 import { useStudioGeneration } from './useStudioGeneration';
 
 const mockStartPhotoshoot = vi.mocked(startPhotoshoot);
 const mockStartFixShot = vi.mocked(startFixShot);
+const mockBulkUploadJewelry = vi.mocked(bulkUploadJewelry);
 const mockMarkGenerationStarted = vi.mocked(markGenerationStarted);
 
 // ── Context helpers ────────────────────────────────────────────────────────
@@ -92,6 +122,9 @@ function baseOptions() {
     aspectRatio: '3:4',
     resolution: '1K' as const,
     generationCost: 10,
+    effort: 'low' as const,
+    supportingItems: [],
+    jewelryFile: null,
     checkCredits: mockCheckCredits,
     toast: vi.fn(),
     setCurrentStep: mockSetCurrentStep,
@@ -129,6 +162,97 @@ describe('useStudioGeneration', () => {
     });
     expect(mockMarkGenerationStarted).toHaveBeenCalledWith('wf-test-1');
     expect(mockSetCurrentStep).toHaveBeenCalledWith('generating');
+  });
+
+  it('High effort with supporting files bulk-uploads the set and sends cover-first arrays', async () => {
+    const ctx = makeContextValue();
+    mockStartPhotoshoot.mockResolvedValue({ workflow_id: 'wf-bulk', status_url: '', result_url: '' });
+    mockBulkUploadJewelry.mockResolvedValue({
+      jewelry: [
+        { asset_id: 'id-a', uri: 'azure://a', sha256: 'sa' },
+        { asset_id: 'id-b', uri: 'azure://b', sha256: 'sb' },
+      ],
+      model: [],
+      background: [],
+      input_group_id: 'grp-1',
+    });
+
+    const cover = new File(['c'], 'cover.png', { type: 'image/png' });
+    const support = new File(['s'], 'support.png', { type: 'image/png' });
+
+    const { result } = renderHook(
+      () => useStudioGeneration({ ...baseOptions(), effort: 'high' as const, jewelryFile: cover, supportingItems: [{ file: support }] }),
+      { wrapper: wrapper(ctx) },
+    );
+
+    await act(async () => { await result.current.handleGenerate(); });
+
+    expect(mockBulkUploadJewelry).toHaveBeenCalledTimes(1);
+    const startArg = mockStartPhotoshoot.mock.calls[0][0] as Record<string, unknown>;
+    expect(startArg.jewelry_image_urls).toEqual(['azure://a', 'azure://b']);
+    expect(startArg.input_jewelry_asset_ids).toEqual(['id-a', 'id-b']);
+  });
+
+  it('High effort with an all-vault set reuses member urls/ids and uploads nothing', async () => {
+    const ctx = makeContextValue();
+    mockStartPhotoshoot.mockResolvedValue({ workflow_id: 'wf-vault', status_url: '', result_url: '' });
+
+    // Cover came from the vault (no jewelryFile); supporting angles are vault
+    // members too. Nothing should be bulk-uploaded; the run gets the existing
+    // cover-first urls/ids as-is.
+    const { result } = renderHook(
+      () => useStudioGeneration({
+        ...baseOptions(),
+        effort: 'high' as const,
+        jewelryFile: null,
+        jewelryUploadedUrl: 'azure://cover',
+        jewelryAssetId: 'id-cover',
+        supportingItems: [
+          { url: 'azure://m2', assetId: 'id-m2' },
+          { url: 'azure://m3', assetId: 'id-m3' },
+        ],
+      }),
+      { wrapper: wrapper(ctx) },
+    );
+
+    await act(async () => { await result.current.handleGenerate(); });
+
+    expect(mockBulkUploadJewelry).not.toHaveBeenCalled();
+    const startArg = mockStartPhotoshoot.mock.calls[0][0] as Record<string, unknown>;
+    expect(startArg.jewelry_image_urls).toEqual(['azure://cover', 'azure://m2', 'azure://m3']);
+    expect(startArg.input_jewelry_asset_ids).toEqual(['id-cover', 'id-m2', 'id-m3']);
+  });
+
+  it('High effort mixing a vault cover with a fresh supporting file uploads only the fresh one', async () => {
+    const ctx = makeContextValue();
+    mockStartPhotoshoot.mockResolvedValue({ workflow_id: 'wf-mixed', status_url: '', result_url: '' });
+    mockBulkUploadJewelry.mockResolvedValue({
+      jewelry: [{ asset_id: 'id-fresh', uri: 'azure://fresh', sha256: 'sf' }],
+      model: [],
+      background: [],
+      input_group_id: 'grp-mixed',
+    });
+
+    const support = new File(['s'], 'support.png', { type: 'image/png' });
+
+    const { result } = renderHook(
+      () => useStudioGeneration({
+        ...baseOptions(),
+        effort: 'high' as const,
+        jewelryFile: null,
+        jewelryUploadedUrl: 'azure://cover',
+        jewelryAssetId: 'id-cover',
+        supportingItems: [{ file: support }],
+      }),
+      { wrapper: wrapper(ctx) },
+    );
+
+    await act(async () => { await result.current.handleGenerate(); });
+
+    expect(mockBulkUploadJewelry).toHaveBeenCalledTimes(1);
+    const startArg = mockStartPhotoshoot.mock.calls[0][0] as Record<string, unknown>;
+    expect(startArg.jewelry_image_urls).toEqual(['azure://cover', 'azure://fresh']);
+    expect(startArg.input_jewelry_asset_ids).toEqual(['id-cover', 'id-fresh']);
   });
 
   it('passes the resolution tier as pricingContext.image_size to the credit gate', async () => {
@@ -341,6 +465,11 @@ describe('useStudioGeneration', () => {
       aspectRatio: '3:4',
       resolution: '1K',
       generationCost: 10,
+      // Exposed for the input previews (spinner / fix / feedback). Low effort:
+      // single-entry jewelry set, effort 'low', reference = the model url.
+      jewelryUrls: ['https://example.com/jewelry.jpg'],
+      effort: 'low',
+      referenceModelUrl: 'https://example.com/model.jpg',
     });
   });
 
@@ -417,6 +546,9 @@ describe('useStudioGeneration', () => {
       aspectRatio: '3:4',
       resolution: '4K',
       generationCost: 25,
+      jewelryUrls: ['https://example.com/jewelry.jpg'],
+      effort: 'low',
+      referenceModelUrl: 'https://example.com/model-a.jpg',
     });
 
     act(() => { result.current.handleKeepBrowsing(); });

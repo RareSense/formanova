@@ -15,8 +15,10 @@ import { UploadGuideModal } from '@/components/studio/UploadGuideModal';
 import { ProductShotGuideModal } from '@/components/studio/ProductShotGuideModal';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
 import { type Resolution } from '@/components/studio/OutputSettingsPills';
+import { type EffortLevel } from '@/components/studio/EffortToggle';
+import { workflowFor } from '@/lib/photoshoot-api';
+import { useSupportingImages } from '@/hooks/useSupportingImages';
 import { useGenerationCost } from '@/hooks/useGenerationCost';
-import { generateWorkflowFor } from '@/lib/photoshoot-api';
 import { useStudioOnboarding } from '@/hooks/useStudioOnboarding';
 import { useStudioModels } from '@/hooks/useStudioModels';
 import { useStudioGeneration } from '@/hooks/useStudioGeneration';
@@ -145,8 +147,35 @@ export default function UnifiedStudio() {
     setResolution(v);
     sessionStorage.setItem('formanova_studio_resolution', v);
   };
-  // Base workflow name (no _2k/_4k suffix); resolution drives price via pricing_context. Step 5.
-  const generationWorkflow = generateWorkflowFor(isProductShot);
+  // Effort defaults to Low. A user's explicit choice is remembered durably
+  // (localStorage, not sessionStorage) so it sticks across sessions until they
+  // change it themselves.
+  const [effort, setEffort] = useState<EffortLevel>(() => {
+    const saved = localStorage.getItem('formanova_studio_effort');
+    return saved === 'high' ? 'high' : 'low';
+  });
+  const handleEffortChange = (v: EffortLevel) => {
+    setEffort(v);
+    localStorage.setItem('formanova_studio_effort', v);
+  };
+  // High Effort is available to all users (rollout flag removed post-staging).
+  const effectiveEffort: EffortLevel = effort;
+  // High Effort supporting-angle images (primary + up to 2 = 3 total). Lifted here
+  // so handleGenerate can read the uploaded URLs/asset-ids at call time.
+  const {
+    supporting: supportingImages,
+    addFiles: addSupportingImages,
+    setVaultSupporting,
+    removeAt: removeSupportingImage,
+    clear: clearSupportingImages,
+  } = useSupportingImages({
+    onReject: (message) => toast({ title: message }),
+  });
+  // Low effort is always single-image: drop supporting images when leaving High.
+  useEffect(() => {
+    if (effectiveEffort !== 'high') clearSupportingImages();
+  }, [effectiveEffort, clearSupportingImages]);
+  const generationWorkflow = workflowFor(isProductShot, resolution, effectiveEffort);
   const { cost: generationCost } = useGenerationCost(generationWorkflow, resolution);
 
   // Fetch preset models from the backend. No local fallback catalog is used.
@@ -450,6 +479,9 @@ export default function UnifiedStudio() {
   } = useStudioGeneration({
     isProductShot,
     effectiveJewelryType,
+    effort: effectiveEffort,
+    supportingItems: supportingImages.map(s => ({ file: s.file, url: s.url, assetId: s.assetId })),
+    jewelryFile,
     jewelryImage,
     activeModelUrl,
     jewelryUploadedUrl,
@@ -468,8 +500,21 @@ export default function UnifiedStudio() {
   });
   const generatingJewelryImage = generationInputUrls?.jewelryUrl ?? jewelryImage;
   const generatingActiveModelUrl = generationInputUrls?.modelUrl ?? activeModelUrl;
-  const resolvedGeneratingJewelryImage = useAuthenticatedImage(generatingJewelryImage);
-  const resolvedGeneratingActiveModelUrl = useAuthenticatedImage(generatingActiveModelUrl);
+  // Every jewelry input the running workflow used (cover first). High Effort has the
+  // full angle set; low effort falls back to the single cover. Each thumbnail
+  // resolves its own URL inside StudioGeneratingStep.
+  const generatingJewelryUrls = (generationInputUrls?.jewelryUrls?.length
+    ? generationInputUrls.jewelryUrls
+    : [generatingJewelryImage]);
+
+  // High Effort fix preview: the jewelry angle set + the model/inspiration reference the
+  // generation used, shown in the AI Fix modal. Only surfaced for high-effort generations.
+  const fixIsHighEffort = (generationInputUrls?.effort ?? effectiveEffort) === 'high';
+  const fixJewelryDisplayUrls = fixIsHighEffort
+    ? generationInputUrls?.jewelryUrls?.map((u) => azureUriToUrl(u) || u)
+    : undefined;
+  const fixReferenceRaw = fixIsHighEffort ? (generationInputUrls?.referenceModelUrl ?? activeModelUrl) : null;
+  const fixReferenceUrl = fixReferenceRaw ? (azureUriToUrl(fixReferenceRaw) || fixReferenceRaw) : null;
 
   const HUMAN_FIX_WORKFLOWS: Record<string, string> = {
     '1K': 'human_fix_photoshoot',
@@ -581,6 +626,13 @@ export default function UnifiedStudio() {
         <StudioUploadStep
           user={user}
           isProductShot={isProductShot}
+          effort={effectiveEffort}
+          onEffortChange={handleEffortChange}
+          effortModeEnabled={true}
+          supportingImages={supportingImages}
+          addSupportingImages={addSupportingImages}
+          setVaultSupporting={setVaultSupporting}
+          removeSupportingImage={removeSupportingImage}
           effectiveJewelryType={effectiveJewelryType}
           exampleCategoryType={exampleCategoryType}
           currentStep={currentStep}
@@ -656,10 +708,8 @@ export default function UnifiedStudio() {
             generationStep={generationStep}
             generationProgress={generationProgress}
             rotatingMsgIdx={rotatingMsgIdx}
-            jewelryImage={generatingJewelryImage}
-            resolvedJewelryImage={resolvedGeneratingJewelryImage}
-            activeModelUrl={generatingActiveModelUrl}
-            resolvedActiveModelUrl={resolvedGeneratingActiveModelUrl}
+            jewelryUrls={generatingJewelryUrls}
+            modelUrl={generatingActiveModelUrl}
             generationError={generationError}
             handleStartOver={handleStartOver}
             onKeepBrowsing={handleKeepBrowsing}
@@ -689,6 +739,8 @@ export default function UnifiedStudio() {
             jewelrySasUrl={jewelrySasUrl}
             jewelryImage={jewelryImage}
             activeModelUrl={generationInputUrls?.modelUrl ?? activeModelUrl}
+            fixJewelryDisplayUrls={fixJewelryDisplayUrls}
+            fixReferenceUrl={fixReferenceUrl}
             userEmail={user?.email}
             generationCost={generationInputUrls?.generationCost ?? generationCost}
             humanFixCost={HUMAN_FIX_COSTS[generationInputUrls?.resolution ?? resolution] ?? 10}
@@ -711,6 +763,7 @@ export default function UnifiedStudio() {
         open={modelGuideOpen}
         onClose={() => setModelGuideOpen(false)}
       />
+
 
       {(
         <StudioTestMenu

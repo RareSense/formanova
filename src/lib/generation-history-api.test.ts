@@ -134,6 +134,20 @@ describe('inferSourceType', () => {
     expect(inferSourceType('agentic_pipeline')).toBe('photo');
   });
 
+  it('classifies High Effort (higher_tier) generate + fix names into the right section', () => {
+    // Model generate high -> photo (via photo/jewelry keywords)
+    expect(inferSourceType('jewelry_photoshoots_generator_higher_tier')).toBe('photo');
+    expect(inferSourceType('jewelry_photoshoots_generator_higher_tier_4k')).toBe('photo');
+    // Product generate high -> product_shot
+    expect(inferSourceType('Product_shot_pipeline_higher_tier')).toBe('product_shot');
+    // Model fix high -> photo (has no photo/jewelry keyword; matched via model_shot)
+    expect(inferSourceType('fix_model_shot_higher_tier')).toBe('photo');
+    expect(inferSourceType('fix_model_shot_higher_tier_4k')).toBe('photo');
+    // Product fix high -> product_shot
+    expect(inferSourceType('fix_product_shot_higher_tier')).toBe('product_shot');
+    expect(inferSourceType('fix_product_shot_higher_tier_4k')).toBe('product_shot');
+  });
+
   it('identifies upscale workflows as photo entries', () => {
     expect(inferSourceType('upscale_image')).toBe('photo');
     expect(inferSourceType('Upscale')).toBe('photo');
@@ -172,6 +186,15 @@ describe('resolveSourceType', () => {
     expect(resolveSourceType('product_shot', 'jewelry_photoshoot')).toBe('product_shot');
     // Consolidated base name that no longer encodes the fix family; backend disambiguates.
     expect(resolveSourceType('product_fix', 'fix')).toBe('product_shot');
+  });
+
+  it('classifies High Effort (higher_tier) by name even if the backend mislabels it', () => {
+    // Backend label is wrong/unknown, but the higher_tier name is authoritative:
+    // model high -> model-shot section, product high -> product-shot section.
+    expect(resolveSourceType('product_shot', 'jewelry_photoshoots_generator_higher_tier')).toBe('photo');
+    expect(resolveSourceType('unknown', 'fix_model_shot_higher_tier')).toBe('photo');
+    expect(resolveSourceType('model_shot', 'Product_shot_pipeline_higher_tier')).toBe('product_shot');
+    expect(resolveSourceType('cad_text', 'fix_product_shot_higher_tier_4k')).toBe('product_shot');
   });
 
   it('falls back to name parsing when the field is absent', () => {

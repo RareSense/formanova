@@ -29,6 +29,9 @@ export interface TrackedGeneration {
   generationStep: string;
   resultImages: string[];
   jewelryUrl: string;
+  /** High Effort: the full cover-first jewelry angle set, when known. Falls back
+   *  to [jewelryUrl] downstream. Optional — absent on older/simple runs. */
+  jewelryUrls?: string[];
   modelUrl: string;
   isProductShot: boolean;
   jewelryType: string;
@@ -88,8 +91,11 @@ export const GenerationsContext = createContext<GenerationsContextValue | null>(
 
 function normalizeResultImage(value: string): string | null {
   if (!value) return null;
-  if (value.startsWith('azure://')) return azureUriToUrl(value);
-  if (value.startsWith('http') || value.startsWith('data:') || value.startsWith('blob:')) return value;
+  // Route every candidate through azureUriToUrl so a content-addressed blob URL
+  // (azure:// OR a raw https blob host) collapses to the same-origin artifact
+  // proxy. data:/blob:/non-artifact URLs pass through unchanged.
+  if (value.startsWith('azure://') || value.startsWith('http')) return azureUriToUrl(value);
+  if (value.startsWith('data:') || value.startsWith('blob:')) return value;
   return null;
 }
 
@@ -133,12 +139,16 @@ function extractJewelryDescription(result: PhotoshootResultResponse): string | u
       if (!item || typeof item !== 'object') continue;
       const rec = item as Record<string, unknown>;
       if (typeof rec['description'] === 'string' && rec['description'].length > 0) {
-        console.log(`[extractJewelryDescription] found in node "${key}":`, rec['description']);
+        if (import.meta.env.DEV) console.log(`[extractJewelryDescription] found in node "${key}":`, rec['description']);
         return rec['description'];
       }
     }
   }
-  console.warn('[extractJewelryDescription] no description found in result. Keys:', Object.keys(result));
+  // Absent is the normal case for upscale/fix/PDP results (no description node);
+  // only some model-shot generations emit one. Dev-only, not a production warning.
+  if (import.meta.env.DEV) {
+    console.debug('[extractJewelryDescription] no description node in result (expected for upscale/fix/pdp). Keys:', Object.keys(result));
+  }
   return undefined;
 }
 
@@ -280,7 +290,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
         // Extract images first — if we got output images the generation succeeded regardless
         // of what other keys exist in the result (handles _2k/_4k workflows with different node names).
         const resultImages = extractResultImages(result);
-        if (gen.isProductShot) console.log('[product-shot result keys]', Object.keys(result), result);
+        if (import.meta.env.DEV && gen.isProductShot) console.log('[product-shot result keys]', Object.keys(result), result);
         const jewelryDescription = gen.isProductShot ? extractJewelryDescription(result) : undefined;
         // Top-level sibling scalar (not a node-keyed array). Undefined for old /result
         // payloads that predate the field; consumers treat that as "unavailable".

@@ -10,8 +10,8 @@
 
 import React, { useState } from 'react';
 import {
-  Check, X, Diamond, Upload, ArrowRight, Loader2,
-  ChevronLeft, ChevronRight, ImageIcon, Lightbulb, Pencil, Search,
+  X, Diamond, Upload, ArrowRight, Loader2,
+  ChevronLeft, ChevronRight, ImageIcon, Lightbulb, Search,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -20,150 +20,12 @@ import { TO_SINGULAR } from '@/lib/jewelry-utils';
 import { trackMyProductsCategoryFiltered } from '@/lib/posthog-events';
 import { MasonryGrid } from '@/components/ui/masonry-grid';
 import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
-import { getAssetDisplayName, renameAsset } from '@/lib/assets-api';
+import { getAssetDisplayName } from '@/lib/assets-api';
 import type { UserAsset } from '@/lib/assets-api';
-
-const DISPLAY_NAME_MAX_CHARS = 50;
-
-function truncateDisplayName(name: string): string {
-  return name.length > DISPLAY_NAME_MAX_CHARS
-    ? `${name.slice(0, DISPLAY_NAME_MAX_CHARS)}...`
-    : name;
-}
-
-function ProductThumb({ src, alt }: { src: string; alt: string }) {
-  const resolved = useAuthenticatedImage(src);
-  return (
-    <img
-      src={resolved ?? ""}
-      alt={alt}
-      loading="lazy"
-      className="w-full block transition-transform duration-300 group-hover:scale-105"
-    />
-  );
-}
-
-function ProductCard({
-  asset,
-  isSelected,
-  onSelect,
-}: {
-  asset: UserAsset;
-  isSelected: boolean;
-  onSelect: () => void;
-}) {
-  const displayName = getAssetDisplayName(asset) || 'Product';
-  const [editing, setEditing] = useState(false);
-  const [nameInput, setNameInput] = useState(displayName ?? '');
-  const [localName, setLocalName] = useState(displayName ?? '');
-  const [saved, setSaved] = useState(false);
-  const syncedDisplayNameRef = React.useRef(displayName);
-
-  React.useEffect(() => {
-    if (displayName && displayName !== syncedDisplayNameRef.current) {
-      syncedDisplayNameRef.current = displayName;
-      setLocalName(displayName);
-      setNameInput(displayName);
-    }
-  }, [displayName]);
-
-  const handleRenameCommit = async () => {
-    setEditing(false);
-    const trimmed = nameInput.trim();
-    if (trimmed && trimmed !== localName) {
-      try {
-        await renameAsset(asset.id, trimmed);
-        setLocalName(trimmed);
-        setSaved(true);
-        setTimeout(() => setSaved(false), 1800);
-      } catch {
-        setNameInput(localName);
-      }
-    }
-  };
-
-  const cancel = () => {
-    setEditing(false);
-    setNameInput(localName);
-  };
-
-  return (
-    <div className="break-inside-avoid mb-2">
-      <button
-        type="button"
-        onClick={() => !editing && onSelect()}
-        className={`relative overflow-hidden border transition-all group w-full
-          ${isSelected
-            ? 'border-[hsl(var(--formanova-hero-accent))]'
-            : 'border-border/20 hover:border-foreground/30'}`}
-      >
-        <ProductThumb src={asset.thumbnail_url} alt={localName || 'Product'} />
-        {isSelected && (
-          <div className="absolute inset-0 flex items-center justify-center"
-               style={{ background: 'hsl(var(--formanova-hero-accent)/0.15)' }}>
-            <div className="w-6 h-6 flex items-center justify-center"
-                 style={{ background: 'hsl(var(--formanova-hero-accent))' }}>
-              <Check className="h-3.5 w-3.5 text-background" />
-            </div>
-          </div>
-        )}
-        {!isSelected && (
-          <div className="absolute inset-0 bg-foreground/0 group-hover:bg-foreground/10
-                          transition-colors flex items-center justify-center">
-            <span className="opacity-0 group-hover:opacity-100 transition-opacity
-                             font-mono text-[9px] tracking-[0.15em] uppercase
-                             text-background bg-foreground/70 px-2 py-1">
-              Use
-            </span>
-          </div>
-        )}
-      </button>
-
-      {/* Naming row — fixed height matches ModelCard, never overlaps image */}
-      <div className="h-10 sm:h-11 flex items-center px-2 overflow-hidden">
-        {editing ? (
-          <div className="flex items-center gap-1.5 w-full" onClick={e => e.stopPropagation()}>
-            <input
-              autoFocus
-              className="font-mono text-[11px] text-foreground bg-muted/30 border border-foreground/20 focus:border-formanova-glow rounded px-2 py-1 outline-none flex-1 min-w-0 transition-colors"
-              value={nameInput}
-              onChange={e => setNameInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') handleRenameCommit(); if (e.key === 'Escape') cancel(); }}
-              maxLength={50}
-              placeholder="Enter a name..."
-            />
-            <button onClick={cancel} className="flex-shrink-0 p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors" aria-label="Cancel">
-              <X className="h-3 w-3" />
-            </button>
-            <button onClick={handleRenameCommit} className="flex-shrink-0 p-1.5 rounded text-foreground hover:bg-muted/30 transition-colors" aria-label="Save">
-              <Check className="h-3 w-3" />
-            </button>
-          </div>
-        ) : (
-          <button
-            className="flex items-center justify-center gap-2 sm:gap-2.5 w-full h-full rounded hover:bg-muted/20 transition-colors group/rename"
-            title="Click to rename"
-            onClick={e => { e.stopPropagation(); setEditing(true); setNameInput(localName); }}
-          >
-            {saved ? (
-              <>
-                <Check className="h-3 w-3 text-formanova-success flex-shrink-0" />
-                <span className="font-mono text-[11px] text-formanova-success truncate">Saved!</span>
-              </>
-            ) : (
-              <>
-                <span className="font-mono text-[11px] truncate text-foreground transition-colors" title={localName || undefined}>
-                  {localName ? truncateDisplayName(localName) : <span className="italic text-muted-foreground/60">Click to name</span>}
-                </span>
-                <Pencil className="h-3 w-3 flex-shrink-0 text-muted-foreground/40 group-hover/rename:text-foreground/60 transition-colors" />
-              </>
-            )}
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
+import { EffortToggle, type EffortLevel } from '@/components/studio/EffortToggle';
+import { HighEffortUploadCanvas } from '@/components/studio/HighEffortUploadCanvas';
+import { ProductCard, GroupedProductCard, buildVaultCards } from '@/components/studio/VaultProductCards';
+import type { SupportingImage } from '@/hooks/useSupportingImages';
 
 // ── Example images ────────────────────────────────────────────────────────────
 import necklaceAllowed1    from '@/assets/examples/necklace-allowed-1.jpg';
@@ -326,9 +188,22 @@ export interface StudioVaultUploadStepProps {
   onFileUpload: (file: File) => void;
   onClearImage: () => void;
   onNextStep: () => void;
-  onProductSelect: (thumbnailUrl: string, assetId: string) => void;
+  /** Select a vault product for generation. `supportingMembers` carries a grouped
+   *  set's non-cover angles (url + assetId) so High Effort can load all of them
+   *  onto the canvas; omitted/empty for an ungrouped single product. */
+  onProductSelect: (
+    thumbnailUrl: string,
+    assetId: string,
+    supportingMembers?: { url: string; assetId: string }[],
+  ) => void;
   onCategoryChange?: (category: string) => void;
   isProductShot?: boolean;
+  effort: EffortLevel;
+  onEffortChange: (v: EffortLevel) => void;
+  effortModeEnabled: boolean;
+  supportingImages: SupportingImage[];
+  addSupportingImages: (files: File[]) => void;
+  removeSupportingImage: (index: number) => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -345,6 +220,12 @@ export function StudioVaultUploadStep({
   onProductSelect,
   onCategoryChange,
   isProductShot,
+  effort,
+  onEffortChange,
+  effortModeEnabled,
+  supportingImages,
+  addSupportingImages,
+  removeSupportingImage,
 }: StudioVaultUploadStepProps) {
   const examples = CATEGORY_EXAMPLES[exampleCategoryType] ?? CATEGORY_EXAMPLES['necklace'];
   const categoryCopy = {
@@ -368,6 +249,17 @@ export function StudioVaultUploadStep({
   const [productSearch, setProductSearch] = useState('');
 
   const resolvedJewelryImage = useAuthenticatedImage(jewelryImage);
+
+  // Primary drop zone accepts multi-select: first file -> primary, rest -> supporting.
+  const handlePrimaryFiles = (files: File[]) => {
+    if (!files.length) return;
+    if (!jewelryImage) {
+      onFileUpload(files[0]);
+      if (files.length > 1) addSupportingImages(files.slice(1));
+    } else {
+      addSupportingImages(files);
+    }
+  };
 
   const PAGE_SIZE = 10;
   const activeCategory = selectedCategory ?? undefined;
@@ -405,6 +297,9 @@ export function StudioVaultUploadStep({
       })
     : assets;
 
+  // Collapse multi-angle sets (shared input_group_id) into single grouped cards.
+  const vaultCards = buildVaultCards(displayAssets);
+
   // Show upload guide if user has no uploads matching the current context
   const showGuide = !isLoading && assets.length === 0;
 
@@ -425,20 +320,43 @@ export function StudioVaultUploadStep({
           ══════════════════════════════════════════════════════════════ */}
       <div className="lg:col-span-2 flex flex-col gap-4">
 
-        <div>
-          <span className="marta-label block mb-1">Step 1</span>
-          <h1 className="font-display text-3xl md:text-4xl uppercase tracking-tight mt-2">
-            Upload Your {categoryCopy.singular}
-          </h1>
-          <p className="text-muted-foreground mt-1.5 text-sm">
-            {isProductShot
-              ? `Upload a high quality photo of your ${categoryCopy.singular}.`
-              : <>Upload a photo of your {categoryCopy.singular} <strong>worn on a person or mannequin</strong></>}
-          </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <span className="marta-label block mb-1">Step 1</span>
+            <h1 className="font-display text-3xl md:text-4xl uppercase tracking-tight mt-2">
+              Upload Your {categoryCopy.singular}
+            </h1>
+            <p className="text-muted-foreground mt-1.5 text-sm">
+              {isProductShot
+                ? `Upload a high quality photo of your ${categoryCopy.singular}.`
+                : <>Upload a photo of your {categoryCopy.singular} <strong>worn on a person or mannequin</strong></>}
+            </p>
+          </div>
+          {/* Effort toggle — aligned on the same baseline as the "Show all" toggle in the right column.
+              Only shown when High Effort is enabled for the user (rollout gate). */}
+          {effortModeEnabled && (
+            <EffortToggle value={effort} onChange={onEffortChange} className="mt-8 shrink-0" />
+          )}
         </div>
 
-        {/* Drop zone — empty state */}
-        {!jewelryImage && (
+        {/* ── High Effort canvas: primary + up to 2 supporting angles ── */}
+        {effort === 'high' && (
+          <HighEffortUploadCanvas
+            singular={categoryCopy.singular}
+            canvasH={CANVAS_H}
+            primaryImage={jewelryImage}
+            resolvedPrimaryImage={resolvedJewelryImage}
+            primaryInputRef={jewelryInputRef}
+            onPrimaryFiles={handlePrimaryFiles}
+            onPrimaryClear={onClearImage}
+            supporting={supportingImages}
+            onSupportingFiles={addSupportingImages}
+            onSupportingRemove={removeSupportingImage}
+          />
+        )}
+
+        {/* Drop zone — empty state (Low effort) */}
+        {effort !== 'high' && !jewelryImage && (
           <div
             onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) onFileUpload(f); }}
             onDragOver={(e) => e.preventDefault()}
@@ -482,45 +400,44 @@ export function StudioVaultUploadStep({
           </div>
         )}
 
-        {/* Uploaded preview */}
-        {jewelryImage && (
-          <div className="space-y-4">
-            <div className={`relative border overflow-hidden flex items-center justify-center bg-muted/20 border-border/30 ${CANVAS_H}`}>
-              <img src={resolvedJewelryImage ?? undefined} alt="Jewelry" className="max-w-full max-h-full object-contain" />
+        {/* Uploaded preview (Low effort) */}
+        {effort !== 'high' && jewelryImage && (
+          <div className={`relative border overflow-hidden flex items-center justify-center bg-muted/20 border-border/30 ${CANVAS_H}`}>
+            <img src={resolvedJewelryImage ?? undefined} alt="Jewelry" className="max-w-full max-h-full object-contain" />
 
-              {!showGuide && (
-                <button
-                  type="button"
-                  onClick={() => setGuideDialogOpen(true)}
-                  className="absolute top-3 right-12 flex items-center gap-1.5 border border-foreground/30
-                             bg-muted px-2.5 py-1
-                             font-mono text-[10px] tracking-widest uppercase
-                             text-foreground hover:bg-foreground/10 hover:border-foreground/60
-                             transition-colors z-10"
-                >
-                  <Lightbulb className="h-3 w-3" />
-                  View Guide
-                </button>
-              )}
-
-              <button onClick={onClearImage}
-                      className="absolute top-3 right-3 w-7 h-7 bg-background/80 backdrop-blur-sm
-                                 flex items-center justify-center border border-border/40
-                                 hover:bg-destructive hover:text-destructive-foreground transition-colors z-10">
-                <X className="h-3.5 w-3.5" />
+            {!showGuide && (
+              <button
+                type="button"
+                onClick={() => setGuideDialogOpen(true)}
+                className="absolute top-3 right-12 flex items-center gap-1.5 border border-foreground/30
+                           bg-muted px-2.5 py-1
+                           font-mono text-[10px] tracking-widest uppercase
+                           text-foreground hover:bg-foreground/10 hover:border-foreground/60
+                           transition-colors z-10"
+              >
+                <Lightbulb className="h-3 w-3" />
+                View Guide
               </button>
+            )}
 
-            </div>
+            <button onClick={onClearImage}
+                    className="absolute top-3 right-3 w-7 h-7 bg-background/80 backdrop-blur-sm
+                               flex items-center justify-center border border-border/40
+                               hover:bg-destructive hover:text-destructive-foreground transition-colors z-10">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
 
-            {/* Action area — normal Next button */}
-            <div className="flex items-center justify-end gap-3">
-              <Button size="lg" onClick={onNextStep} disabled={!canProceed}
-                      className="gap-2.5 font-display text-base uppercase tracking-wide px-10
-                                 bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))]
-                                 text-background hover:opacity-90 transition-opacity border-0 disabled:opacity-60">
-                Next <ArrowRight className="h-4 w-4" />
-              </Button>
-            </div>
+        {/* Action area — Next, shown once a primary image is present (both modes) */}
+        {jewelryImage && (
+          <div className="flex items-center justify-end gap-3">
+            <Button size="lg" onClick={onNextStep} disabled={!canProceed}
+                    className="gap-2.5 font-display text-base uppercase tracking-wide px-10
+                               bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))]
+                               text-background hover:opacity-90 transition-opacity border-0 disabled:opacity-60">
+              Next <ArrowRight className="h-4 w-4" />
+            </Button>
           </div>
         )}
       </div>
@@ -592,13 +509,29 @@ export function StudioVaultUploadStep({
                     </p>
                   ) : (
                     <div className="columns-3 gap-2">
-                      {displayAssets.map((asset) => (
-                        <ProductCard
-                          key={asset.id}
-                          asset={asset}
-                          isSelected={asset.id === activeProductAssetId}
-                          onSelect={() => onProductSelect(asset.thumbnail_url, asset.id)}
-                        />
+                      {vaultCards.map((card) => (
+                        card.members.length > 1 ? (
+                          <GroupedProductCard
+                            key={card.groupId}
+                            members={card.members}
+                            cover={card.cover}
+                            isSelected={card.members.some((m) => m.id === activeProductAssetId)}
+                            onSelect={() => onProductSelect(
+                              card.cover.thumbnail_url,
+                              card.cover.id,
+                              card.members
+                                .filter((m) => m.id !== card.cover.id)
+                                .map((m) => ({ url: m.thumbnail_url, assetId: m.id })),
+                            )}
+                          />
+                        ) : (
+                          <ProductCard
+                            key={card.cover.id}
+                            asset={card.cover}
+                            isSelected={card.cover.id === activeProductAssetId}
+                            onSelect={() => onProductSelect(card.cover.thumbnail_url, card.cover.id)}
+                          />
+                        )
                       ))}
                     </div>
                   )}

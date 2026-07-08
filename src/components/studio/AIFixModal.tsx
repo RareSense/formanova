@@ -50,6 +50,11 @@ interface Props {
   onClose: () => void;
   onConfirm: (prompt: string) => void;
   jewelryDisplayUrl: string | null;
+  /** High Effort: the jewelry angles used (cover first). Overrides the single thumbnail. */
+  jewelryDisplayUrls?: string[];
+  /** High Effort: the model (model shot) or inspiration (product shot) reference used. */
+  referenceUrl?: string | null;
+  referenceLabel?: string;
   resultImageUrl: string | null;
   isProductShot: boolean;
   generationCost?: number | null;
@@ -60,6 +65,9 @@ export function AIFixModal({
   onClose,
   onConfirm,
   jewelryDisplayUrl,
+  jewelryDisplayUrls,
+  referenceUrl,
+  referenceLabel,
   resultImageUrl,
   isProductShot,
   generationCost,
@@ -89,7 +97,17 @@ export function AIFixModal({
   };
 
   const resultLabel = isProductShot ? 'Product shot' : 'Model shot';
-  const hasImages = jewelryDisplayUrl || resultImageUrl;
+
+  // Reference thumbnails shown above the prompt. High Effort surfaces every input the
+  // fix uses: each jewelry angle, then the model/inspiration reference, then the result.
+  const angles = (jewelryDisplayUrls && jewelryDisplayUrls.length)
+    ? jewelryDisplayUrls
+    : (jewelryDisplayUrl ? [jewelryDisplayUrl] : []);
+  const refItems: { url: string | null; label: string }[] = [];
+  angles.forEach((u, i) => refItems.push({ url: u, label: angles.length > 1 ? `Jewelry ${i + 1}` : 'Your jewelry' }));
+  if (referenceUrl) refItems.push({ url: referenceUrl, label: referenceLabel ?? (isProductShot ? 'Inspiration' : 'Model') });
+  if (resultImageUrl) refItems.push({ url: resultImageUrl, label: resultLabel });
+  const hasImages = refItems.length > 0;
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose(); }}>
@@ -108,11 +126,15 @@ export function AIFixModal({
             </DialogDescription>
           </div>
 
-          {/* Thumbnails */}
+          {/* Thumbnails - up to 3 per row so an angle set + reference + result stay uncramped */}
           {hasImages && (
-            <div className="flex gap-3">
-              <Thumbnail url={jewelryDisplayUrl} label="Your jewelry" />
-              <Thumbnail url={resultImageUrl} label={resultLabel} />
+            <div
+              className="grid gap-2"
+              style={{ gridTemplateColumns: `repeat(${Math.min(refItems.length, 3)}, minmax(0, 1fr))` }}
+            >
+              {refItems.map((r, i) => (
+                <Thumbnail key={`${r.label}-${i}`} url={r.url} label={r.label} />
+              ))}
             </div>
           )}
 

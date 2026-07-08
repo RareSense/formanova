@@ -14,6 +14,17 @@ export const TOOL_COSTS: Record<string, number> = {
   Product_shot_pipeline: 8,               // product-shot 1K
   Product_shot_pipeline_2k: 15,           // product-shot 2K
   Product_shot_pipeline_4k: 25,           // product-shot 4K
+  // High Effort ("higher tier") photoshoots — up to 3 jewelry images + more compute.
+  // Effort is chosen by workflow_name (see photoshoot-api WORKFLOW_NAMES/workflowFor).
+  // Real cost comes from /api/credits/estimate keyed by workflow_name + image_size;
+  // these are only last-resort gate fallbacks when the estimate call fails. Because the
+  // key is the bare workflow_name (one value per name, no per-tier suffix), each
+  // fallback is set to the MAX tier it covers so the gate never under-quotes. Values per
+  // the Pricing Restructure handoff (2026-07-06): on-model high 1K/2K/4K = 20/32/44,
+  // PDP high 1K/2K/4K = 12/18/24.
+  jewelry_photoshoots_generator_higher_tier: 32,     // model-shot high 1K/2K (max = 2K)
+  jewelry_photoshoots_generator_higher_tier_4k: 44,  // model-shot high 4K
+  Product_shot_pipeline_higher_tier: 24,             // product-shot high, all tiers (max = 4K)
   // Upscale — real cost depends on tier + factor (sent via pricing_context to the
   // estimate endpoint). This flat key is only a last-resort gate fallback when the
   // estimate call fails; set mid-grid so it neither blocks cheap nor approves the

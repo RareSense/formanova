@@ -50,16 +50,18 @@ import {
   startPhotoshoot,
   startPdpShot,
   startFixShot,
-  generateWorkflowFor,
+  workflowFor,
+  buildJewelryRequestFields,
   fixWorkflowFor,
 } from '@/lib/photoshoot-api';
+import type { EffortLevel } from '@/components/studio/EffortToggle';
 import { startUpscale, tierForUpscale, estimateUpscaleCostCached, UPSCALE_POLL_TIMEOUT_MS } from '@/lib/upscale-api';
-import { uploadToAzure } from '@/lib/microservices-api';
+import { uploadToAzure, bulkUploadJewelry, MAX_BULK_JEWELRY_FILES } from '@/lib/microservices-api';
 import { azureUriToUrl } from '@/lib/azure-utils';
 import { compressImageBlob, imageSourceToBlob } from '@/lib/image-compression';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
 import { markGenerationStarted } from '@/lib/generation-lifecycle';
-import { getJewelryDescription } from '@/lib/photoshoot-api';
+import { getJewelryDescription, getAnalyzeOutput, type AnalyzeOutputResult } from '@/lib/photoshoot-api';
 import {
   trackPaywallHit,
   trackGenerationComplete,
@@ -76,9 +78,26 @@ import type { Resolution } from '@/components/studio/OutputSettingsPills';
 
 type StudioStep = 'upload' | 'model' | 'generating' | 'results';
 
+/** Compress a File to a jpeg File for the multipart bulk upload (matches the per-file path). */
+async function compressToJpegFile(file: File): Promise<File> {
+  const { blob } = await compressImageBlob(file);
+  const base = file.name.replace(/\.[^.]+$/, '') || 'jewelry';
+  return new File([blob], `${base}.jpg`, { type: 'image/jpeg' });
+}
+
 interface UseStudioGenerationOptions {
   isProductShot: boolean;
   effectiveJewelryType: string;
+  effort: EffortLevel;
+  /**
+   * High Effort supporting angles, cover-excluded, in slot order. Each is either
+   * a fresh `file` (bulk-uploaded with the cover at generate time so the backend
+   * mints one input_group_id) or a pre-existing vault member (`url` + `assetId`,
+   * reused as-is with no re-upload). Empty for Low effort or single-image High.
+   */
+  supportingItems: { file?: File; url?: string; assetId?: string }[];
+  /** Cover file for the bulk set (the primary jewelry image). */
+  jewelryFile: File | null;
   jewelryImage: string | null;
   activeModelUrl: string | null;
   jewelryUploadedUrl: string | null;
@@ -103,6 +122,9 @@ interface UseStudioGenerationOptions {
 export function useStudioGeneration({
   isProductShot,
   effectiveJewelryType,
+  effort,
+  supportingItems,
+  jewelryFile,
   jewelryImage,
   activeModelUrl,
   jewelryUploadedUrl,
@@ -153,6 +175,14 @@ export function useStudioGeneration({
       resolution: Resolution;
       generationCost: number | null;
       jewelryDescription?: string;
+      /** High Effort: the full cover-first jewelry angle URLs the generation used. */
+      jewelryUrls?: string[];
+      /** Effort of the generation being fixed (drives the higher-tier fix family). */
+      effort?: EffortLevel;
+      /** Original model (model shot) / inspiration (product shot) URL, preserved across
+       *  fix chains so a higher-tier fix always references the real model/setting, not
+       *  the previous result image that `modelUrl` gets swapped to for display. */
+      referenceModelUrl?: string;
     }>
   >({});
 
@@ -170,6 +200,12 @@ export function useStudioGeneration({
     aspectRatio: generationInputUrlsMap[workflowId]?.aspectRatio ?? myGeneration?.aspectRatio ?? '3:4',
     resolution: generationInputUrlsMap[workflowId]?.resolution ?? myGeneration?.resolution ?? '1K',
     generationCost: generationInputUrlsMap[workflowId]?.generationCost ?? myGeneration?.generationCost ?? null,
+    // High Effort context, needed by every input preview (generating spinner, AI
+    // Fix modal, feedback/human-fix popup) so they surface the full angle set + the
+    // real reference and branch on the generation's own effort, not the live toggle.
+    jewelryUrls: generationInputUrlsMap[workflowId]?.jewelryUrls ?? myGeneration?.jewelryUrls,
+    effort: generationInputUrlsMap[workflowId]?.effort,
+    referenceModelUrl: generationInputUrlsMap[workflowId]?.referenceModelUrl,
   }) : null;
 
   // Cycle rotating messages every 4s while generating
@@ -193,6 +229,11 @@ export function useStudioGeneration({
       }
       clearGeneration(workflowId!);
       const isFirst = consumeFirstGeneration();
+      // Effort tier + jewelry image count for this generation, read from what was
+      // actually sent at generate time (stored per-workflow at start). This only
+      // fires on a completed generation, so uploading images without generating
+      // never counts. Low effort is always 1 image; high effort is 1-3.
+      const genMeta = generationInputUrlsMap[workflowId!];
       trackGenerationComplete({
         source: 'unified-studio',
         category: TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType,
@@ -201,6 +242,8 @@ export function useStudioGeneration({
         is_first_ever: isFirst,
         aspect_ratio: aspectRatio,
         resolution,
+        effort: genMeta?.effort ?? effectiveEffort,
+        jewelry_image_count: genMeta?.jewelryUrls?.length ?? 1,
       });
       clearStudioSession();
       if (!hasNavigatedAway.current) {
@@ -269,11 +312,11 @@ export function useStudioGeneration({
       return;
     }
 
-    // Base workflow name (no _2k/_4k suffix); tier travels as image_size. Step 5.
-    const workflowName = generateWorkflowFor(isProductShot);
-    // Send the resolution tier so the preflight hold matches the actual per-tier charge
-    // (mirrors the run payload's image_size). Otherwise the gate authorizes the worst-case
-    // tier and could wrongly block a user near their balance. See consolidation Step 4.
+    // Effort chooses the workflow_name (low → unsuffixed, high → higher-tier); the
+    // resolution tier travels as image_size both in the run payload and the preflight
+    // pricing_context, so the credit hold matches the actual per-tier charge instead of
+    // authorizing the worst-case tier. Step 5 + effort toggle.
+    const workflowName = workflowFor(isProductShot, resolution, effort);
     const hasCredits = await checkCredits(workflowName, 1, { pricingContext: { image_size: resolution } });
     if (!hasCredits) {
       trackPaywallHit({
@@ -287,6 +330,13 @@ export function useStudioGeneration({
     setIsSubmitting(true);
     setGenerationError(null);
     hasNavigatedAway.current = false;
+    // A fresh generation is never an upscaled result. Clear any stale upscale
+    // state so its 'completed' status can't carry over from a prior upscale
+    // (e.g. done in the other studio, then switched here) and wrongly hide the
+    // fix actions on this new result.
+    setUpscaleStatus('idle');
+    setUpscaleError(null);
+    setActiveUpscaleId(null);
 
     try {
       let jewelryUrl: string;
@@ -327,6 +377,59 @@ export function useStudioGeneration({
       const idempotencyKey = `${Date.now()}-${effectiveJewelryType}-${selectedModel?.id || 'custom'}`;
       const category = TO_SINGULAR[effectiveJewelryType] ?? effectiveJewelryType;
 
+      // High Effort with supporting angles: send the cover-first
+      // jewelry_image_urls + input_jewelry_asset_ids arrays for the whole set.
+      // Each set member is either a fresh File (needs upload) or a pre-existing
+      // vault asset (url + assetId, reused as-is with no re-upload, no duplicate
+      // grouped set). The fresh Files upload together as ONE grouped
+      // POST /upload/bulk call so the backend mints a single input_group_id.
+      // When every member is from the vault (a grouped set clicked in My
+      // Products), nothing is uploaded and the original input_group_id is kept.
+      // Low effort, or High with just the cover, keeps the singular/existing path.
+      let jewelryReqFields;
+      if (effort === 'high' && supportingItems.length > 0) {
+        type SetEntry = { file?: File; url?: string; assetId?: string };
+        const coverEntry: SetEntry = jewelryFile
+          ? { file: jewelryFile }
+          : { url: jewelryUrl ?? undefined, assetId: jewelryAssetId ?? undefined };
+        const entries: SetEntry[] = [coverEntry, ...supportingItems].slice(0, MAX_BULK_JEWELRY_FILES);
+
+        // Upload only the fresh Files, in one grouped bulk call. Persist the same
+        // jewelry metadata the single-file path sets so grouped assets get a
+        // correct tier/category badge (matches useStudioUpload.ts).
+        const fileEntries = entries.filter(e => e.file);
+        let uploaded: { uri: string; asset_id: string }[] = [];
+        if (fileEntries.length > 0) {
+          const compressed = await Promise.all(fileEntries.map(e => compressToJpegFile(e.file!)));
+          const intendedUse = isProductShot ? 'pdp' : 'on_model';
+          const bulk = await bulkUploadJewelry(compressed, { category, intended_use: intendedUse });
+          uploaded = bulk.jewelry;
+        }
+
+        // Reassemble cover-first: File entries take the next uploaded result (bulk
+        // preserves order); vault entries use their own url/id. Push url+id together
+        // so the two arrays stay index-aligned.
+        let u = 0;
+        const urls: string[] = [];
+        const ids: string[] = [];
+        for (const e of entries) {
+          if (e.file) {
+            const up = uploaded[u++];
+            if (up?.uri && up?.asset_id) { urls.push(up.uri); ids.push(up.asset_id); }
+          } else if (e.url && e.assetId) {
+            urls.push(e.url); ids.push(e.assetId);
+          }
+        }
+        jewelryReqFields = { tier: 'high' as const, jewelry_image_urls: urls, input_jewelry_asset_ids: ids };
+      } else {
+        jewelryReqFields = buildJewelryRequestFields({
+          effort,
+          coverUrl: jewelryUrl,
+          coverAssetId: jewelryAssetId,
+          supporting: [],
+        });
+      }
+
       const startResponse = isProductShot
         ? await startPdpShot({
             jewelry_image_url: jewelryUrl,
@@ -335,7 +438,7 @@ export function useStudioGeneration({
             idempotency_key: idempotencyKey,
             aspect_ratio: aspectRatio,
             resolution,
-            ...(jewelryAssetId ? { input_jewelry_asset_id: jewelryAssetId } : {}),
+            ...jewelryReqFields,
             ...(selectedModel?.id ? { input_preset_inspiration_id: selectedModel.id }
                 : modelAssetId ? { input_inspiration_asset_id: modelAssetId } : {}),
           })
@@ -346,7 +449,7 @@ export function useStudioGeneration({
             idempotency_key: idempotencyKey,
             aspect_ratio: aspectRatio,
             resolution,
-            ...(jewelryAssetId ? { input_jewelry_asset_id: jewelryAssetId } : {}),
+            ...jewelryReqFields,
             ...(modelAssetId ? { input_model_asset_id: modelAssetId } : {}),
             ...(selectedModel?.id && !modelAssetId ? { input_preset_model_id: selectedModel.id } : {}),
           });
@@ -354,7 +457,12 @@ export function useStudioGeneration({
       const _workflowId = startResponse.workflow_id;
       setGenerationInputUrlsMap(prev => ({
         ...prev,
-        [_workflowId]: { jewelryUrl, modelUrl, aspectRatio, resolution, generationCost },
+        [_workflowId]: {
+          jewelryUrl, modelUrl, aspectRatio, resolution, generationCost,
+          jewelryUrls: jewelryReqFields.jewelry_image_urls ?? [jewelryUrl],
+          effort,
+          referenceModelUrl: modelUrl,
+        },
       }));
       setWorkflowId(_workflowId);
       trackGeneration({
@@ -376,6 +484,7 @@ export function useStudioGeneration({
     }
   }, [
     isSubmitting, jewelryImage, activeModelUrl, isProductShot, effectiveJewelryType,
+    effort, supportingItems, jewelryFile,
     jewelryUploadedUrl, jewelryAssetId, selectedModel, customModelImage, modelAssetId,
     aspectRatio, resolution,
     generationCost, checkCredits, toast, setCurrentStep, setJewelryAssetId, trackGeneration,
@@ -399,12 +508,55 @@ export function useStudioGeneration({
     const rawJewelryUrl = prevData?.jewelryUrl ?? jewelryUploadedUrl;
     const resultImageUrl = azureUriToUrl(resultImages[0]) || resultImages[0];
     const jewelryImageUrl = azureUriToUrl(rawJewelryUrl) || rawJewelryUrl;
-    let jewelryDescription = prevData?.jewelryDescription;
 
-    if (!jewelryDescription && isProductShot && workflowId) {
+    // High Effort fix: routes to the higher-tier fix family, which needs the full
+    // cover-first jewelry angle set plus the original model/inspiration reference.
+    // Effort follows the generation being fixed, not the live toggle.
+    const isHighFix = (prevData?.effort ?? effort) === 'high';
+    const jewelryImageUrls = (prevData?.jewelryUrls ?? (rawJewelryUrl ? [rawJewelryUrl] : []))
+      .map(u => azureUriToUrl(u) || u)
+      .filter((u): u is string => !!u);
+    const referenceRaw = prevData?.referenceModelUrl ?? prevData?.modelUrl;
+    const referenceModelUrl = referenceRaw ? (azureUriToUrl(referenceRaw) || referenceRaw) : undefined;
+
+    let jewelryDescription = prevData?.jewelryDescription;
+    let modelDescription: string | undefined;
+    let generationType: string | undefined;
+
+    if (isHighFix && workflowId) {
+      // Higher-tier fix: pull jewelry + model descriptions and generation_type from the
+      // analyze output the original generation produced (both shot types). generation_type
+      // is required as-is downstream (never reconstruct it), so if analyze isn't ready or
+      // available we stop with a clear message instead of sending a wrong/omitted value.
+      let analyze: AnalyzeOutputResult;
+      try {
+        analyze = await getAnalyzeOutput(workflowId);
+      } catch (e) {
+        console.warn('[handleAIFix] getAnalyzeOutput failed:', e);
+        toast({ variant: 'destructive', title: "Couldn't prepare the fix", description: 'Something went wrong loading this image. Please try again in a moment.' });
+        return;
+      }
+      if (analyze.status === 'pending') {
+        // 409 - right image, analysis just isn't finished (still running, or it failed
+        // to produce output). In-progress, not an app error. Log the backend detail
+        // (running vs no-output) but show the user a plain, non-jargon message.
+        console.info('[handleAIFix] analyze not ready:', analyze.detail);
+        toast({ title: 'Almost ready', description: 'This image is still being prepared for editing. Please try again in a moment.' });
+        return;
+      }
+      if (analyze.status === 'unavailable') {
+        // 404/422 - shouldn't happen in the normal fix flow; without generation_type the
+        // higher-tier fix can't run, so stop rather than fail downstream.
+        toast({ variant: 'destructive', title: "Can't fix this image", description: 'We couldn\'t load the details needed to fix it. Try starting a new photoshoot.' });
+        return;
+      }
+      jewelryDescription = jewelryDescription ?? analyze.data.jewelry_description;
+      modelDescription = analyze.data.model_description || undefined;
+      generationType = analyze.data.generation_type;
+    } else if (!jewelryDescription && isProductShot && workflowId) {
+      // Low-effort product fix keeps the PDP-only jewelry-description endpoint.
       try {
         jewelryDescription = await getJewelryDescription(workflowId) ?? undefined;
-        console.log('[handleAIFix] description from endpoint:', jewelryDescription, 'workflowId:', workflowId);
       } catch (e) {
         console.warn('[handleAIFix] getJewelryDescription failed:', e);
       }
@@ -458,7 +610,20 @@ export function useStudioGeneration({
         aspect_ratio: fixAspectRatio,
         idempotency_key: `fix-${Date.now()}-${effectiveJewelryType}`,
         sourceAssetId,
-        ...(isProductShot && jewelryDescription ? { jewelry_description: jewelryDescription } : {}),
+        ...(isHighFix
+          ? {
+              tier: 'high' as const,
+              jewelryImageUrls,
+              ...(jewelryDescription ? { jewelry_description: jewelryDescription } : {}),
+              ...(generationType ? { generationType } : {}),
+              ...(isProductShot
+                ? { inspirationImageUrl: referenceModelUrl }
+                : {
+                    modelImageUrl: referenceModelUrl,
+                    ...(modelDescription ? { modelDescription } : {}),
+                  }),
+            }
+          : (isProductShot && jewelryDescription ? { jewelry_description: jewelryDescription } : {})),
       });
 
       const _workflowId = startResponse.workflow_id;
@@ -472,6 +637,12 @@ export function useStudioGeneration({
           resolution: fixResolution,
           generationCost: prevData?.generationCost ?? generationCost,
           ...(jewelryDescription ? { jewelryDescription } : {}),
+          // Preserve the fix references across chained fixes (fixing a fix): the
+          // jewelry angle set, the generation effort, and the real model/inspiration
+          // image (modelUrl above is swapped to the result image for display).
+          jewelryUrls: prevData?.jewelryUrls ?? jewelryImageUrls,
+          effort: prevData?.effort ?? (isHighFix ? 'high' : 'low'),
+          referenceModelUrl: prevData?.referenceModelUrl ?? referenceModelUrl,
         },
       }));
       setWorkflowId(_workflowId);
@@ -493,7 +664,7 @@ export function useStudioGeneration({
     }
   }, [
     isSubmitting, resultImages, resultAssetId, workflowId, generationInputUrlsMap,
-    jewelryUploadedUrl, isProductShot, effectiveJewelryType,
+    jewelryUploadedUrl, isProductShot, effectiveJewelryType, effort,
     resolution, aspectRatio, generationCost, checkCredits,
     toast, setCurrentStep, trackGeneration, regenerationCount,
   ]);
