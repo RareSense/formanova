@@ -522,8 +522,12 @@ export default function UnifiedStudio() {
   });
   const generatingJewelryImage = generationInputUrls?.jewelryUrl ?? jewelryImage;
   const generatingActiveModelUrl = generationInputUrls?.modelUrl ?? activeModelUrl;
-  const resolvedGeneratingJewelryImage = useAuthenticatedImage(generatingJewelryImage);
-  const resolvedGeneratingActiveModelUrl = useAuthenticatedImage(generatingActiveModelUrl);
+  // Every jewelry input the running workflow used (cover first). High Effort has the
+  // full angle set; low effort falls back to the single cover. Each thumbnail
+  // resolves its own URL inside StudioGeneratingStep.
+  const generatingJewelryUrls = (generationInputUrls?.jewelryUrls?.length
+    ? generationInputUrls.jewelryUrls
+    : [generatingJewelryImage]);
 
   // High Effort fix preview: the jewelry angle set + the model/inspiration reference the
   // generation used, shown in the AI Fix modal. Only surfaced for high-effort generations.
@@ -726,10 +730,8 @@ export default function UnifiedStudio() {
             generationStep={generationStep}
             generationProgress={generationProgress}
             rotatingMsgIdx={rotatingMsgIdx}
-            jewelryImage={generatingJewelryImage}
-            resolvedJewelryImage={resolvedGeneratingJewelryImage}
-            activeModelUrl={generatingActiveModelUrl}
-            resolvedActiveModelUrl={resolvedGeneratingActiveModelUrl}
+            jewelryUrls={generatingJewelryUrls}
+            modelUrl={generatingActiveModelUrl}
             generationError={generationError}
             handleStartOver={handleStartOver}
             onKeepBrowsing={handleKeepBrowsing}

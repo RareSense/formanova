@@ -10,6 +10,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { Gem, AlertTriangle, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
 
 type StudioStep = 'upload' | 'model' | 'generating' | 'results';
 
@@ -18,13 +19,24 @@ interface StudioGeneratingStepProps {
   generationStep: string;
   generationProgress: number;
   rotatingMsgIdx: number;
-  jewelryImage: string | null;
-  resolvedJewelryImage: string | null;
-  activeModelUrl: string | null;
-  resolvedActiveModelUrl: string | null;
+  /** Every jewelry input the workflow is using, cover first. High Effort surfaces
+   *  all angles; low effort is a single-entry array. */
+  jewelryUrls: (string | null | undefined)[];
+  /** The model (model shot) / inspiration (product shot) reference used. */
+  modelUrl: string | null | undefined;
   generationError: string | null;
   handleStartOver: () => void;
   onKeepBrowsing: () => void;
+}
+
+/** One input thumbnail; resolves its own (possibly auth-gated) image URL. */
+function InputThumb({ url, alt }: { url: string | null | undefined; alt: string }) {
+  const resolved = useAuthenticatedImage(url ?? null);
+  return (
+    <div className="w-16 h-16 border border-border/30 overflow-hidden">
+      <img src={resolved ?? undefined} alt={alt} className="w-full h-full object-cover opacity-50" />
+    </div>
+  );
 }
 
 const PRODUCT_SHOT_MSGS = [
@@ -48,14 +60,13 @@ export function StudioGeneratingStep({
   generationStep,
   generationProgress,
   rotatingMsgIdx,
-  jewelryImage,
-  resolvedJewelryImage,
-  activeModelUrl,
-  resolvedActiveModelUrl,
+  jewelryUrls,
+  modelUrl,
   generationError,
   handleStartOver,
   onKeepBrowsing,
 }: StudioGeneratingStepProps) {
+  const jewelryInputs = jewelryUrls.filter(Boolean);
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.98 }}
@@ -105,17 +116,13 @@ export function StudioGeneratingStep({
           <ArrowRight className="h-3 w-3 shrink-0" />
         </button>
 
-        <div className="flex gap-4">
-          {jewelryImage && (
-            <div className="w-16 h-16 border border-border/30 overflow-hidden">
-              <img src={resolvedJewelryImage ?? undefined} alt="Jewelry" className="w-full h-full object-cover opacity-50" />
-            </div>
-          )}
-          {activeModelUrl && (
-            <div className="w-16 h-16 border border-border/30 overflow-hidden">
-              <img src={resolvedActiveModelUrl ?? undefined} alt="Model" className="w-full h-full object-cover opacity-50" />
-            </div>
-          )}
+        {/* Every input the workflow is using: each jewelry angle, then the model /
+            inspiration reference. Wraps so a full High Effort set stays uncramped. */}
+        <div className="flex flex-wrap justify-center gap-3">
+          {jewelryInputs.map((url, i) => (
+            <InputThumb key={`jewelry-${i}`} url={url} alt={jewelryInputs.length > 1 ? `Jewelry angle ${i + 1}` : 'Jewelry'} />
+          ))}
+          {modelUrl && <InputThumb url={modelUrl} alt={isProductShot ? 'Inspiration' : 'Model'} />}
         </div>
 
         {generationError && (

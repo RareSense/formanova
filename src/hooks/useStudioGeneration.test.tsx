@@ -465,6 +465,11 @@ describe('useStudioGeneration', () => {
       aspectRatio: '3:4',
       resolution: '1K',
       generationCost: 10,
+      // Exposed for the input previews (spinner / fix / feedback). Low effort:
+      // single-entry jewelry set, effort 'low', reference = the model url.
+      jewelryUrls: ['https://example.com/jewelry.jpg'],
+      effort: 'low',
+      referenceModelUrl: 'https://example.com/model.jpg',
     });
   });
 
@@ -541,6 +546,9 @@ describe('useStudioGeneration', () => {
       aspectRatio: '3:4',
       resolution: '4K',
       generationCost: 25,
+      jewelryUrls: ['https://example.com/jewelry.jpg'],
+      effort: 'low',
+      referenceModelUrl: 'https://example.com/model-a.jpg',
     });
 
     act(() => { result.current.handleKeepBrowsing(); });

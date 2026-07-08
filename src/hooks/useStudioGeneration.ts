@@ -200,6 +200,12 @@ export function useStudioGeneration({
     aspectRatio: generationInputUrlsMap[workflowId]?.aspectRatio ?? myGeneration?.aspectRatio ?? '3:4',
     resolution: generationInputUrlsMap[workflowId]?.resolution ?? myGeneration?.resolution ?? '1K',
     generationCost: generationInputUrlsMap[workflowId]?.generationCost ?? myGeneration?.generationCost ?? null,
+    // High Effort context, needed by every input preview (generating spinner, AI
+    // Fix modal, feedback/human-fix popup) so they surface the full angle set + the
+    // real reference and branch on the generation's own effort, not the live toggle.
+    jewelryUrls: generationInputUrlsMap[workflowId]?.jewelryUrls ?? myGeneration?.jewelryUrls,
+    effort: generationInputUrlsMap[workflowId]?.effort,
+    referenceModelUrl: generationInputUrlsMap[workflowId]?.referenceModelUrl,
   }) : null;
 
   // Cycle rotating messages every 4s while generating
