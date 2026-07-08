@@ -4,7 +4,7 @@
  * Step 1 upload canvas shown when Effort = High. Lets the user add up to 3 images
  * of the SAME piece: one cover + up to two supporting angles.
  *
- * Layout: a single row of EQUAL-SIZE boxes.
+ * Layout: a fixed-height canvas containing a single row of EQUAL-SIZE boxes.
  *   - Nothing uploaded -> one full-width drop zone (looks like low effort; copy
  *     says up to 3).
  *   - As soon as one image is added -> all three equal boxes show: the cover plus
@@ -84,106 +84,108 @@ export function HighEffortUploadCanvas({
   const visibleCount = hasAnyImage ? MAX_TOTAL : 1;
 
   return (
-    <div
-      className={`grid gap-4 ${canvasH}`}
-      style={{ gridTemplateColumns: `repeat(${visibleCount}, minmax(0, 1fr))` }}
-    >
-      {/* Cover box - drop zone when empty, image when filled. Full width when it is
-          the only box (empty state), which reads like the low-effort canvas. */}
-      <div className="relative h-full">
-        {!primaryImage ? (
-          <div
-            onDrop={(e) => { e.preventDefault(); const fs = Array.from(e.dataTransfer.files); if (fs.length) onPrimaryFiles(fs); }}
-            onDragOver={(e) => e.preventDefault()}
-            onClick={() => primaryInputRef.current?.click()}
-            className="relative h-full border-2 border-dashed border-border/70 text-center cursor-pointer
-                       hover:border-foreground/70 hover:bg-foreground/5 transition-all
-                       flex flex-col items-center justify-center px-4"
-          >
-            <FlickerDiamond size="lg" />
-            <p className="text-lg font-display font-medium mb-1.5">Drop your {singular} images here</p>
-            <p className="text-sm text-muted-foreground mb-1.5">Add up to 3 photos of the same {singular} (different angles)</p>
-            <p className="text-sm text-muted-foreground mb-6">Drag &amp; drop &middot; click to browse &middot; paste (Ctrl+V)</p>
-            <Button variant="outline" size="lg" className="gap-2 pointer-events-none">
-              <ImageIcon className="h-4 w-4" />
-              Browse {singular} files
-            </Button>
-            <input
-              ref={primaryInputRef}
-              type="file"
-              multiple
-              accept="image/*,.jfif,.pjpeg,.jpe"
-              className="hidden"
-              onChange={(e) => { const fs = Array.from(e.target.files ?? []); if (fs.length) onPrimaryFiles(fs); e.currentTarget.value = ''; }}
-            />
-          </div>
-        ) : (
-          <div className="relative h-full border-2 border-border/70 overflow-hidden flex items-center justify-center bg-muted/20">
-            <img src={resolvedPrimaryImage ?? undefined} alt={`${singular} cover`} className="max-w-full max-h-full object-contain" />
-            <button
-              onClick={onPrimaryClear}
-              aria-label="Remove cover image"
-              className="absolute top-3 right-3 w-7 h-7 bg-background/80 backdrop-blur-sm flex items-center justify-center
-                         border border-border/40 hover:bg-destructive hover:text-destructive-foreground transition-colors z-10"
+    <div className={`border border-border/30 overflow-hidden ${canvasH}`}>
+      <div
+        className="grid h-full min-h-0 gap-3 p-2 sm:gap-4 sm:p-3"
+        style={{ gridTemplateColumns: `repeat(${visibleCount}, minmax(0, 1fr))` }}
+      >
+        {/* Cover box - drop zone when empty, image when filled. Full width when it is
+            the only box (empty state), which reads like the low-effort canvas. */}
+        <div className="relative h-full min-h-0 min-w-0 overflow-hidden">
+          {!primaryImage ? (
+            <div
+              onDrop={(e) => { e.preventDefault(); const fs = Array.from(e.dataTransfer.files); if (fs.length) onPrimaryFiles(fs); }}
+              onDragOver={(e) => e.preventDefault()}
+              onClick={() => primaryInputRef.current?.click()}
+              className="relative h-full border-2 border-dashed border-border/70 text-center cursor-pointer
+                         hover:border-foreground/70 hover:bg-foreground/5 transition-all
+                         flex flex-col items-center justify-center px-4"
             >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        )}
-      </div>
+              <FlickerDiamond size="lg" />
+              <p className="text-lg font-display font-medium mb-1.5">Drop your {singular} images here</p>
+              <p className="text-sm text-muted-foreground mb-1.5">Add up to 3 photos of the same {singular} (different angles)</p>
+              <p className="text-sm text-muted-foreground mb-6">Drag &amp; drop &middot; click to browse &middot; paste (Ctrl+V)</p>
+              <Button variant="outline" size="lg" className="gap-2 pointer-events-none">
+                <ImageIcon className="h-4 w-4" />
+                Browse {singular} files
+              </Button>
+              <input
+                ref={primaryInputRef}
+                type="file"
+                multiple
+                accept="image/*,.jfif,.pjpeg,.jpe"
+                className="hidden"
+                onChange={(e) => { const fs = Array.from(e.target.files ?? []); if (fs.length) onPrimaryFiles(fs); e.currentTarget.value = ''; }}
+              />
+            </div>
+          ) : (
+            <div className="relative h-full border-2 border-border/70 overflow-hidden flex items-center justify-center bg-muted/20">
+              <img src={resolvedPrimaryImage ?? undefined} alt={`${singular} cover`} className="max-w-full max-h-full object-contain" />
+              <button
+                onClick={onPrimaryClear}
+                aria-label="Remove cover image"
+                className="absolute top-3 right-3 w-7 h-7 bg-background/80 backdrop-blur-sm flex items-center justify-center
+                           border border-border/40 hover:bg-destructive hover:text-destructive-foreground transition-colors z-10"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
 
-      {/* Two supporting slots - shown as soon as any image exists. Each is either a
-          filled angle or an empty "(optional)" box; removing an image returns the
-          box to the empty state. All boxes are the same size as the cover. */}
-      {hasAnyImage && Array.from({ length: MAX_SUPPORTING }).map((_, i) => {
-        const item = supporting[i];
-        return (
-          <div key={i} className="relative h-full">
-            {!item ? (
-              <>
-                <button
-                  type="button"
-                  onDrop={(e) => { e.preventDefault(); const fs = Array.from(e.dataTransfer.files); if (fs.length) onSupportingFiles(fs); }}
-                  onDragOver={(e) => e.preventDefault()}
-                  onClick={() => supportingInputRefs.current[i]?.click()}
-                  className="h-full w-full border-2 border-dashed border-border/70 text-center cursor-pointer
-                             hover:border-foreground/70 hover:bg-foreground/5 transition-all
-                             flex flex-col items-center justify-center px-3"
-                >
-                  <FlickerDiamond size="sm" />
-                  <p className="text-xs text-muted-foreground leading-snug">
-                    Add supporting image of same {singular} (optional)
-                  </p>
-                </button>
-                <input
-                  ref={(el) => { supportingInputRefs.current[i] = el; }}
-                  type="file"
-                  multiple
-                  accept="image/*,.jfif,.pjpeg,.jpe"
-                  className="hidden"
-                  onChange={(e) => { const fs = Array.from(e.target.files ?? []); if (fs.length) onSupportingFiles(fs); e.currentTarget.value = ''; }}
-                />
-              </>
-            ) : (
-              <div className="relative h-full border-2 border-border/70 overflow-hidden flex items-center justify-center bg-muted/20">
-                <img
-                  src={(item.assetId ? resolvedSupporting[i] : item.preview) ?? undefined}
-                  alt={`${singular} angle ${i + 1}`}
-                  className="max-w-full max-h-full object-contain"
-                />
-                <button
-                  onClick={() => onSupportingRemove(i)}
-                  aria-label={`Remove supporting image ${i + 1}`}
-                  className="absolute top-2 right-2 w-6 h-6 bg-background/80 backdrop-blur-sm flex items-center justify-center
-                             border border-border/40 hover:bg-destructive hover:text-destructive-foreground transition-colors z-10"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            )}
-          </div>
-        );
-      })}
+        {/* Two supporting slots - shown as soon as any image exists. Each is either a
+            filled angle or an empty "(optional)" box; removing an image returns the
+            box to the empty state. All boxes are the same size as the cover. */}
+        {hasAnyImage && Array.from({ length: MAX_SUPPORTING }).map((_, i) => {
+          const item = supporting[i];
+          return (
+            <div key={i} className="relative h-full min-h-0 min-w-0 overflow-hidden">
+              {!item ? (
+                <>
+                  <button
+                    type="button"
+                    onDrop={(e) => { e.preventDefault(); const fs = Array.from(e.dataTransfer.files); if (fs.length) onSupportingFiles(fs); }}
+                    onDragOver={(e) => e.preventDefault()}
+                    onClick={() => supportingInputRefs.current[i]?.click()}
+                    className="h-full w-full border-2 border-dashed border-border/70 text-center cursor-pointer
+                               hover:border-foreground/70 hover:bg-foreground/5 transition-all
+                               flex flex-col items-center justify-center px-3"
+                  >
+                    <FlickerDiamond size="sm" />
+                    <p className="text-xs text-muted-foreground leading-snug">
+                      Add supporting image of same {singular} (optional)
+                    </p>
+                  </button>
+                  <input
+                    ref={(el) => { supportingInputRefs.current[i] = el; }}
+                    type="file"
+                    multiple
+                    accept="image/*,.jfif,.pjpeg,.jpe"
+                    className="hidden"
+                    onChange={(e) => { const fs = Array.from(e.target.files ?? []); if (fs.length) onSupportingFiles(fs); e.currentTarget.value = ''; }}
+                  />
+                </>
+              ) : (
+                <div className="relative h-full border-2 border-border/70 overflow-hidden flex items-center justify-center bg-muted/20">
+                  <img
+                    src={(item.assetId ? resolvedSupporting[i] : item.preview) ?? undefined}
+                    alt={`${singular} angle ${i + 1}`}
+                    className="max-w-full max-h-full object-contain"
+                  />
+                  <button
+                    onClick={() => onSupportingRemove(i)}
+                    aria-label={`Remove supporting image ${i + 1}`}
+                    className="absolute top-2 right-2 w-6 h-6 bg-background/80 backdrop-blur-sm flex items-center justify-center
+                               border border-border/40 hover:bg-destructive hover:text-destructive-foreground transition-colors z-10"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
