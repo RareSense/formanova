@@ -42,9 +42,13 @@ export function ResultImageItem({ url, index, workflowId, jewelryType, naturalAs
   // real pixels. Re-fires whenever resolvedSrc changes, so swapping in an
   // upscaled result automatically updates the badge to its new tier.
   const [tier, setTier] = useState<string | null>(null);
+  // Track load so the card holds its space until the image is ready. Without this,
+  // a not-yet-loaded/failed image (naturalAspect = no fixed height) collapses the
+  // container to zero height and the badge + action buttons appear to vanish.
+  const [loaded, setLoaded] = useState(false);
   return (
     <div
-      className={`relative group border border-border/30 overflow-hidden ${
+      className={`relative group border border-border/30 overflow-hidden bg-muted/20 min-h-[220px] ${
         hero
           ? 'w-full max-w-2xl mx-auto'
           : 'w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.75rem)]'
@@ -59,10 +63,18 @@ export function ResultImageItem({ url, index, workflowId, jewelryType, naturalAs
           const height = el.naturalHeight;
           const nextTier = resolutionTierLabel(Math.max(width, height));
           setTier(nextTier);
+          setLoaded(true);
           onMeta?.({ tier: nextTier, width, height });
         }}
+        onError={() => setLoaded(false)}
         className={`w-full object-contain bg-muted/30 ${hero ? 'max-h-[72vh]' : 'max-h-[70vh]'}${naturalAspect ? '' : ' aspect-[3/4]'}`}
       />
+      {/* Loading state — keeps the card sized so the badge + buttons stay visible. */}
+      {!loaded && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-foreground/20 border-t-foreground/60" />
+        </div>
+      )}
       {tier && (
         <span className="absolute top-3 left-3 rounded-md border border-foreground/15 bg-background/90 px-2.5 py-1 font-mono text-xs font-semibold tracking-wider text-foreground shadow-sm backdrop-blur-sm">
           {tier}
