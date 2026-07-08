@@ -848,6 +848,7 @@ export function useStudioGeneration({
     workflowId,
     resultImages,
     setResultImages,
+    resultAssetId,
     generationError,
     regenerationCount,
     setRegenerationCount,

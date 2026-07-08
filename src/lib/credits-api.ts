@@ -30,9 +30,11 @@ export const TOOL_COSTS: Record<string, number> = {
   // estimate call fails; set mid-grid so it neither blocks cheap nor approves the
   // most expensive runs blindly.
   upscale_image: 30,
-  human_fix_photoshoot: 10,          // human fix 1K
-  human_fix_photoshoot_2k: 13,       // human fix 2K
-  human_fix_photoshoot_4k: 18,       // human fix 4K
+  // Human fix pricing is policy-driven by pricing_context (source_asset_id /
+  // workflow_id / effort / shot_type / image_size). This fallback is only
+  // used if /credits/estimate fails, so keep it at the highest current hold instead
+  // of the removed legacy static 10/13/18 table.
+  human_fix_photoshoot: 44,
   cad_generation: 85,
   ring_full_pipeline: 85,
   ring_generate_v1: 85,
