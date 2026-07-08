@@ -110,10 +110,12 @@ export function StudioGeneratingStep({
 
         <button
           onClick={onKeepBrowsing}
-          className="flex items-center gap-1.5 font-mono text-[10px] tracking-[0.2em] uppercase text-foreground hover:text-foreground/70 transition-colors mb-6"
+          className="mb-6 inline-flex items-center gap-2 border border-primary/60 bg-primary/5 px-5 py-2.5
+                     font-mono text-xs font-semibold tracking-[0.2em] uppercase text-foreground
+                     hover:bg-primary/10 hover:border-primary transition-colors"
         >
-          Keep browsing
-          <ArrowRight className="h-3 w-3 shrink-0" />
+          Continue generating
+          <ArrowRight className="h-4 w-4 shrink-0" />
         </button>
 
         {/* Every input the workflow is using: each jewelry angle, then the model /
