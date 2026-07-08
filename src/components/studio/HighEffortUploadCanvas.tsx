@@ -4,14 +4,12 @@
  * Step 1 upload canvas shown when Effort = High. Lets the user add up to 3 images
  * of the SAME piece: one cover + up to two supporting angles.
  *
- * Layout: a single row of EQUAL-SIZE boxes that grows as the user adds images, so
- * it reads clean like the low-effort canvas but makes the "up to 3" affordance
- * obvious:
- *   - 0 images -> one full-width drop zone (looks like low effort; copy says up to 3).
- *   - 1 image  -> two equal boxes: the cover + one empty "add supporting" box.
- *   - 2 images -> three equal boxes: cover + supporting + one empty box.
- *   - 3 images -> three equal filled boxes (no empty slot; max reached).
- * Only ever one trailing empty box is shown (the next slot), never dead boxes.
+ * Layout: a single row of EQUAL-SIZE boxes.
+ *   - Nothing uploaded -> one full-width drop zone (looks like low effort; copy
+ *     says up to 3).
+ *   - As soon as one image is added -> all three equal boxes show: the cover plus
+ *     two supporting slots. Empty supporting slots show the "(optional)" text, so
+ *     removing an image returns that box to the same empty supporting state.
  *
  * Behaviour:
  * - Every box accepts multi-select via browse or drag-drop; paste (Ctrl+V) is
@@ -70,7 +68,7 @@ export function HighEffortUploadCanvas({
   onSupportingFiles,
   onSupportingRemove,
 }: HighEffortUploadCanvasProps) {
-  const emptyInputRef = React.useRef<HTMLInputElement | null>(null);
+  const supportingInputRefs = React.useRef<Array<HTMLInputElement | null>>([]);
 
   // Vault entries (assetId set) carry no data-URL preview; auth-resolve their
   // thumbnail for display. Fresh uploads use `preview` directly. Hooks run at a
@@ -79,11 +77,11 @@ export function HighEffortUploadCanvas({
   const resolvedSlot1 = useAuthenticatedImage(supporting[1]?.assetId ? supporting[1].url : null);
   const resolvedSupporting = [resolvedSlot0, resolvedSlot1];
 
-  const primaryFilled = !!primaryImage;
-  const totalFilled = (primaryFilled ? 1 : 0) + supporting.length;
-  // Reveal the next empty box only once there's a cover and we're under the max.
-  const showEmptySlot = primaryFilled && totalFilled < MAX_TOTAL;
-  const visibleCount = 1 + supporting.length + (showEmptySlot ? 1 : 0);
+  // Nothing uploaded -> one full-width drop zone (low-effort look). As soon as any
+  // image exists -> all three equal boxes (cover + two supporting slots), empty
+  // slots showing the "(optional)" text. Canvas height stays canvasH throughout.
+  const hasAnyImage = !!primaryImage || supporting.length > 0;
+  const visibleCount = hasAnyImage ? MAX_TOTAL : 1;
 
   return (
     <div
@@ -134,54 +132,58 @@ export function HighEffortUploadCanvas({
         )}
       </div>
 
-      {/* Filled supporting angles - one equal box each. */}
-      {supporting.map((item, i) => (
-        <div key={item.id ?? i} className="relative h-full">
-          <div className="relative h-full border-2 border-border/70 overflow-hidden flex items-center justify-center bg-muted/20">
-            <img
-              src={(item.assetId ? resolvedSupporting[i] : item.preview) ?? undefined}
-              alt={`${singular} angle ${i + 1}`}
-              className="max-w-full max-h-full object-contain"
-            />
-            <button
-              onClick={() => onSupportingRemove(i)}
-              aria-label={`Remove supporting image ${i + 1}`}
-              className="absolute top-2 right-2 w-6 h-6 bg-background/80 backdrop-blur-sm flex items-center justify-center
-                         border border-border/40 hover:bg-destructive hover:text-destructive-foreground transition-colors z-10"
-            >
-              <X className="h-3 w-3" />
-            </button>
+      {/* Two supporting slots - shown as soon as any image exists. Each is either a
+          filled angle or an empty "(optional)" box; removing an image returns the
+          box to the empty state. All boxes are the same size as the cover. */}
+      {hasAnyImage && Array.from({ length: MAX_SUPPORTING }).map((_, i) => {
+        const item = supporting[i];
+        return (
+          <div key={i} className="relative h-full">
+            {!item ? (
+              <>
+                <button
+                  type="button"
+                  onDrop={(e) => { e.preventDefault(); const fs = Array.from(e.dataTransfer.files); if (fs.length) onSupportingFiles(fs); }}
+                  onDragOver={(e) => e.preventDefault()}
+                  onClick={() => supportingInputRefs.current[i]?.click()}
+                  className="h-full w-full border-2 border-dashed border-border/70 text-center cursor-pointer
+                             hover:border-foreground/70 hover:bg-foreground/5 transition-all
+                             flex flex-col items-center justify-center px-3"
+                >
+                  <FlickerDiamond size="sm" />
+                  <p className="text-xs text-muted-foreground leading-snug">
+                    Add supporting image of same {singular} (optional)
+                  </p>
+                </button>
+                <input
+                  ref={(el) => { supportingInputRefs.current[i] = el; }}
+                  type="file"
+                  multiple
+                  accept="image/*,.jfif,.pjpeg,.jpe"
+                  className="hidden"
+                  onChange={(e) => { const fs = Array.from(e.target.files ?? []); if (fs.length) onSupportingFiles(fs); e.currentTarget.value = ''; }}
+                />
+              </>
+            ) : (
+              <div className="relative h-full border-2 border-border/70 overflow-hidden flex items-center justify-center bg-muted/20">
+                <img
+                  src={(item.assetId ? resolvedSupporting[i] : item.preview) ?? undefined}
+                  alt={`${singular} angle ${i + 1}`}
+                  className="max-w-full max-h-full object-contain"
+                />
+                <button
+                  onClick={() => onSupportingRemove(i)}
+                  aria-label={`Remove supporting image ${i + 1}`}
+                  className="absolute top-2 right-2 w-6 h-6 bg-background/80 backdrop-blur-sm flex items-center justify-center
+                             border border-border/40 hover:bg-destructive hover:text-destructive-foreground transition-colors z-10"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            )}
           </div>
-        </div>
-      ))}
-
-      {/* One trailing empty box for the next angle - same size as the rest. */}
-      {showEmptySlot && (
-        <div className="relative h-full">
-          <button
-            type="button"
-            onDrop={(e) => { e.preventDefault(); const fs = Array.from(e.dataTransfer.files); if (fs.length) onSupportingFiles(fs); }}
-            onDragOver={(e) => e.preventDefault()}
-            onClick={() => emptyInputRef.current?.click()}
-            className="h-full w-full border-2 border-dashed border-border/70 text-center cursor-pointer
-                       hover:border-foreground/70 hover:bg-foreground/5 transition-all
-                       flex flex-col items-center justify-center px-3"
-          >
-            <FlickerDiamond size="sm" />
-            <p className="text-xs text-muted-foreground leading-snug">
-              Add supporting image of same {singular} (optional)
-            </p>
-          </button>
-          <input
-            ref={emptyInputRef}
-            type="file"
-            multiple
-            accept="image/*,.jfif,.pjpeg,.jpe"
-            className="hidden"
-            onChange={(e) => { const fs = Array.from(e.target.files ?? []); if (fs.length) onSupportingFiles(fs); e.currentTarget.value = ''; }}
-          />
-        </div>
-      )}
+        );
+      })}
     </div>
   );
 }
