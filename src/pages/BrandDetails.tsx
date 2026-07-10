@@ -390,7 +390,8 @@ export default function BrandDetails() {
           <div className="flex items-center justify-center gap-2 pt-2">
             <Lock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             <p className="text-center text-sm text-muted-foreground">
-              Your brand details stay confidential and are never sold or used to train AI.
+              <span className="font-semibold text-foreground">Strictly confidential.</span>{' '}
+              Never sold, never used to train AI. Used solely to shape FormaNova around your brand.
             </p>
           </div>
         </div>
