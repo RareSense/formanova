@@ -7,6 +7,7 @@ const TABS = [
   { label: 'Generations', to: '/admin/generations' },
   { label: 'Feedback', to: '/admin/feedback' },
   { label: 'AI Fixes', to: '/admin/ai-fixes' },
+  { label: 'Brands', to: '/admin/brands' },
   { label: 'Preset Library', to: '/admin/preset-library' },
 ];
 

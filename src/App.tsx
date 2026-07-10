@@ -14,6 +14,7 @@ import { AdminRouteGuard } from '@/components/AdminRouteGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { isOnboardingComplete } from '@/lib/onboarding-api';
 import { PostHogPageView } from '@/components/PostHogPageView';
+import { BrandPromptHandler } from '@/components/BrandPromptHandler';
 import { ChunkErrorBoundary } from '@/components/ChunkErrorBoundary';
 import { RouteErrorBoundary } from '@/components/RouteErrorBoundary';
 import { UpdateBanner } from '@/components/UpdateBanner';
@@ -80,6 +81,7 @@ const AdminAIFixesPage = lazyWithRetry(() => import("./pages/AdminAIFixesPage"))
 const AdminModelsPage = lazyWithRetry(() => import("./pages/AdminModelsPage"));
 const AdminInspirationsPage = lazyWithRetry(() => import("./pages/AdminInspirationsPage"));
 const AdminGenerationsPage = lazyWithRetry(() => import("./pages/AdminGenerationsPage"));
+const AdminBrandsPage = lazyWithRetry(() => import("./pages/AdminBrandsPage"));
 const AdminGenerationDetailPage = lazyWithRetry(() => import("./pages/AdminGenerationDetailPage"));
 const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 const AIJewelryPhotoshoot = lazyWithRetry(() => import("./pages/AIJewelryPhotoshoot"));
@@ -183,6 +185,7 @@ const App = () => (
               <PostHogPageView />
               <PostReloadHandler />
               <OnboardingRedirectHandler />
+              <BrandPromptHandler />
               <VersionBanner />
 
               <DeferredDecorations>
@@ -243,6 +246,7 @@ const App = () => (
                     <Route index element={<Navigate to="/admin/promo-codes" replace />} />
                     <Route path="promo-codes" element={<PromoAdminPage />} />
                     <Route path="generations" element={<AdminGenerationsPage />} />
+                    <Route path="brands" element={<AdminBrandsPage />} />
                     <Route path="feedback" element={<AdminFeedbackPage />} />
                     <Route path="ai-fixes" element={<AdminAIFixesPage />} />
                     <Route path="preset-library" element={<PresetLibraryLayout />}>

@@ -1,12 +1,20 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Plus } from 'lucide-react';
+import { X, Plus, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 export interface BrandDetails {
   brand_name: string;
   website_url: string;
+  store_url: string;
   social_links: string[];
+}
+
+/** Users often type "mybrand.com" — the backend rejects anything that isn't http(s). */
+function normalizeUrl(value: string): string {
+  const v = value.trim();
+  if (!v) return '';
+  return /^https?:\/\//i.test(v) ? v : `https://${v}`;
 }
 
 interface Props {
@@ -19,6 +27,7 @@ interface Props {
 export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props) {
   const [brandName, setBrandName] = useState(initial?.brand_name ?? '');
   const [websiteUrl, setWebsiteUrl] = useState(initial?.website_url ?? '');
+  const [storeUrl, setStoreUrl] = useState(initial?.store_url ?? '');
   const [socialLinks, setSocialLinks] = useState<string[]>(
     initial?.social_links?.length ? initial.social_links : [''],
   );
@@ -57,8 +66,9 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
     }
     onContinue({
       brand_name: brandName.trim(),
-      website_url: websiteUrl.trim(),
-      social_links: socialLinks.map((l) => l.trim()).filter(Boolean),
+      website_url: normalizeUrl(websiteUrl),
+      store_url: normalizeUrl(storeUrl),
+      social_links: socialLinks.map((l) => normalizeUrl(l)).filter(Boolean),
     });
   };
 
@@ -130,6 +140,20 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
             />
           </div>
 
+          {/* Store URL */}
+          <div className="space-y-1.5">
+            <label className="block font-mono text-[10px] uppercase tracking-[0.2em] text-foreground">
+              Online store URL <span className="font-normal text-muted-foreground">[optional]</span>
+            </label>
+            <input
+              type="url"
+              value={storeUrl}
+              onChange={(e) => setStoreUrl(e.target.value)}
+              placeholder="Shopify, Etsy, Amazon, or your own storefront"
+              className="w-full border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 outline-none focus:border-foreground transition-colors"
+            />
+          </div>
+
           {/* Social links */}
           <div className="space-y-2">
             <label className="block font-mono text-[10px] uppercase tracking-[0.2em] text-foreground">
@@ -160,6 +184,19 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
 
         {/* Footer */}
         <div className="border-t border-border px-6 py-5 space-y-4">
+          <div className="flex items-start gap-3 border border-primary/40 bg-primary/5 px-4 py-3.5">
+            <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+            <div className="space-y-1">
+              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-foreground">
+                Confidential
+              </p>
+              <p className="text-sm leading-relaxed text-foreground text-justify">
+                Your brand details remain strictly confidential. They are never sold and never
+                used to train AI. They serve one purpose: crafting a bespoke FormaNova
+                experience around your brand's signature aesthetic.
+              </p>
+            </div>
+          </div>
           <Button
             onClick={handleContinue}
             className="h-11 w-full font-mono text-[10px] uppercase tracking-[0.2em]"
