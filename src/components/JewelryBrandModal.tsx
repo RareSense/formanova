@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Plus, ShieldCheck } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { X, Plus, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface BrandDetails {
@@ -15,6 +14,26 @@ function normalizeUrl(value: string): string {
   const v = value.trim();
   if (!v) return '';
   return /^https?:\/\//i.test(v) ? v : `https://${v}`;
+}
+
+const MAX_SOCIAL_LINKS = 10;
+
+const INPUT_CLASS =
+  'w-full rounded-lg border border-border bg-background px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-foreground transition-colors';
+
+function FieldLabel({ label, required }: { label: string; required?: boolean }) {
+  return (
+    <div className="flex items-center gap-2">
+      <label className="text-sm font-medium text-foreground">
+        {label}{required && <span className="ml-1 text-destructive">*</span>}
+      </label>
+      {!required && (
+        <span className="rounded-full border border-border px-2.5 py-0.5 text-[11px] text-muted-foreground">
+          Optional
+        </span>
+      )}
+    </div>
+  );
 }
 
 interface Props {
@@ -56,6 +75,10 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
     setSocialLinks((prev) => prev.map((v, i) => (i === index ? value : v)));
   };
 
+  const removeSocialLink = (index: number) => {
+    setSocialLinks((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const addSocialLink = () => setSocialLinks((prev) => [...prev, '']);
 
   const handleContinue = () => {
@@ -75,137 +98,133 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6"
       onClick={handleOverlayClick}
     >
-      <div className="relative w-full max-w-md border border-border bg-background shadow-xl">
+      <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col rounded-xl border border-border bg-background shadow-sm">
 
-        {/* Header */}
-        <div className="flex items-start justify-between border-b border-border px-6 pt-6 pb-5">
-          <div>
-            <h2 className="font-display text-2xl uppercase tracking-wide text-foreground leading-none">
-              Tell us about your jewelry brand
-            </h2>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              This helps us personalize your AI photoshoots and product experience.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="ml-4 mt-0.5 shrink-0 flex h-7 w-7 items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Close"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+        {/* Close */}
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+          aria-label="Close"
+        >
+          <X className="h-4 w-4" />
+        </button>
 
-        {/* Body */}
-        <div className="px-6 py-5 space-y-5">
+        {/* Body — scrolls when content outgrows the viewport */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-8 py-10 sm:px-12">
 
-          {/* Brand name */}
-          <div className="space-y-1.5">
-            <label className="block font-mono text-[10px] uppercase tracking-[0.2em] text-foreground">
-              Brand / Business name <span className="text-destructive">*</span>
-            </label>
-            <input
-              ref={firstInputRef}
-              type="text"
-              value={brandName}
-              onChange={(e) => { setBrandName(e.target.value); setBrandNameError(false); }}
-              placeholder="Enter your brand or business name"
-              className={cn(
-                'w-full border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 outline-none transition-colors',
-                brandNameError
-                  ? 'border-destructive focus:border-destructive'
-                  : 'border-border focus:border-foreground',
-              )}
-            />
-            {brandNameError && (
-              <p className="text-xs text-destructive">Brand name is required.</p>
-            )}
-          </div>
+          {/* Header */}
+          <h2 className="font-display text-3xl text-foreground sm:text-4xl">
+            Tell us about your jewelry brand
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground sm:text-base">
+            We'll use this to personalize your studio and future photoshoots.
+          </p>
 
-          {/* Website URL */}
-          <div className="space-y-1.5">
-            <label className="block font-mono text-[10px] uppercase tracking-[0.2em] text-foreground">
-              Website URL <span className="font-normal text-muted-foreground">[optional]</span>
-            </label>
-            <input
-              type="url"
-              value={websiteUrl}
-              onChange={(e) => setWebsiteUrl(e.target.value)}
-              placeholder="https://yourbrand.com"
-              className="w-full border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 outline-none focus:border-foreground transition-colors"
-            />
-          </div>
+          <div className="mt-8 space-y-6">
 
-          {/* Store URL */}
-          <div className="space-y-1.5">
-            <label className="block font-mono text-[10px] uppercase tracking-[0.2em] text-foreground">
-              Online store URL <span className="font-normal text-muted-foreground">[optional]</span>
-            </label>
-            <input
-              type="url"
-              value={storeUrl}
-              onChange={(e) => setStoreUrl(e.target.value)}
-              placeholder="Shopify, Etsy, Amazon, or your own storefront"
-              className="w-full border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 outline-none focus:border-foreground transition-colors"
-            />
-          </div>
-
-          {/* Social links */}
-          <div className="space-y-2">
-            <label className="block font-mono text-[10px] uppercase tracking-[0.2em] text-foreground">
-              Social profile link <span className="font-normal text-muted-foreground">[optional]</span>
-            </label>
+            {/* Brand name */}
             <div className="space-y-2">
-              {socialLinks.map((link, i) => (
-                <input
-                  key={i}
-                  type="url"
-                  value={link}
-                  onChange={(e) => updateSocialLink(i, e.target.value)}
-                  placeholder="Instagram, TikTok, Etsy, Shopify, Pinterest, or any brand page"
-                  className="w-full border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 outline-none focus:border-foreground transition-colors"
-                />
-              ))}
+              <FieldLabel label="Brand name" required />
+              <input
+                ref={firstInputRef}
+                type="text"
+                value={brandName}
+                onChange={(e) => { setBrandName(e.target.value); setBrandNameError(false); }}
+                placeholder="Enter your brand or business name"
+                className={cn(
+                  INPUT_CLASS,
+                  brandNameError && 'border-destructive focus:border-destructive',
+                )}
+              />
+              {brandNameError && (
+                <p className="text-xs text-destructive">Brand name is required.</p>
+              )}
             </div>
+
+            {/* Website */}
+            <div className="space-y-2">
+              <FieldLabel label="Website" />
+              <input
+                type="url"
+                value={websiteUrl}
+                onChange={(e) => setWebsiteUrl(e.target.value)}
+                placeholder="https://yourbrand.com"
+                className={INPUT_CLASS}
+              />
+            </div>
+
+            {/* Online store */}
+            <div className="space-y-2">
+              <FieldLabel label="Online store" />
+              <input
+                type="url"
+                value={storeUrl}
+                onChange={(e) => setStoreUrl(e.target.value)}
+                placeholder="Shopify, Etsy, Amazon, or storefront URL"
+                className={INPUT_CLASS}
+              />
+            </div>
+
+            {/* Social profiles */}
+            <div className="space-y-2">
+              <FieldLabel label="Social profile" />
+              <div className="space-y-2">
+                {socialLinks.map((link, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <input
+                      type="url"
+                      value={link}
+                      onChange={(e) => updateSocialLink(i, e.target.value)}
+                      placeholder="Instagram, TikTok, or Pinterest URL"
+                      className={cn(INPUT_CLASS, 'flex-1')}
+                    />
+                    {socialLinks.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeSocialLink(i)}
+                        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground hover:border-destructive hover:text-destructive transition-colors"
+                        aria-label="Remove link"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {socialLinks.length < MAX_SOCIAL_LINKS && (
+                <button
+                  type="button"
+                  onClick={addSocialLink}
+                  className="flex items-center gap-1.5 pt-1 text-sm font-medium text-foreground hover:opacity-70 transition-opacity"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add another social profile
+                </button>
+              )}
+            </div>
+
+            {/* Privacy */}
+            <div className="flex items-start gap-2.5 pt-1">
+              <Lock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+              <p className="text-xs leading-relaxed text-muted-foreground sm:text-sm">
+                Strictly confidential. Never sold, never used to train AI. Used solely to
+                craft a bespoke FormaNova experience around your brand.
+              </p>
+            </div>
+
+            {/* CTA */}
             <button
               type="button"
-              onClick={addSocialLink}
-              className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground transition-colors"
+              onClick={handleContinue}
+              className="w-full rounded-lg bg-foreground py-4 text-sm font-medium text-background hover:opacity-90 transition-opacity"
             >
-              <Plus className="h-3 w-3" />
-              Add another link
+              Continue to Studio
             </button>
           </div>
-        </div>
-
-        {/* Footer */}
-        <div className="border-t border-border px-6 py-5 space-y-4">
-          <div className="flex items-start gap-3 border border-primary/40 bg-primary/5 px-4 py-3.5">
-            <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-            <div className="space-y-1">
-              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-foreground">
-                Confidential
-              </p>
-              <p className="text-sm leading-relaxed text-foreground text-justify">
-                Your brand details remain strictly confidential. They are never sold and never
-                used to train AI. They serve one purpose: crafting a bespoke FormaNova
-                experience around your brand's signature aesthetic.
-              </p>
-            </div>
-          </div>
-          <Button
-            onClick={handleContinue}
-            className="h-11 w-full font-mono text-[10px] uppercase tracking-[0.2em]"
-          >
-            Continue
-          </Button>
-          <p className="text-center font-mono text-[9px] tracking-[0.1em] text-muted-foreground">
-            You can edit these details anytime from Brand Details in your profile menu.
-          </p>
         </div>
 
       </div>

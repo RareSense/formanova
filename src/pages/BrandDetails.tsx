@@ -71,17 +71,22 @@ const EMPTY: BrandProfile = {
 const BRAND_BOOK_ACCEPT = '.pdf,.png,.jpg,.jpeg,.webp';
 const BRAND_BOOK_MAX_BYTES = 20 * 1024 * 1024;
 
-function FieldLabel({ children }: { children: React.ReactNode }) {
+function LabelRow({ label, required }: { label: string; required?: boolean }) {
   return (
-    <label className="block font-mono text-[10px] uppercase tracking-[0.2em] text-foreground">
-      {children}
-    </label>
+    <div className="flex items-baseline justify-between gap-2">
+      <label className="font-mono text-[10px] uppercase tracking-[0.2em] text-foreground">
+        {label} {required && <span className="text-destructive">*</span>}
+      </label>
+      {!required && (
+        <span className="shrink-0 font-mono text-[9px] uppercase tracking-[0.15em] text-muted-foreground">
+          Optional
+        </span>
+      )}
+    </div>
   );
 }
 
-function Optional() {
-  return <span className="font-normal text-muted-foreground">[optional]</span>;
-}
+const MAX_SOCIAL_LINKS = 10;
 
 const INPUT_CLASS =
   'w-full border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 outline-none focus:border-foreground transition-colors';
@@ -277,26 +282,23 @@ export default function BrandDetails() {
         Dashboard
       </Link>
 
-      {/* Page header */}
+      {/* Page header — the brand's own panel, headlined by their name */}
       <div className="mb-8">
-        <h1 className="font-display text-4xl uppercase tracking-wide text-foreground leading-none sm:text-5xl">
+        <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
           Brand Details
+        </p>
+        <h1 className="mt-2 font-display text-4xl uppercase tracking-wide text-foreground leading-none sm:text-5xl">
+          {isLoading ? ' ' : profile?.brand_name || 'Your Brand'}
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base text-justify">
-          Manage your jewelry brand information. This helps us personalize your AI photoshoots and product experience.
+          This is your brand's home in FormaNova. Everything here shapes how we tailor your AI photoshoots to your brand.
         </p>
-        <div className="mt-4 flex items-start gap-3 border border-primary/40 bg-primary/5 px-4 py-3.5">
-          <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-          <div className="space-y-1">
-            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-foreground">
-              Confidential
-            </p>
-            <p className="text-sm leading-relaxed text-foreground text-justify">
-              Your brand details remain strictly confidential. They are never sold and never
-              used to train AI. They serve one purpose: crafting a bespoke FormaNova
-              experience around your brand's signature aesthetic.
-            </p>
-          </div>
+        <div className="mt-4 flex items-start gap-2">
+          <ShieldCheck className="mt-px h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <p className="font-mono text-[10px] leading-relaxed tracking-[0.1em] text-muted-foreground">
+            CONFIDENTIAL. Never sold, never used to train AI. Used solely to craft a
+            bespoke FormaNova experience around your brand.
+          </p>
         </div>
       </div>
 
@@ -317,14 +319,12 @@ export default function BrandDetails() {
 
             {/* Brand name */}
             <div className="space-y-1.5">
-              <FieldLabel>
-                Brand / Business name <span className="text-destructive">*</span>
-              </FieldLabel>
+              <LabelRow label="Brand / Business name" required />
               <input
                 type="text"
                 value={editName}
                 onChange={(e) => { setEditName(e.target.value); setNameError(false); }}
-                placeholder="Enter your brand or business name"
+                placeholder="Your brand name"
                 className={cn(
                   'w-full border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 outline-none transition-colors',
                   nameError ? 'border-destructive' : 'border-border focus:border-foreground',
@@ -335,31 +335,37 @@ export default function BrandDetails() {
 
             {/* Website URL */}
             <div className="space-y-1.5">
-              <FieldLabel>Website URL <Optional /></FieldLabel>
+              <LabelRow label="Website URL" />
               <input
                 type="url"
                 value={editWebsite}
                 onChange={(e) => setEditWebsite(e.target.value)}
-                placeholder="https://yourbrand.com"
+                placeholder="yourbrand.com"
                 className={INPUT_CLASS}
               />
             </div>
 
             {/* Store URL */}
             <div className="space-y-1.5">
-              <FieldLabel>Online store URL <Optional /></FieldLabel>
+              <LabelRow label="Online store URL" />
               <input
                 type="url"
                 value={editStore}
                 onChange={(e) => setEditStore(e.target.value)}
-                placeholder="Shopify, Etsy, Amazon, or your own storefront"
+                placeholder="yourstore.com"
                 className={INPUT_CLASS}
               />
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Shopify, Etsy, Amazon, or your own storefront.
+              </p>
             </div>
 
             {/* Social links */}
             <div className="space-y-2">
-              <FieldLabel>Social profile links <Optional /></FieldLabel>
+              <LabelRow label="Social profile links" />
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Instagram, TikTok, Pinterest, or any page that shows your brand.
+              </p>
               <div className="space-y-2">
                 {editLinks.map((link, i) => (
                   <div key={i} className="flex items-center gap-2">
@@ -367,14 +373,14 @@ export default function BrandDetails() {
                       type="url"
                       value={link}
                       onChange={(e) => updateLink(i, e.target.value)}
-                      placeholder="Instagram, TikTok, Pinterest, or any brand page"
+                      placeholder="instagram.com/yourbrand"
                       className={cn(INPUT_CLASS, 'flex-1')}
                     />
                     {editLinks.length > 1 && (
                       <button
                         type="button"
                         onClick={() => removeLink(i)}
-                        className="flex h-9 w-9 shrink-0 items-center justify-center border border-border text-muted-foreground hover:border-destructive hover:text-destructive transition-colors"
+                        className="flex h-10 w-10 shrink-0 items-center justify-center border border-border text-muted-foreground hover:border-destructive hover:text-destructive transition-colors"
                         aria-label="Remove link"
                       >
                         <X className="h-3.5 w-3.5" />
@@ -383,39 +389,43 @@ export default function BrandDetails() {
                   </div>
                 ))}
               </div>
-              <button
-                type="button"
-                onClick={addLink}
-                className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <Plus className="h-3 w-3" />
-                Add another link
-              </button>
+              {editLinks.length < MAX_SOCIAL_LINKS && (
+                <button
+                  type="button"
+                  onClick={addLink}
+                  className="flex w-full items-center justify-center gap-2 border border-dashed border-border py-2.5 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground hover:border-foreground hover:text-foreground transition-colors"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add another link
+                </button>
+              )}
             </div>
 
             {/* Based in */}
             <div className="space-y-1.5">
-              <FieldLabel>Based in <Optional /></FieldLabel>
+              <LabelRow label="Based in" />
               <input
                 type="text"
                 value={editBasedIn}
                 onChange={(e) => setEditBasedIn(e.target.value)}
-                placeholder="City, country — e.g. New York, US"
+                placeholder="New York, US"
                 className={INPUT_CLASS}
               />
             </div>
 
             {/* Target markets */}
             <div className="space-y-1.5">
-              <FieldLabel>Target markets <Optional /></FieldLabel>
+              <LabelRow label="Target markets" />
               <input
                 type="text"
                 value={editMarkets}
                 onChange={(e) => setEditMarkets(e.target.value)}
-                placeholder="Comma-separated — e.g. US, UAE, Global"
+                placeholder="US, UAE, Global"
                 className={INPUT_CLASS}
               />
-              <p className="text-xs text-muted-foreground">Separate multiple markets with commas.</p>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Separate multiple markets with commas.
+              </p>
             </div>
 
             {saveError && <p className="text-sm text-destructive">{saveError}</p>}
