@@ -30,7 +30,8 @@ import {
 import { matchesAdminGenerationSearch } from '@/lib/admin-generations-search';
 
 const PAGE_SIZE = 20;
-const STATUS_OPTIONS = ['queued', 'running', 'completed', 'failed', 'cancelled'] as const;
+// 'queued' intentionally absent: the backend never sets it (rows start at 'running').
+const STATUS_OPTIONS = ['running', 'completed', 'failed', 'cancelled'] as const;
 const USER_TYPE_OPTIONS = [
   'jewelry_brand',
   'freelancer',

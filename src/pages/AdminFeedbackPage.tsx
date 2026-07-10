@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   Download, X, ChevronLeft, ChevronRight,
-  Loader2, ImageOff, AlertTriangle, Mail, Clock,
+  Loader2, ImageOff, AlertTriangle, Mail, Clock, Search,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -208,6 +208,14 @@ export default function AdminFeedbackPage() {
   const [toDate, setToDate] = useState('');
   const [offset, setOffset] = useState(0);
 
+  // Reporter email search — debounced 300ms, server-side substring match
+  const [emailSearch, setEmailSearch] = useState('');
+  const [debouncedEmailSearch, setDebouncedEmailSearch] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedEmailSearch(emailSearch.trim()), 300);
+    return () => clearTimeout(t);
+  }, [emailSearch]);
+
   const [activeItem, setActiveItem] = useState<FeedbackItem | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [loadingId, setLoadingId] = useState<string | null>(null);
@@ -229,13 +237,13 @@ export default function AdminFeedbackPage() {
   }, [deepLinkQuery.data]);
 
   // Reset offset on filter change
-  useEffect(() => { setOffset(0); }, [categoryFilter, generationTypeFilter, emailStatusFilter, fromDate, toDate]);
+  useEffect(() => { setOffset(0); }, [categoryFilter, generationTypeFilter, emailStatusFilter, fromDate, toDate, debouncedEmailSearch]);
 
   // Convert local date inputs to ISO 8601 datetimes for the API
   const createdAfter  = fromDate ? `${fromDate}T00:00:00Z` : undefined;
   const createdBefore = toDate   ? `${toDate}T23:59:59Z`   : undefined;
 
-  const queryKey = ['feedback-list', { categoryFilter, generationTypeFilter, emailStatusFilter, fromDate, toDate, offset }];
+  const queryKey = ['feedback-list', { categoryFilter, generationTypeFilter, emailStatusFilter, fromDate, toDate, offset, debouncedEmailSearch }];
 
   const listQuery = useQuery({
     queryKey,
@@ -247,6 +255,7 @@ export default function AdminFeedbackPage() {
       email_status:    emailStatusFilter || undefined,
       created_after:   createdAfter,
       created_before:  createdBefore,
+      reporter_email:  debouncedEmailSearch || undefined,
     }),
   });
 
@@ -255,7 +264,7 @@ export default function AdminFeedbackPage() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
 
-  const hasFilters = !!(categoryFilter || generationTypeFilter || emailStatusFilter || fromDate || toDate);
+  const hasFilters = !!(categoryFilter || generationTypeFilter || emailStatusFilter || fromDate || toDate || emailSearch);
 
   async function openDetail(id: string) {
     setLoadingId(id);
@@ -276,6 +285,7 @@ export default function AdminFeedbackPage() {
     setEmailStatusFilter('');
     setFromDate('');
     setToDate('');
+    setEmailSearch('');
     setOffset(0);
   }
 
@@ -297,6 +307,16 @@ export default function AdminFeedbackPage() {
 
         {/* Filters */}
         <div className="flex flex-wrap gap-2 mb-5">
+          <div className="relative w-full sm:w-56 shrink-0">
+            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={emailSearch}
+              onChange={(e) => setEmailSearch(e.target.value)}
+              placeholder="Search reporter email"
+              className="h-9 pl-8 text-sm"
+            />
+          </div>
+
           <Select value={categoryFilter || 'all'} onValueChange={(v) => setCategoryFilter(v === 'all' ? '' : v)}>
             <SelectTrigger className="h-9 w-full sm:w-36 text-sm shrink-0">
               <SelectValue placeholder="Category" />

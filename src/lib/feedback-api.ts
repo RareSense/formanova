@@ -79,6 +79,7 @@ export interface FeedbackListParams {
   email_status?: EmailStatus;
   created_after?: string;   // ISO 8601
   created_before?: string;  // ISO 8601
+  reporter_email?: string;  // case-insensitive substring match, server-side
 }
 
 export interface FeedbackListResponse {
@@ -101,6 +102,7 @@ export async function listFeedback(params: FeedbackListParams = {}): Promise<Fee
   if (params.email_status)           q.set('email_status',   params.email_status);
   if (params.created_after)          q.set('created_after',  params.created_after);
   if (params.created_before)         q.set('created_before', params.created_before);
+  if (params.reporter_email)         q.set('reporter_email', params.reporter_email);
   const res = await authenticatedFetch(`/api/feedback?${q.toString()}`);
   if (!res.ok) throw new Error(`Failed to fetch feedback: ${res.status}`);
   return res.json();
