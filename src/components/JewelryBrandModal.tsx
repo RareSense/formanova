@@ -167,6 +167,9 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
                 placeholder="Shopify, Etsy, Amazon, or storefront URL"
                 className={INPUT_CLASS}
               />
+              <p className="text-xs text-muted-foreground">
+                Only if you sell somewhere other than your website.
+              </p>
             </div>
 
             {/* Social profiles */}

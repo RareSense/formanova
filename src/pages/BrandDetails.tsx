@@ -212,7 +212,7 @@ export default function BrandDetails() {
                 onSave={saveField('website_url', (v) => normalizeUrl(v) || null)}
               />
               <InlineField
-                label="Online store"
+                label="Online store (if different from website)"
                 value={profile?.store_url ?? ''}
                 placeholder="https://shop.yourbrand.com"
                 onSave={saveField('store_url', (v) => normalizeUrl(v) || null)}
