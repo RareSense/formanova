@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Plus, X, Check, Loader2, Lock, FileText, Upload } from 'lucide-react';
+import { ArrowLeft, Plus, X, Check, Loader2, Lock, FileText, Upload, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { InlineField, FIELD_INPUT_CLASS, FIELD_ICON_BUTTON_CLASS } from '@/components/brand/InlineField';
-import { SocialRow } from '@/components/brand/SocialRow';
+import { SocialRow, EmptySocialSlot } from '@/components/brand/SocialRow';
+import { PRESET_SOCIAL_PLATFORMS, urlMatchesHost } from '@/components/brand/social-icons';
 import {
   type BrandProfile,
   EMPTY_BRAND_PROFILE,
@@ -27,7 +28,7 @@ function formatBytes(bytes: number): string {
 }
 
 const BRAND_BOOK_ACCEPT = '.pdf,.png,.jpg,.jpeg,.webp';
-const MAX_SOCIAL_LINKS = 10;
+const MAX_SOCIAL_LINKS = 4;
 
 export default function BrandDetails() {
   const [profile, setProfile] = useState<BrandProfile | null>(null);
@@ -134,7 +135,7 @@ export default function BrandDetails() {
   const fileExt = brandBook?.filename.split('.').pop()?.toUpperCase() ?? '';
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 sm:py-12">
+    <div className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6 sm:py-12">
 
       {/* Back link */}
       <Link
@@ -151,14 +152,8 @@ export default function BrandDetails() {
           Brand details
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
-          Everything here is used to craft a bespoke FormaNova experience around your brand.
+          The more we know about your brand, the more bespoke your photoshoots become.
         </p>
-        <div className="mt-2.5 flex items-start gap-2">
-          <Lock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            Confidential. Your data is never sold or used to train AI.
-          </p>
-        </div>
       </div>
 
       {isLoading ? (
@@ -189,6 +184,7 @@ export default function BrandDetails() {
                 label="Based in"
                 value={profile?.based_in ?? ''}
                 placeholder="City, country"
+                icon={MapPin}
                 onSave={saveField('based_in')}
               />
               <div className="sm:col-span-2">
@@ -229,6 +225,26 @@ export default function BrandDetails() {
               {(profile?.social_links ?? []).map((link, i) => (
                 <SocialRow key={`${link}-${i}`} url={link} onSave={saveSocialAt(i)} />
               ))}
+              {/* Pre-made platform slots with example URLs, until that platform is linked */}
+              {(profile?.social_links ?? []).length < MAX_SOCIAL_LINKS &&
+                PRESET_SOCIAL_PLATFORMS
+                  .filter((p) => !(profile?.social_links ?? []).some((l) => urlMatchesHost(l, p.match)))
+                  .slice(0, MAX_SOCIAL_LINKS - (profile?.social_links ?? []).length)
+                  .map((p) => (
+                    <EmptySocialSlot
+                      key={p.key}
+                      example={p.example}
+                      Icon={p.Icon}
+                      onAdd={async (value) => {
+                        const normalized = normalizeUrl(value);
+                        if (!normalized) return 'Enter a profile URL.';
+                        const next = [...(profile?.social_links ?? []), normalized];
+                        const message = await patchBrandProfile({ social_links: next });
+                        if (!message) setProfile((prev) => (prev ? { ...prev, social_links: next } : prev));
+                        return message;
+                      }}
+                    />
+                  ))}
             </div>
 
             {(profile?.social_links ?? []).length < MAX_SOCIAL_LINKS && (
@@ -286,8 +302,8 @@ export default function BrandDetails() {
 
           {/* Brand book */}
           <div className="border border-border bg-background px-6 py-6 sm:px-8 sm:py-7">
-            <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-              <div className="sm:max-w-xs">
+            <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+              <div className="sm:max-w-xs sm:shrink-0">
                 <h2 className="font-display text-2xl text-foreground">Brand book</h2>
                 <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                   Upload your brand guidelines so generated photos can better match your visual identity.
@@ -306,7 +322,7 @@ export default function BrandDetails() {
               />
 
               {brandBook ? (
-                <div className="flex items-center gap-5">
+                <div className="flex flex-1 items-center justify-center gap-5">
                   <div className="flex h-20 w-16 shrink-0 items-center justify-center border border-border bg-muted/30">
                     <FileText className="h-8 w-8 text-destructive" />
                   </div>
@@ -347,18 +363,35 @@ export default function BrandDetails() {
                   </div>
                 </div>
               ) : (
-                <button
-                  type="button"
+                <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={bookUploading}
-                  className="flex items-center justify-center gap-2 bg-foreground px-6 py-3.5 text-sm font-medium text-background hover:opacity-90 transition-opacity"
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click(); }}
+                  className="flex flex-1 cursor-pointer flex-col items-center gap-1.5 border border-dashed border-border px-6 py-6 hover:border-foreground transition-colors"
                 >
-                  {bookUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                  {bookUploading ? 'Uploading' : 'Upload brand book'}
-                </button>
+                  {bookUploading
+                    ? <Loader2 className="h-5 w-5 animate-spin text-foreground" />
+                    : <Upload className="h-5 w-5 text-foreground" />}
+                  <p className="text-sm font-medium text-foreground">
+                    {bookUploading ? 'Uploading…' : 'Upload brand book'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">PDF, PNG or JPG · Maximum 20 MB</p>
+                  <span className="mt-1.5 border border-border px-4 py-1.5 text-sm text-foreground">
+                    Choose file
+                  </span>
+                </div>
               )}
             </div>
-            {bookError && <p className="mt-3 text-sm text-destructive">{bookError}</p>}
+            {bookError && <p className="mt-3 text-center text-sm text-destructive">{bookError}</p>}
+          </div>
+
+          {/* Confidentiality note */}
+          <div className="flex items-center justify-center gap-2 pt-2">
+            <Lock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <p className="text-center text-sm text-muted-foreground">
+              Your brand details stay confidential and are never sold or used to train AI.
+            </p>
           </div>
         </div>
       )}

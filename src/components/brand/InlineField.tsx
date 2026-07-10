@@ -18,6 +18,8 @@ interface InlineFieldProps {
   displayValue?: string;
   placeholder: string;
   required?: boolean;
+  /** Optional leading icon shown in the read-mode box (e.g. MapPin for location). */
+  icon?: React.ComponentType<{ className?: string }>;
   onSave: (value: string) => Promise<string | null>;
 }
 
@@ -25,7 +27,7 @@ interface InlineFieldProps {
  * Read-only value box with a pencil that flips it into an input with explicit
  * save/cancel (Enter/Escape) and a brief saved confirmation.
  */
-export function InlineField({ label, value, displayValue, placeholder, required, onSave }: InlineFieldProps) {
+export function InlineField({ label, value, displayValue, placeholder, required, icon: Icon, onSave }: InlineFieldProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   const [saving, setSaving] = useState(false);
@@ -105,6 +107,7 @@ export function InlineField({ label, value, displayValue, placeholder, required,
         </div>
       ) : (
         <div className={FIELD_BOX_CLASS}>
+          {Icon && <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />}
           <span className={cn('min-w-0 flex-1 truncate text-sm', value ? 'text-foreground' : 'text-muted-foreground/60')}>
             {(value && (displayValue ?? value)) || placeholder}
           </span>

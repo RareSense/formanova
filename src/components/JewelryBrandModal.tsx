@@ -16,7 +16,7 @@ function normalizeUrl(value: string): string {
   return /^https?:\/\//i.test(v) ? v : `https://${v}`;
 }
 
-const MAX_SOCIAL_LINKS = 10;
+const MAX_SOCIAL_LINKS = 4;
 
 const INPUT_CLASS =
   'w-full border border-border bg-background px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-foreground transition-colors';
@@ -208,11 +208,10 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
             </div>
 
             {/* Privacy */}
-            <div className="flex items-start gap-2.5 pt-1">
-              <Lock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-              <p className="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                Strictly confidential. Never sold, never used to train AI. Used solely to
-                craft a bespoke FormaNova experience around your brand.
+            <div className="flex items-center justify-center gap-2 pt-1">
+              <Lock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <p className="text-center text-xs leading-relaxed text-muted-foreground sm:text-sm">
+                Your brand details stay confidential and are never sold or used to train AI.
               </p>
             </div>
 

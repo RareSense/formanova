@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { isOnboardingComplete } from '@/lib/onboarding-api';
@@ -28,6 +28,7 @@ const SKIP_PATHS = [
 export function BrandPromptHandler() {
   const { user, initializing } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
 
   const skip = SKIP_PATHS.includes(location.pathname) || location.pathname.startsWith('/blog/');
@@ -80,6 +81,8 @@ export function BrandPromptHandler() {
       // Non-blocking: they can finish from the Brand Details page anytime.
     }
     markSeen();
+    // The CTA says "Continue to Studio" — honor it.
+    navigate('/studio');
   };
 
   if (!open) return null;
