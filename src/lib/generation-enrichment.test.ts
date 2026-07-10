@@ -17,8 +17,15 @@ describe('extractPhotoThumbnail', () => {
     expect(extractPhotoThumbnail([])).toBeNull();
   });
 
-  it('returns null when generate_jewelry_image step is missing', () => {
-    const steps = [{ tool: 'other_tool', output: { image_b64: 'abc' } }];
+  it('falls back to a generic output scan when generate_jewelry_image step is missing', () => {
+    // Upscale/fix workflows have no generate step but still carry a result
+    // image in a step output — it must surface so history shows them.
+    const steps = [{ tool: 'upscale_image', output: { image_b64: 'abc' } }];
+    expect(extractPhotoThumbnail(steps)).toBe('data:image/jpeg;base64,abc');
+  });
+
+  it('returns null when no step output carries an image at all', () => {
+    const steps = [{ tool: 'other_tool', output: { note: 'no image here' } }];
     expect(extractPhotoThumbnail(steps)).toBeNull();
   });
 

@@ -56,6 +56,26 @@ describe('ResultImageItem', () => {
     });
   });
 
+  it('opens blob: results WITHOUT noopener (Chromium cannot resolve blob URLs in a noopener tab)', async () => {
+    const newTab = {} as unknown as Window;
+    window.open = vi.fn(() => newTab);
+
+    render(
+      <ResultImageItem
+        url="blob:https://formanova.ai/39d55423-9ad1-4527"
+        index={0}
+        workflowId="wf-12345678"
+        jewelryType="ring"
+      />,
+    );
+
+    fireEvent.click(screen.getAllByRole('button')[1]);
+
+    await waitFor(() => {
+      expect(window.open).toHaveBeenCalledWith('blob:https://formanova.ai/39d55423-9ad1-4527', '_blank', '');
+    });
+  });
+
   it('alerts when opening in a new tab is popup-blocked', async () => {
     window.open = vi.fn(() => null);
 

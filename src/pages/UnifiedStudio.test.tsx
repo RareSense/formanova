@@ -6,6 +6,9 @@ import { HelmetProvider } from 'react-helmet-async';
 
 import UnifiedStudio from './UnifiedStudio';
 
+// heic2any touches Worker/canvas at import time, which jsdom doesn't provide.
+vi.mock('heic2any', () => ({ default: vi.fn() }));
+
 // ── framer-motion ──────────────────────────────────────────────────────────
 vi.mock('framer-motion', () => ({
   motion: new Proxy({}, {

@@ -87,7 +87,10 @@ function findKeyedImageUrl(obj: unknown): string | null {
 export function extractPhotoThumbnail(steps: any[]): string | null {
   // Match generate_jewelry_image, generate_jewelry_image_2k, generate_jewelry_image_4k, etc.
   const genStep = steps.find((s: any) => typeof s.tool === 'string' && s.tool.startsWith('generate_jewelry_image'));
-  if (!genStep?.output) return null;
+  // Workflows without a generate step (upscale_image, fixes) still carry their
+  // result image in a step output — fall back to the generic output scan so
+  // they render in history instead of being dropped by the requireImage filter.
+  if (!genStep?.output) return extractProductShotThumbnail(steps);
   const out = genStep.output as any;
   const b64: string | undefined = out?.image_b64 ?? out?.result?.image_b64;
   const mime: string = out?.mime_type ?? out?.result?.mime_type ?? 'image/jpeg';

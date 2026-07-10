@@ -58,7 +58,10 @@ export function PhotoPreviewModal({ imageUrl, alt, onClose, assetId }: PhotoPrev
       document.body.removeChild(a);
       if (!src.startsWith('blob:') && !src.startsWith('data:')) URL.revokeObjectURL(blobUrl);
     } catch {
-      const win = window.open(src, '_blank', 'noopener,noreferrer');
+      // Chromium cannot resolve blob: URLs in a noopener window, so same-origin
+      // blob/data URLs we minted ourselves must open WITHOUT noopener.
+      const features = src.startsWith('blob:') || src.startsWith('data:') ? '' : 'noopener,noreferrer';
+      const win = window.open(src, '_blank', features);
       if (!win) alert('Download failed. Please try again.');
     }
   };

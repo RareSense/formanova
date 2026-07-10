@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Download, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
@@ -16,7 +16,11 @@ function openImageInNewTab(src: string) {
   // Direct navigation works for blob:, data:, artifact-resolved blob URLs, and
   // public/SAS https URLs alike, and unlike fetch() it is not subject to CORS,
   // so cross-origin Azure result images open reliably.
-  const win = window.open(src, '_blank', 'noopener,noreferrer');
+  // Chromium cannot resolve blob: URLs in a noopener window (the tab lands in a
+  // separate agent cluster and shows "site can't be reached"), so same-origin
+  // blob/data URLs we minted ourselves must open WITHOUT noopener.
+  const features = src.startsWith('blob:') || src.startsWith('data:') ? '' : 'noopener,noreferrer';
+  const win = window.open(src, '_blank', features);
   if (!win) throw new Error('Popup blocked');
 }
 
@@ -46,6 +50,11 @@ export function ResultImageItem({ url, index, workflowId, jewelryType, naturalAs
   // a not-yet-loaded/failed image (naturalAspect = no fixed height) collapses the
   // container to zero height and the badge + action buttons appear to vanish.
   const [loaded, setLoaded] = useState(false);
+  // Re-show the spinner whenever the source swaps (e.g. an upscaled result
+  // replacing the original) instead of holding the previous image on screen.
+  useEffect(() => {
+    setLoaded(false);
+  }, [resolvedSrc]);
   return (
     <div
       className={`relative group border border-border/30 overflow-hidden bg-muted/20 min-h-[220px] ${
@@ -133,7 +142,7 @@ export function ResultImageItem({ url, index, workflowId, jewelryType, naturalAs
             try {
               const src = resolvedSrc ?? url;
               if (!src) throw new Error('No image source');
-              await openImageInNewTab(src);
+              openImageInNewTab(src);
             } catch {
               alert('Could not open the image in a new tab. Please try again.');
             }
