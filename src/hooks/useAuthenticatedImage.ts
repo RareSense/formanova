@@ -29,6 +29,11 @@ export function useAuthenticatedImage(url: string | null | undefined): string | 
       return;
     }
 
+    // Clear immediately: when the url swaps (e.g. an upscaled result replacing
+    // the original), the old blob URL is revoked by the previous cleanup, so
+    // keeping it in state renders a stale/dead image while the new one loads.
+    setBlobUrl(null);
+
     let objectUrl: string | null = null;
     let cancelled = false;
 
