@@ -1,3 +1,4 @@
+
 # Brand Analysis — Backend API Spec (follow-up to brand-details)
 
 Follow-up to `docs/brand-details-api-spec.md`, which is already built - nothing

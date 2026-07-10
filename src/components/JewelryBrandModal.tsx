@@ -19,7 +19,7 @@ function normalizeUrl(value: string): string {
 const MAX_SOCIAL_LINKS = 10;
 
 const INPUT_CLASS =
-  'w-full rounded-lg border border-border bg-background px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-foreground transition-colors';
+  'w-full border border-border bg-background px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-foreground transition-colors';
 
 function FieldLabel({ label, required }: { label: string; required?: boolean }) {
   return (
@@ -28,7 +28,7 @@ function FieldLabel({ label, required }: { label: string; required?: boolean }) 
         {label}{required && <span className="ml-1 text-destructive">*</span>}
       </label>
       {!required && (
-        <span className="rounded-full border border-border px-2.5 py-0.5 text-[11px] text-muted-foreground">
+        <span className="border border-border px-2.5 py-0.5 text-[11px] text-muted-foreground">
           Optional
         </span>
       )}
@@ -101,7 +101,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6"
       onClick={handleOverlayClick}
     >
-      <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col rounded-xl border border-border bg-background shadow-sm">
+      <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col border border-border bg-background">
 
         {/* Close */}
         <button
@@ -186,7 +186,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
                       <button
                         type="button"
                         onClick={() => removeSocialLink(i)}
-                        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground hover:border-destructive hover:text-destructive transition-colors"
+                        className="flex h-12 w-12 shrink-0 items-center justify-center border border-border text-muted-foreground hover:border-destructive hover:text-destructive transition-colors"
                         aria-label="Remove link"
                       >
                         <X className="h-4 w-4" />
@@ -220,7 +220,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
             <button
               type="button"
               onClick={handleContinue}
-              className="w-full rounded-lg bg-foreground py-4 text-sm font-medium text-background hover:opacity-90 transition-opacity"
+              className="w-full bg-foreground py-4 text-sm font-medium text-background hover:opacity-90 transition-opacity"
             >
               Continue to Studio
             </button>

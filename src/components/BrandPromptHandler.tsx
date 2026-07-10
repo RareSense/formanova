@@ -51,6 +51,12 @@ export function BrandPromptHandler() {
       })
       .catch(() => {});
     return () => { cancelled = true; };
+    // Excluded deps: `user` (object identity changes on every auth refresh; user?.id covers the
+    // meaningful change) and `open` (only read to skip re-fetching while the modal is showing;
+    // re-running on open change would refetch the profile pointlessly). Safe because the effect
+    // is idempotent: it re-checks localStorage and profile state on every run. Regression to
+    // watch: prompt not appearing after a same-session logout/login as a different user
+    // (user?.id covers this).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initializing, user?.id, skip]);
 
