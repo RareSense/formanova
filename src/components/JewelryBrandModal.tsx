@@ -121,7 +121,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
             Tell us about your jewelry brand
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground sm:text-base">
-            We'll use this to personalize your studio and future photoshoots.
+            The more we know about your brand, the more bespoke your photoshoots become.
           </p>
 
           <div className="mt-8 space-y-6">
