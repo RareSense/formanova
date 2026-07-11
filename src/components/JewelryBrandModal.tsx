@@ -55,6 +55,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
 
   const [brandName, setBrandName] = useState(initial?.brand_name ?? '');
   const [basedIn, setBasedIn] = useState(initial?.based_in ?? '');
+  const [targetMarkets, setTargetMarkets] = useState((initial?.target_markets ?? []).join(', '));
   const [websiteUrl, setWebsiteUrl] = useState(initial?.website_url ?? '');
   const [storeUrl, setStoreUrl] = useState(initial?.store_url ?? '');
   const [instagramHandle, setInstagramHandle] = useState(
@@ -85,6 +86,8 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
 
   const instagramUrl = handleToUrl(instagramHandle, INSTAGRAM.urlPrefix);
 
+  const parsedMarkets = targetMarkets.split(',').map((m) => m.trim()).filter(Boolean);
+
   const handleContinue = () => {
     if (!brandName.trim()) {
       setBrandNameError(true);
@@ -111,7 +114,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
       store_url: store,
       social_links: socialLinks,
       based_in: basedIn.trim(),
-      target_markets: initial?.target_markets ?? [],
+      target_markets: parsedMarkets,
     });
   };
 
@@ -121,7 +124,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6"
       onClick={handleOverlayClick}
     >
-      <div className="relative flex max-h-[90vh] w-full max-w-5xl flex-col border border-border bg-background">
+      <div className="relative flex max-h-[90vh] w-full max-w-6xl flex-col border border-border bg-background">
 
         {/* Close */}
         <button
@@ -148,6 +151,8 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
 
             {/* Form */}
             <div className="order-2 space-y-6 lg:order-1">
+
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-4">
 
             {/* Brand name */}
             <div className="space-y-2">
@@ -182,6 +187,23 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
               />
             </div>
 
+            </div>
+
+            {/* Target markets */}
+            <div className="space-y-2">
+              <FieldLabel label="Target markets" />
+              <input
+                type="text"
+                value={targetMarkets}
+                onChange={(e) => setTargetMarkets(e.target.value)}
+                maxLength={120}
+                placeholder="US, UAE, Global"
+                className={INPUT_CLASS}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-4">
+
             {/* Website */}
             <div className="space-y-2">
               <FieldLabel label="Website" />
@@ -213,6 +235,8 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
               <p className="text-xs text-muted-foreground">
                 Only if you sell somewhere other than your website.
               </p>
+            </div>
+
             </div>
 
             {/* Instagram */}
@@ -268,7 +292,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
                   brandName={brandName}
                   websiteUrl={websiteUrl}
                   basedIn={basedIn}
-                  targetMarkets={[]}
+                  targetMarkets={parsedMarkets}
                   socialLinks={instagramUrl ? [instagramUrl] : []}
                 />
               </div>
