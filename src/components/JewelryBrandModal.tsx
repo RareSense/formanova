@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Plus, Lock, Loader2, Upload, FileText, Check, Globe, MapPin, ShoppingBag } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTheme } from '@/contexts/ThemeContext';
+import { DARK_THEMES } from '@/components/ThemeLogo';
 import { BrandCard } from '@/components/brand/BrandCard';
 import { PRESET_SOCIAL_PLATFORMS, extractHandle, handleToUrl, urlMatchesHost } from '@/components/brand/social-icons';
 import { uploadBrandBook, deleteBrandBook, isValidHttpUrl, isValidHandle, INVALID_URL_MESSAGE } from '@/lib/brand-profile-api';
@@ -63,6 +65,8 @@ interface Props {
 }
 
 export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props) {
+  const { theme } = useTheme();
+  const isDark = DARK_THEMES.has(theme);
   const initialHandles: Record<string, string> = {};
   const otherInitialLinks: string[] = [];
   for (const link of initial?.social_links ?? []) {
@@ -91,6 +95,9 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
   });
   const [brandNameError, setBrandNameError] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<'website' | 'store' | 'social' | 'extra', string>>>({});
+  // Card face follows what the user is filling: front fields flip to front,
+  // back fields flip to back; the toggle stays available for manual control.
+  const [cardFace, setCardFace] = useState<'front' | 'back'>('front');
 
   // Brand book uploads immediately (the endpoint sets the profile field server-side).
   const [bookFilename, setBookFilename] = useState<string | null>(null);
@@ -127,6 +134,13 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
   const liveSocialLinks = PRESET_SOCIAL_PLATFORMS
     .map((p) => handleToUrl(handles[p.key] ?? '', p.urlPrefix))
     .filter(Boolean);
+  // Once the card-visible fields are complete, show both faces at once.
+  const allDone = Boolean(
+    brandName.trim() && basedIn.trim() && parsedMarkets.length &&
+    websiteUrl.trim() && (handles.instagram ?? '').trim(),
+  );
+  const showFront = () => setCardFace('front');
+  const showBack = () => setCardFace('back');
 
   const handleBookUpload = async (file: File) => {
     setBookUploading(true);
@@ -193,7 +207,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6"
       onClick={handleOverlayClick}
     >
-      <div className="relative flex max-h-[90vh] w-full max-w-6xl flex-col border border-border bg-background">
+      <div className="relative flex max-h-[92vh] w-full max-w-7xl flex-col border border-border bg-background">
 
         {/* Close */}
         <button
@@ -207,10 +221,10 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
 
         {/* Body — scrolls when content outgrows the viewport */}
         <div className="min-h-0 flex-1 overflow-y-auto px-8 py-10 sm:px-12">
-          <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,440px)] lg:gap-12">
+          <div className="grid gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-0">
 
             {/* Form */}
-            <div className="order-2 lg:order-1">
+            <div className="order-2 lg:order-1 lg:pr-10">
               <h2 className="font-display text-3xl text-foreground sm:text-4xl">
                 Tell us about your jewelry brand
               </h2>
@@ -228,6 +242,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
                 type="text"
                 value={brandName}
                 onChange={(e) => { setBrandName(e.target.value); setBrandNameError(false); }}
+                onFocus={showFront}
                 maxLength={120}
                 placeholder="Enter your brand or business name"
                 className={cn(
@@ -249,6 +264,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
                   type="text"
                   value={basedIn}
                   onChange={(e) => setBasedIn(e.target.value)}
+                  onFocus={showBack}
                   maxLength={80}
                   placeholder="City, country"
                 />
@@ -260,6 +276,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
                   type="text"
                   value={targetMarkets}
                   onChange={(e) => setTargetMarkets(e.target.value)}
+                  onFocus={showBack}
                   maxLength={120}
                   placeholder="US, UAE, Global"
                 />
@@ -275,6 +292,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
                   type="url"
                   value={websiteUrl}
                   onChange={(e) => { setWebsiteUrl(e.target.value); setFieldErrors((p) => ({ ...p, website: undefined })); }}
+                  onFocus={showBack}
                   maxLength={200}
                   placeholder="yourbrand.com"
                   error={Boolean(fieldErrors.website)}
@@ -288,6 +306,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
                   type="url"
                   value={storeUrl}
                   onChange={(e) => { setStoreUrl(e.target.value); setFieldErrors((p) => ({ ...p, store: undefined })); }}
+                  onFocus={showBack}
                   maxLength={200}
                   placeholder="shop.yourbrand.com"
                   error={Boolean(fieldErrors.store)}
@@ -319,6 +338,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
                         setHandles((prev) => ({ ...prev, [key]: e.target.value }));
                         setFieldErrors((p) => ({ ...p, social: undefined }));
                       }}
+                      onFocus={showBack}
                       maxLength={40}
                       placeholder="username or link"
                       aria-label={`${label} handle`}
@@ -327,15 +347,15 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
                     {(handles[key] ?? '').trim() && (
                       <Check className="mx-3 h-4 w-4 shrink-0 text-formanova-success" aria-label="Filled" />
                     )}
-                    {key !== 'instagram' && (
+                    {(key !== 'instagram' || (handles[key] ?? '').trim()) && (
                       <button
                         type="button"
                         onClick={() => {
-                          setRevealed((prev) => prev.filter((k) => k !== key));
+                          if (key !== 'instagram') setRevealed((prev) => prev.filter((k) => k !== key));
                           setHandles((prev) => ({ ...prev, [key]: '' }));
                         }}
                         className="mr-2 shrink-0 p-1.5 text-muted-foreground hover:text-destructive transition-colors"
-                        aria-label={`Remove ${label}`}
+                        aria-label={key === 'instagram' ? 'Clear Instagram' : `Remove ${label}`}
                       >
                         <X className="h-4 w-4" />
                       </button>
@@ -350,6 +370,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
                         type="url"
                         value={extraLink}
                         onChange={(e) => { setExtraLink(e.target.value); setFieldErrors((p) => ({ ...p, extra: undefined })); }}
+                        onFocus={showBack}
                         maxLength={200}
                         placeholder="Any other profile URL"
                         className="min-w-0 flex-1 bg-transparent px-3.5 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none"
@@ -446,29 +467,58 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
             <button
               type="button"
               onClick={handleContinue}
-              className="w-full bg-foreground py-4 text-sm font-medium text-background hover:opacity-90 transition-opacity"
+              className={cn(
+                'w-full py-4 text-sm font-medium transition-colors',
+                isDark
+                  ? 'border border-foreground bg-transparent text-foreground hover:bg-foreground hover:text-background'
+                  : 'bg-foreground text-background hover:opacity-90',
+              )}
             >
               Save and continue to Studio
             </button>
               </div>
             </div>
 
-            {/* Live bespoke card */}
-            <div className="order-1 lg:order-2">
+            {/* Live bespoke card stage */}
+            <div className="order-1 lg:order-2 lg:border-l lg:border-border lg:pl-10">
               <div className="mx-auto max-w-md lg:sticky lg:top-0 lg:max-w-none">
-                <div className="border border-border bg-muted/20 p-5 sm:p-6">
-                  <p className="mb-4 font-card text-sm uppercase tracking-[0.22em] text-foreground">
+                <div className="mb-4 flex items-center justify-between gap-4">
+                  <p className="font-card text-sm uppercase tracking-[0.22em] text-foreground">
                     Your Bespoke Card
                   </p>
-                  <BrandCard
-                    brandName={brandName}
-                    websiteUrl={websiteUrl}
-                    storeUrl={storeUrl}
-                    basedIn={basedIn}
-                    targetMarkets={parsedMarkets}
-                    socialLinks={liveSocialLinks}
-                  />
                 </div>
+                {!allDone && (
+                  <div className="mb-5 grid grid-cols-2 border border-border">
+                    {(['front', 'back'] as const).map((side) => (
+                      <button
+                        key={side}
+                        type="button"
+                        onClick={() => setCardFace(side)}
+                        className={cn(
+                          'py-2 text-xs font-medium capitalize transition-colors',
+                          cardFace === side
+                            ? 'bg-foreground text-background'
+                            : 'bg-background text-muted-foreground hover:text-foreground',
+                        )}
+                      >
+                        {side}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <BrandCard
+                  brandName={brandName}
+                  websiteUrl={websiteUrl}
+                  storeUrl={storeUrl}
+                  basedIn={basedIn}
+                  targetMarkets={parsedMarkets}
+                  socialLinks={liveSocialLinks}
+                  face={allDone ? 'both' : cardFace}
+                />
+                <p className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+                  <span aria-hidden="true" className="text-formanova-hero-accent">&#10022;</span>
+                  Updates live as you complete your details.
+                </p>
               </div>
             </div>
 
