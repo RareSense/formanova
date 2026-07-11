@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Check, Globe, ShoppingBag, MapPin, Compass, ArrowRight } from 'lucide-react';
+import { Globe, ShoppingBag, MapPin, Compass, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ThemeLogo, DARK_THEMES } from '@/components/ThemeLogo';
@@ -21,12 +21,6 @@ export interface BrandCardProps {
   face?: 'front' | 'back' | 'both';
   className?: string;
 }
-
-const BACK_BENEFITS = [
-  'Your brand details remembered',
-  'Every generation shaped to your aesthetic',
-  'Collections stay consistent across every shoot',
-];
 
 function displayUrl(url: string): string {
   return url
@@ -94,9 +88,9 @@ interface DetailRowProps {
 function DetailRow({ Icon, value, pal, href }: DetailRowProps) {
   const content = (
     <>
-      <Icon className="h-4 w-4 shrink-0" />
-      <span className="h-5 w-px shrink-0" style={{ backgroundColor: pal.line }} />
-      <span className="min-w-0 truncate text-[13px]">{value}</span>
+      <Icon className="h-[18px] w-[18px] shrink-0" />
+      <span className="h-6 w-px shrink-0" style={{ backgroundColor: pal.line }} />
+      <span className="min-w-0 truncate text-sm">{value}</span>
     </>
   );
   const rowClass = 'flex min-w-0 items-center gap-2.5 border-b pb-2';
@@ -252,22 +246,13 @@ export function BrandCard({
 
   const back = (
     <>
-      <p className="font-card text-xl font-medium uppercase tracking-[0.16em] sm:text-2xl">
+      <p className="font-card text-2xl font-medium uppercase tracking-[0.16em] sm:text-[26px]">
         A Bespoke Experience For You
       </p>
       <div className="mt-2.5">{sparkleRule}</div>
 
-      <ul className="mt-5 space-y-2.5">
-        {BACK_BENEFITS.map((line) => (
-          <li key={line} className="flex items-center gap-3">
-            <Check className="h-4 w-4 shrink-0" style={{ color: pal.accent }} />
-            <span className="text-[13px] sm:text-sm">{line}</span>
-          </li>
-        ))}
-      </ul>
-
       {(site || store || basedIn.trim() || markets.length > 0 || links.length > 0) && (
-        <div className="mt-6 grid grid-cols-2 content-start gap-x-8 gap-y-3.5">
+        <div className="mt-7 grid grid-cols-2 content-start gap-x-9 gap-y-5">
           {site && <DetailRow Icon={Globe} value={site} pal={pal} />}
           {store && <DetailRow Icon={ShoppingBag} value={store} pal={pal} />}
           {basedIn.trim() && <DetailRow Icon={MapPin} value={basedIn.trim()} pal={pal} />}
