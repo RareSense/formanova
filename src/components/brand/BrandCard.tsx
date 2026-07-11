@@ -52,20 +52,26 @@ function handleLabel(link: string): string {
  *  - 29-42 chars: two balanced lines, reduced size and line-height
  *  - over 42 chars: two lines maximum, then ellipsis
  */
+/** Desktop spec size capped, scaling proportionally on narrower cards. */
+function fluid(px: number, cqwFactor: number): string {
+  return `min(${px}px, ${cqwFactor}cqw)`;
+}
+
 function titleStyle(name: string): React.CSSProperties {
   const len = name.length;
   if (len <= 28) {
-    // One line: responsive fit against the container, capped at 48px,
-    // never below the 34px readable minimum.
+    // One line: responsive fit against the container, capped at 48px.
+    // The readable floor itself scales on small cards so the fitted size
+    // is never overridden into an overflow.
     const cap = len <= 18 ? 48 : 42;
     return {
       whiteSpace: 'nowrap',
-      fontSize: `clamp(34px, min(${cap}px, ${(120 / len).toFixed(1)}cqw), ${cap}px)`,
+      fontSize: `clamp(${fluid(34, 8)}, min(${cap}px, ${(120 / len).toFixed(1)}cqw), ${cap}px)`,
       lineHeight: 1.1,
     };
   }
   return {
-    fontSize: len <= 42 ? '36px' : '34px',
+    fontSize: len <= 42 ? fluid(36, 8.5) : fluid(34, 8),
     lineHeight: 1.15,
     textWrap: 'balance',
     display: '-webkit-box',
@@ -133,7 +139,7 @@ function DetailRow({ Icon, value, pal, href }: DetailRowProps) {
     <>
       <Icon className="h-[18px] w-[18px] shrink-0" />
       <span className="h-6 w-px shrink-0" style={{ backgroundColor: pal.line }} />
-      <span className="min-w-0 truncate text-sm">{value}</span>
+      <span className="min-w-0 truncate" style={{ fontSize: 'clamp(11px, 2.4cqw, 14px)' }}>{value}</span>
     </>
   );
   const rowClass = 'flex min-w-0 items-center gap-2.5 border-b pb-2';
@@ -215,7 +221,7 @@ export function BrandCard({
   const frame = (children: React.ReactNode, opts?: { abs?: boolean; back?: boolean }) => (
     <div
       className={cn(
-        'flex flex-col overflow-hidden rounded-2xl border p-6 sm:p-8',
+        'flex flex-col overflow-hidden rounded-2xl border',
         opts?.abs ? 'absolute inset-0 [backface-visibility:hidden]' : 'relative aspect-[3/2] w-full',
         opts?.abs && opts?.back && '[transform:rotateY(180deg)]',
       )}
@@ -225,6 +231,7 @@ export function BrandCard({
         color: pal.ink,
         boxShadow: '0 24px 50px -20px hsl(var(--foreground) / 0.45)',
         containerType: 'inline-size',
+        padding: 'clamp(16px, 4.8cqw, 30px)',
       }}
     >
       {children}
@@ -237,8 +244,8 @@ export function BrandCard({
       {name && (
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute right-[17%] top-1/2 -translate-y-1/2 font-card text-[10rem] leading-none sm:text-[12rem]"
-          style={{ color: pal.emboss }}
+          className="pointer-events-none absolute right-[17%] top-1/2 -translate-y-1/2 font-card leading-none"
+          style={{ color: pal.emboss, fontSize: '27cqw' }}
         >
           {name.charAt(0).toUpperCase()}
         </span>
@@ -258,7 +265,7 @@ export function BrandCard({
           <ThemeLogo variant="plain" className="h-6 sm:h-7" width={140} height={28} />
           <Sparkle className="-translate-y-1.5 text-[11px]" />
         </span>
-        <p className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.25em]" style={{ color: pal.ink }}>
+        <p className="flex items-center gap-1.5 font-mono uppercase tracking-[0.25em]" style={{ color: pal.ink, fontSize: 'clamp(8px, 1.7cqw, 10px)' }}>
           Private Brand Space
           <Sparkle className="text-[10px]" />
         </p>
@@ -271,17 +278,17 @@ export function BrandCard({
             {name}
           </p>
         )}
-        <p className="mt-2.5 font-mono text-[11px] uppercase tracking-[0.28em]" style={{ color: pal.support }}>
+        <p className="mt-2.5 font-mono uppercase tracking-[0.28em]" style={{ color: pal.support, fontSize: 'clamp(8.5px, 1.85cqw, 11px)' }}>
           Bespoke Jewelry Brand Experience
         </p>
         <div className="mt-3.5">{sparkleRule}</div>
-        <p className="mt-3.5 font-card text-[15px] italic" style={{ color: pal.support }}>
+        <p className="mt-3.5 font-card italic" style={{ color: pal.support, fontSize: 'clamp(11px, 2.6cqw, 15px)' }}>
           Designed around your brand, every time.
         </p>
       </div>
 
       {/* Bottom-right pairing */}
-      <p className="relative min-w-0 max-w-full self-end truncate font-card text-[11px] uppercase tracking-[0.25em]" style={{ color: pal.ink }}>
+      <p className="relative min-w-0 max-w-full self-end truncate font-card uppercase tracking-[0.25em]" style={{ color: pal.ink, fontSize: 'clamp(8.5px, 1.85cqw, 11px)' }}>
         {name ? `${name} × FormaNova` : 'FormaNova'}
       </p>
     </>
@@ -289,7 +296,7 @@ export function BrandCard({
 
   const back = (
     <>
-      <p className="font-card text-2xl font-medium uppercase tracking-[0.16em] sm:text-[26px]">
+      <p className="font-card font-medium uppercase tracking-[0.16em]" style={{ fontSize: 'clamp(15px, 4.4cqw, 26px)' }}>
         A Bespoke Experience For You
       </p>
       <div className="mt-2.5">{sparkleRule}</div>

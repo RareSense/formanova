@@ -197,7 +197,7 @@ export default function BrandDetails() {
     : (profile?.target_markets ?? []);
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 sm:py-12 lg:px-10">
+    <div className="mx-auto w-full max-w-[1500px] px-4 py-10 sm:px-6 sm:py-12 lg:px-10">
 
       {/* Back link */}
       <Link
@@ -223,7 +223,7 @@ export default function BrandDetails() {
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : (
-        <div className="lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:items-start lg:gap-10">
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,540px)] lg:items-start lg:gap-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,620px)] xl:gap-14">
 
           {/* Live brand card — fills as fields are edited */}
           <div className="mx-auto mb-8 w-full max-w-xl lg:sticky lg:top-8 lg:order-2 lg:mx-0 lg:mb-0 lg:max-w-none">
@@ -312,7 +312,7 @@ export default function BrandDetails() {
 
             {/* Social profiles */}
             <p className="mt-5 text-sm font-medium text-foreground">Social profiles</p>
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {(profile?.social_links ?? []).map((link, i) => (
                 <SocialRow key={`${link}-${i}`} url={link} onSave={saveSocialAt(i)} />
               ))}
