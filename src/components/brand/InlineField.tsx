@@ -111,7 +111,14 @@ export function InlineField({ label, value, displayValue, placeholder, required,
           </button>
         </div>
       ) : (
-        <div className={FIELD_BOX_CLASS}>
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={startEdit}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startEdit(); } }}
+          aria-label={`Edit ${label}`}
+          className={cn(FIELD_BOX_CLASS, 'cursor-text hover:border-foreground transition-colors')}
+        >
           {Icon && <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />}
           <span className={cn('min-w-0 flex-1 truncate text-sm', value ? 'text-foreground' : 'text-muted-foreground/60')}>
             {(value && (displayValue ?? value)) || placeholder}

@@ -92,7 +92,14 @@ export function SocialRow({ url, onSave }: SocialRowProps) {
   }
 
   return (
-    <div className={FIELD_BOX_CLASS}>
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={startEdit}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startEdit(); } }}
+      aria-label="Edit link"
+      className={cn(FIELD_BOX_CLASS, 'cursor-text hover:border-foreground transition-colors')}
+    >
       <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
       <span className="min-w-0 flex-1 truncate text-sm text-foreground">{displayUrl(url)}</span>
       <button
@@ -184,7 +191,14 @@ export function EmptySocialSlot({ example, Icon, onAdd }: EmptySocialSlotProps) 
   }
 
   return (
-    <div className={FIELD_BOX_CLASS}>
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={startEdit}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startEdit(); } }}
+      aria-label={`Add ${example}`}
+      className={cn(FIELD_BOX_CLASS, 'cursor-text hover:border-foreground transition-colors')}
+    >
       <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
       <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground/60">{example}</span>
       <button
