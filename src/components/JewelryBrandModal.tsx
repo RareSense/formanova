@@ -474,7 +474,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
                   : 'bg-foreground text-background hover:opacity-90',
               )}
             >
-              Save and continue to Studio
+              Save and Continue
             </button>
               </div>
             </div>
@@ -515,10 +515,6 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
                   socialLinks={liveSocialLinks}
                   face={allDone ? 'both' : cardFace}
                 />
-                <p className="mt-4 flex items-center gap-2 text-[13px] text-muted-foreground">
-                  <span aria-hidden="true" className="text-formanova-hero-accent">&#10022;</span>
-                  Updates live as you complete your details.
-                </p>
               </div>
             </div>
 
