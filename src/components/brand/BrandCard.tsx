@@ -253,7 +253,7 @@ export function BrandCard({
   const back = (
     <>
       <p className="font-card text-xl font-medium uppercase tracking-[0.16em] sm:text-2xl">
-        Your FormaNova Experience
+        A Bespoke Experience For You
       </p>
       <div className="mt-2.5">{sparkleRule}</div>
 
