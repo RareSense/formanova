@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Plus, X, Check, Loader2, Lock, FileText, Upload, MapPin } from 'lucide-react';
+import { ArrowLeft, Plus, X, Check, Loader2, Lock, FileText, Upload, MapPin, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { InlineField, FIELD_INPUT_CLASS, FIELD_ICON_BUTTON_CLASS } from '@/components/brand/InlineField';
 import { SocialRow, EmptySocialSlot } from '@/components/brand/SocialRow';
-import { BrandCard } from '@/components/brand/BrandCard';
+import { BrandCard, BrandCardFaceToggle, type CardFace } from '@/components/brand/BrandCard';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { PRESET_SOCIAL_PLATFORMS, urlMatchesHost } from '@/components/brand/social-icons';
 import {
   type BrandProfile,
@@ -36,6 +37,9 @@ const MAX_SOCIAL_LINKS = 4;
 export default function BrandDetails() {
   const [profile, setProfile] = useState<BrandProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const isMobile = useIsMobile();
+  // Desktop defaults to showing both faces; mobile shows one readable side.
+  const [cardFace, setCardFace] = useState<CardFace>('both');
 
   // Unsaved drafts overlay the profile on the live brand card while editing.
   const [preview, setPreview] = useState<{
@@ -51,6 +55,11 @@ export default function BrandDetails() {
   const [addSaving, setAddSaving] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const addInputRef = useRef<HTMLInputElement>(null);
+
+  // Delete brand profile state
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deletingProfile, setDeletingProfile] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Brand book state
   const [brandBook, setBrandBook] = useState<BrandBookState | null>(null);
@@ -163,8 +172,29 @@ export default function BrandDetails() {
     setProfile((prev) => (prev ? { ...prev, brand_book_asset_id: null } : prev));
   };
 
+  const handleDeleteProfile = async () => {
+    setDeletingProfile(true);
+    setDeleteError(null);
+    const message = await patchBrandProfile({
+      brand_name: null,
+      website_url: null,
+      store_url: null,
+      social_links: [],
+      based_in: null,
+      target_markets: [],
+    });
+    if (!message && profile?.brand_book_asset_id) await deleteBrandBook();
+    setDeletingProfile(false);
+    if (message) { setDeleteError(message); return; }
+    setProfile(EMPTY_BRAND_PROFILE);
+    setBrandBook(null);
+    setPreview({});
+    setConfirmingDelete(false);
+  };
+
   const fileExt = brandBook?.filename.split('.').pop()?.toUpperCase() ?? '';
 
+  const effectiveCardFace: CardFace = isMobile && cardFace === 'both' ? 'front' : cardFace;
   const cardMarkets = preview.target_markets !== undefined
     ? preview.target_markets.split(',').map((m) => m.trim()).filter(Boolean)
     : (profile?.target_markets ?? []);
@@ -200,6 +230,12 @@ export default function BrandDetails() {
 
           {/* Live brand card — fills as fields are edited */}
           <div className="mx-auto mb-8 max-w-md lg:sticky lg:top-8 lg:order-2 lg:mx-0 lg:mb-0 lg:max-w-none">
+            <BrandCardFaceToggle
+              face={effectiveCardFace}
+              onFaceChange={setCardFace}
+              showBoth={!isMobile}
+              className="mb-5"
+            />
             <BrandCard
               brandName={preview.brand_name ?? profile?.brand_name ?? ''}
               websiteUrl={preview.website_url ?? profile?.website_url ?? ''}
@@ -207,6 +243,7 @@ export default function BrandDetails() {
               basedIn={preview.based_in ?? profile?.based_in ?? ''}
               targetMarkets={cardMarkets}
               socialLinks={profile?.social_links ?? []}
+              face={effectiveCardFace}
             />
           </div>
 
@@ -454,6 +491,45 @@ export default function BrandDetails() {
             </p>
           </div>
           </div>
+
+        </div>
+      )}
+
+      {/* Delete brand profile — outside the containers, bottom-left */}
+      {!isLoading && (
+        <div className="mt-8">
+          {confirmingDelete ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-sm text-foreground">Delete all brand details? This cannot be undone.</p>
+              <button
+                type="button"
+                onClick={() => void handleDeleteProfile()}
+                disabled={deletingProfile}
+                className="inline-flex items-center gap-1.5 border border-destructive px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors"
+              >
+                {deletingProfile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                {deletingProfile ? 'Deleting…' : 'Delete permanently'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmingDelete(false)}
+                disabled={deletingProfile}
+                className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmingDelete(true)}
+              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-destructive transition-colors"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete brand profile
+            </button>
+          )}
+          {deleteError && <p className="mt-2 text-sm text-destructive">{deleteError}</p>}
         </div>
       )}
     </div>

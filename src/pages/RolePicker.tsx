@@ -11,6 +11,7 @@ import {
   saveUserType,
 } from '@/lib/onboarding-api';
 import { trackUserTypeSelected } from '@/lib/posthog-events';
+import { toast } from '@/hooks/use-toast';
 import { JewelryBrandModal, type BrandDetails } from '@/components/JewelryBrandModal';
 
 // ---------------------------------------------------------------------------
@@ -168,6 +169,12 @@ export default function RolePicker() {
     try {
       await saveUserType(selected, selected === 'jewelry_brand' ? brandDetails : null);
       trackUserTypeSelected({ user_type: selected });
+      if (selected === 'jewelry_brand' && brandDetails) {
+        toast({
+          title: 'Saved',
+          description: 'You can edit or delete your details anytime in Brand Settings.',
+        });
+      }
       markOnboardingComplete(user.id);
       navigate('/studio', { replace: true });
     } catch {

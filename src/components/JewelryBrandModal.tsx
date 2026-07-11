@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { X, Plus, Lock, Loader2, Upload, FileText, Check, Globe, MapPin, ShoppingBag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
 import { DARK_THEMES } from '@/components/ThemeLogo';
-import { BrandCard } from '@/components/brand/BrandCard';
+import { BrandCard, BrandCardFaceToggle, type CardFace } from '@/components/brand/BrandCard';
 import { PRESET_SOCIAL_PLATFORMS, extractHandle, handleToUrl, urlMatchesHost } from '@/components/brand/social-icons';
 import { uploadBrandBook, deleteBrandBook, isValidHttpUrl, isValidHandle, INVALID_URL_MESSAGE } from '@/lib/brand-profile-api';
 
@@ -67,6 +68,7 @@ interface Props {
 export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props) {
   const { theme } = useTheme();
   const isDark = DARK_THEMES.has(theme);
+  const isMobile = useIsMobile();
   const initialHandles: Record<string, string> = {};
   const otherInitialLinks: string[] = [];
   for (const link of initial?.social_links ?? []) {
@@ -97,7 +99,10 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<'website' | 'store' | 'social' | 'extra', string>>>({});
   // Card face follows what the user is filling: front fields flip to front,
   // back fields flip to back; the toggle stays available for manual control.
-  const [cardFace, setCardFace] = useState<'front' | 'back'>('front');
+  // On completion the card auto-shows both faces once (desktop only), but
+  // the user can always switch back to one side at a time.
+  const [cardFace, setCardFace] = useState<CardFace>('front');
+  const autoBothShown = useRef(false);
 
   // Brand book uploads immediately (the endpoint sets the profile field server-side).
   const [bookFilename, setBookFilename] = useState<string | null>(null);
@@ -134,13 +139,19 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
   const liveSocialLinks = PRESET_SOCIAL_PLATFORMS
     .map((p) => handleToUrl(handles[p.key] ?? '', p.urlPrefix))
     .filter(Boolean);
-  // Once the card-visible fields are complete, show both faces at once.
+  // Once the card-visible fields are complete, offer (and auto-show once)
+  // the Both view on desktop.
   const allDone = Boolean(
     brandName.trim() && basedIn.trim() && parsedMarkets.length &&
     websiteUrl.trim() && (handles.instagram ?? '').trim(),
   );
-  const showFront = () => setCardFace('front');
-  const showBack = () => setCardFace('back');
+  if (allDone && !isMobile && !autoBothShown.current) {
+    autoBothShown.current = true;
+    setCardFace('both');
+  }
+  // Focus-follow only flips between single faces; it never leaves Both.
+  const showFront = () => setCardFace((f) => (f === 'both' ? f : 'front'));
+  const showBack = () => setCardFace((f) => (f === 'both' ? f : 'back'));
 
   const handleBookUpload = async (file: File) => {
     setBookUploading(true);
@@ -204,7 +215,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6 lg:backdrop-blur-md"
       onClick={handleOverlayClick}
     >
       <div className="relative flex max-h-[92vh] w-full max-w-7xl flex-col border border-border bg-background">
@@ -331,6 +342,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
                       <Icon className="h-4 w-4 shrink-0" />
                       <span className="text-sm">{label}</span>
                     </span>
+                    <span className="pl-3 text-sm text-muted-foreground" aria-hidden="true">@</span>
                     <input
                       type="text"
                       value={handles[key] ?? ''}
@@ -340,9 +352,9 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
                       }}
                       onFocus={showBack}
                       maxLength={40}
-                      placeholder="username or link"
+                      placeholder="yourbrand"
                       aria-label={`${label} handle`}
-                      className="min-w-0 flex-1 bg-transparent px-3.5 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none"
+                      className="min-w-0 flex-1 bg-transparent py-3.5 pl-1 pr-3.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none"
                     />
                     {(handles[key] ?? '').trim() && (
                       <Check className="mx-3 h-4 w-4 shrink-0 text-formanova-success" aria-label="Filled" />
@@ -487,25 +499,12 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
                     Your Bespoke Card
                   </p>
                 </div>
-                {!allDone && (
-                  <div className="mb-5 grid grid-cols-2 border border-border">
-                    {(['front', 'back'] as const).map((side) => (
-                      <button
-                        key={side}
-                        type="button"
-                        onClick={() => setCardFace(side)}
-                        className={cn(
-                          'py-2 text-xs font-medium capitalize transition-colors',
-                          cardFace === side
-                            ? 'bg-foreground text-background'
-                            : 'bg-background text-muted-foreground hover:text-foreground',
-                        )}
-                      >
-                        {side}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                <BrandCardFaceToggle
+                  face={cardFace}
+                  onFaceChange={setCardFace}
+                  showBoth={allDone && !isMobile}
+                  className="mb-5"
+                />
                 <BrandCard
                   brandName={brandName}
                   websiteUrl={websiteUrl}
@@ -513,7 +512,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
                   basedIn={basedIn}
                   targetMarkets={parsedMarkets}
                   socialLinks={liveSocialLinks}
-                  face={allDone ? 'both' : cardFace}
+                  face={cardFace === 'both' && (isMobile || !allDone) ? 'front' : cardFace}
                 />
               </div>
             </div>

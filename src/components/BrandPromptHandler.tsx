@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { isOnboardingComplete } from '@/lib/onboarding-api';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
+import { toast } from '@/hooks/use-toast';
 import type { BrandDetails } from '@/components/JewelryBrandModal';
 
 const JewelryBrandModal = lazy(() =>
@@ -78,6 +79,10 @@ export function BrandPromptHandler() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
+      });
+      toast({
+        title: 'Saved',
+        description: 'You can edit or delete your details anytime in Brand Settings.',
       });
     } catch {
       // Non-blocking: they can finish from the Brand Details page anytime.

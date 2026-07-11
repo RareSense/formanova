@@ -1,5 +1,4 @@
-import { Link } from 'react-router-dom';
-import { Globe, ShoppingBag, MapPin, Compass, ArrowRight } from 'lucide-react';
+import { Globe, ShoppingBag, MapPin, Compass } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ThemeLogo, DARK_THEMES } from '@/components/ThemeLogo';
@@ -20,6 +19,13 @@ export interface BrandCardProps {
    */
   face?: 'front' | 'back' | 'both';
   className?: string;
+}
+
+/** Bare domains, www., or full URLs all become a proper clickable href. */
+function toHref(url: string): string {
+  const v = url.trim();
+  if (!v) return '';
+  return /^https?:\/\//i.test(v) ? v : `https://${v}`;
 }
 
 function displayUrl(url: string): string {
@@ -67,6 +73,43 @@ function titleStyle(name: string): React.CSSProperties {
     WebkitLineClamp: 2,
     overflow: 'hidden',
   };
+}
+
+export type CardFace = 'front' | 'back' | 'both';
+
+/** Segmented Front/Back(/Both) switch shared by every card preview. */
+export function BrandCardFaceToggle({
+  face,
+  onFaceChange,
+  showBoth,
+  className,
+}: {
+  face: CardFace;
+  onFaceChange: (face: CardFace) => void;
+  /** Offer the Both option (desktop, once the card is complete). */
+  showBoth?: boolean;
+  className?: string;
+}) {
+  const options: CardFace[] = showBoth ? ['front', 'back', 'both'] : ['front', 'back'];
+  return (
+    <div className={cn('grid border border-border', showBoth ? 'grid-cols-3' : 'grid-cols-2', className)}>
+      {options.map((side) => (
+        <button
+          key={side}
+          type="button"
+          onClick={() => onFaceChange(side)}
+          className={cn(
+            'py-2 text-xs font-medium capitalize transition-colors',
+            face === side
+              ? 'bg-foreground text-background'
+              : 'bg-background text-muted-foreground hover:text-foreground',
+          )}
+        >
+          {side}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 interface Palette {
@@ -253,8 +296,8 @@ export function BrandCard({
 
       {(site || store || basedIn.trim() || markets.length > 0 || links.length > 0) && (
         <div className="mt-7 grid grid-cols-2 content-start gap-x-9 gap-y-5">
-          {site && <DetailRow Icon={Globe} value={site} pal={pal} />}
-          {store && <DetailRow Icon={ShoppingBag} value={store} pal={pal} />}
+          {site && <DetailRow Icon={Globe} value={site} pal={pal} href={toHref(websiteUrl)} />}
+          {store && <DetailRow Icon={ShoppingBag} value={store} pal={pal} href={toHref(storeUrl)} />}
           {basedIn.trim() && <DetailRow Icon={MapPin} value={basedIn.trim()} pal={pal} />}
           {markets.length > 0 && <DetailRow Icon={Compass} value={markets.join(' · ')} pal={pal} />}
           {links.map((link) => (
@@ -268,16 +311,6 @@ export function BrandCard({
           ))}
         </div>
       )}
-
-      {/* Bottom-right safe-area action */}
-      <Link
-        to="/brand-details"
-        className="mt-auto flex items-center gap-2 self-end font-card text-[15px] italic hover:opacity-60 transition-opacity"
-        style={{ color: pal.ink }}
-      >
-        Edit in Brand Settings
-        <ArrowRight className="h-4 w-4" />
-      </Link>
     </>
   );
 
