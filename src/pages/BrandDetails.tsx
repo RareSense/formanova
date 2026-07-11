@@ -5,7 +5,6 @@ import { cn } from '@/lib/utils';
 import { InlineField, FIELD_INPUT_CLASS, FIELD_ICON_BUTTON_CLASS } from '@/components/brand/InlineField';
 import { SocialRow, EmptySocialSlot } from '@/components/brand/SocialRow';
 import { BrandCard, BrandCardFaceToggle, type CardFace } from '@/components/brand/BrandCard';
-import { useIsMobile } from '@/hooks/use-mobile';
 import { PRESET_SOCIAL_PLATFORMS, urlMatchesHost } from '@/components/brand/social-icons';
 import {
   type BrandProfile,
@@ -37,9 +36,8 @@ const MAX_SOCIAL_LINKS = 4;
 export default function BrandDetails() {
   const [profile, setProfile] = useState<BrandProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const isMobile = useIsMobile();
-  // Desktop defaults to showing both faces; mobile shows one readable side.
-  const [cardFace, setCardFace] = useState<CardFace>('both');
+  // One readable card side at a time, on every screen size.
+  const [cardFace, setCardFace] = useState<CardFace>('front');
 
   // Unsaved drafts overlay the profile on the live brand card while editing.
   const [preview, setPreview] = useState<{
@@ -194,13 +192,12 @@ export default function BrandDetails() {
 
   const fileExt = brandBook?.filename.split('.').pop()?.toUpperCase() ?? '';
 
-  const effectiveCardFace: CardFace = isMobile && cardFace === 'both' ? 'front' : cardFace;
   const cardMarkets = preview.target_markets !== undefined
     ? preview.target_markets.split(',').map((m) => m.trim()).filter(Boolean)
     : (profile?.target_markets ?? []);
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-12">
+    <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 sm:py-12 lg:px-10">
 
       {/* Back link */}
       <Link
@@ -226,14 +223,13 @@ export default function BrandDetails() {
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : (
-        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-8">
+        <div className="lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:items-start lg:gap-10">
 
           {/* Live brand card — fills as fields are edited */}
-          <div className="mx-auto mb-8 max-w-md lg:sticky lg:top-8 lg:order-2 lg:mx-0 lg:mb-0 lg:max-w-none">
+          <div className="mx-auto mb-8 w-full max-w-xl lg:sticky lg:top-8 lg:order-2 lg:mx-0 lg:mb-0 lg:max-w-none">
             <BrandCardFaceToggle
-              face={effectiveCardFace}
+              face={cardFace}
               onFaceChange={setCardFace}
-              showBoth={!isMobile}
               className="mb-5"
             />
             <BrandCard
@@ -243,7 +239,7 @@ export default function BrandDetails() {
               basedIn={preview.based_in ?? profile?.based_in ?? ''}
               targetMarkets={cardMarkets}
               socialLinks={profile?.social_links ?? []}
-              face={effectiveCardFace}
+              face={cardFace}
             />
           </div>
 
@@ -316,7 +312,7 @@ export default function BrandDetails() {
 
             {/* Social profiles */}
             <p className="mt-5 text-sm font-medium text-foreground">Social profiles</p>
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
               {(profile?.social_links ?? []).map((link, i) => (
                 <SocialRow key={`${link}-${i}`} url={link} onSave={saveSocialAt(i)} />
               ))}
