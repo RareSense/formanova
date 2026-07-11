@@ -6,7 +6,7 @@ import logoWhite from '@/assets/formanova-logo-white-tagline.png';
 import logoPlainBlack from '@/assets/formanova-logo-black.webp';
 import logoPlainWhite from '@/assets/formanova-logo-white.webp';
 
-const DARK_THEMES = new Set(['dark', 'cyberpunk', 'retro', 'fashion', 'luxury', 'synthwave', 'neon']);
+export const DARK_THEMES = new Set(['dark', 'cyberpunk', 'retro', 'fashion', 'luxury', 'synthwave', 'neon']);
 
 interface ThemeLogoProps {
   className?: string;

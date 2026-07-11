@@ -1,7 +1,8 @@
 import { Check, Globe, ShoppingBag, MapPin, Compass } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTheme } from '@/contexts/ThemeContext';
+import { ThemeLogo, DARK_THEMES } from '@/components/ThemeLogo';
 import { socialIconFor, extractHandle } from '@/components/brand/social-icons';
-import wordmark from '@/assets/formanova-logo-black.webp';
 import pendant from '@/assets/brand-card-pendant.webp';
 
 export interface BrandCardProps {
@@ -16,13 +17,16 @@ export interface BrandCardProps {
 }
 
 /*
- * The card is a fixed ivory keepsake, deliberately NOT theme-tokened so it
- * looks identical across all 12 app themes.
+ * The card follows the active theme, mapped for guaranteed visibility:
+ * - body text and the brand name always use foreground (contrast-safe)
+ * - the theme's personality comes from decorative accents (sparkles, rules)
+ * - vivid colored type (primary) only on dark themes, where it stays
+ *   readable; light themes keep quiet ink so pale accents never wash out
  */
-const INK = '#1B1710';
-const ACCENT = '#7A2233';
-const EMBOSS = '#EAE2D0';
-const LINE = '#E0D8C5';
+const INK = 'hsl(var(--foreground))';
+const ACCENT = 'hsl(var(--formanova-hero-accent))';
+const EMBOSS = 'hsl(var(--foreground) / 0.07)';
+const LINE = 'hsl(var(--border))';
 
 function displayUrl(url: string): string {
   return url
@@ -71,10 +75,10 @@ function CardFrame({ children }: { children: React.ReactNode }) {
       <div
         className="relative flex aspect-[3/2] w-full flex-col overflow-hidden rounded-2xl border p-5 sm:p-7"
         style={{
-          backgroundColor: '#F6F1E6',
+          backgroundColor: 'hsl(var(--card))',
           borderColor: LINE,
           color: INK,
-          boxShadow: '0 18px 40px -18px rgba(27, 23, 16, 0.45)',
+          boxShadow: '0 18px 40px -18px hsl(var(--foreground) / 0.4)',
           containerType: 'inline-size',
         }}
       >
@@ -129,7 +133,7 @@ function DetailRow({ Icon, value, href }: DetailRowProps) {
  * Premium bespoke brand card that fills live as the user types.
  * Both faces are shown stacked: front (wordmark, serif brand name, pendant
  * over an embossed initial) and back (the FormaNova experience promise plus
- * the brand's details). Fixed ivory palette, identical across themes.
+ * the brand's details). Follows the active theme with contrast-safe mapping.
  */
 export function BrandCard({
   brandName,
@@ -140,6 +144,11 @@ export function BrandCard({
   socialLinks = [],
   className,
 }: BrandCardProps) {
+  const { theme } = useTheme();
+  const isDark = DARK_THEMES.has(theme);
+  // Vivid theme color for supporting type on dark themes only; quiet ink on light.
+  const supportColor = isDark ? 'hsl(var(--primary))' : 'hsl(var(--foreground) / 0.75)';
+
   const name = brandName.trim();
   const site = displayUrl(websiteUrl.trim());
   const store = displayUrl(storeUrl.trim());
@@ -173,7 +182,7 @@ export function BrandCard({
         {/* Top row */}
         <div className="relative flex items-start justify-between">
           <span className="flex items-center gap-1">
-            <img src={wordmark} alt="FormaNova" className="h-4 w-auto sm:h-5" />
+            <ThemeLogo variant="plain" className="h-4 sm:h-5" width={100} height={24} />
             <Sparkle className="-translate-y-1 text-[9px]" />
           </span>
           <p className="flex items-center gap-1.5 font-mono text-[8px] uppercase tracking-[0.28em] sm:text-[9px]" style={{ color: INK }}>
@@ -196,13 +205,13 @@ export function BrandCard({
               {name}
             </p>
           )}
-          <p className="mt-2 font-mono text-[8px] uppercase tracking-[0.3em] sm:text-[9px]" style={{ color: INK }}>
+          <p className="mt-2 font-mono text-[8px] uppercase tracking-[0.3em] sm:text-[9px]" style={{ color: supportColor }}>
             Bespoke Jewelry Brand Experience
           </p>
           <div className="mt-3">
             <SparkleRule />
           </div>
-          <p className="mt-3 font-card text-sm italic" style={{ color: INK }}>
+          <p className="mt-3 font-card text-sm italic" style={{ color: supportColor }}>
             Designed around your brand, every time.
           </p>
         </div>
