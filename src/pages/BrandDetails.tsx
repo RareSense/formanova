@@ -491,11 +491,11 @@ export default function BrandDetails() {
         </div>
       )}
 
-      {/* Delete brand profile — outside the containers, bottom-left */}
+      {/* Delete brand profile — outside the containers, bottom-right */}
       {!isLoading && (
-        <div className="mt-8">
+        <div className="mt-8 flex flex-col items-end">
           {confirmingDelete ? (
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center justify-end gap-3">
               <p className="text-sm text-foreground">Delete all brand details? This cannot be undone.</p>
               <button
                 type="button"
@@ -519,10 +519,10 @@ export default function BrandDetails() {
             <button
               type="button"
               onClick={() => setConfirmingDelete(true)}
-              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-destructive transition-colors"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-destructive hover:opacity-70 transition-opacity"
             >
               <Trash2 className="h-4 w-4" />
-              Delete brand profile
+              Delete my details
             </button>
           )}
           {deleteError && <p className="mt-2 text-sm text-destructive">{deleteError}</p>}
