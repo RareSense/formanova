@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { ThemeLogo } from '@/components/ThemeLogo';
+import { socialIconFor } from '@/components/brand/social-icons';
 
 export interface BrandCardProps {
   brandName: string;
   websiteUrl: string;
   basedIn: string;
   targetMarkets: string[];
+  /** Rendered as clickable platform icons (never as text links). */
+  socialLinks?: string[];
   className?: string;
 }
 
@@ -17,18 +20,19 @@ function displayUrl(url: string): string {
     .replace(/\/$/, '');
 }
 
-/** Shared card face frame: border, background, subtle blueprint grid. */
+/** Shared card face frame: border, opaque background, subtle blueprint grid. */
 function CardFace({ back, children }: { back?: boolean; children: React.ReactNode }) {
   return (
     <div
       className={cn(
-        'absolute inset-0 flex flex-col border border-border bg-card p-5 sm:p-6 [backface-visibility:hidden]',
+        'absolute inset-0 flex flex-col border border-border p-5 sm:p-6 [backface-visibility:hidden]',
         back && '[transform:rotateY(180deg)]',
       )}
       style={{
+        backgroundColor: 'hsl(var(--card))',
         backgroundImage:
-          'linear-gradient(hsl(var(--border) / 0.35) 1px, transparent 1px),' +
-          'linear-gradient(90deg, hsl(var(--border) / 0.35) 1px, transparent 1px)',
+          'linear-gradient(hsl(var(--border) / 0.25) 1px, transparent 1px),' +
+          'linear-gradient(90deg, hsl(var(--border) / 0.25) 1px, transparent 1px)',
         backgroundSize: '44px 44px',
       }}
     >
@@ -53,16 +57,18 @@ const BACK_BENEFITS = [
 
 /**
  * Premium flippable brand card that fills live as the user types.
- * Front: FormaNova wordmark, brand name, presence details.
+ * Empty fields render nothing — the card never shows placeholder content.
+ * Front: FormaNova wordmark, brand name, presence details, social icons.
  * Back: the FormaNova Bespoke promise. Click / Enter flips it.
  */
-export function BrandCard({ brandName, websiteUrl, basedIn, targetMarkets, className }: BrandCardProps) {
+export function BrandCard({ brandName, websiteUrl, basedIn, targetMarkets, socialLinks = [], className }: BrandCardProps) {
   const [flipped, setFlipped] = useState(false);
 
   const name = brandName.trim();
   const site = displayUrl(websiteUrl.trim());
   const markets = targetMarkets.filter(Boolean);
-  const initial = (name || 'F').charAt(0).toUpperCase();
+  const links = socialLinks.filter(Boolean);
+  const year = new Date().getFullYear();
 
   return (
     <div className={cn('w-full select-none [perspective:1400px]', className)}>
@@ -87,67 +93,80 @@ export function BrandCard({ brandName, websiteUrl, basedIn, targetMarkets, class
       >
         {/* Front */}
         <CardFace>
-          {/* Watermark initial */}
-          <span
-            aria-hidden="true"
-            className="pointer-events-none absolute right-6 top-1/2 -translate-y-1/2 font-display text-[7rem] leading-none text-foreground/[0.05] sm:text-[9rem]"
-          >
-            {initial}
-          </span>
+          {/* Watermark initial — only once a name exists */}
+          {name && (
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute right-6 top-1/2 -translate-y-1/2 font-display text-[7rem] leading-none text-foreground/[0.05] sm:text-[9rem]"
+            >
+              {name.charAt(0).toUpperCase()}
+            </span>
+          )}
 
           {/* Top row */}
           <div className="flex items-start justify-between">
             <ThemeLogo variant="plain" className="h-4 sm:h-5" width={100} height={24} />
             <p className="font-mono text-[9px] uppercase tracking-[0.25em] text-foreground">
-              Bespoke / 01
+              Bespoke
             </p>
           </div>
 
-          {/* Identity block */}
+          {/* Identity block — renders only what the user has provided */}
           <div className="mt-auto min-w-0">
-            <MonoLabel>Jewelry Brand Experience</MonoLabel>
-            <p
-              className={cn(
-                'mt-1 truncate font-script text-4xl leading-[1.15] sm:text-5xl',
-                name ? 'text-foreground' : 'text-muted-foreground/50',
-              )}
-            >
-              {name || 'Your Brand'}
-            </p>
-            <p
-              className={cn(
-                'mt-1 truncate font-mono text-[10px] uppercase tracking-[0.2em]',
-                site ? 'text-foreground' : 'text-muted-foreground/60',
-              )}
-            >
-              {site || 'yourbrand.com'}
-            </p>
+            {name && (
+              <p className="mt-1 truncate font-script text-4xl leading-[1.15] text-foreground sm:text-5xl">
+                {name}
+              </p>
+            )}
+            {site && (
+              <p className="mt-1 truncate font-mono text-[10px] uppercase tracking-[0.2em] text-foreground">
+                {site}
+              </p>
+            )}
+            {links.length > 0 && (
+              <div className="mt-2.5 flex items-center gap-3">
+                {links.map((link) => {
+                  const Icon = socialIconFor(link);
+                  return (
+                    <a
+                      key={link}
+                      href={link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`Open ${displayUrl(link)}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-foreground hover:opacity-60 transition-opacity"
+                    >
+                      <Icon className="h-4 w-4" />
+                    </a>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Bottom row */}
           <div className="mt-5 flex items-end justify-between gap-4 border-t border-border pt-3">
             <div className="flex min-w-0 gap-8">
-              <div className="min-w-0">
-                <MonoLabel>Based in</MonoLabel>
-                <p className={cn(
-                  'mt-0.5 truncate font-mono text-[11px] uppercase tracking-[0.12em]',
-                  basedIn.trim() ? 'text-foreground' : 'text-muted-foreground/60',
-                )}>
-                  {basedIn.trim() || 'Not set'}
-                </p>
-              </div>
-              <div className="min-w-0">
-                <MonoLabel>Target</MonoLabel>
-                <p className={cn(
-                  'mt-0.5 truncate font-mono text-[11px] uppercase tracking-[0.12em]',
-                  markets.length ? 'text-foreground' : 'text-muted-foreground/60',
-                )}>
-                  {markets.length ? markets.join(' / ') : 'Global'}
-                </p>
-              </div>
+              {basedIn.trim() && (
+                <div className="min-w-0">
+                  <MonoLabel>Based in</MonoLabel>
+                  <p className="mt-0.5 truncate font-mono text-[11px] uppercase tracking-[0.12em] text-foreground">
+                    {basedIn.trim()}
+                  </p>
+                </div>
+              )}
+              {markets.length > 0 && (
+                <div className="min-w-0">
+                  <MonoLabel>Target</MonoLabel>
+                  <p className="mt-0.5 truncate font-mono text-[11px] uppercase tracking-[0.12em] text-foreground">
+                    {markets.join(' / ')}
+                  </p>
+                </div>
+              )}
             </div>
             <p className="shrink-0 font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground">
-              FN / {new Date().getFullYear()}
+              FN / {year}
             </p>
           </div>
         </CardFace>
@@ -178,7 +197,7 @@ export function BrandCard({ brandName, websiteUrl, basedIn, targetMarkets, class
           <div className="mt-5 flex items-end justify-between border-t border-border pt-3">
             <MonoLabel>formanova.ai</MonoLabel>
             <p className="font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground">
-              FN / {new Date().getFullYear()}
+              FN / {year}
             </p>
           </div>
         </CardFace>

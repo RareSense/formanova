@@ -205,6 +205,7 @@ export default function BrandDetails() {
               websiteUrl={preview.website_url ?? profile?.website_url ?? ''}
               basedIn={preview.based_in ?? profile?.based_in ?? ''}
               targetMarkets={cardMarkets}
+              socialLinks={profile?.social_links ?? []}
             />
           </div>
 
