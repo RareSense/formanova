@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Plus, Lock, Loader2, Upload, FileText, Settings, Globe, MapPin, ShoppingBag } from 'lucide-react';
+import { X, Plus, Lock, Loader2, Upload, FileText, Check, Globe, MapPin, ShoppingBag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BrandCard } from '@/components/brand/BrandCard';
 import { PRESET_SOCIAL_PLATFORMS, extractHandle, handleToUrl, urlMatchesHost } from '@/components/brand/social-icons';
@@ -81,13 +81,16 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
   const [storeUrl, setStoreUrl] = useState(initial?.store_url ?? '');
   const [handles, setHandles] = useState<Record<string, string>>(initialHandles);
   const [extraLink, setExtraLink] = useState(otherInitialLinks[0] ?? '');
-  // Instagram and TikTok always show; "+ Add another" reveals Pinterest, then a free URL row.
-  const [extraRows, setExtraRows] = useState(
-    otherInitialLinks.length > 0 ? 2 : initialHandles.pinterest ? 1 : 0,
-  );
+  // Instagram always shows; "Add more" reveals TikTok, Pinterest, then a free URL row.
+  const [revealed, setRevealed] = useState<string[]>(() => {
+    const keys: string[] = [];
+    if (initialHandles.tiktok) keys.push('tiktok');
+    if (initialHandles.pinterest) keys.push('pinterest');
+    if (otherInitialLinks.length > 0) keys.push('extra');
+    return keys;
+  });
   const [brandNameError, setBrandNameError] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<'website' | 'store' | 'social' | 'extra', string>>>({});
-  const [cardFlipped, setCardFlipped] = useState(false);
 
   // Brand book uploads immediately (the endpoint sets the profile field server-side).
   const [bookFilename, setBookFilename] = useState<string | null>(null);
@@ -118,8 +121,9 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
 
   const parsedMarkets = targetMarkets.split(',').map((m) => m.trim()).filter(Boolean);
   const visiblePlatforms = PRESET_SOCIAL_PLATFORMS.filter(
-    (p) => p.key !== 'pinterest' || extraRows >= 1,
+    (p) => p.key === 'instagram' || revealed.includes(p.key),
   );
+  const nextReveal = ['tiktok', 'pinterest', 'extra'].find((k) => !revealed.includes(k));
   const liveSocialLinks = PRESET_SOCIAL_PLATFORMS
     .map((p) => handleToUrl(handles[p.key] ?? '', p.urlPrefix))
     .filter(Boolean);
@@ -275,9 +279,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
                   placeholder="yourbrand.com"
                   error={Boolean(fieldErrors.website)}
                 />
-                {fieldErrors.website
-                  ? <p className="text-xs text-destructive">{fieldErrors.website}</p>
-                  : <p className="text-xs text-muted-foreground">No need for https:// or www.</p>}
+                {fieldErrors.website && <p className="text-xs text-destructive">{fieldErrors.website}</p>}
               </div>
               <div className="space-y-2">
                 <FieldLabel label="Online store" />
@@ -287,12 +289,10 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
                   value={storeUrl}
                   onChange={(e) => { setStoreUrl(e.target.value); setFieldErrors((p) => ({ ...p, store: undefined })); }}
                   maxLength={200}
-                  placeholder="Shopify, Etsy, WooCommerce, etc."
+                  placeholder="shop.yourbrand.com"
                   error={Boolean(fieldErrors.store)}
                 />
-                {fieldErrors.store
-                  ? <p className="text-xs text-destructive">{fieldErrors.store}</p>
-                  : <p className="text-xs text-muted-foreground">Only if separate from your website.</p>}
+                {fieldErrors.store && <p className="text-xs text-destructive">{fieldErrors.store}</p>}
               </div>
             </div>
 
@@ -324,24 +324,46 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
                       aria-label={`${label} handle`}
                       className="min-w-0 flex-1 bg-transparent px-3.5 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none"
                     />
+                    {(handles[key] ?? '').trim() && (
+                      <Check className="mx-3 h-4 w-4 shrink-0 text-formanova-success" aria-label="Filled" />
+                    )}
+                    {key !== 'instagram' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRevealed((prev) => prev.filter((k) => k !== key));
+                          setHandles((prev) => ({ ...prev, [key]: '' }));
+                        }}
+                        className="mr-2 shrink-0 p-1.5 text-muted-foreground hover:text-destructive transition-colors"
+                        aria-label={`Remove ${label}`}
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 ))}
                 {fieldErrors.social && <p className="text-xs text-destructive">{fieldErrors.social}</p>}
-                {extraRows >= 2 && (
+                {revealed.includes('extra') && (
                   <div className="space-y-1.5">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center border border-border bg-background focus-within:border-foreground transition-colors">
                       <input
                         type="url"
                         value={extraLink}
                         onChange={(e) => { setExtraLink(e.target.value); setFieldErrors((p) => ({ ...p, extra: undefined })); }}
                         maxLength={200}
                         placeholder="Any other profile URL"
-                        className={cn(INPUT_CLASS, 'flex-1', fieldErrors.extra && 'border-destructive focus:border-destructive')}
+                        className="min-w-0 flex-1 bg-transparent px-3.5 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none"
                       />
+                      {extraLink.trim() && (
+                        <Check className="mx-3 h-4 w-4 shrink-0 text-formanova-success" aria-label="Filled" />
+                      )}
                       <button
                         type="button"
-                        onClick={() => { setExtraRows(1); setExtraLink(''); }}
-                        className="flex h-12 w-12 shrink-0 items-center justify-center border border-border text-muted-foreground hover:border-destructive hover:text-destructive transition-colors"
+                        onClick={() => {
+                          setRevealed((prev) => prev.filter((k) => k !== 'extra'));
+                          setExtraLink('');
+                        }}
+                        className="mr-2 shrink-0 p-1.5 text-muted-foreground hover:text-destructive transition-colors"
                         aria-label="Remove link"
                       >
                         <X className="h-4 w-4" />
@@ -350,14 +372,14 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
                     {fieldErrors.extra && <p className="text-xs text-destructive">{fieldErrors.extra}</p>}
                   </div>
                 )}
-                {extraRows < 2 && (
+                {nextReveal && (
                   <button
                     type="button"
-                    onClick={() => setExtraRows((n) => n + 1)}
-                    className="flex w-full items-center justify-center gap-1.5 border border-dashed border-border px-4 py-3 text-sm text-foreground hover:border-foreground transition-colors"
+                    onClick={() => setRevealed((prev) => [...prev, nextReveal])}
+                    className="flex items-center gap-1 pt-0.5 text-sm font-medium text-foreground hover:opacity-70 transition-opacity"
                   >
-                    <Plus className="h-4 w-4" />
-                    Add another
+                    <Plus className="h-3.5 w-3.5" />
+                    Add more
                   </button>
                 )}
               </div>
@@ -418,12 +440,6 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
                   Never sold, never used to train AI. Used solely to shape FormaNova around your brand.
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <Settings className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                <p className="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                  You can edit or delete this anytime in Brand Settings.
-                </p>
-              </div>
             </div>
 
             {/* CTA */}
@@ -441,31 +457,9 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
             <div className="order-1 lg:order-2">
               <div className="mx-auto max-w-md lg:sticky lg:top-0 lg:max-w-none">
                 <div className="border border-border bg-muted/20 p-5 sm:p-6">
-                  <div className="mb-4 flex items-center justify-between">
-                    <p className="font-card text-sm uppercase tracking-[0.22em] text-foreground">
-                      Your Bespoke Card
-                    </p>
-                    <div className="flex border border-border">
-                      {(['Front', 'Back'] as const).map((side) => {
-                        const active = (side === 'Back') === cardFlipped;
-                        return (
-                          <button
-                            key={side}
-                            type="button"
-                            onClick={() => setCardFlipped(side === 'Back')}
-                            className={cn(
-                              'px-4 py-1.5 text-xs font-medium transition-colors',
-                              active
-                                ? 'bg-foreground text-background'
-                                : 'bg-background text-muted-foreground hover:text-foreground',
-                            )}
-                          >
-                            {side}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  <p className="mb-4 font-card text-sm uppercase tracking-[0.22em] text-foreground">
+                    Your Bespoke Card
+                  </p>
                   <BrandCard
                     brandName={brandName}
                     websiteUrl={websiteUrl}
@@ -473,9 +467,6 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
                     basedIn={basedIn}
                     targetMarkets={parsedMarkets}
                     socialLinks={liveSocialLinks}
-                    flipped={cardFlipped}
-                    onFlippedChange={setCardFlipped}
-                    caption="Updates live as you complete your details."
                   />
                 </div>
               </div>
