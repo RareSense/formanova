@@ -56,6 +56,8 @@ export interface BrandDetails {
   website_url?: string;
   store_url?: string;
   social_links?: string[];
+  based_in?: string;
+  target_markets?: string[];
 }
 
 export async function saveUserType(userType: UserType, brandDetails?: BrandDetails | null): Promise<void> {
@@ -65,6 +67,8 @@ export async function saveUserType(userType: UserType, brandDetails?: BrandDetai
     if (brandDetails.website_url) body.website_url = brandDetails.website_url;
     if (brandDetails.store_url) body.store_url = brandDetails.store_url;
     if (brandDetails.social_links?.length) body.social_links = brandDetails.social_links;
+    if (brandDetails.based_in) body.based_in = brandDetails.based_in;
+    if (brandDetails.target_markets?.length) body.target_markets = brandDetails.target_markets;
   }
   const res = await authenticatedFetch('/api/user/profile', {
     method: 'PATCH',

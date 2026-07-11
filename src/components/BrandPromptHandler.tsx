@@ -71,6 +71,8 @@ export function BrandPromptHandler() {
     if (details.website_url) body.website_url = details.website_url;
     if (details.store_url) body.store_url = details.store_url;
     if (details.social_links.length) body.social_links = details.social_links;
+    if (details.based_in) body.based_in = details.based_in;
+    if (details.target_markets.length) body.target_markets = details.target_markets;
     try {
       await authenticatedFetch('/api/user/profile', {
         method: 'PATCH',

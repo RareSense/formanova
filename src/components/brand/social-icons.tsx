@@ -80,11 +80,32 @@ export function socialIconFor(url: string): SocialIconComponent {
 }
 
 /** Pre-made empty slots shown in Social profiles until a link for that platform exists. */
-export const PRESET_SOCIAL_PLATFORMS: { key: string; match: string; example: string; Icon: SocialIconComponent }[] = [
-  { key: 'instagram', match: 'instagram.com', example: 'instagram.com/yourbrand', Icon: InstagramIcon },
-  { key: 'tiktok', match: 'tiktok.com', example: 'tiktok.com/@yourbrand', Icon: TikTokIcon },
-  { key: 'pinterest', match: 'pinterest.com', example: 'pinterest.com/yourbrand', Icon: PinterestIcon },
+export const PRESET_SOCIAL_PLATFORMS: {
+  key: string;
+  label: string;
+  match: string;
+  example: string;
+  /** Host prefix a typed handle is appended to (e.g. "instagram.com/" + handle). */
+  urlPrefix: string;
+  Icon: SocialIconComponent;
+}[] = [
+  { key: 'instagram', label: 'Instagram', match: 'instagram.com', example: 'instagram.com/yourbrand', urlPrefix: 'instagram.com/', Icon: InstagramIcon },
+  { key: 'tiktok', label: 'TikTok', match: 'tiktok.com', example: 'tiktok.com/@yourbrand', urlPrefix: 'tiktok.com/@', Icon: TikTokIcon },
+  { key: 'pinterest', label: 'Pinterest', match: 'pinterest.com', example: 'pinterest.com/yourbrand', urlPrefix: 'pinterest.com/', Icon: PinterestIcon },
 ];
+
+/** "@yourbrand", "instagram.com/yourbrand", or a full URL -> bare handle. */
+export function extractHandle(value: string, match: string): string {
+  let v = value.trim().replace(/^https?:\/\//i, '').replace(/^www\./i, '');
+  if (v.toLowerCase().startsWith(match)) v = v.slice(match.length);
+  return v.replace(/^\//, '').replace(/^@/, '').replace(/\/+$/, '');
+}
+
+/** Bare handle -> full profile URL for a preset platform. */
+export function handleToUrl(handle: string, urlPrefix: string): string {
+  const h = extractHandle(handle, urlPrefix.replace(/\/@?$/, ''));
+  return h ? `https://${urlPrefix}${h}` : '';
+}
 
 export function urlMatchesHost(url: string, match: string): boolean {
   try {

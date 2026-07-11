@@ -7,6 +7,8 @@ vi.mock('@/lib/authenticated-fetch', () => ({
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import {
   normalizeUrl,
+  isValidHttpUrl,
+  isValidHandle,
   patchBrandProfile,
   fetchBrandProfile,
   uploadBrandBook,
@@ -22,6 +24,35 @@ function jsonResponse(body: unknown, status = 200): Response {
 
 beforeEach(() => {
   mockFetch.mockReset();
+});
+
+describe('isValidHttpUrl', () => {
+  it('accepts normalized domains with and without www', () => {
+    expect(isValidHttpUrl('https://icecartel.com')).toBe(true);
+    expect(isValidHttpUrl('https://www.icecartel.com/collections/all')).toBe(true);
+    expect(isValidHttpUrl('http://icecartel.com')).toBe(true);
+  });
+
+  it('rejects hostnames without a dot, spaces, and non-http schemes', () => {
+    expect(isValidHttpUrl('https://icecartel')).toBe(false);
+    expect(isValidHttpUrl('https://ice cartel.com')).toBe(false);
+    expect(isValidHttpUrl('ftp://icecartel.com')).toBe(false);
+    expect(isValidHttpUrl('not a url')).toBe(false);
+    expect(isValidHttpUrl('')).toBe(false);
+  });
+});
+
+describe('isValidHandle', () => {
+  it('accepts letters, digits, dots, underscores, dashes', () => {
+    expect(isValidHandle('ice.cartel_2-x')).toBe(true);
+  });
+
+  it('rejects spaces, slashes, and at-signs', () => {
+    expect(isValidHandle('ice cartel')).toBe(false);
+    expect(isValidHandle('ice/cartel')).toBe(false);
+    expect(isValidHandle('@icecartel')).toBe(false);
+    expect(isValidHandle('')).toBe(false);
+  });
 });
 
 describe('normalizeUrl', () => {

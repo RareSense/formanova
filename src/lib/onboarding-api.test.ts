@@ -44,9 +44,26 @@ describe('saveUserType', () => {
       website_url: '',
       store_url: '',
       social_links: [],
+      based_in: '',
+      target_markets: [],
     });
     const body = JSON.parse(mockFetch.mock.calls[0][1]?.body as string);
     expect(body).toEqual({ user_type: 'jewelry_brand', brand_name: 'Ice Cartel' });
+  });
+
+  it('includes based_in and target_markets when provided', async () => {
+    await saveUserType('jewelry_brand', {
+      brand_name: 'Ice Cartel',
+      based_in: 'New York, US',
+      target_markets: ['US', 'UAE'],
+    });
+    const body = JSON.parse(mockFetch.mock.calls[0][1]?.body as string);
+    expect(body).toEqual({
+      user_type: 'jewelry_brand',
+      brand_name: 'Ice Cartel',
+      based_in: 'New York, US',
+      target_markets: ['US', 'UAE'],
+    });
   });
 
   it('throws on a failed response', async () => {

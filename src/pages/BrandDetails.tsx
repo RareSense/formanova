@@ -4,11 +4,14 @@ import { ArrowLeft, Plus, X, Check, Loader2, Lock, FileText, Upload, MapPin } fr
 import { cn } from '@/lib/utils';
 import { InlineField, FIELD_INPUT_CLASS, FIELD_ICON_BUTTON_CLASS } from '@/components/brand/InlineField';
 import { SocialRow, EmptySocialSlot } from '@/components/brand/SocialRow';
+import { BrandCard } from '@/components/brand/BrandCard';
 import { PRESET_SOCIAL_PLATFORMS, urlMatchesHost } from '@/components/brand/social-icons';
 import {
   type BrandProfile,
   EMPTY_BRAND_PROFILE,
   normalizeUrl,
+  isValidHttpUrl,
+  INVALID_URL_MESSAGE,
   fetchBrandProfile,
   patchBrandProfile,
   fetchBrandBook,
@@ -33,6 +36,14 @@ const MAX_SOCIAL_LINKS = 4;
 export default function BrandDetails() {
   const [profile, setProfile] = useState<BrandProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Unsaved drafts overlay the profile on the live brand card while editing.
+  const [preview, setPreview] = useState<{
+    brand_name?: string;
+    based_in?: string;
+    target_markets?: string;
+    website_url?: string;
+  }>({});
 
   // Social add-row state
   const [addingSocial, setAddingSocial] = useState(false);
@@ -69,9 +80,27 @@ export default function BrandDetails() {
         const message = await patchBrandProfile({ [key]: value });
         if (!message) {
           setProfile((prev) => (prev ? { ...prev, [key]: value ?? (Array.isArray(prev[key]) ? [] : '') } : prev));
+          setPreview((prev) => ({ ...prev, [key]: undefined }));
         }
         return message;
       },
+    [],
+  );
+
+  /** URL fields reject invalid formats before anything is sent. */
+  const saveUrlField = useCallback(
+    (key: 'website_url' | 'store_url') =>
+      async (raw: string): Promise<string | null> => {
+        const normalized = normalizeUrl(raw);
+        if (normalized && !isValidHttpUrl(normalized)) return INVALID_URL_MESSAGE;
+        return saveField(key, (v) => normalizeUrl(v) || null)(raw);
+      },
+    [saveField],
+  );
+
+  const setPreviewField = useCallback(
+    (key: 'brand_name' | 'based_in' | 'target_markets' | 'website_url') =>
+      (value: string) => setPreview((prev) => ({ ...prev, [key]: value })),
     [],
   );
 
@@ -80,6 +109,7 @@ export default function BrandDetails() {
       async (value: string | null): Promise<string | null> => {
         const current = profile?.social_links ?? [];
         const normalized = value === null ? null : normalizeUrl(value);
+        if (normalized && !isValidHttpUrl(normalized)) return INVALID_URL_MESSAGE;
         const next = normalized
           ? current.map((v, i) => (i === index ? normalized : v))
           : current.filter((_, i) => i !== index);
@@ -93,6 +123,7 @@ export default function BrandDetails() {
   const addSocial = async () => {
     const normalized = normalizeUrl(addDraft);
     if (!normalized) { setAddError('Enter a profile URL.'); return; }
+    if (!isValidHttpUrl(normalized)) { setAddError(INVALID_URL_MESSAGE); return; }
     const next = [...(profile?.social_links ?? []), normalized];
     setAddSaving(true);
     setAddError(null);
@@ -134,8 +165,12 @@ export default function BrandDetails() {
 
   const fileExt = brandBook?.filename.split('.').pop()?.toUpperCase() ?? '';
 
+  const cardMarkets = preview.target_markets !== undefined
+    ? preview.target_markets.split(',').map((m) => m.trim()).filter(Boolean)
+    : (profile?.target_markets ?? []);
+
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6 sm:py-12">
+    <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-12">
 
       {/* Back link */}
       <Link
@@ -161,7 +196,19 @@ export default function BrandDetails() {
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-8">
+
+          {/* Live brand card — fills as fields are edited */}
+          <div className="mx-auto mb-8 max-w-md lg:sticky lg:top-8 lg:order-2 lg:mx-0 lg:mb-0 lg:max-w-none">
+            <BrandCard
+              brandName={preview.brand_name ?? profile?.brand_name ?? ''}
+              websiteUrl={preview.website_url ?? profile?.website_url ?? ''}
+              basedIn={preview.based_in ?? profile?.based_in ?? ''}
+              targetMarkets={cardMarkets}
+            />
+          </div>
+
+          <div className="space-y-6 lg:order-1">
 
           {/* Brand information */}
           <div className="border border-border bg-background px-6 py-6 sm:px-8 sm:py-7">
@@ -178,14 +225,18 @@ export default function BrandDetails() {
                 value={profile?.brand_name ?? ''}
                 placeholder="Your brand name"
                 required
+                maxLength={120}
                 onSave={saveField('brand_name', (v) => v.trim())}
+                onDraftChange={setPreviewField('brand_name')}
               />
               <InlineField
                 label="Based in"
                 value={profile?.based_in ?? ''}
                 placeholder="City, country"
                 icon={MapPin}
+                maxLength={80}
                 onSave={saveField('based_in')}
+                onDraftChange={setPreviewField('based_in')}
               />
               <div className="sm:col-span-2">
                 <InlineField
@@ -193,9 +244,11 @@ export default function BrandDetails() {
                   value={(profile?.target_markets ?? []).join(', ')}
                   displayValue={(profile?.target_markets ?? []).join(' · ')}
                   placeholder="US, UAE, Global"
+                  maxLength={120}
                   onSave={saveField('target_markets', (v) =>
                     v.split(',').map((m) => m.trim()).filter(Boolean),
                   )}
+                  onDraftChange={setPreviewField('target_markets')}
                 />
               </div>
             </div>
@@ -208,14 +261,17 @@ export default function BrandDetails() {
               <InlineField
                 label="Website"
                 value={profile?.website_url ?? ''}
-                placeholder="https://yourbrand.com"
-                onSave={saveField('website_url', (v) => normalizeUrl(v) || null)}
+                placeholder="yourbrand.com"
+                maxLength={200}
+                onSave={saveUrlField('website_url')}
+                onDraftChange={setPreviewField('website_url')}
               />
               <InlineField
                 label="Online store (if different from website)"
                 value={profile?.store_url ?? ''}
-                placeholder="https://shop.yourbrand.com"
-                onSave={saveField('store_url', (v) => normalizeUrl(v) || null)}
+                placeholder="shop.yourbrand.com"
+                maxLength={200}
+                onSave={saveUrlField('store_url')}
               />
             </div>
 
@@ -238,6 +294,7 @@ export default function BrandDetails() {
                       onAdd={async (value) => {
                         const normalized = normalizeUrl(value);
                         if (!normalized) return 'Enter a profile URL.';
+                        if (!isValidHttpUrl(normalized)) return INVALID_URL_MESSAGE;
                         const next = [...(profile?.social_links ?? []), normalized];
                         const message = await patchBrandProfile({ social_links: next });
                         if (!message) setProfile((prev) => (prev ? { ...prev, social_links: next } : prev));
@@ -393,6 +450,7 @@ export default function BrandDetails() {
               <span className="font-semibold text-foreground">Strictly confidential.</span>{' '}
               Never sold, never used to train AI. Used solely to shape FormaNova around your brand.
             </p>
+          </div>
           </div>
         </div>
       )}

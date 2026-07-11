@@ -34,6 +34,24 @@ export function normalizeUrl(value: string): string {
   return /^https?:\/\//i.test(v) ? v : `https://${v}`;
 }
 
+export const INVALID_URL_MESSAGE = 'Enter a valid URL, e.g. yourbrand.com';
+
+/** True for parseable http(s) URLs with a real hostname (must contain a dot, no spaces). */
+export function isValidHttpUrl(value: string): boolean {
+  if (/\s/.test(value.trim())) return false;
+  try {
+    const u = new URL(value);
+    return (u.protocol === 'http:' || u.protocol === 'https:') && u.hostname.includes('.');
+  } catch {
+    return false;
+  }
+}
+
+/** Social handle: letters, digits, dot, underscore, dash only. */
+export function isValidHandle(value: string): boolean {
+  return /^[A-Za-z0-9._-]+$/.test(value);
+}
+
 export async function fetchBrandProfile(): Promise<BrandProfile> {
   const res = await authenticatedFetch('/api/user/profile');
   const data = await res.json();

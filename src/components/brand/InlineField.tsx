@@ -21,13 +21,16 @@ interface InlineFieldProps {
   /** Optional leading icon shown in the read-mode box (e.g. MapPin for location). */
   icon?: React.ComponentType<{ className?: string }>;
   onSave: (value: string) => Promise<string | null>;
+  /** Fires on every keystroke while editing (and with the committed value on cancel) for live previews. */
+  onDraftChange?: (value: string) => void;
+  maxLength?: number;
 }
 
 /**
  * Read-only value box with a pencil that flips it into an input with explicit
  * save/cancel (Enter/Escape) and a brief saved confirmation.
  */
-export function InlineField({ label, value, displayValue, placeholder, required, icon: Icon, onSave }: InlineFieldProps) {
+export function InlineField({ label, value, displayValue, placeholder, required, icon: Icon, onSave, onDraftChange, maxLength }: InlineFieldProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   const [saving, setSaving] = useState(false);
@@ -48,6 +51,7 @@ export function InlineField({ label, value, displayValue, placeholder, required,
   const cancel = () => {
     setEditing(false);
     setError(null);
+    onDraftChange?.(value);
   };
 
   const save = async () => {
@@ -78,12 +82,13 @@ export function InlineField({ label, value, displayValue, placeholder, required,
             ref={inputRef}
             type="text"
             value={draft}
-            onChange={(e) => { setDraft(e.target.value); setError(null); }}
+            onChange={(e) => { setDraft(e.target.value); setError(null); onDraftChange?.(e.target.value); }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') void save();
               if (e.key === 'Escape') cancel();
             }}
             placeholder={placeholder}
+            maxLength={maxLength}
             className={FIELD_INPUT_CLASS}
           />
           <button
