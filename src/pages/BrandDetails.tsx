@@ -203,6 +203,7 @@ export default function BrandDetails() {
             <BrandCard
               brandName={preview.brand_name ?? profile?.brand_name ?? ''}
               websiteUrl={preview.website_url ?? profile?.website_url ?? ''}
+              storeUrl={profile?.store_url ?? ''}
               basedIn={preview.based_in ?? profile?.based_in ?? ''}
               targetMarkets={cardMarkets}
               socialLinks={profile?.social_links ?? []}

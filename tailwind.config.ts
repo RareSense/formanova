@@ -18,7 +18,7 @@ export default {
         marta: ["'Bebas Neue'", "sans-serif"],
         body: ["'Inter'", "system-ui", "sans-serif"],
         mono: ["'Space Mono'", "monospace"],
-        script: ["'Great Vibes'", "cursive"],
+        card: ["'Playfair Display'", "serif"],
       },
       colors: {
         border: "hsl(var(--border))",
