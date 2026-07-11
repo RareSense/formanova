@@ -515,7 +515,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
                   socialLinks={liveSocialLinks}
                   face={allDone ? 'both' : cardFace}
                 />
-                <p className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+                <p className="mt-4 flex items-center gap-2 text-[13px] text-muted-foreground">
                   <span aria-hidden="true" className="text-formanova-hero-accent">&#10022;</span>
                   Updates live as you complete your details.
                 </p>
