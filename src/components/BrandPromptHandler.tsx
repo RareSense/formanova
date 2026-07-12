@@ -96,7 +96,7 @@ export function BrandPromptHandler() {
 
   return (
     <Suspense fallback={null}>
-      <JewelryBrandModal open={open} onClose={markSeen} onContinue={handleContinue} />
+      <JewelryBrandModal source="studio_prompt" open={open} onClose={markSeen} onContinue={handleContinue} />
     </Suspense>
   );
 }

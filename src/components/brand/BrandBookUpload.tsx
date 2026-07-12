@@ -9,7 +9,7 @@ const BRAND_BOOK_ACCEPT = '.pdf,.png,.jpg,.jpeg,.webp';
  * immediately (the endpoint sets the profile field server-side) and owns
  * all of its own state.
  */
-export function BrandBookUpload() {
+export function BrandBookUpload({ onHasFileChange }: { onHasFileChange?: (hasFile: boolean) => void }) {
   const [filename, setFilename] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [removing, setRemoving] = useState(false);
@@ -27,6 +27,7 @@ export function BrandBookUpload() {
       return;
     }
     setFilename(result.filename ?? file.name);
+    onHasFileChange?.(true);
   };
 
   const handleRemove = async () => {
@@ -36,6 +37,7 @@ export function BrandBookUpload() {
     setRemoving(false);
     if (message) { setError(message); return; }
     setFilename(null);
+    onHasFileChange?.(false);
   };
 
   return (

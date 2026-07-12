@@ -8,6 +8,7 @@ import { BrandCard, BrandCardFaceToggle, type CardFace } from '@/components/bran
 import { PRESET_SOCIAL_PLATFORMS, extractHandle, handleToUrl, urlMatchesHost } from '@/components/brand/social-icons';
 import { isValidHttpUrl, isValidHandle, INVALID_URL_MESSAGE } from '@/lib/brand-profile-api';
 import { BrandBookUpload } from '@/components/brand/BrandBookUpload';
+import { trackBrandFormOpened, trackBrandFormSubmitted } from '@/lib/posthog-events';
 
 export interface BrandDetails {
   brand_name: string;
@@ -62,9 +63,11 @@ interface Props {
   onClose: () => void;
   onContinue: (details: BrandDetails) => void;
   initial?: BrandDetails;
+  /** Analytics funnel source: role picker vs existing-user Studio prompt. */
+  source: 'onboarding' | 'studio_prompt';
 }
 
-export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props) {
+export function JewelryBrandModal({ open, onClose, onContinue, initial, source }: Props) {
   const { theme } = useTheme();
   const isDark = DARK_THEMES.has(theme);
   const isMobile = useIsMobile();
@@ -101,6 +104,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
   // On completion the card auto-shows both faces once (desktop only), but
   // the user can always switch back to one side at a time.
   const [cardFace, setCardFace] = useState<CardFace>('front');
+  const [hasBrandBook, setHasBrandBook] = useState(false);
   const autoBothShown = useRef(false);
 
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -116,6 +120,10 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
   useEffect(() => {
     if (open) setTimeout(() => firstInputRef.current?.focus(), 50);
   }, [open]);
+
+  useEffect(() => {
+    if (open) trackBrandFormOpened({ source });
+  }, [open, source]);
 
   if (!open) return null;
 
@@ -172,6 +180,15 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
     for (const link of otherInitialLinks) {
       if (link !== extra && !socialLinks.includes(link)) socialLinks.push(link);
     }
+    trackBrandFormSubmitted({
+      source,
+      has_website: Boolean(site),
+      has_store: Boolean(store),
+      has_location: Boolean(basedIn.trim()),
+      has_markets: parsedMarkets.length > 0,
+      social_count: socialLinks.length,
+      has_brand_book: hasBrandBook,
+    });
     onContinue({
       brand_name: brandName.trim(),
       website_url: site,
@@ -391,7 +408,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
             {/* Brand book */}
             <div className="space-y-2">
               <FieldLabel label="Brand book" />
-              <BrandBookUpload />
+              <BrandBookUpload onHasFileChange={setHasBrandBook} />
             </div>
 
             {/* Privacy */}

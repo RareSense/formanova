@@ -6,6 +6,7 @@ import { InlineField, FIELD_INPUT_CLASS, FIELD_ICON_BUTTON_CLASS } from '@/compo
 import { SocialRow, EmptySocialSlot } from '@/components/brand/SocialRow';
 import { BrandCard, BrandCardFaceToggle, type CardFace } from '@/components/brand/BrandCard';
 import { DeleteBrandDetails } from '@/components/brand/DeleteBrandDetails';
+import { trackBrandDetailsDeleted } from '@/lib/posthog-events';
 import { PRESET_SOCIAL_PLATFORMS, urlMatchesHost } from '@/components/brand/social-icons';
 import {
   type BrandProfile,
@@ -177,6 +178,7 @@ export default function BrandDetails() {
     });
     if (message) return message;
     if (profile?.brand_book_asset_id) await deleteBrandBook();
+    trackBrandDetailsDeleted();
     setProfile(EMPTY_BRAND_PROFILE);
     setBrandBook(null);
     setPreview({});

@@ -141,6 +141,37 @@ export function trackUserTypeSelected(props: UserTypeSelectedProps) {
   if (posthog.__loaded) posthog.setPersonProperties({ user_type: props.user_type });
 }
 
+// ═══════ Brand form funnel ══════════════════════════════════════════
+
+export interface BrandFormOpenedProps {
+  /** Where the popup appeared: role picker vs the existing-user Studio prompt. */
+  source: 'onboarding' | 'studio_prompt';
+}
+
+export function trackBrandFormOpened(props: BrandFormOpenedProps) {
+  capture('brand_form_opened', { ...props });
+}
+
+/** Field SHAPE only — never the entered values, which are confidential. */
+export interface BrandFormSubmittedProps {
+  source: 'onboarding' | 'studio_prompt';
+  has_website: boolean;
+  has_store: boolean;
+  has_location: boolean;
+  has_markets: boolean;
+  social_count: number;
+  has_brand_book: boolean;
+}
+
+export function trackBrandFormSubmitted(props: BrandFormSubmittedProps) {
+  capture('brand_form_submitted', { ...props });
+}
+
+/** The user cleared their entire brand profile from Brand Settings. */
+export function trackBrandDetailsDeleted() {
+  capture('brand_details_deleted');
+}
+
 // ═══════ Auth Events ════════════════════════════════════════════════
 
 export function trackSignup(method: string, email?: string) {
