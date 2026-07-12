@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Plus, X, Check, Loader2, Lock, FileText, Upload, MapPin, Trash2 } from 'lucide-react';
+import { ArrowLeft, Plus, X, Check, Loader2, Lock, FileText, Upload, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { InlineField, FIELD_INPUT_CLASS, FIELD_ICON_BUTTON_CLASS } from '@/components/brand/InlineField';
 import { SocialRow, EmptySocialSlot } from '@/components/brand/SocialRow';
 import { BrandCard, BrandCardFaceToggle, type CardFace } from '@/components/brand/BrandCard';
+import { DeleteBrandDetails } from '@/components/brand/DeleteBrandDetails';
 import { PRESET_SOCIAL_PLATFORMS, urlMatchesHost } from '@/components/brand/social-icons';
 import {
   type BrandProfile,
@@ -53,11 +54,6 @@ export default function BrandDetails() {
   const [addSaving, setAddSaving] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const addInputRef = useRef<HTMLInputElement>(null);
-
-  // Delete brand profile state
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [deletingProfile, setDeletingProfile] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Brand book state
   const [brandBook, setBrandBook] = useState<BrandBookState | null>(null);
@@ -170,9 +166,7 @@ export default function BrandDetails() {
     setProfile((prev) => (prev ? { ...prev, brand_book_asset_id: null } : prev));
   };
 
-  const handleDeleteProfile = async () => {
-    setDeletingProfile(true);
-    setDeleteError(null);
+  const handleDeleteProfile = async (): Promise<string | null> => {
     const message = await patchBrandProfile({
       brand_name: null,
       website_url: null,
@@ -181,13 +175,12 @@ export default function BrandDetails() {
       based_in: null,
       target_markets: [],
     });
-    if (!message && profile?.brand_book_asset_id) await deleteBrandBook();
-    setDeletingProfile(false);
-    if (message) { setDeleteError(message); return; }
+    if (message) return message;
+    if (profile?.brand_book_asset_id) await deleteBrandBook();
     setProfile(EMPTY_BRAND_PROFILE);
     setBrandBook(null);
     setPreview({});
-    setConfirmingDelete(false);
+    return null;
   };
 
   const fileExt = brandBook?.filename.split('.').pop()?.toUpperCase() ?? '';
@@ -488,40 +481,7 @@ export default function BrandDetails() {
           </div>
 
           {/* Delete my details — under the confidential note, aligned to the form */}
-          <div className="flex flex-col items-end pt-1">
-            {confirmingDelete ? (
-              <div className="flex flex-wrap items-center justify-end gap-3">
-                <p className="text-sm text-foreground">Delete all brand details? This cannot be undone.</p>
-                <button
-                  type="button"
-                  onClick={() => void handleDeleteProfile()}
-                  disabled={deletingProfile}
-                  className="inline-flex items-center gap-1.5 border border-destructive px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors"
-                >
-                  {deletingProfile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                  {deletingProfile ? 'Deleting…' : 'Delete permanently'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setConfirmingDelete(false)}
-                  disabled={deletingProfile}
-                  className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setConfirmingDelete(true)}
-                className="inline-flex items-center gap-1.5 text-sm font-medium text-destructive hover:opacity-70 transition-opacity"
-              >
-                <Trash2 className="h-4 w-4" />
-                Delete my details
-              </button>
-            )}
-            {deleteError && <p className="mt-2 text-sm text-destructive">{deleteError}</p>}
-          </div>
+          <DeleteBrandDetails onDelete={handleDeleteProfile} />
           </div>
 
         </div>

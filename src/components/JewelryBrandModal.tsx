@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { X, Plus, Lock, Loader2, Upload, FileText, Check, Globe, MapPin, ShoppingBag } from 'lucide-react';
+import { X, Plus, Lock, Check, Globe, MapPin, ShoppingBag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
 import { DARK_THEMES } from '@/components/ThemeLogo';
 import { BrandCard, BrandCardFaceToggle, type CardFace } from '@/components/brand/BrandCard';
 import { PRESET_SOCIAL_PLATFORMS, extractHandle, handleToUrl, urlMatchesHost } from '@/components/brand/social-icons';
-import { uploadBrandBook, deleteBrandBook, isValidHttpUrl, isValidHandle, INVALID_URL_MESSAGE } from '@/lib/brand-profile-api';
+import { isValidHttpUrl, isValidHandle, INVALID_URL_MESSAGE } from '@/lib/brand-profile-api';
+import { BrandBookUpload } from '@/components/brand/BrandBookUpload';
 
 export interface BrandDetails {
   brand_name: string;
@@ -26,8 +27,6 @@ function normalizeUrl(value: string): string {
 
 const INPUT_CLASS =
   'w-full border border-border bg-background px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-foreground transition-colors';
-
-const BRAND_BOOK_ACCEPT = '.pdf,.png,.jpg,.jpeg,.webp';
 
 function FieldLabel({ label, required }: { label: string; required?: boolean }) {
   return (
@@ -104,13 +103,6 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
   const [cardFace, setCardFace] = useState<CardFace>('front');
   const autoBothShown = useRef(false);
 
-  // Brand book uploads immediately (the endpoint sets the profile field server-side).
-  const [bookFilename, setBookFilename] = useState<string | null>(null);
-  const [bookUploading, setBookUploading] = useState(false);
-  const [bookRemoving, setBookRemoving] = useState(false);
-  const [bookError, setBookError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
   const overlayRef = useRef<HTMLDivElement>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
 
@@ -152,28 +144,6 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
   // Focus-follow only flips between single faces; it never leaves Both.
   const showFront = () => setCardFace((f) => (f === 'both' ? f : 'front'));
   const showBack = () => setCardFace((f) => (f === 'both' ? f : 'back'));
-
-  const handleBookUpload = async (file: File) => {
-    setBookUploading(true);
-    setBookError(null);
-    const result = await uploadBrandBook(file);
-    setBookUploading(false);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-    if (!result.ok) {
-      setBookError(result.error ?? 'Upload failed. Please try again.');
-      return;
-    }
-    setBookFilename(result.filename ?? file.name);
-  };
-
-  const handleBookRemove = async () => {
-    setBookRemoving(true);
-    setBookError(null);
-    const message = await deleteBrandBook();
-    setBookRemoving(false);
-    if (message) { setBookError(message); return; }
-    setBookFilename(null);
-  };
 
   const handleContinue = () => {
     if (!brandName.trim()) {
@@ -421,47 +391,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
             {/* Brand book */}
             <div className="space-y-2">
               <FieldLabel label="Brand book" />
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept={BRAND_BOOK_ACCEPT}
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void handleBookUpload(file);
-                }}
-              />
-              {bookFilename ? (
-                <div className="flex items-center gap-3 border border-border px-4 py-3">
-                  <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span className="min-w-0 flex-1 truncate text-sm text-foreground">{bookFilename}</span>
-                  <button
-                    type="button"
-                    onClick={() => void handleBookRemove()}
-                    disabled={bookRemoving}
-                    className="shrink-0 text-sm font-medium text-foreground hover:text-destructive transition-colors"
-                  >
-                    {bookRemoving ? 'Removing…' : 'Remove'}
-                  </button>
-                </div>
-              ) : (
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => fileInputRef.current?.click()}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click(); }}
-                  className="flex cursor-pointer items-center gap-2.5 border border-dashed border-border px-4 py-3.5 hover:border-foreground transition-colors"
-                >
-                  {bookUploading
-                    ? <Loader2 className="h-4 w-4 shrink-0 animate-spin text-foreground" />
-                    : <Upload className="h-4 w-4 shrink-0 text-foreground" />}
-                  <span className="min-w-0 flex-1 truncate text-sm text-foreground">
-                    {bookUploading ? 'Uploading…' : 'Upload brand guidelines'}
-                  </span>
-                  <span className="shrink-0 text-xs text-muted-foreground">PDF, PNG or JPG · Max 20 MB</span>
-                </div>
-              )}
-              {bookError && <p className="text-xs text-destructive">{bookError}</p>}
+              <BrandBookUpload />
             </div>
 
             {/* Privacy */}
