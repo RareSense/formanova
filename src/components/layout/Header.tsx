@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Menu, X, LogIn, LogOut, User, Image, BadgeCheck, ScanEye, Gem, Check } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
+import { useUserType } from '@/hooks/useUserType';
 import { useCredits } from '@/contexts/CreditsContext';
 import { useGenerations } from '@/contexts/GenerationsContext';
 import {
@@ -117,6 +118,7 @@ export function Header() {
   const { user, signOut, signInWithGoogle } = useAuth();
   const { credits, lastDelta } = useCredits();
   const isAdmin = useIsAdmin();
+  const isJewelryBrand = useUserType() === 'jewelry_brand';
   const [visibleDelta, setVisibleDelta] = useState<{ amount: number; id: number } | null>(null);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -274,13 +276,15 @@ export function Header() {
                       <img src={creditCoinIcon} alt="" className="h-6 w-6 mr-2 object-contain" width={24} height={24} loading="eager" decoding="sync" />
                       My Credits
                     </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => navigate('/brand-details')}
-                      className="text-sm min-h-10"
-                    >
-                      <BrandDetailsIcon className="h-6 w-6 mr-2" />
-                      Brand Details
-                    </DropdownMenuItem>
+                    {isJewelryBrand && (
+                      <DropdownMenuItem
+                        onClick={() => navigate('/brand-details')}
+                        className="text-sm min-h-10"
+                      >
+                        <BrandDetailsIcon className="h-6 w-6 mr-2" />
+                        Brand Details
+                      </DropdownMenuItem>
+                    )}
                     {isAdmin && (
                       <DropdownMenuItem
                         onClick={() => navigate('/admin')}
@@ -396,12 +400,14 @@ export function Header() {
                     My Credits
                   </Button>
                 </Link>
-                <Link to="/brand-details">
-                  <Button variant="outline" size="lg" className="gap-2 w-full">
-                    <BrandDetailsIcon className="h-7 w-7" />
-                    Brand Details
-                  </Button>
-                </Link>
+                {isJewelryBrand && (
+                  <Link to="/brand-details">
+                    <Button variant="outline" size="lg" className="gap-2 w-full">
+                      <BrandDetailsIcon className="h-7 w-7" />
+                      Brand Details
+                    </Button>
+                  </Link>
+                )}
                 {isAdmin && (
                   <Link to="/admin">
                     <Button variant="outline" size="lg" className="gap-2 w-full">

@@ -2,7 +2,7 @@ import { useState, useEffect, lazy, Suspense } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '@/contexts/AuthContext';
-import { isOnboardingComplete } from '@/lib/onboarding-api';
+import { isOnboardingComplete, setCachedUserType } from '@/lib/onboarding-api';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { toast } from '@/hooks/use-toast';
 import type { BrandDetails } from '@/components/JewelryBrandModal';
@@ -44,6 +44,7 @@ export function BrandPromptHandler() {
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
+        setCachedUserType(user.id, data.user_type ?? null);
         if (data.user_type === 'jewelry_brand' && !data.brand_name) {
           setOpen(true);
         } else {

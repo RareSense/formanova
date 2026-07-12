@@ -5,13 +5,37 @@ vi.mock('@/lib/authenticated-fetch', () => ({
 }));
 
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
-import { saveUserType } from '@/lib/onboarding-api';
+import { saveUserType, getCachedUserType, setCachedUserType } from '@/lib/onboarding-api';
 
 const mockFetch = vi.mocked(authenticatedFetch);
 
 beforeEach(() => {
   mockFetch.mockReset();
   mockFetch.mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 200 }));
+  sessionStorage.clear();
+});
+
+describe('getCachedUserType', () => {
+  it('fetches the profile once, then serves from the session cache', async () => {
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ id: 'u1', user_type: 'jewelry_brand' }), { status: 200 }),
+    );
+    expect(await getCachedUserType('u1')).toBe('jewelry_brand');
+    expect(await getCachedUserType('u1')).toBe('jewelry_brand');
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns a seeded value without fetching', async () => {
+    setCachedUserType('u2', 'freelancer');
+    expect(await getCachedUserType('u2')).toBe('freelancer');
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('returns null and does not cache on fetch failure', async () => {
+    mockFetch.mockRejectedValue(new Error('network'));
+    expect(await getCachedUserType('u3')).toBeNull();
+    expect(sessionStorage.getItem('formanova_user_type_u3')).toBeNull();
+  });
 });
 
 describe('saveUserType', () => {

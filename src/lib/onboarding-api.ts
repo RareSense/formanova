@@ -43,6 +43,29 @@ export async function getUserProfile(): Promise<UserProfile> {
   return res.json();
 }
 
+const USER_TYPE_CACHE_PREFIX = 'formanova_user_type_';
+
+/** Seed the per-user cache (called wherever the profile is already known). */
+export function setCachedUserType(userId: string, userType: UserType | null): void {
+  if (userType) sessionStorage.setItem(USER_TYPE_CACHE_PREFIX + userId, userType);
+}
+
+/**
+ * user_type for UI gating (e.g. the Brand Details menu entry), cached per
+ * session so the header does not refetch the profile on every mount.
+ */
+export async function getCachedUserType(userId: string): Promise<UserType | null> {
+  const cached = sessionStorage.getItem(USER_TYPE_CACHE_PREFIX + userId);
+  if (cached) return cached as UserType;
+  try {
+    const profile = await getUserProfile();
+    setCachedUserType(userId, profile.user_type);
+    return profile.user_type;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * PATCH /api/user/profile — saves user_type against the authenticated user.
  * Required backend endpoint:

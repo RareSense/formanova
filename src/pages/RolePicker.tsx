@@ -9,6 +9,7 @@ import {
   isOnboardingComplete,
   markOnboardingComplete,
   saveUserType,
+  setCachedUserType,
 } from '@/lib/onboarding-api';
 import { trackUserTypeSelected } from '@/lib/posthog-events';
 import { toast } from '@/hooks/use-toast';
@@ -168,6 +169,7 @@ export default function RolePicker() {
     setError(null);
     try {
       await saveUserType(selected, selected === 'jewelry_brand' ? brandDetails : null);
+      setCachedUserType(user.id, selected);
       trackUserTypeSelected({ user_type: selected });
       if (selected === 'jewelry_brand' && brandDetails) {
         toast({
