@@ -470,7 +470,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial }: Props)
                 <Lock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                 <p className="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                   <span className="font-semibold text-foreground">Strictly confidential.</span>{' '}
-                  Never sold, never used to train AI. Used solely to shape FormaNova around your brand.
+                  Your data is never sold, never used to train AI. Used solely to shape FormaNova around your brand.
                 </p>
               </div>
             </div>
