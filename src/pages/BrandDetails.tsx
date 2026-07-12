@@ -486,46 +486,44 @@ export default function BrandDetails() {
               Never sold, never used to train AI. Used solely to shape FormaNova around your brand.
             </p>
           </div>
+
+          {/* Delete my details — under the confidential note, aligned to the form */}
+          <div className="flex flex-col items-end pt-1">
+            {confirmingDelete ? (
+              <div className="flex flex-wrap items-center justify-end gap-3">
+                <p className="text-sm text-foreground">Delete all brand details? This cannot be undone.</p>
+                <button
+                  type="button"
+                  onClick={() => void handleDeleteProfile()}
+                  disabled={deletingProfile}
+                  className="inline-flex items-center gap-1.5 border border-destructive px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                >
+                  {deletingProfile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                  {deletingProfile ? 'Deleting…' : 'Delete permanently'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmingDelete(false)}
+                  disabled={deletingProfile}
+                  className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmingDelete(true)}
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-destructive hover:opacity-70 transition-opacity"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete my details
+              </button>
+            )}
+            {deleteError && <p className="mt-2 text-sm text-destructive">{deleteError}</p>}
+          </div>
           </div>
 
-        </div>
-      )}
-
-      {/* Delete brand profile — outside the containers, bottom-right */}
-      {!isLoading && (
-        <div className="mt-8 flex flex-col items-end">
-          {confirmingDelete ? (
-            <div className="flex flex-wrap items-center justify-end gap-3">
-              <p className="text-sm text-foreground">Delete all brand details? This cannot be undone.</p>
-              <button
-                type="button"
-                onClick={() => void handleDeleteProfile()}
-                disabled={deletingProfile}
-                className="inline-flex items-center gap-1.5 border border-destructive px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors"
-              >
-                {deletingProfile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                {deletingProfile ? 'Deleting…' : 'Delete permanently'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmingDelete(false)}
-                disabled={deletingProfile}
-                className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setConfirmingDelete(true)}
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-destructive hover:opacity-70 transition-opacity"
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete my details
-            </button>
-          )}
-          {deleteError && <p className="mt-2 text-sm text-destructive">{deleteError}</p>}
         </div>
       )}
     </div>
