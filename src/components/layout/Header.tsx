@@ -278,9 +278,7 @@ export function Header() {
                       onClick={() => navigate('/brand-details')}
                       className="text-sm min-h-10"
                     >
-                      <span className="mr-2 flex w-4 shrink-0 justify-center">
-                        <BrandDetailsIcon className="h-10 w-10 max-w-none shrink-0" />
-                      </span>
+                      <BrandDetailsIcon className="h-6 w-6 mr-2" />
                       Brand Details
                     </DropdownMenuItem>
                     {isAdmin && (
@@ -400,9 +398,7 @@ export function Header() {
                 </Link>
                 <Link to="/brand-details">
                   <Button variant="outline" size="lg" className="gap-2 w-full">
-                    <span className="flex w-5 shrink-0 justify-center">
-                      <BrandDetailsIcon className="h-12 w-12 max-w-none shrink-0" />
-                    </span>
+                    <BrandDetailsIcon className="h-7 w-7" />
                     Brand Details
                   </Button>
                 </Link>
