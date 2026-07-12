@@ -26,6 +26,8 @@ import {
   trackUserTypeSelected,
   trackFeedbackModalOpened,
   trackFeedbackSubmitted,
+  trackBrandFormOpened,
+  trackBrandFormSubmitted,
   setUserProfession,
   trackUpscaleStarted,
   trackUpscaleCompleted,
@@ -70,6 +72,47 @@ describe('__loaded guard', () => {
   })
 })
 
+
+// ── Brand form funnel ───────────────────────────────────────────────
+
+describe('trackBrandFormOpened', () => {
+  it('captures brand_form_opened with the source', () => {
+    trackBrandFormOpened({ source: 'onboarding' })
+    expect(posthog.capture).toHaveBeenCalledWith('brand_form_opened', {
+      source: 'onboarding',
+    })
+  })
+
+  it('supports the studio prompt source', () => {
+    trackBrandFormOpened({ source: 'studio_prompt' })
+    expect(posthog.capture).toHaveBeenCalledWith('brand_form_opened', {
+      source: 'studio_prompt',
+    })
+  })
+})
+
+describe('trackBrandFormSubmitted', () => {
+  it('captures brand_form_submitted with field shape, never field values', () => {
+    trackBrandFormSubmitted({
+      source: 'studio_prompt',
+      has_website: true,
+      has_store: false,
+      has_location: true,
+      has_markets: true,
+      social_count: 2,
+      has_brand_book: false,
+    })
+    expect(posthog.capture).toHaveBeenCalledWith('brand_form_submitted', {
+      source: 'studio_prompt',
+      has_website: true,
+      has_store: false,
+      has_location: true,
+      has_markets: true,
+      social_count: 2,
+      has_brand_book: false,
+    })
+  })
+})
 
 // ── New event functions ─────────────────────────────────────────────
 
