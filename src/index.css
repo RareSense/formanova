@@ -1063,3 +1063,19 @@
     display: none;
   }
 }
+
+/* Brand card: slow 3D drift so the card feels dimensional without distracting */
+.brand-card-tilt {
+  animation: brand-card-drift 12s ease-in-out infinite;
+}
+@keyframes brand-card-drift {
+  0%, 100% { transform: rotateX(0deg) rotateY(0deg); }
+  25% { transform: rotateX(1.5deg) rotateY(-2.5deg); }
+  50% { transform: rotateX(-1deg) rotateY(2deg); }
+  75% { transform: rotateX(1deg) rotateY(-1.5deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .brand-card-tilt {
+    animation: none;
+  }
+}

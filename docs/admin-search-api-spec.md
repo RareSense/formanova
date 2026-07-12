@@ -86,9 +86,34 @@ contains `jo`.
 
 ---
 
+## 3. User brands list — `GET /api/admin/users/brands`  (new endpoint)
+
+Full endpoint contract lives in `docs/brand-details-api-spec.md` (section 4).
+Search behavior must follow the same conventions as the endpoints above:
+
+### Query params (search-relevant subset)
+
+| Param        | Type   | Notes                                                                                     |
+|--------------|--------|-------------------------------------------------------------------------------------------|
+| `search`     | string | Case-insensitive **substring** (ILIKE `%term%`) across `email`, `brand_name`, `website_url`, `store_url`. One box, four fields — partial `ice` must return "Ice Cartel". |
+| `location`   | string | Case-insensitive substring on `based_in` OR any `target_markets` entry.                   |
+| `platform`   | string | Exact: `shopify` \| `etsy` \| `woocommerce` \| `bigcommerce` \| `wix` \| `squarespace` \| `unknown`. |
+| `has_brand` / `has_store` / `has_brand_book` | bool | Presence filters.                                           |
+| `limit` / `offset` | int | Same pagination contract; `total` = count after filtering.                          |
+| `sort` / `order`   | string | `brand_updated_at` (default) \| `brand_name` \| `email`; `asc`/`desc`.              |
+
+All filters ANDed, like the other endpoints.
+
+### Acceptance test
+`GET /api/admin/users/brands?search=ice` returns every user whose email, brand
+name, website URL, or store URL contains `ice` (case-insensitive), with `total`
+= full match count.
+
+---
+
 ## Notes for the backend
 - Case-insensitive: use `ILIKE` (Postgres) or `LOWER(col) LIKE LOWER(:term)`.
 - Escape `%` and `_` in the user term so they are treated as literals.
 - Index suggestion: a trigram (`pg_trgm` GIN) index on `user_email` / `workflow_name`
-  / `reporter_email` keeps substring search fast at scale.
+  / `reporter_email` / `brand_name` keeps substring search fast at scale.
 - Keep `total` consistent with the filtered set so the frontend paginator is correct.

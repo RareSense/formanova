@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ThemeLogo } from '@/components/ThemeLogo';
+import { BrandDetailsIcon } from '@/components/brand/BrandDetailsIcon';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
 
 type NavLink = { path: string; label: string; activePaths?: string[] };
@@ -261,22 +262,29 @@ export function Header() {
                     <DropdownMenuSeparator />
                     <DropdownMenuItem 
                       onClick={() => navigate('/generations')}
-                      className="text-sm"
+                      className="text-sm min-h-10"
                     >
                       <Image className="h-4 w-4 mr-2" />
                       Generations
                     </DropdownMenuItem>
                     <DropdownMenuItem 
                       onClick={() => navigate('/credits')}
-                      className="text-sm"
+                      className="text-sm min-h-10"
                     >
                       <img src={creditCoinIcon} alt="" className="h-6 w-6 mr-2 object-contain" width={24} height={24} loading="eager" decoding="sync" />
                       My Credits
                     </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => navigate('/brand-details')}
+                      className="text-sm min-h-10"
+                    >
+                      <BrandDetailsIcon className="h-6 w-6 mr-2" />
+                      Brand Details
+                    </DropdownMenuItem>
                     {isAdmin && (
                       <DropdownMenuItem
                         onClick={() => navigate('/admin')}
-                        className="text-sm"
+                        className="text-sm min-h-10"
                       >
                         <ScanEye className="h-4 w-4 mr-2" />
                         Admin
@@ -386,6 +394,12 @@ export function Header() {
                   <Button variant="outline" size="lg" className="gap-2 w-full">
                     <img src={creditCoinIcon} alt="" className="h-7 w-7 object-contain" width={28} height={28} loading="eager" decoding="sync" />
                     My Credits
+                  </Button>
+                </Link>
+                <Link to="/brand-details">
+                  <Button variant="outline" size="lg" className="gap-2 w-full">
+                    <BrandDetailsIcon className="h-7 w-7" />
+                    Brand Details
                   </Button>
                 </Link>
                 {isAdmin && (
