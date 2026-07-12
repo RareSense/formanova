@@ -82,7 +82,7 @@ export function BrandPromptHandler() {
       });
       toast({
         title: 'Saved',
-        description: 'You can edit or delete your details anytime in Brand Settings.',
+        description: 'You can always edit or delete these details later from your profile menu.',
       });
     } catch {
       // Non-blocking: they can finish from the Brand Details page anytime.

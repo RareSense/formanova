@@ -172,7 +172,7 @@ export default function RolePicker() {
       if (selected === 'jewelry_brand' && brandDetails) {
         toast({
           title: 'Saved',
-          description: 'You can edit or delete your details anytime in Brand Settings.',
+          description: 'You can always edit or delete these details later from your profile menu.',
         });
       }
       markOnboardingComplete(user.id);

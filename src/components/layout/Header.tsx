@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { Button } from '@/components/ui/button';
-import { Menu, X, LogIn, LogOut, User, Image, BadgeCheck, ScanEye, Gem, Check, Settings } from 'lucide-react';
+import { Menu, X, LogIn, LogOut, User, Image, BadgeCheck, ScanEye, Gem, Check } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
 import { useCredits } from '@/contexts/CreditsContext';
@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ThemeLogo } from '@/components/ThemeLogo';
+import { BrandDetailsIcon } from '@/components/brand/BrandDetailsIcon';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
 
 type NavLink = { path: string; label: string; activePaths?: string[] };
@@ -277,7 +278,7 @@ export function Header() {
                       onClick={() => navigate('/brand-details')}
                       className="text-sm"
                     >
-                      <Settings className="h-4 w-4 mr-2" />
+                      <BrandDetailsIcon className="h-5 w-5 mr-2" />
                       Brand Details
                     </DropdownMenuItem>
                     {isAdmin && (
@@ -397,7 +398,7 @@ export function Header() {
                 </Link>
                 <Link to="/brand-details">
                   <Button variant="outline" size="lg" className="gap-2 w-full">
-                    <Settings className="h-5 w-5" />
+                    <BrandDetailsIcon className="h-6 w-6" />
                     Brand Details
                   </Button>
                 </Link>
