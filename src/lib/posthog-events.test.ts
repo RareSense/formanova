@@ -118,7 +118,7 @@ describe('trackBrandFormSubmitted', () => {
 describe('trackBrandDetailsDeleted', () => {
   it('captures brand_details_deleted with no properties', () => {
     trackBrandDetailsDeleted()
-    expect(posthog.capture).toHaveBeenCalledWith('brand_details_deleted')
+    expect(posthog.capture).toHaveBeenCalledWith('brand_details_deleted', undefined)
   })
 })
 
