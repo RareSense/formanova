@@ -278,7 +278,7 @@ export function Header() {
                       onClick={() => navigate('/brand-details')}
                       className="text-sm"
                     >
-                      <BrandDetailsIcon className="h-5 w-5 mr-2" />
+                      <BrandDetailsIcon className="h-6 w-6 mr-2" />
                       Brand Details
                     </DropdownMenuItem>
                     {isAdmin && (
@@ -398,7 +398,7 @@ export function Header() {
                 </Link>
                 <Link to="/brand-details">
                   <Button variant="outline" size="lg" className="gap-2 w-full">
-                    <BrandDetailsIcon className="h-6 w-6" />
+                    <BrandDetailsIcon className="h-7 w-7" />
                     Brand Details
                   </Button>
                 </Link>
