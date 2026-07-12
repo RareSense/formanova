@@ -28,6 +28,7 @@ import {
   trackFeedbackSubmitted,
   trackBrandFormOpened,
   trackBrandFormSubmitted,
+  trackBrandDetailsDeleted,
   setUserProfession,
   trackUpscaleStarted,
   trackUpscaleCompleted,
@@ -111,6 +112,13 @@ describe('trackBrandFormSubmitted', () => {
       social_count: 2,
       has_brand_book: false,
     })
+  })
+})
+
+describe('trackBrandDetailsDeleted', () => {
+  it('captures brand_details_deleted with no properties', () => {
+    trackBrandDetailsDeleted()
+    expect(posthog.capture).toHaveBeenCalledWith('brand_details_deleted')
   })
 })
 

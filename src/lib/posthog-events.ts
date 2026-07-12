@@ -167,6 +167,11 @@ export function trackBrandFormSubmitted(props: BrandFormSubmittedProps) {
   capture('brand_form_submitted', { ...props });
 }
 
+/** The user cleared their entire brand profile from Brand Settings. */
+export function trackBrandDetailsDeleted() {
+  capture('brand_details_deleted');
+}
+
 // ═══════ Auth Events ════════════════════════════════════════════════
 
 export function trackSignup(method: string, email?: string) {
