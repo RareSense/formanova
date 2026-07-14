@@ -5,6 +5,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ShopifyExportDialog } from '@/components/shopify/ShopifyExportDialog';
 import { ShopifyConnectDialog } from '@/components/shopify/ShopifyConnectDialog';
+// TEMPORARY app-review tester callout - see docs/SHOPIFY_TESTER_CALLOUT_REMOVAL.md
+import { ShopifyTesterCalloutAnchor } from '@/components/shopify/ShopifyTesterCallout';
 import { useShopifyStatus } from '@/hooks/useShopify';
 import { cn } from '@/lib/utils';
 
@@ -82,6 +84,7 @@ export function ShopifyPublishButton({
 
   return (
     <div className="w-full">
+      <ShopifyTesterCalloutAnchor>
       <Button
         type="button"
         variant="outline"
@@ -108,6 +111,7 @@ export function ShopifyPublishButton({
           <span className="whitespace-nowrap">{label}</span>
         )}
       </Button>
+      </ShopifyTesterCalloutAnchor>
 
       {showNotReadyHint && (
         <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
