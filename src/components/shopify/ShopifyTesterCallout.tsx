@@ -50,7 +50,7 @@ function CopyField({
         className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
       >
         {copied
-          ? <Check className="h-3.5 w-3.5 text-[#008060]" />
+          ? <Check className="h-3.5 w-3.5 text-primary" />
           : <Copy className="h-3.5 w-3.5" />}
       </button>
     </div>
@@ -62,7 +62,7 @@ function TesterCallout({ onDismiss }: { onDismiss: () => void }) {
     <div
       className={cn(
         // Mobile / narrow: in-flow card above the button, arrow pointing down.
-        'relative z-40 mb-3 w-full rounded-xl border border-border bg-background p-4 text-left shadow-[0_10px_35px_rgba(0,0,0,0.16)]',
+        'relative z-40 mb-3 w-full rounded-xl border border-border bg-background p-4 text-left shadow-xl',
         // lg+: floats to the right of the button, arrow pointing left at it.
         'lg:absolute lg:left-full lg:top-1/2 lg:mb-0 lg:ml-4 lg:w-72 lg:-translate-y-1/2'
       )}
