@@ -134,7 +134,9 @@ export function ShopifyTesterCalloutAnchor({
   return (
     <div
       className={cn('relative w-full', className)}
-      onClickCapture={(e) => {
+      // Bubble phase: the button's own onClick runs FIRST (connect/export
+      // fires on this same click), then the tooltip hides.
+      onClick={(e) => {
         // Copy clicks inside the callout should not dismiss it
         if (calloutRef.current?.contains(e.target as Node)) return;
         setDismissed(true);
