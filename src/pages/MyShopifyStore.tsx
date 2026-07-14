@@ -5,7 +5,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import logoBlack from '@/assets/formanova-logo-black.png';
 import logoWhite from '@/assets/formanova-logo-white.png';
 import fnLogo from '@/assets/fn-logo-black.webp';
-import { ArrowLeft, Check, Info, Lock, Loader2, Store } from 'lucide-react';
+import { ArrowLeft, Check, Info, Lock, Loader2 } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
@@ -175,19 +175,6 @@ export default function MyShopifyStore() {
                 <DialogDescription className="max-w-xs text-sm leading-relaxed text-muted-foreground">
                   Your store is now connected to FormaNova.
                 </DialogDescription>
-
-                {/* Connected store card */}
-                {status?.shop_domain && (
-                  <div className="flex w-full items-center gap-3 border border-border bg-muted/20 px-4 py-3 text-left">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center border border-border bg-background">
-                      <Store className="h-4 w-4 text-[#008060]" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Connected store</p>
-                      <p className="mt-0.5 truncate text-sm font-medium text-foreground">{status.shop_domain}</p>
-                    </div>
-                  </div>
-                )}
 
                 <Button
                   onClick={() => {
