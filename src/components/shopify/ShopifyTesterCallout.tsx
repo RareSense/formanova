@@ -11,9 +11,10 @@ import { Copy, Check } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
-// Fill these in with the development test-store credentials.
-const TESTER_STORE_EMAIL = 'hassan@raresense.so';
-const TESTER_STORE_PASSWORD = 'asdasdASFDA234@#$';
+// Development test-store credentials come from env so nothing sensitive
+// lives in the repo. Set both in .env or the callout will not render.
+const TESTER_STORE_EMAIL = import.meta.env.VITE_SHOPIFY_TESTER_STORE_EMAIL as string | undefined;
+const TESTER_STORE_PASSWORD = import.meta.env.VITE_SHOPIFY_TESTER_STORE_PASSWORD as string | undefined;
 
 // Reads the logged-in user's email from the same localStorage key AuthContext
 // uses, so this temporary component needs no provider wiring.
@@ -88,8 +89,8 @@ function TesterCallout() {
       </p>
 
       <div className="mt-3 space-y-1.5">
-        <CopyField label="Email" value={TESTER_STORE_EMAIL} />
-        <CopyField label="Password" value={TESTER_STORE_PASSWORD} />
+        <CopyField label="Email" value={TESTER_STORE_EMAIL!} />
+        <CopyField label="Password" value={TESTER_STORE_PASSWORD!} />
       </div>
 
       {/* Arrow pointing down at the button below */}
@@ -117,6 +118,7 @@ export function ShopifyTesterCalloutAnchor({
   const [dismissed, setDismissed] = useState(false);
   const calloutRef = useRef<HTMLDivElement>(null);
 
+  if (!TESTER_STORE_EMAIL || !TESTER_STORE_PASSWORD) return <>{children}</>;
   if (!isShopifyReviewTester(getStoredUserEmail())) return <>{children}</>;
 
   return (

@@ -6,15 +6,19 @@ Delete everything below once Shopify app review is complete.
 
 ## Setup (while active)
 
-1. Fill in the credentials in `src/components/shopify/ShopifyTesterCallout.tsx`:
-   - `TESTER_STORE_EMAIL`
-   - `TESTER_STORE_PASSWORD`
-2. Add the tester account email(s) to `.env` (comma-separated):
-   ```
-   VITE_SHOPIFY_TESTER_EMAILS=tester@example.com
-   ```
-   The callout renders ONLY for logged-in users whose email is in this list.
-   It stays visible until the tester clicks the button it points at.
+Add all three vars to `.env` (nothing is hardcoded in the repo):
+```
+VITE_SHOPIFY_TESTER_EMAILS=tester@example.com
+VITE_SHOPIFY_TESTER_STORE_EMAIL=test-store-login@example.com
+VITE_SHOPIFY_TESTER_STORE_PASSWORD=the-test-store-password
+```
+- `VITE_SHOPIFY_TESTER_EMAILS` (comma-separated): the callout renders ONLY for
+  logged-in FormaNova users whose email is in this list.
+- `STORE_EMAIL` / `STORE_PASSWORD`: the credentials displayed in the callout.
+  If either is missing, the callout does not render at all.
+- It stays visible until the tester clicks the button it points at.
+- Vite bakes these in at build time; rebuild after changing them. They are
+  visible in the built JS bundle, so use throwaway test-store credentials only.
 
 ## How to remove (3 steps)
 
@@ -31,8 +35,9 @@ Delete everything below once Shopify app review is complete.
      - Remove the `<ShopifyTesterCalloutAnchor>` / `</ShopifyTesterCalloutAnchor>`
        tags around the connect `<Button>` in `ConnectCard`; keep the button as-is
 
-3. **Clean env vars:** remove `VITE_SHOPIFY_TESTER_EMAILS` from `.env` and any
-   deployment environment.
+3. **Clean env vars:** remove `VITE_SHOPIFY_TESTER_EMAILS`,
+   `VITE_SHOPIFY_TESTER_STORE_EMAIL`, and `VITE_SHOPIFY_TESTER_STORE_PASSWORD`
+   from `.env` and any deployment environment.
 
 4. **Delete this file:** `docs/SHOPIFY_TESTER_CALLOUT_REMOVAL.md`
 
