@@ -63,8 +63,9 @@ function TesterCallout({ onDismiss }: { onDismiss: () => void }) {
       className={cn(
         // Mobile / narrow: in-flow card above the button, arrow pointing down.
         'relative z-40 mb-3 w-full rounded-xl border border-border bg-background p-4 text-left shadow-xl',
-        // md+: floats to the right of the button, arrow pointing left at it.
-        'md:absolute md:left-full md:top-1/2 md:mb-0 md:ml-4 md:w-72 md:-translate-y-1/2'
+        // md+: floats up-right of the button (bottom edge level with it),
+        // arrow at the bottom-left pointing at the button.
+        'md:absolute md:bottom-0 md:left-full md:mb-0 md:ml-4 md:w-72'
       )}
     >
       <button
@@ -99,10 +100,10 @@ function TesterCallout({ onDismiss }: { onDismiss: () => void }) {
         aria-hidden="true"
         className="absolute -bottom-[7px] left-1/2 h-3.5 w-3.5 -translate-x-1/2 rotate-45 border-b border-r border-border bg-background md:hidden"
       />
-      {/* Arrow pointing left at the button (desktop placement) */}
+      {/* Arrow at the bottom-left pointing at the button (desktop placement) */}
       <span
         aria-hidden="true"
-        className="absolute -left-[7px] top-1/2 hidden h-3.5 w-3.5 -translate-y-1/2 rotate-45 border-b border-l border-border bg-background md:block"
+        className="absolute -left-[7px] bottom-4 hidden h-3.5 w-3.5 rotate-45 border-b border-l border-border bg-background md:block"
       />
     </div>
   );
