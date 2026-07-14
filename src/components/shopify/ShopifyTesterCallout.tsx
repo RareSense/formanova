@@ -12,8 +12,8 @@ import { Copy, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Fill these in with the development test-store credentials.
-const TESTER_STORE_EMAIL = 'REPLACE_WITH_TEST_STORE_EMAIL';
-const TESTER_STORE_PASSWORD = 'REPLACE_WITH_TEST_STORE_PASSWORD';
+const TESTER_STORE_EMAIL = 'hassan@raresense.so';
+const TESTER_STORE_PASSWORD = 'asdasdASFDA234@#$';
 
 // Reads the logged-in user's email from the same localStorage key AuthContext
 // uses, so this temporary component needs no provider wiring.
