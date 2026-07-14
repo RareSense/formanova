@@ -1,8 +1,9 @@
 /**
  * TEMPORARY - Shopify app-review tester callout.
  *
- * Shows test-store credentials above the Shopify connect/export buttons,
- * only for the app-review tester account (VITE_SHOPIFY_TESTER_EMAILS).
+ * Shows test-store credentials above the Shopify connect/export buttons.
+ * Renders for every user, but only when VITE_SHOPIFY_TESTER_STORE_EMAIL and
+ * VITE_SHOPIFY_TESTER_STORE_PASSWORD are set at build time (review env only).
  *
  * Removal instructions: docs/SHOPIFY_TESTER_CALLOUT_REMOVAL.md
  */
@@ -15,30 +16,6 @@ import { cn } from '@/lib/utils';
 // lives in the repo. Set both in .env or the callout will not render.
 const TESTER_STORE_EMAIL = import.meta.env.VITE_SHOPIFY_TESTER_STORE_EMAIL as string | undefined;
 const TESTER_STORE_PASSWORD = import.meta.env.VITE_SHOPIFY_TESTER_STORE_PASSWORD as string | undefined;
-
-// Reads the logged-in user's email from the same localStorage key AuthContext
-// uses, so this temporary component needs no provider wiring.
-function getStoredUserEmail(): string | null {
-  try {
-    const raw = localStorage.getItem('formanova_auth_user');
-    if (!raw) return null;
-    const email = JSON.parse(raw)?.email;
-    return typeof email === 'string' ? email : null;
-  } catch {
-    return null;
-  }
-}
-
-function isShopifyReviewTester(email: string | undefined | null): boolean {
-  if (!email) return false;
-  const raw = import.meta.env.VITE_SHOPIFY_TESTER_EMAILS;
-  if (!raw || typeof raw !== 'string') return false;
-  return raw
-    .split(',')
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean)
-    .includes(email.trim().toLowerCase());
-}
 
 function CopyField({ label, value }: { label: string; value: string }) {
   const [copied, setCopied] = useState(false);
@@ -103,10 +80,10 @@ function TesterCallout() {
 }
 
 /**
- * Wraps a Shopify connect/export button. For the app-review tester account it
- * renders the credentials callout directly above the button, pointing at it.
- * The callout stays visible until the button is clicked. For everyone else it
- * renders children untouched.
+ * Wraps a Shopify connect/export button. When the credential env vars are set
+ * it renders the callout directly above the button, pointing at it, for every
+ * user. The callout stays visible until the button is clicked. When the vars
+ * are absent (production) it renders children untouched.
  */
 export function ShopifyTesterCalloutAnchor({
   children,
@@ -118,8 +95,10 @@ export function ShopifyTesterCalloutAnchor({
   const [dismissed, setDismissed] = useState(false);
   const calloutRef = useRef<HTMLDivElement>(null);
 
+  // Shown to every user whenever the credential env vars are set. The vars
+  // are only set on the environment used for Shopify app review, never on
+  // production, so regular users never see this.
   if (!TESTER_STORE_EMAIL || !TESTER_STORE_PASSWORD) return <>{children}</>;
-  if (!isShopifyReviewTester(getStoredUserEmail())) return <>{children}</>;
 
   return (
     <div
