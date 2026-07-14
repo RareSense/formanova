@@ -1,14 +1,15 @@
 /**
  * TEMPORARY - Shopify app-review tester callout.
  *
- * Shows test-store credentials above the Shopify connect/export buttons.
- * Renders for every user, but only when VITE_SHOPIFY_TESTER_STORE_EMAIL and
- * VITE_SHOPIFY_TESTER_STORE_PASSWORD are set at build time (review env only).
+ * Floating card beside the Shopify connect/export buttons showing the
+ * test-store credentials. Renders for every user, but only when
+ * VITE_SHOPIFY_TESTER_STORE_EMAIL and VITE_SHOPIFY_TESTER_STORE_PASSWORD
+ * are set at build time (review env only).
  *
  * Removal instructions: docs/SHOPIFY_TESTER_CALLOUT_REMOVAL.md
  */
 import { useRef, useState, type ReactNode } from 'react';
-import { Copy, Check } from 'lucide-react';
+import { Copy, Check, KeyRound, Mail, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
@@ -17,7 +18,15 @@ import { cn } from '@/lib/utils';
 const TESTER_STORE_EMAIL = import.meta.env.VITE_SHOPIFY_TESTER_STORE_EMAIL as string | undefined;
 const TESTER_STORE_PASSWORD = import.meta.env.VITE_SHOPIFY_TESTER_STORE_PASSWORD as string | undefined;
 
-function CopyField({ label, value }: { label: string; value: string }) {
+function CopyField({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof Mail;
+  label: string;
+  value: string;
+}) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
@@ -28,18 +37,17 @@ function CopyField({ label, value }: { label: string; value: string }) {
   };
 
   return (
-    <div className="flex items-center gap-2 border border-border bg-muted/20 px-2.5 py-1.5">
-      <span className="w-16 shrink-0 text-left font-mono text-[9px] uppercase tracking-[0.15em] text-muted-foreground">
-        {label}
-      </span>
-      <span className="min-w-0 flex-1 truncate text-left font-mono text-xs text-foreground">
+    <div className="flex items-center gap-2">
+      <Icon className="h-3.5 w-3.5 shrink-0 text-primary" />
+      <span className="shrink-0 text-xs font-semibold text-foreground">{label}:</span>
+      <span className="min-w-0 flex-1 truncate text-left text-xs text-foreground">
         {value}
       </span>
       <button
         type="button"
         onClick={handleCopy}
         aria-label={`Copy ${label.toLowerCase()}`}
-        className="flex h-6 w-6 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
       >
         {copied
           ? <Check className="h-3.5 w-3.5 text-[#008060]" />
@@ -49,31 +57,52 @@ function CopyField({ label, value }: { label: string; value: string }) {
   );
 }
 
-function TesterCallout() {
+function TesterCallout({ onDismiss }: { onDismiss: () => void }) {
   return (
-    <div className="relative mb-3 w-full border border-foreground bg-background p-4">
-      <p className="font-mono text-[8px] uppercase tracking-[0.3em] text-muted-foreground">
+    <div
+      className={cn(
+        // Mobile / narrow: in-flow card above the button, arrow pointing down.
+        'relative z-40 mb-3 w-full rounded-xl border border-border bg-background p-4 text-left shadow-[0_10px_35px_rgba(0,0,0,0.16)]',
+        // lg+: floats to the right of the button, arrow pointing left at it.
+        'lg:absolute lg:left-full lg:top-1/2 lg:mb-0 lg:ml-4 lg:w-72 lg:-translate-y-1/2'
+      )}
+    >
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label="Dismiss tester notice"
+        className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <X className="h-4 w-4" />
+      </button>
+
+      <p className="pr-7 font-mono text-[8px] uppercase tracking-[0.3em] text-primary">
         For Shopify app testers
       </p>
 
-      <p className="mt-2 font-display text-lg uppercase leading-none tracking-wide text-foreground">
+      <p className="mt-2 pr-4 font-display text-xl uppercase leading-none tracking-wide text-foreground">
         Before clicking this button
       </p>
 
-      <p className="mt-2 text-xs font-semibold leading-relaxed text-foreground">
-        Log in to Shopify with the development test-store credentials below in
-        the same browser. Otherwise, the connection will not work.
+      <p className="mt-2.5 text-xs font-semibold leading-relaxed text-foreground">
+        Log in to Shopify with these development test-store credentials in the
+        same browser. Otherwise, the connection will not work.
       </p>
 
-      <div className="mt-3 space-y-1.5">
-        <CopyField label="Email" value={TESTER_STORE_EMAIL!} />
-        <CopyField label="Password" value={TESTER_STORE_PASSWORD!} />
+      <div className="mt-3 space-y-2 border-t border-border pt-3">
+        <CopyField icon={Mail} label="Email" value={TESTER_STORE_EMAIL!} />
+        <CopyField icon={KeyRound} label="Password" value={TESTER_STORE_PASSWORD!} />
       </div>
 
-      {/* Arrow pointing down at the button below */}
+      {/* Arrow pointing down at the button (mobile placement) */}
       <span
         aria-hidden="true"
-        className="absolute -bottom-[7px] left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 border-b border-r border-foreground bg-background"
+        className="absolute -bottom-[7px] left-1/2 h-3.5 w-3.5 -translate-x-1/2 rotate-45 border-b border-r border-border bg-background lg:hidden"
+      />
+      {/* Arrow pointing left at the button (desktop placement) */}
+      <span
+        aria-hidden="true"
+        className="absolute -left-[7px] top-1/2 hidden h-3.5 w-3.5 -translate-y-1/2 rotate-45 border-b border-l border-border bg-background lg:block"
       />
     </div>
   );
@@ -81,9 +110,10 @@ function TesterCallout() {
 
 /**
  * Wraps a Shopify connect/export button. When the credential env vars are set
- * it renders the callout directly above the button, pointing at it, for every
- * user. The callout stays visible until the button is clicked. When the vars
- * are absent (production) it renders children untouched.
+ * it renders the callout pointing at the button (beside it on desktop, above
+ * it on smaller screens) for every user. The callout stays visible until the
+ * button is clicked or the notice is dismissed. When the vars are absent
+ * (production) it renders children untouched.
  */
 export function ShopifyTesterCalloutAnchor({
   children,
@@ -102,7 +132,7 @@ export function ShopifyTesterCalloutAnchor({
 
   return (
     <div
-      className={cn('w-full', className)}
+      className={cn('relative w-full', className)}
       onClickCapture={(e) => {
         // Copy clicks inside the callout should not dismiss it
         if (calloutRef.current?.contains(e.target as Node)) return;
@@ -111,7 +141,7 @@ export function ShopifyTesterCalloutAnchor({
     >
       {!dismissed && (
         <div ref={calloutRef}>
-          <TesterCallout />
+          <TesterCallout onDismiss={() => setDismissed(true)} />
         </div>
       )}
       {children}
