@@ -327,23 +327,10 @@ function ConnectedCard({
           </div>
         </div>
 
-        <div className="divide-y divide-border">
-          {/* Connected store */}
-          <div className="px-8 py-6">
-            <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">Connected to</p>
-            <p className="mt-2 text-base font-medium text-foreground">{status.shop_name || status.shop_domain}</p>
-          </div>
-
-          {/* Export CTA */}
-          <div className="flex justify-center px-8 py-6">
-            <Button
-              disabled
-              className="h-11 gap-2.5 font-mono text-[10px] uppercase tracking-[0.2em] opacity-40"
-            >
-              <ShopifyBagIcon className="h-4 w-4 shrink-0" />
-              Connect your Shopify store
-            </Button>
-          </div>
+        {/* Connected store */}
+        <div className="px-8 py-6">
+          <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">Connected to</p>
+          <p className="mt-2 text-base font-medium text-foreground">{status.shop_name || status.shop_domain}</p>
         </div>
 
         {/* Footer hint */}
