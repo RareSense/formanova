@@ -2,8 +2,6 @@
 
 Date: 2026-07-17
 Environment: staging (`staging-gsdgds12.formanova.ai`)
-Backend: `temporal-agentic-pipeline`, service `formanova-api-gateway-staging.service`,
-WorkingDirectory `/home/hassan/temporal-agentic-pipeline`, env file `.env.staging`, port 9005 behind nginx `/api/`.
 
 ---
 
@@ -14,7 +12,7 @@ WorkingDirectory `/home/hassan/temporal-agentic-pipeline`, env file `.env.stagin
 | OLD custom app | `ae47d5b4db86db8f852cfed2544123b1` | Dead. Custom-distribution, locked to test store `formanova-rgjliypg.myshopify.com`, its install link signature expired 2026-05-28. Do not use anywhere. |
 | NEW public app (submitted for App Store review) | `d2d12989da2fb5578ca789bd2734f48f` | Active. Created 2026-05-22. This is the only app that matters. |
 
-Backend `.env.staging` already has the correct `SHOPIFY_API_KEY=d2d12989...` and matching secret. Do NOT change credentials.
+Backend staging env already has the correct `SHOPIFY_API_KEY=d2d12989...` and matching secret. Do NOT change credentials.
 
 ---
 
@@ -59,10 +57,10 @@ httpx.HTTPStatusError: Client error '403 Forbidden' for url
 Also: the connected card shows the raw domain instead of the store name, because
 `fetch_shop_name` (first Admin API call after connect) fails silently with the same 403.
 
-### Exact reproduction (run on the server)
+### Exact reproduction
 
-We decrypted the stored token with the backend's own `decrypt_token()` +
-`TOKEN_ENCRYPTION_KEY` and called the Admin API directly:
+We decrypted the stored token with the backend's own `decrypt_token()` and called
+the Admin API directly:
 
 Request:
 ```
@@ -164,7 +162,7 @@ a bare 500.
 
 ## Part 4: Deploy + verify
 
-1. Run migration, deploy to staging, restart `formanova-api-gateway-staging.service`.
+1. Run migration, deploy to staging, restart the API.
 2. One-time token replacement (there is no in-place conversion of the old token):
    - FormaNova -> /my-shopify-store -> Disconnect
    - shell-jewelry Shopify admin -> Settings -> Apps and sales channels -> uninstall FormaNova
