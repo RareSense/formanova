@@ -9,39 +9,23 @@ Environment: staging (`staging-gsdgds12.formanova.ai`)
 
 | App | Client ID | Status |
 |---|---|---|
-| OLD custom app | `ae47d5b4db86db8f852cfed2544123b1` | Dead. Custom-distribution, locked to test store `formanova-rgjliypg.myshopify.com`, its install link signature expired 2026-05-28. Do not use anywhere. |
+| OLD custom app | `ae47d5b4db86db8f852cfed2544123b1` | Dead. Do not use anywhere. |
 | NEW public app (submitted for App Store review) | `d2d12989da2fb5578ca789bd2734f48f` | Active. Created 2026-05-22. This is the only app that matters. |
 
 Backend staging env already has the correct `SHOPIFY_API_KEY=d2d12989...` and matching secret. Do NOT change credentials.
 
 ---
 
-## Part 1: What was broken and is now FIXED (connection flow)
+## Part 1: Current state (connection works)
 
-The Shopify app-review rejection ("Unauthorized Access") was caused by the frontend
-`VITE_SHOPIFY_APP_LISTING_URL` pointing at the OLD app's expired, store-locked custom install link:
-
-```
-https://admin.shopify.com/store/formanova-rgjliypg/oauth/install_custom_app
-  ?client_id=ae47d5b4db86db8f852cfed2544123b1&no_redirect=true&signature=<expired 2026-05-28>
-```
-
-Clicking it returned `403 Forbidden` from Shopify for everyone (reproduced in browser).
-
-Fixes applied (all config, no backend code):
-1. Frontend staging env now uses the managed-install link of the new app:
-   `https://admin.shopify.com/oauth/install?client_id=d2d12989da2fb5578ca789bd2734f48f`
-2. Dev Dashboard App URL -> `https://staging-gsdgds12.formanova.ai/api/shopify/install`,
-   redirect URL -> `https://staging-gsdgds12.formanova.ai/api/shopify/callback`.
-
-Result: full OAuth flow now works. Install -> `/api/shopify/install` (HMAC ok) ->
+The full OAuth flow works end to end: install -> `/api/shopify/install` (HMAC ok) ->
 authorize -> `/api/shopify/callback` (state ok, token exchange ok) -> connection row
 saved -> `/shopify/link` binds it to the user. Store `shell-jewelry-n6ipnfxr.myshopify.com`
 shows as Connected in FormaNova.
 
 ---
 
-## Part 2: What is STILL BROKEN (every Admin API call, therefore export)
+## Part 2: What is BROKEN (every Admin API call, therefore export)
 
 ### Symptom
 
