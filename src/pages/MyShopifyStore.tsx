@@ -228,8 +228,10 @@ export default function MyShopifyStore() {
 /* ---------- Connect (App Store listing flow — no domain input) ---------- */
 
 // INTEGRATION POINT: set VITE_SHOPIFY_APP_LISTING_URL in .env
-// Production: https://apps.shopify.com/<your-handle>
-// Review/staging: use the Partner Dashboard direct install link
+// Must be the public App Store listing: https://apps.shopify.com/<your-handle>
+// NEVER a custom-app or single-store install link (admin.shopify.com/store/.../install_custom_app):
+// those are store-locked, signed, and expire; anyone else gets Shopify "Unauthorized Access".
+// During app review, leave unset (button disables); reviewers install via Shopify's review flow.
 const SHOPIFY_LISTING_URL = import.meta.env.VITE_SHOPIFY_APP_LISTING_URL as string | undefined;
 
 function ConnectCard() {

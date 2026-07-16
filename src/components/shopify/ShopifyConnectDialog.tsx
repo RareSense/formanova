@@ -9,8 +9,9 @@ import {
 import { useShopifyStatus } from '@/hooks/useShopify';
 
 // INTEGRATION POINT: set VITE_SHOPIFY_APP_LISTING_URL in .env
-// Production: https://apps.shopify.com/<your-handle>
-// Review/staging: use the Partner Dashboard direct install link
+// Must be the public App Store listing: https://apps.shopify.com/<your-handle>
+// NEVER a custom-app or single-store install link: store-locked, signed, expiring;
+// anyone else gets Shopify "Unauthorized Access". During review, leave unset.
 const SHOPIFY_LISTING_URL = import.meta.env.VITE_SHOPIFY_APP_LISTING_URL as string | undefined;
 
 function ShopifyBagIcon({ className }: { className?: string }) {
