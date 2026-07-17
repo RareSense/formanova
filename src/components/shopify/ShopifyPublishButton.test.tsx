@@ -15,7 +15,7 @@ vi.mock('@/components/shopify/ShopifyExportDialog', () => ({
 }));
 
 describe('ShopifyPublishButton', () => {
-  it('shows the disconnected hint when the store is not connected', () => {
+  it('opens the connect dialog when the store is not connected', () => {
     mockUseShopifyStatus.mockReturnValue({ data: { connected: false }, isLoading: false });
 
     render(
@@ -24,9 +24,9 @@ describe('ShopifyPublishButton', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /publish to shopify/i }));
+    fireEvent.click(screen.getByRole('button', { name: /export to shopify/i }));
 
-    expect(screen.getByText(/connect your shopify store first/i)).toBeTruthy();
+    expect(screen.getByText(/connect your shopify store/i)).toBeTruthy();
   });
 
   it('opens the export dialog when the store is already connected', () => {
@@ -38,7 +38,7 @@ describe('ShopifyPublishButton', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /publish to shopify/i }));
+    fireEvent.click(screen.getByRole('button', { name: /export to shopify/i }));
 
     expect(screen.getByText('export-dialog')).toBeTruthy();
   });

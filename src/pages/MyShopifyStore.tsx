@@ -22,8 +22,6 @@ import {
   LinkTokenExpiredError,
 } from '@/services/shopify-api';
 import { useToast } from '@/hooks/use-toast';
-// TEMPORARY app-review tester callout - see docs/SHOPIFY_TESTER_CALLOUT_REMOVAL.md
-import { ShopifyTesterCalloutAnchor } from '@/components/shopify/ShopifyTesterCallout';
 
 function ShopifyBagIcon({ className }: { className?: string }) {
   return (
@@ -267,17 +265,15 @@ function ConnectCard() {
           transition={{ delay: 0.30, duration: 0.35 }}
           className="mt-8 w-full max-w-xs space-y-4"
         >
-          <ShopifyTesterCalloutAnchor>
-            <Button
-              onClick={() => { if (SHOPIFY_LISTING_URL) window.location.href = SHOPIFY_LISTING_URL; }}
-              disabled={!SHOPIFY_LISTING_URL}
-              className="h-12 w-full gap-2.5 font-mono text-[10px] uppercase tracking-[0.2em]"
-              aria-label="Connect with Shopify — opens the App Store listing"
-            >
-              <ShopifyBagIcon className="h-4 w-4 shrink-0" />
-              Connect your Shopify store
-            </Button>
-          </ShopifyTesterCalloutAnchor>
+          <Button
+            onClick={() => { if (SHOPIFY_LISTING_URL) window.location.href = SHOPIFY_LISTING_URL; }}
+            disabled={!SHOPIFY_LISTING_URL}
+            className="h-12 w-full gap-2.5 font-mono text-[10px] uppercase tracking-[0.2em]"
+            aria-label="Connect with Shopify — opens the App Store listing"
+          >
+            <ShopifyBagIcon className="h-4 w-4 shrink-0" />
+            Connect your Shopify store
+          </Button>
 
 
         </motion.div>

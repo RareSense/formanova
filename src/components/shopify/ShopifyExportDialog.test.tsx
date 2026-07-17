@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -31,15 +32,17 @@ describe('ShopifyExportDialog', () => {
     mockUseToast.mockReturnValue({ toast: vi.fn() });
 
     render(
-      <ShopifyExportDialog
-        open
-        onOpenChange={() => {}}
-        assetId="asset-1"
-        assetName="Necklace Shot"
-      />,
+      <QueryClientProvider client={new QueryClient()}>
+        <ShopifyExportDialog
+          open
+          onOpenChange={() => {}}
+          assetId="asset-1"
+          assetName="Necklace Shot"
+        />
+      </QueryClientProvider>,
     );
 
     expect(screen.queryByRole('button', { name: /generate with ai/i })).toBeNull();
-    expect(screen.getByRole('button', { name: /publish to shopify/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /export to shopify/i })).toBeTruthy();
   });
 });
