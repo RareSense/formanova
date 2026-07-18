@@ -189,7 +189,9 @@ export function StudioResultsStep({
       )}
 
       {/* Action area. */}
-      <div className="relative z-40 mx-auto flex w-full max-w-2xl flex-col gap-4 pt-2">
+      {/* gap-8 mirrors the approved mock's group separation (its tier labels
+          added air we keep as whitespace, since the labels themselves are out). */}
+      <div className="relative z-40 mx-auto flex w-full max-w-2xl flex-col gap-8 pt-2">
         {/* Multi-result grids have no details row, so the upscale pill gets its
             own centered row. Single results carry it inline next to the metadata. */}
         {resultImages.length > 1 && (

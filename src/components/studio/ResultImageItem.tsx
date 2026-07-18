@@ -183,7 +183,7 @@ export function ResultImageItem({ url, index, workflowId, outputAssetId, jewelry
       {belowImage && <div className="mt-2.5">{belowImage}</div>}
 
       {/* Ship-it actions — always equal-width two columns */}
-      <div className="mt-3 grid grid-cols-2 gap-3">
+      <div className="mt-5 grid grid-cols-2 gap-3">
         <Button
           variant="outline"
           aria-label="Download image"
