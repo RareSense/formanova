@@ -5,6 +5,7 @@ import { ArrowRight, Play } from 'lucide-react';
 import { ScrollRevealSection, StaggerContainer } from '@/components/ScrollRevealSection';
 import { KineticText } from '@/components/KineticText';
 import { CinematicHero } from '@/components/CinematicHero';
+import { ShopifyBagIcon } from '@/components/shopify/ShopifyBagIcon';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect } from 'react';
 
@@ -24,6 +25,33 @@ import heroEmeraldEarrings from '@/assets/jewelry/hero-emerald-earrings.webp';
 import heroGemstoneRings from '@/assets/jewelry/hero-gemstone-rings.webp';
 import heroAquamarineRings from '@/assets/jewelry/hero-aquamarine-rings.webp';
 import heroDiamondBracelets from '@/assets/jewelry/hero-diamond-bracelets.webp';
+
+/**
+ * "Works with Shopify" seal for the hero: dashed ring, arc text, centered bag,
+ * gold dots. Colors are FIXED (not theme tokens) - the seal sits on the always-
+ * dark hero photo, and theme-driven colors here would break in light themes the
+ * same way the old hero button did. Identical in all 12 themes by design.
+ */
+function WorksWithShopifySeal({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 150 150" className={className} aria-label="Works with Shopify">
+      <defs>
+        <path id="shopify-seal-arc-top" d="M 75,75 m -57,0 a 57,57 0 0 1 114,0" />
+        <path id="shopify-seal-arc-bottom" d="M 75,75 m -57,0 a 57,57 0 1 0 114,0" />
+      </defs>
+      <circle cx="75" cy="75" r="72" fill="rgba(10,8,6,0.2)" stroke="rgba(255,255,255,0.75)" strokeWidth="1.4" strokeDasharray="5 6" />
+      <ShopifyBagIcon x={45} y={43} width={60} height={60} />
+      <circle cx="18" cy="75" r="2.4" fill="#C9A227" />
+      <circle cx="132" cy="75" r="2.4" fill="#C9A227" />
+      <text textAnchor="middle" style={{ fontFamily: "'Space Mono', monospace", fontSize: '12.5px', letterSpacing: '3.5px', fill: 'rgba(255,255,255,0.95)' }}>
+        <textPath href="#shopify-seal-arc-top" startOffset="50%">WORKS WITH</textPath>
+      </text>
+      <text textAnchor="middle" style={{ fontFamily: "'Space Mono', monospace", fontSize: '12.5px', letterSpacing: '3.5px', fill: 'rgba(255,255,255,0.95)' }}>
+        <textPath href="#shopify-seal-arc-bottom" startOffset="50%">SHOPIFY</textPath>
+      </text>
+    </svg>
+  );
+}
 
 export default function Welcome() {
   const navigate = useNavigate();
@@ -104,7 +132,19 @@ export default function Welcome() {
                 <ArrowRight className="h-4 w-4" />
               </button>
             </div>
+
+            {/* Mobile fallback for the Shopify seal (no photo negative space on phones) */}
+            <p className="mt-6 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-white/70 lg:hidden">
+              <ShopifyBagIcon className="h-4 w-4 shrink-0" />
+              Works with Shopify
+            </p>
           </div>
+        </div>
+
+        {/* Works with Shopify seal - permanent capability mark in the hero's
+            dark lower-right photo space. Desktop only; phones get the caption. */}
+        <div className="pointer-events-none absolute bottom-[9%] right-[5%] z-20 hidden w-36 lg:block xl:w-44">
+          <WorksWithShopifySeal className="h-auto w-full" />
         </div>
       </section>
 
