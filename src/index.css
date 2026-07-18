@@ -599,6 +599,26 @@
     color: hsl(var(--foreground));
   }
 
+  /* Hero CTA: sits on the always-dark hero photo, so its colors are fixed —
+     theme tokens would render it black-on-black in light mode. */
+  .marta-button-hero {
+    @apply px-8 py-4 inline-flex items-center justify-center gap-3;
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    background: #ffffff;
+    color: #111111;
+    border: 1px solid #ffffff;
+  }
+
+  .marta-button-hero:hover {
+    background: transparent;
+    color: #ffffff;
+  }
+
   /* Marta-style section padding */
   .marta-section {
     @apply py-24 md:py-32 lg:py-40;

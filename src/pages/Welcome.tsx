@@ -99,7 +99,7 @@ export default function Welcome() {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4">
-              <button onClick={handleStart} className="marta-button-filled magnetic-button">
+              <button onClick={handleStart} className="marta-button-hero magnetic-button">
                 <span>Start Creating</span>
                 <ArrowRight className="h-4 w-4" />
               </button>
