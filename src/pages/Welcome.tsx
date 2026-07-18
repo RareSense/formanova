@@ -39,7 +39,10 @@ function WorksWithShopifySeal({ className }: { className?: string }) {
         <path id="shopify-seal-arc-top" d="M 75,75 m -57,0 a 57,57 0 0 1 114,0" />
         <path id="shopify-seal-arc-bottom" d="M 75,75 m -57,0 a 57,57 0 1 0 114,0" />
       </defs>
-      <circle cx="75" cy="75" r="72" fill="rgba(10,8,6,0.2)" stroke="rgba(255,255,255,0.8)" strokeWidth="1.6" />
+      {/* Outlined stamp: solid dark disc with a thin solid ring, per the
+          approved reference (Variant 3). The disc makes its own background,
+          so the seal stays legible over any hero photo. */}
+      <circle cx="75" cy="75" r="72" fill="rgba(13,11,9,0.92)" stroke="rgba(255,255,255,0.85)" strokeWidth="1.5" />
       <ShopifyBagIcon x={45} y={43} width={60} height={60} />
       <circle cx="18" cy="75" r="2.4" fill="#C9A227" />
       <circle cx="132" cy="75" r="2.4" fill="#C9A227" />
