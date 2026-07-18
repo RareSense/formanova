@@ -129,25 +129,26 @@ export default function Welcome() {
               Your jewelry accurately shown.
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-10">
               <button onClick={handleStart} className="marta-button-hero magnetic-button">
                 <span>Start Creating</span>
                 <ArrowRight className="h-4 w-4" />
               </button>
+
+              {/* Works with Shopify seal - permanent capability mark, anchored
+                  beside the CTA per the approved reference. Phones get the
+                  compact caption instead. */}
+              <div className="pointer-events-none hidden w-32 shrink-0 lg:block xl:w-36">
+                <WorksWithShopifySeal className="h-auto w-full" />
+              </div>
             </div>
 
-            {/* Mobile fallback for the Shopify seal (no photo negative space on phones) */}
+            {/* Mobile fallback for the Shopify seal (no room for the stamp on phones) */}
             <p className="mt-6 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-white/70 lg:hidden">
               <ShopifyBagIcon className="h-4 w-4 shrink-0" />
               Works with Shopify
             </p>
           </div>
-        </div>
-
-        {/* Works with Shopify seal - permanent capability mark in the hero's
-            dark lower-right photo space. Desktop only; phones get the caption. */}
-        <div className="pointer-events-none absolute bottom-[9%] right-[5%] z-20 hidden w-36 lg:block xl:w-44">
-          <WorksWithShopifySeal className="h-auto w-full" />
         </div>
       </section>
 
