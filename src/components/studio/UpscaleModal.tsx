@@ -83,6 +83,8 @@ export function UpscaleModal({ open, onOpenChange, resultImageUrl, resolution, o
     // Excluded: estimateStatus (read as a guard only; including it would refetch
     // on every status write). Safe: open + factorsKey + resolution fully determine
     // which factors need fetching, and inFlight prevents duplicate requests.
+    // Regression to watch: if prices stop refreshing after the source image
+    // changes, verify factorsKey actually changed for the new image.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, factorsKey, resolution]);
 
