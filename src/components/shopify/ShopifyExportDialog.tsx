@@ -92,13 +92,11 @@ export function ShopifyExportDialog({
       if (result.success) {
         // Success is the draft being created, not the admin URL being present -
         // treating a missing URL as failure caused duplicate drafts on retry.
+        // Deliberately no redirect to Shopify: the user stays in Formanova and
+        // gets a passing toast, same pattern as the photoshoot-ready message.
         trackShopifyExported();
         onOpenChange(false);
-        if (result.shopify_admin_url) {
-          window.open(result.shopify_admin_url, '_blank', 'noopener,noreferrer');
-        } else {
-          toast({ title: 'Draft product created in Shopify.' });
-        }
+        toast({ title: 'Your draft in Shopify has been created' });
         return;
       }
 
