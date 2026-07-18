@@ -164,7 +164,7 @@ export function ShopifyExportDialog({
               Export to Shopify
             </DialogTitle>
             <DialogDescription className="max-w-sm text-sm leading-6 text-muted-foreground">
-              This will create a draft in your Shopify store. All fields are optional.
+              This will create a draft in your Shopify store.
             </DialogDescription>
           </div>
 
@@ -173,7 +173,7 @@ export function ShopifyExportDialog({
               <img
                 src={previewUrl}
                 alt="Product image being exported"
-                className="mx-auto max-h-44 w-auto rounded-sm border border-border/50 object-contain"
+                className="mx-auto max-h-44 w-auto border border-border/50 object-contain"
                 onError={(event) => { event.currentTarget.style.display = 'none'; }}
               />
             </div>
