@@ -128,6 +128,12 @@ export function ShopifyExportDialog({
       didAutoSuggestRef.current = true;
       suggestMutation.mutate();
     }
+  // Deps excluded: suggestMutation, exportMutation, resetDefaults. useMutation
+  // returns a new object each render, so including them would re-run this effect
+  // every render and endlessly reset the form fields. Safe because the effect
+  // only needs to fire when the dialog opens/closes or the target asset changes.
+  // Regression to watch: a stale mutation.reset() if react-query ever changes
+  // mutation identity semantics.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, autoSuggest, assetId, assetName, workflowId]);
 
