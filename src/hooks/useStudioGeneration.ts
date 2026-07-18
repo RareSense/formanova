@@ -242,7 +242,10 @@ export function useStudioGeneration({
         is_first_ever: isFirst,
         aspect_ratio: aspectRatio,
         resolution,
-        effort: genMeta?.effort ?? effectiveEffort,
+        // 'effectiveEffort' does not exist in this scope; referencing it threw a
+        // ReferenceError inside the completion handler whenever the per-workflow
+        // effort was not stored (resumed/keep-creating runs), crashing the page.
+        effort: genMeta?.effort ?? effort,
         jewelry_image_count: genMeta?.jewelryUrls?.length ?? 1,
       });
       clearStudioSession();
