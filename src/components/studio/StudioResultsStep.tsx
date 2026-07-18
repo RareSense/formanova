@@ -155,34 +155,32 @@ export function StudioResultsStep({
                 naturalAspect
                 hero={resultImages.length === 1}
                 onMeta={i === 0 ? setPrimaryMeta : undefined}
+                belowImage={resultImages.length === 1 && primaryMeta ? (
+                  /* Details row directly under the image, above the ship-it pair:
+                     tier . dimensions . shot type + the plain Upscale pill. The
+                     pill carries no factor or price; those live in the modal. */
+                  <div className="flex flex-wrap items-center justify-center gap-3">
+                    <p className="text-center font-mono text-xs font-bold tracking-wider text-foreground">
+                      {primaryMeta.tier && <>{primaryMeta.tier} &middot; </>}
+                      {primaryMeta.width} x {primaryMeta.height} &middot; {isProductShot ? 'Product shot' : 'Model shot'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setUpscaleModalOpen(true)}
+                      disabled={upscaling}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--formanova-hero-accent))] bg-background px-4 py-1.5 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] transition-colors hover:bg-[hsl(var(--formanova-hero-accent))]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                    >
+                      <Maximize2 className="h-3 w-3 shrink-0" />
+                      Upscale
+                    </button>
+                    {upscaleRunStatus === 'error' && upscaleError && (
+                      <p className="w-full text-center text-xs text-destructive">{upscaleError}</p>
+                    )}
+                  </div>
+                ) : undefined}
               />
             ))}
           </div>
-
-          {/* Details row directly under the preview: tier . dimensions . shot type,
-              with a plain Upscale pill attached - the moment the user reads the
-              resolution is the moment they decide whether it's big enough. The
-              pill carries no factor or price; those live in the size-picker modal. */}
-          {resultImages.length === 1 && primaryMeta && (
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              <p className="text-center font-mono text-xs font-bold tracking-wider text-foreground">
-                {primaryMeta.tier && <>{primaryMeta.tier} &middot; </>}
-                {primaryMeta.width} x {primaryMeta.height} &middot; {isProductShot ? 'Product shot' : 'Model shot'}
-              </p>
-              <button
-                type="button"
-                onClick={() => setUpscaleModalOpen(true)}
-                disabled={upscaling}
-                className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--formanova-hero-accent))] bg-background px-4 py-1.5 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] transition-colors hover:bg-[hsl(var(--formanova-hero-accent))]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-              >
-                <Maximize2 className="h-3 w-3 shrink-0" />
-                Upscale
-              </button>
-              {upscaleRunStatus === 'error' && upscaleError && (
-                <p className="w-full text-center text-xs text-destructive">{upscaleError}</p>
-              )}
-            </div>
-          )}
         </div>
       ) : (
         <div className="text-center py-16">

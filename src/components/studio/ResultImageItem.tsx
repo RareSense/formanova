@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Download, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ShopifyPublishButton } from '@/components/shopify/ShopifyPublishButton';
@@ -32,7 +32,7 @@ export interface ResultImageMeta {
   height: number;
 }
 
-export function ResultImageItem({ url, index, workflowId, outputAssetId, jewelryType, naturalAspect, hero, onMeta }: {
+export function ResultImageItem({ url, index, workflowId, outputAssetId, jewelryType, naturalAspect, hero, onMeta, belowImage }: {
   url: string;
   index: number;
   workflowId: string | null;
@@ -43,6 +43,8 @@ export function ResultImageItem({ url, index, workflowId, outputAssetId, jewelry
   hero?: boolean;
   /** Reports the loaded image's tier + pixel dimensions (for a details line). */
   onMeta?: (meta: ResultImageMeta) => void;
+  /** Rendered between the image and the Download/Export pair (metadata + upscale row). */
+  belowImage?: ReactNode;
 }) {
   const resolvedSrc = useAuthenticatedImage(url);
   // Track load so the card holds its space until the image is ready. Without this,
@@ -176,6 +178,9 @@ export function ResultImageItem({ url, index, workflowId, outputAssetId, jewelry
           </Button>
         </div>
       </div>
+
+      {/* Metadata + upscale row (parent-owned), directly under the image */}
+      {belowImage && <div className="mt-2.5">{belowImage}</div>}
 
       {/* Ship-it actions — always equal-width two columns */}
       <div className="mt-3 grid grid-cols-2 gap-3">
