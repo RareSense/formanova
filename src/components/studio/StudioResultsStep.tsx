@@ -153,12 +153,24 @@ export function StudioResultsStep({
             ))}
           </div>
 
-          {/* Details line directly under the preview: tier . dimensions . shot type. */}
+          {/* Details row directly under the preview: tier . dimensions . shot type,
+              with the compact upscale control attached — the moment the user reads
+              the resolution is the moment they decide whether it's big enough. */}
           {resultImages.length === 1 && primaryMeta && (
-            <p className="text-center font-mono text-xs font-bold tracking-wider text-foreground">
-              {primaryMeta.tier && <>{primaryMeta.tier} &middot; </>}
-              {primaryMeta.width} x {primaryMeta.height} &middot; {isProductShot ? 'Product shot' : 'Model shot'}
-            </p>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <p className="text-center font-mono text-xs font-bold tracking-wider text-foreground">
+                {primaryMeta.tier && <>{primaryMeta.tier} &middot; </>}
+                {primaryMeta.width} x {primaryMeta.height} &middot; {isProductShot ? 'Product shot' : 'Model shot'}
+              </p>
+              <UpscaleControl
+                compact
+                resultImageUrl={resultImages[0]}
+                resolution={upscaleResolution}
+                onUpscale={(factor) => { setActiveFactor(factor); onUpscale(factor); }}
+                runStatus={upscaleRunStatus}
+                error={upscaleError}
+              />
+            </div>
           )}
         </div>
       ) : (
@@ -169,9 +181,9 @@ export function StudioResultsStep({
 
       {/* Action area. */}
       <div className="relative z-40 mx-auto flex w-full max-w-2xl flex-col gap-4 pt-2">
-        {/* Inline upscale: pick a multiplier and start, no modal, directly below
-            the generated image. Hides itself when the image can't be enlarged. */}
-        {resultImages.length > 0 && (
+        {/* Multi-result grids have no details row, so the upscale keeps its own
+            row there. Single results carry it inline next to the metadata above. */}
+        {resultImages.length > 1 && (
           <UpscaleControl
             resultImageUrl={resultImages[0]}
             resolution={upscaleResolution}
