@@ -147,7 +147,7 @@ export function ResultImageItem({ url, index, workflowId, outputAssetId, jewelry
             onMeta?.({ tier: resolutionTierLabel(Math.max(width, height)), width, height });
           }}
           onError={() => setLoaded(false)}
-          className={`w-full object-contain bg-muted/30 ${hero ? 'max-h-[64vh]' : 'max-h-[70vh]'}${naturalAspect ? '' : ' aspect-[3/4]'}`}
+          className={`w-full object-contain bg-muted/30 ${hero ? 'max-h-[max(260px,min(52vh,100vh_-_540px))]' : 'max-h-[70vh]'}${naturalAspect ? '' : ' aspect-[3/4]'}`}
         />
         {/* Loading state — keeps the card sized so the badge + buttons stay visible. */}
         {!loaded && (
