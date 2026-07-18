@@ -46,7 +46,7 @@ function WorksWithShopifySeal({ className }: { className?: string }) {
       {/* Outlined stamp: solid dark disc with a thin solid ring, per the
           approved reference (Variant 3). The disc makes its own background,
           so the seal stays legible over any hero photo. */}
-      <circle cx="75" cy="75" r="72" fill="rgba(13,11,9,0.92)" stroke="rgba(255,255,255,0.85)" strokeWidth="1.5" />
+      <circle cx="75" cy="75" r="72" fill="rgba(13,11,9,0.92)" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" />
       <ShopifyBagIcon x={45} y={43} width={60} height={60} />
       <circle cx="18" cy="75" r="2.4" fill="#C9A227" />
       <circle cx="132" cy="75" r="2.4" fill="#C9A227" />
