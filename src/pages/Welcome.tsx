@@ -36,8 +36,12 @@ function WorksWithShopifySeal({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 150 150" className={className} aria-label="Works with Shopify">
       <defs>
+        {/* Bottom arc radius is larger on purpose: top text rises toward the
+            ring, bottom text hangs toward the center, so equal radii leave the
+            bottom word ~a cap-height farther from the boundary. 57 vs 66 makes
+            both words visually equidistant from the ring. */}
         <path id="shopify-seal-arc-top" d="M 75,75 m -57,0 a 57,57 0 0 1 114,0" />
-        <path id="shopify-seal-arc-bottom" d="M 75,75 m -57,0 a 57,57 0 1 0 114,0" />
+        <path id="shopify-seal-arc-bottom" d="M 75,75 m -66,0 a 66,66 0 1 0 132,0" />
       </defs>
       {/* Outlined stamp: solid dark disc with a thin solid ring, per the
           approved reference (Variant 3). The disc makes its own background,
