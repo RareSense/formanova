@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { ResultImageItem, type ResultImageMeta } from '@/components/studio/ResultImageItem';
 import { FeedbackModal } from '@/components/studio/FeedbackModal';
 import { AIFixModal } from '@/components/studio/AIFixModal';
-import { UpscaleControl, type UpscaleRunStatus } from '@/components/studio/UpscaleControl';
+import { type UpscaleRunStatus } from '@/components/studio/UpscaleControl';
 import { UpscaleModal } from '@/components/studio/UpscaleModal';
 import { upscaleEtaLabel } from '@/lib/upscale-api';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
@@ -192,16 +192,23 @@ export function StudioResultsStep({
 
       {/* Action area. */}
       <div className="relative z-40 mx-auto flex w-full max-w-2xl flex-col gap-4 pt-2">
-        {/* Multi-result grids have no details row, so the upscale keeps its own
-            row there. Single results carry it inline next to the metadata above. */}
+        {/* Multi-result grids have no details row, so the upscale pill gets its
+            own centered row. Single results carry it inline next to the metadata. */}
         {resultImages.length > 1 && (
-          <UpscaleControl
-            resultImageUrl={resultImages[0]}
-            resolution={upscaleResolution}
-            onUpscale={(factor) => { setActiveFactor(factor); onUpscale(factor); }}
-            runStatus={upscaleRunStatus}
-            error={upscaleError}
-          />
+          <div className="flex flex-col items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setUpscaleModalOpen(true)}
+              disabled={upscaling}
+              className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--formanova-hero-accent))] bg-background px-4 py-1.5 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] transition-colors hover:bg-[hsl(var(--formanova-hero-accent))]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+            >
+              <Maximize2 className="h-3 w-3 shrink-0" />
+              Upscale
+            </button>
+            {upscaleRunStatus === 'error' && upscaleError && (
+              <p className="text-center text-xs text-destructive">{upscaleError}</p>
+            )}
+          </div>
         )}
         <Button
           size="lg"
