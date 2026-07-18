@@ -155,7 +155,7 @@ export function ResultImageItem({ url, index, workflowId, outputAssetId, jewelry
         )}
         {/* No resolution badge on the image itself - the tier is reported via
             onMeta and shown in the details line under the preview instead. */}
-        <div className="absolute top-2 left-2 flex gap-1.5">
+        <div className="absolute top-2 right-2 flex gap-1.5">
           <Button
             variant="outline"
             size="icon"
