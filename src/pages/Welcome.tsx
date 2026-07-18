@@ -48,8 +48,10 @@ function WorksWithShopifySeal({ className }: { className?: string }) {
           so the seal stays legible over any hero photo. */}
       <circle cx="75" cy="75" r="72" fill="rgba(13,11,9,0.92)" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" />
       <ShopifyBagIcon x={45} y={43} width={60} height={60} />
-      <circle cx="18" cy="75" r="2.4" fill="#C9A227" />
-      <circle cx="132" cy="75" r="2.4" fill="#C9A227" />
+      {/* Dots follow the theme's hero accent so they always match "UNCHANGED"
+          in the headline; disc/ring/text stay fixed for the dark photo. */}
+      <circle cx="18" cy="75" r="2.4" fill="hsl(var(--formanova-hero-accent))" />
+      <circle cx="132" cy="75" r="2.4" fill="hsl(var(--formanova-hero-accent))" />
       <text textAnchor="middle" style={{ fontFamily: "'Space Mono', monospace", fontSize: '12.5px', letterSpacing: '3.5px', fill: 'rgba(255,255,255,0.95)' }}>
         <textPath href="#shopify-seal-arc-top" startOffset="50%">WORKS WITH</textPath>
       </text>
