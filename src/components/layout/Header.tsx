@@ -286,13 +286,6 @@ export function Header() {
                       <img src={creditCoinIcon} alt="" className="h-6 w-6 mr-2 object-contain" width={24} height={24} loading="eager" decoding="sync" />
                       My Credits
                     </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => navigate('/my-shopify-store')}
-                      className="text-sm min-h-10"
-                    >
-                      <ShopifyMenuIcon className="h-4 w-4 mr-2" />
-                      My Shopify Store
-                    </DropdownMenuItem>
                     {isJewelryBrand && (
                       <DropdownMenuItem
                         onClick={() => navigate('/brand-details')}
@@ -302,6 +295,13 @@ export function Header() {
                         Brand Details
                       </DropdownMenuItem>
                     )}
+                    <DropdownMenuItem
+                      onClick={() => navigate('/my-shopify-store')}
+                      className="text-sm min-h-10"
+                    >
+                      <ShopifyMenuIcon className="h-4 w-4 mr-2" />
+                      My Shopify Store
+                    </DropdownMenuItem>
                     {isAdmin && (
                       <DropdownMenuItem
                         onClick={() => navigate('/admin')}
@@ -417,12 +417,6 @@ export function Header() {
                     My Credits
                   </Button>
                 </Link>
-                <Link to="/my-shopify-store">
-                  <Button variant="outline" size="lg" className="gap-2 w-full">
-                    <ShopifyMenuIcon className="h-5 w-5" />
-                    My Shopify Store
-                  </Button>
-                </Link>
                 {isJewelryBrand && (
                   <Link to="/brand-details">
                     <Button variant="outline" size="lg" className="gap-2 w-full">
@@ -431,6 +425,12 @@ export function Header() {
                     </Button>
                   </Link>
                 )}
+                <Link to="/my-shopify-store">
+                  <Button variant="outline" size="lg" className="gap-2 w-full">
+                    <ShopifyMenuIcon className="h-5 w-5" />
+                    My Shopify Store
+                  </Button>
+                </Link>
                 {isAdmin && (
                   <Link to="/admin">
                     <Button variant="outline" size="lg" className="gap-2 w-full">
