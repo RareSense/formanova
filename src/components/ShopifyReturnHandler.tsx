@@ -8,6 +8,7 @@ interface PendingShopifyExport {
   assetName: string;
   workflowId?: string | null;
   returnPath?: string;
+  previewUrl?: string | null;
 }
 
 export function ShopifyReturnHandler() {
@@ -52,6 +53,7 @@ export function ShopifyReturnHandler() {
         assetName: pending.assetName,
         workflowId: pending.workflowId ?? null,
         returnPath: pending.returnPath,
+        previewUrl: pending.previewUrl ?? null,
       });
       setExportOpen(true);
       navigate(pending.returnPath || '/dashboard', { replace: true });
@@ -71,6 +73,7 @@ export function ShopifyReturnHandler() {
       assetName={pendingExport.assetName}
       workflowId={pendingExport.workflowId}
       autoSuggest={false}
+      previewUrl={pendingExport.previewUrl}
     />
   ) : null;
 }

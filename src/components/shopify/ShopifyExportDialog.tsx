@@ -22,6 +22,8 @@ interface ShopifyExportDialogProps {
   assetName: string;
   workflowId?: string | null;
   autoSuggest?: boolean;
+  /** Resolved (displayable) URL of the image being exported, for the preview. */
+  previewUrl?: string | null;
 }
 
 function ShopifyBagIcon({ className }: { className?: string }) {
@@ -41,6 +43,7 @@ export function ShopifyExportDialog({
   assetName,
   workflowId,
   autoSuggest = false,
+  previewUrl,
 }: ShopifyExportDialogProps) {
   const { toast } = useToast();
   const { data: shopifyStatus } = useShopifyStatus();
@@ -78,17 +81,25 @@ export function ShopifyExportDialog({
   });
 
   const exportMutation = useMutation({
+    // All fields are optional for the user; Shopify itself requires a product
+    // title, so an emptied field falls back to the asset name, then 'Untitled'.
     mutationFn: () => exportToShopify({
       assetId,
-      title: title.trim(),
+      title: title.trim() || assetName || 'Untitled',
       description: description.trim(),
       altText: altText.trim(),
     }),
     onSuccess: (result) => {
-      if (result.success && result.shopify_admin_url) {
+      if (result.success) {
+        // Success is the draft being created, not the admin URL being present -
+        // treating a missing URL as failure caused duplicate drafts on retry.
         trackShopifyExported();
         onOpenChange(false);
-        window.open(result.shopify_admin_url, '_blank', 'noopener,noreferrer');
+        if (result.shopify_admin_url) {
+          window.open(result.shopify_admin_url, '_blank', 'noopener,noreferrer');
+        } else {
+          toast({ title: 'Draft product created in Shopify.' });
+        }
         return;
       }
 
@@ -141,7 +152,6 @@ export function ShopifyExportDialog({
   const isExporting = exportMutation.isPending;
 
   const handleExport = () => {
-    if (!title.trim()) return;
     exportMutation.mutate();
   };
 
@@ -159,14 +169,22 @@ export function ShopifyExportDialog({
             </DialogDescription>
           </div>
 
+          {previewUrl && (
+            <div className="mb-5 w-full">
+              <img
+                src={previewUrl}
+                alt="Product image being exported"
+                className="mx-auto max-h-44 w-auto rounded-sm border border-border/50 object-contain"
+                onError={(event) => { event.currentTarget.style.display = 'none'; }}
+              />
+            </div>
+          )}
+
           <div className="w-full space-y-5">
               <div className="space-y-2">
                 <label htmlFor="shopify-title" className="block font-mono text-[11px] uppercase tracking-[0.2em] text-foreground">
-                  Product title
+                  Title
                 </label>
-                <p className="font-mono text-[9px] tracking-[0.15em] text-muted-foreground">
-                  Keep it short and recognizable.
-                </p>
                 {isSuggesting ? (
                   <div className="h-11 animate-pulse rounded-md border border-input bg-muted/30" />
                 ) : (
@@ -181,11 +199,8 @@ export function ShopifyExportDialog({
 
               <div className="space-y-2">
                 <label htmlFor="shopify-description" className="block font-mono text-[11px] uppercase tracking-[0.2em] text-foreground">
-                  Description [optional]
+                  Description
                 </label>
-                <p className="font-mono text-[9px] tracking-[0.15em] text-muted-foreground">
-                  Add the key details customers should see first.
-                </p>
                 {isSuggesting ? (
                   <div className="min-h-[112px] animate-pulse rounded-md border border-input bg-muted/30" />
                 ) : (
@@ -200,11 +215,8 @@ export function ShopifyExportDialog({
 
               <div className="space-y-2">
                 <label htmlFor="shopify-alt-text" className="block font-mono text-[11px] uppercase tracking-[0.2em] text-foreground">
-                  Alt text [optional]
+                  Alt text
                 </label>
-                <p className="font-mono text-[9px] tracking-[0.15em] text-muted-foreground">
-                  Describe what is visible in the image.
-                </p>
                 {isSuggesting ? (
                   <div className="h-11 animate-pulse rounded-md border border-input bg-muted/30" />
                 ) : (
@@ -227,7 +239,7 @@ export function ShopifyExportDialog({
                 <Button
                   type="button"
                   onClick={handleExport}
-                  disabled={isSuggesting || isExporting || !title.trim()}
+                  disabled={isSuggesting || isExporting}
                   className="h-11 w-full gap-2.5 px-3 font-mono text-[10px] uppercase tracking-[0.15em] sm:tracking-[0.2em]"
                 >
                   {isExporting ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : <ShopifyBagIcon className="h-4 w-4 shrink-0" />}

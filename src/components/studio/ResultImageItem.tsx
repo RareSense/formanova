@@ -45,10 +45,6 @@ export function ResultImageItem({ url, index, workflowId, outputAssetId, jewelry
   onMeta?: (meta: ResultImageMeta) => void;
 }) {
   const resolvedSrc = useAuthenticatedImage(url);
-  // Resolution badge ("1K"/"2K"/"4K"/"6K"...) derived from the rendered image's
-  // real pixels. Re-fires whenever resolvedSrc changes, so swapping in an
-  // upscaled result automatically updates the badge to its new tier.
-  const [tier, setTier] = useState<string | null>(null);
   // Track load so the card holds its space until the image is ready. Without this,
   // a not-yet-loaded/failed image (naturalAspect = no fixed height) collapses the
   // container to zero height and the badge + action buttons appear to vanish.
@@ -143,10 +139,10 @@ export function ResultImageItem({ url, index, workflowId, outputAssetId, jewelry
             const el = e.currentTarget;
             const width = el.naturalWidth;
             const height = el.naturalHeight;
-            const nextTier = resolutionTierLabel(Math.max(width, height));
-            setTier(nextTier);
             setLoaded(true);
-            onMeta?.({ tier: nextTier, width, height });
+            // Tier ("1K"/"2K"...) from real pixels - re-fires when resolvedSrc
+            // swaps (e.g. an upscaled result), keeping the details line current.
+            onMeta?.({ tier: resolutionTierLabel(Math.max(width, height)), width, height });
           }}
           onError={() => setLoaded(false)}
           className={`w-full object-contain bg-muted/30 ${hero ? 'max-h-[72vh]' : 'max-h-[70vh]'}${naturalAspect ? '' : ' aspect-[3/4]'}`}
@@ -157,12 +153,9 @@ export function ResultImageItem({ url, index, workflowId, outputAssetId, jewelry
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-foreground/20 border-t-foreground/60" />
           </div>
         )}
-        {tier && (
-          <span className="absolute top-3 left-3 rounded-md border border-foreground/15 bg-background/90 px-2.5 py-1 font-mono text-xs font-semibold tracking-wider text-foreground shadow-sm backdrop-blur-sm">
-            {tier}
-          </span>
-        )}
-        <div className="absolute top-2 right-2 flex gap-1.5">
+        {/* No resolution badge on the image itself - the tier is reported via
+            onMeta and shown in the details line under the preview instead. */}
+        <div className="absolute top-2 left-2 flex gap-1.5">
           <Button
             variant="outline"
             size="icon"
@@ -200,6 +193,7 @@ export function ResultImageItem({ url, index, workflowId, outputAssetId, jewelry
           assetId={outputAssetId ?? generatedAsset?.id ?? null}
           assetName={(generatedAsset && getAssetDisplayName(generatedAsset)) || generatedAsset?.name || `Photoshoot ${index + 1}`}
           workflowId={workflowId}
+          previewUrl={resolvedSrc ?? url}
           isResolvingAsset={isResolvingAsset}
           label="Export to Shopify"
           shortLabel="Export"

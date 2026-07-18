@@ -207,6 +207,12 @@ export async function findGeneratedPhotoAssetByWorkflowId(workflowId: string): P
         asset.metadata?.generation_workflow_id === workflowId
       )) ?? null
     ))
+    .then((result) => {
+      // Not-found is usually a race (asset not indexed yet) - evict so the next
+      // mount retries instead of pinning null for the whole session.
+      if (result === null) generatedPhotoAssetByWorkflowIdCache.delete(workflowId);
+      return result;
+    })
     .catch((error) => {
       generatedPhotoAssetByWorkflowIdCache.delete(workflowId);
       throw error;

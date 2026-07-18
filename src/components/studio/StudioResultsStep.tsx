@@ -138,13 +138,17 @@ export function StudioResultsStep({
       {resultImages.length > 0 ? (
         <div className="space-y-2.5">
           <div className="flex flex-wrap justify-center gap-4 max-w-5xl mx-auto">
+            {/* The workflow has ONE linked output asset. Tile 0 gets it, or
+                undefined to trigger the workflow lookup. Other tiles get null
+                (known to have no per-image asset) so exporting them can never
+                publish tile 0's image to the store. */}
             {resultImages.map((url, i) => (
               <ResultImageItem
                 key={i}
                 url={url}
                 index={i}
                 workflowId={workflowId}
-                outputAssetId={outputAssetId}
+                outputAssetId={i === 0 ? (outputAssetId ?? undefined) : null}
                 jewelryType={effectiveJewelryType}
                 naturalAspect
                 hero={resultImages.length === 1}

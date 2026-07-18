@@ -312,6 +312,7 @@ export function PhotoCard({ workflow, index, onUpscaled }: { workflow: WorkflowS
               assetId={workflow.output_asset_id ?? null}
               assetName={displayName ?? workflow.output_asset_name ?? workflow.name ?? 'Untitled'}
               workflowId={workflow.workflow_id}
+              previewUrl={resolvedThumbnail ?? workflow.thumbnail_url ?? null}
               className="h-10 w-full font-mono text-[10px] uppercase tracking-[0.15em]"
             />
           </div>

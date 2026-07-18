@@ -29,6 +29,8 @@ interface ShopifyPublishButtonProps {
   className?: string;
   autoSuggest?: boolean;
   isResolvingAsset?: boolean;
+  /** Resolved (displayable) URL of the image, shown as a preview in the export dialog. */
+  previewUrl?: string | null;
 }
 
 export function ShopifyPublishButton({
@@ -40,6 +42,7 @@ export function ShopifyPublishButton({
   className,
   autoSuggest = false,
   isResolvingAsset = false,
+  previewUrl,
 }: ShopifyPublishButtonProps) {
   const { data: status } = useShopifyStatus();
   const [exportOpen, setExportOpen] = useState(false);
@@ -70,11 +73,17 @@ export function ShopifyPublishButton({
     }
 
     if (assetId) {
+      // blob:/data: URLs do not survive the full-page OAuth round trip, so only
+      // persist a preview that will still resolve after the reload.
+      const persistablePreview = previewUrl && !previewUrl.startsWith('blob:') && !previewUrl.startsWith('data:')
+        ? previewUrl
+        : null;
       sessionStorage.setItem('shopify_pending_export', JSON.stringify({
         assetId,
         assetName,
         workflowId: workflowId ?? null,
         returnPath: location.pathname + location.search,
+        previewUrl: persistablePreview,
       }));
     }
     setConnectOpen(true);
@@ -125,6 +134,7 @@ export function ShopifyPublishButton({
           assetName={assetName}
           workflowId={workflowId}
           autoSuggest={false}
+          previewUrl={previewUrl}
         />
       )}
     </div>
