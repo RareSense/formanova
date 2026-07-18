@@ -17,7 +17,7 @@ import {
   getAdminGenerationDetail,
   type AdminGenerationDetail,
 } from '@/lib/admin-generations-api';
-import { inferSourceType } from '@/lib/generation-history-api';
+import { resolveSourceType } from '@/lib/generation-history-api';
 import type { AdminGenerationStep } from '@/lib/admin-generations-api';
 import { ScissorGLBGrid, GLBPreviewSlot } from '@/components/generations/ScissorGLBGrid';
 import { Badge } from '@/components/ui/badge';
@@ -333,7 +333,7 @@ function InvalidRequestState({ message }: { message: string }) {
 }
 
 function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
-  const isCadText = inferSourceType(detail.workflow_name) === 'cad_text';
+  const isCadText = resolveSourceType(detail.source_type, detail.workflow_name) === 'cad_text';
   const textPrompt = isCadText
     ? findText(detail.input_payload, ['prompt', 'description', 'ring_description', 'text_input', 'input_text', 'text', 'query'])
     : null;
@@ -344,27 +344,54 @@ function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
       .map((value) => normalizeRenderableUrl(value))
       .filter((value): value is string => Boolean(value)),
   );
-  const jewelryInputUrls = [
-    ...findStringArray(detail.input_payload, ['jewelry_image_urls', 'input_image_urls', 'input_images']),
-    ...['jewelry_image_url', 'input_image_url']
-      .map((key) => findString(detail.input_payload, [key]))
+  // Derivative runs (upscale) store their source under `image` — either a bare
+  // string or `{ uri }` — with no jewelry_image_url. Surface it so the workflow's
+  // input still renders in the admin detail.
+  const derivativeSourceUrl = (() => {
+    const img = (detail.input_payload as Record<string, unknown> | null)?.image;
+    if (typeof img === 'string') return img;
+    if (img && typeof img === 'object' && typeof (img as Record<string, unknown>).uri === 'string') {
+      return (img as Record<string, unknown>).uri as string;
+    }
+    return null;
+  })();
+  // The request wraps everything as { payload: {...} }, so image fields live one
+  // level down (input_payload.payload.*) - the shallow finders miss them at the top
+  // level. Search the raw payload, its nested payload, and the first step's resolved
+  // input so the full jewelry_image_urls array (High Effort) is always found.
+  const payloadRoots: unknown[] = [
+    detail.input_payload,
+    (detail.input_payload as Record<string, unknown> | null)?.payload,
+    detail.steps[0]?.input,
+  ];
+  const jewelryInputUrls = [...new Set(
+    [
+      ...payloadRoots.flatMap((root) => [
+        ...findStringArray(root, ['jewelry_image_urls', 'input_image_urls', 'input_images']),
+        ...['jewelry_image_url', 'input_image_url', 'image_url', 'source_image_url']
+          .map((key) => findString(root, [key]))
+          .filter((value): value is string => Boolean(value)),
+      ]),
+      ...(derivativeSourceUrl ? [derivativeSourceUrl] : []),
+    ]
+      .map((value) => normalizeRenderableUrl(value))
       .filter((value): value is string => Boolean(value)),
-  ]
-    .map((value) => normalizeRenderableUrl(value))
-    .filter((value): value is string => Boolean(value));
-  const inspirationImageUrl = firstRenderableUrl([
-    findString(detail.input_payload, ['inspiration_image_url']),
-    ...findStringArray(detail.input_payload, ['inspiration_image_urls']),
-    findString(detail.steps[0]?.input, ['inspiration_image_url']),
-  ]);
-  const modelImageUrl = firstRenderableUrl([
-    findString(detail.input_payload, ['model_image_url', 'model_url']),
-    findString(detail.steps[0]?.input, ['model_image_url', 'model_url']),
-  ]);
+  )];
+  const inspirationImageUrl = firstRenderableUrl(
+    payloadRoots.flatMap((root) => [
+      findString(root, ['inspiration_image_url']),
+      ...findStringArray(root, ['inspiration_image_urls']),
+    ]),
+  );
+  const modelImageUrl = firstRenderableUrl(
+    payloadRoots.map((root) => findString(root, ['model_image_url', 'model_url'])),
+  );
   const outputImageUrl = firstRenderableUrl([
     detail.feedback?.output_image_url ?? null,
     findString(detail.input_payload, ['output_image_url', 'output_url', 'image_url', 'result_url']),
-    stepOutputImageUrls[0],
+    // Final render is the LAST image produced across steps; earlier steps now emit
+    // intermediate images (e.g. the model image), so [0] would mislabel them as output.
+    stepOutputImageUrls[stepOutputImageUrls.length - 1],
   ]);
   const category =
     detail.feedback?.category ??
@@ -375,8 +402,16 @@ function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
     : modelImageUrl
       ? { url: modelImageUrl, label: 'Model Image' }
       : null;
+  // Show every jewelry input the workflow received (High Effort sends up to 3),
+  // not just the cover. Keep a single labeled placeholder when none resolved.
+  const jewelryEntries = jewelryInputUrls.length
+    ? jewelryInputUrls.map((url, i) => ({
+        url,
+        label: jewelryInputUrls.length > 1 ? `Jewelry Input ${i + 1}` : 'Jewelry Input',
+      }))
+    : [{ url: null, label: 'Jewelry Input' }];
   const visualSummaryImages = [
-    { url: jewelryInputUrls[0] ?? null, label: 'Jewelry Input' },
+    ...jewelryEntries,
     ...(referenceImage ? [referenceImage] : []),
     { url: outputImageUrl, label: 'Output Image' },
   ];
@@ -435,18 +470,23 @@ function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
               <div className="space-y-2">
                 <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">3D Preview (Output)</p>
                 {cadGlbUrl ? (
-                  <ScissorGLBGrid>
-                    <GLBPreviewSlot
-                      id={detail.workflow_id}
-                      glbUrl={cadGlbUrl}
-                      className="w-full aspect-[4/3] rounded-md border border-border bg-muted/20"
-                    />
-                  </ScissorGLBGrid>
+                  // Match the generation-history card size (~1/5 of the panel): a small
+                  // fixed box keeps the shared WebGL canvas small so it renders fast,
+                  // instead of a full-width canvas that is slow to draw.
+                  <div className="w-40">
+                    <ScissorGLBGrid>
+                      <GLBPreviewSlot
+                        id={detail.workflow_id}
+                        glbUrl={cadGlbUrl}
+                        className="w-full aspect-[4/3] rounded-md border border-border bg-muted/20"
+                      />
+                    </ScissorGLBGrid>
+                  </div>
                 ) : (
-                  <div className="flex h-48 items-center justify-center rounded-md border border-border bg-muted/20">
+                  <div className="flex w-40 aspect-[4/3] items-center justify-center rounded-md border border-border bg-muted/20">
                     <div className="flex flex-col items-center gap-2 text-muted-foreground/50">
                       <ImageOff className="h-6 w-6" />
-                      <span className="font-mono text-[10px] uppercase tracking-widest">No 3D output</span>
+                      <span className="font-mono text-[10px] uppercase tracking-widest text-center">No 3D output</span>
                     </div>
                   </div>
                 )}

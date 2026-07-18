@@ -42,21 +42,13 @@ describe('ResultImageItem', () => {
     URL.revokeObjectURL = originalRevokeObjectURL;
   });
 
-  it('opens artifact-backed results in a new tab via authenticated blob fetch', async () => {
-    const newTab = {
-      location: { href: '' },
-      close: vi.fn(),
-    } as unknown as Window;
+  it('opens results in a new tab by navigating directly (no CORS-prone fetch)', async () => {
+    const newTab = {} as unknown as Window;
     window.open = vi.fn(() => newTab);
-
-    mockAuthenticatedFetch.mockResolvedValueOnce({
-      ok: true,
-      blob: async () => new Blob(['image'], { type: 'image/jpeg' }),
-    } as Response);
 
     render(
       <ResultImageItem
-        url="/api/artifacts/example-image"
+        url="https://cdn.example.com/result.png"
         index={0}
         workflowId="wf-12345678"
         jewelryType="ring"
@@ -66,19 +58,39 @@ describe('ResultImageItem', () => {
     fireEvent.click(screen.getByRole('button', { name: /open image in new tab/i }));
 
     await waitFor(() => {
-      expect(window.open).toHaveBeenCalledWith('', '_blank', 'noopener,noreferrer');
-      expect(mockAuthenticatedFetch).toHaveBeenCalledWith('/api/artifacts/example-image');
-      expect(newTab.location.href).toBe('blob:generated-preview');
-      expect(newTab.close).not.toHaveBeenCalled();
+      // Direct navigation to the resolved src — no fetch (which would CORS-block
+      // a cross-origin Azure image).
+      expect(window.open).toHaveBeenCalledWith('https://cdn.example.com/result.png', '_blank', 'noopener,noreferrer');
+      expect(mockAuthenticatedFetch).not.toHaveBeenCalled();
     });
   });
 
-  it('alerts when opening in a new tab fails', async () => {
+  it('opens blob: results WITHOUT noopener (Chromium cannot resolve blob URLs in a noopener tab)', async () => {
+    const newTab = {} as unknown as Window;
+    window.open = vi.fn(() => newTab);
+
+    render(
+      <ResultImageItem
+        url="blob:https://formanova.ai/39d55423-9ad1-4527"
+        index={0}
+        workflowId="wf-12345678"
+        jewelryType="ring"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /open image in new tab/i }));
+
+    await waitFor(() => {
+      expect(window.open).toHaveBeenCalledWith('blob:https://formanova.ai/39d55423-9ad1-4527', '_blank', '');
+    });
+  });
+
+  it('alerts when opening in a new tab is popup-blocked', async () => {
     window.open = vi.fn(() => null);
 
     render(
       <ResultImageItem
-        url="/api/artifacts/example-image"
+        url="https://cdn.example.com/result.png"
         index={0}
         workflowId="wf-12345678"
         jewelryType="ring"
@@ -90,5 +102,30 @@ describe('ResultImageItem', () => {
     await waitFor(() => {
       expect(window.alert).toHaveBeenCalledWith('Could not open the image in a new tab. Please try again.');
     });
+  });
+
+  it('falls back to opening the image when a cross-origin download fetch is blocked', async () => {
+    const newTab = {} as unknown as Window;
+    window.open = vi.fn(() => newTab);
+    // Non-artifact URL -> plain fetch path; simulate a CORS block.
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('CORS'));
+
+    render(
+      <ResultImageItem
+        url="https://cdn.example.com/result.png"
+        index={0}
+        workflowId="wf-12345678"
+        jewelryType="ring"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /download image/i }));
+
+    await waitFor(() => {
+      expect(window.open).toHaveBeenCalledWith('https://cdn.example.com/result.png', '_blank', 'noopener,noreferrer');
+      expect(window.alert).not.toHaveBeenCalled();
+    });
+
+    fetchSpy.mockRestore();
   });
 });

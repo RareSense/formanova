@@ -1,28 +1,19 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
-import { Maximize2, Box, Download, Pencil, Check, X, Layers } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Box, Download, Pencil, Check, X, Layers } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
-import { OptimizedImage } from '@/components/ui/optimized-image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ShopifyPublishButton } from '@/components/shopify/ShopifyPublishButton';
 import type { WorkflowSummary } from '@/lib/generation-history-api';
 import { SnapshotPreviewModal } from './SnapshotPreviewModal';
-import { PhotoPreviewModal } from './PhotoPreviewModal';
 import { GLBPreviewSlot } from './ScissorGLBGrid';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { downloadAsset, isShaLikeName, renameAsset } from '@/lib/assets-api';
+import { truncateDisplayName, formatLocal, formatLocalDateOnly, itemVariants, CreditsBadge } from './workflow-card-shared';
+import { PhotoCard } from './PhotoCard';
 
 const CAD_RENAMES_KEY = 'formanova_cad_renames';
-const DISPLAY_NAME_MAX_CHARS = 50;
-
-function truncateDisplayName(name: string): string {
-  return name.length > DISPLAY_NAME_MAX_CHARS
-    ? `${name.slice(0, DISPLAY_NAME_MAX_CHARS)}...`
-    : name;
-}
 
 function getStoredRename(map: Record<string, string>, workflowId: string): string | null {
   const value = map[workflowId];
@@ -37,45 +28,20 @@ function saveStoredRename(workflowId: string, name: string) {
     const map = loadStoredRenames();
     map[workflowId] = name;
     localStorage.setItem(CAD_RENAMES_KEY, JSON.stringify(map));
-  } catch { /* quota — ignore */ }
-}
-
-const localDateFmt = new Intl.DateTimeFormat(undefined, {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-});
-const localDateOnlyFmt = new Intl.DateTimeFormat(undefined, {
-  dateStyle: 'medium',
-});
-function formatLocal(ts: string): string {
-  let normalized = ts.trim();
-  if (normalized && !/[Zz]$/.test(normalized) && !/[+-]\d{2}:\d{2}$/.test(normalized)) {
-    normalized += 'Z';
-  }
-  return localDateFmt.format(new Date(normalized));
-}
-function formatLocalDateOnly(ts: string): string {
-  let normalized = ts.trim();
-  if (normalized && !/[Zz]$/.test(normalized) && !/[+-]\d{2}:\d{2}$/.test(normalized)) {
-    normalized += 'Z';
-  }
-  return localDateOnlyFmt.format(new Date(normalized));
+  } catch { /* quota - ignore */ }
 }
 
 interface WorkflowCardProps {
   workflow: WorkflowSummary;
   index?: number;
   onClick: (id: string) => void;
+  /** Called after an inline upscale completes, so the page can refresh the list. */
+  onUpscaled?: () => void;
 }
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 12 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.35 } },
-};
 
 // ─── Text-to-CAD card ──────────────────────────────────────────────────────
 
-// Model ID → display label mapping
+// Model ID -> display label mapping
 const MODEL_LABELS: Record<string, string> = {
   gemini: 'Lite',
   'claude-sonnet': 'Standard',
@@ -84,16 +50,6 @@ const MODEL_LABELS: Record<string, string> = {
   standard: 'Standard',
   premium: 'Premium',
 };
-
-function CreditsBadge({ credits }: { credits?: number | null }) {
-  if (credits === undefined || credits === null) return null;
-  return (
-    <span className="inline-flex items-center gap-1 font-mono text-[10px] tracking-wider text-muted-foreground">
-      <img src={creditCoinIcon} alt="" className="w-3.5 h-3.5" />
-      {credits}
-    </span>
-  );
-}
 
 function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: number }) {
   const navigate = useNavigate();
@@ -334,197 +290,13 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
   );
 }
 
-// ─── Photo / CAD-render card ────────────────────────────────────────────────
-// Matches the "From Text to CAD" card style: image-first, minimal metadata.
-
-const PHOTO_RENAMES_KEY = 'formanova_photo_renames';
-function loadPhotoRenames(): Record<string, string> {
-  try { return JSON.parse(localStorage.getItem(PHOTO_RENAMES_KEY) ?? '{}'); } catch { return {}; }
-}
-function savePhotoRename(id: string, name: string) {
-  try {
-    const map = loadPhotoRenames();
-    map[id] = name;
-    localStorage.setItem(PHOTO_RENAMES_KEY, JSON.stringify(map));
-  } catch { /* quota */ }
-}
-
-function PhotoCard({ workflow, index }: { workflow: WorkflowSummary; index: number }) {
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [isRenaming, setIsRenaming] = useState(false);
-  const [displayName, setDisplayName] = useState<string | null>(
-    () => loadPhotoRenames()[workflow.workflow_id] ?? workflow.output_asset_name ?? null,
-  );
-  const [renameValue, setRenameValue] = useState('');
-
-  useEffect(() => {
-    if (workflow.output_asset_name && !loadPhotoRenames()[workflow.workflow_id]) {
-      setDisplayName(workflow.output_asset_name);
-    }
-  }, [workflow.output_asset_name]);
-
-  const dateStr = workflow.created_at ? formatLocal(workflow.created_at) : '—';
-  const dateOnlyStr = workflow.created_at ? formatLocalDateOnly(workflow.created_at) : '—';
-
-  const handleStartRename = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setRenameValue(displayName ?? '');
-    setIsRenaming(true);
-  };
-
-  const handleConfirmPhotoRename = async () => {
-    const sanitized = renameValue.trim().replace(/[<>:"/\\|?*]/g, '_');
-    if (sanitized) {
-      setDisplayName(sanitized);
-      savePhotoRename(workflow.workflow_id, sanitized);
-      if (workflow.output_asset_id) {
-        try {
-          await renameAsset(workflow.output_asset_id, sanitized);
-        } catch (err) {
-          console.error('[WorkflowCard] photo rename error:', err);
-        }
-      }
-    }
-    setIsRenaming(false);
-  };
-
-  const handleCancelPhotoRename = () => setIsRenaming(false);
-
-  // undefined = enrichment not started; '' = enriched but no thumbnail found
-  const isEnriching = workflow.thumbnail_url === undefined;
-  const hasThumbnail = !!workflow.thumbnail_url;
-  const resolvedThumbnail = useAuthenticatedImage(workflow.thumbnail_url);
-  const supportsShopifyPublish = workflow.source_type === 'photo' || workflow.source_type === 'product_shot';
-
-  return (
-    <>
-      <motion.div variants={itemVariants} className="marta-frame overflow-hidden">
-        {/* Thumbnail — sharp rectangle, image-first */}
-        {hasThumbnail ? (
-          <button
-            onClick={() => setPreviewOpen(true)}
-            className="group relative w-full bg-muted overflow-hidden block focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground"
-            aria-label="Enlarge preview"
-          >
-            <OptimizedImage
-              src={resolvedThumbnail ?? ""}
-              alt={workflow.name || 'Generation preview'}
-              sizes="(max-width: 640px) 33vw, (max-width: 1024px) 25vw, 20vw"
-              className="w-full aspect-square object-cover transition-transform duration-300 group-hover:scale-105"
-            />
-            {/* Credits badge — mobile only, top-left corner */}
-            {workflow.credits_spent != null && (
-              <div className="sm:hidden absolute top-0 left-0 flex items-center gap-1 bg-background/80 backdrop-blur-sm px-1.5 py-0.5 border-r border-b border-border/30">
-                <img src={creditCoinIcon} alt="" className="w-3 h-3" />
-                <span className="font-mono text-[9px] text-foreground">{workflow.credits_spent}</span>
-              </div>
-            )}
-            {/* View / enlarge icon overlay */}
-            <div className="absolute inset-0 flex items-center justify-center bg-background/0 group-hover:bg-background/20 transition-colors duration-200">
-              <div className="bg-background/80 backdrop-blur-sm p-2.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                <Maximize2 className="h-5 w-5 text-foreground" />
-              </div>
-            </div>
-          </button>
-        ) : isEnriching ? (
-          /* Spinner placeholder while enrichment is in progress */
-          <div className="w-full aspect-square bg-muted/30 flex items-center justify-center">
-            <div className="w-6 h-6 border-2 border-muted-foreground/20 border-t-muted-foreground/60 rounded-full animate-spin" />
-          </div>
-        ) : null}
-
-        {/* Rename row — only when asset is linked */}
-        {workflow.output_asset_id && (
-          <div className="mx-2 sm:mx-3 mt-2 min-w-0" onClick={e => e.stopPropagation()}>
-            {isRenaming ? (
-              <div className="flex flex-col gap-1">
-                <Input
-                  value={renameValue}
-                  onChange={e => setRenameValue(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') handleConfirmPhotoRename();
-                    if (e.key === 'Escape') handleCancelPhotoRename();
-                  }}
-                  autoFocus
-                  placeholder="Name..."
-                  maxLength={50}
-                  className="h-6 w-full font-mono text-[10px] tracking-wider px-1.5 py-0"
-                />
-                <div className="flex items-center justify-end gap-2">
-                  <button onClick={handleCancelPhotoRename} className="p-0.5 hover:text-foreground text-muted-foreground transition-colors">
-                    <X className="h-3 w-3" />
-                  </button>
-                  <button onClick={handleConfirmPhotoRename} className="p-0.5 hover:text-foreground text-muted-foreground transition-colors">
-                    <Check className="h-3 w-3" />
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center gap-1 sm:gap-1.5 min-w-0">
-                <span
-                  className="font-mono text-[10px] tracking-wider text-foreground truncate max-w-[calc(100%-1.25rem)]"
-                  title={displayName ?? undefined}
-                >
-                  {displayName ? truncateDisplayName(displayName) : <span className="text-muted-foreground/40 italic">Untitled</span>}
-                </span>
-                <button
-                  onClick={handleStartRename}
-                  className="p-0.5 hover:text-foreground text-muted-foreground/50 transition-colors flex-shrink-0"
-                  aria-label="Rename generation"
-                >
-                  <Pencil className="h-3 w-3" />
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Card footer: index · credits · date */}
-        <div className="flex items-center justify-end sm:justify-between px-3 pt-3 pb-3 gap-2">
-          <span className="hidden sm:inline font-mono text-[10px] tracking-[0.15em] text-muted-foreground/70 select-none min-w-0">
-            #{index}
-          </span>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <span className="hidden sm:inline-flex"><CreditsBadge credits={workflow.credits_spent} /></span>
-            <span className="font-mono text-[10px] tracking-wider text-muted-foreground whitespace-nowrap">
-              <span className="sm:hidden">{dateOnlyStr}</span>
-              <span className="hidden sm:inline">{dateStr}</span>
-            </span>
-          </div>
-        </div>
-
-        {hasThumbnail && supportsShopifyPublish && (
-          <div className="px-3 pb-3">
-            <ShopifyPublishButton
-              assetId={workflow.output_asset_id ?? null}
-              assetName={displayName ?? workflow.output_asset_name ?? workflow.name ?? 'Untitled'}
-              workflowId={workflow.workflow_id}
-              className="h-10 w-full font-mono text-[10px] uppercase tracking-[0.15em]"
-            />
-          </div>
-        )}
-      </motion.div>
-
-      {/* Enlarged preview modal */}
-      {previewOpen && hasThumbnail && (
-        <PhotoPreviewModal
-          imageUrl={workflow.thumbnail_url!}
-          alt={displayName || workflow.name || 'Generation preview'}
-          onClose={() => setPreviewOpen(false)}
-          assetId={workflow.output_asset_id}
-        />
-      )}
-    </>
-  );
-}
-
 // ─── Exported card dispatcher ───────────────────────────────────────────────
 
-export function WorkflowCard({ workflow, index = 0, onClick: _onClick }: WorkflowCardProps) {
+export function WorkflowCard({ workflow, index = 0, onClick: _onClick, onUpscaled }: WorkflowCardProps) {
   if (workflow.source_type === 'cad_text') {
     return <CadTextCard workflow={workflow} index={index} />;
   }
 
   // photo and cad_render both use the new image-first card
-  return <PhotoCard workflow={workflow} index={index} />;
+  return <PhotoCard workflow={workflow} index={index} onUpscaled={onUpscaled} />;
 }

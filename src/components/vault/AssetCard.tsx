@@ -21,6 +21,10 @@ export function AssetCard({ asset, onReshoot, onClick, reshootLabel, showMetadat
   const label = reshootLabel ?? (asset.asset_type === 'model_photo' ? 'New Shoot' : 'New Style');
   const displayName = getAssetDisplayName(asset);
   const isGenerated = asset.asset_type === 'generated_photo' || asset.asset_type === 'generated_cad';
+  // Resolution tier badge (Step 7). Only present for assets generated after the backend
+  // started populating metadata.image_size; absent for uploads and older assets, in which
+  // case nothing renders.
+  const resolutionBadge = asset.metadata?.image_size?.trim() || null;
   const [editing, setEditing] = useState(false);
   const resolvedThumbnail = useAuthenticatedImage(asset.thumbnail_url);
   const [nameInput, setNameInput] = useState(displayName ?? '');
@@ -55,6 +59,12 @@ export function AssetCard({ asset, onReshoot, onClick, reshootLabel, showMetadat
           loading="lazy"
         />
       </div>
+
+      {resolutionBadge && (
+        <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-background/80 backdrop-blur-sm pointer-events-none">
+          <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">{resolutionBadge}</span>
+        </div>
+      )}
 
       {/* ── Naming row — fixed height for grid alignment ── */}
       <div className="h-10 sm:h-11 flex items-center px-3 overflow-hidden">

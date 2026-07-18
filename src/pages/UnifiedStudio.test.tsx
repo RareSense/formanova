@@ -2,8 +2,12 @@ import React, { act } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { HelmetProvider } from 'react-helmet-async';
 
 import UnifiedStudio from './UnifiedStudio';
+
+// heic2any touches Worker/canvas at import time, which jsdom doesn't provide.
+vi.mock('heic2any', () => ({ default: vi.fn() }));
 
 // ── framer-motion ──────────────────────────────────────────────────────────
 vi.mock('framer-motion', () => ({
@@ -42,14 +46,26 @@ vi.mock('@tanstack/react-query', () => ({
 }));
 
 // ── hooks ──────────────────────────────────────────────────────────────────
-vi.mock('@/hooks/use-credit-preflight', () => ({
-  useCreditPreflight: () => ({
+const preflightMock = vi.hoisted(() => ({
+  state: {
+    checkCredits: vi.fn(),
+    showInsufficientModal: false,
+    dismissModal: vi.fn(),
+    preflightResult: null as null | { estimatedCredits: number; currentBalance: number },
+    checking: false,
+  },
+}));
+function resetPreflightMock() {
+  preflightMock.state = {
     checkCredits: vi.fn(),
     showInsufficientModal: false,
     dismissModal: vi.fn(),
     preflightResult: null,
     checking: false,
-  }),
+  };
+}
+vi.mock('@/hooks/use-credit-preflight', () => ({
+  useCreditPreflight: () => preflightMock.state,
 }));
 
 vi.mock('@/hooks/useAuthenticatedImage', () => ({
@@ -195,6 +211,8 @@ afterEach(() => {
   container?.remove();
   root = null;
   container = null;
+  resetPreflightMock();
+  sessionStorage.clear();
 });
 
 function renderStudio(path = '/studio/necklace') {
@@ -203,14 +221,17 @@ function renderStudio(path = '/studio/necklace') {
   root = createRoot(container);
   act(() => {
     root?.render(
+      <HelmetProvider>
       <MemoryRouter
         initialEntries={[path]}
         future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
       >
         <Routes>
           <Route path="/studio/:type" element={<UnifiedStudio />} />
+          <Route path="/credits" element={<div>CREDITS PAGE MARKER</div>} />
         </Routes>
-      </MemoryRouter>,
+      </MemoryRouter>
+      </HelmetProvider>,
     );
   });
   return container;
@@ -236,5 +257,20 @@ describe('UnifiedStudio smoke tests', () => {
   it('does not crash for product-shot route', () => {
     const c = renderStudio('/studio/ring');
     expect(c.textContent).toContain('Upload Your Jewelry');
+  });
+
+  it('redirects to /credits with the shortfall when credits are insufficient (door-in)', () => {
+    preflightMock.state = {
+      checkCredits: vi.fn(),
+      showInsufficientModal: true,
+      dismissModal: vi.fn(),
+      preflightResult: { estimatedCredits: 50, currentBalance: 0 },
+      checking: false,
+    };
+    const c = renderStudio('/studio/necklace');
+    // Navigated away from the studio to the credits page (popup replaced by redirect)
+    expect(c.textContent).toContain('CREDITS PAGE MARKER');
+    // Return path persisted so the post-purchase redirect can bring them back
+    expect(sessionStorage.getItem('formanova_post_purchase_return')).toContain('/studio/necklace');
   });
 });

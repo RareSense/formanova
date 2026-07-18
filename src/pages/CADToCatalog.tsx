@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from "react";
+import { Helmet } from "react-helmet-async";
 import { motion, AnimatePresence } from "framer-motion";
 import { Upload, Camera, ChevronLeft, ChevronRight, Trash2, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -122,6 +123,13 @@ export default function CADToCatalog() {
   }, [modelUrl]);
 
   return (
+    <>
+      <Helmet>
+        <title>CAD to Catalog | FormaNova</title>
+        <meta name="description" content="Transform your 3D jewelry CAD models into professional product catalog images for e-commerce and marketing." />
+        <link rel="canonical" href="/cad-to-catalog" />
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
     <div className="flex h-[calc(100vh-5rem)] overflow-hidden bg-muted/30">
       {/* ── LEFT PANEL: Material Library ── */}
       <AnimatePresence>
@@ -258,5 +266,6 @@ export default function CADToCatalog() {
         )}
       </AnimatePresence>
     </div>
+    </>
   );
 }

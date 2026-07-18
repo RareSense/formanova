@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 interface FloatingElementsProps {
@@ -47,16 +47,6 @@ export function FloatingElements({ className }: FloatingElementsProps) {
         }}
       />
       
-      {/* Small accent orb - moves faster */}
-      <div 
-        className="absolute w-[200px] h-[200px] rounded-full bg-primary/10 blur-2xl"
-        style={{
-          top: '50%',
-          left: '60%',
-          transform: `translateY(${scrollY * 0.2}px) translateX(${-scrollY * 0.05}px)`,
-        }}
-      />
-
       {/* Geometric shapes */}
       <div 
         className="absolute w-24 h-24 border border-border/10 rotate-45"

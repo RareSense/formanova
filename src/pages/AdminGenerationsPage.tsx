@@ -1,7 +1,7 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, ExternalLink, Loader2, MessageSquareWarning } from 'lucide-react';
+import { AlertTriangle, ExternalLink, Loader2, MessageSquareWarning, Search } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -30,8 +30,8 @@ import {
 import { matchesAdminGenerationSearch } from '@/lib/admin-generations-search';
 
 const PAGE_SIZE = 20;
-const SEARCH_FETCH_LIMIT = 500;
-const STATUS_OPTIONS = ['queued', 'running', 'completed', 'failed', 'cancelled'] as const;
+// 'queued' intentionally absent: the backend never sets it (rows start at 'running').
+const STATUS_OPTIONS = ['running', 'completed', 'failed', 'cancelled'] as const;
 const USER_TYPE_OPTIONS = [
   'jewelry_brand',
   'freelancer',
@@ -120,20 +120,40 @@ export default function AdminGenerationsPage() {
 
   const status = searchParams.get('status') ?? '';
   const search = searchParams.get('search') ?? searchParams.get('workflow_name') ?? '';
+  // Which server-side field the search box targets. Both `user_email` and
+  // `workflow_name` are substring-filtered by the backend across ALL records, so
+  // partial/close matches surface without loading every page into the browser.
+  const searchField = searchParams.get('field') === 'workflow' ? 'workflow' : 'email';
   const hasFeedback = searchParams.get('has_feedback') ?? '';
   const userType = searchParams.get('user_type') ?? '';
   const isPaying = searchParams.get('is_paying') ?? '';
   const offset = Number(searchParams.get('offset') ?? '0') || 0;
-  const hasSearch = search.trim().length > 0;
-  const backendLimit = hasSearch ? SEARCH_FETCH_LIMIT : PAGE_SIZE;
-  const backendOffset = hasSearch ? 0 : offset;
+  const trimmedSearch = search.trim();
+  const hasSearch = trimmedSearch.length > 0;
+
+  // Local, immediately-responsive input value. Writes to the `search` URL param
+  // (which drives the query) are debounced so we don't hit the API per keystroke.
+  const [searchInput, setSearchInput] = useState(search);
+  // Keep the input in sync when `search` changes from outside (clear filters, back/forward).
+  useEffect(() => { setSearchInput(search); }, [search]);
+  useEffect(() => {
+    if (searchInput === search) return;
+    const t = setTimeout(() => updateParam('search', searchInput), 300);
+    return () => clearTimeout(t);
+    // Deps: only searchInput. `search`/`updateParam` are read fresh; adding them would
+    // re-arm the timer on every param change. Regression to watch: if updateParam starts
+    // closing over stale state, revisit. Guarded by the early return above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchInput]);
 
   const query = useQuery({
-    queryKey: ['admin-generations', { status, search, hasFeedback, userType, isPaying, backendOffset, backendLimit }],
+    queryKey: ['admin-generations', { status, search, searchField, hasFeedback, userType, isPaying, offset }],
     queryFn: () => listAdminGenerations({
-      limit: backendLimit,
-      offset: backendOffset,
+      limit: PAGE_SIZE,
+      offset,
       status: status || undefined,
+      user_email: hasSearch && searchField === 'email' ? trimmedSearch : undefined,
+      workflow_name: hasSearch && searchField === 'workflow' ? trimmedSearch : undefined,
       has_feedback: hasFeedback === '' ? undefined : hasFeedback === 'true',
       user_type: userType || undefined,
       is_paying: isPaying === '' ? undefined : isPaying === 'true',
@@ -142,16 +162,13 @@ export default function AdminGenerationsPage() {
   });
 
   const serverItems = query.data?.items ?? [];
-  const filteredItems = useMemo(
+  const items = useMemo(
     () => (hasSearch
       ? serverItems.filter((item) => matchesAdminGenerationSearch(item, search))
       : serverItems),
     [hasSearch, search, serverItems],
   );
-  const items = hasSearch
-    ? filteredItems.slice(offset, offset + PAGE_SIZE)
-    : filteredItems;
-  const total = hasSearch ? filteredItems.length : (query.data?.total ?? 0);
+  const total = query.data?.total ?? 0;
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const error = query.error instanceof AdminGenerationsApiError ? query.error : null;
@@ -191,12 +208,25 @@ export default function AdminGenerationsPage() {
     <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 sm:py-8">
 
         <div className="mb-5 flex flex-wrap gap-2">
-          <Input
-            value={search}
-            onChange={(event) => updateParam('search', event.target.value)}
-            placeholder="Search workflow, ID, or email"
-            className="h-9 w-full shrink-0 text-sm sm:w-64"
-          />
+          <Select value={searchField} onValueChange={(value) => updateParam('field', value === 'email' ? '' : value)}>
+            <SelectTrigger className="h-9 w-full shrink-0 text-sm sm:w-32">
+              <SelectValue placeholder="Search by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="email">Email</SelectItem>
+              <SelectItem value="workflow">Workflow</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <div className="relative w-full shrink-0 sm:w-64">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              placeholder={searchField === 'email' ? 'Search by email...' : 'Search by workflow name...'}
+              className="h-9 pl-8 text-sm"
+            />
+          </div>
 
           <Select value={status || 'all'} onValueChange={(value) => updateParam('status', value === 'all' ? '' : value)}>
             <SelectTrigger className="h-9 w-full shrink-0 text-sm sm:w-40">
@@ -257,9 +287,9 @@ export default function AdminGenerationsPage() {
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           </div>
-        ) : error?.status === 401 ? (
+        ) : error?.status === 401 || error?.status === 403 ? (
           <NotAuthorizedState />
-        ) : error?.status === 422 ? (
+        ) : error?.status === 402 || error?.status === 422 ? (
           <InvalidRequestState message={error.message || 'One or more filters are invalid.'} />
         ) : error ? (
           <div className="border border-border bg-card">

@@ -1,4 +1,5 @@
 import React, { lazy, Suspense } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { Link, useNavigate, Navigate } from 'react-router-dom';
 import { ArrowRight, Play } from 'lucide-react';
 import { ScrollRevealSection, StaggerContainer } from '@/components/ScrollRevealSection';
@@ -12,6 +13,7 @@ const CinematicShowcase = lazy(() => import('@/components/CinematicShowcase').th
 
 // Assets
 import { ThemeLogo } from '@/components/ThemeLogo';
+import rareSenseLogo from '@/assets/rare-sense-logo.webp';
 const heroDiamondChoker = '/hero-diamond-choker.webp';
 import heroVneckNecklace from '@/assets/jewelry/hero-vneck-necklace.webp';
 import heroChokerBack from '@/assets/jewelry/hero-choker-back.webp';
@@ -64,6 +66,12 @@ export default function Welcome() {
 
 
   return (
+    <>
+      <Helmet>
+        <title>FormaNova | AI Jewelry Photoshoot Studio & CAD Generator</title>
+        <meta name="description" content="AI jewelry photoshoot studio & CAD generator. Upload product images for professional model photos, or generate 3D jewelry models from text. Starter pack from $2." />
+        <link rel="canonical" href="/" />
+      </Helmet>
     <div className="min-h-screen bg-background overflow-x-hidden scroll-smooth">
       {/* Hero Section with Cinematic 3D Parallax */}
       <section className="min-h-screen relative overflow-hidden bg-background">
@@ -206,10 +214,19 @@ export default function Welcome() {
               <Link to="/tutorial" className="marta-label marta-link hover:text-foreground">Tutorial</Link>
               <a href="https://linkedin.com/company/rare-sense-inc" target="_blank" rel="noopener noreferrer" className="marta-label marta-link hover:text-foreground">LinkedIn</a>
             </nav>
-            <p className="marta-label">© {new Date().getFullYear()} FormaNova</p>
+            <div className="flex items-center gap-3">
+              <img
+                src={rareSenseLogo}
+                alt="Rare Sense Inc. logo"
+                className="h-10 w-auto object-contain"
+                loading="lazy"
+              />
+              <p className="marta-label">© {new Date().getFullYear()} FormaNova, a product of Rare Sense Inc.</p>
+            </div>
           </div>
         </div>
       </footer>
     </div>
+    </>
   );
 }

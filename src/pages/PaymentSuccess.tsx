@@ -76,7 +76,9 @@ export default function PaymentSuccess() {
           amount_usd: pkg.amount_usd,
           currency_shown: currencyRef.current, // ref — always reads current value at call time, not stale closure
         });
-        if (data.credits_added <= 50) trackStarterPackPurchased();
+        if (data.credits_added <= 50) {
+          trackStarterPackPurchased();
+        }
         setState({ type: 'fulfilled', creditsAdded: data.credits_added });
         stopPolling();
         return 'done';

@@ -43,6 +43,29 @@ export async function getUserProfile(): Promise<UserProfile> {
   return res.json();
 }
 
+const USER_TYPE_CACHE_PREFIX = 'formanova_user_type_';
+
+/** Seed the per-user cache (called wherever the profile is already known). */
+export function setCachedUserType(userId: string, userType: UserType | null): void {
+  if (userType) sessionStorage.setItem(USER_TYPE_CACHE_PREFIX + userId, userType);
+}
+
+/**
+ * user_type for UI gating (e.g. the Brand Details menu entry), cached per
+ * session so the header does not refetch the profile on every mount.
+ */
+export async function getCachedUserType(userId: string): Promise<UserType | null> {
+  const cached = sessionStorage.getItem(USER_TYPE_CACHE_PREFIX + userId);
+  if (cached) return cached as UserType;
+  try {
+    const profile = await getUserProfile();
+    setCachedUserType(userId, profile.user_type);
+    return profile.user_type;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * PATCH /api/user/profile — saves user_type against the authenticated user.
  * Required backend endpoint:
@@ -51,11 +74,29 @@ export async function getUserProfile(): Promise<UserProfile> {
  *   Body: { "user_type": "jewelry_brand" | "freelancer" | "researcher_student" | "content_creator" | "other" }
  *   Response 200: { "success": true }
  */
-export async function saveUserType(userType: UserType): Promise<void> {
+export interface BrandDetails {
+  brand_name: string;
+  website_url?: string;
+  store_url?: string;
+  social_links?: string[];
+  based_in?: string;
+  target_markets?: string[];
+}
+
+export async function saveUserType(userType: UserType, brandDetails?: BrandDetails | null): Promise<void> {
+  const body: Record<string, unknown> = { user_type: userType };
+  if (brandDetails) {
+    body.brand_name = brandDetails.brand_name;
+    if (brandDetails.website_url) body.website_url = brandDetails.website_url;
+    if (brandDetails.store_url) body.store_url = brandDetails.store_url;
+    if (brandDetails.social_links?.length) body.social_links = brandDetails.social_links;
+    if (brandDetails.based_in) body.based_in = brandDetails.based_in;
+    if (brandDetails.target_markets?.length) body.target_markets = brandDetails.target_markets;
+  }
   const res = await authenticatedFetch('/api/user/profile', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_type: userType }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     throw new Error(`Failed to save user type: ${res.status}`);

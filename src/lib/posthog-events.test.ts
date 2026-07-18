@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Mock posthog-js BEFORE importing posthog-events
 vi.mock('posthog-js', () => ({
-  default: { capture: vi.fn(), setPersonProperties: vi.fn(), reset: vi.fn(), identify: vi.fn(), onFeatureFlags: vi.fn(), getFeatureFlag: vi.fn(), __loaded: true },
+  default: { capture: vi.fn(), setPersonProperties: vi.fn(), reset: vi.fn(), identify: vi.fn(), onFeatureFlags: vi.fn(), getFeatureFlag: vi.fn(), _isIdentified: vi.fn(), __loaded: true },
 }))
 
 import posthog from 'posthog-js'
@@ -17,17 +17,25 @@ import {
   trackCadGenerationCompleted,
   trackGenerationComplete,
   trackDownloadClicked,
-  trackRegenerateClicked,
+  trackAIFixSubmitted,
+  trackAIFixModalOpened,
   trackPaymentSuccess,
   trackStarterPackPurchased,
   trackUploadGuideViewed,
   trackUploadGuideAcknowledged,
   trackUserTypeSelected,
+  trackFeedbackModalOpened,
   trackFeedbackSubmitted,
+  trackBrandFormOpened,
+  trackBrandFormSubmitted,
+  trackBrandDetailsDeleted,
   setUserProfession,
-  trackButtonLabelExperimentExposure,
-  getButtonLabelVariant,
   trackShopifyExported,
+  trackUpscaleStarted,
+  trackUpscaleCompleted,
+  trackUpscalePaywallHit,
+  getStarterPackPricingVariant,
+  onPostHogFlagsLoaded,
 } from './posthog-events'
 
 beforeEach(() => {
@@ -63,6 +71,55 @@ describe('__loaded guard', () => {
     trackJewelryUploaded({ category: 'ring', upload_type: 'mannequin', was_flagged: false })
     expect(posthog.capture).not.toHaveBeenCalled()
     ;(posthog as any).__loaded = true
+  })
+})
+
+
+// ── Brand form funnel ───────────────────────────────────────────────
+
+describe('trackBrandFormOpened', () => {
+  it('captures brand_form_opened with the source', () => {
+    trackBrandFormOpened({ source: 'onboarding' })
+    expect(posthog.capture).toHaveBeenCalledWith('brand_form_opened', {
+      source: 'onboarding',
+    })
+  })
+
+  it('supports the studio prompt source', () => {
+    trackBrandFormOpened({ source: 'studio_prompt' })
+    expect(posthog.capture).toHaveBeenCalledWith('brand_form_opened', {
+      source: 'studio_prompt',
+    })
+  })
+})
+
+describe('trackBrandFormSubmitted', () => {
+  it('captures brand_form_submitted with field shape, never field values', () => {
+    trackBrandFormSubmitted({
+      source: 'studio_prompt',
+      has_website: true,
+      has_store: false,
+      has_location: true,
+      has_markets: true,
+      social_count: 2,
+      has_brand_book: false,
+    })
+    expect(posthog.capture).toHaveBeenCalledWith('brand_form_submitted', {
+      source: 'studio_prompt',
+      has_website: true,
+      has_store: false,
+      has_location: true,
+      has_markets: true,
+      social_count: 2,
+      has_brand_book: false,
+    })
+  })
+})
+
+describe('trackBrandDetailsDeleted', () => {
+  it('captures brand_details_deleted with no properties', () => {
+    trackBrandDetailsDeleted()
+    expect(posthog.capture).toHaveBeenCalledWith('brand_details_deleted', undefined)
   })
 })
 
@@ -198,6 +255,35 @@ describe('trackGenerationComplete', () => {
     }))
   })
 
+  it('includes effort and jewelry_image_count when provided (high effort, 3 images)', () => {
+    trackGenerationComplete({
+      source: 'unified-studio',
+      category: 'ring',
+      upload_type: null,
+      duration_ms: 3000,
+      is_first_ever: false,
+      effort: 'high',
+      jewelry_image_count: 3,
+    })
+    expect(posthog.capture).toHaveBeenCalledWith('generation_completed', expect.objectContaining({
+      effort: 'high',
+      jewelry_image_count: 3,
+    }))
+  })
+
+  it('omits effort and jewelry_image_count when not provided (e.g. upscale completion)', () => {
+    trackGenerationComplete({
+      source: 'unified-studio',
+      category: 'ring',
+      upload_type: null,
+      duration_ms: 3000,
+      is_first_ever: false,
+    })
+    const props = (posthog.capture as ReturnType<typeof vi.fn>).mock.calls.at(-1)![1]
+    expect(props).not.toHaveProperty('effort')
+    expect(props).not.toHaveProperty('jewelry_image_count')
+  })
+
   it('includes aspect_ratio and resolution when provided', () => {
     trackGenerationComplete({
       source: 'unified-studio',
@@ -251,14 +337,22 @@ describe('trackDownloadClicked', () => {
   })
 })
 
-describe('trackRegenerateClicked', () => {
-  it('captures regenerate_clicked with enriched props', () => {
-    trackRegenerateClicked({ context: 'unified-studio', category: 'ring', regeneration_number: 1 })
-    expect(posthog.capture).toHaveBeenCalledWith('regenerate_clicked', {
-      context: 'unified-studio',
+describe('trackAIFixSubmitted', () => {
+  it('captures ai_fix_submitted with correct shape', () => {
+    trackAIFixSubmitted({ category: 'ring', prompt_length: 42, workflow_id: 'wf-abc', regeneration_number: 2 })
+    expect(posthog.capture).toHaveBeenCalledWith('ai_fix_submitted', {
       category: 'ring',
-      regeneration_number: 1,
+      prompt_length: 42,
+      workflow_id: 'wf-abc',
+      regeneration_number: 2,
     })
+  })
+
+  it('accepts null workflow_id', () => {
+    trackAIFixSubmitted({ category: 'necklace', prompt_length: 10, workflow_id: null, regeneration_number: 1 })
+    expect(posthog.capture).toHaveBeenCalledWith('ai_fix_submitted', expect.objectContaining({
+      workflow_id: null,
+    }))
   })
 })
 
@@ -293,6 +387,42 @@ describe('trackUploadGuideAcknowledged', () => {
   it('captures upload_guide_acknowledged', () => {
     trackUploadGuideAcknowledged()
     expect(posthog.capture).toHaveBeenCalledWith('upload_guide_acknowledged', undefined)
+  })
+})
+
+describe('trackAIFixModalOpened', () => {
+  it('captures ai_fix_modal_opened with correct shape', () => {
+    trackAIFixModalOpened({ category: 'ring', workflow_id: 'wf-123' })
+    expect(posthog.capture).toHaveBeenCalledWith('ai_fix_modal_opened', {
+      category: 'ring',
+      workflow_id: 'wf-123',
+    })
+  })
+
+  it('accepts null workflow_id', () => {
+    trackAIFixModalOpened({ category: 'earring', workflow_id: null })
+    expect(posthog.capture).toHaveBeenCalledWith('ai_fix_modal_opened', {
+      category: 'earring',
+      workflow_id: null,
+    })
+  })
+})
+
+describe('trackFeedbackModalOpened', () => {
+  it('captures feedback_modal_opened with correct shape', () => {
+    trackFeedbackModalOpened({ category: 'ring', workflow_id: 'wf-123' })
+    expect(posthog.capture).toHaveBeenCalledWith('feedback_modal_opened', {
+      category: 'ring',
+      workflow_id: 'wf-123',
+    })
+  })
+
+  it('accepts null workflow_id', () => {
+    trackFeedbackModalOpened({ category: 'earring', workflow_id: null })
+    expect(posthog.capture).toHaveBeenCalledWith('feedback_modal_opened', {
+      category: 'earring',
+      workflow_id: null,
+    })
   })
 })
 
@@ -361,26 +491,37 @@ describe('setUserProfession', () => {
   })
 })
 
-// ── trackButtonLabelExperimentExposure ──────────────────────────────
+// ── Upscale events ──────────────────────────────────────────────────
 
-describe('trackButtonLabelExperimentExposure', () => {
-  it('calls onFeatureFlags and then getFeatureFlag with button-labels-experiment', () => {
-    let captured: (() => void) | undefined;
-    (posthog.onFeatureFlags as any).mockImplementation((fn: () => void) => {
-      captured = fn;
-    });
-    trackButtonLabelExperimentExposure();
-    expect(posthog.onFeatureFlags).toHaveBeenCalled();
-    captured!();
-    expect(posthog.getFeatureFlag).toHaveBeenCalledWith('button-labels-experiment');
-  });
+describe('trackUpscaleStarted', () => {
+  it('captures upscale_started with the full prop shape', () => {
+    trackUpscaleStarted({
+      source_tier: '2K',
+      factor: 3,
+      credits_cost: 20,
+      category: 'ring',
+      is_product_shot: true,
+      surface: 'studio',
+    })
+    expect(posthog.capture).toHaveBeenCalledWith('upscale_started', {
+      source_tier: '2K',
+      factor: 3,
+      credits_cost: 20,
+      category: 'ring',
+      is_product_shot: true,
+      surface: 'studio',
+    })
+  })
 
-  it('does nothing when posthog is not loaded', () => {
+  it('does not capture when __loaded is false', () => {
     ;(posthog as any).__loaded = false
-    trackButtonLabelExperimentExposure()
-    expect(posthog.onFeatureFlags).not.toHaveBeenCalled()
+    trackUpscaleStarted({
+      source_tier: '1K', factor: 2, credits_cost: 6, category: 'ring',
+      is_product_shot: false, surface: 'history',
+    })
+    expect(posthog.capture).not.toHaveBeenCalled()
     ;(posthog as any).__loaded = true
-  });
+  })
 })
 
 // ── trackShopifyExported ────────────────────────────────────────────
@@ -399,24 +540,106 @@ describe('trackShopifyExported', () => {
   })
 })
 
-// ── getButtonLabelVariant ───────────────────────────────────────────
+describe('trackUpscaleCompleted', () => {
+  it('captures upscale_completed with the full prop shape', () => {
+    trackUpscaleCompleted({
+      source_tier: '1K',
+      factor: 4,
+      credits_cost: 12,
+      category: 'necklace',
+      is_product_shot: false,
+      surface: 'history',
+    })
+    expect(posthog.capture).toHaveBeenCalledWith('upscale_completed', {
+      source_tier: '1K',
+      factor: 4,
+      credits_cost: 12,
+      category: 'necklace',
+      is_product_shot: false,
+      surface: 'history',
+    })
+  })
+})
 
-describe('getButtonLabelVariant', () => {
-  it('returns the flag value when treatment', () => {
-    (posthog.getFeatureFlag as any).mockReturnValue('treatment');
-    expect(getButtonLabelVariant()).toBe('treatment');
-    expect(posthog.getFeatureFlag).toHaveBeenCalledWith('button-labels-experiment');
-  });
+describe('trackUpscalePaywallHit', () => {
+  it('captures upscale_paywall_hit with the full prop shape', () => {
+    trackUpscalePaywallHit({
+      source_tier: '4K',
+      factor: 2,
+      credits_cost: 40,
+      category: 'earring',
+      surface: 'studio',
+    })
+    expect(posthog.capture).toHaveBeenCalledWith('upscale_paywall_hit', {
+      source_tier: '4K',
+      factor: 2,
+      credits_cost: 40,
+      category: 'earring',
+      surface: 'studio',
+    })
+  })
+})
 
-  it('returns undefined when flag is not yet loaded', () => {
-    (posthog.getFeatureFlag as any).mockReturnValue(undefined);
-    expect(getButtonLabelVariant()).toBeUndefined();
-  });
+// ── getStarterPackPricingVariant (A/B experiment) ───────────────────
 
-  it('returns undefined when posthog is not loaded', () => {
+describe('getStarterPackPricingVariant', () => {
+  it('returns the flag value (treatment) when loaded and identified', () => {
+    ;(posthog as any).__loaded = true
+    ;(posthog._isIdentified as any).mockReturnValue(true)
+    ;(posthog.getFeatureFlag as any).mockReturnValue('treatment')
+    expect(getStarterPackPricingVariant()).toBe('treatment')
+    expect(posthog.getFeatureFlag).toHaveBeenCalledWith('starter-pack-pricing-experiment')
+  })
+
+  it('returns control when bucketed to control', () => {
+    ;(posthog as any).__loaded = true
+    ;(posthog._isIdentified as any).mockReturnValue(true)
+    ;(posthog.getFeatureFlag as any).mockReturnValue('control')
+    expect(getStarterPackPricingVariant()).toBe('control')
+  })
+
+  it('returns undefined and does not read the flag when not identified', () => {
+    ;(posthog as any).__loaded = true
+    ;(posthog._isIdentified as any).mockReturnValue(false)
+    expect(getStarterPackPricingVariant()).toBeUndefined()
+    expect(posthog.getFeatureFlag).not.toHaveBeenCalled()
+  })
+
+  it('returns undefined and does not read the flag when posthog is not loaded', () => {
     ;(posthog as any).__loaded = false
-    expect(getButtonLabelVariant()).toBeUndefined()
+    ;(posthog._isIdentified as any).mockReturnValue(true)
+    expect(getStarterPackPricingVariant()).toBeUndefined()
     expect(posthog.getFeatureFlag).not.toHaveBeenCalled()
     ;(posthog as any).__loaded = true
-  });
+  })
 })
+
+// ── onPostHogFlagsLoaded ────────────────────────────────────────────
+
+describe('onPostHogFlagsLoaded', () => {
+  it('subscribes via posthog.onFeatureFlags when loaded and runs cb on flags', () => {
+    ;(posthog as any).__loaded = true
+    let captured: (() => void) | undefined
+    ;(posthog.onFeatureFlags as any).mockImplementation((fn: () => void) => {
+      captured = fn
+      return () => {}
+    })
+    const cb = vi.fn()
+    onPostHogFlagsLoaded(cb)
+    expect(posthog.onFeatureFlags).toHaveBeenCalled()
+    captured!()
+    expect(cb).toHaveBeenCalledTimes(1)
+  })
+
+  it('runs cb immediately (fallback) when posthog is not loaded', () => {
+    ;(posthog as any).__loaded = false
+    const cb = vi.fn()
+    const unsub = onPostHogFlagsLoaded(cb)
+    expect(cb).toHaveBeenCalledTimes(1)
+    expect(posthog.onFeatureFlags).not.toHaveBeenCalled()
+    expect(typeof unsub).toBe('function')
+    ;(posthog as any).__loaded = true
+  })
+})
+
+

@@ -39,7 +39,7 @@
  *     });
  */
 import { useCallback, useState } from 'react';
-import { normalizeImageFile } from '@/lib/image-normalize';
+import { normalizeImageFile, isLikelyImageFile } from '@/lib/image-normalize';
 import { compressImageBlob } from '@/lib/image-compression';
 import { uploadToAzure } from '@/lib/microservices-api';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
@@ -86,7 +86,7 @@ export function useStudioUpload({
   const [isModelUploading, setIsModelUploading] = useState(false);
 
   const handleJewelryUpload = useCallback(async (file: File) => {
-    if (!file.type.startsWith('image/')) {
+    if (!isLikelyImageFile(file)) {
       toast({ variant: 'destructive', title: 'Invalid file', description: 'Please upload an image.' });
       return;
     }
@@ -120,7 +120,7 @@ export function useStudioUpload({
   }, [toast, effectiveJewelryType, isProductShot]);
 
   const handleModelUpload = useCallback(async (file: File) => {
-    if (!file.type.startsWith('image/')) {
+    if (!isLikelyImageFile(file)) {
       toast({ variant: 'destructive', title: 'Invalid file', description: 'Please upload an image.' });
       return;
     }

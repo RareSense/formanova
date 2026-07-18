@@ -15,6 +15,7 @@ function ShopifyMenuIcon({ className }: { className?: string }) {
 }
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
+import { useUserType } from '@/hooks/useUserType';
 import { useCredits } from '@/contexts/CreditsContext';
 import { useGenerations } from '@/contexts/GenerationsContext';
 import {
@@ -25,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ThemeLogo } from '@/components/ThemeLogo';
+import { BrandDetailsIcon } from '@/components/brand/BrandDetailsIcon';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
 
 type NavLink = { path: string; label: string; activePaths?: string[] };
@@ -68,12 +70,17 @@ function GenerationIndicator() {
       navigate(`/studio/${mostRecent.jewelryType}`, {
         state: {
           asyncResult: {
-            workflowId: mostRecent.workflowId,
+            // Derivative runs (upscale) re-anchor to the source generation so
+            // feedback/category/inputs stay tied to the original photoshoot.
+            workflowId: mostRecent.parentWorkflowId ?? mostRecent.workflowId,
             resultImages: mostRecent.resultImages,
             aspectRatio: mostRecent.aspectRatio,
             resolution: mostRecent.resolution,
             generationCost: mostRecent.generationCost,
+            jewelryUrl: mostRecent.jewelryUrl,
+            modelUrl: mostRecent.parentModelUrl ?? mostRecent.modelUrl,
           },
+          mode: mostRecent.isProductShot ? 'product-shot' : 'model-shot',
         },
       });
     } else {
@@ -121,6 +128,7 @@ export function Header() {
   const { user, signOut, signInWithGoogle } = useAuth();
   const { credits, lastDelta } = useCredits();
   const isAdmin = useIsAdmin();
+  const isJewelryBrand = useUserType() === 'jewelry_brand';
   const [visibleDelta, setVisibleDelta] = useState<{ amount: number; id: number } | null>(null);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -266,29 +274,38 @@ export function Header() {
                     <DropdownMenuSeparator />
                     <DropdownMenuItem 
                       onClick={() => navigate('/generations')}
-                      className="text-sm"
+                      className="text-sm min-h-10"
                     >
                       <Image className="h-4 w-4 mr-2" />
                       Generations
                     </DropdownMenuItem>
                     <DropdownMenuItem 
                       onClick={() => navigate('/credits')}
-                      className="text-sm"
+                      className="text-sm min-h-10"
                     >
                       <img src={creditCoinIcon} alt="" className="h-6 w-6 mr-2 object-contain" width={24} height={24} loading="eager" decoding="sync" />
                       My Credits
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => navigate('/my-shopify-store')}
-                      className="text-sm"
+                      className="text-sm min-h-10"
                     >
                       <ShopifyMenuIcon className="h-4 w-4 mr-2" />
                       My Shopify Store
                     </DropdownMenuItem>
+                    {isJewelryBrand && (
+                      <DropdownMenuItem
+                        onClick={() => navigate('/brand-details')}
+                        className="text-sm min-h-10"
+                      >
+                        <BrandDetailsIcon className="h-6 w-6 mr-2" />
+                        Brand Details
+                      </DropdownMenuItem>
+                    )}
                     {isAdmin && (
                       <DropdownMenuItem
                         onClick={() => navigate('/admin')}
-                        className="text-sm"
+                        className="text-sm min-h-10"
                       >
                         <ScanEye className="h-4 w-4 mr-2" />
                         Admin
@@ -406,6 +423,14 @@ export function Header() {
                     My Shopify Store
                   </Button>
                 </Link>
+                {isJewelryBrand && (
+                  <Link to="/brand-details">
+                    <Button variant="outline" size="lg" className="gap-2 w-full">
+                      <BrandDetailsIcon className="h-7 w-7" />
+                      Brand Details
+                    </Button>
+                  </Link>
+                )}
                 {isAdmin && (
                   <Link to="/admin">
                     <Button variant="outline" size="lg" className="gap-2 w-full">
@@ -448,7 +473,7 @@ export function Header() {
         </nav>
       </div>
 
-      {/* Spacer for fixed header */}
+      {/* Spacer for fixed header (h-16/h-20) */}
       <div className="h-16 lg:h-20" />
     </>
   );

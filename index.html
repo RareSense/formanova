@@ -2,6 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="p:domain_verify" content="59a90a3578babb1b74e8767406565c55"/>
     <link rel="icon" id="favicon" type="image/png" href="/favicon-light.png" />
     <script>
       // Dynamic favicon for light/dark mode
@@ -24,7 +25,7 @@
       })();
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="canonical" href="https://formanova.ai/" />
+    
     <title>FormaNova | AI Jewelry Photoshoot Studio & CAD Generator</title>
     <meta name="description" content="AI jewelry photoshoot studio & CAD generator. Upload product images for professional model photos, or generate 3D jewelry models from text. Plans from $9." />
     <meta name="keywords" content="AI jewelry photoshoot, jewelry photography AI, text to jewelry CAD, AI CAD generator, jewelry design software, 3D jewelry modeling, product photography automation, jewelry e-commerce" />
@@ -48,9 +49,9 @@
     <!-- Marta Verba Typography - Bebas Neue + Inter (non-render-blocking) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap">
-    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'"  >
-    <noscript><link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"></noscript>
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap">
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'"  >
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"></noscript>
 
     <!-- LCP hero image preload — injected statically for fastest discovery -->
     <link rel="preload" as="image" type="image/webp" href="/hero-diamond-choker.webp" />
@@ -59,41 +60,59 @@
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "SoftwareApplication",
-      "name": "FormaNova",
-      "applicationCategory": "DesignApplication",
-      "description": "AI-powered jewelry photoshoot studio and text-to-CAD generator. Upload product images to create professional model photoshoots, or describe jewelry in text to generate 3D CAD models.",
-      "url": "https://formanova.ai",
-      "image": "https://formanova.ai/og-image-v2.png",
-      "operatingSystem": "Web",
-      "offers": [
+      "@graph": [
         {
-          "@type": "Offer",
-          "name": "Basic",
-          "price": "9",
-          "priceCurrency": "USD",
-          "description": "100 credits — generate up to 10 photos"
+          "@type": "Organization",
+          "@id": "https://formanova.ai",
+          "name": "FormaNova",
+          "alternateName": "Forma Nova",
+          "url": "https://formanova.ai",
+          "logo": "https://formanova.ai/formanova-logo-black-tagline.png"
         },
         {
-          "@type": "Offer",
-          "name": "Standard",
-          "price": "39",
-          "priceCurrency": "USD",
-          "description": "500 credits — generate up to 50 photos"
-        },
-        {
-          "@type": "Offer",
-          "name": "Pro",
-          "price": "99",
-          "priceCurrency": "USD",
-          "description": "1500 credits — generate up to 150 photos"
+          "@type": "SoftwareApplication",
+          "name": "FormaNova",
+          "applicationCategory": "DesignApplication",
+          "description": "AI-powered jewelry photoshoot studio and text-to-CAD generator. Upload product images to create professional model photoshoots, or describe jewelry in text to generate 3D CAD models.",
+          "url": "https://formanova.ai",
+          "image": "https://formanova.ai/og-image-v2.png",
+          "operatingSystem": "Web",
+          "creator": {
+            "@type": "Organization",
+            "@id": "https://formanova.ai"
+          },
+          "offers": [
+            {
+              "@type": "Offer",
+              "name": "Starter",
+              "price": "2",
+              "priceCurrency": "USD",
+              "description": "50 credits — generate up to 5 photos"
+            },
+            {
+              "@type": "Offer",
+              "name": "Basic",
+              "price": "9",
+              "priceCurrency": "USD",
+              "description": "100 credits — generate up to 10 photos"
+            },
+            {
+              "@type": "Offer",
+              "name": "Standard",
+              "price": "39",
+              "priceCurrency": "USD",
+              "description": "500 credits — generate up to 50 photos"
+            },
+            {
+              "@type": "Offer",
+              "name": "Pro",
+              "price": "99",
+              "priceCurrency": "USD",
+              "description": "1500 credits — generate up to 150 photos"
+            }
+          ]
         }
-      ],
-      "creator": {
-        "@type": "Organization",
-        "name": "FormaNova",
-        "url": "https://formanova.ai"
-      }
+      ]
     }
     </script>
     <!-- Critical inline CSS: hero above-the-fold styles to allow first paint before full stylesheet -->

@@ -16,6 +16,9 @@ const STUDIO_RESULT_RETRY_DELAY_MS = 3000;
 // 4K workflows can reach "completed" before the result payload is readable.
 // Keep the status poll bounded separately and only extend this post-completion lag window.
 const STUDIO_RESULT_MAX_RETRIES = 100;
+// Default poll ceiling for photoshoot/fix runs. Slow workflows (e.g. upscale)
+// override this via TrackGenerationParams.timeoutMs.
+const DEFAULT_POLL_TIMEOUT_MS = 720_000;
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -25,8 +28,10 @@ export interface TrackedGeneration {
   progress: number;
   generationStep: string;
   resultImages: string[];
-  outputAssetId: string | null;
   jewelryUrl: string;
+  /** High Effort: the full cover-first jewelry angle set, when known. Falls back
+   *  to [jewelryUrl] downstream. Optional — absent on older/simple runs. */
+  jewelryUrls?: string[];
   modelUrl: string;
   isProductShot: boolean;
   jewelryType: string;
@@ -34,6 +39,25 @@ export interface TrackedGeneration {
   aspectRatio: string;
   resolution: Resolution;
   generationCost: number | null;
+  jewelryDescription?: string;
+  /**
+   * Vault asset id of this run's output image, read top-level from /result on
+   * completion (generic across model-shot/PDP/fix/upscale). Undefined for
+   * history-fallback / error paths and for old items whose /result predates the
+   * field. Consumed as the fix `source_asset_id` so a fix prices/runs at the tier
+   * of the exact asset being fixed (including an already-upscaled one).
+   */
+  outputAssetId?: string | null;
+  /** Poll ceiling for this run. Defaults to DEFAULT_POLL_TIMEOUT_MS when omitted. */
+  timeoutMs?: number;
+  /**
+   * For derivative runs (e.g. upscale): the original generation this was derived
+   * from. Restore paths re-anchor the studio to this id so feedback, category, and
+   * inputs stay tied to the source photoshoot rather than the upscale workflow.
+   */
+  parentWorkflowId?: string;
+  /** Original model/reference image of the parent generation (upscale carries this). */
+  parentModelUrl?: string;
 }
 
 export interface TrackGenerationParams {
@@ -45,6 +69,12 @@ export interface TrackGenerationParams {
   aspectRatio: string;
   resolution: Resolution;
   generationCost: number | null;
+  /** Override the poll ceiling for slow workflows (e.g. upscale). */
+  timeoutMs?: number;
+  /** Original generation id when this run is a derivative (upscale). */
+  parentWorkflowId?: string;
+  /** Original model/reference image of the parent generation. */
+  parentModelUrl?: string;
 }
 
 export interface GenerationsContextValue {
@@ -61,8 +91,11 @@ export const GenerationsContext = createContext<GenerationsContextValue | null>(
 
 function normalizeResultImage(value: string): string | null {
   if (!value) return null;
-  if (value.startsWith('azure://')) return azureUriToUrl(value);
-  if (value.startsWith('http') || value.startsWith('data:') || value.startsWith('blob:')) return value;
+  // Route every candidate through azureUriToUrl so a content-addressed blob URL
+  // (azure:// OR a raw https blob host) collapses to the same-origin artifact
+  // proxy. data:/blob:/non-artifact URLs pass through unchanged.
+  if (value.startsWith('azure://') || value.startsWith('http')) return azureUriToUrl(value);
+  if (value.startsWith('data:') || value.startsWith('blob:')) return value;
   return null;
 }
 
@@ -115,6 +148,26 @@ function extractOutputAssetId(result: PhotoshootResultResponse): string | null {
     }
   }
   return null;
+}
+
+function extractJewelryDescription(result: PhotoshootResultResponse): string | undefined {
+  for (const [key, items] of Object.entries(result)) {
+    if (!Array.isArray(items)) continue;
+    for (const item of items) {
+      if (!item || typeof item !== 'object') continue;
+      const rec = item as Record<string, unknown>;
+      if (typeof rec['description'] === 'string' && rec['description'].length > 0) {
+        if (import.meta.env.DEV) console.log(`[extractJewelryDescription] found in node "${key}":`, rec['description']);
+        return rec['description'];
+      }
+    }
+  }
+  // Absent is the normal case for upscale/fix/PDP results (no description node);
+  // only some model-shot generations emit one. Dev-only, not a production warning.
+  if (import.meta.env.DEV) {
+    console.debug('[extractJewelryDescription] no description node in result (expected for upscale/fix/pdp). Keys:', Object.keys(result));
+  }
+  return undefined;
 }
 
 function extractResultImages(result: PhotoshootResultResponse): string[] {
@@ -180,6 +233,9 @@ export function GenerationsContextProvider({ children }: { children: React.React
         aspectRatio: params.aspectRatio,
         resolution: params.resolution,
         generationCost: params.generationCost,
+        ...(params.timeoutMs ? { timeoutMs: params.timeoutMs } : {}),
+        ...(params.parentWorkflowId ? { parentWorkflowId: params.parentWorkflowId } : {}),
+        ...(params.parentModelUrl ? { parentModelUrl: params.parentModelUrl } : {}),
       },
     ]);
   }, []);
@@ -217,6 +273,9 @@ export function GenerationsContextProvider({ children }: { children: React.React
           return { ...g, progress: Math.min(g.progress + Math.max((90 - g.progress) * 0.04, 0.1), 90) };
         }));
       }, 300);
+      // Aborting the poll (unmount/cancel) must also stop the ticker — otherwise
+      // it keeps firing setState after teardown.
+      ctrl.signal.addEventListener('abort', () => clearInterval(ticker), { once: true });
 
       pollWorkflow<PhotoshootResultResponse>({
         mode: 'status-then-result',
@@ -238,7 +297,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
         },
         parseResult: (d) => d as PhotoshootResultResponse,
         intervalMs: 3000,
-        timeoutMs: 720_000,
+        timeoutMs: gen.timeoutMs ?? DEFAULT_POLL_TIMEOUT_MS,
         max404s: Number.MAX_SAFE_INTEGER,
         maxPollErrors: 1,
         maxResultRetries: STUDIO_RESULT_MAX_RETRIES,
@@ -253,7 +312,11 @@ export function GenerationsContextProvider({ children }: { children: React.React
         // Extract images first — if we got output images the generation succeeded regardless
         // of what other keys exist in the result (handles _2k/_4k workflows with different node names).
         const resultImages = extractResultImages(result);
-        const outputAssetId = extractOutputAssetId(result);
+        if (import.meta.env.DEV && gen.isProductShot) console.log('[product-shot result keys]', Object.keys(result), result);
+        const jewelryDescription = gen.isProductShot ? extractJewelryDescription(result) : undefined;
+        // Top-level sibling scalar (not a node-keyed array). Older payloads bury the
+        // asset id inside node-keyed arrays instead, so fall back to the deep scan.
+        const outputAssetId = typeof result.output_asset_id === 'string' ? result.output_asset_id : extractOutputAssetId(result);
 
         // Only check for activity errors when no images were produced.
         // Prefer targeted key lookup; only fall back to scanning all values when those keys are absent.
@@ -290,12 +353,15 @@ export function GenerationsContextProvider({ children }: { children: React.React
                     onClick={() => navigate(`/studio/${gen.jewelryType}`, {
                       state: {
                         asyncResult: {
-                          workflowId: gen.workflowId,
+                          workflowId: gen.parentWorkflowId ?? gen.workflowId,
                           resultImages: fallbackImages,
                           aspectRatio: gen.aspectRatio,
                           resolution: gen.resolution,
                           generationCost: gen.generationCost,
+                          jewelryUrl: gen.jewelryUrl,
+                          modelUrl: gen.parentModelUrl ?? gen.modelUrl,
                         },
+                        mode: gen.isProductShot ? 'product-shot' : 'model-shot',
                       },
                     })}
                   >
@@ -322,7 +388,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
 
         setGenerations(prev => prev.map(g =>
           g.workflowId === gen.workflowId
-            ? { ...g, status: 'completed', progress: 100, resultImages, outputAssetId }
+            ? { ...g, status: 'completed', progress: 100, resultImages, outputAssetId, ...(jewelryDescription ? { jewelryDescription } : {}) }
             : g
         ));
         markGenerationCompleted(gen.workflowId, startTime);
@@ -338,13 +404,18 @@ export function GenerationsContextProvider({ children }: { children: React.React
               onClick={() => navigate(`/studio/${gen.jewelryType}`, {
                 state: {
                   asyncResult: {
-                    workflowId: gen.workflowId,
+                    // Derivative runs (upscale) re-anchor to the source generation so
+                    // feedback/category/inputs stay tied to the original photoshoot.
+                    workflowId: gen.parentWorkflowId ?? gen.workflowId,
                     resultImages,
                     outputAssetId,
                     aspectRatio: gen.aspectRatio,
                     resolution: gen.resolution,
                     generationCost: gen.generationCost,
+                    jewelryUrl: gen.jewelryUrl,
+                    modelUrl: gen.parentModelUrl ?? gen.modelUrl,
                   },
+                  mode: gen.isProductShot ? 'product-shot' : 'model-shot',
                 },
               })}
             >

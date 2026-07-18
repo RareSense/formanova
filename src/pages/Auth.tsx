@@ -1,5 +1,5 @@
 import { Helmet } from 'react-helmet-async';
-import { useEffect, useState, useRef, forwardRef, FormEvent } from 'react';
+import { useEffect, useState, useRef, forwardRef } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -38,15 +38,9 @@ const Auth = forwardRef<HTMLDivElement>(function Auth(_, ref) {
   const processedRef = useRef(false);
   const isInstagram = isInAppBrowser();
   const [copiedLink, setCopiedLink] = useState(false);
-  const [reviewEmail, setReviewEmail] = useState('');
-  const [reviewPassword, setReviewPassword] = useState('');
-  const [reviewLoading, setReviewLoading] = useState(false);
-  const [reviewError, setReviewError] = useState<string | null>(null);
-  const isReviewLoginEnabled = import.meta.env.VITE_SHOPIFY_REVIEW_LOGIN === 'true';
 
   // Support ?redirect= query param (from ProtectedRoute guard) AND location.state (from in-app redirects)
-  const rawRedirect = searchParams.get('redirect') || searchParams.get('next');
-  const redirectParam = rawRedirect && !rawRedirect.startsWith('/login') ? rawRedirect : null;
+  const redirectParam = searchParams.get('redirect') || searchParams.get('next');
   const from = redirectParam || (location.state as { from?: string })?.from || AUTH_SUCCESS_REDIRECT;
 
   // Persist return URL across OAuth redirect (location.state is lost during OAuth flow)
@@ -209,40 +203,10 @@ const Auth = forwardRef<HTMLDivElement>(function Auth(_, ref) {
     }
   };
 
-  const handleReviewLogin = async (e: FormEvent) => {
-    e.preventDefault();
-    setReviewLoading(true);
-    setReviewError(null);
-    try {
-      const response = await fetch('/api/auth/shopify-review-login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: reviewEmail, password: reviewPassword }),
-      });
-      const data = await response.json();
-      if (!response.ok || !data.access_token) {
-        throw new Error(data.detail || 'Invalid credentials');
-      }
-      setStoredToken(data.access_token);
-      if (data.user) {
-        setStoredUser(data.user);
-        dispatchAuthChange(data.user);
-      } else {
-        const userData = await authApi.getCurrentUser();
-        if (userData) dispatchAuthChange(userData);
-      }
-      navigate('/my-shopify-store', { replace: true });
-    } catch (err: any) {
-      setReviewError(err.message || 'Login failed');
-    } finally {
-      setReviewLoading(false);
-    }
-  };
-
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4">
       <Helmet>
-        <meta name="robots" content="noindex, follow" />
+        <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       <ThemeLogo className="h-16 md:h-20 mb-8" />
       
@@ -252,47 +216,6 @@ const Auth = forwardRef<HTMLDivElement>(function Auth(_, ref) {
           <p className="text-muted-foreground text-center mb-8">
             Sign in to create photoshoots
           </p>
-
-          {isReviewLoginEnabled && (
-            <div className="w-full max-w-xs mb-8">
-              <p className="text-sm font-bold text-foreground mb-1">Shopify Reviewer Login</p>
-              <p className="text-[11px] text-muted-foreground mb-4 italic">
-                Use the credentials from the review instructions.
-              </p>
-              <form onSubmit={handleReviewLogin} className="flex flex-col gap-3">
-                <input
-                  type="email"
-                  placeholder="Email"
-                  value={reviewEmail}
-                  onChange={e => setReviewEmail(e.target.value)}
-                  required
-                  className="w-full h-12 rounded-md border border-input bg-background px-3 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                />
-                <input
-                  type="password"
-                  placeholder="Password"
-                  value={reviewPassword}
-                  onChange={e => setReviewPassword(e.target.value)}
-                  required
-                  className="w-full h-12 rounded-md border border-input bg-background px-3 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                />
-                {reviewError && (
-                  <p className="text-destructive text-xs">{reviewError}</p>
-                )}
-                <Button
-                  type="submit"
-                  variant={reviewEmail && reviewPassword ? 'default' : 'outline'}
-                  className="w-full h-12 text-base"
-                  disabled={reviewLoading}
-                >
-                  {reviewLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Sign in'}
-                </Button>
-              </form>
-              <p className="text-[11px] text-muted-foreground mt-3">
-                Google Sign-In is not required for reviewers.
-              </p>
-            </div>
-          )}
 
           {isInstagram && (() => {
             const loginUrl = new URL('/login', getPublicSiteUrl());

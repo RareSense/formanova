@@ -9,8 +9,11 @@ import {
   isOnboardingComplete,
   markOnboardingComplete,
   saveUserType,
+  setCachedUserType,
 } from '@/lib/onboarding-api';
 import { trackUserTypeSelected } from '@/lib/posthog-events';
+import { toast } from '@/hooks/use-toast';
+import { JewelryBrandModal, type BrandDetails } from '@/components/JewelryBrandModal';
 
 // ---------------------------------------------------------------------------
 // Inline SVG icons — all use currentColor so they adapt to any theme.
@@ -134,6 +137,8 @@ export default function RolePicker() {
   const [error, setError] = useState<string | null>(null);
   const [roleError, setRoleError] = useState<string | null>(null);
   const [tosError, setTosError] = useState<string | null>(null);
+  const [showBrandModal, setShowBrandModal] = useState(false);
+  const [brandDetails, setBrandDetails] = useState<BrandDetails | null>(null);
   const shakeRoleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shakeTosTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -163,8 +168,15 @@ export default function RolePicker() {
     setSubmitting(true);
     setError(null);
     try {
-      await saveUserType(selected);
+      await saveUserType(selected, selected === 'jewelry_brand' ? brandDetails : null);
+      setCachedUserType(user.id, selected);
       trackUserTypeSelected({ user_type: selected });
+      if (selected === 'jewelry_brand' && brandDetails) {
+        toast({
+          title: 'Saved',
+          description: 'You can always edit or delete these details later from your profile menu.',
+        });
+      }
       markOnboardingComplete(user.id);
       navigate('/studio', { replace: true });
     } catch {
@@ -174,6 +186,14 @@ export default function RolePicker() {
   };
 
   return (
+    <>
+    <JewelryBrandModal
+      source="onboarding"
+      open={showBrandModal}
+      onClose={() => setShowBrandModal(false)}
+      onContinue={(details) => { setBrandDetails(details); setShowBrandModal(false); }}
+      initial={brandDetails ?? undefined}
+    />
     <div className="flex h-screen flex-col items-center justify-center overflow-hidden px-5 py-8 sm:px-10 sm:py-10 lg:px-16 lg:py-12">
       <div className="w-full shrink-0 pb-6 text-center sm:pb-8">
         <h1 className="font-display text-3xl leading-tight tracking-wide sm:text-4xl lg:text-5xl">
@@ -193,7 +213,11 @@ export default function RolePicker() {
             key={option.value}
             {...option}
             selected={selected === option.value}
-            onSelect={() => { setSelected(option.value); setRoleError(null); }}
+            onSelect={() => {
+              setSelected(option.value);
+              setRoleError(null);
+              if (option.value === 'jewelry_brand') setShowBrandModal(true);
+            }}
           />
         ))}
       </div>
@@ -263,5 +287,6 @@ export default function RolePicker() {
       </div>
 
     </div>
+    </>
   );
 }

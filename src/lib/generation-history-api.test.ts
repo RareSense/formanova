@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { inferSourceType } from './generation-history-api';
+import { inferSourceType, resolveSourceType } from './generation-history-api';
 
 // -- URL tests: verify no hardcoded production domain --
 
@@ -134,6 +134,25 @@ describe('inferSourceType', () => {
     expect(inferSourceType('agentic_pipeline')).toBe('photo');
   });
 
+  it('classifies High Effort (higher_tier) generate + fix names into the right section', () => {
+    // Model generate high -> photo (via photo/jewelry keywords)
+    expect(inferSourceType('jewelry_photoshoots_generator_higher_tier')).toBe('photo');
+    expect(inferSourceType('jewelry_photoshoots_generator_higher_tier_4k')).toBe('photo');
+    // Product generate high -> product_shot
+    expect(inferSourceType('Product_shot_pipeline_higher_tier')).toBe('product_shot');
+    // Model fix high -> photo (has no photo/jewelry keyword; matched via model_shot)
+    expect(inferSourceType('fix_model_shot_higher_tier')).toBe('photo');
+    expect(inferSourceType('fix_model_shot_higher_tier_4k')).toBe('photo');
+    // Product fix high -> product_shot
+    expect(inferSourceType('fix_product_shot_higher_tier')).toBe('product_shot');
+    expect(inferSourceType('fix_product_shot_higher_tier_4k')).toBe('product_shot');
+  });
+
+  it('identifies upscale workflows as photo entries', () => {
+    expect(inferSourceType('upscale_image')).toBe('photo');
+    expect(inferSourceType('Upscale')).toBe('photo');
+  });
+
   it('product_shot takes priority over photo keywords', () => {
     expect(inferSourceType('product_shot_jewelry')).toBe('product_shot');
   });
@@ -146,5 +165,50 @@ describe('inferSourceType', () => {
     expect(inferSourceType('')).toBe('unknown');
     expect(inferSourceType('my_custom_workflow')).toBe('unknown');
     expect(inferSourceType('test')).toBe('unknown');
+  });
+});
+
+describe('resolveSourceType', () => {
+  it('maps backend generate/fix/upscale families to the coarse UI bucket', () => {
+    // name is intentionally empty to prove the backend value is what drives it.
+    expect(resolveSourceType('model_shot', '')).toBe('photo');
+    expect(resolveSourceType('model_fix', '')).toBe('photo');
+    expect(resolveSourceType('upscale', '')).toBe('photo');
+    expect(resolveSourceType('product_shot', '')).toBe('product_shot');
+    expect(resolveSourceType('product_fix', '')).toBe('product_shot');
+    expect(resolveSourceType('cad_text', '')).toBe('cad_text');
+    expect(resolveSourceType('cad_sketch', '')).toBe('cad_sketch');
+    expect(resolveSourceType('cad_render', '')).toBe('cad_render');
+  });
+
+  it('prefers the backend value over the workflow name', () => {
+    // Name would parse to photo, but the backend says product -> backend wins.
+    expect(resolveSourceType('product_shot', 'jewelry_photoshoot')).toBe('product_shot');
+    // Consolidated base name that no longer encodes the fix family; backend disambiguates.
+    expect(resolveSourceType('product_fix', 'fix')).toBe('product_shot');
+  });
+
+  it('classifies High Effort (higher_tier) by name even if the backend mislabels it', () => {
+    // Backend label is wrong/unknown, but the higher_tier name is authoritative:
+    // model high -> model-shot section, product high -> product-shot section.
+    expect(resolveSourceType('product_shot', 'jewelry_photoshoots_generator_higher_tier')).toBe('photo');
+    expect(resolveSourceType('unknown', 'fix_model_shot_higher_tier')).toBe('photo');
+    expect(resolveSourceType('model_shot', 'Product_shot_pipeline_higher_tier')).toBe('product_shot');
+    expect(resolveSourceType('cad_text', 'fix_product_shot_higher_tier_4k')).toBe('product_shot');
+  });
+
+  it('falls back to name parsing when the field is absent', () => {
+    expect(resolveSourceType(undefined, 'jewelry_photoshoots_generator')).toBe('photo');
+    expect(resolveSourceType(null, 'Product_shot_pipeline')).toBe('product_shot');
+    expect(resolveSourceType(undefined, 'ring_full_pipeline')).toBe('cad_text');
+  });
+
+  it('falls back to name parsing when the backend value is unknown or unrecognised', () => {
+    // Backend could not classify, but the name still can.
+    expect(resolveSourceType('unknown', 'jewelry_photoshoot')).toBe('photo');
+    // A future backend enum the UI does not know yet -> parse the name instead of breaking.
+    expect(resolveSourceType('cad_video', 'render_workflow')).toBe('cad_render');
+    // Neither side can classify -> unknown, gracefully.
+    expect(resolveSourceType('unknown', 'my_custom_workflow')).toBe('unknown');
   });
 });

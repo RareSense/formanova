@@ -1,10 +1,14 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { trackStudioTypeSelected } from '@/lib/posthog-events';
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 
 import { PeopleIcon } from '@/components/icons/PeopleIcon';
 import { RingIcon } from '@/components/icons/RingIcon';
+import { EffortIntroModal } from '@/components/studio/EffortIntroModal';
+import type { EffortLevel } from '@/components/studio/EffortToggle';
 
 import modelShotImg from '@/assets/jewelry/model-shot-card.webp';
 import productShotImg from '@/assets/cad-studio/product-shot-card.webp';
@@ -31,7 +35,31 @@ const modes = [
 export default function StudioTypeSelection() {
   const navigate = useNavigate();
 
+  // First-time effort chooser, shown on the shot-type card click (before category
+  // selection). pendingRoute holds where to go once the user picks; null = closed.
+  const [pendingRoute, setPendingRoute] = useState<string | null>(null);
+  const defaultEffort: EffortLevel =
+    localStorage.getItem('formanova_studio_effort') === 'high' ? 'high' : 'low';
+
+  const handleModeClick = (mode: (typeof modes)[number]) => {
+    trackStudioTypeSelected(mode.title === 'Product Shot' ? 'product-shot' : 'model-shot');
+    // First time: pop the effort chooser and defer navigation until they choose.
+    // Afterwards (seen flag set): go straight through, like any other card.
+    if (!localStorage.getItem('formanova_effort_intro_seen')) {
+      setPendingRoute(mode.route);
+    } else {
+      navigate(mode.route);
+    }
+  };
+
   return (
+    <>
+      <Helmet>
+        <title>Photo Studio | FormaNova</title>
+        <meta name="description" content="Choose between model-shot and product-shot studios for professional AI jewelry photography." />
+        <link rel="canonical" href="/studio" />
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
     <div className="min-h-[calc(100dvh-5rem)] bg-background flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 lg:px-10 overflow-x-hidden pt-4 md:pt-8 lg:pt-0">
       {/* Header */}
       <motion.div
@@ -66,10 +94,7 @@ export default function StudioTypeSelection() {
               key={mode.title}
               whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.99 }}
-              onClick={() => {
-                trackStudioTypeSelected(mode.title === 'Product Shot' ? 'product-shot' : 'model-shot');
-                navigate(mode.route);
-              }}
+              onClick={() => handleModeClick(mode)}
               className="group relative marta-frame overflow-hidden flex flex-col transition-all duration-300 hover:border-formanova-hero-accent hover:shadow-[0_0_30px_-5px_hsl(var(--formanova-hero-accent)/0.4)] cursor-pointer"
             >
               {/* Image */}
@@ -117,5 +142,19 @@ export default function StudioTypeSelection() {
         <span className="text-formanova-hero-accent">Studio</span>
       </motion.p>
     </div>
+
+    <EffortIntroModal
+      open={pendingRoute !== null}
+      defaultEffort={defaultEffort}
+      onConfirm={(effort, dontShowAgain) => {
+        localStorage.setItem('formanova_studio_effort', effort);
+        if (dontShowAgain) localStorage.setItem('formanova_effort_intro_seen', 'true');
+        const route = pendingRoute;
+        setPendingRoute(null);
+        if (route) navigate(route);
+      }}
+      onDismiss={() => setPendingRoute(null)}
+    />
+    </>
   );
 }

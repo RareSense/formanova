@@ -120,6 +120,41 @@ describe('GenerationsContext', () => {
     expect(mockMarkCompleted).toHaveBeenCalledWith('wf-3', expect.any(Number));
   });
 
+  it('populates outputAssetId from the top-level /result scalar on completion', async () => {
+    const resultData = {
+      output_asset_id: 'a1b2c3d4-0000-1111-2222-333344445555',
+      output: [{ output_url: 'https://example.com/image.jpg' }],
+    };
+    mockPollWorkflow.mockResolvedValueOnce({ status: 'completed', result: resultData });
+
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    act(() => {
+      result.current.trackGeneration({ workflowId: 'wf-asset', isProductShot: false, jewelryType: 'ring', jewelryUrl: 'https://example.com/jewelry.jpg', modelUrl: 'https://example.com/model.jpg', aspectRatio: '3:4', resolution: '1K', generationCost: 10 });
+    });
+
+    await waitFor(() => {
+      const gen = result.current.generations.find(g => g.workflowId === 'wf-asset');
+      expect(gen?.status).toBe('completed');
+      expect(gen?.outputAssetId).toBe('a1b2c3d4-0000-1111-2222-333344445555');
+    });
+  });
+
+  it('sets outputAssetId to null when the /result payload omits it (old items)', async () => {
+    const resultData = { output: [{ output_url: 'https://example.com/image.jpg' }] };
+    mockPollWorkflow.mockResolvedValueOnce({ status: 'completed', result: resultData });
+
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    act(() => {
+      result.current.trackGeneration({ workflowId: 'wf-noasset', isProductShot: false, jewelryType: 'ring', jewelryUrl: 'https://example.com/jewelry.jpg', modelUrl: 'https://example.com/model.jpg', aspectRatio: '3:4', resolution: '1K', generationCost: 10 });
+    });
+
+    await waitFor(() => {
+      const gen = result.current.generations.find(g => g.workflowId === 'wf-noasset');
+      expect(gen?.status).toBe('completed');
+      expect(gen?.outputAssetId).toBeNull();
+    });
+  });
+
   it('dedupes identical result image urls before rendering', async () => {
     const resultData = {
       output: [

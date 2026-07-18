@@ -17,8 +17,15 @@ describe('extractPhotoThumbnail', () => {
     expect(extractPhotoThumbnail([])).toBeNull();
   });
 
-  it('returns null when generate_jewelry_image step is missing', () => {
-    const steps = [{ tool: 'other_tool', output: { image_b64: 'abc' } }];
+  it('falls back to a generic output scan when generate_jewelry_image step is missing', () => {
+    // Upscale/fix workflows have no generate step but still carry a result
+    // image in a step output — it must surface so history shows them.
+    const steps = [{ tool: 'upscale_image', output: { image_b64: 'abc' } }];
+    expect(extractPhotoThumbnail(steps)).toBe('data:image/jpeg;base64,abc');
+  });
+
+  it('returns null when no step output carries an image at all', () => {
+    const steps = [{ tool: 'other_tool', output: { note: 'no image here' } }];
     expect(extractPhotoThumbnail(steps)).toBeNull();
   });
 
@@ -54,10 +61,18 @@ describe('extractPhotoThumbnail', () => {
     expect(extractPhotoThumbnail(steps)).toBe('https://example.com/image.jpg');
   });
 
-  it('returns null when output_url is not https', () => {
+  it('resolves an azure:// output_url to a blob URL', () => {
     const steps = [{
       tool: 'generate_jewelry_image',
       output: { output_url: 'azure://container/image.jpg' },
+    }];
+    expect(extractPhotoThumbnail(steps)).toBe('https://cdn.example.com/container/image.jpg');
+  });
+
+  it('returns null for an unsupported url scheme', () => {
+    const steps = [{
+      tool: 'generate_jewelry_image',
+      output: { output_url: 'ftp://container/image.jpg' },
     }];
     expect(extractPhotoThumbnail(steps)).toBeNull();
   });

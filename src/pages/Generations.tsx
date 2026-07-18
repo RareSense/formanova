@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, AlertCircle } from 'lucide-react';
@@ -49,6 +50,9 @@ export default function Generations() {
 
   const [allWorkflows, setAllWorkflows] = useState<WorkflowSummary[]>([]);
   const [globalLoading, setGlobalLoading] = useState(true);
+  // Bumped when an inline upscale completes, to re-fetch the list so the new
+  // upscaled generation appears as its own entry.
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const [photoPage, setPhotoPage] = useState(1);
   const [productShotPage, setProductShotPage] = useState(1);
@@ -174,7 +178,7 @@ export default function Generations() {
     })();
 
     return () => { clearTimeout(safetyTimeout); controller.abort(); };
-  }, [resolveGeneratedAssetName, user]);
+  }, [resolveGeneratedAssetName, user, refreshKey]);
 
   // ── Pagination helper ─────────────────────────────────────────────
     const getSection = useCallback(
@@ -344,6 +348,13 @@ export default function Generations() {
   const cadSketchSection = imageToCadEnabled ? getSection('cad_sketch', cadSketchPage) : null;
 
   return (
+    <>
+      <Helmet>
+        <title>My Generations | FormaNova</title>
+        <meta name="description" content="View and manage your AI-generated jewelry photoshoots and CAD models. Download, share, or revisit past creations." />
+        <link rel="canonical" href="/generations" />
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
     <div className="min-h-[calc(100vh-5rem)] bg-background py-6 px-6 md:px-12 lg:px-16">
       <div className="max-w-7xl mx-auto">
         <motion.div
@@ -396,6 +407,7 @@ export default function Generations() {
               columns={5}
               onPageChange={setPhotoPage}
               onWorkflowClick={() => {}}
+              onUpscaled={() => setRefreshKey(k => k + 1)}
             />
 
             <WorkflowSection
@@ -409,6 +421,7 @@ export default function Generations() {
               columns={5}
               onPageChange={setProductShotPage}
               onWorkflowClick={() => {}}
+              onUpscaled={() => setRefreshKey(k => k + 1)}
             />
 
             <CADRuntimeErrorBoundary
@@ -452,5 +465,6 @@ export default function Generations() {
         )}
       </div>
     </div>
+    </>
   );
 }

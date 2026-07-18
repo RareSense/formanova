@@ -68,6 +68,13 @@ export interface GenerationCompleteProps {
   is_first_ever: boolean;
   aspect_ratio?: string;
   resolution?: string;
+  /** Effort tier of this generation: 'low' or 'high'. Only set for real photoshoot
+   *  generations (not upscales), so low-vs-high counts exclude upscales. */
+  effort?: 'low' | 'high';
+  /** How many jewelry images were actually used for this generation (1-3). 1 for
+   *  low effort; up to 3 for high effort. Captured at generate time, so uploading
+   *  N images without generating never counts. */
+  jewelry_image_count?: number;
 }
 
 export interface PaymentSuccessProps {
@@ -87,7 +94,25 @@ export interface FeedbackSubmittedProps {
   workflow_id: string | null;
 }
 
+export interface FeedbackModalOpenedProps {
+  category: string;
+  workflow_id: string | null;
+}
+
+export interface AIFixModalOpenedProps {
+  category: string;
+  workflow_id: string | null;
+}
+
 // ═══════ Feedback ═══════════════════════════════════════════════════
+
+export function trackAIFixModalOpened(props: AIFixModalOpenedProps) {
+  capture('ai_fix_modal_opened', { ...props });
+}
+
+export function trackFeedbackModalOpened(props: FeedbackModalOpenedProps) {
+  capture('feedback_modal_opened', { ...props });
+}
 
 export function trackFeedbackSubmitted(props: FeedbackSubmittedProps) {
   capture('feedback_submitted', { ...props });
@@ -114,6 +139,37 @@ export function trackProductShotGuideAcknowledged() {
 export function trackUserTypeSelected(props: UserTypeSelectedProps) {
   capture('user_type_selected', { ...props });
   if (posthog.__loaded) posthog.setPersonProperties({ user_type: props.user_type });
+}
+
+// ═══════ Brand form funnel ══════════════════════════════════════════
+
+export interface BrandFormOpenedProps {
+  /** Where the popup appeared: role picker vs the existing-user Studio prompt. */
+  source: 'onboarding' | 'studio_prompt';
+}
+
+export function trackBrandFormOpened(props: BrandFormOpenedProps) {
+  capture('brand_form_opened', { ...props });
+}
+
+/** Field SHAPE only — never the entered values, which are confidential. */
+export interface BrandFormSubmittedProps {
+  source: 'onboarding' | 'studio_prompt';
+  has_website: boolean;
+  has_store: boolean;
+  has_location: boolean;
+  has_markets: boolean;
+  social_count: number;
+  has_brand_book: boolean;
+}
+
+export function trackBrandFormSubmitted(props: BrandFormSubmittedProps) {
+  capture('brand_form_submitted', { ...props });
+}
+
+/** The user cleared their entire brand profile from Brand Settings. */
+export function trackBrandDetailsDeleted() {
+  capture('brand_details_deleted');
 }
 
 // ═══════ Auth Events ════════════════════════════════════════════════
@@ -250,23 +306,44 @@ export function setUserProfession(profession: UserProfession) {
   }
 }
 
-// ─── A/B EXPERIMENT: button-labels-experiment ───────────────────────────────
-// Cleanup instructions (both outcomes): docs/superpowers/plans/2026-05-09-button-labels-experiment.md → Task 6
-// TO REMOVE when experiment ends: delete trackButtonLabelExperimentExposure,
-// getButtonLabelVariant, their tests in posthog-events.test.ts,
-// the call in AuthContext.tsx, and the isNewLabels logic in StudioResultsStep.tsx.
-// ────────────────────────────────────────────────────────────────────────────
+// ═══════ Starter Pack pricing A/B experiment ═════════════════════════
+// control = old multi-plan grid; treatment = new single-offer Starter Pack page.
+// Default-safe: callers treat anything except 'control' as the Starter Pack page,
+// so behaviour is unchanged until the PostHog flag actively buckets a user (no
+// regression before the experiment is configured / after it ends).
+//
+// TO REMOVE when experiment ends: delete STARTER_PACK_EXPERIMENT_FLAG,
+// getStarterPackPricingVariant, onPostHogFlagsLoaded, their tests, the
+// useStarterPackPricingVariant hook, and the gating in Credits.tsx / Pricing.tsx.
 
-export function trackButtonLabelExperimentExposure() {
-  if (!posthog.__loaded) return;
-  posthog.onFeatureFlags(() => {
-    posthog.getFeatureFlag('button-labels-experiment');
-  });
+export const STARTER_PACK_EXPERIMENT_FLAG = 'starter-pack-pricing-experiment';
+
+/**
+ * Variant for the starter-pack pricing experiment: 'control' = old multi-plan
+ * grid, 'treatment' (or undefined) = new single-offer Starter Pack page.
+ *
+ * Read only after identify so eligible buyers bucket on the right distinct_id;
+ * reading the flag here is also what records the PostHog exposure
+ * ($feature_flag_called). Callers gate this behind eligibility so exposure fires
+ * only for the experiment's real population.
+ */
+export function getStarterPackPricingVariant(): string | undefined {
+  if (!posthog.__loaded || !posthog._isIdentified()) return undefined;
+  return posthog.getFeatureFlag(STARTER_PACK_EXPERIMENT_FLAG) as string | undefined;
 }
 
-export function getButtonLabelVariant(): string | undefined {
-  if (!posthog.__loaded) return undefined;
-  return posthog.getFeatureFlag('button-labels-experiment') as string | undefined;
+/**
+ * Run `cb` once PostHog feature flags are available (and on later changes),
+ * returning an unsubscribe fn. Lets a full-page A/B wait for flags before
+ * choosing a variant, avoiding a control->treatment flash. If PostHog never
+ * loaded, `cb` runs immediately so callers fall back to the default variant.
+ */
+export function onPostHogFlagsLoaded(cb: () => void): () => void {
+  if (!posthog.__loaded) {
+    cb();
+    return () => {};
+  }
+  return posthog.onFeatureFlags(() => cb());
 }
 
 // ═══════ Studio Actions ══════════════════════════════════════════════
@@ -290,12 +367,58 @@ export function trackShopifyExported(props?: {
   capture('shopify_exported', props ?? {});
 }
 
-// Signature change: was trackRegenerateClicked(context?: string)
-// Only called in UnifiedStudio.tsx — update it alongside this change.
-export function trackRegenerateClicked(props?: {
-  context?: string;
-  category?: string;
-  regeneration_number?: number;
-}) {
-  capture('regenerate_clicked', props ?? {});
+export interface AIFixSubmittedProps {
+  category: string;
+  prompt_length: number;
+  workflow_id: string | null;
+  regeneration_number: number;
+}
+
+export function trackAIFixSubmitted(props: AIFixSubmittedProps) {
+  capture('ai_fix_submitted', { ...props });
+}
+
+// ═══════ Upscale Events ══════════════════════════════════════════════
+
+export interface UpscaleStartedProps {
+  /** Source image tier that drives billing: '1K' | '2K' | '4K'. */
+  source_tier: string;
+  /** Integer multiplier the user chose (2-9). */
+  factor: number;
+  /** Quoted hold price at launch (from estimateUpscaleCostCached), not a settled charge. */
+  credits_cost: number;
+  /** Singular jewelry category. */
+  category: string;
+  is_product_shot: boolean;
+  /** Where the upscale was launched from. */
+  surface: 'studio' | 'history';
+}
+
+export function trackUpscaleStarted(props: UpscaleStartedProps) {
+  capture('upscale_started', { ...props });
+}
+
+export interface UpscaleCompletedProps {
+  source_tier: string;
+  factor: number;
+  credits_cost: number;
+  category: string;
+  is_product_shot: boolean;
+  surface: 'studio' | 'history';
+}
+
+export function trackUpscaleCompleted(props: UpscaleCompletedProps) {
+  capture('upscale_completed', { ...props });
+}
+
+export interface UpscalePaywallHitProps {
+  source_tier: string;
+  factor: number;
+  credits_cost: number;
+  category: string;
+  surface: 'studio' | 'history';
+}
+
+export function trackUpscalePaywallHit(props: UpscalePaywallHitProps) {
+  capture('upscale_paywall_hit', { ...props });
 }

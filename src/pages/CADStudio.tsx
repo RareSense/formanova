@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { motion } from "framer-motion";
 import { ArrowRight, Layers, ImageIcon } from "lucide-react";
 
@@ -28,6 +29,13 @@ export default function CADStudio() {
   const navigate = useNavigate();
 
   return (
+    <>
+      <Helmet>
+        <title>CAD Studio | FormaNova</title>
+        <meta name="description" content="Browse, edit, and export your AI-generated 3D jewelry CAD models. Refine materials and prepare for manufacturing." />
+        <link rel="canonical" href="/studio-cad" />
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
     <div className="min-h-[calc(100dvh-5rem)] bg-background flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 lg:px-10 overflow-x-hidden pt-4 md:pt-8 lg:pt-0">
       {/* Header */}
       <motion.h1
@@ -126,5 +134,6 @@ export default function CADStudio() {
         })}
       </motion.div>
     </div>
+    </>
   );
 }
