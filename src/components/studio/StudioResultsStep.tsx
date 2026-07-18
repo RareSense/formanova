@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Diamond, Gem, ArrowRight } from 'lucide-react';
+import { Diamond, Gem, ArrowRight, Maximize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ResultImageItem, type ResultImageMeta } from '@/components/studio/ResultImageItem';
 import { FeedbackModal } from '@/components/studio/FeedbackModal';
 import { AIFixModal } from '@/components/studio/AIFixModal';
 import { UpscaleControl, type UpscaleRunStatus } from '@/components/studio/UpscaleControl';
+import { UpscaleModal } from '@/components/studio/UpscaleModal';
 import { upscaleEtaLabel } from '@/lib/upscale-api';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
 import { type FeedbackCategory } from '@/lib/feedback-api';
@@ -82,6 +83,7 @@ export function StudioResultsStep({
   humanFixCost,
 }: StudioResultsStepProps) {
   const [aiFixOpen, setAiFixOpen] = useState(false);
+  const [upscaleModalOpen, setUpscaleModalOpen] = useState(false);
 
   // Remember which factor the user launched so the in-progress overlay can show
   // an accurate ETA for that (source tier, factor) pair.
@@ -158,22 +160,27 @@ export function StudioResultsStep({
           </div>
 
           {/* Details row directly under the preview: tier . dimensions . shot type,
-              with the compact upscale control attached — the moment the user reads
-              the resolution is the moment they decide whether it's big enough. */}
+              with a plain Upscale pill attached - the moment the user reads the
+              resolution is the moment they decide whether it's big enough. The
+              pill carries no factor or price; those live in the size-picker modal. */}
           {resultImages.length === 1 && primaryMeta && (
             <div className="flex flex-wrap items-center justify-center gap-3">
               <p className="text-center font-mono text-xs font-bold tracking-wider text-foreground">
                 {primaryMeta.tier && <>{primaryMeta.tier} &middot; </>}
                 {primaryMeta.width} x {primaryMeta.height} &middot; {isProductShot ? 'Product shot' : 'Model shot'}
               </p>
-              <UpscaleControl
-                compact
-                resultImageUrl={resultImages[0]}
-                resolution={upscaleResolution}
-                onUpscale={(factor) => { setActiveFactor(factor); onUpscale(factor); }}
-                runStatus={upscaleRunStatus}
-                error={upscaleError}
-              />
+              <button
+                type="button"
+                onClick={() => setUpscaleModalOpen(true)}
+                disabled={upscaling}
+                className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--formanova-hero-accent))] bg-background px-4 py-1.5 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] transition-colors hover:bg-[hsl(var(--formanova-hero-accent))]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+              >
+                <Maximize2 className="h-3 w-3 shrink-0" />
+                Upscale
+              </button>
+              {upscaleRunStatus === 'error' && upscaleError && (
+                <p className="w-full text-center text-xs text-destructive">{upscaleError}</p>
+              )}
             </div>
           )}
         </div>
@@ -248,6 +255,14 @@ export function StudioResultsStep({
         category={(TO_SINGULAR[effectiveJewelryType] ?? 'other') as FeedbackCategory}
         userEmail={userEmail}
         humanFixCost={humanFixCost}
+      />
+
+      <UpscaleModal
+        open={upscaleModalOpen}
+        onOpenChange={setUpscaleModalOpen}
+        resultImageUrl={resultImages[0] ?? null}
+        resolution={upscaleResolution}
+        onUpscale={(factor) => { setActiveFactor(factor); onUpscale(factor); }}
       />
 
       <AIFixModal
