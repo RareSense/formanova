@@ -291,6 +291,20 @@ export function PhotoCard({ workflow, index, onUpscaled }: { workflow: WorkflowS
           </div>
         )}
 
+        {/* Export to Shopify - photo / product shot results only. Sits above the
+            footer: the timestamp line stays the card's quiet last line. */}
+        {hasThumbnail && (workflow.source_type === 'photo' || workflow.source_type === 'product_shot') && (
+          <div className="px-3 pt-3">
+            <ShopifyPublishButton
+              assetId={workflow.output_asset_id ?? null}
+              assetName={displayName ?? workflow.output_asset_name ?? workflow.name ?? 'Untitled'}
+              workflowId={workflow.workflow_id}
+              previewUrl={resolvedThumbnail ?? workflow.thumbnail_url ?? null}
+              className="h-10 w-full font-mono text-[10px] uppercase tracking-[0.15em]"
+            />
+          </div>
+        )}
+
         {/* Card footer: index . credits . date */}
         <div className="flex items-center justify-end sm:justify-between px-3 pt-3 pb-3 gap-2">
           <span className="hidden sm:inline font-mono text-[10px] tracking-[0.15em] text-muted-foreground/70 select-none min-w-0">
@@ -304,19 +318,6 @@ export function PhotoCard({ workflow, index, onUpscaled }: { workflow: WorkflowS
             </span>
           </div>
         </div>
-
-        {/* Export to Shopify - photo / product shot results only */}
-        {hasThumbnail && (workflow.source_type === 'photo' || workflow.source_type === 'product_shot') && (
-          <div className="px-3 pb-3">
-            <ShopifyPublishButton
-              assetId={workflow.output_asset_id ?? null}
-              assetName={displayName ?? workflow.output_asset_name ?? workflow.name ?? 'Untitled'}
-              workflowId={workflow.workflow_id}
-              previewUrl={resolvedThumbnail ?? workflow.thumbnail_url ?? null}
-              className="h-10 w-full font-mono text-[10px] uppercase tracking-[0.15em]"
-            />
-          </div>
-        )}
       </motion.div>
 
       {/* Size picker for the inline upscale - selecting a size starts it. */}
