@@ -27,6 +27,7 @@ import {
   setUserProfession,
   trackButtonLabelExperimentExposure,
   getButtonLabelVariant,
+  trackShopifyExported,
 } from './posthog-events'
 
 beforeEach(() => {
@@ -380,6 +381,22 @@ describe('trackButtonLabelExperimentExposure', () => {
     expect(posthog.onFeatureFlags).not.toHaveBeenCalled()
     ;(posthog as any).__loaded = true
   });
+})
+
+// ── trackShopifyExported ────────────────────────────────────────────
+
+describe('trackShopifyExported', () => {
+  it('captures shopify_exported with no args (mirrors trackDownloadClicked)', () => {
+    trackShopifyExported()
+    expect(posthog.capture).toHaveBeenCalledWith('shopify_exported', {})
+  })
+
+  it('captures shopify_exported with context', () => {
+    trackShopifyExported({ context: 'unified-studio' })
+    expect(posthog.capture).toHaveBeenCalledWith('shopify_exported', {
+      context: 'unified-studio',
+    })
+  })
 })
 
 // ── getButtonLabelVariant ───────────────────────────────────────────

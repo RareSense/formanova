@@ -281,6 +281,15 @@ export function trackDownloadClicked(props?: {
   capture('download_clicked', props ?? {});
 }
 
+// Fired only on a confirmed successful export (draft product created in the
+// user's store) — not on button click — so unique-user counts answer
+// "how many people actually put an image into Shopify".
+export function trackShopifyExported(props?: {
+  context?: string;
+}) {
+  capture('shopify_exported', props ?? {});
+}
+
 // Signature change: was trackRegenerateClicked(context?: string)
 // Only called in UnifiedStudio.tsx — update it alongside this change.
 export function trackRegenerateClicked(props?: {

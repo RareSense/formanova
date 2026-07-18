@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useShopifyStatus } from '@/hooks/useShopify';
+import { trackShopifyExported } from '@/lib/posthog-events';
 import { exportToShopify, suggestShopifyMetadata } from '@/services/shopify-api';
 
 interface ShopifyExportDialogProps {
@@ -85,6 +86,7 @@ export function ShopifyExportDialog({
     }),
     onSuccess: (result) => {
       if (result.success && result.shopify_admin_url) {
+        trackShopifyExported();
         onOpenChange(false);
         window.open(result.shopify_admin_url, '_blank', 'noopener,noreferrer');
         return;
