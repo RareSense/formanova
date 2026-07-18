@@ -11,7 +11,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { useShopifyStatus } from '@/hooks/useShopify';
 import { trackShopifyExported } from '@/lib/posthog-events';
 import { exportToShopify, suggestShopifyMetadata } from '@/services/shopify-api';
 
@@ -46,17 +45,17 @@ export function ShopifyExportDialog({
   previewUrl,
 }: ShopifyExportDialogProps) {
   const { toast } = useToast();
-  const { data: shopifyStatus } = useShopifyStatus();
-  const shopName = shopifyStatus?.shop_name ?? shopifyStatus?.shop_domain ?? 'Shopify';
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [altText, setAltText] = useState('');
   const [suggestError, setSuggestError] = useState<string | null>(null);
   const didAutoSuggestRef = useRef(false);
 
+  // Fields start empty on purpose - nothing is pre-filled. Export falls back to
+  // the asset name for the title only at submit time (Shopify requires one).
   const resetDefaults = () => {
-    setTitle(assetName || 'Untitled');
-    setDescription('Photographed by Formanova.');
+    setTitle('');
+    setDescription('');
     setAltText('');
   };
 
@@ -165,7 +164,7 @@ export function ShopifyExportDialog({
               Export to Shopify
             </DialogTitle>
             <DialogDescription className="max-w-sm text-sm leading-6 text-muted-foreground">
-              This will create a draft product in {shopName}. Review it in Shopify before making it live.
+              This will create a draft in your Shopify store. All fields are optional.
             </DialogDescription>
           </div>
 
@@ -217,6 +216,9 @@ export function ShopifyExportDialog({
                 <label htmlFor="shopify-alt-text" className="block font-mono text-[11px] uppercase tracking-[0.2em] text-foreground">
                   Alt text
                 </label>
+                <p className="font-mono text-[9px] tracking-[0.15em] text-muted-foreground">
+                  Describe what is visible in the image.
+                </p>
                 {isSuggesting ? (
                   <div className="h-11 animate-pulse rounded-md border border-input bg-muted/30" />
                 ) : (
