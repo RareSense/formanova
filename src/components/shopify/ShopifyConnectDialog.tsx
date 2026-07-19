@@ -66,7 +66,7 @@ export function ShopifyConnectDialog({ open, onOpenChange }: ShopifyConnectDialo
           ) : (
             <div className="w-full space-y-5">
               <p className="text-center text-sm leading-relaxed text-muted-foreground">
-                Send your finished photos to Shopify as draft products ready to publish.
+                Send your finished photos to Shopify as drafts.
               </p>
 
               <Button

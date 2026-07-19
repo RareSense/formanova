@@ -255,7 +255,7 @@ function ConnectCard() {
             Connect your Shopify store
           </h2>
           <p className="mx-auto max-w-[22rem] text-sm leading-relaxed text-muted-foreground">
-            Send your finished photos to Shopify as draft products ready to publish.
+            Send your finished photos to Shopify as drafts.
           </p>
         </motion.div>
 
