@@ -2,10 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '@/contexts/ThemeContext';
-import logoBlack from '@/assets/formanova-logo-black.webp';
-import logoWhite from '@/assets/formanova-logo-white.webp';
 import fnLogo from '@/assets/fn-logo-black.webp';
-import { ArrowLeft, Check, Info, Lock, Loader2 } from 'lucide-react';
+import { ArrowLeft, Check, Info, Lock, Loader2, Store } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
@@ -38,7 +36,6 @@ const DARK_THEMES = new Set(['dark', 'cyberpunk', 'retro', 'fashion', 'luxury', 
 export default function MyShopifyStore() {
   const { toast } = useToast();
   const { theme } = useTheme();
-  const logoSrc = DARK_THEMES.has(theme) ? logoWhite : logoBlack;
   const invalidateStatus = useInvalidateShopifyStatus();
   const { data: status, isLoading, isError } = useShopifyStatus();
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -130,7 +127,7 @@ export default function MyShopifyStore() {
           <div>
             <h1 className="font-display text-4xl uppercase tracking-wide text-foreground leading-none">Connect your Shopify store</h1>
             <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-              Send finished photos to your Shopify store as draft products.
+              Send your finished photos straight to your Shopify store as drafts.
             </p>
           </div>
 
@@ -304,7 +301,7 @@ function ConnectedCard({
         <div className="flex items-start gap-5 border-b border-border px-8 py-6">
           <ShopifyBagIcon className="mt-1 h-9 w-9 shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-base font-medium text-foreground">Shopify publishing</p>
+            <p className="text-base font-medium text-foreground">Store connection</p>
             <p className="mt-1 text-sm text-muted-foreground">Manage your Shopify store connection.</p>
           </div>
           <div className="flex shrink-0 items-center gap-3">
@@ -325,9 +322,12 @@ function ConnectedCard({
 
         {/* Connected store */}
         <div className="px-8 py-6">
-          <p className="text-base text-foreground">
-            <span className="text-muted-foreground">Connected to </span>
-            <span className="font-medium">{status.shop_name || status.shop_domain}</span>
+          <p className="flex items-center gap-2 text-base text-foreground">
+            <Store className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <span className="min-w-0 truncate">
+              <span className="text-muted-foreground">Connected to </span>
+              <span className="font-medium">{status.shop_name || status.shop_domain}</span>
+            </span>
           </p>
         </div>
 
