@@ -5,6 +5,7 @@ import { ArrowRight, Play } from 'lucide-react';
 import { ScrollRevealSection, StaggerContainer } from '@/components/ScrollRevealSection';
 import { KineticText } from '@/components/KineticText';
 import { CinematicHero } from '@/components/CinematicHero';
+import { ShopifyBagIcon } from '@/components/shopify/ShopifyBagIcon';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect } from 'react';
 
@@ -83,9 +84,19 @@ export default function Welcome() {
         {/* Content */}
         <div className="relative z-20 marta-container min-h-screen flex flex-col justify-center py-24 lg:py-32">
           <div className="max-w-2xl">
-            <span className="marta-label mb-8 block text-white text-base tracking-[0.3em] uppercase font-medium">
-              Trustable AI Photography for Jewelry
-            </span>
+            {/* Eyebrow row: brand line + inline Works-with-Shopify lockup,
+                divided by a hairline. Typographic treatment - part of the type
+                system, no floating badge shapes. */}
+            <div className="mb-8 flex flex-wrap items-center gap-x-4 gap-y-2">
+              <span className="marta-label text-white text-base tracking-[0.3em] uppercase font-medium">
+                Trustable AI Photography for Jewelry
+              </span>
+              <span aria-hidden="true" className="hidden h-4 w-px bg-white/30 sm:block" />
+              <span className="flex items-center gap-2 text-white/60 text-base tracking-[0.3em] uppercase font-medium">
+                <ShopifyBagIcon className="h-4 w-4 shrink-0" />
+                Works with <span className="font-semibold text-white">Shopify</span>
+              </span>
+            </div>
 
             <div className="mb-8">
               <h1 className="marta-headline text-white leading-[0.85]">Your</h1>
