@@ -87,11 +87,14 @@ export default function Welcome() {
             {/* Eyebrow row: brand line + inline Works-with-Shopify lockup,
                 divided by a hairline. Typographic treatment - part of the type
                 system, no floating badge shapes. */}
-            <div className="mb-8 flex flex-wrap items-center gap-x-4 gap-y-2">
+            {/* lg:w-max lets the single line extend past the text column into the
+                photo's empty space; below lg it stacks and the divider hides so
+                it can never dangle orphaned at a line end. */}
+            <div className="mb-8 flex flex-wrap items-center gap-x-4 gap-y-2 lg:w-max lg:flex-nowrap">
               <span className="marta-label text-white text-base tracking-[0.3em] uppercase font-medium">
                 Trustable AI Photography for Jewelry
               </span>
-              <span aria-hidden="true" className="hidden h-4 w-px bg-white/40 sm:block" />
+              <span aria-hidden="true" className="hidden h-4 w-px bg-white/40 lg:block" />
               <span className="flex items-center gap-2 text-white/85 text-base tracking-[0.3em] uppercase font-medium">
                 <ShopifyBagIcon className="h-4 w-4 shrink-0" />
                 Works with <span className="font-bold text-white">Shopify</span>
