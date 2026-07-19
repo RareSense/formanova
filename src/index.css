@@ -599,8 +599,10 @@
     color: hsl(var(--foreground));
   }
 
-  /* Hero CTA: sits on the always-dark hero photo, so its colors are fixed —
-     theme tokens would render it black-on-black in light mode. */
+  /* Hero CTA: theme tokens by default (matches the original marta-button-filled
+     behavior, which works in dark/neon/etc.). Only the light theme overrides to
+     white - its near-black foreground rendered the button black-on-black on the
+     always-dark hero photo. */
   .marta-button-hero {
     @apply px-8 py-4 inline-flex items-center justify-center gap-3;
     font-family: 'Inter', sans-serif;
@@ -609,12 +611,23 @@
     text-transform: uppercase;
     font-weight: 500;
     transition: all 0.3s ease;
-    background: #ffffff;
-    color: #111111;
-    border: 1px solid #ffffff;
+    background: hsl(var(--foreground));
+    color: hsl(var(--background));
+    border: 1px solid hsl(var(--foreground));
   }
 
   .marta-button-hero:hover {
+    background: transparent;
+    color: hsl(var(--foreground));
+  }
+
+  .light .marta-button-hero {
+    background: #ffffff;
+    color: #111111;
+    border-color: #ffffff;
+  }
+
+  .light .marta-button-hero:hover {
     background: transparent;
     color: #ffffff;
   }
