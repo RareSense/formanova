@@ -145,7 +145,7 @@ export default function Welcome() {
                   beside the CTA per the approved reference: its top sits near
                   the button's midline so it hangs slightly below the CTA row.
                   Phones get the compact caption instead. */}
-              <div className="pointer-events-none hidden w-32 shrink-0 lg:block lg:translate-y-6 xl:w-36">
+              <div className="pointer-events-none hidden w-32 shrink-0 lg:block lg:translate-y-10 xl:w-36">
                 <WorksWithShopifySeal className="h-auto w-full" />
               </div>
             </div>

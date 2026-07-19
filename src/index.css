@@ -621,13 +621,14 @@
     color: hsl(var(--foreground));
   }
 
-  .light .marta-button-hero {
+  /* ThemeContext applies non-dark themes as data-theme attributes, not classes. */
+  [data-theme='light'] .marta-button-hero {
     background: #ffffff;
     color: #111111;
     border-color: #ffffff;
   }
 
-  .light .marta-button-hero:hover {
+  [data-theme='light'] .marta-button-hero:hover {
     background: transparent;
     color: #ffffff;
   }

@@ -32,7 +32,7 @@ export interface ResultImageMeta {
   height: number;
 }
 
-export function ResultImageItem({ url, index, workflowId, outputAssetId, jewelryType, naturalAspect, hero, onMeta, belowImage }: {
+export function ResultImageItem({ url, index, workflowId, outputAssetId, jewelryType, naturalAspect, hero, onMeta, belowImage, actionsLabel }: {
   url: string;
   index: number;
   workflowId: string | null;
