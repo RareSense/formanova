@@ -94,7 +94,7 @@ export default function Welcome() {
               <span aria-hidden="true" className="hidden h-4 w-px bg-white/30 sm:block" />
               <span className="flex items-center gap-2 text-white/60 text-base tracking-[0.3em] uppercase font-medium">
                 <ShopifyBagIcon className="h-4 w-4 shrink-0" />
-                Works with <span className="font-semibold text-white">Shopify</span>
+                Works with <span className="font-bold text-white">Shopify</span>
               </span>
             </div>
 
