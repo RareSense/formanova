@@ -357,7 +357,7 @@ function ConnectedCard({
                   What changes
                 </p>
                 <DialogDescription className="mt-2 text-sm leading-6 text-foreground">
-                  Publishing will pause. Nothing will be sent to Shopify again until you reconnect this store.
+                  Exports stop until you reconnect.
                 </DialogDescription>
               </div>
 
