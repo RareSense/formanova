@@ -5,7 +5,6 @@ import { ArrowRight, Play } from 'lucide-react';
 import { ScrollRevealSection, StaggerContainer } from '@/components/ScrollRevealSection';
 import { KineticText } from '@/components/KineticText';
 import { CinematicHero } from '@/components/CinematicHero';
-import { ShopifyBagIcon } from '@/components/shopify/ShopifyBagIcon';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect } from 'react';
 
@@ -25,42 +24,6 @@ import heroEmeraldEarrings from '@/assets/jewelry/hero-emerald-earrings.webp';
 import heroGemstoneRings from '@/assets/jewelry/hero-gemstone-rings.webp';
 import heroAquamarineRings from '@/assets/jewelry/hero-aquamarine-rings.webp';
 import heroDiamondBracelets from '@/assets/jewelry/hero-diamond-bracelets.webp';
-
-/**
- * "Works with Shopify" seal for the hero: dashed ring, arc text, centered bag,
- * gold dots. Colors are FIXED (not theme tokens) - the seal sits on the always-
- * dark hero photo, and theme-driven colors here would break in light themes the
- * same way the old hero button did. Identical in all 12 themes by design.
- */
-function WorksWithShopifySeal({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 150 150" className={className} aria-label="Works with Shopify">
-      <defs>
-        {/* Bottom arc radius is larger on purpose: top text rises toward the
-            ring, bottom text hangs toward the center, so equal radii leave the
-            bottom word ~a cap-height farther from the boundary. 57 vs 66 makes
-            both words visually equidistant from the ring. */}
-        <path id="shopify-seal-arc-top" d="M 75,75 m -57,0 a 57,57 0 0 1 114,0" />
-        <path id="shopify-seal-arc-bottom" d="M 75,75 m -66,0 a 66,66 0 1 0 132,0" />
-      </defs>
-      {/* Outlined stamp: solid dark disc with a thin solid ring, per the
-          approved reference (Variant 3). The disc makes its own background,
-          so the seal stays legible over any hero photo. */}
-      <circle cx="75" cy="75" r="72" fill="rgba(13,11,9,0.92)" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" />
-      {/* Shoulder dots follow the theme's hero accent (same token as the
-          "UNCHANGED" headline), so they match each theme's accent color. */}
-      <circle cx="18" cy="75" r="2.4" fill="hsl(var(--formanova-hero-accent))" />
-      <circle cx="132" cy="75" r="2.4" fill="hsl(var(--formanova-hero-accent))" />
-      <ShopifyBagIcon x={45} y={43} width={60} height={60} />
-      <text textAnchor="middle" style={{ fontFamily: "'Space Mono', monospace", fontSize: '12.5px', fontWeight: 700, letterSpacing: '2px', fill: 'rgba(255,255,255,0.95)' }}>
-        <textPath href="#shopify-seal-arc-top" startOffset="50%">WORKS WITH</textPath>
-      </text>
-      <text textAnchor="middle" style={{ fontFamily: "'Space Mono', monospace", fontSize: '12.5px', fontWeight: 700, letterSpacing: '2px', fill: 'rgba(255,255,255,0.95)' }}>
-        <textPath href="#shopify-seal-arc-bottom" startOffset="50%">SHOPIFY</textPath>
-      </text>
-    </svg>
-  );
-}
 
 export default function Welcome() {
   const navigate = useNavigate();
@@ -135,26 +98,12 @@ export default function Welcome() {
               Your jewelry accurately shown.
             </p>
 
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-10">
+            <div className="flex flex-col sm:flex-row gap-4">
               <button onClick={handleStart} className="marta-button-hero magnetic-button">
                 <span>Start Creating</span>
                 <ArrowRight className="h-4 w-4" />
               </button>
-
-              {/* Works with Shopify seal - permanent capability mark, anchored
-                  beside the CTA per the approved reference: its top sits near
-                  the button's midline so it hangs slightly below the CTA row.
-                  Phones get the compact caption instead. */}
-              <div className="pointer-events-none hidden w-32 shrink-0 lg:block lg:translate-y-10 xl:w-36">
-                <WorksWithShopifySeal className="h-auto w-full" />
-              </div>
             </div>
-
-            {/* Mobile fallback for the Shopify seal (no room for the stamp on phones) */}
-            <p className="mt-6 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-white/70 lg:hidden">
-              <ShopifyBagIcon className="h-4 w-4 shrink-0" />
-              Works with Shopify
-            </p>
           </div>
         </div>
       </section>
