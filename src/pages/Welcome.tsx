@@ -91,8 +91,8 @@ export default function Welcome() {
               <span className="marta-label text-white text-base tracking-[0.3em] uppercase font-medium">
                 Trustable AI Photography for Jewelry
               </span>
-              <span aria-hidden="true" className="hidden h-4 w-px bg-white/30 sm:block" />
-              <span className="flex items-center gap-2 text-white/60 text-base tracking-[0.3em] uppercase font-medium">
+              <span aria-hidden="true" className="hidden h-4 w-px bg-white/40 sm:block" />
+              <span className="flex items-center gap-2 text-white/85 text-base tracking-[0.3em] uppercase font-medium">
                 <ShopifyBagIcon className="h-4 w-4 shrink-0" />
                 Works with <span className="font-bold text-white">Shopify</span>
               </span>
