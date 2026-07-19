@@ -52,10 +52,10 @@ function WorksWithShopifySeal({ className }: { className?: string }) {
       <circle cx="18" cy="75" r="2.4" fill="hsl(var(--formanova-hero-accent))" />
       <circle cx="132" cy="75" r="2.4" fill="hsl(var(--formanova-hero-accent))" />
       <ShopifyBagIcon x={45} y={43} width={60} height={60} />
-      <text textAnchor="middle" style={{ fontFamily: "'Space Mono', monospace", fontSize: '12.5px', letterSpacing: '3.5px', fill: 'rgba(255,255,255,0.95)' }}>
+      <text textAnchor="middle" style={{ fontFamily: "'Space Mono', monospace", fontSize: '12.5px', fontWeight: 700, letterSpacing: '2px', fill: 'rgba(255,255,255,0.95)' }}>
         <textPath href="#shopify-seal-arc-top" startOffset="50%">WORKS WITH</textPath>
       </text>
-      <text textAnchor="middle" style={{ fontFamily: "'Space Mono', monospace", fontSize: '12.5px', letterSpacing: '3.5px', fill: 'rgba(255,255,255,0.95)' }}>
+      <text textAnchor="middle" style={{ fontFamily: "'Space Mono', monospace", fontSize: '12.5px', fontWeight: 700, letterSpacing: '2px', fill: 'rgba(255,255,255,0.95)' }}>
         <textPath href="#shopify-seal-arc-bottom" startOffset="50%">SHOPIFY</textPath>
       </text>
     </svg>
@@ -145,7 +145,7 @@ export default function Welcome() {
                   beside the CTA per the approved reference: its top sits near
                   the button's midline so it hangs slightly below the CTA row.
                   Phones get the compact caption instead. */}
-              <div className="pointer-events-none hidden w-32 shrink-0 lg:block lg:translate-y-10 xl:w-36">
+              <div className="pointer-events-none hidden w-32 shrink-0 lg:block lg:translate-y-6 xl:w-36">
                 <WorksWithShopifySeal className="h-auto w-full" />
               </div>
             </div>
