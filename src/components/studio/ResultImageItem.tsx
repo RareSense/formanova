@@ -45,6 +45,8 @@ export function ResultImageItem({ url, index, workflowId, outputAssetId, jewelry
   onMeta?: (meta: ResultImageMeta) => void;
   /** Rendered between the image and the Download/Export pair (metadata + upscale row). */
   belowImage?: ReactNode;
+  /** Tier label rendered directly above the Download/Export pair ("Ship it"). */
+  actionsLabel?: ReactNode;
 }) {
   const resolvedSrc = useAuthenticatedImage(url);
   // Track load so the card holds its space until the image is ready. Without this,
@@ -182,8 +184,11 @@ export function ResultImageItem({ url, index, workflowId, outputAssetId, jewelry
       {/* Metadata + upscale row (parent-owned), directly under the image */}
       {belowImage && <div className="mt-2.5">{belowImage}</div>}
 
+      {/* Tier label hugs its button group, per the approved mock */}
+      {actionsLabel && <div className="mt-5">{actionsLabel}</div>}
+
       {/* Ship-it actions — always equal-width two columns */}
-      <div className="mt-5 grid grid-cols-2 gap-3">
+      <div className={`${actionsLabel ? 'mt-1.5' : 'mt-5'} grid grid-cols-2 gap-3`}>
         <Button
           variant="outline"
           aria-label="Download image"

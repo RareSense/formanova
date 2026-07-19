@@ -14,6 +14,16 @@ import { type Resolution } from '@/components/studio/OutputSettingsPills';
 import { trackAIFixModalOpened } from '@/lib/posthog-events';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
 
+/** Tier label with trailing rule line, per the approved results-screen mock. */
+function TierLabel({ children }: { children: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="font-mono text-[9px] uppercase tracking-[0.24em] text-muted-foreground/70">{children}</span>
+      <span aria-hidden="true" className="h-px flex-1 bg-border/60" />
+    </div>
+  );
+}
+
 /** Inline coin + credit cost shown on a credit-spending action button. */
 function ButtonCost({ cost }: { cost?: number | null }) {
   if (cost == null) return null;
@@ -178,6 +188,7 @@ export function StudioResultsStep({
                     )}
                   </div>
                 ) : undefined}
+                actionsLabel={resultImages.length === 1 ? <TierLabel>Ship it</TierLabel> : undefined}
               />
             ))}
           </div>
@@ -188,9 +199,7 @@ export function StudioResultsStep({
         </div>
       )}
 
-      {/* Action area. */}
-      {/* gap-8 mirrors the approved mock's group separation (its tier labels
-          added air we keep as whitespace, since the labels themselves are out). */}
+      {/* Action area: each button group carries its tier label, per the mock. */}
       <div className="relative z-40 mx-auto flex w-full max-w-2xl flex-col gap-8 pt-2">
         {/* Multi-result grids have no details row, so the upscale pill gets its
             own centered row. Single results carry it inline next to the metadata. */}
@@ -210,15 +219,20 @@ export function StudioResultsStep({
             )}
           </div>
         )}
-        <Button
-          size="lg"
-          onClick={() => { handleStartOver(); }}
-          className="h-12 w-full gap-2 border-0 bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] px-6 font-display text-base uppercase tracking-wide text-background transition-opacity hover:opacity-90"
-        >
-          <Diamond className="h-4 w-4" />
-          New Photoshoot
-        </Button>
+        <div className="flex flex-col gap-1.5">
+          <TierLabel>Start over</TierLabel>
+          <Button
+            size="lg"
+            onClick={() => { handleStartOver(); }}
+            className="h-12 w-full gap-2 border-0 bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] px-6 font-display text-base uppercase tracking-wide text-background transition-opacity hover:opacity-90"
+          >
+            <Diamond className="h-4 w-4" />
+            New Photoshoot
+          </Button>
+        </div>
         {!isUpscaledResult && (
+          <div className="flex flex-col gap-1.5">
+          <TierLabel>Repair it</TierLabel>
           <div className="grid grid-cols-2 items-center gap-3">
             <div className="relative min-w-0">
               <Button
@@ -246,6 +260,7 @@ export function StudioResultsStep({
               Fix it with AI
               <ButtonCost cost={generationCost} />
             </Button>
+          </div>
           </div>
         )}
       </div>
