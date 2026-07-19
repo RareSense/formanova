@@ -133,7 +133,7 @@ export function ResultImageItem({ url, index, workflowId, outputAssetId, jewelry
   };
 
   return (
-    <div className={hero ? 'w-full max-w-2xl mx-auto' : 'w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.75rem)]'}>
+    <div className={hero ? 'w-full max-w-xl mx-auto' : 'w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.75rem)]'}>
       {/* Image card */}
       <div className="relative group border border-border/30 overflow-hidden bg-muted/20 min-h-[220px]">
         <img

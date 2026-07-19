@@ -200,7 +200,7 @@ export function StudioResultsStep({
       )}
 
       {/* Action area: each button group carries its tier label, per the mock. */}
-      <div className="relative z-40 mx-auto flex w-full max-w-2xl flex-col gap-8 pt-2">
+      <div className="relative z-40 mx-auto flex w-full max-w-xl flex-col gap-8 pt-2">
         {/* Multi-result grids have no details row, so the upscale pill gets its
             own centered row. Single results carry it inline next to the metadata. */}
         {resultImages.length > 1 && (

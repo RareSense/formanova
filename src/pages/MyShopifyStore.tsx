@@ -305,7 +305,7 @@ function ConnectedCard({
           <ShopifyBagIcon className="mt-1 h-9 w-9 shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-base font-medium text-foreground">Shopify publishing</p>
-            <p className="mt-1 text-sm text-muted-foreground">Manage Shopify draft-product publishing.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Manage your Shopify store connection.</p>
           </div>
           <div className="flex shrink-0 items-center gap-3">
             <span className="font-mono text-[11px] uppercase tracking-[0.15em] text-primary">Connected</span>
@@ -325,8 +325,10 @@ function ConnectedCard({
 
         {/* Connected store */}
         <div className="px-8 py-6">
-          <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">Connected to</p>
-          <p className="mt-2 text-base font-medium text-foreground">{status.shop_name || status.shop_domain}</p>
+          <p className="text-base text-foreground">
+            <span className="text-muted-foreground">Connected to </span>
+            <span className="font-medium">{status.shop_name || status.shop_domain}</span>
+          </p>
         </div>
 
         {/* Footer hint */}
