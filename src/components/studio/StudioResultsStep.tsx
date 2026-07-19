@@ -1,17 +1,28 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Diamond, Gem, ArrowRight } from 'lucide-react';
+import { Diamond, Gem, ArrowRight, Maximize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ResultImageItem, type ResultImageMeta } from '@/components/studio/ResultImageItem';
 import { FeedbackModal } from '@/components/studio/FeedbackModal';
 import { AIFixModal } from '@/components/studio/AIFixModal';
-import { UpscaleControl, type UpscaleRunStatus } from '@/components/studio/UpscaleControl';
+import { type UpscaleRunStatus } from '@/components/studio/UpscaleControl';
+import { UpscaleModal } from '@/components/studio/UpscaleModal';
 import { upscaleEtaLabel } from '@/lib/upscale-api';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
 import { type FeedbackCategory } from '@/lib/feedback-api';
 import { type Resolution } from '@/components/studio/OutputSettingsPills';
 import { trackAIFixModalOpened } from '@/lib/posthog-events';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
+
+/** Tier label with trailing rule line, per the approved results-screen mock. */
+function TierLabel({ children }: { children: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="font-mono text-[9px] uppercase tracking-[0.24em] text-muted-foreground/70">{children}</span>
+      <span aria-hidden="true" className="h-px flex-1 bg-border/60" />
+    </div>
+  );
+}
 
 /** Inline coin + credit cost shown on a credit-spending action button. */
 function ButtonCost({ cost }: { cost?: number | null }) {
@@ -27,6 +38,7 @@ function ButtonCost({ cost }: { cost?: number | null }) {
 interface StudioResultsStepProps {
   resultImages: string[];
   workflowId: string | null;
+  outputAssetId?: string | null;
   effectiveJewelryType: string;
   isProductShot: boolean;
   onAIFix: (prompt: string) => void;
@@ -57,6 +69,7 @@ interface StudioResultsStepProps {
 export function StudioResultsStep({
   resultImages,
   workflowId,
+  outputAssetId,
   effectiveJewelryType,
   isProductShot,
   onAIFix,
@@ -80,6 +93,7 @@ export function StudioResultsStep({
   humanFixCost,
 }: StudioResultsStepProps) {
   const [aiFixOpen, setAiFixOpen] = useState(false);
+  const [upscaleModalOpen, setUpscaleModalOpen] = useState(false);
 
   // Remember which factor the user launched so the in-progress overlay can show
   // an accurate ETA for that (source tier, factor) pair.
@@ -136,27 +150,48 @@ export function StudioResultsStep({
       {resultImages.length > 0 ? (
         <div className="space-y-2.5">
           <div className="flex flex-wrap justify-center gap-4 max-w-5xl mx-auto">
+            {/* The workflow has ONE linked output asset. Tile 0 gets it, or
+                undefined to trigger the workflow lookup. Other tiles get null
+                (known to have no per-image asset) so exporting them can never
+                publish tile 0's image to the store. */}
             {resultImages.map((url, i) => (
               <ResultImageItem
                 key={i}
                 url={url}
                 index={i}
                 workflowId={workflowId}
+                outputAssetId={i === 0 ? (outputAssetId ?? undefined) : null}
                 jewelryType={effectiveJewelryType}
                 naturalAspect
                 hero={resultImages.length === 1}
                 onMeta={i === 0 ? setPrimaryMeta : undefined}
+                belowImage={resultImages.length === 1 && primaryMeta ? (
+                  /* Details row directly under the image, above the ship-it pair:
+                     tier . dimensions . shot type + the plain Upscale pill. The
+                     pill carries no factor or price; those live in the modal. */
+                  <div className="flex flex-wrap items-center justify-center gap-3">
+                    <p className="text-center font-mono text-xs font-bold tracking-wider text-foreground">
+                      {primaryMeta.tier && <>{primaryMeta.tier} &middot; </>}
+                      {primaryMeta.width} x {primaryMeta.height} &middot; {isProductShot ? 'Product shot' : 'Model shot'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setUpscaleModalOpen(true)}
+                      disabled={upscaling}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--formanova-hero-accent))] bg-background px-4 py-1.5 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] transition-colors hover:bg-[hsl(var(--formanova-hero-accent))]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                    >
+                      <Maximize2 className="h-3 w-3 shrink-0" />
+                      Upscale
+                    </button>
+                    {upscaleRunStatus === 'error' && upscaleError && (
+                      <p className="w-full text-center text-xs text-destructive">{upscaleError}</p>
+                    )}
+                  </div>
+                ) : undefined}
+                actionsLabel={resultImages.length === 1 ? <TierLabel>Ship it</TierLabel> : undefined}
               />
             ))}
           </div>
-
-          {/* Details line directly under the preview: tier . dimensions . shot type. */}
-          {resultImages.length === 1 && primaryMeta && (
-            <p className="text-center font-mono text-xs font-bold tracking-wider text-foreground">
-              {primaryMeta.tier && <>{primaryMeta.tier} &middot; </>}
-              {primaryMeta.width} x {primaryMeta.height} &middot; {isProductShot ? 'Product shot' : 'Model shot'}
-            </p>
-          )}
         </div>
       ) : (
         <div className="text-center py-16">
@@ -164,28 +199,40 @@ export function StudioResultsStep({
         </div>
       )}
 
-      {/* Action area. */}
-      <div className="relative z-40 mx-auto flex w-full max-w-2xl flex-col gap-4 pt-2">
-        {/* Inline upscale: pick a multiplier and start, no modal, directly below
-            the generated image. Hides itself when the image can't be enlarged. */}
-        {resultImages.length > 0 && (
-          <UpscaleControl
-            resultImageUrl={resultImages[0]}
-            resolution={upscaleResolution}
-            onUpscale={(factor) => { setActiveFactor(factor); onUpscale(factor); }}
-            runStatus={upscaleRunStatus}
-            error={upscaleError}
-          />
+      {/* Action area: each button group carries its tier label, per the mock. */}
+      <div className="relative z-40 mx-auto flex w-full max-w-xl flex-col gap-8 pt-2">
+        {/* Multi-result grids have no details row, so the upscale pill gets its
+            own centered row. Single results carry it inline next to the metadata. */}
+        {resultImages.length > 1 && (
+          <div className="flex flex-col items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setUpscaleModalOpen(true)}
+              disabled={upscaling}
+              className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--formanova-hero-accent))] bg-background px-4 py-1.5 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] transition-colors hover:bg-[hsl(var(--formanova-hero-accent))]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+            >
+              <Maximize2 className="h-3 w-3 shrink-0" />
+              Upscale
+            </button>
+            {upscaleRunStatus === 'error' && upscaleError && (
+              <p className="text-center text-xs text-destructive">{upscaleError}</p>
+            )}
+          </div>
         )}
-        <Button
-          size="lg"
-          onClick={() => { handleStartOver(); }}
-          className="h-12 w-full gap-2 border-0 bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] px-6 font-display text-base uppercase tracking-wide text-background transition-opacity hover:opacity-90"
-        >
-          <Diamond className="h-4 w-4" />
-          New Photoshoot
-        </Button>
+        <div className="flex flex-col gap-1.5">
+          <TierLabel>Start over</TierLabel>
+          <Button
+            size="lg"
+            onClick={() => { handleStartOver(); }}
+            className="h-12 w-full gap-2 border-0 bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] px-6 font-display text-base uppercase tracking-wide text-background transition-opacity hover:opacity-90"
+          >
+            <Diamond className="h-4 w-4" />
+            New Photoshoot
+          </Button>
+        </div>
         {!isUpscaledResult && (
+          <div className="flex flex-col gap-1.5">
+          <TierLabel>Repair it</TierLabel>
           <div className="grid grid-cols-2 items-center gap-3">
             <div className="relative min-w-0">
               <Button
@@ -214,6 +261,7 @@ export function StudioResultsStep({
               <ButtonCost cost={generationCost} />
             </Button>
           </div>
+          </div>
         )}
       </div>
 
@@ -229,6 +277,14 @@ export function StudioResultsStep({
         category={(TO_SINGULAR[effectiveJewelryType] ?? 'other') as FeedbackCategory}
         userEmail={userEmail}
         humanFixCost={humanFixCost}
+      />
+
+      <UpscaleModal
+        open={upscaleModalOpen}
+        onOpenChange={setUpscaleModalOpen}
+        resultImageUrl={resultImages[0] ?? null}
+        resolution={upscaleResolution}
+        onUpscale={(factor) => { setActiveFactor(factor); onUpscale(factor); }}
       />
 
       <AIFixModal

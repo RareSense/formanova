@@ -5,19 +5,20 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
 import { Maximize2, Pencil, Check, X, Gem } from 'lucide-react';
+import { UpscaleModal } from '@/components/studio/UpscaleModal';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
 import { OptimizedImage } from '@/components/ui/optimized-image';
 import { Input } from '@/components/ui/input';
 import type { WorkflowSummary } from '@/lib/generation-history-api';
 import { PhotoPreviewModal } from './PhotoPreviewModal';
 import { renameAsset, getAsset } from '@/lib/assets-api';
-import { UpscaleControl } from '@/components/studio/UpscaleControl';
 import { CreditPreflightModal } from '@/components/CreditPreflightModal';
 import { useUpscaleLauncher } from '@/hooks/useUpscaleLauncher';
 import { loadUpscaleIntent, clearUpscaleIntent } from '@/lib/upscale-intent';
 import { inferResolutionTier, resolutionTierLabel, upscaleEtaLabel } from '@/lib/upscale-api';
 import type { Resolution } from '@/components/studio/OutputSettingsPills';
 import { truncateDisplayName, formatLocal, formatLocalDateOnly, itemVariants, CreditsBadge } from './workflow-card-shared';
+import { ShopifyPublishButton } from '@/components/shopify/ShopifyPublishButton';
 
 const PHOTO_RENAMES_KEY = 'formanova_photo_renames';
 function loadPhotoRenames(): Record<string, string> {
@@ -90,6 +91,12 @@ export function PhotoCard({ workflow, index, onUpscaled }: { workflow: WorkflowS
   // Resumed factor after a credits purchase: re-arm the dropdown to the user's
   // prior choice so finishing the upscale is a single click, not a restart.
   const [resumeFactor, setResumeFactor] = useState<number | null>(null);
+  const [upscaleModalOpen, setUpscaleModalOpen] = useState(false);
+  // A resumed intent (return from a credits purchase) re-opens the size picker
+  // so finishing the upscale stays a single tap.
+  useEffect(() => {
+    if (resumeFactor != null) setUpscaleModalOpen(true);
+  }, [resumeFactor]);
   const intentConsumedRef = useRef(false);
   const {
     status: upscaleStatus, error: upscaleError, launch,
@@ -265,27 +272,35 @@ export function PhotoCard({ workflow, index, onUpscaled }: { workflow: WorkflowS
           </div>
         )}
 
-        {/* Inline upscale - under the thumbnail, above the credits/date footer. */}
+        {/* Inline upscale - under the thumbnail, above the credits/date footer.
+            A plain outline button; factor + price live in the size-picker modal. */}
         {upscaleEligible && upscaleTier && (
           <div className="mx-2 sm:mx-3 mt-2">
-            <UpscaleControl
-              compact
-              resultImageUrl={workflow.thumbnail_url ?? null}
-              resolution={upscaleTier}
-              runStatus={upscaleStatus}
-              error={upscaleError}
-              initialFactor={resumeFactor ?? undefined}
-              onUpscale={(factor) => {
-                setActiveFactor(factor);
-                launch({
-                  imageUri: workflow.thumbnail_url ?? '',
-                  resolution: upscaleTier,
-                  factor,
-                  isProductShot,
-                  jewelryType: 'other',
-                  onCompleted: () => onUpscaled?.(),
-                });
-              }}
+            <button
+              type="button"
+              onClick={() => setUpscaleModalOpen(true)}
+              disabled={upscaling}
+              className="flex h-10 w-full items-center justify-center gap-1.5 border border-[hsl(var(--formanova-hero-accent))] bg-background px-4 font-mono text-[10px] uppercase tracking-[0.15em] text-[hsl(var(--formanova-hero-accent))] transition-colors hover:bg-[hsl(var(--formanova-hero-accent))]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+            >
+              <Maximize2 className="h-3.5 w-3.5 shrink-0" />
+              Upscale
+            </button>
+            {upscaleStatus === 'error' && upscaleError && (
+              <p className="mt-1 text-center text-[10px] text-destructive">{upscaleError}</p>
+            )}
+          </div>
+        )}
+
+        {/* Export to Shopify - photo / product shot results only. Sits above the
+            footer: the timestamp line stays the card's quiet last line. */}
+        {hasThumbnail && (workflow.source_type === 'photo' || workflow.source_type === 'product_shot') && (
+          <div className="px-3 pt-3">
+            <ShopifyPublishButton
+              assetId={workflow.output_asset_id ?? null}
+              assetName={displayName ?? workflow.output_asset_name ?? workflow.name ?? 'Untitled'}
+              workflowId={workflow.workflow_id}
+              previewUrl={resolvedThumbnail ?? workflow.thumbnail_url ?? null}
+              className="h-10 w-full font-mono text-[10px] uppercase tracking-[0.15em]"
             />
           </div>
         )}
@@ -304,6 +319,27 @@ export function PhotoCard({ workflow, index, onUpscaled }: { workflow: WorkflowS
           </div>
         </div>
       </motion.div>
+
+      {/* Size picker for the inline upscale - selecting a size starts it. */}
+      {upscaleTier && (
+        <UpscaleModal
+          open={upscaleModalOpen}
+          onOpenChange={setUpscaleModalOpen}
+          resultImageUrl={workflow.thumbnail_url ?? null}
+          resolution={upscaleTier}
+          onUpscale={(factor) => {
+            setActiveFactor(factor);
+            launch({
+              imageUri: workflow.thumbnail_url ?? '',
+              resolution: upscaleTier,
+              factor,
+              isProductShot,
+              jewelryType: 'other',
+              onCompleted: () => onUpscaled?.(),
+            });
+          }}
+        />
+      )}
 
       {/* Insufficient-credit modal for the inline upscale */}
       {showInsufficientModal && preflightResult && (

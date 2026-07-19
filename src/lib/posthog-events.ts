@@ -358,6 +358,15 @@ export function trackDownloadClicked(props?: {
   capture('download_clicked', props ?? {});
 }
 
+// Fired only on a confirmed successful export (draft product created in the
+// user's store) — not on button click — so unique-user counts answer
+// "how many people actually put an image into Shopify".
+export function trackShopifyExported(props?: {
+  context?: string;
+}) {
+  capture('shopify_exported', props ?? {});
+}
+
 export interface AIFixSubmittedProps {
   category: string;
   prompt_length: number;

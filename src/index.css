@@ -599,6 +599,40 @@
     color: hsl(var(--foreground));
   }
 
+  /* Hero CTA: theme tokens by default (matches the original marta-button-filled
+     behavior, which works in dark/neon/etc.). Only the light theme overrides to
+     white - its near-black foreground rendered the button black-on-black on the
+     always-dark hero photo. */
+  .marta-button-hero {
+    @apply px-8 py-4 inline-flex items-center justify-center gap-3;
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    background: hsl(var(--foreground));
+    color: hsl(var(--background));
+    border: 1px solid hsl(var(--foreground));
+  }
+
+  .marta-button-hero:hover {
+    background: transparent;
+    color: hsl(var(--foreground));
+  }
+
+  /* ThemeContext applies non-dark themes as data-theme attributes, not classes. */
+  [data-theme='light'] .marta-button-hero {
+    background: #ffffff;
+    color: #111111;
+    border-color: #ffffff;
+  }
+
+  [data-theme='light'] .marta-button-hero:hover {
+    background: transparent;
+    color: #ffffff;
+  }
+
   /* Marta-style section padding */
   .marta-section {
     @apply py-24 md:py-32 lg:py-40;

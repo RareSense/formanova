@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import Dashboard from './Dashboard';
 
@@ -54,13 +55,18 @@ describe('Dashboard CAD entry copy', () => {
     document.body.appendChild(container);
     root = createRoot(container);
 
+    // Dashboard calls useShopifyStatus (react-query), so it needs a client.
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
     act(() => {
       root?.render(
-        <HelmetProvider>
-          <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-            <Dashboard />
-          </MemoryRouter>
-        </HelmetProvider>,
+        <QueryClientProvider client={queryClient}>
+          <HelmetProvider>
+            <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+              <Dashboard />
+            </MemoryRouter>
+          </HelmetProvider>
+        </QueryClientProvider>,
       );
     });
 

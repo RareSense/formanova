@@ -9,6 +9,15 @@ vi.mock('@/hooks/useAuthenticatedImage', () => ({
   useAuthenticatedImage: (url: string) => url,
 }));
 
+vi.mock('@/components/shopify/ShopifyPublishButton', () => ({
+  ShopifyPublishButton: () => <button type="button">Export to Shopify</button>,
+}));
+
+vi.mock('@/lib/assets-api', () => ({
+  findGeneratedPhotoAssetByWorkflowId: vi.fn(async () => null),
+  getAssetDisplayName: vi.fn(() => ''),
+}));
+
 vi.mock('@/lib/authenticated-fetch', () => ({
   authenticatedFetch: mockAuthenticatedFetch,
 }));
@@ -46,7 +55,7 @@ describe('ResultImageItem', () => {
       />,
     );
 
-    fireEvent.click(screen.getAllByRole('button')[1]);
+    fireEvent.click(screen.getByRole('button', { name: /open image in new tab/i }));
 
     await waitFor(() => {
       // Direct navigation to the resolved src — no fetch (which would CORS-block
@@ -69,7 +78,7 @@ describe('ResultImageItem', () => {
       />,
     );
 
-    fireEvent.click(screen.getAllByRole('button')[1]);
+    fireEvent.click(screen.getByRole('button', { name: /open image in new tab/i }));
 
     await waitFor(() => {
       expect(window.open).toHaveBeenCalledWith('blob:https://formanova.ai/39d55423-9ad1-4527', '_blank', '');
@@ -88,7 +97,7 @@ describe('ResultImageItem', () => {
       />,
     );
 
-    fireEvent.click(screen.getAllByRole('button')[1]);
+    fireEvent.click(screen.getByRole('button', { name: /open image in new tab/i }));
 
     await waitFor(() => {
       expect(window.alert).toHaveBeenCalledWith('Could not open the image in a new tab. Please try again.');
@@ -110,7 +119,7 @@ describe('ResultImageItem', () => {
       />,
     );
 
-    fireEvent.click(screen.getAllByRole('button')[0]);
+    fireEvent.click(screen.getByRole('button', { name: /download image/i }));
 
     await waitFor(() => {
       expect(window.open).toHaveBeenCalledWith('https://cdn.example.com/result.png', '_blank', 'noopener,noreferrer');

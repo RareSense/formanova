@@ -311,6 +311,7 @@ export default function UnifiedStudio() {
       asyncResult?: {
         workflowId: string;
         resultImages: string[];
+        outputAssetId?: string | null;
         aspectRatio?: string;
         resolution?: Resolution;
         generationCost?: number | null;
@@ -332,6 +333,7 @@ export default function UnifiedStudio() {
         aspectRatio: state.asyncResult.aspectRatio,
         resolution: state.asyncResult.resolution,
         generationCost: state.asyncResult.generationCost,
+        outputAssetId: state.asyncResult.outputAssetId,
         jewelryUrl: state.asyncResult.jewelryUrl,
         modelUrl: state.asyncResult.modelUrl,
       });
@@ -739,6 +741,7 @@ export default function UnifiedStudio() {
           <StudioResultsStep
             resultImages={resultImages}
             workflowId={workflowId}
+            outputAssetId={resultAssetId}
             effectiveJewelryType={effectiveJewelryType}
             isProductShot={isProductShot}
             onAIFix={handleAIFix}

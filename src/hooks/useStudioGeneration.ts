@@ -242,7 +242,7 @@ export function useStudioGeneration({
         is_first_ever: isFirst,
         aspect_ratio: aspectRatio,
         resolution,
-        effort: genMeta?.effort ?? effectiveEffort,
+        effort: genMeta?.effort ?? effort,
         jewelry_image_count: genMeta?.jewelryUrls?.length ?? 1,
       });
       clearStudioSession();
@@ -801,6 +801,7 @@ export function useStudioGeneration({
     aspectRatio?: string;
     resolution?: Resolution;
     generationCost?: number | null;
+    outputAssetId?: string | null;
     // Original inputs, carried when re-anchoring a derivative (upscale) run back to
     // its source generation so feedback keeps the real jewelry/reference inputs.
     jewelryUrl?: string;
@@ -823,6 +824,7 @@ export function useStudioGeneration({
     }
     setWorkflowId(id);
     setResultImages(images);
+    setResultAssetId(meta?.outputAssetId ?? null);
     hasNavigatedAway.current = false;
   }, []);
 

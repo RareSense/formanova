@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { ArrowRight } from 'lucide-react';
@@ -5,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { OptimizedImage } from '@/components/ui/optimized-image';
 import { usePrefetchGenerations } from '@/hooks/use-prefetch-generations';
+import { useShopifyStatus } from '@/hooks/useShopify';
 
 // Reuse the same hero imagery
 import heroNecklace from '@/assets/jewelry/hero-necklace-diamond.jpg';
@@ -31,10 +33,19 @@ const itemVariants = {
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { refetch: refetchShopifyStatus } = useShopifyStatus();
   const userName = user?.email ? user.email.split('@')[0] : '';
 
   // Prefetch generation history in background so it's instant when user opens Generations
   usePrefetchGenerations();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('shopify_connected') !== 'true') return;
+    refetchShopifyStatus().finally(() => {
+      window.history.replaceState({}, '', window.location.pathname);
+    });
+  }, [refetchShopifyStatus]);
 
   return (
     <>

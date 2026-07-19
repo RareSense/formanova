@@ -145,20 +145,20 @@ export function StudioGeneratingStep({
                   <AlertTriangle className="h-6 w-6 text-muted-foreground" />
                 </div>
                 <h3 className="font-display text-lg uppercase tracking-[0.15em] text-foreground mb-3">
-                  Our AI is a little overwhelmed
+                  AI is overwhelmed
                 </h3>
                 <p className="font-mono text-[11px] leading-relaxed tracking-wide text-muted-foreground mb-4">
-                  The AI model is currently overloaded from high demand -- this is temporary and completely normal. It'll be back up shortly, but we recommend trying again in a few hours.
+                  Due to a high number of requests, AI is overwhelmed. This is temporary. Do not worry. Please try again in a few hours. Thanks.
                 </p>
                 <p className="font-mono text-[11px] leading-relaxed tracking-wide text-muted-foreground mb-6">
-                  AI models can occasionally crash under heavy usage. This gets better over time as we scale. In the meantime, reach out at{' '}
+                  If this does not resolve, please contact{' '}
                   <a
                     href="mailto:studio@formanova.ai"
                     className="text-primary underline underline-offset-2 hover:text-primary/80 transition-colors"
                   >
                     studio@formanova.ai
                   </a>
-                  {' '}we'd love to hear from you.
+                  .
                 </p>
                 <Button
                   onClick={handleStartOver}

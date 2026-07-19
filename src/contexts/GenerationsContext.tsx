@@ -132,6 +132,24 @@ function findNestedResultImage(item: unknown): string | null {
   return null;
 }
 
+function extractOutputAssetId(result: PhotoshootResultResponse): string | null {
+  const r = result as unknown as Record<string, unknown>;
+  if (typeof r.output_asset_id === 'string') return r.output_asset_id;
+  for (const items of Object.values(r)) {
+    if (!Array.isArray(items)) continue;
+    for (const item of items) {
+      if (!item || typeof item !== 'object') continue;
+      const entry = item as Record<string, unknown>;
+      if (typeof entry.output_asset_id === 'string') return entry.output_asset_id;
+      if (entry.output_asset && typeof entry.output_asset === 'object') {
+        const oa = entry.output_asset as Record<string, unknown>;
+        if (typeof oa.id === 'string') return oa.id;
+      }
+    }
+  }
+  return null;
+}
+
 function extractJewelryDescription(result: PhotoshootResultResponse): string | undefined {
   for (const [key, items] of Object.entries(result)) {
     if (!Array.isArray(items)) continue;
@@ -206,6 +224,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
         progress: 35,
         generationStep: 'Generating photoshoot...',
         resultImages: [],
+        outputAssetId: null,
         jewelryUrl: params.jewelryUrl,
         modelUrl: params.modelUrl,
         isProductShot: params.isProductShot,
@@ -254,6 +273,9 @@ export function GenerationsContextProvider({ children }: { children: React.React
           return { ...g, progress: Math.min(g.progress + Math.max((90 - g.progress) * 0.04, 0.1), 90) };
         }));
       }, 300);
+      // Aborting the poll (unmount/cancel) must also stop the ticker — otherwise
+      // it keeps firing setState after teardown.
+      ctrl.signal.addEventListener('abort', () => clearInterval(ticker), { once: true });
 
       pollWorkflow<PhotoshootResultResponse>({
         mode: 'status-then-result',
@@ -292,9 +314,9 @@ export function GenerationsContextProvider({ children }: { children: React.React
         const resultImages = extractResultImages(result);
         if (import.meta.env.DEV && gen.isProductShot) console.log('[product-shot result keys]', Object.keys(result), result);
         const jewelryDescription = gen.isProductShot ? extractJewelryDescription(result) : undefined;
-        // Top-level sibling scalar (not a node-keyed array). Undefined for old /result
-        // payloads that predate the field; consumers treat that as "unavailable".
-        const outputAssetId = typeof result.output_asset_id === 'string' ? result.output_asset_id : null;
+        // Top-level sibling scalar (not a node-keyed array). Older payloads bury the
+        // asset id inside node-keyed arrays instead, so fall back to the deep scan.
+        const outputAssetId = typeof result.output_asset_id === 'string' ? result.output_asset_id : extractOutputAssetId(result);
 
         // Only check for activity errors when no images were produced.
         // Prefer targeted key lookup; only fall back to scanning all values when those keys are absent.
@@ -386,6 +408,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
                     // feedback/category/inputs stay tied to the original photoshoot.
                     workflowId: gen.parentWorkflowId ?? gen.workflowId,
                     resultImages,
+                    outputAssetId,
                     aspectRatio: gen.aspectRatio,
                     resolution: gen.resolution,
                     generationCost: gen.generationCost,
