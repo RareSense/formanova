@@ -9,6 +9,7 @@ import { PRESET_SOCIAL_PLATFORMS, extractHandle, handleToUrl, urlMatchesHost } f
 import { FacebookChannelIcon, WhatsAppChannelIcon } from '@/components/brand/channel-icons';
 import { isValidHttpUrl, isValidHandle, INVALID_URL_MESSAGE } from '@/lib/brand-profile-api';
 import { BrandBookUpload } from '@/components/brand/BrandBookUpload';
+import { NovaIntroPanel, type NovaLeftStep } from '@/components/brand/NovaIntroPanel';
 import { trackBrandFormOpened, trackBrandFormSubmitted } from '@/lib/posthog-events';
 
 export interface BrandDetails {
@@ -193,6 +194,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
   const [cardFace, setCardFace] = useState<CardFace>('front');
   const [hasBrandBook, setHasBrandBook] = useState(false);
   const autoBothShown = useRef(false);
+  const [step, setStep] = useState<NovaLeftStep | 'form'>('intro');
 
   const overlayRef = useRef<HTMLDivElement>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
@@ -318,8 +320,10 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-12 sm:py-10">
           <div className="grid gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-0">
 
-            {/* Form */}
+            {/* Nova intro/voice/text, or the existing brand form once continuation is wired. */}
             <div className="order-2 lg:order-1 lg:pr-10">
+              {step === 'form' ? (
+                <>
               <h2 className="font-display text-3xl text-foreground sm:text-4xl">
                 Tell us about your jewelry brand
               </h2>
@@ -566,6 +570,14 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
               Save and Continue
             </button>
               </div>
+                </>
+              ) : (
+                <NovaIntroPanel
+                  step={step}
+                  onSelectVoice={() => setStep('voice')}
+                  onSelectText={() => setStep('text')}
+                />
+              )}
             </div>
 
             {/* Live bespoke card stage */}
