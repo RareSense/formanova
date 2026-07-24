@@ -73,8 +73,8 @@ const CHANNEL_DETAIL_COPY: Record<SalesChannel, { label: string; placeholder: st
     helper: 'Examples: Etsy, Amazon, eBay, etc.',
   },
   other: {
-    label: 'Link or details',
-    placeholder: 'Briefly describe how customers buy from you',
+    label: 'Other link',
+    placeholder: 'Link where customers can buy',
   },
 };
 
@@ -104,15 +104,11 @@ function normalizeSalesChannelDetail(channel: SalesChannel, value: string): stri
   if (channel === 'store' && !/^[\w.-]+\.[A-Za-z]{2,}/.test(raw) && !/^https?:\/\//i.test(raw)) {
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(raw)}`;
   }
-  if (channel === 'other' && !/^[\w.-]+\.[A-Za-z]{2,}/.test(raw) && !/^https?:\/\//i.test(raw)) {
-    return `https://www.google.com/search?q=${encodeURIComponent(raw)}`;
-  }
   return normalizeUrl(raw);
 }
 
 function validateSalesChannelDetail(channel: SalesChannel, normalized: string): string | undefined {
   if (!normalized) return 'Sales channel details are required.';
-  if (channel === 'other') return undefined;
   if (!isValidHttpUrl(normalized)) {
     return INVALID_URL_MESSAGE;
   }
@@ -223,9 +219,10 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
   };
 
   const parsedMarkets = targetMarkets.split(',').map((m) => m.trim()).filter(Boolean);
-  const visiblePlatforms = PRESET_SOCIAL_PLATFORMS.filter(
-    (p) => p.key === 'instagram' || revealed.includes(p.key),
-  );
+  const visiblePlatforms = PRESET_SOCIAL_PLATFORMS.filter((p) => {
+    if (p.key === 'instagram') return salesChannel !== 'instagram';
+    return revealed.includes(p.key);
+  });
   const nextReveal = ['tiktok', 'pinterest', 'extra'].find((k) => !revealed.includes(k));
   const liveSocialLinks = PRESET_SOCIAL_PLATFORMS
     .map((p) => handleToUrl(handles[p.key] ?? '', p.urlPrefix))
@@ -234,7 +231,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
   // the Both view on desktop.
   const allDone = Boolean(
     brandName.trim() && basedIn.trim() && parsedMarkets.length &&
-    salesChannelDetail.trim() && (handles.instagram ?? '').trim(),
+    salesChannelDetail.trim() && (salesChannel === 'instagram' || (handles.instagram ?? '').trim()),
   );
   if (allDone && !isMobile && !autoBothShown.current) {
     autoBothShown.current = true;
@@ -371,7 +368,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
                         }));
                       }}
                       className={cn(
-                        'flex h-[68px] w-[94px] shrink-0 flex-col items-center justify-center gap-1.5 border px-2 text-center transition-colors',
+                        'grid h-[68px] w-[94px] shrink-0 grid-rows-[20px_26px] content-center justify-items-center gap-1.5 border px-2 text-center transition-colors',
                         selected
                           ? 'border-[#7f1d3a] bg-[#7f1d3a]/[0.06] text-foreground'
                           : 'border-border bg-background text-muted-foreground hover:border-foreground hover:text-foreground',
@@ -379,7 +376,9 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
                       )}
                       aria-pressed={selected}
                     >
-                      <Icon className="h-[18px] w-[18px] shrink-0 stroke-[1.8]" />
+                      <span className="flex h-5 w-5 items-center justify-center">
+                        <Icon className="h-[18px] w-[18px] shrink-0 stroke-[1.8]" />
+                      </span>
                       <span className="flex h-[26px] w-full max-w-[78px] items-center justify-center text-center text-[11px] font-medium leading-[1.15]">
                         {label}
                       </span>
