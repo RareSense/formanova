@@ -354,7 +354,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
               <div className="space-y-1">
                 <FieldLabel label="Where do customers mainly buy your jewelry?" required />
               </div>
-              <div className="grid w-fit max-w-full grid-cols-[repeat(4,96px)] gap-2.5 overflow-x-auto pb-1">
+              <div className="grid w-fit max-w-full grid-cols-[repeat(4,94px)] gap-2.5 overflow-x-auto pb-1">
                 {SALES_CHANNELS.map(({ key, label, Icon }) => {
                   const selected = salesChannel === key;
                   return (
@@ -371,7 +371,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
                         }));
                       }}
                       className={cn(
-                        'flex h-16 w-24 shrink-0 flex-col items-center justify-center gap-1.5 border px-2 text-center transition-colors',
+                        'flex h-[68px] w-[94px] shrink-0 flex-col items-center justify-center gap-1.5 border px-2 text-center transition-colors',
                         selected
                           ? 'border-[#7f1d3a] bg-[#7f1d3a]/[0.06] text-foreground'
                           : 'border-border bg-background text-muted-foreground hover:border-foreground hover:text-foreground',
@@ -379,8 +379,8 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
                       )}
                       aria-pressed={selected}
                     >
-                      <Icon className="h-4 w-4 shrink-0 stroke-[1.8]" />
-                      <span className="flex h-7 w-full max-w-[82px] items-center justify-center text-center text-[11px] font-medium leading-[1.15]">
+                      <Icon className="h-[18px] w-[18px] shrink-0 stroke-[1.8]" />
+                      <span className="flex h-[26px] w-full max-w-[78px] items-center justify-center text-center text-[11px] font-medium leading-[1.15]">
                         {label}
                       </span>
                     </button>
