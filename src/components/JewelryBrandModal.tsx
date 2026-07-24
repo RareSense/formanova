@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { X, Plus, Lock, Check, Globe, MapPin } from 'lucide-react';
+import { X, Plus, Lock, Check, Globe, MapPin, ShoppingBag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
 import { DARK_THEMES } from '@/components/ThemeLogo';
@@ -60,13 +60,14 @@ function IconInput({
 
 interface Props {
   open: boolean;
+  onClose: () => void;
   onContinue: (details: BrandDetails) => void;
   initial?: BrandDetails;
   /** Analytics funnel source: role picker vs existing-user Studio prompt. */
   source: 'onboarding' | 'studio_prompt';
 }
 
-export function JewelryBrandModal({ open, onContinue, initial, source }: Props) {
+export function JewelryBrandModal({ open, onClose, onContinue, initial, source }: Props) {
   const { theme } = useTheme();
   const isDark = DARK_THEMES.has(theme);
   const isMobile = useIsMobile();
@@ -84,11 +85,8 @@ export function JewelryBrandModal({ open, onContinue, initial, source }: Props) 
   const [brandName, setBrandName] = useState(initial?.brand_name ?? '');
   const [basedIn, setBasedIn] = useState(initial?.based_in ?? '');
   const [targetMarkets, setTargetMarkets] = useState((initial?.target_markets ?? []).join(', '));
-  // TODO(backend): the single "Primary sales channel" field is submitted as
-  // website_url until a dedicated field exists on the backend; store_url is
-  // always submitted empty from this form. Seed from either in case a future
-  // caller passes `initial` with only store_url set.
-  const [salesChannelUrl, setSalesChannelUrl] = useState(initial?.website_url || initial?.store_url || '');
+  const [websiteUrl, setWebsiteUrl] = useState(initial?.website_url ?? '');
+  const [storeUrl, setStoreUrl] = useState(initial?.store_url ?? '');
   const [handles, setHandles] = useState<Record<string, string>>(initialHandles);
   const [extraLink, setExtraLink] = useState(otherInitialLinks[0] ?? '');
   // Instagram always shows; "Add more" reveals TikTok, Pinterest, then a free URL row.
@@ -100,7 +98,7 @@ export function JewelryBrandModal({ open, onContinue, initial, source }: Props) 
     return keys;
   });
   const [brandNameError, setBrandNameError] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState<Partial<Record<'salesChannel' | 'social' | 'extra', string>>>({});
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<'website' | 'store' | 'social' | 'extra', string>>>({});
   // Card face follows what the user is filling: front fields flip to front,
   // back fields flip to back; the toggle stays available for manual control.
   // On completion the card auto-shows both faces once (desktop only), but
@@ -109,7 +107,15 @@ export function JewelryBrandModal({ open, onContinue, initial, source }: Props) 
   const [hasBrandBook, setHasBrandBook] = useState(false);
   const autoBothShown = useRef(false);
 
+  const overlayRef = useRef<HTMLDivElement>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
 
   useEffect(() => {
     if (open) setTimeout(() => firstInputRef.current?.focus(), 50);
@@ -120,6 +126,10 @@ export function JewelryBrandModal({ open, onContinue, initial, source }: Props) 
   }, [open, source]);
 
   if (!open) return null;
+
+  const handleOverlayClick = (e: React.MouseEvent) => {
+    if (e.target === overlayRef.current) onClose();
+  };
 
   const parsedMarkets = targetMarkets.split(',').map((m) => m.trim()).filter(Boolean);
   const visiblePlatforms = PRESET_SOCIAL_PLATFORMS.filter(
@@ -133,7 +143,7 @@ export function JewelryBrandModal({ open, onContinue, initial, source }: Props) 
   // the Both view on desktop.
   const allDone = Boolean(
     brandName.trim() && basedIn.trim() && parsedMarkets.length &&
-    salesChannelUrl.trim() && (handles.instagram ?? '').trim(),
+    websiteUrl.trim() && (handles.instagram ?? '').trim(),
   );
   if (allDone && !isMobile && !autoBothShown.current) {
     autoBothShown.current = true;
@@ -144,14 +154,16 @@ export function JewelryBrandModal({ open, onContinue, initial, source }: Props) 
   const showBack = () => setCardFace((f) => (f === 'both' ? f : 'back'));
 
   const handleContinue = () => {
-    const hasBrandName = Boolean(brandName.trim());
-    const errors: typeof fieldErrors = {};
-    const site = normalizeUrl(salesChannelUrl);
-    if (!site) {
-      errors.salesChannel = 'Primary sales channel is required.';
-    } else if (!isValidHttpUrl(site)) {
-      errors.salesChannel = INVALID_URL_MESSAGE;
+    if (!brandName.trim()) {
+      setBrandNameError(true);
+      firstInputRef.current?.focus();
+      return;
     }
+    const errors: typeof fieldErrors = {};
+    const site = normalizeUrl(websiteUrl);
+    if (site && !isValidHttpUrl(site)) errors.website = INVALID_URL_MESSAGE;
+    const store = normalizeUrl(storeUrl);
+    if (store && !isValidHttpUrl(store)) errors.store = INVALID_URL_MESSAGE;
     const badHandle = PRESET_SOCIAL_PLATFORMS.find((p) => {
       const raw = (handles[p.key] ?? '').trim();
       return raw && !isValidHandle(extractHandle(raw, p.match));
@@ -159,10 +171,8 @@ export function JewelryBrandModal({ open, onContinue, initial, source }: Props) 
     if (badHandle) errors.social = 'Handles can only contain letters, numbers, dots, dashes and underscores.';
     const extra = normalizeUrl(extraLink);
     if (extra && !isValidHttpUrl(extra)) errors.extra = INVALID_URL_MESSAGE;
-    if (!hasBrandName || Object.keys(errors).length) {
-      setBrandNameError(!hasBrandName);
+    if (Object.keys(errors).length) {
       setFieldErrors(errors);
-      if (!hasBrandName) firstInputRef.current?.focus();
       return;
     }
     const socialLinks = [...liveSocialLinks];
@@ -172,12 +182,8 @@ export function JewelryBrandModal({ open, onContinue, initial, source }: Props) 
     }
     trackBrandFormSubmitted({
       source,
-      // TODO(backend): "site" is the single primary-sales-channel value,
-      // reused as website_url until a dedicated field exists (see state
-      // declaration above). has_store is always false because this form no
-      // longer collects a separate store URL.
       has_website: Boolean(site),
-      has_store: false,
+      has_store: Boolean(store),
       has_location: Boolean(basedIn.trim()),
       has_markets: parsedMarkets.length > 0,
       social_count: socialLinks.length,
@@ -185,11 +191,8 @@ export function JewelryBrandModal({ open, onContinue, initial, source }: Props) 
     });
     onContinue({
       brand_name: brandName.trim(),
-      // TODO(backend): reusing website_url as the generic "primary sales
-      // channel" until a dedicated field exists; store_url intentionally
-      // left blank.
       website_url: site,
-      store_url: '',
+      store_url: store,
       social_links: socialLinks.slice(0, 10),
       based_in: basedIn.trim(),
       target_markets: parsedMarkets,
@@ -197,8 +200,22 @@ export function JewelryBrandModal({ open, onContinue, initial, source }: Props) 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6 lg:backdrop-blur-md">
+    <div
+      ref={overlayRef}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6 lg:backdrop-blur-md"
+      onClick={handleOverlayClick}
+    >
       <div className="relative flex max-h-[92vh] w-full max-w-7xl flex-col border border-border bg-background">
+
+        {/* Close */}
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+          aria-label="Close"
+        >
+          <X className="h-4 w-4" />
+        </button>
 
         {/* Body — scrolls when content outgrows the viewport */}
         <div className="min-h-0 flex-1 overflow-y-auto px-8 py-10 sm:px-12">
@@ -264,23 +281,36 @@ export function JewelryBrandModal({ open, onContinue, initial, source }: Props) 
               </div>
             </div>
 
-            {/* Primary sales channel */}
-            <div className="space-y-2">
-              <FieldLabel label="Primary sales channel" required />
-              <IconInput
-                icon={Globe}
-                type="url"
-                value={salesChannelUrl}
-                onChange={(e) => { setSalesChannelUrl(e.target.value); setFieldErrors((p) => ({ ...p, salesChannel: undefined })); }}
-                onFocus={showBack}
-                maxLength={200}
-                placeholder="Paste your website, Instagram, Facebook, Etsy or other sales link"
-                error={Boolean(fieldErrors.salesChannel)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Add the main place where customers currently sell or showcase their jewelry.
-              </p>
-              {fieldErrors.salesChannel && <p className="text-xs text-destructive">{fieldErrors.salesChannel}</p>}
+            {/* Website + Online store */}
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-4">
+              <div className="space-y-2">
+                <FieldLabel label="Website" />
+                <IconInput
+                  icon={Globe}
+                  type="url"
+                  value={websiteUrl}
+                  onChange={(e) => { setWebsiteUrl(e.target.value); setFieldErrors((p) => ({ ...p, website: undefined })); }}
+                  onFocus={showBack}
+                  maxLength={200}
+                  placeholder="yourbrand.com"
+                  error={Boolean(fieldErrors.website)}
+                />
+                {fieldErrors.website && <p className="text-xs text-destructive">{fieldErrors.website}</p>}
+              </div>
+              <div className="space-y-2">
+                <FieldLabel label="Online store" />
+                <IconInput
+                  icon={ShoppingBag}
+                  type="url"
+                  value={storeUrl}
+                  onChange={(e) => { setStoreUrl(e.target.value); setFieldErrors((p) => ({ ...p, store: undefined })); }}
+                  onFocus={showBack}
+                  maxLength={200}
+                  placeholder="shop.yourbrand.com"
+                  error={Boolean(fieldErrors.store)}
+                />
+                {fieldErrors.store && <p className="text-xs text-destructive">{fieldErrors.store}</p>}
+              </div>
             </div>
 
             {/* Social profiles */}
@@ -424,7 +454,8 @@ export function JewelryBrandModal({ open, onContinue, initial, source }: Props) 
                 />
                 <BrandCard
                   brandName={brandName}
-                  websiteUrl={salesChannelUrl}
+                  websiteUrl={websiteUrl}
+                  storeUrl={storeUrl}
                   basedIn={basedIn}
                   targetMarkets={parsedMarkets}
                   socialLinks={liveSocialLinks}
