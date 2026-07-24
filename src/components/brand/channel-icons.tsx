@@ -1,15 +1,17 @@
 export function FacebookChannelIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-      <path d="M13.5 21v-8h2.7l.4-3.1h-3.1v-2c0-.9.3-1.5 1.6-1.5h1.7V3.6c-.3 0-1.3-.1-2.5-.1-2.5 0-4.2 1.5-4.2 4.2v2.3H7.3V13h2.8v8h3.4Z" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M15.5 4h-2.1A3.4 3.4 0 0 0 10 7.4V10H7.8v3H10v7" />
+      <path d="M14.8 13h-4.8" />
     </svg>
   );
 }
 
 export function WhatsAppChannelIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-      <path d="M12.04 2A9.9 9.9 0 0 0 2.1 11.86c0 1.74.46 3.43 1.33 4.92L2 22l5.35-1.4a10.04 10.04 0 0 0 4.69 1.18h.01A9.9 9.9 0 0 0 22 11.92 9.95 9.95 0 0 0 12.04 2Zm5.85 14.1c-.25.7-1.46 1.36-2.02 1.44-.52.08-1.18.11-1.9-.12-.44-.14-1-.32-1.72-.63-3.02-1.3-4.99-4.34-5.14-4.54-.15-.2-1.23-1.63-1.23-3.12 0-1.49.78-2.22 1.06-2.52.28-.3.6-.38.8-.38h.58c.18 0 .44-.07.68.52.25.6.84 2.05.91 2.2.08.15.12.33.03.53-.09.2-.13.32-.27.5-.13.17-.29.38-.41.5-.14.14-.28.29-.12.59.15.3.68 1.12 1.46 1.82 1 .9 1.85 1.18 2.15 1.33.3.15.48.13.66-.08.2-.22.76-.88.96-1.18.2-.3.4-.25.68-.15.28.1 1.78.84 2.08.99.3.15.5.23.58.35.08.13.08.73-.17 1.43Z" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M12 4a8 8 0 0 0-6.8 12.2L4.4 20l3.9-.9A8 8 0 1 0 12 4Z" />
+      <path d="M9.2 8.8c.2-.4.4-.4.7-.4h.5c.2 0 .4.1.5.4l.6 1.4c.1.2 0 .4-.1.6l-.5.6c.6 1.2 1.5 2.1 2.7 2.7l.6-.5c.2-.2.4-.2.7-.1l1.4.6c.3.1.4.3.4.5v.5c0 .3-.1.5-.4.7-.4.3-1 .5-1.7.5-2.9 0-7.4-4.5-7.4-7.4 0-.7.2-1.3.5-1.7Z" />
     </svg>
   );
 }

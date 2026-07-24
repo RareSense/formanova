@@ -371,7 +371,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
                         }));
                       }}
                       className={cn(
-                        'flex h-24 w-24 shrink-0 flex-col items-center justify-start gap-2.5 border px-2 pt-4 text-center transition-colors',
+                        'flex h-16 w-24 shrink-0 flex-col items-center justify-center gap-1.5 border px-2 text-center transition-colors',
                         selected
                           ? 'border-[#7f1d3a] bg-[#7f1d3a]/[0.06] text-foreground'
                           : 'border-border bg-background text-muted-foreground hover:border-foreground hover:text-foreground',
@@ -379,8 +379,8 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
                       )}
                       aria-pressed={selected}
                     >
-                      <Icon className="h-5 w-5 shrink-0 stroke-[1.8]" />
-                      <span className="flex h-8 w-full max-w-[76px] items-center justify-center text-center text-[11px] font-medium leading-[1.15] sm:text-xs">
+                      <Icon className="h-4 w-4 shrink-0 stroke-[1.8]" />
+                      <span className="flex h-7 w-full max-w-[82px] items-center justify-center text-center text-[11px] font-medium leading-[1.15]">
                         {label}
                       </span>
                     </button>
