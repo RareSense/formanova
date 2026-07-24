@@ -175,7 +175,8 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
   );
   const [handles, setHandles] = useState<Record<string, string>>(initialHandles);
   const [extraLink, setExtraLink] = useState(otherInitialLinks[0] ?? '');
-  // Instagram always shows; "Add more" reveals TikTok, Pinterest, then a free URL row.
+  // Instagram usually starts the secondary profile list; if Instagram is the
+  // primary sales channel, TikTok becomes the first secondary profile instead.
   const [revealed, setRevealed] = useState<string[]>(() => {
     const keys: string[] = [];
     if (initialHandles.tiktok) keys.push('tiktok');
@@ -219,11 +220,14 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
   };
 
   const parsedMarkets = targetMarkets.split(',').map((m) => m.trim()).filter(Boolean);
+  const defaultVisibleSocialKeys = salesChannel === 'instagram' ? ['tiktok'] : [];
   const visiblePlatforms = PRESET_SOCIAL_PLATFORMS.filter((p) => {
     if (p.key === 'instagram') return salesChannel !== 'instagram';
-    return revealed.includes(p.key);
+    return defaultVisibleSocialKeys.includes(p.key) || revealed.includes(p.key);
   });
-  const nextReveal = ['tiktok', 'pinterest', 'extra'].find((k) => !revealed.includes(k));
+  const nextReveal = ['tiktok', 'pinterest', 'extra'].find(
+    (k) => !defaultVisibleSocialKeys.includes(k) && !revealed.includes(k),
+  );
   const liveSocialLinks = PRESET_SOCIAL_PLATFORMS
     .map((p) => handleToUrl(handles[p.key] ?? '', p.urlPrefix))
     .filter(Boolean);

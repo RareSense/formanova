@@ -1,7 +1,8 @@
 export function FacebookChannelIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
-      <path d="M14.5 4h-1.7A3.8 3.8 0 0 0 9 7.8V10H6.8v3H9v7h3v-7h2.2l.5-3H12V7.9c0-.6.3-.9.9-.9h1.6V4Z" />
+      <path d="M14.8 5h-1.5A3.3 3.3 0 0 0 10 8.3V20" />
+      <path d="M8 11.2h6.4" />
     </svg>
   );
 }
