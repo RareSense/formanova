@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { X, Plus, Lock, Check, Globe, MapPin, ShoppingBag, MessageCircle, Store, MoreHorizontal, Link2, Instagram as InstagramChannelIcon } from 'lucide-react';
+import { X, Plus, Lock, Check, Globe, MapPin, ShoppingBag, Store, MoreHorizontal, Link2, Instagram as InstagramChannelIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
 import { DARK_THEMES } from '@/components/ThemeLogo';
 import { BrandCard, BrandCardFaceToggle, type CardFace } from '@/components/brand/BrandCard';
 import { PRESET_SOCIAL_PLATFORMS, extractHandle, handleToUrl, urlMatchesHost } from '@/components/brand/social-icons';
+import { FacebookChannelIcon, WhatsAppChannelIcon } from '@/components/brand/channel-icons';
 import { isValidHttpUrl, isValidHandle, INVALID_URL_MESSAGE } from '@/lib/brand-profile-api';
 import { BrandBookUpload } from '@/components/brand/BrandBookUpload';
 import { trackBrandFormOpened, trackBrandFormSubmitted } from '@/lib/posthog-events';
@@ -38,8 +39,8 @@ const SALES_CHANNELS: {
 }[] = [
   { key: 'website', label: 'Website', Icon: Globe },
   { key: 'instagram', label: 'Instagram', Icon: InstagramChannelIcon },
-  { key: 'facebook', label: 'Facebook', Icon: Link2 },
-  { key: 'whatsapp', label: 'WhatsApp', Icon: MessageCircle },
+  { key: 'facebook', label: 'Facebook', Icon: FacebookChannelIcon },
+  { key: 'whatsapp', label: 'WhatsApp', Icon: WhatsAppChannelIcon },
   { key: 'store', label: 'Physical store', Icon: Store },
   { key: 'marketplace', label: 'Marketplace', Icon: ShoppingBag },
   { key: 'other', label: 'Other', Icon: MoreHorizontal },
@@ -69,7 +70,7 @@ const CHANNEL_DETAIL_COPY: Record<SalesChannel, { label: string; placeholder: st
   marketplace: {
     label: 'Marketplace shop link',
     placeholder: 'etsy.com/shop/yourbrand',
-    helper: 'Examples: Etsy, Amazon, IndiaMART',
+    helper: 'Examples: Etsy, Amazon, eBay, etc.',
   },
   other: {
     label: 'Link or details',
@@ -352,9 +353,8 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
             <div className="space-y-3">
               <div className="space-y-1">
                 <FieldLabel label="Where do customers mainly buy your jewelry?" required />
-                <p className="text-xs text-muted-foreground">Select your main sales channel.</p>
               </div>
-              <div className="grid w-fit max-w-full grid-cols-[repeat(4,80px)] gap-2 overflow-x-auto pb-1">
+              <div className="grid w-fit max-w-full grid-cols-[repeat(4,96px)] gap-2.5 overflow-x-auto pb-1">
                 {SALES_CHANNELS.map(({ key, label, Icon }) => {
                   const selected = salesChannel === key;
                   return (
@@ -371,7 +371,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
                         }));
                       }}
                       className={cn(
-                        'flex h-20 w-20 shrink-0 flex-col items-center justify-start gap-2 border px-1.5 pt-3 text-center transition-colors',
+                        'flex h-24 w-24 shrink-0 flex-col items-center justify-start gap-2.5 border px-2 pt-4 text-center transition-colors',
                         selected
                           ? 'border-[#7f1d3a] bg-[#7f1d3a]/[0.06] text-foreground'
                           : 'border-border bg-background text-muted-foreground hover:border-foreground hover:text-foreground',
@@ -380,7 +380,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
                       aria-pressed={selected}
                     >
                       <Icon className="h-5 w-5 shrink-0 stroke-[1.8]" />
-                      <span className="flex min-h-[28px] items-center justify-center text-[11px] font-medium leading-tight sm:text-xs">
+                      <span className="flex h-8 w-full max-w-[76px] items-center justify-center text-center text-[11px] font-medium leading-[1.15] sm:text-xs">
                         {label}
                       </span>
                     </button>
