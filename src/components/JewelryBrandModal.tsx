@@ -569,7 +569,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
             </div>
 
             {/* Live bespoke card stage */}
-            <div className="order-1 lg:order-2 lg:border-l lg:border-border lg:pl-10">
+            <div className="hidden lg:order-2 lg:block lg:border-l lg:border-border lg:pl-10">
               <div className="mx-auto max-w-md lg:sticky lg:top-0 lg:max-w-none">
                 <div className="mb-4 flex items-center justify-between gap-4">
                   <p className="font-card text-sm uppercase tracking-[0.22em] text-foreground">
