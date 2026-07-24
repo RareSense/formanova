@@ -190,7 +190,6 @@ export default function RolePicker() {
     <JewelryBrandModal
       source="onboarding"
       open={showBrandModal}
-      onClose={() => setShowBrandModal(false)}
       onContinue={(details) => { setBrandDetails(details); setShowBrandModal(false); }}
       initial={brandDetails ?? undefined}
     />
