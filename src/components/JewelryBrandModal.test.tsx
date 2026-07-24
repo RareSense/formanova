@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { render, screen, fireEvent } from '@testing-library/react';
-import '@testing-library/jest-dom/vitest';
+import '@testing-library/jest-dom';
 import { describe, expect, it, vi, beforeAll } from 'vitest';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { JewelryBrandModal } from '@/components/JewelryBrandModal';
