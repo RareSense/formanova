@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { X, Plus, Lock, Check, Globe, MapPin, ShoppingBag, MessageCircle, Store, MoreHorizontal, Link2 } from 'lucide-react';
+import { X, Plus, Lock, Check, Globe, MapPin, ShoppingBag, MessageCircle, Store, MoreHorizontal, Link2, Instagram as InstagramChannelIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
 import { DARK_THEMES } from '@/components/ThemeLogo';
 import { BrandCard, BrandCardFaceToggle, type CardFace } from '@/components/brand/BrandCard';
-import { InstagramIcon, PRESET_SOCIAL_PLATFORMS, extractHandle, handleToUrl, urlMatchesHost } from '@/components/brand/social-icons';
+import { PRESET_SOCIAL_PLATFORMS, extractHandle, handleToUrl, urlMatchesHost } from '@/components/brand/social-icons';
 import { isValidHttpUrl, isValidHandle, INVALID_URL_MESSAGE } from '@/lib/brand-profile-api';
 import { BrandBookUpload } from '@/components/brand/BrandBookUpload';
 import { trackBrandFormOpened, trackBrandFormSubmitted } from '@/lib/posthog-events';
@@ -37,7 +37,7 @@ const SALES_CHANNELS: {
   Icon: React.ComponentType<{ className?: string }>;
 }[] = [
   { key: 'website', label: 'Website', Icon: Globe },
-  { key: 'instagram', label: 'Instagram', Icon: InstagramIcon },
+  { key: 'instagram', label: 'Instagram', Icon: InstagramChannelIcon },
   { key: 'facebook', label: 'Facebook', Icon: Link2 },
   { key: 'whatsapp', label: 'WhatsApp', Icon: MessageCircle },
   { key: 'store', label: 'Physical store', Icon: Store },
@@ -350,8 +350,11 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
 
             {/* Primary sales channel */}
             <div className="space-y-3">
-              <FieldLabel label="Where do customers mainly buy your jewelry?" required />
-              <div className="grid max-w-[360px] grid-cols-4 gap-2">
+              <div className="space-y-1">
+                <FieldLabel label="Where do customers mainly buy your jewelry?" required />
+                <p className="text-xs text-muted-foreground">Select your main sales channel.</p>
+              </div>
+              <div className="grid w-fit max-w-full grid-cols-[repeat(4,80px)] gap-2 overflow-x-auto pb-1">
                 {SALES_CHANNELS.map(({ key, label, Icon }) => {
                   const selected = salesChannel === key;
                   return (
@@ -368,44 +371,46 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
                         }));
                       }}
                       className={cn(
-                        'flex aspect-square min-h-[76px] w-full max-w-[84px] flex-col items-center justify-center gap-1.5 border bg-background px-1.5 text-center transition-colors',
+                        'flex h-20 w-20 shrink-0 flex-col items-center justify-start gap-2 border px-1.5 pt-3 text-center transition-colors',
                         selected
                           ? 'border-[#7f1d3a] bg-[#7f1d3a]/[0.06] text-foreground'
-                          : 'border-border text-muted-foreground hover:border-foreground hover:text-foreground',
+                          : 'border-border bg-background text-muted-foreground hover:border-foreground hover:text-foreground',
                         fieldErrors.salesChannel && 'border-destructive',
                       )}
                       aria-pressed={selected}
                     >
-                      <Icon className="h-5 w-5 shrink-0" />
-                      <span className="text-[11px] font-medium leading-tight sm:text-xs">{label}</span>
+                      <Icon className="h-5 w-5 shrink-0 stroke-[1.8]" />
+                      <span className="flex min-h-[28px] items-center justify-center text-[11px] font-medium leading-tight sm:text-xs">
+                        {label}
+                      </span>
                     </button>
                   );
                 })}
               </div>
               {fieldErrors.salesChannel && <p className="text-xs text-destructive">{fieldErrors.salesChannel}</p>}
-            </div>
 
-            {salesChannel && (
-              <div className="space-y-2">
-                <FieldLabel label={CHANNEL_DETAIL_COPY[salesChannel].label} required />
-                {salesChannel === 'marketplace' && (
-                  <p className="text-xs text-muted-foreground">
-                    {CHANNEL_DETAIL_COPY.marketplace.helper}
-                  </p>
-                )}
-                <IconInput
-                  icon={salesChannel === 'store' ? Store : SALES_CHANNELS.find((c) => c.key === salesChannel)?.Icon ?? Link2}
-                  type="text"
-                  value={salesChannelDetail}
-                  onChange={(e) => { setSalesChannelDetail(e.target.value); setFieldErrors((p) => ({ ...p, salesChannelDetail: undefined })); }}
-                  onFocus={showBack}
-                  maxLength={200}
-                  placeholder={CHANNEL_DETAIL_COPY[salesChannel].placeholder}
-                  error={Boolean(fieldErrors.salesChannelDetail)}
-                />
-                {fieldErrors.salesChannelDetail && <p className="text-xs text-destructive">{fieldErrors.salesChannelDetail}</p>}
-              </div>
-            )}
+              {salesChannel && (
+                <div className="space-y-2 pt-1">
+                  <FieldLabel label={CHANNEL_DETAIL_COPY[salesChannel].label} required />
+                  {salesChannel === 'marketplace' && (
+                    <p className="text-xs text-muted-foreground">
+                      {CHANNEL_DETAIL_COPY.marketplace.helper}
+                    </p>
+                  )}
+                  <IconInput
+                    icon={salesChannel === 'store' ? Store : SALES_CHANNELS.find((c) => c.key === salesChannel)?.Icon ?? Link2}
+                    type="text"
+                    value={salesChannelDetail}
+                    onChange={(e) => { setSalesChannelDetail(e.target.value); setFieldErrors((p) => ({ ...p, salesChannelDetail: undefined })); }}
+                    onFocus={showBack}
+                    maxLength={200}
+                    placeholder={CHANNEL_DETAIL_COPY[salesChannel].placeholder}
+                    error={Boolean(fieldErrors.salesChannelDetail)}
+                  />
+                  {fieldErrors.salesChannelDetail && <p className="text-xs text-destructive">{fieldErrors.salesChannelDetail}</p>}
+                </div>
+              )}
+            </div>
 
             {/* Location + Target markets */}
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-4">
