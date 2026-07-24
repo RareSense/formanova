@@ -6,12 +6,18 @@ import { isOnboardingComplete, setCachedUserType } from '@/lib/onboarding-api';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { toast } from '@/hooks/use-toast';
 import type { BrandDetails } from '@/components/JewelryBrandModal';
+import { urlMatchesHost } from '@/components/brand/social-icons';
 
 const JewelryBrandModal = lazy(() =>
   import('@/components/JewelryBrandModal').then((m) => ({ default: m.JewelryBrandModal })),
 );
 
-const PROMPT_SEEN_KEY_PREFIX = 'formanova_brand_prompt_v1_';
+const PROMPT_SEEN_KEY_PREFIX = 'formanova_brand_prompt_v2_';
+
+function hasInstagramProfile(socialLinks: unknown): boolean {
+  return Array.isArray(socialLinks)
+    && socialLinks.some((link) => typeof link === 'string' && urlMatchesHost(link, 'instagram.com'));
+}
 
 /** Paths where interrupting with a brand prompt would be wrong. */
 const SKIP_PATHS = [
@@ -31,6 +37,7 @@ export function BrandPromptHandler() {
   const location = useLocation();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [initialDetails, setInitialDetails] = useState<BrandDetails | undefined>();
 
   const skip = SKIP_PATHS.includes(location.pathname) || location.pathname.startsWith('/blog/');
 
@@ -45,7 +52,22 @@ export function BrandPromptHandler() {
       .then((data) => {
         if (cancelled) return;
         setCachedUserType(user.id, data.user_type ?? null);
-        if (data.user_type === 'jewelry_brand' && !data.brand_name) {
+        const missingBrandName = !String(data.brand_name ?? '').trim();
+        const hasPrimaryChannel = Boolean(
+          String(data.website_url ?? '').trim()
+          || String(data.store_url ?? '').trim()
+          || hasInstagramProfile(data.social_links),
+        );
+        const missingSalesChannel = !hasPrimaryChannel;
+        if (data.user_type === 'jewelry_brand' && (missingBrandName || missingSalesChannel)) {
+          setInitialDetails({
+            brand_name: data.brand_name ?? '',
+            website_url: data.website_url ?? '',
+            store_url: data.store_url ?? '',
+            social_links: data.social_links ?? [],
+            based_in: data.based_in ?? '',
+            target_markets: data.target_markets ?? [],
+          });
           setOpen(true);
         } else {
           // Not a brand user, or brand already set — never ask again.
@@ -86,7 +108,12 @@ export function BrandPromptHandler() {
         description: 'You can always edit or delete these details later from your profile menu.',
       });
     } catch {
-      // Non-blocking: they can finish from the Brand Details page anytime.
+      toast({
+        title: 'Could not save',
+        description: 'Please try again before continuing.',
+        variant: 'destructive',
+      });
+      return;
     }
     markSeen();
     // The CTA says "Continue to Studio" — honor it.
@@ -97,7 +124,14 @@ export function BrandPromptHandler() {
 
   return (
     <Suspense fallback={null}>
-      <JewelryBrandModal source="studio_prompt" open={open} onClose={markSeen} onContinue={handleContinue} />
+      <JewelryBrandModal
+        source="studio_prompt"
+        open={open}
+        onClose={markSeen}
+        onContinue={handleContinue}
+        initial={initialDetails}
+        dismissible={false}
+      />
     </Suspense>
   );
 }

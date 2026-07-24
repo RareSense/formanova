@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { X, Plus, Lock, Check, Globe, MapPin, ShoppingBag } from 'lucide-react';
+import { X, Plus, Lock, Check, Globe, MapPin, ShoppingBag, Store, MoreHorizontal, Link2, Instagram as InstagramChannelIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
 import { DARK_THEMES } from '@/components/ThemeLogo';
 import { BrandCard, BrandCardFaceToggle, type CardFace } from '@/components/brand/BrandCard';
 import { PRESET_SOCIAL_PLATFORMS, extractHandle, handleToUrl, urlMatchesHost } from '@/components/brand/social-icons';
+import { FacebookChannelIcon, WhatsAppChannelIcon } from '@/components/brand/channel-icons';
 import { isValidHttpUrl, isValidHandle, INVALID_URL_MESSAGE } from '@/lib/brand-profile-api';
 import { BrandBookUpload } from '@/components/brand/BrandBookUpload';
 import { trackBrandFormOpened, trackBrandFormSubmitted } from '@/lib/posthog-events';
@@ -29,12 +30,89 @@ function normalizeUrl(value: string): string {
 const INPUT_CLASS =
   'w-full border border-border bg-background px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-foreground transition-colors';
 
+type SalesChannel = 'website' | 'instagram' | 'facebook' | 'whatsapp' | 'store' | 'marketplace' | 'other';
+
+const SALES_CHANNELS: {
+  key: SalesChannel;
+  label: string;
+  Icon: React.ComponentType<{ className?: string }>;
+}[] = [
+  { key: 'website', label: 'Website', Icon: Globe },
+  { key: 'instagram', label: 'Instagram', Icon: InstagramChannelIcon },
+  { key: 'facebook', label: 'Facebook', Icon: FacebookChannelIcon },
+  { key: 'whatsapp', label: 'WhatsApp', Icon: WhatsAppChannelIcon },
+  { key: 'store', label: 'Physical store', Icon: Store },
+  { key: 'marketplace', label: 'Marketplace', Icon: ShoppingBag },
+  { key: 'other', label: 'Other', Icon: MoreHorizontal },
+];
+
+const CHANNEL_DETAIL_COPY: Record<SalesChannel, { label: string; placeholder: string; helper?: string }> = {
+  website: {
+    label: 'Website link',
+    placeholder: 'yourbrand.com',
+  },
+  instagram: {
+    label: 'Instagram link or handle',
+    placeholder: 'instagram.com/yourbrand or @yourbrand',
+  },
+  facebook: {
+    label: 'Facebook page link',
+    placeholder: 'facebook.com/yourbrand or @yourbrand',
+  },
+  whatsapp: {
+    label: 'WhatsApp number',
+    placeholder: '+1 555 123 4567',
+  },
+  store: {
+    label: 'Store name and city',
+    placeholder: 'Store name, city',
+  },
+  marketplace: {
+    label: 'Marketplace shop link',
+    placeholder: 'etsy.com/shop/yourbrand',
+    helper: 'Examples: Etsy, Amazon, eBay, etc.',
+  },
+  other: {
+    label: 'Other link',
+    placeholder: 'Link where customers can buy',
+  },
+};
+
 function FieldLabel({ label, required }: { label: string; required?: boolean }) {
   return (
     <label className="text-sm font-medium text-foreground">
       {label}{required && <span className="ml-1 text-destructive">*</span>}
     </label>
   );
+}
+
+function normalizeSalesChannelDetail(channel: SalesChannel, value: string): string {
+  const raw = value.trim();
+  if (!raw) return '';
+  if (channel === 'instagram') {
+    const handle = extractHandle(raw, 'instagram.com');
+    if (isValidHandle(handle)) return `https://instagram.com/${handle}`;
+  }
+  if (channel === 'facebook') {
+    const handle = extractHandle(raw, 'facebook.com');
+    if (isValidHandle(handle)) return `https://facebook.com/${handle}`;
+  }
+  if (channel === 'whatsapp' && !/^https?:\/\//i.test(raw) && !/^[\w.-]+\.[A-Za-z]{2,}/.test(raw)) {
+    const digits = raw.replace(/[^\d]/g, '');
+    if (digits.length >= 7) return `https://wa.me/${digits}`;
+  }
+  if (channel === 'store' && !/^[\w.-]+\.[A-Za-z]{2,}/.test(raw) && !/^https?:\/\//i.test(raw)) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(raw)}`;
+  }
+  return normalizeUrl(raw);
+}
+
+function validateSalesChannelDetail(channel: SalesChannel, normalized: string): string | undefined {
+  if (!normalized) return 'Sales channel details are required.';
+  if (!isValidHttpUrl(normalized)) {
+    return INVALID_URL_MESSAGE;
+  }
+  return undefined;
 }
 
 /** Input with a muted trailing icon, as in the bespoke mockup. */
@@ -63,11 +141,12 @@ interface Props {
   onClose: () => void;
   onContinue: (details: BrandDetails) => void;
   initial?: BrandDetails;
+  dismissible?: boolean;
   /** Analytics funnel source: role picker vs existing-user Studio prompt. */
   source: 'onboarding' | 'studio_prompt';
 }
 
-export function JewelryBrandModal({ open, onClose, onContinue, initial, source }: Props) {
+export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissible = true, source }: Props) {
   const { theme } = useTheme();
   const isDark = DARK_THEMES.has(theme);
   const isMobile = useIsMobile();
@@ -85,11 +164,19 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, source }
   const [brandName, setBrandName] = useState(initial?.brand_name ?? '');
   const [basedIn, setBasedIn] = useState(initial?.based_in ?? '');
   const [targetMarkets, setTargetMarkets] = useState((initial?.target_markets ?? []).join(', '));
-  const [websiteUrl, setWebsiteUrl] = useState(initial?.website_url ?? '');
-  const [storeUrl, setStoreUrl] = useState(initial?.store_url ?? '');
+  const [salesChannel, setSalesChannel] = useState<SalesChannel | null>(() => {
+    if (initial?.store_url) return 'marketplace';
+    if (initial?.website_url) return 'website';
+    if (initialHandles.instagram) return 'instagram';
+    return null;
+  });
+  const [salesChannelDetail, setSalesChannelDetail] = useState(
+    initial?.store_url || initial?.website_url || initialHandles.instagram || '',
+  );
   const [handles, setHandles] = useState<Record<string, string>>(initialHandles);
   const [extraLink, setExtraLink] = useState(otherInitialLinks[0] ?? '');
-  // Instagram always shows; "Add more" reveals TikTok, Pinterest, then a free URL row.
+  // Instagram usually starts the secondary profile list; if Instagram is the
+  // primary sales channel, TikTok becomes the first secondary profile instead.
   const [revealed, setRevealed] = useState<string[]>(() => {
     const keys: string[] = [];
     if (initialHandles.tiktok) keys.push('tiktok');
@@ -98,7 +185,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, source }
     return keys;
   });
   const [brandNameError, setBrandNameError] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState<Partial<Record<'website' | 'store' | 'social' | 'extra', string>>>({});
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<'salesChannel' | 'salesChannelDetail' | 'social' | 'extra', string>>>({});
   // Card face follows what the user is filling: front fields flip to front,
   // back fields flip to back; the toggle stays available for manual control.
   // On completion the card auto-shows both faces once (desktop only), but
@@ -112,10 +199,11 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, source }
 
   useEffect(() => {
     if (!open) return;
+    if (!dismissible) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  }, [open, onClose, dismissible]);
 
   useEffect(() => {
     if (open) setTimeout(() => firstInputRef.current?.focus(), 50);
@@ -128,14 +216,18 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, source }
   if (!open) return null;
 
   const handleOverlayClick = (e: React.MouseEvent) => {
-    if (e.target === overlayRef.current) onClose();
+    if (dismissible && e.target === overlayRef.current) onClose();
   };
 
   const parsedMarkets = targetMarkets.split(',').map((m) => m.trim()).filter(Boolean);
-  const visiblePlatforms = PRESET_SOCIAL_PLATFORMS.filter(
-    (p) => p.key === 'instagram' || revealed.includes(p.key),
+  const defaultVisibleSocialKeys = salesChannel === 'instagram' ? ['tiktok'] : [];
+  const visiblePlatforms = PRESET_SOCIAL_PLATFORMS.filter((p) => {
+    if (p.key === 'instagram') return salesChannel !== 'instagram';
+    return defaultVisibleSocialKeys.includes(p.key) || revealed.includes(p.key);
+  });
+  const nextReveal = ['tiktok', 'pinterest', 'extra'].find(
+    (k) => !defaultVisibleSocialKeys.includes(k) && !revealed.includes(k),
   );
-  const nextReveal = ['tiktok', 'pinterest', 'extra'].find((k) => !revealed.includes(k));
   const liveSocialLinks = PRESET_SOCIAL_PLATFORMS
     .map((p) => handleToUrl(handles[p.key] ?? '', p.urlPrefix))
     .filter(Boolean);
@@ -143,7 +235,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, source }
   // the Both view on desktop.
   const allDone = Boolean(
     brandName.trim() && basedIn.trim() && parsedMarkets.length &&
-    websiteUrl.trim() && (handles.instagram ?? '').trim(),
+    salesChannelDetail.trim() && (salesChannel === 'instagram' || (handles.instagram ?? '').trim()),
   );
   if (allDone && !isMobile && !autoBothShown.current) {
     autoBothShown.current = true;
@@ -154,16 +246,18 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, source }
   const showBack = () => setCardFace((f) => (f === 'both' ? f : 'back'));
 
   const handleContinue = () => {
-    if (!brandName.trim()) {
+    const errors: typeof fieldErrors = {};
+    const missingBrandName = !brandName.trim();
+    if (missingBrandName) {
       setBrandNameError(true);
       firstInputRef.current?.focus();
-      return;
     }
-    const errors: typeof fieldErrors = {};
-    const site = normalizeUrl(websiteUrl);
-    if (site && !isValidHttpUrl(site)) errors.website = INVALID_URL_MESSAGE;
-    const store = normalizeUrl(storeUrl);
-    if (store && !isValidHttpUrl(store)) errors.store = INVALID_URL_MESSAGE;
+    if (!salesChannel) errors.salesChannel = 'Choose where customers mainly buy.';
+    const channelDetail = salesChannel ? normalizeSalesChannelDetail(salesChannel, salesChannelDetail) : '';
+    if (salesChannel) {
+      const channelError = validateSalesChannelDetail(salesChannel, channelDetail);
+      if (channelError) errors.salesChannelDetail = channelError;
+    }
     const badHandle = PRESET_SOCIAL_PLATFORMS.find((p) => {
       const raw = (handles[p.key] ?? '').trim();
       return raw && !isValidHandle(extractHandle(raw, p.match));
@@ -182,8 +276,8 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, source }
     }
     trackBrandFormSubmitted({
       source,
-      has_website: Boolean(site),
-      has_store: Boolean(store),
+      has_website: Boolean(channelDetail),
+      has_store: salesChannel === 'store' || salesChannel === 'marketplace',
       has_location: Boolean(basedIn.trim()),
       has_markets: parsedMarkets.length > 0,
       social_count: socialLinks.length,
@@ -191,8 +285,10 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, source }
     });
     onContinue({
       brand_name: brandName.trim(),
-      website_url: site,
-      store_url: store,
+      // TODO(backend): replace this temporary mapping once the backend has a
+      // dedicated primary sales channel type + detail field.
+      website_url: channelDetail,
+      store_url: '',
       social_links: socialLinks.slice(0, 10),
       based_in: basedIn.trim(),
       target_markets: parsedMarkets,
@@ -202,23 +298,24 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, source }
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6 lg:backdrop-blur-md"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-3 py-4 sm:px-4 sm:py-6 lg:backdrop-blur-md"
       onClick={handleOverlayClick}
     >
       <div className="relative flex max-h-[92vh] w-full max-w-7xl flex-col border border-border bg-background">
 
-        {/* Close */}
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-          aria-label="Close"
-        >
-          <X className="h-4 w-4" />
-        </button>
+        {dismissible && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
 
         {/* Body — scrolls when content outgrows the viewport */}
-        <div className="min-h-0 flex-1 overflow-y-auto px-8 py-10 sm:px-12">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-12 sm:py-10">
           <div className="grid gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-0">
 
             {/* Form */}
@@ -253,6 +350,71 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, source }
               )}
             </div>
 
+            {/* Primary sales channel */}
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <FieldLabel label="Where do customers mainly buy your jewelry?" required />
+              </div>
+              <div className="grid w-full grid-cols-2 gap-2.5 pb-1 sm:w-fit sm:grid-cols-[repeat(4,92px)]">
+                {SALES_CHANNELS.map(({ key, label, Icon }) => {
+                  const selected = salesChannel === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => {
+                        setSalesChannel(key);
+                        setSalesChannelDetail('');
+                        setFieldErrors((p) => ({
+                          ...p,
+                          salesChannel: undefined,
+                          salesChannelDetail: undefined,
+                        }));
+                      }}
+                      className={cn(
+                        'grid h-[86px] w-full min-w-0 grid-rows-[24px_28px] content-center justify-items-center gap-2 border px-2 text-center transition-colors sm:h-[92px] sm:w-[92px]',
+                        selected
+                          ? 'border-[#7f1d3a] bg-[#7f1d3a]/[0.06] text-foreground'
+                          : 'border-border bg-background text-muted-foreground hover:border-foreground hover:text-foreground',
+                        fieldErrors.salesChannel && 'border-destructive',
+                      )}
+                      aria-pressed={selected}
+                    >
+                      <span className="flex h-6 w-6 items-center justify-center">
+                        <Icon className="h-5 w-5 shrink-0 stroke-[1.75]" />
+                      </span>
+                      <span className="flex h-7 w-full max-w-[76px] items-center justify-center text-center text-[11px] font-medium leading-[1.15]">
+                        {label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              {fieldErrors.salesChannel && <p className="text-xs text-destructive">{fieldErrors.salesChannel}</p>}
+
+              {salesChannel && (
+                <div className="space-y-2 pt-1">
+                  <FieldLabel label={CHANNEL_DETAIL_COPY[salesChannel].label} required />
+                  {salesChannel === 'marketplace' && (
+                    <p className="text-xs text-muted-foreground">
+                      {CHANNEL_DETAIL_COPY.marketplace.helper}
+                    </p>
+                  )}
+                  <IconInput
+                    icon={salesChannel === 'store' ? Store : SALES_CHANNELS.find((c) => c.key === salesChannel)?.Icon ?? Link2}
+                    type="text"
+                    value={salesChannelDetail}
+                    onChange={(e) => { setSalesChannelDetail(e.target.value); setFieldErrors((p) => ({ ...p, salesChannelDetail: undefined })); }}
+                    onFocus={showBack}
+                    maxLength={200}
+                    placeholder={CHANNEL_DETAIL_COPY[salesChannel].placeholder}
+                    error={Boolean(fieldErrors.salesChannelDetail)}
+                  />
+                  {fieldErrors.salesChannelDetail && <p className="text-xs text-destructive">{fieldErrors.salesChannelDetail}</p>}
+                </div>
+              )}
+            </div>
+
             {/* Location + Target markets */}
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-4">
               <div className="space-y-2">
@@ -281,38 +443,6 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, source }
               </div>
             </div>
 
-            {/* Website + Online store */}
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-4">
-              <div className="space-y-2">
-                <FieldLabel label="Website" />
-                <IconInput
-                  icon={Globe}
-                  type="url"
-                  value={websiteUrl}
-                  onChange={(e) => { setWebsiteUrl(e.target.value); setFieldErrors((p) => ({ ...p, website: undefined })); }}
-                  onFocus={showBack}
-                  maxLength={200}
-                  placeholder="yourbrand.com"
-                  error={Boolean(fieldErrors.website)}
-                />
-                {fieldErrors.website && <p className="text-xs text-destructive">{fieldErrors.website}</p>}
-              </div>
-              <div className="space-y-2">
-                <FieldLabel label="Online store" />
-                <IconInput
-                  icon={ShoppingBag}
-                  type="url"
-                  value={storeUrl}
-                  onChange={(e) => { setStoreUrl(e.target.value); setFieldErrors((p) => ({ ...p, store: undefined })); }}
-                  onFocus={showBack}
-                  maxLength={200}
-                  placeholder="shop.yourbrand.com"
-                  error={Boolean(fieldErrors.store)}
-                />
-                {fieldErrors.store && <p className="text-xs text-destructive">{fieldErrors.store}</p>}
-              </div>
-            </div>
-
             {/* Social profiles */}
             <div className="space-y-2">
               <FieldLabel label="Social profiles" />
@@ -325,7 +455,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, source }
                       fieldErrors.social && 'border-destructive focus-within:border-destructive',
                     )}
                   >
-                    <span className="flex w-32 shrink-0 items-center gap-2.5 border-r border-border px-3.5 py-3.5 text-foreground">
+                    <span className="flex w-24 shrink-0 items-center gap-2 border-r border-border px-2.5 py-3.5 text-foreground sm:w-32 sm:gap-2.5 sm:px-3.5">
                       <Icon className="h-4 w-4 shrink-0" />
                       <span className="text-sm">{label}</span>
                     </span>
@@ -439,7 +569,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, source }
             </div>
 
             {/* Live bespoke card stage */}
-            <div className="order-1 lg:order-2 lg:border-l lg:border-border lg:pl-10">
+            <div className="hidden lg:order-2 lg:block lg:border-l lg:border-border lg:pl-10">
               <div className="mx-auto max-w-md lg:sticky lg:top-0 lg:max-w-none">
                 <div className="mb-4 flex items-center justify-between gap-4">
                   <p className="font-card text-sm uppercase tracking-[0.22em] text-foreground">
@@ -454,8 +584,8 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, source }
                 />
                 <BrandCard
                   brandName={brandName}
-                  websiteUrl={websiteUrl}
-                  storeUrl={storeUrl}
+                  websiteUrl={salesChannelDetail}
+                  storeUrl=""
                   basedIn={basedIn}
                   targetMarkets={parsedMarkets}
                   socialLinks={liveSocialLinks}
