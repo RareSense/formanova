@@ -298,7 +298,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6 lg:backdrop-blur-md"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-3 py-4 sm:px-4 sm:py-6 lg:backdrop-blur-md"
       onClick={handleOverlayClick}
     >
       <div className="relative flex max-h-[92vh] w-full max-w-7xl flex-col border border-border bg-background">
@@ -315,7 +315,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
         )}
 
         {/* Body — scrolls when content outgrows the viewport */}
-        <div className="min-h-0 flex-1 overflow-y-auto px-8 py-10 sm:px-12">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-12 sm:py-10">
           <div className="grid gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-0">
 
             {/* Form */}
@@ -355,7 +355,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
               <div className="space-y-1">
                 <FieldLabel label="Where do customers mainly buy your jewelry?" required />
               </div>
-              <div className="grid w-fit max-w-full grid-cols-[repeat(4,92px)] gap-2.5 overflow-x-auto pb-1">
+              <div className="grid w-full grid-cols-2 gap-2.5 pb-1 sm:w-fit sm:grid-cols-[repeat(4,92px)]">
                 {SALES_CHANNELS.map(({ key, label, Icon }) => {
                   const selected = salesChannel === key;
                   return (
@@ -372,7 +372,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
                         }));
                       }}
                       className={cn(
-                        'grid h-[92px] w-[92px] shrink-0 grid-rows-[24px_28px] content-center justify-items-center gap-2 border px-2 text-center transition-colors',
+                        'grid h-[86px] w-full min-w-0 grid-rows-[24px_28px] content-center justify-items-center gap-2 border px-2 text-center transition-colors sm:h-[92px] sm:w-[92px]',
                         selected
                           ? 'border-[#7f1d3a] bg-[#7f1d3a]/[0.06] text-foreground'
                           : 'border-border bg-background text-muted-foreground hover:border-foreground hover:text-foreground',
@@ -455,7 +455,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
                       fieldErrors.social && 'border-destructive focus-within:border-destructive',
                     )}
                   >
-                    <span className="flex w-32 shrink-0 items-center gap-2.5 border-r border-border px-3.5 py-3.5 text-foreground">
+                    <span className="flex w-24 shrink-0 items-center gap-2 border-r border-border px-2.5 py-3.5 text-foreground sm:w-32 sm:gap-2.5 sm:px-3.5">
                       <Icon className="h-4 w-4 shrink-0" />
                       <span className="text-sm">{label}</span>
                     </span>
