@@ -170,9 +170,12 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
   const [salesChannel, setSalesChannel] = useState<SalesChannel | null>(() => {
     if (initial?.store_url) return 'marketplace';
     if (initial?.website_url) return 'website';
+    if (initialHandles.instagram) return 'instagram';
     return null;
   });
-  const [salesChannelDetail, setSalesChannelDetail] = useState(initial?.store_url || initial?.website_url || '');
+  const [salesChannelDetail, setSalesChannelDetail] = useState(
+    initial?.store_url || initial?.website_url || initialHandles.instagram || '',
+  );
   const [handles, setHandles] = useState<Record<string, string>>(initialHandles);
   const [extraLink, setExtraLink] = useState(otherInitialLinks[0] ?? '');
   // Instagram always shows; "Add more" reveals TikTok, Pinterest, then a free URL row.

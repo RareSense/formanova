@@ -6,12 +6,18 @@ import { isOnboardingComplete, setCachedUserType } from '@/lib/onboarding-api';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { toast } from '@/hooks/use-toast';
 import type { BrandDetails } from '@/components/JewelryBrandModal';
+import { urlMatchesHost } from '@/components/brand/social-icons';
 
 const JewelryBrandModal = lazy(() =>
   import('@/components/JewelryBrandModal').then((m) => ({ default: m.JewelryBrandModal })),
 );
 
 const PROMPT_SEEN_KEY_PREFIX = 'formanova_brand_prompt_v2_';
+
+function hasInstagramProfile(socialLinks: unknown): boolean {
+  return Array.isArray(socialLinks)
+    && socialLinks.some((link) => typeof link === 'string' && urlMatchesHost(link, 'instagram.com'));
+}
 
 /** Paths where interrupting with a brand prompt would be wrong. */
 const SKIP_PATHS = [
@@ -47,7 +53,12 @@ export function BrandPromptHandler() {
         if (cancelled) return;
         setCachedUserType(user.id, data.user_type ?? null);
         const missingBrandName = !String(data.brand_name ?? '').trim();
-        const missingSalesChannel = !String(data.website_url ?? '').trim() && !String(data.store_url ?? '').trim();
+        const hasPrimaryChannel = Boolean(
+          String(data.website_url ?? '').trim()
+          || String(data.store_url ?? '').trim()
+          || hasInstagramProfile(data.social_links),
+        );
+        const missingSalesChannel = !hasPrimaryChannel;
         if (data.user_type === 'jewelry_brand' && (missingBrandName || missingSalesChannel)) {
           setInitialDetails({
             brand_name: data.brand_name ?? '',
