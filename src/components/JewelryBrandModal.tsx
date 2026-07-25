@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { X, Plus, Lock, Check, Globe, MapPin, ShoppingBag, Store, MoreHorizontal, Link2, Instagram as InstagramChannelIcon } from 'lucide-react';
+import { X, Plus, Lock, Check, Globe, MapPin, ShoppingBag, MoreHorizontal, Link2, Instagram as InstagramChannelIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
 import { DARK_THEMES } from '@/components/ThemeLogo';
@@ -31,7 +31,7 @@ function normalizeUrl(value: string): string {
 const INPUT_CLASS =
   'w-full border border-border bg-background px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-foreground transition-colors';
 
-type SalesChannel = 'website' | 'instagram' | 'facebook' | 'whatsapp' | 'store' | 'marketplace' | 'other';
+type SalesChannel = 'website' | 'instagram' | 'facebook' | 'whatsapp' | 'marketplace' | 'other';
 
 const SALES_CHANNELS: {
   key: SalesChannel;
@@ -42,7 +42,6 @@ const SALES_CHANNELS: {
   { key: 'instagram', label: 'Instagram', Icon: InstagramChannelIcon },
   { key: 'facebook', label: 'Facebook', Icon: FacebookChannelIcon },
   { key: 'whatsapp', label: 'WhatsApp', Icon: WhatsAppChannelIcon },
-  { key: 'store', label: 'Physical store', Icon: Store },
   { key: 'marketplace', label: 'Marketplace', Icon: ShoppingBag },
   { key: 'other', label: 'Other', Icon: MoreHorizontal },
 ];
@@ -63,10 +62,6 @@ const CHANNEL_DETAIL_COPY: Record<SalesChannel, { label: string; placeholder: st
   whatsapp: {
     label: 'WhatsApp number',
     placeholder: '+1 555 123 4567',
-  },
-  store: {
-    label: 'Store name and city',
-    placeholder: 'Store name, city',
   },
   marketplace: {
     label: 'Marketplace shop link',
@@ -102,14 +97,11 @@ function normalizeSalesChannelDetail(channel: SalesChannel, value: string): stri
     const digits = raw.replace(/[^\d]/g, '');
     if (digits.length >= 7) return `https://wa.me/${digits}`;
   }
-  if (channel === 'store' && !/^[\w.-]+\.[A-Za-z]{2,}/.test(raw) && !/^https?:\/\//i.test(raw)) {
-    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(raw)}`;
-  }
   return normalizeUrl(raw);
 }
 
 function validateSalesChannelDetail(channel: SalesChannel, normalized: string): string | undefined {
-  if (!normalized) return 'Sales channel details are required.';
+  if (!normalized) return 'This field is required.';
   if (!isValidHttpUrl(normalized)) {
     return INVALID_URL_MESSAGE;
   }
@@ -166,16 +158,17 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
   const [basedIn, setBasedIn] = useState(initial?.based_in ?? '');
   const [targetMarkets, setTargetMarkets] = useState((initial?.target_markets ?? []).join(', '));
   const [salesChannel, setSalesChannel] = useState<SalesChannel | null>(() => {
-    if (initial?.store_url) return 'marketplace';
     if (initial?.website_url) return 'website';
     if (initialHandles.instagram) return 'instagram';
     return null;
   });
   const [salesChannelDetail, setSalesChannelDetail] = useState(
-    initial?.store_url || initial?.website_url || initialHandles.instagram || '',
+    initial?.website_url || initialHandles.instagram || '',
   );
   const [handles, setHandles] = useState<Record<string, string>>(initialHandles);
   const [extraLink, setExtraLink] = useState(otherInitialLinks[0] ?? '');
+  const [storeMapsLink, setStoreMapsLink] = useState(initial?.store_url ?? '');
+  const [showPhysicalStore, setShowPhysicalStore] = useState(Boolean(initial?.store_url));
   // Instagram usually starts the secondary profile list; if Instagram is the
   // primary sales channel, TikTok becomes the first secondary profile instead.
   const [revealed, setRevealed] = useState<string[]>(() => {
@@ -186,7 +179,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
     return keys;
   });
   const [brandNameError, setBrandNameError] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState<Partial<Record<'salesChannel' | 'salesChannelDetail' | 'social' | 'extra', string>>>({});
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<'salesChannel' | 'salesChannelDetail' | 'social' | 'extra' | 'storeMapsLink', string>>>({});
   // Card face follows what the user is filling: front fields flip to front,
   // back fields flip to back; the toggle stays available for manual control.
   // On completion the card auto-shows both faces once (desktop only), but
@@ -250,15 +243,19 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
   const handleContinue = () => {
     const errors: typeof fieldErrors = {};
     const missingBrandName = !brandName.trim();
+    setBrandNameError(missingBrandName);
     if (missingBrandName) {
-      setBrandNameError(true);
       firstInputRef.current?.focus();
     }
-    if (!salesChannel) errors.salesChannel = 'Choose where customers mainly buy.';
     const channelDetail = salesChannel ? normalizeSalesChannelDetail(salesChannel, salesChannelDetail) : '';
     if (salesChannel) {
       const channelError = validateSalesChannelDetail(salesChannel, channelDetail);
       if (channelError) errors.salesChannelDetail = channelError;
+    }
+    const mapsLink = normalizeUrl(storeMapsLink);
+    if (mapsLink && !isValidHttpUrl(mapsLink)) errors.storeMapsLink = INVALID_URL_MESSAGE;
+    if (!salesChannel && !mapsLink) {
+      errors.salesChannel = "Add an online channel, or your physical store's Maps link.";
     }
     const badHandle = PRESET_SOCIAL_PLATFORMS.find((p) => {
       const raw = (handles[p.key] ?? '').trim();
@@ -267,7 +264,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
     if (badHandle) errors.social = 'Handles can only contain letters, numbers, dots, dashes and underscores.';
     const extra = normalizeUrl(extraLink);
     if (extra && !isValidHttpUrl(extra)) errors.extra = INVALID_URL_MESSAGE;
-    if (Object.keys(errors).length) {
+    if (missingBrandName || Object.keys(errors).length) {
       setFieldErrors(errors);
       return;
     }
@@ -279,7 +276,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
     trackBrandFormSubmitted({
       source,
       has_website: Boolean(channelDetail),
-      has_store: salesChannel === 'store' || salesChannel === 'marketplace',
+      has_store: Boolean(mapsLink),
       has_location: Boolean(basedIn.trim()),
       has_markets: parsedMarkets.length > 0,
       social_count: socialLinks.length,
@@ -290,7 +287,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
       // TODO(backend): replace this temporary mapping once the backend has a
       // dedicated primary sales channel type + detail field.
       website_url: channelDetail,
-      store_url: '',
+      store_url: mapsLink,
       social_links: socialLinks.slice(0, 10),
       based_in: basedIn.trim(),
       target_markets: parsedMarkets,
@@ -357,7 +354,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
             {/* Primary sales channel */}
             <div className="space-y-3">
               <div className="space-y-1">
-                <FieldLabel label="Where do customers mainly buy your jewelry?" required />
+                <FieldLabel label="Where do you sell online?" required />
               </div>
               <div className="grid w-full grid-cols-2 gap-2.5 pb-1 sm:w-fit sm:grid-cols-[repeat(4,92px)]">
                 {SALES_CHANNELS.map(({ key, label, Icon }) => {
@@ -405,7 +402,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
                     </p>
                   )}
                   <IconInput
-                    icon={salesChannel === 'store' ? Store : SALES_CHANNELS.find((c) => c.key === salesChannel)?.Icon ?? Link2}
+                    icon={SALES_CHANNELS.find((c) => c.key === salesChannel)?.Icon ?? Link2}
                     type="text"
                     value={salesChannelDetail}
                     onChange={(e) => { setSalesChannelDetail(e.target.value); setFieldErrors((p) => ({ ...p, salesChannelDetail: undefined })); }}
@@ -415,6 +412,41 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
                     error={Boolean(fieldErrors.salesChannelDetail)}
                   />
                   {fieldErrors.salesChannelDetail && <p className="text-xs text-destructive">{fieldErrors.salesChannelDetail}</p>}
+                </div>
+              )}
+
+              {!showPhysicalStore ? (
+                <button
+                  type="button"
+                  onClick={() => setShowPhysicalStore(true)}
+                  onFocus={showBack}
+                  className="text-xs text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
+                >
+                  Don't have an online presence? Add your physical store instead
+                </button>
+              ) : (
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-center justify-between">
+                    <FieldLabel label="Physical store: Google Maps link" />
+                    <button
+                      type="button"
+                      onClick={() => { setShowPhysicalStore(false); setStoreMapsLink(''); setFieldErrors((p) => ({ ...p, storeMapsLink: undefined })); }}
+                      className="text-xs text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  <IconInput
+                    icon={MapPin}
+                    type="text"
+                    value={storeMapsLink}
+                    onChange={(e) => { setStoreMapsLink(e.target.value); setFieldErrors((p) => ({ ...p, storeMapsLink: undefined, salesChannel: undefined })); }}
+                    onFocus={showBack}
+                    maxLength={300}
+                    placeholder="maps.google.com/..."
+                    error={Boolean(fieldErrors.storeMapsLink)}
+                  />
+                  {fieldErrors.storeMapsLink && <p className="text-xs text-destructive">{fieldErrors.storeMapsLink}</p>}
                 </div>
               )}
             </div>
