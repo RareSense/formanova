@@ -241,8 +241,8 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
   const handleContinue = () => {
     const errors: typeof fieldErrors = {};
     const missingBrandName = !brandName.trim();
+    setBrandNameError(missingBrandName);
     if (missingBrandName) {
-      setBrandNameError(true);
       firstInputRef.current?.focus();
     }
     const channelDetail = salesChannel ? normalizeSalesChannelDetail(salesChannel, salesChannelDetail) : '';
@@ -262,7 +262,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
     if (badHandle) errors.social = 'Handles can only contain letters, numbers, dots, dashes and underscores.';
     const extra = normalizeUrl(extraLink);
     if (extra && !isValidHttpUrl(extra)) errors.extra = INVALID_URL_MESSAGE;
-    if (Object.keys(errors).length) {
+    if (missingBrandName || Object.keys(errors).length) {
       setFieldErrors(errors);
       return;
     }
