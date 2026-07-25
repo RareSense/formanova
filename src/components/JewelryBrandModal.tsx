@@ -350,7 +350,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
             {/* Primary sales channel */}
             <div className="space-y-3">
               <div className="space-y-1">
-                <FieldLabel label="Where do you sell? Online or in person?" required />
+                <FieldLabel label="Where do you sell online?" required />
               </div>
               <div className="grid w-full grid-cols-2 gap-2.5 pb-1 sm:w-fit sm:grid-cols-[repeat(4,92px)]">
                 {SALES_CHANNELS.map(({ key, label, Icon }) => {
