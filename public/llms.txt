@@ -40,4 +40,4 @@ Pricing page: https://formanova.ai/pricing
 - Dashboard: https://formanova.ai/dashboard
 
 ## Contact
-hello@formanova.ai
+studio@formanova.ai
