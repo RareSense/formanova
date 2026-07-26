@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Phone, Lock } from 'lucide-react';
+import { Phone, Lock, Globe } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { DARK_THEMES } from '@/components/ThemeLogo';
 import { cn } from '@/lib/utils';
@@ -62,7 +62,7 @@ export function NovaIntroPanel({ step, onSelectVoice }: NovaIntroPanelProps) {
   else if (orbHovered) orbState = 'hover';
 
   return (
-    <div className="flex min-h-full flex-col items-center justify-center py-4 text-center">
+    <div className="flex min-h-full flex-col items-center justify-center py-6 text-center">
       {/* 1. Animated Nova orb */}
       <div
         onMouseEnter={() => setOrbHovered(true)}
@@ -72,18 +72,19 @@ export function NovaIntroPanel({ step, onSelectVoice }: NovaIntroPanelProps) {
       </div>
 
       {/* 2. Nova */}
-      <h2 className="mt-6 font-display text-3xl font-bold text-foreground sm:text-4xl">Nova</h2>
+      <h2 className="mt-8 font-display text-5xl font-bold text-foreground sm:text-6xl">Nova</h2>
 
       {/* 3. Your creative consultant */}
-      <p className="mt-1 text-sm font-medium text-muted-foreground">Your creative consultant</p>
+      <p className="mt-2 text-sm font-medium text-muted-foreground sm:text-base">Your creative consultant</p>
 
-      {/* 4. Language selector — compact, secondary, directly below the title */}
+      {/* 4. Language selector — compact bordered control, secondary to the CTA */}
       {step === 'intro' && (
         <Select value={language} onValueChange={setLanguage}>
           <SelectTrigger
             aria-label="Language"
-            className="mt-4 h-8 w-auto gap-1.5 border-none bg-transparent px-2 text-xs font-medium text-muted-foreground shadow-none hover:text-foreground focus:ring-0 focus:ring-offset-0"
+            className="mt-6 h-11 w-60 gap-2 border border-border bg-background px-4 text-sm font-medium text-foreground shadow-none focus:ring-0 focus:ring-offset-0"
           >
+            <Globe className="h-4 w-4 shrink-0 text-muted-foreground" />
             <SelectValue>
               <span>Language: {selectedLabel}</span>
             </SelectValue>
@@ -100,32 +101,32 @@ export function NovaIntroPanel({ step, onSelectVoice }: NovaIntroPanelProps) {
 
       {/* 5. Short supporting copy */}
       {step === 'intro' && (
-        <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted-foreground sm:text-base">
+        <p className="mt-6 max-w-md text-base leading-relaxed text-muted-foreground sm:text-lg">
           Let's get to know your brand and shape a more tailored FormaNova experience.
         </p>
       )}
 
       {step === 'intro' && (
-        <div className="mt-8 flex w-full max-w-xs flex-col items-center gap-4">
+        <div className="mt-9 flex w-full flex-col items-center gap-4">
           {/* 6. Talk to Nova — call action, not page navigation */}
           <button
             type="button"
             onClick={onSelectVoice}
             className={cn(
-              'flex w-full items-center justify-center gap-2 py-4 text-sm font-medium transition-colors',
+              'flex w-[340px] max-w-full items-center justify-center gap-2.5 py-5 text-base font-medium transition-colors',
               isDark
                 ? 'border border-foreground bg-transparent text-foreground hover:bg-foreground hover:text-background'
                 : 'bg-foreground text-background hover:opacity-90',
             )}
           >
-            <Phone className="h-4 w-4 shrink-0" />
+            <Phone className="h-5 w-5 shrink-0" />
             Talk to Nova
           </button>
 
           {/* 7. Privacy note */}
-          <p className="flex items-center gap-1.5 text-xs leading-relaxed text-muted-foreground">
-            <Lock className="h-3 w-3 shrink-0" />
-            Your answers stay private and are never used to train AI.
+          <p className="flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground sm:text-sm">
+            <Lock className="h-3.5 w-3.5 shrink-0" />
+            Your information stays private.
           </p>
         </div>
       )}
@@ -133,7 +134,7 @@ export function NovaIntroPanel({ step, onSelectVoice }: NovaIntroPanelProps) {
       {step === 'voice' && (
         <p
           data-testid="nova-voice-caption"
-          className="mt-8 max-w-sm animate-fade-in text-sm italic leading-relaxed text-muted-foreground"
+          className="mt-9 max-w-md animate-fade-in text-base italic leading-relaxed text-muted-foreground"
         >
           {INTRO_LINE}
         </p>
@@ -142,7 +143,7 @@ export function NovaIntroPanel({ step, onSelectVoice }: NovaIntroPanelProps) {
       {step === 'text' && (
         <div
           data-testid="nova-text-message"
-          className="mt-8 w-full max-w-sm animate-fade-in border border-border bg-background px-4 py-3 text-left text-sm leading-relaxed text-foreground"
+          className="mt-9 w-full max-w-md animate-fade-in border border-border bg-background px-4 py-3 text-left text-sm leading-relaxed text-foreground"
         >
           <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Nova

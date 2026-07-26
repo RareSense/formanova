@@ -300,7 +300,12 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-3 py-4 sm:px-4 sm:py-6 lg:backdrop-blur-md"
       onClick={handleOverlayClick}
     >
-      <div className="relative flex max-h-[92vh] w-full max-w-7xl flex-col border border-border bg-background">
+      <div
+        className={cn(
+          'relative flex max-h-[92vh] w-full flex-col border border-border bg-background',
+          step === 'form' ? 'max-w-7xl' : 'max-w-2xl',
+        )}
+      >
 
         {dismissible && (
           <button
@@ -314,16 +319,21 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
         )}
 
         {/* Body — scrolls when content outgrows the viewport */}
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-12 sm:py-10">
+        <div
+          className={cn(
+            'min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-12',
+            step === 'form' ? 'sm:py-10' : 'flex sm:py-16',
+          )}
+        >
           <div
             className={cn(
               'grid gap-10',
-              step === 'form' ? 'lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-0' : 'lg:grid-cols-1',
+              step === 'form' ? 'w-full lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-0' : 'w-full self-center lg:grid-cols-1',
             )}
           >
 
             {/* Nova intro/voice/text, or the existing brand form once continuation is wired. */}
-            <div className={cn('order-2 lg:order-1', step === 'form' ? 'lg:pr-10' : 'mx-auto w-full max-w-md')}>
+            <div className={cn('order-2 lg:order-1', step === 'form' ? 'lg:pr-10' : 'mx-auto w-full max-w-lg')}>
               {step === 'form' ? (
                 <>
               <h2 className="font-display text-3xl text-foreground sm:text-4xl">
