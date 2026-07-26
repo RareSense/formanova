@@ -190,7 +190,6 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
   const [handles, setHandles] = useState<Record<string, string>>(initialHandles);
   const [extraLink, setExtraLink] = useState(otherInitialLinks[0] ?? '');
   const [storeMapsLink, setStoreMapsLink] = useState(initial?.store_url ?? '');
-  const [showPhysicalStore, setShowPhysicalStore] = useState(Boolean(initial?.store_url));
   // Instagram usually starts the secondary profile list; if Instagram is the
   // primary sales channel, TikTok becomes the first secondary profile instead.
   const [revealed, setRevealed] = useState<string[]>(() => {
@@ -455,41 +454,22 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
                   {fieldErrors.salesChannel && <p className="text-xs text-destructive">{fieldErrors.salesChannel}</p>}
                 </div>
               )}
+            </div>
 
-              {!showPhysicalStore ? (
-                <button
-                  type="button"
-                  onClick={() => setShowPhysicalStore(true)}
-                  onFocus={showBack}
-                  className="text-xs text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
-                >
-                  Don't have an online presence? Add your physical store instead
-                </button>
-              ) : (
-                <div className="space-y-2 pt-1">
-                  <div className="flex items-center justify-between">
-                    <FieldLabel label="Physical store: Google Maps link" />
-                    <button
-                      type="button"
-                      onClick={() => { setShowPhysicalStore(false); setStoreMapsLink(''); setFieldErrors((p) => ({ ...p, storeMapsLink: undefined })); }}
-                      className="text-xs text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                  <IconInput
-                    icon={MapPin}
-                    type="text"
-                    value={storeMapsLink}
-                    onChange={(e) => { setStoreMapsLink(e.target.value); setFieldErrors((p) => ({ ...p, storeMapsLink: undefined, salesChannel: undefined })); }}
-                    onFocus={showBack}
-                    maxLength={300}
-                    placeholder="maps.google.com/..."
-                    error={Boolean(fieldErrors.storeMapsLink)}
-                  />
-                  {fieldErrors.storeMapsLink && <p className="text-xs text-destructive">{fieldErrors.storeMapsLink}</p>}
-                </div>
-              )}
+            {/* Physical store — its own plain field, same weight as Location/Target markets */}
+            <div className="space-y-2">
+              <FieldLabel label="Physical store: Google Maps link" />
+              <IconInput
+                icon={MapPin}
+                type="text"
+                value={storeMapsLink}
+                onChange={(e) => { setStoreMapsLink(e.target.value); setFieldErrors((p) => ({ ...p, storeMapsLink: undefined, salesChannel: undefined })); }}
+                onFocus={showBack}
+                maxLength={300}
+                placeholder="maps.google.com/..."
+                error={Boolean(fieldErrors.storeMapsLink)}
+              />
+              {fieldErrors.storeMapsLink && <p className="text-xs text-destructive">{fieldErrors.storeMapsLink}</p>}
             </div>
 
             {/* Location + Target markets */}
@@ -680,10 +660,9 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
     {showWhatsappWarning && (
       <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4">
         <div className="w-full max-w-md border border-border bg-background p-6">
-          <h3 className="font-display text-xl text-foreground">A WhatsApp number on its own isn't much to work with</h3>
+          <h3 className="font-display text-xl text-foreground">Just WhatsApp?</h3>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-            We can't tailor FormaNova to your brand from a phone number alone. If you have a website,
-            online store, Instagram, or Facebook, going back and adding one gets you a more bespoke experience.
+            Add a website, store, or social link too. It helps us understand your brand better and give you a more bespoke experience.
           </p>
           <div className="mt-6 flex flex-col gap-2.5 sm:flex-row-reverse">
             <button
