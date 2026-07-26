@@ -146,7 +146,7 @@ export function VoiceOrb({ state, className, size = 224 }: VoiceOrbProps) {
         transition={ORB_TRANSITION[state]}
         className="absolute inset-0 overflow-hidden rounded-full"
         style={{
-          background: `radial-gradient(circle at 34% 28%, ${pal.stops[0]} 0%, ${pal.stops[1]} 32%, ${pal.stops[2]} 58%, ${pal.stops[3]} 80%, ${pal.stops[4]} 100%)`,
+          background: `radial-gradient(circle at 34% 28%, ${pal.stops[0]} 0%, ${pal.stops[1]} 18%, ${pal.stops[2]} 42%, ${pal.stops[3]} 68%, ${pal.stops[4]} 100%)`,
           boxShadow: isDark
             ? 'inset 0 0 0 1px hsl(var(--formanova-hero-accent) / 0.35), inset 0 -16px 26px hsl(0 0% 0% / 0.4)'
             : 'inset 0 0 0 1px hsl(0 0% 100% / 0.65), inset 0 -16px 24px hsl(30 20% 70% / 0.25)',
@@ -163,8 +163,9 @@ export function VoiceOrb({ state, className, size = 224 }: VoiceOrbProps) {
             height: highlightSize,
             left: '18%',
             top: '10%',
-            background: `radial-gradient(circle, ${pal.highlight} 0%, transparent 68%)`,
-            filter: `blur(${size * 0.05}px)`,
+            background: `radial-gradient(circle, ${pal.highlight} 0%, transparent 55%)`,
+            filter: `blur(${size * 0.035}px)`,
+            opacity: 0.85,
           }}
         />
         <motion.div
@@ -177,30 +178,48 @@ export function VoiceOrb({ state, className, size = 224 }: VoiceOrbProps) {
             height: highlightSize * 0.75,
             right: '8%',
             bottom: '6%',
-            background: `radial-gradient(circle, ${pal.highlight} 0%, transparent 70%)`,
-            filter: `blur(${size * 0.055}px)`,
-            opacity: 0.7,
+            background: `radial-gradient(circle, ${pal.highlight} 0%, transparent 58%)`,
+            filter: `blur(${size * 0.04}px)`,
+            opacity: 0.55,
           }}
         />
       </motion.div>
 
       {state === 'speaking' && (
-        <div
-          aria-hidden="true"
-          data-testid="voice-orb-waveform"
-          className="absolute top-1/2 flex items-center gap-[3px]"
-          style={{ right: -size * 0.18, transform: 'translateY(-50%)' }}
-        >
-          {WAVEFORM_BARS.map((i) => (
-            <motion.span
-              key={i}
-              className="block w-[3px] rounded-full"
-              style={{ background: 'hsl(var(--formanova-hero-accent))', height: 10 }}
-              animate={{ height: [10, 22, 8, 18, 10] }}
-              transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut', delay: i * 0.12 }}
-            />
-          ))}
-        </div>
+        <>
+          <div
+            aria-hidden="true"
+            data-testid="voice-orb-waveform"
+            className="absolute top-1/2 flex items-center gap-[3px]"
+            style={{ right: -size * 0.18, transform: 'translateY(-50%)' }}
+          >
+            {WAVEFORM_BARS.map((i) => (
+              <motion.span
+                key={`right-${i}`}
+                className="block w-[3px] rounded-full"
+                style={{ background: 'hsl(var(--formanova-hero-accent))', height: 10 }}
+                animate={{ height: [10, 22, 8, 18, 10] }}
+                transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut', delay: i * 0.12 }}
+              />
+            ))}
+          </div>
+          <div
+            aria-hidden="true"
+            data-testid="voice-orb-waveform-left"
+            className="absolute top-1/2 flex items-center gap-[3px]"
+            style={{ left: -size * 0.18, transform: 'translateY(-50%)' }}
+          >
+            {WAVEFORM_BARS.map((i) => (
+              <motion.span
+                key={`left-${i}`}
+                className="block w-[3px] rounded-full"
+                style={{ background: 'hsl(var(--formanova-hero-accent))', height: 10 }}
+                animate={{ height: [10, 22, 8, 18, 10] }}
+                transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut', delay: i * 0.12 }}
+              />
+            ))}
+          </div>
+        </>
       )}
     </div>
   );

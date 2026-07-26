@@ -120,7 +120,14 @@ export function NovaIntroPanel({ step, onSelectVoice }: NovaIntroPanelProps) {
       {/* 3. Your creative consultant */}
       <p className="mt-2 text-sm font-medium text-muted-foreground sm:text-base">Your creative consultant</p>
 
-      {/* 4. Language selector — compact bordered control with search, secondary to the CTA */}
+      {/* 4. Short supporting copy */}
+      {step === 'intro' && (
+        <p className="mt-6 max-w-md text-base leading-relaxed text-muted-foreground sm:text-lg">
+          Let's get to know your brand and shape a more tailored FormaNova experience.
+        </p>
+      )}
+
+      {/* 5. Language selector — compact bordered control with search, secondary to the CTA */}
       {step === 'intro' && (
         <Popover open={languageOpen} onOpenChange={setLanguageOpen}>
           <PopoverTrigger asChild>
@@ -159,13 +166,6 @@ export function NovaIntroPanel({ step, onSelectVoice }: NovaIntroPanelProps) {
             </Command>
           </PopoverContent>
         </Popover>
-      )}
-
-      {/* 5. Short supporting copy */}
-      {step === 'intro' && (
-        <p className="mt-6 max-w-md text-base leading-relaxed text-muted-foreground sm:text-lg">
-          Let's get to know your brand and shape a more tailored FormaNova experience.
-        </p>
       )}
 
       {step === 'intro' && (
