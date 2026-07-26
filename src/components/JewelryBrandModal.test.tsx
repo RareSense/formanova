@@ -24,7 +24,7 @@ describe('JewelryBrandModal Nova intro', () => {
   it('opens on the Nova intro step, not the brand-details form', () => {
     renderModal();
 
-    expect(screen.getByText('Meet Nova')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Nova' })).toBeInTheDocument();
     expect(screen.queryByText('Tell us about your jewelry brand')).not.toBeInTheDocument();
   });
 
@@ -37,18 +37,9 @@ describe('JewelryBrandModal Nova intro', () => {
     expect(screen.queryByRole('button', { name: 'Talk to Nova' })).not.toBeInTheDocument();
   });
 
-  it('shows the chat message after choosing Continue without voice, and hides the intro CTAs', () => {
+  it('does not render the bespoke card stage on the intro step — not needed until the brand form', () => {
     renderModal();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Continue without voice' }));
-
-    expect(screen.getByTestId('nova-text-message')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Continue without voice' })).not.toBeInTheDocument();
-  });
-
-  it('still renders the bespoke card stage on the intro step', () => {
-    renderModal();
-
-    expect(screen.getByText('Your Bespoke Card')).toBeInTheDocument();
+    expect(screen.queryByText('Your Bespoke Card')).not.toBeInTheDocument();
   });
 });

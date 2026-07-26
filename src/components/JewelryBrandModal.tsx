@@ -315,10 +315,15 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
 
         {/* Body — scrolls when content outgrows the viewport */}
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-12 sm:py-10">
-          <div className="grid gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-0">
+          <div
+            className={cn(
+              'grid gap-10',
+              step === 'form' ? 'lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-0' : 'lg:grid-cols-1',
+            )}
+          >
 
             {/* Nova intro/voice/text, or the existing brand form once continuation is wired. */}
-            <div className="order-2 lg:order-1 lg:pr-10">
+            <div className={cn('order-2 lg:order-1', step === 'form' ? 'lg:pr-10' : 'mx-auto w-full max-w-md')}>
               {step === 'form' ? (
                 <>
               <h2 className="font-display text-3xl text-foreground sm:text-4xl">
@@ -612,31 +617,33 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
               )}
             </div>
 
-            {/* Live bespoke card stage */}
-            <div className="hidden lg:order-2 lg:block lg:border-l lg:border-border lg:pl-10">
-              <div className="mx-auto max-w-md lg:sticky lg:top-0 lg:max-w-none">
-                <div className="mb-4 flex items-center justify-between gap-4">
-                  <p className="font-card text-sm uppercase tracking-[0.22em] text-foreground">
-                    Your Bespoke Card
-                  </p>
+            {/* Live bespoke card stage — only relevant once the brand form is reached. */}
+            {step === 'form' && (
+              <div className="hidden lg:order-2 lg:block lg:border-l lg:border-border lg:pl-10">
+                <div className="mx-auto max-w-md lg:sticky lg:top-0 lg:max-w-none">
+                  <div className="mb-4 flex items-center justify-between gap-4">
+                    <p className="font-card text-sm uppercase tracking-[0.22em] text-foreground">
+                      Your Bespoke Card
+                    </p>
+                  </div>
+                  <BrandCardFaceToggle
+                    face={cardFace}
+                    onFaceChange={setCardFace}
+                    showBoth={allDone && !isMobile}
+                    className="mb-5"
+                  />
+                  <BrandCard
+                    brandName={brandName}
+                    websiteUrl={salesChannelDetail}
+                    storeUrl=""
+                    basedIn={basedIn}
+                    targetMarkets={parsedMarkets}
+                    socialLinks={liveSocialLinks}
+                    face={cardFace === 'both' && (isMobile || !allDone) ? 'front' : cardFace}
+                  />
                 </div>
-                <BrandCardFaceToggle
-                  face={cardFace}
-                  onFaceChange={setCardFace}
-                  showBoth={allDone && !isMobile}
-                  className="mb-5"
-                />
-                <BrandCard
-                  brandName={brandName}
-                  websiteUrl={salesChannelDetail}
-                  storeUrl=""
-                  basedIn={basedIn}
-                  targetMarkets={parsedMarkets}
-                  socialLinks={liveSocialLinks}
-                  face={cardFace === 'both' && (isMobile || !allDone) ? 'front' : cardFace}
-                />
               </div>
-            </div>
+            )}
 
           </div>
         </div>
