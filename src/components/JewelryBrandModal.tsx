@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { X, Plus, Lock, Check, Globe, MapPin, ShoppingBag, MoreHorizontal, Link2, Instagram as InstagramChannelIcon } from 'lucide-react';
+import { X, Plus, Lock, Check, Globe, MapPin, ShoppingBag, MoreHorizontal, Instagram as InstagramChannelIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
 import { DARK_THEMES } from '@/components/ThemeLogo';
@@ -30,46 +30,57 @@ function normalizeUrl(value: string): string {
 const INPUT_CLASS =
   'w-full border border-border bg-background px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-foreground transition-colors';
 
-type SalesChannel = 'website' | 'instagram' | 'facebook' | 'whatsapp' | 'marketplace' | 'other';
+type SalesChannel = 'website' | 'store' | 'instagram' | 'facebook' | 'whatsapp' | 'other';
 
-const SALES_CHANNELS: {
-  key: SalesChannel;
-  label: string;
-  Icon: React.ComponentType<{ className?: string }>;
-}[] = [
-  { key: 'website', label: 'Website', Icon: Globe },
-  { key: 'instagram', label: 'Instagram', Icon: InstagramChannelIcon },
-  { key: 'facebook', label: 'Facebook', Icon: FacebookChannelIcon },
-  { key: 'whatsapp', label: 'WhatsApp', Icon: WhatsAppChannelIcon },
-  { key: 'marketplace', label: 'Marketplace', Icon: ShoppingBag },
-  { key: 'other', label: 'Other', Icon: MoreHorizontal },
-];
+/**
+ * Priority order for the one-at-a-time channel cascade: we ask for the
+ * highest-priority channel first, and only reveal the next one down if the
+ * user says they don't have the current one. WhatsApp sits second-to-last on
+ * purpose — it's the easiest channel for a seller to have, so asking early
+ * would let it crowd out higher-value channels like Website.
+ */
+const CASCADE_ORDER: SalesChannel[] = ['website', 'store', 'instagram', 'facebook', 'whatsapp', 'other'];
 
-const CHANNEL_DETAIL_COPY: Record<SalesChannel, { label: string; placeholder: string; helper?: string }> = {
+const CHANNEL_META: Record<SalesChannel, { label: string; Icon: React.ComponentType<{ className?: string }> }> = {
+  website: { label: 'Website', Icon: Globe },
+  store: { label: 'Online store', Icon: ShoppingBag },
+  instagram: { label: 'Instagram', Icon: InstagramChannelIcon },
+  facebook: { label: 'Facebook', Icon: FacebookChannelIcon },
+  whatsapp: { label: 'WhatsApp', Icon: WhatsAppChannelIcon },
+  other: { label: 'Other', Icon: MoreHorizontal },
+};
+
+const CHANNEL_DETAIL_COPY: Record<SalesChannel, { label: string; placeholder: string; helper?: string; skipLabel: string }> = {
   website: {
     label: 'Website link',
     placeholder: 'yourbrand.com',
+    skipLabel: "I don't have a website",
+  },
+  store: {
+    label: 'Online store link',
+    placeholder: 'etsy.com/shop/yourbrand',
+    helper: 'Examples: Shopify, Etsy, Amazon, WooCommerce, etc.',
+    skipLabel: "I don't have an online store",
   },
   instagram: {
     label: 'Instagram link or handle',
     placeholder: 'instagram.com/yourbrand or @yourbrand',
+    skipLabel: "I don't have Instagram",
   },
   facebook: {
     label: 'Facebook page link',
     placeholder: 'facebook.com/yourbrand or @yourbrand',
+    skipLabel: "I don't have Facebook",
   },
   whatsapp: {
     label: 'WhatsApp number',
     placeholder: '+1 555 123 4567',
-  },
-  marketplace: {
-    label: 'Marketplace shop link',
-    placeholder: 'etsy.com/shop/yourbrand',
-    helper: 'Examples: Etsy, Amazon, eBay, etc.',
+    skipLabel: "I don't have WhatsApp",
   },
   other: {
     label: 'Other link',
     placeholder: 'Link where customers can buy',
+    skipLabel: "I don't have any of these",
   },
 };
 
@@ -153,17 +164,29 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
     }
   }
 
+  // Historically website_url stored whatever channel was picked (see the
+  // TODO below in handleContinue), so on edit we reverse-map it back to a
+  // step in the cascade rather than assuming it's always a real website.
+  const initialChannel = (() => {
+    if (initial?.website_url) {
+      if (urlMatchesHost(initial.website_url, 'instagram.com')) return { step: 'instagram' as SalesChannel, detail: initial.website_url };
+      if (urlMatchesHost(initial.website_url, 'facebook.com')) return { step: 'facebook' as SalesChannel, detail: initial.website_url };
+      if (urlMatchesHost(initial.website_url, 'wa.me')) return { step: 'whatsapp' as SalesChannel, detail: initial.website_url };
+      return { step: 'website' as SalesChannel, detail: initial.website_url };
+    }
+    if (initialHandles.instagram) return { step: 'instagram' as SalesChannel, detail: initialHandles.instagram };
+    return { step: CASCADE_ORDER[0], detail: '' };
+  })();
+
   const [brandName, setBrandName] = useState(initial?.brand_name ?? '');
   const [basedIn, setBasedIn] = useState(initial?.based_in ?? '');
   const [targetMarkets, setTargetMarkets] = useState((initial?.target_markets ?? []).join(', '));
-  const [salesChannel, setSalesChannel] = useState<SalesChannel | null>(() => {
-    if (initial?.website_url) return 'website';
-    if (initialHandles.instagram) return 'instagram';
-    return null;
-  });
-  const [salesChannelDetail, setSalesChannelDetail] = useState(
-    initial?.website_url || initialHandles.instagram || '',
-  );
+  // Index into CASCADE_ORDER: which channel the user is currently being
+  // asked about. Skipping moves this forward; once it passes the end of
+  // CASCADE_ORDER, no online channel is set (physical store is the fallback).
+  const [channelStepIndex, setChannelStepIndex] = useState(() => CASCADE_ORDER.indexOf(initialChannel.step));
+  const [salesChannelDetail, setSalesChannelDetail] = useState(initialChannel.detail);
+  const salesChannel: SalesChannel | null = CASCADE_ORDER[channelStepIndex] ?? null;
   const [handles, setHandles] = useState<Record<string, string>>(initialHandles);
   const [extraLink, setExtraLink] = useState(otherInitialLinks[0] ?? '');
   const [storeMapsLink, setStoreMapsLink] = useState(initial?.store_url ?? '');
@@ -186,6 +209,10 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
   const [cardFace, setCardFace] = useState<CardFace>('front');
   const [hasBrandBook, setHasBrandBook] = useState(false);
   const autoBothShown = useRef(false);
+  // WhatsApp-only warning: shown once at submit time if that's the only
+  // online channel provided; "Continue anyway" replays the same submit.
+  const [showWhatsappWarning, setShowWhatsappWarning] = useState(false);
+  const [pendingSubmit, setPendingSubmit] = useState<{ channelDetail: string; mapsLink: string } | null>(null);
 
   const overlayRef = useRef<HTMLDivElement>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
@@ -238,6 +265,37 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
   const showFront = () => setCardFace((f) => (f === 'both' ? f : 'front'));
   const showBack = () => setCardFace((f) => (f === 'both' ? f : 'back'));
 
+  // Kept outside handleContinue so the "Continue anyway" button on the
+  // WhatsApp-only warning can call it directly, skipping the popup the
+  // second time.
+  const submitForm = (channelDetail: string, mapsLink: string) => {
+    const extra = normalizeUrl(extraLink);
+    const socialLinks = [...liveSocialLinks];
+    if (extra) socialLinks.push(extra);
+    for (const link of otherInitialLinks) {
+      if (link !== extra && !socialLinks.includes(link)) socialLinks.push(link);
+    }
+    trackBrandFormSubmitted({
+      source,
+      has_website: Boolean(channelDetail),
+      has_store: Boolean(mapsLink),
+      has_location: Boolean(basedIn.trim()),
+      has_markets: parsedMarkets.length > 0,
+      social_count: socialLinks.length,
+      has_brand_book: hasBrandBook,
+    });
+    onContinue({
+      brand_name: brandName.trim(),
+      // TODO(backend): replace this temporary mapping once the backend has a
+      // dedicated primary sales channel type + detail field.
+      website_url: channelDetail,
+      store_url: mapsLink,
+      social_links: socialLinks.slice(0, 10),
+      based_in: basedIn.trim(),
+      target_markets: parsedMarkets,
+    });
+  };
+
   const handleContinue = () => {
     const errors: typeof fieldErrors = {};
     const missingBrandName = !brandName.trim();
@@ -266,33 +324,16 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
       setFieldErrors(errors);
       return;
     }
-    const socialLinks = [...liveSocialLinks];
-    if (extra) socialLinks.push(extra);
-    for (const link of otherInitialLinks) {
-      if (link !== extra && !socialLinks.includes(link)) socialLinks.push(link);
+    if (salesChannel === 'whatsapp') {
+      setPendingSubmit({ channelDetail, mapsLink });
+      setShowWhatsappWarning(true);
+      return;
     }
-    trackBrandFormSubmitted({
-      source,
-      has_website: Boolean(channelDetail),
-      has_store: Boolean(mapsLink),
-      has_location: Boolean(basedIn.trim()),
-      has_markets: parsedMarkets.length > 0,
-      social_count: socialLinks.length,
-      has_brand_book: hasBrandBook,
-    });
-    onContinue({
-      brand_name: brandName.trim(),
-      // TODO(backend): replace this temporary mapping once the backend has a
-      // dedicated primary sales channel type + detail field.
-      website_url: channelDetail,
-      store_url: mapsLink,
-      social_links: socialLinks.slice(0, 10),
-      based_in: basedIn.trim(),
-      target_markets: parsedMarkets,
-    });
+    submitForm(channelDetail, mapsLink);
   };
 
   return (
+    <>
     <div
       ref={overlayRef}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-3 py-4 sm:px-4 sm:py-6 lg:backdrop-blur-md"
@@ -347,58 +388,48 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
               )}
             </div>
 
-            {/* Primary sales channel */}
+            {/* Primary sales channel — asked one at a time, in priority order
+                (website first, WhatsApp second-to-last); skipping advances
+                to the next channel instead of showing them all at once. */}
             <div className="space-y-3">
-              <div className="space-y-1">
-                <FieldLabel label="Where do you sell online?" required />
-              </div>
-              <div className="grid w-full grid-cols-2 gap-2.5 pb-1 sm:w-fit sm:grid-cols-[repeat(4,92px)]">
-                {SALES_CHANNELS.map(({ key, label, Icon }) => {
-                  const selected = salesChannel === key;
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => {
-                        setSalesChannel(key);
-                        setSalesChannelDetail('');
-                        setFieldErrors((p) => ({
-                          ...p,
-                          salesChannel: undefined,
-                          salesChannelDetail: undefined,
-                        }));
-                      }}
-                      className={cn(
-                        'grid h-[86px] w-full min-w-0 grid-rows-[24px_28px] content-center justify-items-center gap-2 border px-2 text-center transition-colors sm:h-[92px] sm:w-[92px]',
-                        selected
-                          ? 'border-[#7f1d3a] bg-[#7f1d3a]/[0.06] text-foreground'
-                          : 'border-border bg-background text-muted-foreground hover:border-foreground hover:text-foreground',
-                        fieldErrors.salesChannel && 'border-destructive',
+              {salesChannel ? (
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+                    <FieldLabel label={CHANNEL_DETAIL_COPY[salesChannel].label} required />
+                    <div className="flex items-center gap-3">
+                      {channelStepIndex > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setChannelStepIndex((i) => Math.max(0, i - 1));
+                            setSalesChannelDetail('');
+                            setFieldErrors((p) => ({ ...p, salesChannel: undefined, salesChannelDetail: undefined }));
+                          }}
+                          className="text-xs text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
+                        >
+                          Back
+                        </button>
                       )}
-                      aria-pressed={selected}
-                    >
-                      <span className="flex h-6 w-6 items-center justify-center">
-                        <Icon className="h-5 w-5 shrink-0 stroke-[1.75]" />
-                      </span>
-                      <span className="flex h-7 w-full max-w-[76px] items-center justify-center text-center text-[11px] font-medium leading-[1.15]">
-                        {label}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-              {fieldErrors.salesChannel && <p className="text-xs text-destructive">{fieldErrors.salesChannel}</p>}
-
-              {salesChannel && (
-                <div className="space-y-2 pt-1">
-                  <FieldLabel label={CHANNEL_DETAIL_COPY[salesChannel].label} required />
-                  {salesChannel === 'marketplace' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setChannelStepIndex((i) => i + 1);
+                          setSalesChannelDetail('');
+                          setFieldErrors((p) => ({ ...p, salesChannel: undefined, salesChannelDetail: undefined }));
+                        }}
+                        className="text-xs text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
+                      >
+                        {CHANNEL_DETAIL_COPY[salesChannel].skipLabel}
+                      </button>
+                    </div>
+                  </div>
+                  {salesChannel === 'store' && (
                     <p className="text-xs text-muted-foreground">
-                      {CHANNEL_DETAIL_COPY.marketplace.helper}
+                      {CHANNEL_DETAIL_COPY.store.helper}
                     </p>
                   )}
                   <IconInput
-                    icon={SALES_CHANNELS.find((c) => c.key === salesChannel)?.Icon ?? Link2}
+                    icon={CHANNEL_META[salesChannel].Icon}
                     type="text"
                     value={salesChannelDetail}
                     onChange={(e) => { setSalesChannelDetail(e.target.value); setFieldErrors((p) => ({ ...p, salesChannelDetail: undefined })); }}
@@ -408,6 +439,20 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
                     error={Boolean(fieldErrors.salesChannelDetail)}
                   />
                   {fieldErrors.salesChannelDetail && <p className="text-xs text-destructive">{fieldErrors.salesChannelDetail}</p>}
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setChannelStepIndex(CASCADE_ORDER.length - 1);
+                      setFieldErrors((p) => ({ ...p, salesChannel: undefined }));
+                    }}
+                    className="text-xs text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
+                  >
+                    Back to online channels
+                  </button>
+                  {fieldErrors.salesChannel && <p className="text-xs text-destructive">{fieldErrors.salesChannel}</p>}
                 </div>
               )}
 
@@ -631,5 +676,42 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
 
       </div>
     </div>
+
+    {showWhatsappWarning && (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4">
+        <div className="w-full max-w-md border border-border bg-background p-6">
+          <h3 className="font-display text-xl text-foreground">A WhatsApp number on its own isn't much to work with</h3>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            We can't tailor FormaNova to your brand from a phone number alone. If you have a website,
+            online store, Instagram, or Facebook, going back and adding one gets you a more bespoke experience.
+          </p>
+          <div className="mt-6 flex flex-col gap-2.5 sm:flex-row-reverse">
+            <button
+              type="button"
+              onClick={() => {
+                if (pendingSubmit) submitForm(pendingSubmit.channelDetail, pendingSubmit.mapsLink);
+                setShowWhatsappWarning(false);
+              }}
+              className={cn(
+                'w-full py-3 text-sm font-medium transition-colors sm:w-auto sm:px-6',
+                isDark
+                  ? 'border border-foreground bg-transparent text-foreground hover:bg-foreground hover:text-background'
+                  : 'bg-foreground text-background hover:opacity-90',
+              )}
+            >
+              Continue anyway
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowWhatsappWarning(false)}
+              className="w-full border border-border py-3 text-sm font-medium text-foreground transition-colors hover:border-foreground sm:w-auto sm:px-6"
+            >
+              Go back
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
