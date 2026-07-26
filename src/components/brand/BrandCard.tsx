@@ -1,4 +1,4 @@
-import { Globe, ShoppingBag, MapPin, Compass } from 'lucide-react';
+import { Globe, ShoppingBag, MapPin, Compass, Tag, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ThemeLogo, DARK_THEMES } from '@/components/ThemeLogo';
@@ -19,6 +19,18 @@ export interface BrandCardProps {
    */
   face?: 'front' | 'back' | 'both';
   className?: string;
+  /** Overrides the default italic tagline. Pass '' to hide it entirely (used while it's still being revealed during onboarding). */
+  descriptor?: string;
+  /** Small pill row under the descriptor, e.g. ['Minimalist', 'Everyday Luxury']. */
+  styleTags?: string[];
+  /** Small color-dot row representing the brand's derived palette. */
+  paletteSwatches?: string[];
+  /** Gates the pendant photo so it can be its own progressive-reveal step. Defaults to true. */
+  showImagery?: boolean;
+  /** Back-face detail row, e.g. "Fine gold & diamond jewelry". */
+  productFocus?: string;
+  /** Back-face detail row for any other business fact. */
+  otherInfo?: string;
 }
 
 /** Bare domains, www., or full URLs all become a proper clickable href. */
@@ -178,6 +190,12 @@ export function BrandCard({
   socialLinks = [],
   face = 'both',
   className,
+  descriptor,
+  styleTags = [],
+  paletteSwatches = [],
+  showImagery = true,
+  productFocus = '',
+  otherInfo = '',
 }: BrandCardProps) {
   const { theme } = useTheme();
   const isDark = DARK_THEMES.has(theme);
@@ -252,12 +270,14 @@ export function BrandCard({
       )}
 
       {/* Pendant cutout: contained, aspect preserved, anchored center-right */}
-      <img
-        src={pendant}
-        alt=""
-        aria-hidden="true"
-        className="pointer-events-none absolute right-4 top-1/2 h-[76%] w-auto -translate-y-1/2 object-contain sm:right-6"
-      />
+      {showImagery && (
+        <img
+          src={pendant}
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none absolute right-4 top-1/2 h-[76%] w-auto -translate-y-1/2 object-contain animate-fade-in sm:right-6"
+        />
+      )}
 
       {/* Top row */}
       <div className="relative flex items-start justify-between">
@@ -282,9 +302,39 @@ export function BrandCard({
           Bespoke Jewelry Brand Experience
         </p>
         <div className="mt-3.5">{sparkleRule}</div>
-        <p className="mt-3.5 font-card italic" style={{ color: pal.support, fontSize: 'clamp(11px, 2.6cqw, 15px)' }}>
-          Designed around your brand, every time.
-        </p>
+        {(descriptor ?? 'Designed around your brand, every time.') && (
+          <p
+            className="mt-3.5 animate-fade-in font-card italic"
+            style={{ color: pal.support, fontSize: 'clamp(11px, 2.6cqw, 15px)' }}
+          >
+            {descriptor ?? 'Designed around your brand, every time.'}
+          </p>
+        )}
+        {styleTags.length > 0 && (
+          <div className="mt-3 flex animate-fade-in flex-wrap gap-1.5">
+            {styleTags.map((tag) => (
+              <span
+                key={tag}
+                className="border px-2 py-0.5 font-mono uppercase tracking-[0.1em]"
+                style={{ borderColor: pal.line, color: pal.support, fontSize: 'clamp(7px, 1.6cqw, 9px)' }}
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
+        {paletteSwatches.length > 0 && (
+          <div className="mt-3 flex animate-fade-in items-center gap-1.5">
+            {paletteSwatches.map((hex, i) => (
+              <span
+                key={`${hex}-${i}`}
+                aria-hidden="true"
+                className="h-3 w-3 shrink-0 rounded-full border"
+                style={{ backgroundColor: hex, borderColor: pal.line }}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Bottom-right pairing */}
@@ -301,12 +351,14 @@ export function BrandCard({
       </p>
       <div className="mt-2.5">{sparkleRule}</div>
 
-      {(site || store || basedIn.trim() || markets.length > 0 || links.length > 0) && (
+      {(site || store || basedIn.trim() || markets.length > 0 || links.length > 0 || productFocus.trim() || otherInfo.trim()) && (
         <div className="mt-7 grid grid-cols-2 content-start gap-x-9 gap-y-5">
           {site && <DetailRow Icon={Globe} value={site} pal={pal} href={toHref(websiteUrl)} />}
           {store && <DetailRow Icon={ShoppingBag} value={store} pal={pal} href={toHref(storeUrl)} />}
           {basedIn.trim() && <DetailRow Icon={MapPin} value={basedIn.trim()} pal={pal} />}
           {markets.length > 0 && <DetailRow Icon={Compass} value={markets.join(' · ')} pal={pal} />}
+          {productFocus.trim() && <DetailRow Icon={Tag} value={productFocus.trim()} pal={pal} />}
+          {otherInfo.trim() && <DetailRow Icon={Info} value={otherInfo.trim()} pal={pal} />}
           {links.map((link) => (
             <DetailRow
               key={link}
