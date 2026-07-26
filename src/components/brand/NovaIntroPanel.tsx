@@ -1,16 +1,18 @@
 import { useState } from 'react';
-import { Phone, Lock, Globe } from 'lucide-react';
+import { Phone, Lock, Globe, Check, ChevronDown } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { DARK_THEMES } from '@/components/ThemeLogo';
 import { cn } from '@/lib/utils';
 import { VoiceOrb, type OrbState } from '@/components/brand/VoiceOrb';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 
 export type NovaLeftStep = 'intro' | 'voice' | 'text';
 
@@ -22,30 +24,70 @@ interface NovaIntroPanelProps {
 
 const INTRO_LINE = "Hi, I'm Nova. Let's make FormaNova feel more tailored to your brand.";
 
+function levenshtein(a: string, b: string): number {
+  const rows = a.length + 1;
+  const cols = b.length + 1;
+  const d: number[][] = Array.from({ length: rows }, () => new Array(cols).fill(0));
+  for (let i = 0; i < rows; i++) d[i][0] = i;
+  for (let j = 0; j < cols; j++) d[0][j] = j;
+  for (let i = 1; i < rows; i++) {
+    for (let j = 1; j < cols; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+    }
+  }
+  return d[rows - 1][cols - 1];
+}
+
+/**
+ * cmdk's default filter only does in-order subsequence matching, so a single
+ * typo ("spamish", "chienese") returns nothing on a short, finite language
+ * list where typos are the norm. Blend substring matching with edit-distance
+ * tolerance across each word of the label/keywords.
+ */
+function languageSearchFilter(value: string, search: string, keywords?: string[]): number {
+  const query = search.trim().toLowerCase();
+  if (!query) return 1;
+  const terms = [value, ...(keywords ?? [])].map((t) => t.toLowerCase());
+  let best = 0;
+  for (const term of terms) {
+    if (term.includes(query)) return 1;
+    for (const word of term.split(/\s+/)) {
+      if (!word) continue;
+      const dist = levenshtein(word, query);
+      const score = 1 - dist / Math.max(word.length, query.length);
+      if (score > best) best = score;
+    }
+  }
+  return best >= 0.55 ? best : 0;
+}
+
 interface NovaLanguageOption {
   code: string;
   label: string;
+  /** English name(s), searchable even though the label is in-script. */
+  englishName: string;
 }
 
 const NOVA_LANGUAGES: NovaLanguageOption[] = [
-  { code: 'en', label: 'English' },
-  { code: 'hi', label: 'हिन्दी' },
-  { code: 'ur', label: 'اردو' },
-  { code: 'ar', label: 'العربية' },
-  { code: 'es', label: 'Español' },
-  { code: 'fr', label: 'Français' },
-  { code: 'de', label: 'Deutsch' },
-  { code: 'pt', label: 'Português' },
-  { code: 'zh', label: '中文' },
-  { code: 'ja', label: '日本語' },
-  { code: 'ko', label: '한국어' },
-  { code: 'ru', label: 'Русский' },
-  { code: 'it', label: 'Italiano' },
-  { code: 'tr', label: 'Türkçe' },
-  { code: 'bn', label: 'বাংলা' },
-  { code: 'id', label: 'Bahasa Indonesia' },
-  { code: 'vi', label: 'Tiếng Việt' },
-  { code: 'nl', label: 'Nederlands' },
+  { code: 'en', label: 'English', englishName: 'English' },
+  { code: 'hi', label: 'हिन्दी', englishName: 'Hindi' },
+  { code: 'ur', label: 'اردو', englishName: 'Urdu' },
+  { code: 'ar', label: 'العربية', englishName: 'Arabic' },
+  { code: 'es', label: 'Español', englishName: 'Spanish' },
+  { code: 'fr', label: 'Français', englishName: 'French' },
+  { code: 'de', label: 'Deutsch', englishName: 'German' },
+  { code: 'pt', label: 'Português', englishName: 'Portuguese' },
+  { code: 'zh', label: '中文', englishName: 'Chinese Mandarin' },
+  { code: 'ja', label: '日本語', englishName: 'Japanese' },
+  { code: 'ko', label: '한국어', englishName: 'Korean' },
+  { code: 'ru', label: 'Русский', englishName: 'Russian' },
+  { code: 'it', label: 'Italiano', englishName: 'Italian' },
+  { code: 'tr', label: 'Türkçe', englishName: 'Turkish' },
+  { code: 'bn', label: 'বাংলা', englishName: 'Bengali' },
+  { code: 'id', label: 'Bahasa Indonesia', englishName: 'Indonesian' },
+  { code: 'vi', label: 'Tiếng Việt', englishName: 'Vietnamese' },
+  { code: 'nl', label: 'Nederlands', englishName: 'Dutch' },
 ];
 
 export function NovaIntroPanel({ step, onSelectVoice }: NovaIntroPanelProps) {
@@ -53,6 +95,7 @@ export function NovaIntroPanel({ step, onSelectVoice }: NovaIntroPanelProps) {
   const isDark = DARK_THEMES.has(theme);
   const [orbHovered, setOrbHovered] = useState(false);
   const [language, setLanguage] = useState('en');
+  const [languageOpen, setLanguageOpen] = useState(false);
 
   const selectedLabel = NOVA_LANGUAGES.find((l) => l.code === language)?.label ?? 'English';
 
@@ -77,26 +120,45 @@ export function NovaIntroPanel({ step, onSelectVoice }: NovaIntroPanelProps) {
       {/* 3. Your creative consultant */}
       <p className="mt-2 text-sm font-medium text-muted-foreground sm:text-base">Your creative consultant</p>
 
-      {/* 4. Language selector — compact bordered control, secondary to the CTA */}
+      {/* 4. Language selector — compact bordered control with search, secondary to the CTA */}
       {step === 'intro' && (
-        <Select value={language} onValueChange={setLanguage}>
-          <SelectTrigger
-            aria-label="Language"
-            className="mt-6 h-11 w-60 gap-2 border border-border bg-background px-4 text-sm font-medium text-foreground shadow-none focus:ring-0 focus:ring-offset-0"
-          >
-            <Globe className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <SelectValue>
-              <span>Language: {selectedLabel}</span>
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent align="center">
-            {NOVA_LANGUAGES.map((l) => (
-              <SelectItem key={l.code} value={l.code}>
-                {l.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Popover open={languageOpen} onOpenChange={setLanguageOpen}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              aria-label="Language"
+              className="mt-6 flex h-11 w-64 items-center gap-2 border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:border-foreground/40"
+            >
+              <Globe className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="flex-1 text-left">Language: {selectedLabel}</span>
+              <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="center" className="w-64 border-border p-0">
+            <Command filter={languageSearchFilter}>
+              <CommandInput placeholder="Search language..." className="text-sm" />
+              <CommandList>
+                <CommandEmpty>No language found.</CommandEmpty>
+                <CommandGroup>
+                  {NOVA_LANGUAGES.map((l) => (
+                    <CommandItem
+                      key={l.code}
+                      value={l.label}
+                      keywords={[l.englishName]}
+                      onSelect={() => {
+                        setLanguage(l.code);
+                        setLanguageOpen(false);
+                      }}
+                    >
+                      <Check className={cn('mr-2 h-4 w-4', language === l.code ? 'opacity-100' : 'opacity-0')} />
+                      {l.label}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
       )}
 
       {/* 5. Short supporting copy */}
