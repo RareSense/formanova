@@ -19,27 +19,28 @@ interface OrbPalette {
 }
 
 /**
- * Light-family themes get the approved pearl/ivory/champagne/blush palette
- * exactly. Dark-family themes shift the same glossy-sphere treatment onto
- * theme tokens (charcoal base, muted-gold/plum highlight) so every theme
- * gets the same orb design, just recolored.
+ * Light-family themes get a saturated gold/amber/rose/blue sphere drawn from
+ * FormaNova's actual hero-accent hue (not a washed-out pastel pearl) — a
+ * warm cream core, deep amber, deep rose, deep cool-blue at the edge.
+ * Dark-family themes push the same theme tokens to much higher opacity so
+ * they read equally rich instead of muted.
  */
 function getOrbPalette(isDark: boolean): OrbPalette {
   if (!isDark) {
     return {
-      stops: ['#FDFBF6', '#F7EFDD', '#F2DCC9', '#F0CBD3', '#D3E3ED'],
-      highlight: 'hsl(0 0% 100% / 0.95)',
+      stops: ['#FFFBF2', '#F3D48A', '#D89A3E', '#C15C82', '#3E6E99'],
+      highlight: 'hsl(0 0% 100% / 0.9)',
     };
   }
   return {
     stops: [
       'hsl(var(--card))',
-      'hsl(var(--muted))',
-      'hsl(var(--formanova-hero-accent) / 0.55)',
-      'hsl(var(--formanova-glow) / 0.45)',
-      'hsl(var(--accent) / 0.5)',
+      'hsl(var(--formanova-hero-accent) / 0.85)',
+      'hsl(var(--formanova-glow) / 0.8)',
+      'hsl(var(--accent) / 0.85)',
+      'hsl(var(--primary) / 0.6)',
     ],
-    highlight: 'hsl(var(--formanova-glow) / 0.85)',
+    highlight: 'hsl(var(--formanova-glow) / 0.95)',
   };
 }
 
@@ -190,15 +191,15 @@ export function VoiceOrb({ state, className, size = 224 }: VoiceOrbProps) {
           <div
             aria-hidden="true"
             data-testid="voice-orb-waveform"
-            className="absolute top-1/2 flex items-center gap-[3px]"
-            style={{ right: -size * 0.18, transform: 'translateY(-50%)' }}
+            className="absolute top-1/2 flex items-center gap-[5px]"
+            style={{ right: -size * 0.24, transform: 'translateY(-50%)' }}
           >
             {WAVEFORM_BARS.map((i) => (
               <motion.span
                 key={`right-${i}`}
-                className="block w-[3px] rounded-full"
-                style={{ background: 'hsl(var(--formanova-hero-accent))', height: 10 }}
-                animate={{ height: [10, 22, 8, 18, 10] }}
+                className="block w-[5px] rounded-full"
+                style={{ background: 'hsl(var(--formanova-hero-accent))', height: 18 }}
+                animate={{ height: [18, 40, 14, 32, 18] }}
                 transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut', delay: i * 0.12 }}
               />
             ))}
@@ -206,15 +207,15 @@ export function VoiceOrb({ state, className, size = 224 }: VoiceOrbProps) {
           <div
             aria-hidden="true"
             data-testid="voice-orb-waveform-left"
-            className="absolute top-1/2 flex items-center gap-[3px]"
-            style={{ left: -size * 0.18, transform: 'translateY(-50%)' }}
+            className="absolute top-1/2 flex items-center gap-[5px]"
+            style={{ left: -size * 0.24, transform: 'translateY(-50%)' }}
           >
             {WAVEFORM_BARS.map((i) => (
               <motion.span
                 key={`left-${i}`}
-                className="block w-[3px] rounded-full"
-                style={{ background: 'hsl(var(--formanova-hero-accent))', height: 10 }}
-                animate={{ height: [10, 22, 8, 18, 10] }}
+                className="block w-[5px] rounded-full"
+                style={{ background: 'hsl(var(--formanova-hero-accent))', height: 18 }}
+                animate={{ height: [18, 40, 14, 32, 18] }}
                 transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut', delay: i * 0.12 }}
               />
             ))}

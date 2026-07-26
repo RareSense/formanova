@@ -303,7 +303,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
       <div
         className={cn(
           'relative flex max-h-[92vh] w-full flex-col border border-border bg-background',
-          step === 'form' ? 'max-w-7xl' : 'max-w-4xl',
+          step === 'form' ? 'max-w-7xl' : 'max-w-6xl min-h-[85vh]',
         )}
       >
 
@@ -333,7 +333,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
           >
 
             {/* Nova intro/voice/text, or the existing brand form once continuation is wired. */}
-            <div className={cn('order-2 lg:order-1', step === 'form' ? 'lg:pr-10' : 'mx-auto w-full max-w-2xl')}>
+            <div className={cn('order-2 lg:order-1', step === 'form' ? 'lg:pr-10' : 'mx-auto w-full max-w-3xl')}>
               {step === 'form' ? (
                 <>
               <h2 className="font-display text-3xl text-foreground sm:text-4xl">
