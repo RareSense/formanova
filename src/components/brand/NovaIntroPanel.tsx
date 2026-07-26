@@ -193,15 +193,6 @@ export function NovaIntroPanel({ step, onSelectVoice }: NovaIntroPanelProps) {
         </div>
       )}
 
-      {step === 'voice' && (
-        <p
-          data-testid="nova-voice-caption"
-          className="mt-9 max-w-md animate-fade-in text-base italic leading-relaxed text-muted-foreground"
-        >
-          {INTRO_LINE}
-        </p>
-      )}
-
       {step === 'text' && (
         <div
           data-testid="nova-text-message"

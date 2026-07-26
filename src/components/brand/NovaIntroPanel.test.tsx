@@ -34,10 +34,10 @@ describe('NovaIntroPanel', () => {
     expect(onSelectVoice).toHaveBeenCalledTimes(1);
   });
 
-  it('renders the spoken caption and no CTAs on the voice step', () => {
+  it('shows no spoken caption and no CTAs on the voice step — the orb speaks for itself', () => {
     renderPanel('voice');
 
-    expect(screen.getByTestId('nova-voice-caption')).toBeInTheDocument();
+    expect(screen.queryByTestId('nova-voice-caption')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Talk to Nova' })).not.toBeInTheDocument();
   });
 

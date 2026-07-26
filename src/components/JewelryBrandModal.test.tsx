@@ -28,12 +28,12 @@ describe('JewelryBrandModal Nova intro', () => {
     expect(screen.queryByText('Tell us about your jewelry brand')).not.toBeInTheDocument();
   });
 
-  it('shows the spoken caption after choosing Talk to Nova, and hides the intro CTAs', () => {
+  it('hides the intro CTAs after choosing Talk to Nova — the orb speaks for itself', () => {
     renderModal();
 
     fireEvent.click(screen.getByRole('button', { name: 'Talk to Nova' }));
 
-    expect(screen.getByTestId('nova-voice-caption')).toBeInTheDocument();
+    expect(screen.queryByTestId('nova-voice-caption')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Talk to Nova' })).not.toBeInTheDocument();
   });
 
