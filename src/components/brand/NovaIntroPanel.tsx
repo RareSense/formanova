@@ -3,7 +3,7 @@ import { Lock, Mic, MicOff, PhoneOff, Pencil, Check, X, Plus } from 'lucide-reac
 import { useTheme } from '@/contexts/ThemeContext';
 import { DARK_THEMES } from '@/components/ThemeLogo';
 import { cn } from '@/lib/utils';
-import { VoiceOrb, type OrbState } from '@/components/brand/VoiceOrb';
+import { VoiceOrb, type VoiceOrbState } from '@/components/brand/VoiceOrb';
 import { INSIGHT_META, type InsightFeedKey } from '@/components/brand/creative-zava-demo';
 
 export type NovaOnboardingStep = 'intro' | 'speaking' | 'fields' | 'scanning' | 'done';
@@ -227,7 +227,7 @@ export function NovaIntroPanel({
   const isDark = DARK_THEMES.has(theme);
   const [showAllFindings, setShowAllFindings] = useState(false);
 
-  let orbState: OrbState = 'idle';
+  let orbState: VoiceOrbState = 'idle';
   if (step === 'speaking') orbState = 'speaking';
   else if (step === 'scanning') orbState = 'connecting';
   else if (step === 'done') orbState = 'speaking';

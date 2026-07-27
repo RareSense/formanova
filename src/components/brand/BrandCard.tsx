@@ -293,7 +293,7 @@ export function BrandCard({
           src={pendant}
           alt=""
           aria-hidden="true"
-          className="pointer-events-none absolute right-4 top-1/2 h-[76%] w-auto -translate-y-1/2 object-contain animate-fade-in sm:right-6"
+          className="pointer-events-none absolute right-4 top-[38%] h-[52%] w-auto -translate-y-1/2 object-contain animate-fade-in sm:right-6"
         />
       )}
 

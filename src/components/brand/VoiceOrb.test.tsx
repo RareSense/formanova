@@ -1,14 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { ThemeProvider } from '@/contexts/ThemeContext';
-import { VoiceOrb } from '@/components/brand/VoiceOrb';
+import { VoiceOrb, type VoiceOrbState } from '@/components/brand/VoiceOrb';
 
-function renderOrb(state: 'idle' | 'hover' | 'connecting' | 'speaking' | 'listening') {
-  return render(
-    <ThemeProvider>
-      <VoiceOrb state={state} />
-    </ThemeProvider>,
-  );
+function renderOrb(state: VoiceOrbState) {
+  return render(<VoiceOrb state={state} />);
 }
 
 describe('VoiceOrb', () => {
@@ -17,18 +12,13 @@ describe('VoiceOrb', () => {
     expect(screen.getByTestId('voice-orb')).toHaveAttribute('data-orb-state', 'idle');
   });
 
-  it('renders the side waveform only in the speaking state', () => {
+  it('reflects state changes on the data attribute', () => {
     renderOrb('speaking');
-    expect(screen.getByTestId('voice-orb-waveform')).toBeInTheDocument();
+    expect(screen.getByTestId('voice-orb')).toHaveAttribute('data-orb-state', 'speaking');
   });
 
-  it('does not render the waveform in the idle state', () => {
-    renderOrb('idle');
-    expect(screen.queryByTestId('voice-orb-waveform')).not.toBeInTheDocument();
-  });
-
-  it('does not render the waveform in the listening state', () => {
-    renderOrb('listening');
-    expect(screen.queryByTestId('voice-orb-waveform')).not.toBeInTheDocument();
+  it('is a labeled, clickable control', () => {
+    renderOrb('connecting');
+    expect(screen.getByRole('button', { name: 'Talk to Nova' })).toBeInTheDocument();
   });
 });
