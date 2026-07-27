@@ -254,6 +254,18 @@ export function BrandCard({
     </div>
   );
 
+  // Artistic wash: when a brand palette has been detected, its colors paint
+  // the card's surface directly (not just a thin accent line) via layered
+  // corner gradients blended into the base surface. Text stays a separate,
+  // later-painted layer so legibility is untouched regardless of intensity.
+  const paletteWash =
+    paletteSwatches.length > 0
+      ? `radial-gradient(120% 90% at 6% 0%, ${paletteSwatches[0]} 0%, transparent 55%),
+         radial-gradient(120% 100% at 100% 10%, ${paletteSwatches[2] ?? paletteSwatches[0]} 0%, transparent 60%),
+         radial-gradient(140% 120% at 92% 100%, ${paletteSwatches[1] ?? paletteSwatches[0]} 0%, transparent 55%),
+         linear-gradient(135deg, ${paletteSwatches[3] ?? paletteSwatches[0]} 0%, transparent 70%)`
+      : undefined;
+
   const frame = (children: React.ReactNode, opts?: { abs?: boolean; back?: boolean }) => (
     <div
       className={cn(
@@ -270,7 +282,18 @@ export function BrandCard({
         padding: 'clamp(16px, 4.8cqw, 30px)',
       }}
     >
-      {children}
+      {paletteWash && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 animate-fade-in"
+          style={{
+            background: paletteWash,
+            opacity: isDark ? 0.5 : 0.4,
+            mixBlendMode: isDark ? 'screen' : 'multiply',
+          }}
+        />
+      )}
+      <div className="relative z-[1] flex min-h-0 flex-1 flex-col">{children}</div>
     </div>
   );
 
@@ -309,8 +332,10 @@ export function BrandCard({
         </p>
       </div>
 
-      {/* Identity block: constant width, vertically centred regardless of name length */}
-      <div className="relative flex min-h-0 w-[70%] flex-1 flex-col justify-center">
+      {/* Identity block: constant width, top-anchored (not centered) so extra
+          findings revealed below (descriptor, tags, palette) grow downward
+          instead of pulling the name upward toward the top row */}
+      <div className="relative flex min-h-0 w-[70%] flex-1 flex-col justify-start pt-3">
         {name && (
           <p className="font-card font-medium tracking-[0.01em]" style={titleStyle(name)}>
             {name}
@@ -342,13 +367,19 @@ export function BrandCard({
           </div>
         )}
         {paletteSwatches.length > 0 && (
-          <div className="mt-3 flex animate-fade-in items-center gap-1.5">
+          <div className="mt-3.5 flex animate-fade-in items-center gap-2">
             {paletteSwatches.map((hex, i) => (
               <span
                 key={`${hex}-${i}`}
                 aria-hidden="true"
-                className="h-3 w-3 shrink-0 rounded-full border"
-                style={{ backgroundColor: hex, borderColor: pal.line }}
+                className="shrink-0 rounded-full border-2 shadow-sm"
+                style={{
+                  backgroundColor: hex,
+                  borderColor: pal.surface,
+                  width: 'clamp(14px, 3.4cqw, 22px)',
+                  height: 'clamp(14px, 3.4cqw, 22px)',
+                  boxShadow: '0 1px 3px hsl(0 0% 0% / 0.18)',
+                }}
               />
             ))}
           </div>

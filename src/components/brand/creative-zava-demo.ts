@@ -34,11 +34,11 @@ export const CREATIVE_ZAVA_DEMO: CreativeZavaProfile = {
 
 /**
  * Order the scanning screen reveals findings in — one every ~700ms so it
- * reads as live discovery, not an instant dump. "imagery" gates the pendant
- * photo but isn't rendered as its own insight card.
+ * reads as live discovery, not an instant dump. The pendant photo is always
+ * visible on the card from the first paint (matches the production
+ * BrandDetails card) rather than being gated behind a reveal step.
  */
 export const INSIGHT_REVEAL_ORDER = [
-  'imagery',
   'identity',
   'palette',
   'productFocus',
@@ -52,7 +52,7 @@ export const INSIGHT_REVEAL_ORDER = [
 ] as const;
 
 export type InsightKey = (typeof INSIGHT_REVEAL_ORDER)[number];
-export type InsightFeedKey = Exclude<InsightKey, 'imagery'>;
+export type InsightFeedKey = InsightKey;
 
 /** Back-face fields — discovering one of these briefly auto-flips the card. */
 export const BACK_SIDE_KEYS: ReadonlySet<InsightKey> = new Set([

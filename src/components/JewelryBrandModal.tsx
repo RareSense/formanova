@@ -154,7 +154,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
     const timers = INSIGHT_REVEAL_ORDER.map((key, i) =>
       setTimeout(() => {
         setRevealedKeys((prev) => [...prev, key]);
-        if (BACK_SIDE_KEYS.has(key) && key !== 'imagery') triggerBackFlip(key as InsightFeedKey);
+        if (BACK_SIDE_KEYS.has(key)) triggerBackFlip(key);
       }, REVEAL_START_DELAY_MS + i * REVEAL_STEP_MS),
     );
     const finishTimer = setTimeout(
@@ -170,11 +170,11 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
   if (!open) return null;
 
   const revealed = (key: InsightKey) => step === 'done' || revealedKeys.includes(key);
-  const hasImagery = revealed('imagery');
 
-  const feedItems: InsightFeedItem[] = INSIGHT_REVEAL_ORDER.filter(
-    (key): key is InsightFeedKey => key !== 'imagery' && revealed(key),
-  ).map((key) => ({ key, value: insightValue(key, profile, website) }));
+  const feedItems: InsightFeedItem[] = INSIGHT_REVEAL_ORDER.filter(revealed).map((key) => ({
+    key,
+    value: insightValue(key, profile, website),
+  }));
 
   const handleOverlayClick = (e: React.MouseEvent) => {
     if (dismissible && e.target === overlayRef.current) onClose();
@@ -300,7 +300,6 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
                   descriptor={revealed('identity') ? profile.identity : ''}
                   styleTags={revealed('visualStyle') ? profile.visualStyle : []}
                   paletteSwatches={revealed('palette') ? profile.palette : []}
-                  showImagery={hasImagery}
                   productFocus={revealed('productFocus') ? profile.productFocus : ''}
                   audience={revealed('audience') ? profile.audience : ''}
                   otherInfo={revealed('otherInfo') ? profile.otherInfo : ''}
