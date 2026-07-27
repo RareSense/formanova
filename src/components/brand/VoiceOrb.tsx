@@ -11,38 +11,17 @@ interface VoiceOrbProps {
   size?: number;
 }
 
-interface OrbPalette {
-  /** Base radial-gradient stops, center to edge. */
-  stops: [string, string, string, string, string];
-  /** The soft bright blob that continuously drifts inside the sphere. */
-  highlight: string;
-}
-
 /**
- * Light-family themes get a saturated gold/amber/rose/blue sphere drawn from
- * FormaNova's actual hero-accent hue (not a washed-out pastel pearl) — a
- * warm cream core, deep amber, deep rose, deep cool-blue at the edge.
- * Dark-family themes push the same theme tokens to much higher opacity so
- * they read equally rich instead of muted.
+ * Fully theme-token-driven — every one of the 12 themes gets its own
+ * correctly-colored orb, not one hardcoded palette that only fits one theme.
+ * Bands are narrow so no single hue (e.g. the amber hero-accent) dominates
+ * the sphere: background core -> glow -> hero-accent -> accent -> a
+ * shaded-down version of hero-accent at the rim for depth without mud.
  */
-function getOrbPalette(isDark: boolean): OrbPalette {
-  if (!isDark) {
-    return {
-      stops: ['#FFFBF2', '#F3D48A', '#D89A3E', '#C15C82', '#3E6E99'],
-      highlight: 'hsl(0 0% 100% / 0.9)',
-    };
-  }
-  return {
-    stops: [
-      'hsl(var(--card))',
-      'hsl(var(--formanova-hero-accent) / 0.85)',
-      'hsl(var(--formanova-glow) / 0.8)',
-      'hsl(var(--accent) / 0.85)',
-      'hsl(var(--primary) / 0.6)',
-    ],
-    highlight: 'hsl(var(--formanova-glow) / 0.95)',
-  };
-}
+const ORB_GRADIENT =
+  'radial-gradient(circle at 40% 32%, hsl(var(--background)) 0%, hsl(var(--formanova-glow) / 0.85) 20%, hsl(var(--formanova-hero-accent) / 0.9) 45%, hsl(var(--accent) / 0.85) 70%, color-mix(in srgb, hsl(var(--formanova-hero-accent)) 55%, black) 100%)';
+
+const ORB_HIGHLIGHT = 'hsl(0 0% 100% / 0.9)';
 
 /**
  * NOTE: these are plain `animate` targets, not `variants` + `initial="idle"`.
@@ -117,7 +96,6 @@ const WAVEFORM_BARS = [0, 1, 2, 3, 4];
 export function VoiceOrb({ state, className, size = 224 }: VoiceOrbProps) {
   const { theme } = useTheme();
   const isDark = DARK_THEMES.has(theme);
-  const pal = getOrbPalette(isDark);
   const highlightSize = size * 0.7;
 
   return (
@@ -147,7 +125,7 @@ export function VoiceOrb({ state, className, size = 224 }: VoiceOrbProps) {
         transition={ORB_TRANSITION[state]}
         className="absolute inset-0 overflow-hidden rounded-full"
         style={{
-          background: `radial-gradient(circle at 34% 28%, ${pal.stops[0]} 0%, ${pal.stops[1]} 18%, ${pal.stops[2]} 42%, ${pal.stops[3]} 68%, ${pal.stops[4]} 100%)`,
+          background: ORB_GRADIENT,
           boxShadow: isDark
             ? 'inset 0 0 0 1px hsl(var(--formanova-hero-accent) / 0.35), inset 0 -16px 26px hsl(0 0% 0% / 0.4)'
             : 'inset 0 0 0 1px hsl(0 0% 100% / 0.65), inset 0 -16px 24px hsl(30 20% 70% / 0.25)',
@@ -164,7 +142,7 @@ export function VoiceOrb({ state, className, size = 224 }: VoiceOrbProps) {
             height: highlightSize,
             left: '18%',
             top: '10%',
-            background: `radial-gradient(circle, ${pal.highlight} 0%, transparent 55%)`,
+            background: `radial-gradient(circle, ${ORB_HIGHLIGHT} 0%, transparent 55%)`,
             filter: `blur(${size * 0.035}px)`,
             opacity: 0.85,
           }}
@@ -179,7 +157,7 @@ export function VoiceOrb({ state, className, size = 224 }: VoiceOrbProps) {
             height: highlightSize * 0.75,
             right: '8%',
             bottom: '6%',
-            background: `radial-gradient(circle, ${pal.highlight} 0%, transparent 58%)`,
+            background: `radial-gradient(circle, ${ORB_HIGHLIGHT} 0%, transparent 58%)`,
             filter: `blur(${size * 0.04}px)`,
             opacity: 0.55,
           }}

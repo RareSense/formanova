@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { JewelryBrandModal } from '@/components/JewelryBrandModal';
-import { CREATIVE_ZAVA_DEMO, DEMO_REVEAL_ORDER } from '@/components/brand/creative-zava-demo';
+import { CREATIVE_ZAVA_DEMO, INSIGHT_REVEAL_ORDER } from '@/components/brand/creative-zava-demo';
 
 vi.mock('@/hooks/use-mobile', () => ({
   useIsMobile: () => false,
@@ -28,9 +28,9 @@ function advanceToFields() {
   act(() => { vi.advanceTimersByTime(5200); }); // speaking -> fields
 }
 
-/** Advances through the full building -> done reveal sequence. */
-function advanceThroughBuilding() {
-  const totalMs = 500 + DEMO_REVEAL_ORDER.length * 550 + 600 + 100;
+/** Advances through the full scanning -> done reveal sequence. */
+function advanceThroughScanning() {
+  const totalMs = 600 + INSIGHT_REVEAL_ORDER.length * 700 + 700 + 100;
   act(() => { vi.advanceTimersByTime(totalMs); });
 }
 
@@ -82,7 +82,7 @@ describe('JewelryBrandModal Nova onboarding', () => {
     expect(screen.getAllByText('Creative Zava').length).toBeGreaterThan(0);
   });
 
-  it('progressively reveals the hardcoded demo fields after Continue, then calls onContinue', () => {
+  it('progressively reveals findings during scanning, then calls onContinue with the (possibly edited) profile', () => {
     const { onContinue } = renderModal();
     advanceToFields();
 
@@ -90,12 +90,12 @@ describe('JewelryBrandModal Nova onboarding', () => {
     fireEvent.change(screen.getByLabelText('Website or store URL'), { target: { value: 'creativezava.com' } });
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
 
-    expect(screen.getByTestId('nova-building-caption')).toBeInTheDocument();
-    expect(screen.queryByText(CREATIVE_ZAVA_DEMO.descriptor)).not.toBeInTheDocument();
+    expect(screen.getByTestId('nova-call-timer')).toBeInTheDocument();
+    expect(screen.queryByText(CREATIVE_ZAVA_DEMO.identity)).not.toBeInTheDocument();
 
-    advanceThroughBuilding();
+    advanceThroughScanning();
 
-    expect(screen.getAllByText(CREATIVE_ZAVA_DEMO.descriptor).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(CREATIVE_ZAVA_DEMO.identity).length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Continue to FormaNova' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Continue to FormaNova' }));
@@ -109,5 +109,35 @@ describe('JewelryBrandModal Nova onboarding', () => {
         social_links: CREATIVE_ZAVA_DEMO.socialLinks,
       }),
     );
+  });
+
+  it('lets the user end the call early, jumping straight to the done step', () => {
+    renderModal();
+    advanceToFields();
+
+    fireEvent.change(screen.getByLabelText('Brand name'), { target: { value: 'Creative Zava' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    act(() => { vi.advanceTimersByTime(600); }); // reveal "identity"
+
+    fireEvent.click(screen.getByRole('button', { name: 'End call' }));
+
+    expect(screen.getByRole('button', { name: 'Continue to FormaNova' })).toBeInTheDocument();
+  });
+
+  it('edits an insight after scanning finishes and reflects it on the card', () => {
+    renderModal();
+    advanceToFields();
+
+    fireEvent.change(screen.getByLabelText('Brand name'), { target: { value: 'Creative Zava' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    advanceThroughScanning();
+
+    fireEvent.click(screen.getByRole('button', { name: /Show all findings/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Edit Brand identity/i }));
+    const input = screen.getByDisplayValue(CREATIVE_ZAVA_DEMO.identity);
+    fireEvent.change(input, { target: { value: 'Bold statement jewelry.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(screen.getAllByText('Bold statement jewelry.').length).toBeGreaterThan(0);
   });
 });

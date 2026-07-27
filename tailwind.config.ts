@@ -183,6 +183,10 @@ export default {
           "50%": { backgroundPosition: "100% 50%" },
           "100%": { backgroundPosition: "0% 50%" },
         },
+        "highlight-flash": {
+          "0%, 100%": { backgroundColor: "transparent" },
+          "25%": { backgroundColor: "hsl(var(--formanova-hero-accent) / 0.24)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -209,6 +213,7 @@ export default {
         "letter-wave": "letter-wave 1.5s ease-in-out infinite",
         "pulse-glow": "pulse-glow 2s ease-in-out infinite",
         "gradient-shift": "gradient-shift 8s ease-in-out infinite",
+        "highlight-flash": "highlight-flash 1.3s ease-out",
       },
     },
   },

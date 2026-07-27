@@ -1,4 +1,4 @@
-import { Globe, ShoppingBag, MapPin, Compass, Tag, Info } from 'lucide-react';
+import { Globe, ShoppingBag, MapPin, Compass, Tag, Info, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ThemeLogo, DARK_THEMES } from '@/components/ThemeLogo';
@@ -31,6 +31,16 @@ export interface BrandCardProps {
   productFocus?: string;
   /** Back-face detail row for any other business fact. */
   otherInfo?: string;
+  /** Back-face detail row, e.g. "Women 25-45, gift shoppers". */
+  audience?: string;
+  /**
+   * Opt-in override for the card's decorative accent color (sparkles, rule
+   * lines) — used to reflect a detected brand palette without touching ink
+   * or surface contrast. Leave unset for the default approved accent.
+   */
+  accentColor?: string;
+  /** Back-face row key to briefly pulse-highlight, e.g. right after it's discovered. */
+  highlightField?: 'website' | 'store' | 'basedIn' | 'targetMarkets' | 'productFocus' | 'audience' | 'otherInfo' | 'social' | null;
 }
 
 /** Bare domains, www., or full URLs all become a proper clickable href. */
@@ -144,9 +154,10 @@ interface DetailRowProps {
   value: string;
   pal: Palette;
   href?: string;
+  highlighted?: boolean;
 }
 
-function DetailRow({ Icon, value, pal, href }: DetailRowProps) {
+function DetailRow({ Icon, value, pal, href, highlighted }: DetailRowProps) {
   const content = (
     <>
       <Icon className="h-[18px] w-[18px] shrink-0" />
@@ -154,7 +165,10 @@ function DetailRow({ Icon, value, pal, href }: DetailRowProps) {
       <span className="min-w-0 truncate" style={{ fontSize: 'clamp(11px, 2.4cqw, 14px)' }}>{value}</span>
     </>
   );
-  const rowClass = 'flex min-w-0 items-center gap-2.5 border-b pb-2';
+  const rowClass = cn(
+    'flex min-w-0 items-center gap-2.5 rounded-sm border-b px-1 -mx-1 pb-2',
+    highlighted && 'animate-highlight-flash',
+  );
   if (href) {
     return (
       <a
@@ -196,6 +210,9 @@ export function BrandCard({
   showImagery = true,
   productFocus = '',
   otherInfo = '',
+  audience = '',
+  accentColor,
+  highlightField = null,
 }: BrandCardProps) {
   const { theme } = useTheme();
   const isDark = DARK_THEMES.has(theme);
@@ -205,16 +222,17 @@ export function BrandCard({
         surface: 'hsl(var(--card))',
         ink: 'hsl(var(--foreground))',
         support: 'hsl(var(--primary))',
-        accent: 'hsl(var(--formanova-hero-accent))',
+        accent: accentColor || 'hsl(var(--formanova-hero-accent))',
         emboss: 'hsl(var(--foreground) / 0.07)',
         line: 'hsl(var(--border))',
       }
     : {
-        // Approved cream paper + burgundy accent on all light themes.
+        // Approved cream paper + burgundy accent on all light themes,
+        // unless a detected brand palette opts into its own accent.
         surface: '#F7F2E9',
         ink: '#1B1710',
         support: 'rgba(27, 23, 16, 0.78)',
-        accent: '#7A2233',
+        accent: accentColor || '#7A2233',
         emboss: 'rgba(27, 23, 16, 0.08)',
         line: '#E0D8C5',
       };
@@ -351,14 +369,15 @@ export function BrandCard({
       </p>
       <div className="mt-2.5">{sparkleRule}</div>
 
-      {(site || store || basedIn.trim() || markets.length > 0 || links.length > 0 || productFocus.trim() || otherInfo.trim()) && (
+      {(site || store || basedIn.trim() || markets.length > 0 || links.length > 0 || productFocus.trim() || audience.trim() || otherInfo.trim()) && (
         <div className="mt-7 grid grid-cols-2 content-start gap-x-9 gap-y-5">
-          {site && <DetailRow Icon={Globe} value={site} pal={pal} href={toHref(websiteUrl)} />}
-          {store && <DetailRow Icon={ShoppingBag} value={store} pal={pal} href={toHref(storeUrl)} />}
-          {basedIn.trim() && <DetailRow Icon={MapPin} value={basedIn.trim()} pal={pal} />}
-          {markets.length > 0 && <DetailRow Icon={Compass} value={markets.join(' · ')} pal={pal} />}
-          {productFocus.trim() && <DetailRow Icon={Tag} value={productFocus.trim()} pal={pal} />}
-          {otherInfo.trim() && <DetailRow Icon={Info} value={otherInfo.trim()} pal={pal} />}
+          {site && <DetailRow Icon={Globe} value={site} pal={pal} href={toHref(websiteUrl)} highlighted={highlightField === 'website'} />}
+          {store && <DetailRow Icon={ShoppingBag} value={store} pal={pal} href={toHref(storeUrl)} highlighted={highlightField === 'store'} />}
+          {basedIn.trim() && <DetailRow Icon={MapPin} value={basedIn.trim()} pal={pal} highlighted={highlightField === 'basedIn'} />}
+          {markets.length > 0 && <DetailRow Icon={Compass} value={markets.join(' · ')} pal={pal} highlighted={highlightField === 'targetMarkets'} />}
+          {productFocus.trim() && <DetailRow Icon={Tag} value={productFocus.trim()} pal={pal} highlighted={highlightField === 'productFocus'} />}
+          {audience.trim() && <DetailRow Icon={Users} value={audience.trim()} pal={pal} highlighted={highlightField === 'audience'} />}
+          {otherInfo.trim() && <DetailRow Icon={Info} value={otherInfo.trim()} pal={pal} highlighted={highlightField === 'otherInfo'} />}
           {links.map((link) => (
             <DetailRow
               key={link}
@@ -366,6 +385,7 @@ export function BrandCard({
               value={handleLabel(link)}
               pal={pal}
               href={link}
+              highlighted={highlightField === 'social'}
             />
           ))}
         </div>

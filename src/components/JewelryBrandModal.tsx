@@ -1,10 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
-import { useIsMobile } from '@/hooks/use-mobile';
 import { X } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { BrandCard, BrandCardFaceToggle, type CardFace } from '@/components/brand/BrandCard';
-import { NovaIntroPanel, type NovaOnboardingStep } from '@/components/brand/NovaIntroPanel';
-import { CREATIVE_ZAVA_DEMO, DEMO_REVEAL_ORDER, type DemoRevealKey } from '@/components/brand/creative-zava-demo';
+import { NovaIntroPanel, type NovaOnboardingStep, type InsightFeedItem } from '@/components/brand/NovaIntroPanel';
+import {
+  CREATIVE_ZAVA_DEMO,
+  INSIGHT_REVEAL_ORDER,
+  BACK_SIDE_KEYS,
+  type InsightKey,
+  type InsightFeedKey,
+  type CreativeZavaProfile,
+} from '@/components/brand/creative-zava-demo';
 import { trackBrandFormOpened, trackBrandFormSubmitted } from '@/lib/posthog-events';
 
 export interface BrandDetails {
@@ -23,10 +28,38 @@ function normalizeUrl(value: string): string {
   return /^https?:\/\//i.test(v) ? v : `https://${v}`;
 }
 
-/** How long each staggered demo-field reveal is spaced apart, in ms. */
-const REVEAL_STEP_MS = 550;
-const REVEAL_START_DELAY_MS = 500;
-const REVEAL_FINISH_PAUSE_MS = 600;
+/** How long each staggered scan-reveal is spaced apart, in ms. */
+const REVEAL_STEP_MS = 700;
+const REVEAL_START_DELAY_MS = 600;
+const REVEAL_FINISH_PAUSE_MS = 700;
+/** How long a back-side discovery holds the card flipped before returning. */
+const FLIP_HOLD_MS = 1400;
+
+/** Maps a feed key to the matching BrandCard back-face row for the auto-flip highlight. */
+const HIGHLIGHT_FIELD_MAP: Partial<Record<InsightFeedKey, NonNullable<Parameters<typeof BrandCard>[0]['highlightField']>>> = {
+  productFocus: 'productFocus',
+  targetMarkets: 'targetMarkets',
+  audience: 'audience',
+  location: 'basedIn',
+  website: 'website',
+  social: 'social',
+  otherInfo: 'otherInfo',
+};
+
+function insightValue(key: InsightFeedKey, profile: CreativeZavaProfile, website: string): string {
+  switch (key) {
+    case 'identity': return profile.identity;
+    case 'productFocus': return profile.productFocus;
+    case 'visualStyle': return profile.visualStyle.join(', ');
+    case 'targetMarkets': return profile.targetMarkets.join(', ');
+    case 'audience': return profile.audience;
+    case 'location': return profile.basedIn;
+    case 'website': return normalizeUrl(website) || website;
+    case 'social': return profile.socialLinks.join(', ');
+    case 'otherInfo': return profile.otherInfo;
+    default: return '';
+  }
+}
 
 interface Props {
   open: boolean;
@@ -39,17 +72,29 @@ interface Props {
 }
 
 export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissible = true, source }: Props) {
-  const isMobile = useIsMobile();
-
   const [step, setStep] = useState<NovaOnboardingStep>('intro');
   const [brandName, setBrandName] = useState(initial?.brand_name ?? '');
   const [website, setWebsite] = useState(initial?.website_url ?? '');
   const [brandNameError, setBrandNameError] = useState(false);
   const [cardFace, setCardFace] = useState<CardFace>('front');
-  const [revealedDemoKeys, setRevealedDemoKeys] = useState<DemoRevealKey[]>([]);
-  const autoBothShown = useRef(false);
+  const [revealedKeys, setRevealedKeys] = useState<InsightKey[]>([]);
+  const [profile, setProfile] = useState<CreativeZavaProfile>(() => ({
+    ...CREATIVE_ZAVA_DEMO,
+    palette: [...CREATIVE_ZAVA_DEMO.palette],
+    visualStyle: [...CREATIVE_ZAVA_DEMO.visualStyle],
+    targetMarkets: [...CREATIVE_ZAVA_DEMO.targetMarkets],
+    socialLinks: [...CREATIVE_ZAVA_DEMO.socialLinks],
+  }));
+  const [callSeconds, setCallSeconds] = useState(0);
+  const [muted, setMuted] = useState(false);
+  const [highlightKey, setHighlightKey] = useState<InsightFeedKey | null>(null);
 
   const overlayRef = useRef<HTMLDivElement>(null);
+  const cardFaceRef = useRef<CardFace>('front');
+  const previousFaceRef = useRef<CardFace>('front');
+  const flipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => { cardFaceRef.current = cardFace; }, [cardFace]);
 
   useEffect(() => {
     if (!open) return;
@@ -76,31 +121,60 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
     return () => clearTimeout(t);
   }, [open, step]);
 
-  // Once Continue is pressed, the demo fields fill in one at a time.
+  // Call timer — ticks while the scan is live, freezes once done.
   useEffect(() => {
-    if (step !== 'building') return;
-    setRevealedDemoKeys([]);
-    const revealTimers = DEMO_REVEAL_ORDER.map((key, i) =>
-      setTimeout(() => setRevealedDemoKeys((prev) => [...prev, key]), REVEAL_START_DELAY_MS + i * REVEAL_STEP_MS),
+    if (step !== 'scanning') return;
+    const id = setInterval(() => setCallSeconds((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [step]);
+
+  // Briefly flips the card to Back and pulses the newly-discovered field, then
+  // returns to whichever face the user was already on. A new flip mid-hold
+  // extends the same hold window instead of stacking a second flip.
+  const triggerBackFlip = (key: InsightFeedKey) => {
+    if (!flipTimeoutRef.current) {
+      previousFaceRef.current = cardFaceRef.current;
+    } else {
+      clearTimeout(flipTimeoutRef.current);
+    }
+    setCardFace('back');
+    setHighlightKey(key);
+    flipTimeoutRef.current = setTimeout(() => {
+      setCardFace(previousFaceRef.current);
+      setHighlightKey(null);
+      flipTimeoutRef.current = null;
+    }, FLIP_HOLD_MS);
+  };
+
+  // Once the scan starts, findings reveal one at a time.
+  useEffect(() => {
+    if (step !== 'scanning') return;
+    setRevealedKeys([]);
+    setCallSeconds(0);
+    const timers = INSIGHT_REVEAL_ORDER.map((key, i) =>
+      setTimeout(() => {
+        setRevealedKeys((prev) => [...prev, key]);
+        if (BACK_SIDE_KEYS.has(key) && key !== 'imagery') triggerBackFlip(key as InsightFeedKey);
+      }, REVEAL_START_DELAY_MS + i * REVEAL_STEP_MS),
     );
     const finishTimer = setTimeout(
       () => setStep('done'),
-      REVEAL_START_DELAY_MS + DEMO_REVEAL_ORDER.length * REVEAL_STEP_MS + REVEAL_FINISH_PAUSE_MS,
+      REVEAL_START_DELAY_MS + INSIGHT_REVEAL_ORDER.length * REVEAL_STEP_MS + REVEAL_FINISH_PAUSE_MS,
     );
     return () => {
-      revealTimers.forEach(clearTimeout);
+      timers.forEach(clearTimeout);
       clearTimeout(finishTimer);
     };
   }, [step]);
 
   if (!open) return null;
 
-  if (step === 'done' && !isMobile && !autoBothShown.current) {
-    autoBothShown.current = true;
-    setCardFace('both');
-  }
+  const revealed = (key: InsightKey) => step === 'done' || revealedKeys.includes(key);
+  const hasImagery = revealed('imagery');
 
-  const hasDemo = (key: DemoRevealKey) => step === 'done' || revealedDemoKeys.includes(key);
+  const feedItems: InsightFeedItem[] = INSIGHT_REVEAL_ORDER.filter(
+    (key): key is InsightFeedKey => key !== 'imagery' && revealed(key),
+  ).map((key) => ({ key, value: insightValue(key, profile, website) }));
 
   const handleOverlayClick = (e: React.MouseEvent) => {
     if (dismissible && e.target === overlayRef.current) onClose();
@@ -112,8 +186,24 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
       return;
     }
     setBrandNameError(false);
-    if (!isMobile) setCardFace('both');
-    setStep('building');
+    setStep('scanning');
+  };
+
+  const handleEditInsight = (key: InsightFeedKey, value: string) => {
+    setProfile((prev) => {
+      switch (key) {
+        case 'identity': return { ...prev, identity: value };
+        case 'productFocus': return { ...prev, productFocus: value };
+        case 'visualStyle': return { ...prev, visualStyle: value.split(',').map((s) => s.trim()).filter(Boolean) };
+        case 'targetMarkets': return { ...prev, targetMarkets: value.split(',').map((s) => s.trim()).filter(Boolean) };
+        case 'audience': return { ...prev, audience: value };
+        case 'location': return { ...prev, basedIn: value };
+        case 'website': setWebsite(value); return prev;
+        case 'social': return { ...prev, socialLinks: value.split(',').map((s) => s.trim()).filter(Boolean) };
+        case 'otherInfo': return { ...prev, otherInfo: value };
+        default: return prev;
+      }
+    });
   };
 
   const handleFinish = () => {
@@ -124,18 +214,22 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
       has_store: false,
       has_location: true,
       has_markets: true,
-      social_count: CREATIVE_ZAVA_DEMO.socialLinks.length,
+      social_count: profile.socialLinks.length,
       has_brand_book: false,
     });
     onContinue({
       brand_name: brandName.trim(),
       website_url: websiteUrl,
       store_url: '',
-      social_links: CREATIVE_ZAVA_DEMO.socialLinks,
-      based_in: CREATIVE_ZAVA_DEMO.basedIn,
-      target_markets: CREATIVE_ZAVA_DEMO.targetMarkets,
+      social_links: profile.socialLinks,
+      based_in: profile.basedIn,
+      target_markets: profile.targetMarkets,
     });
   };
+
+  const summaryLine = step === 'done'
+    ? `Here's what I understand about your brand so far: ${brandName.trim() || 'your brand'} is ${profile.identity.toLowerCase()} If anything feels off, you can edit it here or tell me what to change.`
+    : undefined;
 
   return (
     <div
@@ -160,7 +254,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
         <div className="flex min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-12 sm:py-16">
           <div className="grid w-full flex-1 grid-cols-1 gap-10 self-center lg:grid-cols-2 lg:gap-0">
 
-            {/* Nova — orb, simulated speech, then the two fields */}
+            {/* Nova — orb, simulated speech, fields, then the live scanning feed */}
             <div className="order-2 flex flex-col lg:order-1 lg:pr-12">
               <NovaIntroPanel
                 step={step}
@@ -171,6 +265,15 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
                 brandNameError={brandNameError}
                 onStartBuilding={handleStartBuilding}
                 onFinish={handleFinish}
+                callSeconds={callSeconds}
+                muted={muted}
+                onToggleMute={() => setMuted((m) => !m)}
+                onEndCall={() => setStep('done')}
+                insights={feedItems}
+                onEditInsight={handleEditInsight}
+                palette={profile.palette}
+                onEditPalette={(palette) => setProfile((prev) => ({ ...prev, palette }))}
+                summaryLine={summaryLine}
               />
             </div>
 
@@ -185,23 +288,25 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
                 <BrandCardFaceToggle
                   face={cardFace}
                   onFaceChange={setCardFace}
-                  showBoth={(step === 'building' || step === 'done') && !isMobile}
                   className="mb-5"
                 />
                 <BrandCard
                   brandName={brandName}
-                  websiteUrl={website}
+                  websiteUrl={revealed('website') ? website : ''}
                   storeUrl=""
-                  basedIn={hasDemo('basedIn') ? CREATIVE_ZAVA_DEMO.basedIn : ''}
-                  targetMarkets={hasDemo('targetMarkets') ? CREATIVE_ZAVA_DEMO.targetMarkets : []}
-                  socialLinks={hasDemo('social') ? CREATIVE_ZAVA_DEMO.socialLinks : []}
-                  descriptor={hasDemo('descriptor') ? CREATIVE_ZAVA_DEMO.descriptor : ''}
-                  styleTags={hasDemo('styleTags') ? CREATIVE_ZAVA_DEMO.styleTags : []}
-                  paletteSwatches={hasDemo('palette') ? CREATIVE_ZAVA_DEMO.paletteSwatches : []}
-                  showImagery={hasDemo('imagery')}
-                  productFocus={hasDemo('productFocus') ? CREATIVE_ZAVA_DEMO.productFocus : ''}
-                  otherInfo={hasDemo('otherInfo') ? CREATIVE_ZAVA_DEMO.otherInfo : ''}
-                  face={cardFace === 'both' && isMobile ? 'front' : cardFace}
+                  basedIn={revealed('location') ? profile.basedIn : ''}
+                  targetMarkets={revealed('targetMarkets') ? profile.targetMarkets : []}
+                  socialLinks={revealed('social') ? profile.socialLinks : []}
+                  descriptor={revealed('identity') ? profile.identity : ''}
+                  styleTags={revealed('visualStyle') ? profile.visualStyle : []}
+                  paletteSwatches={revealed('palette') ? profile.palette : []}
+                  showImagery={hasImagery}
+                  productFocus={revealed('productFocus') ? profile.productFocus : ''}
+                  audience={revealed('audience') ? profile.audience : ''}
+                  otherInfo={revealed('otherInfo') ? profile.otherInfo : ''}
+                  accentColor={revealed('palette') ? profile.palette[0] : undefined}
+                  highlightField={highlightKey ? HIGHLIGHT_FIELD_MAP[highlightKey] : null}
+                  face={cardFace}
                 />
               </div>
             </div>
