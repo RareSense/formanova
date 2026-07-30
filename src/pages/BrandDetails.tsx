@@ -93,7 +93,7 @@ export default function BrandDetails() {
 
   /** URL fields reject invalid formats before anything is sent. */
   const saveUrlField = useCallback(
-    (key: 'website_url' | 'store_url') =>
+    (key: 'website_url' | 'storefront_url') =>
       async (raw: string): Promise<string | null> => {
         const normalized = normalizeUrl(raw);
         if (normalized && !isValidHttpUrl(normalized)) return INVALID_URL_MESSAGE;
@@ -171,7 +171,8 @@ export default function BrandDetails() {
     const message = await patchBrandProfile({
       brand_name: null,
       website_url: null,
-      store_url: null,
+      storefront_url: null,
+      physical_location: null,
       social_links: [],
       based_in: null,
       target_markets: [],
@@ -230,7 +231,7 @@ export default function BrandDetails() {
             <BrandCard
               brandName={preview.brand_name ?? profile?.brand_name ?? ''}
               websiteUrl={preview.website_url ?? profile?.website_url ?? ''}
-              storeUrl={profile?.store_url ?? ''}
+              storeUrl={profile?.storefront_url ?? ''}
               basedIn={preview.based_in ?? profile?.based_in ?? ''}
               targetMarkets={cardMarkets}
               socialLinks={profile?.social_links ?? []}
@@ -291,17 +292,17 @@ export default function BrandDetails() {
               <InlineField
                 label="Website"
                 value={profile?.website_url ?? ''}
-                placeholder="yourbrand.com"
+                placeholder="e.g. yourbrand.com"
                 maxLength={200}
                 onSave={saveUrlField('website_url')}
                 onDraftChange={setPreviewField('website_url')}
               />
               <InlineField
                 label="Online store (if different from website)"
-                value={profile?.store_url ?? ''}
-                placeholder="shop.yourbrand.com"
+                value={profile?.storefront_url ?? ''}
+                placeholder="e.g. shop.yourbrand.com"
                 maxLength={200}
-                onSave={saveUrlField('store_url')}
+                onSave={saveUrlField('storefront_url')}
               />
             </div>
 

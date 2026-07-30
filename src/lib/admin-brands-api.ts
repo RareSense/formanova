@@ -46,7 +46,8 @@ export interface AdminBrandListItem {
   user_type: string | null;
   brand_name: string | null;
   website_url: string | null;
-  store_url: string | null;
+  storefront_url: string | null;
+  physical_location: string | null;
   store_platform: string | null;
   social_links: string[];
   based_in: string | null;
@@ -74,7 +75,8 @@ function normalizeItem(raw: unknown): AdminBrandListItem {
     user_type: item.user_type ?? null,
     brand_name: item.brand_name ?? null,
     website_url: item.website_url ?? null,
-    store_url: item.store_url ?? null,
+    storefront_url: item.storefront_url ?? null,
+    physical_location: item.physical_location ?? null,
     store_platform: item.store_platform ?? null,
     social_links: Array.isArray(item.social_links) ? item.social_links : [],
     based_in: item.based_in ?? null,

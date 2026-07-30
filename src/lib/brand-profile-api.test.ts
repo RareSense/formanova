@@ -95,11 +95,11 @@ describe('patchBrandProfile', () => {
 
   it('joins multiple 422 field errors', async () => {
     mockFetch.mockResolvedValue(
-      jsonResponse({ detail: { website_url: 'invalid URL', store_url: 'invalid URL' } }, 422),
+      jsonResponse({ detail: { website_url: 'invalid URL', storefront_url: 'invalid URL' } }, 422),
     );
-    const result = await patchBrandProfile({ website_url: 'a', store_url: 'b' });
+    const result = await patchBrandProfile({ website_url: 'a', storefront_url: 'b' });
     expect(result).toContain('website url: invalid URL');
-    expect(result).toContain('store url: invalid URL');
+    expect(result).toContain('storefront url: invalid URL');
   });
 
   it('returns a generic error on non-422 failures', async () => {
@@ -120,7 +120,8 @@ describe('fetchBrandProfile', () => {
     expect(profile).toEqual({
       brand_name: '',
       website_url: '',
-      store_url: '',
+      storefront_url: '',
+      physical_location: '',
       social_links: [],
       based_in: '',
       target_markets: [],

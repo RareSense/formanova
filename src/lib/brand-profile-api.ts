@@ -3,7 +3,8 @@ import { authenticatedFetch } from '@/lib/authenticated-fetch';
 export interface BrandProfile {
   brand_name: string;
   website_url: string;
-  store_url: string;
+  storefront_url: string;
+  physical_location: string;
   social_links: string[];
   based_in: string;
   target_markets: string[];
@@ -18,7 +19,8 @@ export interface BrandBookInfo {
 export const EMPTY_BRAND_PROFILE: BrandProfile = {
   brand_name: '',
   website_url: '',
-  store_url: '',
+  storefront_url: '',
+  physical_location: '',
   social_links: [],
   based_in: '',
   target_markets: [],
@@ -58,7 +60,8 @@ export async function fetchBrandProfile(): Promise<BrandProfile> {
   return {
     brand_name: data.brand_name ?? '',
     website_url: data.website_url ?? '',
-    store_url: data.store_url ?? '',
+    storefront_url: data.storefront_url ?? '',
+    physical_location: data.physical_location ?? '',
     social_links: data.social_links ?? [],
     based_in: data.based_in ?? '',
     target_markets: data.target_markets ?? [],
