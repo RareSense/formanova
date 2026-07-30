@@ -55,7 +55,8 @@ export function BrandPromptHandler() {
         const missingBrandName = !String(data.brand_name ?? '').trim();
         const hasPrimaryChannel = Boolean(
           String(data.website_url ?? '').trim()
-          || String(data.store_url ?? '').trim()
+          || String(data.storefront_url ?? '').trim()
+          || String(data.physical_location ?? '').trim()
           || hasInstagramProfile(data.social_links),
         );
         const missingSalesChannel = !hasPrimaryChannel;
@@ -63,7 +64,7 @@ export function BrandPromptHandler() {
           setInitialDetails({
             brand_name: data.brand_name ?? '',
             website_url: data.website_url ?? '',
-            store_url: data.store_url ?? '',
+            physical_location: data.physical_location ?? '',
             social_links: data.social_links ?? [],
             based_in: data.based_in ?? '',
             target_markets: data.target_markets ?? [],
@@ -93,7 +94,7 @@ export function BrandPromptHandler() {
   const handleContinue = async (details: BrandDetails) => {
     const body: Record<string, unknown> = { brand_name: details.brand_name };
     if (details.website_url) body.website_url = details.website_url;
-    if (details.store_url) body.store_url = details.store_url;
+    if (details.physical_location) body.physical_location = details.physical_location;
     if (details.social_links.length) body.social_links = details.social_links;
     if (details.based_in) body.based_in = details.based_in;
     if (details.target_markets.length) body.target_markets = details.target_markets;

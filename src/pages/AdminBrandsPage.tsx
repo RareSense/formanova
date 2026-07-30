@@ -71,6 +71,25 @@ function HostLink({ url }: { url: string | null }) {
   );
 }
 
+/** Physical location is free text or a Maps link, not URL-validated on the backend. */
+function PhysicalLocationCell({ value }: { value: string | null }) {
+  if (!value) return <span className="text-muted-foreground">-</span>;
+  if (/^https?:\/\//i.test(value)) {
+    return (
+      <a
+        href={value}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1 text-primary hover:opacity-80 transition-opacity"
+      >
+        Map link
+        <ExternalLink className="h-3 w-3 shrink-0" />
+      </a>
+    );
+  }
+  return <span className="max-w-[200px] truncate">{value}</span>;
+}
+
 function NotAuthorizedState() {
   return (
     <div className="border border-border bg-card">
@@ -210,6 +229,7 @@ export default function AdminBrandsPage() {
                   <TableHead>Website</TableHead>
                   <TableHead>Store</TableHead>
                   <TableHead>Platform</TableHead>
+                  <TableHead>Physical location</TableHead>
                   <TableHead>Based in</TableHead>
                   <TableHead>Markets</TableHead>
                   <TableHead>Book</TableHead>
@@ -224,7 +244,7 @@ export default function AdminBrandsPage() {
                       {item.brand_name ?? <span className="text-muted-foreground italic">Not set</span>}
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-sm"><HostLink url={item.website_url} /></TableCell>
-                    <TableCell className="whitespace-nowrap text-sm"><HostLink url={item.store_url} /></TableCell>
+                    <TableCell className="whitespace-nowrap text-sm"><HostLink url={item.storefront_url} /></TableCell>
                     <TableCell className="whitespace-nowrap">
                       {item.store_platform ? (
                         <Badge variant={item.store_platform === 'unknown' ? 'outline' : 'secondary'} className="gap-1">
@@ -234,6 +254,9 @@ export default function AdminBrandsPage() {
                       ) : (
                         <span className="text-muted-foreground">-</span>
                       )}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-sm">
+                      <PhysicalLocationCell value={item.physical_location} />
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-sm">
                       {item.based_in ?? <span className="text-muted-foreground">-</span>}
@@ -255,7 +278,7 @@ export default function AdminBrandsPage() {
                 ))}
                 {(data?.items ?? []).length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={9} className="py-12 text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={10} className="py-12 text-center text-sm text-muted-foreground">
                       No users match these filters.
                     </TableCell>
                   </TableRow>

@@ -1,142 +1,35 @@
 import { useState, useEffect, useRef } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { X, Plus, Lock, Check, Globe, MapPin, ShoppingBag, MoreHorizontal, Instagram as InstagramChannelIcon } from 'lucide-react';
+import { X, Lock, Globe, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
 import { DARK_THEMES } from '@/components/ThemeLogo';
-import { BrandCard, BrandCardFaceToggle, type CardFace } from '@/components/brand/BrandCard';
+import { type CardFace } from '@/components/brand/BrandCard';
 import { PRESET_SOCIAL_PLATFORMS, extractHandle, handleToUrl, urlMatchesHost } from '@/components/brand/social-icons';
-import { FacebookChannelIcon, WhatsAppChannelIcon } from '@/components/brand/channel-icons';
 import { isValidHttpUrl, isValidHandle, INVALID_URL_MESSAGE } from '@/lib/brand-profile-api';
 import { BrandBookUpload } from '@/components/brand/BrandBookUpload';
 import { trackBrandFormOpened, trackBrandFormSubmitted } from '@/lib/posthog-events';
+import {
+  type SalesChannel,
+  normalizeUrl,
+  CASCADE_ORDER,
+  CHANNEL_META,
+  CHANNEL_DETAIL_COPY,
+  normalizeSalesChannelDetail,
+  validateSalesChannelDetail,
+} from '@/components/brand/sales-channel';
+import { INPUT_CLASS, FieldLabel, IconInput } from '@/components/brand/JewelryBrandFormFields';
+import { WhatsAppOnlyWarning } from '@/components/brand/WhatsAppOnlyWarning';
+import { BespokeCardPreview } from '@/components/brand/BespokeCardPreview';
+import { SocialProfilesSection } from '@/components/brand/SocialProfilesSection';
 
 export interface BrandDetails {
   brand_name: string;
   website_url: string;
-  store_url: string;
+  physical_location: string;
   social_links: string[];
   based_in: string;
   target_markets: string[];
-}
-
-/** Users often type "mybrand.com" — the backend rejects anything that isn't http(s). */
-function normalizeUrl(value: string): string {
-  const v = value.trim();
-  if (!v) return '';
-  return /^https?:\/\//i.test(v) ? v : `https://${v}`;
-}
-
-const INPUT_CLASS =
-  'w-full border border-border bg-background px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-foreground transition-colors';
-
-type SalesChannel = 'website' | 'store' | 'instagram' | 'facebook' | 'whatsapp' | 'other';
-
-/**
- * Priority order for the one-at-a-time channel cascade: we ask for the
- * highest-priority channel first, and only reveal the next one down if the
- * user says they don't have the current one. WhatsApp sits second-to-last on
- * purpose — it's the easiest channel for a seller to have, so asking early
- * would let it crowd out higher-value channels like Website.
- */
-const CASCADE_ORDER: SalesChannel[] = ['website', 'store', 'instagram', 'facebook', 'whatsapp', 'other'];
-
-const CHANNEL_META: Record<SalesChannel, { label: string; Icon: React.ComponentType<{ className?: string }> }> = {
-  website: { label: 'Website', Icon: Globe },
-  store: { label: 'Online store', Icon: ShoppingBag },
-  instagram: { label: 'Instagram', Icon: InstagramChannelIcon },
-  facebook: { label: 'Facebook', Icon: FacebookChannelIcon },
-  whatsapp: { label: 'WhatsApp', Icon: WhatsAppChannelIcon },
-  other: { label: 'Other', Icon: MoreHorizontal },
-};
-
-const CHANNEL_DETAIL_COPY: Record<SalesChannel, { label: string; placeholder: string; helper?: string; skipLabel: string }> = {
-  website: {
-    label: 'Website link',
-    placeholder: 'yourbrand.com',
-    skipLabel: "I don't have a website",
-  },
-  store: {
-    label: 'Online store link',
-    placeholder: 'etsy.com/shop/yourbrand',
-    helper: 'Examples: Shopify, Etsy, Amazon, WooCommerce, etc.',
-    skipLabel: "I don't have an online store",
-  },
-  instagram: {
-    label: 'Instagram link or handle',
-    placeholder: 'instagram.com/yourbrand or @yourbrand',
-    skipLabel: "I don't have Instagram",
-  },
-  facebook: {
-    label: 'Facebook page link',
-    placeholder: 'facebook.com/yourbrand or @yourbrand',
-    skipLabel: "I don't have Facebook",
-  },
-  whatsapp: {
-    label: 'WhatsApp number',
-    placeholder: '+1 555 123 4567',
-    skipLabel: "I don't have WhatsApp",
-  },
-  other: {
-    label: 'Other link',
-    placeholder: 'Link where customers can buy',
-    skipLabel: "I don't have any of these",
-  },
-};
-
-function FieldLabel({ label, required }: { label: string; required?: boolean }) {
-  return (
-    <label className="text-sm font-medium text-foreground">
-      {label}{required && <span className="ml-1 text-destructive">*</span>}
-    </label>
-  );
-}
-
-function normalizeSalesChannelDetail(channel: SalesChannel, value: string): string {
-  const raw = value.trim();
-  if (!raw) return '';
-  if (channel === 'instagram') {
-    const handle = extractHandle(raw, 'instagram.com');
-    if (isValidHandle(handle)) return `https://instagram.com/${handle}`;
-  }
-  if (channel === 'facebook') {
-    const handle = extractHandle(raw, 'facebook.com');
-    if (isValidHandle(handle)) return `https://facebook.com/${handle}`;
-  }
-  if (channel === 'whatsapp' && !/^https?:\/\//i.test(raw) && !/^[\w.-]+\.[A-Za-z]{2,}/.test(raw)) {
-    const digits = raw.replace(/[^\d]/g, '');
-    if (digits.length >= 7) return `https://wa.me/${digits}`;
-  }
-  return normalizeUrl(raw);
-}
-
-function validateSalesChannelDetail(channel: SalesChannel, normalized: string): string | undefined {
-  if (!normalized) return 'This field is required.';
-  if (!isValidHttpUrl(normalized)) {
-    return INVALID_URL_MESSAGE;
-  }
-  return undefined;
-}
-
-/** Input with a muted trailing icon, as in the bespoke mockup. */
-function IconInput({
-  icon: Icon,
-  error,
-  className,
-  ...props
-}: React.InputHTMLAttributes<HTMLInputElement> & {
-  icon: React.ComponentType<{ className?: string }>;
-  error?: boolean;
-}) {
-  return (
-    <div className="relative">
-      <input
-        {...props}
-        className={cn(INPUT_CLASS, 'pr-11', error && 'border-destructive focus:border-destructive', className)}
-      />
-      <Icon className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
-    </div>
-  );
 }
 
 interface Props {
@@ -189,7 +82,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
   const salesChannel: SalesChannel | null = CASCADE_ORDER[channelStepIndex] ?? null;
   const [handles, setHandles] = useState<Record<string, string>>(initialHandles);
   const [extraLink, setExtraLink] = useState(otherInitialLinks[0] ?? '');
-  const [storeMapsLink, setStoreMapsLink] = useState(initial?.store_url ?? '');
+  const [storeMapsLink, setStoreMapsLink] = useState(initial?.physical_location ?? '');
   // Instagram usually starts the secondary profile list; if Instagram is the
   // primary sales channel, TikTok becomes the first secondary profile instead.
   const [revealed, setRevealed] = useState<string[]>(() => {
@@ -288,7 +181,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
       // TODO(backend): replace this temporary mapping once the backend has a
       // dedicated primary sales channel type + detail field.
       website_url: channelDetail,
-      store_url: mapsLink,
+      physical_location: mapsLink,
       social_links: socialLinks.slice(0, 10),
       based_in: basedIn.trim(),
       target_markets: parsedMarkets,
@@ -307,8 +200,8 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
       const channelError = validateSalesChannelDetail(salesChannel, channelDetail);
       if (channelError) errors.salesChannelDetail = channelError;
     }
-    const mapsLink = normalizeUrl(storeMapsLink);
-    if (mapsLink && !isValidHttpUrl(mapsLink)) errors.storeMapsLink = INVALID_URL_MESSAGE;
+    // Physical location is free text or a Maps link — not URL-validated.
+    const mapsLink = storeMapsLink.trim();
     if (!salesChannel && !mapsLink) {
       errors.salesChannel = "Add an online channel, or your physical store's Maps link.";
     }
@@ -501,96 +394,30 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
             </div>
 
             {/* Social profiles */}
-            <div className="space-y-2">
-              <FieldLabel label="Social profiles" />
-              <div className="space-y-2">
-                {visiblePlatforms.map(({ key, label, Icon }) => (
-                  <div
-                    key={key}
-                    className={cn(
-                      'flex items-center border border-border bg-background focus-within:border-foreground transition-colors',
-                      fieldErrors.social && 'border-destructive focus-within:border-destructive',
-                    )}
-                  >
-                    <span className="flex w-24 shrink-0 items-center gap-2 border-r border-border px-2.5 py-3.5 text-foreground sm:w-32 sm:gap-2.5 sm:px-3.5">
-                      <Icon className="h-4 w-4 shrink-0" />
-                      <span className="text-sm">{label}</span>
-                    </span>
-                    <span className="pl-3 text-sm text-muted-foreground" aria-hidden="true">@</span>
-                    <input
-                      type="text"
-                      value={handles[key] ?? ''}
-                      onChange={(e) => {
-                        setHandles((prev) => ({ ...prev, [key]: e.target.value }));
-                        setFieldErrors((p) => ({ ...p, social: undefined }));
-                      }}
-                      onFocus={showBack}
-                      maxLength={40}
-                      placeholder="yourbrand"
-                      aria-label={`${label} handle`}
-                      className="min-w-0 flex-1 bg-transparent py-3.5 pl-1 pr-3.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none"
-                    />
-                    {(handles[key] ?? '').trim() && (
-                      <Check className="mx-3 h-4 w-4 shrink-0 text-formanova-success" aria-label="Filled" />
-                    )}
-                    {(key !== 'instagram' || (handles[key] ?? '').trim()) && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (key !== 'instagram') setRevealed((prev) => prev.filter((k) => k !== key));
-                          setHandles((prev) => ({ ...prev, [key]: '' }));
-                        }}
-                        className="mr-2 shrink-0 p-1.5 text-muted-foreground hover:text-destructive transition-colors"
-                        aria-label={key === 'instagram' ? 'Clear Instagram' : `Remove ${label}`}
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-                ))}
-                {fieldErrors.social && <p className="text-xs text-destructive">{fieldErrors.social}</p>}
-                {revealed.includes('extra') && (
-                  <div className="space-y-1.5">
-                    <div className="flex items-center border border-border bg-background focus-within:border-foreground transition-colors">
-                      <input
-                        type="url"
-                        value={extraLink}
-                        onChange={(e) => { setExtraLink(e.target.value); setFieldErrors((p) => ({ ...p, extra: undefined })); }}
-                        onFocus={showBack}
-                        maxLength={200}
-                        placeholder="Any other profile URL"
-                        className="min-w-0 flex-1 bg-transparent px-3.5 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none"
-                      />
-                      {extraLink.trim() && (
-                        <Check className="mx-3 h-4 w-4 shrink-0 text-formanova-success" aria-label="Filled" />
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setRevealed((prev) => prev.filter((k) => k !== 'extra'));
-                          setExtraLink('');
-                        }}
-                        className="mr-2 shrink-0 p-1.5 text-muted-foreground hover:text-destructive transition-colors"
-                        aria-label="Remove link"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                    {fieldErrors.extra && <p className="text-xs text-destructive">{fieldErrors.extra}</p>}
-                  </div>
-                )}
-                {nextReveal && (
-                  <button
-                    type="button"
-                    onClick={() => setRevealed((prev) => [...prev, nextReveal])}
-                    className="flex items-center gap-1 pt-0.5 text-sm font-medium text-foreground hover:opacity-70 transition-opacity"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    Add more
-                  </button>
-                )}
-              </div>
-            </div>
+            <SocialProfilesSection
+              visiblePlatforms={visiblePlatforms}
+              handles={handles}
+              error={fieldErrors.social}
+              extraLink={extraLink}
+              extraError={fieldErrors.extra}
+              revealed={revealed}
+              nextReveal={nextReveal}
+              onHandleChange={(key, value) => {
+                setHandles((prev) => ({ ...prev, [key]: value }));
+                setFieldErrors((p) => ({ ...p, social: undefined }));
+              }}
+              onRemoveHandle={(key) => {
+                if (key !== 'instagram') setRevealed((prev) => prev.filter((k) => k !== key));
+                setHandles((prev) => ({ ...prev, [key]: '' }));
+              }}
+              onExtraChange={(value) => { setExtraLink(value); setFieldErrors((p) => ({ ...p, extra: undefined })); }}
+              onRemoveExtra={() => {
+                setRevealed((prev) => prev.filter((k) => k !== 'extra'));
+                setExtraLink('');
+              }}
+              onReveal={(key) => setRevealed((prev) => [...prev, key])}
+              onFocus={showBack}
+            />
 
             {/* Brand book */}
             <div className="space-y-2">
@@ -626,30 +453,17 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
             </div>
 
             {/* Live bespoke card stage */}
-            <div className="hidden lg:order-2 lg:block lg:border-l lg:border-border lg:pl-10">
-              <div className="mx-auto max-w-md lg:sticky lg:top-0 lg:max-w-none">
-                <div className="mb-4 flex items-center justify-between gap-4">
-                  <p className="font-card text-sm uppercase tracking-[0.22em] text-foreground">
-                    Your Bespoke Card
-                  </p>
-                </div>
-                <BrandCardFaceToggle
-                  face={cardFace}
-                  onFaceChange={setCardFace}
-                  showBoth={allDone && !isMobile}
-                  className="mb-5"
-                />
-                <BrandCard
-                  brandName={brandName}
-                  websiteUrl={salesChannelDetail}
-                  storeUrl=""
-                  basedIn={basedIn}
-                  targetMarkets={parsedMarkets}
-                  socialLinks={liveSocialLinks}
-                  face={cardFace === 'both' && (isMobile || !allDone) ? 'front' : cardFace}
-                />
-              </div>
-            </div>
+            <BespokeCardPreview
+              cardFace={cardFace}
+              onFaceChange={setCardFace}
+              allDone={allDone}
+              isMobile={isMobile}
+              brandName={brandName}
+              salesChannelDetail={salesChannelDetail}
+              basedIn={basedIn}
+              targetMarkets={parsedMarkets}
+              socialLinks={liveSocialLinks}
+            />
 
           </div>
         </div>
@@ -658,38 +472,14 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
     </div>
 
     {showWhatsappWarning && (
-      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4">
-        <div className="w-full max-w-md border border-border bg-background p-6">
-          <h3 className="font-display text-xl text-foreground">Just WhatsApp?</h3>
-          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-            Add a website, store, or social link too. It helps us understand your brand better and give you a more bespoke experience.
-          </p>
-          <div className="mt-6 flex flex-col gap-2.5 sm:flex-row-reverse">
-            <button
-              type="button"
-              onClick={() => {
-                if (pendingSubmit) submitForm(pendingSubmit.channelDetail, pendingSubmit.mapsLink);
-                setShowWhatsappWarning(false);
-              }}
-              className={cn(
-                'w-full py-3 text-sm font-medium transition-colors sm:w-auto sm:px-6',
-                isDark
-                  ? 'border border-foreground bg-transparent text-foreground hover:bg-foreground hover:text-background'
-                  : 'bg-foreground text-background hover:opacity-90',
-              )}
-            >
-              Continue anyway
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowWhatsappWarning(false)}
-              className="w-full border border-border py-3 text-sm font-medium text-foreground transition-colors hover:border-foreground sm:w-auto sm:px-6"
-            >
-              Go back
-            </button>
-          </div>
-        </div>
-      </div>
+      <WhatsAppOnlyWarning
+        isDark={isDark}
+        onContinueAnyway={() => {
+          if (pendingSubmit) submitForm(pendingSubmit.channelDetail, pendingSubmit.mapsLink);
+          setShowWhatsappWarning(false);
+        }}
+        onGoBack={() => setShowWhatsappWarning(false)}
+      />
     )}
     </>
   );

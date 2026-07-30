@@ -45,11 +45,11 @@ describe('saveUserType', () => {
     expect(body).toEqual({ user_type: 'freelancer' });
   });
 
-  it('includes brand fields, store_url among them, when provided', async () => {
+  it('includes brand fields, physical_location among them, when provided', async () => {
     await saveUserType('jewelry_brand', {
       brand_name: 'Ice Cartel',
       website_url: 'https://icecartel.com',
-      store_url: 'https://icecartel.com/collections/all',
+      physical_location: '123 Main St, Miami',
       social_links: ['https://instagram.com/icecartel'],
     });
     const body = JSON.parse(mockFetch.mock.calls[0][1]?.body as string);
@@ -57,7 +57,7 @@ describe('saveUserType', () => {
       user_type: 'jewelry_brand',
       brand_name: 'Ice Cartel',
       website_url: 'https://icecartel.com',
-      store_url: 'https://icecartel.com/collections/all',
+      physical_location: '123 Main St, Miami',
       social_links: ['https://instagram.com/icecartel'],
     });
   });
@@ -66,7 +66,7 @@ describe('saveUserType', () => {
     await saveUserType('jewelry_brand', {
       brand_name: 'Ice Cartel',
       website_url: '',
-      store_url: '',
+      physical_location: '',
       social_links: [],
       based_in: '',
       target_markets: [],
