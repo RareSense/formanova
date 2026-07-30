@@ -269,6 +269,14 @@ export default function BrandDetails() {
                 onSave={saveField('based_in')}
                 onDraftChange={setPreviewField('based_in')}
               />
+              <InlineField
+                label="Physical store (Google Maps link)"
+                value={profile?.physical_location ?? ''}
+                placeholder="e.g. maps.google.com/... or a street address"
+                icon={MapPin}
+                maxLength={300}
+                onSave={saveField('physical_location')}
+              />
               <div className="sm:col-span-2">
                 <InlineField
                   label="Target markets"
