@@ -15,7 +15,7 @@ import { trackBrandFormOpened, trackBrandFormSubmitted } from '@/lib/posthog-eve
 export interface BrandDetails {
   brand_name: string;
   website_url: string;
-  store_url: string;
+  physical_location: string;
   social_links: string[];
   based_in: string;
   target_markets: string[];
@@ -220,7 +220,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
     onContinue({
       brand_name: brandName.trim(),
       website_url: websiteUrl,
-      store_url: '',
+      physical_location: '',
       social_links: profile.socialLinks,
       based_in: profile.basedIn,
       target_markets: profile.targetMarkets,
