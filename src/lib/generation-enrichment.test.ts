@@ -194,4 +194,22 @@ describe('extractProductShotThumbnail', () => {
 
     expect(extractProductShotThumbnail(steps)).toBe('data:image/png;base64,recursive123');
   });
+
+  it('prefers the generate step output over an input image CAS ref from an earlier prepare step', () => {
+    // Regression for the prepare->generate CAS handoff change: prepare steps now emit
+    // input images as {uri: "azure://..."} too, which must not be picked up as the thumbnail.
+    const steps = [
+      { tool: 'analyze_jewelry_pdp', output: { description: 'a gold ring' } },
+      {
+        tool: 'prepare_jewelry_request_pdp_higher_tier',
+        output: { jewelry_images: [{ uri: 'azure://container/input/jewelry1.jpg', sha256: 'abc' }] },
+      },
+      {
+        tool: 'generate_jewelry_image_pdp_higher_tier',
+        output: { output_url: 'azure://container/output/real-result.jpg' },
+      },
+    ];
+
+    expect(extractProductShotThumbnail(steps)).toBe('https://cdn.example.com/container/output/real-result.jpg');
+  });
 });
