@@ -213,8 +213,10 @@ export function extractCadTextData(steps: any[]) {
       }
     }
     if (!glb_url && glbOut) {
+      // Must actually be a .glb — glbOut can carry other azure:// refs (e.g. a
+      // reference image used for generation) that aren't the model itself.
       const uri = findAzureUri(glbOut);
-      if (uri) {
+      if (uri && uri.includes('.glb')) {
         glb_url = azureUriToUrl(uri);
         const parts = uri.split('/');
         glb_filename = parts[parts.length - 1] || 'model.glb';

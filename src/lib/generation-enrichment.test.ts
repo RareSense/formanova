@@ -138,6 +138,43 @@ describe('extractCadTextData', () => {
     const result = extractCadTextData([{ tool: 'other', input: {}, output: {} }]);
     expect(result.thumbnail_url).toBe('');
   });
+
+  it('does not mistake a non-glb azure reference on the generate step for the model URI', () => {
+    // ring-generate's output can carry other azure:// refs (e.g. a reference image
+    // used for generation) alongside/instead of the actual model. Only a real .glb
+    // uri should ever be treated as glb_url.
+    const steps = [
+      {
+        tool: 'ring-generate',
+        output: {
+          reference_image: { uri: 'azure://bucket/reference-input.jpg' },
+        },
+      },
+    ];
+    const result = extractCadTextData(steps);
+    expect(result.glb_url).toBeNull();
+  });
+
+  it('finds the real glb even when the generate step also carries a non-glb azure reference', () => {
+    const steps = [
+      {
+        tool: 'ring-generate',
+        output: {
+          reference_image: { uri: 'azure://bucket/reference-input.jpg' },
+        },
+      },
+      {
+        tool: 'run_blender',
+        output: {
+          success: true,
+          glb_artifact: { uri: 'azure://bucket/model.glb' },
+          screenshots: [],
+        },
+      },
+    ];
+    const result = extractCadTextData(steps);
+    expect(result.glb_url).toBe('https://cdn.example.com/bucket/model.glb');
+  });
 });
 
 // -- extractProductShotThumbnail - step-based (sync) --
