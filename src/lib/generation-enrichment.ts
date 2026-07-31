@@ -106,8 +106,17 @@ export function extractPhotoThumbnail(steps: any[]): string | null {
 // ── Product shot thumbnail extraction ───────────────────────────────
 // Same approach as model shot: caller fetches getWorkflowDetails, passes steps here.
 
+// Prepare/analyze steps now emit input images (jewelry/inspiration) as CAS refs
+// too (see prepare->generate CAS handoff), so they must be skipped here — otherwise
+// an input image's azure:// uri gets picked up as if it were the generated result.
+function isInputStageStep(step: any): boolean {
+  const tool = typeof step?.tool === 'string' ? step.tool.toLowerCase() : '';
+  return tool.includes('prepare') || tool.includes('analyze');
+}
+
 export function extractProductShotThumbnail(steps: any[]): string | null {
   for (const step of steps) {
+    if (isInputStageStep(step)) continue;
     const out = step?.output_data ?? step?.output ?? {};
     const b64 = findBase64Image(out);
     if (b64) return b64;
