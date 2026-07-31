@@ -170,6 +170,14 @@ function extractJewelryDescription(result: PhotoshootResultResponse): string | u
   return undefined;
 }
 
+// Prepare/analyze nodes now emit input images (jewelry/inspiration) as CAS refs
+// too (see prepare->generate CAS handoff), so their result keys must be skipped
+// here — otherwise an input image's uri gets picked up as if it were the output.
+function isInputStageKey(key: string): boolean {
+  const lower = key.toLowerCase();
+  return lower.includes('prepare') || lower.includes('analyze');
+}
+
 function extractResultImages(result: PhotoshootResultResponse): string[] {
   const preferredKeys = [
     'output',
@@ -180,7 +188,7 @@ function extractResultImages(result: PhotoshootResultResponse): string[] {
   ];
   const orderedResultKeys = [
     ...preferredKeys.filter(key => key in result),
-    ...Object.keys(result).filter(key => !preferredKeys.includes(key)),
+    ...Object.keys(result).filter(key => !preferredKeys.includes(key) && !isInputStageKey(key)),
   ];
 
   for (const key of orderedResultKeys) {

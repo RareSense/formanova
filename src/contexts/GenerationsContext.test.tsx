@@ -255,6 +255,32 @@ describe('GenerationsContext', () => {
     });
   });
 
+  it('prefers the generate step output over an input image CAS ref from an earlier prepare step', async () => {
+    // Regression for the prepare->generate CAS handoff change: prepare steps now emit
+    // input images as {uri: "azure://..."} too, which must not be picked up as the result.
+    const resultData = {
+      analyze_jewelry_pdp: [{ description: 'a gold ring' }],
+      prepare_jewelry_request_pdp_higher_tier: [
+        { jewelry_images: [{ uri: 'azure://container/input/jewelry1.jpg', sha256: 'abc' }] },
+      ],
+      generate_jewelry_image_pdp_higher_tier: [
+        { output_url: 'azure://container/output/real-result.jpg' },
+      ],
+    };
+    mockPollWorkflow.mockResolvedValueOnce({ status: 'completed', result: resultData });
+
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    act(() => {
+      result.current.trackGeneration({ workflowId: 'wf-cas-input-leak', isProductShot: true, jewelryType: 'ring', jewelryUrl: 'https://example.com/jewelry.jpg', modelUrl: 'https://example.com/model.jpg', aspectRatio: '1:1', resolution: '1K', generationCost: 8 });
+    });
+
+    await waitFor(() => {
+      const gen = result.current.generations.find(g => g.workflowId === 'wf-cas-input-leak');
+      expect(gen?.status).toBe('completed');
+      expect(gen?.resultImages).toEqual(['https://cdn.example.com/container/output/real-result.jpg']);
+    });
+  });
+
   it('transitions to failed when poll rejects', async () => {
     mockPollWorkflow.mockRejectedValueOnce(new Error('timeout'));
 
