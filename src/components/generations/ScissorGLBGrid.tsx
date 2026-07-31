@@ -69,6 +69,31 @@ function cacheScene(url: string, scene: THREE.Group) {
   glbCache.set(url, { scene: scene.clone(true), lastUsed: Date.now() });
 }
 
+// ── GLB fetch with retry ────────────────────────────────────────────
+// 5xx responses (e.g. a transient 503 from blob storage/CDN) are retried with
+// backoff; 4xx responses (404/403 - genuinely missing/forbidden) fail immediately.
+// Without this, one transient blip permanently marks the URL as errored via
+// glbErrors, since that cache has no expiry.
+const GLB_FETCH_MAX_ATTEMPTS = 3;
+const GLB_FETCH_RETRY_DELAY_MS = 400;
+
+export async function fetchGlbArrayBuffer(
+  url: string,
+  fetchFn: (url: string) => Promise<Response>,
+  attempt = 0,
+): Promise<ArrayBuffer> {
+  const resp = await fetchFn(url);
+  if (!resp.ok) {
+    const isTransient = resp.status >= 500 && resp.status < 600;
+    if (isTransient && attempt < GLB_FETCH_MAX_ATTEMPTS - 1) {
+      await new Promise((r) => setTimeout(r, GLB_FETCH_RETRY_DELAY_MS * (attempt + 1)));
+      return fetchGlbArrayBuffer(url, fetchFn, attempt + 1);
+    }
+    throw new Error(`Failed to fetch GLB: ${resp.status}`);
+  }
+  return resp.arrayBuffer();
+}
+
 function disposeScene(obj: THREE.Object3D) {
   obj.traverse((child) => {
     if ((child as THREE.Mesh).isMesh) {
@@ -295,11 +320,8 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
     if (!promise) {
       promise = (async () => {
         const needsAuth = card.glbUrl.includes('/artifacts/');
-        const resp = needsAuth
-          ? await authenticatedFetch(card.glbUrl)
-          : await fetch(card.glbUrl);
-        if (!resp.ok) throw new Error(`Failed to fetch GLB: ${resp.status}`);
-        const arrayBuffer = await resp.arrayBuffer();
+        const fetchFn = needsAuth ? authenticatedFetch : fetch;
+        const arrayBuffer = await fetchGlbArrayBuffer(card.glbUrl, fetchFn);
 
         return new Promise<THREE.Group>((resolve, reject) => {
           gltfLoaderRef.current.parse(
