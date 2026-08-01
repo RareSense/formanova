@@ -1,20 +1,26 @@
 import React, { useRef, useState, useEffect, Suspense, useMemo, forwardRef, useImperativeHandle, useCallback } from "react";
-import { Canvas, useThree, useFrame, ThreeEvent, invalidate, useLoader } from "@react-three/fiber";
+import { Canvas, useThree, useFrame, ThreeEvent, invalidate } from "@react-three/fiber";
 import {
-  Environment,
   OrbitControls,
   TransformControls,
   GizmoHelper,
   GizmoViewport,
-  MeshRefractionMaterial,
 } from "@react-three/drei";
-import { RGBELoader } from "three-stdlib";
+import { OrbitControls as OrbitControlsImpl, RGBELoader } from "three-stdlib";
 import * as THREE from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
 import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
-import { MATERIAL_LIBRARY, findMaterial, findMaterialByName, DIAMOND_DEFAULTS, createSimpleGemMaterial } from "@/components/cad-studio/materials";
-import type { MaterialDef, GemRefractionConfig } from "@/components/cad-studio/materials";
+import {
+  MeshBVH,
+  MeshBVHUniformStruct,
+  SAH,
+  shaderIntersectFunction,
+  shaderStructs,
+} from "three-mesh-bvh";
+import { findMaterial, findMaterialByName } from "@/components/cad-studio/materials";
+import type { MaterialDef } from "@/components/cad-studio/materials";
 import { getQualitySettings, getGPURendererString, getSettingsForMode, getDynamicGemCaps } from "@/lib/gpu-detect";
 import type { QualityMode } from "@/lib/gpu-detect";
 import type { GemMode } from "./GemInstanceRenderer";
@@ -25,6 +31,342 @@ import { authenticatedFetch } from '@/lib/authenticated-fetch';
 
 // ── Quality settings (cached, runs once) ──
 const Q = getQualitySettings();
+
+// ENGINE PORT JUSTIFICATION: CADCanvas is intentionally a legacy, protected,
+// single-file engine. This rendering port remains here because the requested
+// mutation boundary forbids changing its public API, UI consumers, or adding
+// sibling engine modules. Existing workflow/API concerns are not expanded.
+
+type ReferenceMaterialKind = "metal" | "gem" | "pearl";
+
+interface ReferenceMaterialSpec {
+  label: string;
+  kind: ReferenceMaterialKind;
+  color: number;
+  rough?: number;
+  atten?: number;
+  ior?: number;
+  disp?: number;
+  sheen?: number;
+  irid?: number;
+  opal?: boolean;
+  dark?: boolean;
+}
+
+// Exact material constants from the approved standalone reference.
+const REFERENCE_MATERIALS: Record<string, ReferenceMaterialSpec> = {
+  gold18k:      { label: "Yellow Gold", kind: "metal", color: 0xffd88a, rough: 0.08 },
+  roseGold:     { label: "Rose Gold", kind: "metal", color: 0xf6c1a6, rough: 0.08 },
+  whiteGold:    { label: "White Gold", kind: "metal", color: 0xf7f4ec, rough: 0.07 },
+  platinum:     { label: "Platinum", kind: "metal", color: 0xe9e9e7, rough: 0.11 },
+  silver:       { label: "Silver", kind: "metal", color: 0xfbfaf6, rough: 0.05 },
+  blackRhodium: { label: "Black Rhodium", kind: "metal", color: 0x3b3b40, rough: 0.28 },
+
+  diamond:      { label: "Diamond", kind: "gem", color: 0xffffff, atten: 0xffffff, ior: 2.42, disp: 0.02 },
+  champagne:    { label: "Champagne", kind: "gem", color: 0xf6e3bd, atten: 0xc89a4e, ior: 2.42, disp: 0.02 },
+  ruby:         { label: "Ruby", kind: "gem", color: 0xf26a8c, atten: 0x9e0f34, ior: 1.76 },
+  sapphire:     { label: "Sapphire", kind: "gem", color: 0x4f7ce0, atten: 0x0c2f9e, ior: 1.76 },
+  emerald:      { label: "Emerald", kind: "gem", color: 0x46c684, atten: 0x02702f, ior: 1.57, rough: 0.03 },
+  amethyst:     { label: "Amethyst", kind: "gem", color: 0xb488e2, atten: 0x5c1e96, ior: 1.54 },
+  citrine:      { label: "Citrine", kind: "gem", color: 0xf2bb4d, atten: 0xa96400, ior: 1.54 },
+  aquamarine:   { label: "Aquamarine", kind: "gem", color: 0xaee2de, atten: 0x2f9e96, ior: 1.57 },
+  topaz:        { label: "London Topaz", kind: "gem", color: 0x4b9dbd, atten: 0x0e4a66, ior: 1.61 },
+  garnet:       { label: "Garnet", kind: "gem", color: 0xcd5050, atten: 0x570a10, ior: 1.73 },
+  peridot:      { label: "Peridot", kind: "gem", color: 0xbcd45c, atten: 0x647f04, ior: 1.65 },
+  tanzanite:    { label: "Tanzanite", kind: "gem", color: 0x7480e2, atten: 0x28329e, ior: 1.69 },
+  morganite:    { label: "Morganite", kind: "gem", color: 0xf4c6c6, atten: 0xc06a78, ior: 1.58 },
+  blackDiamond: { label: "Black Diamond", kind: "gem", color: 0x17171c, atten: 0x000000, ior: 2.42, rough: 0.04, dark: true },
+
+  pearlWhite:   { label: "White Pearl", kind: "pearl", color: 0xfdfaf3, sheen: 0xf6dfda },
+  pearlGolden:  { label: "Golden Pearl", kind: "pearl", color: 0xf0d9a2, sheen: 0xf6c86a },
+  pearlPink:    { label: "Pink Pearl", kind: "pearl", color: 0xf6d5d8, sheen: 0xf2aab6 },
+  pearlBlack:   { label: "Tahitian", kind: "pearl", color: 0x2e3438, sheen: 0x4fa08c, irid: 0.85 },
+  opal:         { label: "Opal", kind: "pearl", color: 0xf2f0ea, sheen: 0xffffff, irid: 1, opal: true },
+};
+
+const REFERENCE_BASE_ENV = { metal: 1.15, gem: 2.3, pearl: 1.1 } as const;
+const REFERENCE_ENVIRONMENTS = {
+  room: null,
+  photostudio: "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/brown_photostudio_02_1k.hdr",
+  bright: "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/studio_small_08_1k.hdr",
+  sunset: "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r180/examples/textures/equirectangular/venice_sunset_1k.hdr",
+} as const;
+type ReferenceEnvironmentKey = keyof typeof REFERENCE_ENVIRONMENTS;
+
+const REFERENCE_TYPE_RULES: [RegExp, string][] = [
+  [/pearl/i, "pearlWhite"], [/opal/i, "opal"],
+  [/ruby/i, "ruby"], [/sapphire/i, "sapphire"], [/emerald/i, "emerald"],
+  [/amethyst/i, "amethyst"], [/citrine/i, "citrine"], [/aqua/i, "aquamarine"],
+  [/topaz/i, "topaz"], [/garnet/i, "garnet"], [/peridot/i, "peridot"],
+  [/tanzanit/i, "tanzanite"], [/morganite/i, "morganite"],
+  [/onyx|black[_ ]?diamond/i, "blackDiamond"],
+];
+const REFERENCE_GEM_RE = /diamond|gem|stone|crystal|jewel|brill|cz|cubic|solitaire|pave|moissanite|briolette|cabochon/i;
+
+function classifyReferenceMaterial(name: string): string {
+  for (const [pattern, key] of REFERENCE_TYPE_RULES) {
+    if (pattern.test(name)) return key;
+  }
+  return REFERENCE_GEM_RE.test(name) ? "diamond" : "gold18k";
+}
+
+function referenceKeyForMaterial(material: MaterialDef | undefined, meshName: string): string | null {
+  const idMap: Record<string, string> = {
+    "gold-yellow-polished": "gold18k",
+    "gold-rose-polished": "roseGold",
+    "gold-white-polished": "whiteGold",
+    "platinum-natural-polished": "platinum",
+    "silver-natural-polished": "silver",
+    "rhodium-black-polished": "blackRhodium",
+    diamond: "diamond",
+    ruby: "ruby",
+    sapphire: "sapphire",
+    emerald: "emerald",
+    amethyst: "amethyst",
+    topaz: "topaz",
+    aquamarine: "aquamarine",
+    "black-diamond": "blackDiamond",
+  };
+
+  if (material?.id && idMap[material.id]) return idMap[material.id];
+  if (material?.id?.startsWith("flat-")) {
+    const classified = classifyReferenceMaterial(meshName);
+    return material.category === "gemstone"
+      ? REFERENCE_MATERIALS[classified]?.kind === "metal" ? "diamond" : classified
+      : "gold18k";
+  }
+
+  // Preserve unsupported explicit CAD material definitions. Unassigned meshes
+  // use the reference's exact name-based ring-pipeline classification.
+  if (!material) return classifyReferenceMaterial(meshName);
+  return null;
+}
+
+function makeReferencePhysicalMaterial(spec: ReferenceMaterialSpec): THREE.MeshPhysicalMaterial {
+  let material: THREE.MeshPhysicalMaterial;
+  if (spec.kind === "metal") {
+    material = new THREE.MeshPhysicalMaterial({
+      color: spec.color,
+      metalness: 1,
+      roughness: spec.rough ?? 0.08,
+      envMapIntensity: REFERENCE_BASE_ENV.metal,
+      side: THREE.DoubleSide,
+    });
+  } else if (spec.kind === "pearl") {
+    material = new THREE.MeshPhysicalMaterial({
+      color: spec.color,
+      metalness: 0,
+      roughness: spec.opal ? 0.14 : 0.24,
+      clearcoat: 1,
+      clearcoatRoughness: 0.12,
+      iridescence: spec.irid ?? 0.45,
+      iridescenceIOR: 1.9,
+      iridescenceThicknessRange: spec.opal ? [100, 800] : [120, 440],
+      sheen: 0.6,
+      sheenColor: new THREE.Color(spec.sheen ?? 0xffffff),
+      sheenRoughness: 0.4,
+      envMapIntensity: REFERENCE_BASE_ENV.pearl,
+      side: THREE.DoubleSide,
+    });
+  } else {
+    // Exact FAST GEMS fallback from the reference implementation.
+    material = new THREE.MeshPhysicalMaterial({
+      color: spec.color,
+      metalness: 0.25,
+      roughness: spec.rough ?? 0.02,
+      envMapIntensity: 3,
+      side: THREE.DoubleSide,
+    });
+    if (!spec.dark) {
+      material.transparent = true;
+      material.opacity = 0.92;
+    }
+  }
+  material.name = spec.label;
+  material.userData.referenceMaterial = true;
+  return material;
+}
+
+function makeReferenceGemPlaceholder(
+  spec: ReferenceMaterialSpec,
+  geometry: THREE.BufferGeometry,
+): THREE.MeshPhysicalMaterial {
+  geometry.computeBoundingBox();
+  const extent = geometry.boundingBox?.getSize(new THREE.Vector3()) ?? new THREE.Vector3(0.1, 0.1, 0.1);
+  const size = Math.max((extent.x + extent.y + extent.z) / 3, 0.02);
+  const material = new THREE.MeshPhysicalMaterial({
+    color: spec.color,
+    metalness: 0,
+    roughness: spec.rough ?? 0.005,
+    transmission: spec.dark ? 0.25 : 1,
+    thickness: size * 1.1,
+    ior: spec.ior,
+    attenuationColor: new THREE.Color(spec.atten ?? spec.color),
+    attenuationDistance: size * 0.9,
+    clearcoat: 0.5,
+    clearcoatRoughness: 0.02,
+    envMapIntensity: REFERENCE_BASE_ENV.gem,
+    specularIntensity: 1,
+    side: THREE.FrontSide,
+  });
+  (material as THREE.MeshPhysicalMaterial & { dispersion?: number }).dispersion = spec.disp ?? 0.028;
+  material.name = spec.label;
+  material.userData.referenceMaterial = true;
+  return material;
+}
+
+const REFERENCE_GEM_VERTEX_SHADER = /* glsl */`
+varying vec3 vWorldPosition;
+varying vec3 vNormal;
+void main(){
+  vec4 wp=modelMatrix*vec4(position,1.0);
+  vWorldPosition=wp.xyz;
+  vNormal=normalize(mat3(modelMatrix)*normal);
+  gl_Position=projectionMatrix*viewMatrix*wp;
+}`;
+
+const REFERENCE_GEM_FRAGMENT_SHADER = /* glsl */`
+precision highp isampler2D;
+precision highp usampler2D;
+varying vec3 vWorldPosition;
+varying vec3 vNormal;
+uniform mat4 modelMatrix;
+uniform mat4 modelMatrixInverse;
+uniform sampler2D envMap;
+uniform float bounces;
+${shaderStructs}
+${shaderIntersectFunction}
+uniform BVH bvh;
+uniform float ior;
+uniform float fresnel;
+uniform float aberrationStrength;
+uniform vec3 colorFactor;
+uniform float envIntensity;
+uniform float selected;
+
+vec3 sampleEnv(vec3 dir){
+  vec2 uv=vec2(atan(dir.z,dir.x)*0.1591549431+0.5,asin(clamp(dir.y,-1.0,1.0))*0.3183098862+0.5);
+  return texture2D(envMap,uv).rgb;
+}
+vec3 totalInternalReflection(vec3 incoming,float ior_){
+  vec3 rayDirection=refract(incoming,vNormal,1.0/ior_);
+  vec3 rayOrigin=vWorldPosition+rayDirection*0.001;
+  rayOrigin=(modelMatrixInverse*vec4(rayOrigin,1.0)).xyz;
+  rayDirection=normalize((modelMatrixInverse*vec4(rayDirection,0.0)).xyz);
+  for(float i=0.0;i<8.0;i++){
+    if(i>=bounces)break;
+    uvec4 faceIndices=uvec4(0u);
+    vec3 faceNormal=vec3(0.0,0.0,1.0);
+    vec3 barycoord=vec3(0.0);
+    float side=1.0;
+    float dist=0.0;
+    bvhIntersectFirstHit(bvh,rayOrigin,rayDirection,faceIndices,faceNormal,barycoord,side,dist);
+    vec3 hitPos=rayOrigin+rayDirection*max(dist-0.001,0.0);
+    vec3 tempDir=refract(rayDirection,faceNormal*side,ior_);
+    if(length(tempDir)!=0.0){rayDirection=tempDir;break;}
+    rayDirection=reflect(rayDirection,faceNormal*side);
+    rayOrigin=hitPos+rayDirection*0.01;
+  }
+  return normalize((modelMatrix*vec4(rayDirection,0.0)).xyz);
+}
+void main(){
+  vec3 viewDirection=normalize(vWorldPosition-cameraPosition);
+  vec3 dG=totalInternalReflection(viewDirection,max(ior,1.0));
+  vec3 col;
+  if(aberrationStrength>0.0){
+    vec3 dR=totalInternalReflection(viewDirection,max(ior*(1.0-aberrationStrength),1.0));
+    vec3 dB=totalInternalReflection(viewDirection,max(ior*(1.0+aberrationStrength),1.0));
+    col=vec3(sampleEnv(dR).r,sampleEnv(dG).g,sampleEnv(dB).b);
+  }else{
+    col=sampleEnv(dG);
+  }
+  col*=envIntensity*colorFactor;
+  vec3 reflDir=reflect(viewDirection,vNormal);
+  vec3 reflCol=sampleEnv(reflDir)*envIntensity;
+  float cosT=clamp(-dot(viewDirection,vNormal),0.0,1.0);
+  float F0=pow((ior-1.0)/(ior+1.0),2.0);
+  float F=F0+(1.0-F0)*pow(1.0-cosT,5.0);
+  col=mix(col,reflCol,F);
+  float f=pow(max(0.0,1.0+dot(viewDirection,vNormal)),10.0)*fresnel;
+  col=mix(col,vec3(1.0),f);
+  col=mix(col,vec3(0.0,0.9,1.0),selected*0.4);
+  gl_FragColor=vec4(col,1.0);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+}`;
+
+const referenceBvhCache = new Map<string, MeshBVHUniformStruct>();
+function referenceBvhFor(geometry: THREE.BufferGeometry): MeshBVHUniformStruct {
+  let struct = referenceBvhCache.get(geometry.uuid);
+  if (!struct) {
+    struct = new MeshBVHUniformStruct();
+    struct.updateFrom(new MeshBVH(geometry.clone(), { strategy: SAH }));
+    referenceBvhCache.set(geometry.uuid, struct);
+  }
+  return struct;
+}
+function disposeReferenceBvhCache() {
+  referenceBvhCache.forEach((struct) => struct.dispose());
+  referenceBvhCache.clear();
+}
+
+const referenceWhiteEnvironment = new THREE.DataTexture(
+  new Float32Array([1, 1, 1, 1]),
+  1,
+  1,
+  THREE.RGBAFormat,
+  THREE.FloatType,
+);
+referenceWhiteEnvironment.needsUpdate = true;
+
+interface ReferenceEnvironmentState {
+  rawEnvironment: THREE.Texture | null;
+  environmentKey: ReferenceEnvironmentKey;
+}
+const ReferenceEnvironmentContext = React.createContext<ReferenceEnvironmentState>({
+  rawEnvironment: null,
+  environmentKey: "photostudio",
+});
+
+interface MotionQualityApi {
+  begin: () => void;
+  pulse: () => void;
+  settle: (delayMs?: number) => void;
+}
+type CanvasWithMotionControls = HTMLCanvasElement & {
+  __orbitControls?: OrbitControlsImpl;
+};
+const MotionQualityContext = React.createContext<MotionQualityApi>({
+  begin: () => undefined,
+  pulse: () => undefined,
+  settle: () => undefined,
+});
+
+const ORIGINAL_TONE_MAPPING_CHUNK = THREE.ShaderChunk.tonemapping_pars_fragment;
+const REFERENCE_NEUTRAL_TONE_MAPPING = /* glsl */`
+vec3 CustomToneMapping( vec3 color ) {
+  const float StartCompression = 0.8 - 0.04;
+  const float Desaturation = 0.15;
+  color *= toneMappingExposure;
+  float x = min( color.r, min( color.g, color.b ) );
+  float offset = x < 0.08 ? x - 6.25 * x * x : 0.04;
+  color -= offset;
+  float peak = max( color.r, max( color.g, color.b ) );
+  if ( peak < StartCompression ) return color;
+  float d = 1.0 - StartCompression;
+  float newPeak = 1.0 - d * d / ( peak + d - StartCompression );
+  color *= newPeak / peak;
+  float g = 1.0 - 1.0 / ( Desaturation * ( peak - newPeak ) + 1.0 );
+  return mix( color, vec3( newPeak ), g );
+}`;
+
+function installReferenceNeutralToneMapping() {
+  if (THREE.ShaderChunk.tonemapping_pars_fragment.includes("StartCompression = 0.8 - 0.04")) return;
+  THREE.ShaderChunk.tonemapping_pars_fragment = ORIGINAL_TONE_MAPPING_CHUNK.replace(
+    "vec3 CustomToneMapping( vec3 color ) { return color; }",
+    REFERENCE_NEUTRAL_TONE_MAPPING,
+  );
+}
 
 // Module-level flag: prevents React from overwriting mesh transforms during gizmo drag
 let _isTransformDragging = false;
@@ -50,10 +392,280 @@ const SELECTION_MATERIAL = new THREE.MeshPhysicalMaterial({
 function LightController({ intensity }: { intensity: number }) {
   const { gl, invalidate: inv } = useThree();
   useEffect(() => {
-    gl.toneMappingExposure = 0.45 * intensity;
+    gl.toneMappingExposure = 1.0 * intensity;
     inv();
   }, [intensity, gl, inv]);
   return null;
+}
+
+function makeReferenceBackground(): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 2;
+  canvas.height = 512;
+  const context = canvas.getContext("2d");
+  if (!context) return new THREE.CanvasTexture(canvas);
+  const gradient = context.createLinearGradient(0, 0, 0, 512);
+  gradient.addColorStop(0, "#ffffff");
+  gradient.addColorStop(1, "#c9cdd4");
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, 2, 512);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+function getRequestedReferenceEnvironment(): ReferenceEnvironmentKey {
+  if (typeof window === "undefined") return "photostudio";
+  const requested = new URLSearchParams(window.location.search).get("cadEnvironment");
+  return requested && requested in REFERENCE_ENVIRONMENTS
+    ? requested as ReferenceEnvironmentKey
+    : "photostudio";
+}
+
+function ReferenceStudioEnvironment({ children }: { children: React.ReactNode }) {
+  const { gl, scene, invalidate: inv } = useThree();
+  const environmentKey = useMemo(getRequestedReferenceEnvironment, []);
+  const [rawEnvironment, setRawEnvironment] = useState<THREE.Texture | null>(null);
+
+  useEffect(() => {
+    let disposed = false;
+    let rawTexture: THREE.Texture | null = null;
+    let activeTarget: THREE.WebGLRenderTarget | null = null;
+    const previousEnvironment = scene.environment;
+    const previousBackground = scene.background;
+    const previousBackgroundBlurriness = scene.backgroundBlurriness;
+    const pmrem = new THREE.PMREMGenerator(gl);
+    pmrem.compileEquirectangularShader();
+
+    const background = makeReferenceBackground();
+    scene.background = background;
+    scene.backgroundBlurriness = 0;
+
+    const room = new RoomEnvironment();
+    const roomTarget = pmrem.fromScene(room, 0.04);
+    room.traverse((object) => {
+      const mesh = object as THREE.Mesh;
+      mesh.geometry?.dispose();
+      const materials = Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : [];
+      materials.forEach((material) => material.dispose());
+    });
+    activeTarget = roomTarget;
+    scene.environment = roomTarget.texture;
+    inv();
+
+    const sourceUrl = REFERENCE_ENVIRONMENTS[environmentKey];
+    if (sourceUrl) {
+      const loader = new RGBELoader();
+      loader.load(
+        sourceUrl,
+        (texture) => {
+          if (disposed) {
+            texture.dispose();
+            return;
+          }
+          texture.mapping = THREE.EquirectangularReflectionMapping;
+          rawTexture = texture;
+          const target = pmrem.fromEquirectangular(texture);
+          if (activeTarget && activeTarget !== roomTarget && activeTarget !== target) activeTarget.dispose();
+          activeTarget = target;
+          scene.environment = target.texture;
+          setRawEnvironment(texture);
+          inv();
+        },
+        undefined,
+        (error) => {
+          console.error(`[CADCanvas] Failed to load ${environmentKey} environment; using Soft Studio`, error);
+          if (!disposed) {
+            setRawEnvironment(null);
+            scene.environment = roomTarget.texture;
+            inv();
+          }
+        },
+      );
+    }
+
+    return () => {
+      disposed = true;
+      scene.environment = previousEnvironment;
+      scene.background = previousBackground;
+      scene.backgroundBlurriness = previousBackgroundBlurriness;
+      rawTexture?.dispose();
+      activeTarget?.dispose();
+      if (activeTarget !== roomTarget) roomTarget.dispose();
+      background.dispose();
+      pmrem.dispose();
+    };
+  }, [environmentKey, gl, inv, scene]);
+
+  const value = useMemo(
+    () => ({ rawEnvironment, environmentKey }),
+    [rawEnvironment, environmentKey],
+  );
+  return <ReferenceEnvironmentContext.Provider value={value}>{children}</ReferenceEnvironmentContext.Provider>;
+}
+
+function ReferenceStudioLighting() {
+  const lightRef = useRef<THREE.DirectionalLight>(null);
+  useEffect(() => {
+    const light = lightRef.current;
+    if (!light) return;
+    light.shadow.mapSize.set(2048, 2048);
+    light.shadow.camera.near = 0.1;
+    light.shadow.camera.far = 20;
+    light.shadow.camera.left = -3;
+    light.shadow.camera.right = 3;
+    light.shadow.camera.top = 3;
+    light.shadow.camera.bottom = -3;
+    light.shadow.bias = -0.002;
+    light.shadow.radius = 10;
+    light.shadow.camera.updateProjectionMatrix();
+  }, []);
+
+  return (
+    <>
+      <directionalLight ref={lightRef} color={0xffffff} intensity={0.55} position={[1.5, 8, 2]} castShadow />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.35, 0]} receiveShadow>
+        <planeGeometry args={[12, 12]} />
+        <shadowMaterial transparent opacity={0.13} />
+      </mesh>
+    </>
+  );
+}
+
+function MotionAdaptiveProvider({
+  children,
+  baseDpr,
+  heavyScene,
+}: {
+  children: React.ReactNode;
+  baseDpr: number;
+  heavyScene: boolean;
+}) {
+  const { gl, camera, size, invalidate: inv } = useThree();
+  const inMotionRef = useRef(false);
+  const appliedDprRef = useRef(baseDpr);
+  const lastMotionAtRef = useRef(0);
+  const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const grainRef = useRef<HTMLDivElement | null>(null);
+  const previousCameraPosition = useRef(new THREE.Vector3());
+  const previousCameraTarget = useRef(new THREE.Vector3());
+  const cameraTrackedRef = useRef(false);
+
+  const setRenderScale = useCallback((dpr: number) => {
+    if (Math.abs(dpr - appliedDprRef.current) < 0.001) return;
+    appliedDprRef.current = dpr;
+    gl.setPixelRatio(dpr);
+    gl.setSize(size.width, size.height, false);
+  }, [gl, size.height, size.width]);
+
+  const exitMotion = useCallback(() => {
+    if (!inMotionRef.current && Math.abs(appliedDprRef.current - baseDpr) < 0.001) return;
+    inMotionRef.current = false;
+    setRenderScale(baseDpr);
+    if (grainRef.current) grainRef.current.style.opacity = "0";
+    inv();
+  }, [baseDpr, inv, setRenderScale]);
+
+  const enterMotion = useCallback(() => {
+    if (inMotionRef.current) return;
+    inMotionRef.current = true;
+    const motionDpr = heavyScene
+      ? Math.max(0.22, baseDpr * 0.24)
+      : Math.max(0.3, baseDpr * 0.33);
+    setRenderScale(motionDpr);
+    if (grainRef.current) grainRef.current.style.opacity = heavyScene ? ".72" : ".6";
+    inv();
+  }, [baseDpr, heavyScene, inv, setRenderScale]);
+
+  const settle = useCallback((delayMs = 420) => {
+    if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+    settleTimerRef.current = setTimeout(() => {
+      const controls = (gl.domElement as CanvasWithMotionControls).__orbitControls;
+      if (controls) {
+        const hadDamping = controls.enableDamping;
+        controls.enableDamping = false;
+        controls.update();
+        controls.enableDamping = hadDamping;
+        previousCameraPosition.current.copy(camera.position);
+        previousCameraTarget.current.copy(controls.target);
+      }
+      lastMotionAtRef.current = 0;
+      exitMotion();
+    }, delayMs);
+  }, [camera.position, exitMotion, gl.domElement]);
+
+  const begin = useCallback(() => {
+    if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+    lastMotionAtRef.current = performance.now();
+    enterMotion();
+  }, [enterMotion]);
+
+  const pulse = useCallback(() => {
+    lastMotionAtRef.current = performance.now();
+    enterMotion();
+  }, [enterMotion]);
+
+  useEffect(() => {
+    const grain = document.createElement("div");
+    grain.setAttribute("aria-hidden", "true");
+    grain.style.cssText =
+      "position:absolute;inset:-50%;pointer-events:none;z-index:5;opacity:0;" +
+      "transition:opacity .12s linear;mix-blend-mode:overlay;" +
+      "background-image:url(\"data:image/svg+xml;utf8," +
+      encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="140" height="140">' +
+        '<filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" stitchTiles="stitch"/>' +
+        '<feColorMatrix type="saturate" values="0"/></filter>' +
+        '<rect width="140" height="140" filter="url(%23n)" opacity="0.55"/></svg>',
+      ) +
+      "\");background-repeat:repeat;will-change:transform;";
+    const parent = gl.domElement.parentElement;
+    parent?.appendChild(grain);
+    grainRef.current = grain;
+    return () => {
+      if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+      grain.remove();
+      grainRef.current = null;
+      gl.setPixelRatio(baseDpr);
+      gl.setSize(size.width, size.height, false);
+    };
+  }, [baseDpr, gl, size.height, size.width]);
+
+  useEffect(() => {
+    if (inMotionRef.current) enterMotion();
+    else setRenderScale(baseDpr);
+  }, [baseDpr, enterMotion, setRenderScale]);
+
+  useFrame(() => {
+    const controls = (gl.domElement as CanvasWithMotionControls).__orbitControls;
+    if (!controls) return;
+    if (!cameraTrackedRef.current) {
+      previousCameraPosition.current.copy(camera.position);
+      previousCameraTarget.current.copy(controls.target);
+      cameraTrackedRef.current = true;
+    }
+    const orbitRadius = Math.max(0.001, camera.position.distanceTo(controls.target));
+    const moved = camera.position.distanceTo(previousCameraPosition.current) +
+      controls.target.distanceTo(previousCameraTarget.current);
+    if (moved > orbitRadius * 2e-4) lastMotionAtRef.current = performance.now();
+    previousCameraPosition.current.copy(camera.position);
+    previousCameraTarget.current.copy(controls.target);
+
+    const wantsMotion = _isTransformDragging || performance.now() - lastMotionAtRef.current < 110;
+    if (wantsMotion) {
+      enterMotion();
+      if (grainRef.current) {
+        grainRef.current.style.transform =
+          `translate3d(${(Math.random() * 100 | 0) - 50}px,${(Math.random() * 100 | 0) - 50}px,0)`;
+      }
+      inv();
+    } else {
+      exitMotion();
+    }
+  });
+
+  const value = useMemo(() => ({ begin, pulse, settle }), [begin, pulse, settle]);
+  return <MotionQualityContext.Provider value={value}>{children}</MotionQualityContext.Provider>;
 }
 
 // Post-processing removed for performance
@@ -88,6 +700,7 @@ function TransformControlsWrapper({
 }) {
   const { gl } = useThree();
   const inv = useInvalidate();
+  const motionQuality = React.useContext(MotionQualityContext);
   const controlsRef = useRef<any>(null);
   const prevQuatRef = useRef<THREE.Quaternion>(new THREE.Quaternion());
 
@@ -104,10 +717,11 @@ function TransformControlsWrapper({
     const controls = controlsRef.current;
     if (!controls) return;
     const handler = (e: any) => {
-      const orbitControls = (gl.domElement as any).__orbitControls;
+      const orbitControls = (gl.domElement as CanvasWithMotionControls).__orbitControls;
       if (orbitControls) orbitControls.enabled = !e.value;
       _isTransformDragging = e.value;
       if (e.value) {
+        motionQuality.begin();
         // Drag started — snapshot the current quaternion for delta tracking
         prevQuatRef.current.copy(object.quaternion);
         // Freeze siblings at drag start so they don't change mid-drag
@@ -144,10 +758,14 @@ function TransformControlsWrapper({
         inv();
       }
       // When drag ends, pass the object back so we can sync state
-      if (!e.value && onDragEnd) onDragEnd(object);
+      if (!e.value) {
+        motionQuality.settle(420);
+        if (onDragEnd) onDragEnd(object);
+      }
     };
     controls.addEventListener("dragging-changed", handler);
     const onChange = () => {
+      motionQuality.pulse();
       // Apply delta to all sibling (other selected) meshes
       const siblings = siblingStarts.current;
       if (siblings.length > 0) {
@@ -232,7 +850,7 @@ function TransformControlsWrapper({
       // when dependencies (e.g. siblingObjects) change. The flag is correctly
       // managed by the dragging-changed event handler above.
     };
-  }, [gl, onDragEnd, onRotationDelta, inv, object, mode, siblingObjects]);
+  }, [gl, onDragEnd, onRotationDelta, inv, object, mode, siblingObjects, motionQuality]);
 
   const hasSiblings = (siblingObjects?.length ?? 0) > 0;
 
@@ -247,10 +865,36 @@ function TransformControlsWrapper({
   );
 }
 
-function OrbitControlsWithRef(props: any) {
+function OrbitControlsWithRef(props: React.ComponentProps<typeof OrbitControls>) {
   const { gl } = useThree();
-  const ref = useRef<any>(null);
-  useEffect(() => { if (ref.current) (gl.domElement as any).__orbitControls = ref.current; }, [gl]);
+  const motionQuality = React.useContext(MotionQualityContext);
+  const ref = useRef<OrbitControlsImpl>(null);
+  useEffect(() => {
+    const controls = ref.current;
+    if (!controls) return;
+    (gl.domElement as CanvasWithMotionControls).__orbitControls = controls;
+    const begin = () => motionQuality.begin();
+    const settle = () => motionQuality.settle(420);
+    const wheel = () => {
+      motionQuality.pulse();
+      motionQuality.settle(420);
+    };
+    controls.addEventListener("start", begin);
+    controls.addEventListener("end", settle);
+    gl.domElement.addEventListener("pointerup", settle);
+    gl.domElement.addEventListener("pointercancel", settle);
+    gl.domElement.addEventListener("wheel", wheel, { passive: true });
+    return () => {
+      controls.removeEventListener("start", begin);
+      controls.removeEventListener("end", settle);
+      gl.domElement.removeEventListener("pointerup", settle);
+      gl.domElement.removeEventListener("pointercancel", settle);
+      gl.domElement.removeEventListener("wheel", wheel);
+      if ((gl.domElement as CanvasWithMotionControls).__orbitControls === controls) {
+        delete (gl.domElement as CanvasWithMotionControls).__orbitControls;
+      }
+    };
+  }, [gl, motionQuality]);
   return <OrbitControls ref={ref} {...props} />;
 }
 
@@ -336,10 +980,11 @@ const LoadedModel = forwardRef<
     onModelReady?: () => void;
     magicTexturing?: boolean;
     onDebugGemStats?: (total: number, refraction: number, fallback: number, effectiveBounces: number) => void;
+    onSceneWeightChange?: (heavy: boolean) => void;
     gemMode?: GemMode;
     onGemModeForced?: (mode: GemMode) => void;
   }
->(({ url, additionalGlbUrls = [], selectedMeshNames, hiddenMeshNames, onMeshClick, transformMode, onMeshesDetected, onTransformStart, onTransformEnd, onLoadStart, onLoadEnd, onModelReady, magicTexturing = false, onDebugGemStats, gemMode = "simple", onGemModeForced }, ref) => {
+>(({ url, additionalGlbUrls = [], selectedMeshNames, hiddenMeshNames, onMeshClick, transformMode, onMeshesDetected, onTransformStart, onTransformEnd, onLoadStart, onLoadEnd, onModelReady, magicTexturing = false, onDebugGemStats, onSceneWeightChange, gemMode = "simple", onGemModeForced }, ref) => {
   const [scene, setScene] = useState<THREE.Group | null>(null);
   const loadedUrlRef = useRef<string>("");
 
@@ -401,16 +1046,26 @@ const LoadedModel = forwardRef<
   const prevSelectedRef = useRef<Set<string>>(new Set());
   const inv = useInvalidate();
   const { camera, gl: glRenderer } = useThree();
+  const { rawEnvironment } = React.useContext(ReferenceEnvironmentContext);
+
+  useEffect(() => () => {
+    disposeReferenceBvhCache();
+    flatGeoCache.current.forEach((geometry) => geometry.dispose());
+    flatGeoCache.current.clear();
+    materialCache.current.forEach((material) => material.dispose());
+    materialCache.current.clear();
+  }, []);
 
   // ── Decompose scene into individual mesh data ──
   useEffect(() => {
     if (!scene) return;
+    disposeReferenceBvhCache();
     const clone = scene.clone(true);
     const box = new THREE.Box3().setFromObject(clone);
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z);
-    const s = maxDim === 0 ? 1 : 3 / maxDim;
+    const s = maxDim === 0 ? 1 : 2.2 / maxDim;
     normScaleRef.current = s;
     normCenterRef.current = center.clone();
 
@@ -419,6 +1074,12 @@ const LoadedModel = forwardRef<
     clone.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;
+        if (!mesh.geometry.attributes.normal) {
+          mesh.geometry.computeVertexNormals();
+          mesh.geometry.userData.normalSource = "computed";
+        } else if (!mesh.geometry.userData.normalSource) {
+          mesh.geometry.userData.normalSource = "file";
+        }
         const name = mesh.name || `Mesh_${idx}`;
         mesh.updateWorldMatrix(true, false);
         const worldPos = new THREE.Vector3();
@@ -628,24 +1289,16 @@ const LoadedModel = forwardRef<
       }
 
       if (!framedBox.isEmpty()) {
-        const center = framedBox.getCenter(new THREE.Vector3());
-        const size = framedBox.getSize(new THREE.Vector3());
-        const maxDim = Math.max(size.x, size.y, size.z, 1);
-
-        // Keep models comfortably below top toolbar and visible on first paint
-        const dist = Math.max(maxDim * 2.4, 6.5);
-        const targetY = center.y - maxDim * 0.12;
-        const cameraY = targetY + maxDim * 0.2;
-
         const orbitCtrl = (glRenderer.domElement as any).__orbitControls;
         if (orbitCtrl) {
-          orbitCtrl.target.set(center.x, targetY, center.z);
-          orbitCtrl.object.position.set(center.x, cameraY, center.z + dist);
+          orbitCtrl.target.set(0, 0, 0);
+          orbitCtrl.object.position.set(0, 0.7, 5.4);
+          orbitCtrl.minDistance = 0.5;
+          orbitCtrl.maxDistance = 20;
           orbitCtrl.update();
         } else {
-          // Fallback: use R3F camera directly
-          camera.position.set(center.x, cameraY, center.z + dist);
-          (camera as THREE.PerspectiveCamera).lookAt(center.x, targetY, center.z);
+          camera.position.set(0, 0.7, 5.4);
+          (camera as THREE.PerspectiveCamera).lookAt(0, 0, 0);
         }
 
         inv();
@@ -691,7 +1344,7 @@ const LoadedModel = forwardRef<
             const size = box.getSize(new THREE.Vector3());
             const center = box.getCenter(new THREE.Vector3());
             const maxDim = Math.max(size.x, size.y, size.z);
-            const s = maxDim === 0 ? 1 : 3 / maxDim;
+            const s = maxDim === 0 ? 1 : 2.2 / maxDim;
             normScaleRef.current = s;
             normCenterRef.current = center.clone();
 
@@ -700,6 +1353,12 @@ const LoadedModel = forwardRef<
             clone.traverse((child) => {
               if ((child as THREE.Mesh).isMesh) {
                 const mesh = child as THREE.Mesh;
+                if (!mesh.geometry.attributes.normal) {
+                  mesh.geometry.computeVertexNormals();
+                  mesh.geometry.userData.normalSource = "computed";
+                } else if (!mesh.geometry.userData.normalSource) {
+                  mesh.geometry.userData.normalSource = "file";
+                }
                 const baseName = mesh.name || `Part_${idx}`;
                 // Deduplicate names
                 let name = baseName;
@@ -875,6 +1534,7 @@ const LoadedModel = forwardRef<
       inv();
     },
     deleteMeshes: (meshNames: string[]) => {
+      disposeReferenceBvhCache();
       const names = new Set(meshNames);
       setMeshDataList((prev) => prev.filter((m) => !names.has(m.name)));
       setAssignedMaterials((prev) => {
@@ -959,6 +1619,7 @@ const LoadedModel = forwardRef<
       inv();
     },
     centerOrigin: (meshNames: string[]) => {
+      disposeReferenceBvhCache();
       const names = new Set(meshNames);
       setMeshDataList((prev) => prev.map((md) => {
         if (!names.has(md.name)) return md;
@@ -1079,6 +1740,7 @@ const LoadedModel = forwardRef<
     },
     // Apply Transform: bake current transform into geometry, reset transform to identity
     applyTransform: (meshNames: string[]) => {
+      disposeReferenceBvhCache();
       const names = new Set(meshNames);
       setMeshDataList((prev) => prev.map((md) => {
         if (!names.has(md.name)) return md;
@@ -1129,6 +1791,7 @@ const LoadedModel = forwardRef<
       assignedMaterials: { ...assignedMaterials },
     }),
     restoreSnapshot: (snap: CanvasSnapshot) => {
+      disposeReferenceBvhCache();
       setMeshDataList(snap.meshDataList);
       setAssignedMaterials(snap.assignedMaterials);
       // Clear the "material applied after select" tracking so overlay reappears on undo
@@ -1285,7 +1948,11 @@ const LoadedModel = forwardRef<
           // Generate the runtime material from the MaterialDef, then copy only
           // GLTF-serialisable properties into a clean MeshPhysicalMaterial so the
           // exporter never encounters custom shaders or leftover internal state.
-          const src = assigned.create() as THREE.MeshPhysicalMaterial;
+          const referenceKey = referenceKeyForMaterial(assigned, md.name);
+          const referenceSpec = referenceKey ? REFERENCE_MATERIALS[referenceKey] : undefined;
+          const src = referenceSpec
+            ? makeReferencePhysicalMaterial(referenceSpec)
+            : assigned.create() as THREE.MeshPhysicalMaterial;
           const exportMat = new THREE.MeshPhysicalMaterial({
             color: src.color.clone(),
             metalness: src.metalness,
@@ -1301,6 +1968,17 @@ const LoadedModel = forwardRef<
             transmission: src.transmission ?? 0,
             ior: src.ior ?? 1.5,
             thickness: src.thickness ?? 0,
+            attenuationColor: src.attenuationColor?.clone() ?? new THREE.Color(0xffffff),
+            attenuationDistance: src.attenuationDistance ?? Infinity,
+            iridescence: src.iridescence ?? 0,
+            iridescenceIOR: src.iridescenceIOR ?? 1.3,
+            iridescenceThicknessRange: src.iridescenceThicknessRange
+              ? [...src.iridescenceThicknessRange] as [number, number]
+              : [100, 400],
+            sheen: src.sheen ?? 0,
+            sheenColor: src.sheenColor?.clone() ?? new THREE.Color(0x000000),
+            sheenRoughness: src.sheenRoughness ?? 1,
+            specularIntensity: src.specularIntensity ?? 1,
             // Maps (if any were set by create())
             ...(src.map && { map: src.map }),
             ...(src.normalMap && { normalMap: src.normalMap }),
@@ -1377,7 +2055,7 @@ const LoadedModel = forwardRef<
     },
     exportSceneRawBlob: async (): Promise<Blob> => {
       // ── Export geometry at original real-world metre scale ──
-      // Reverses the viewport normalisation (s = 3/maxDim, center offset)
+      // Reverses the viewport normalisation (s = 2.2/maxDim, center offset)
       const exportScene = new THREE.Scene();
       const currentMeshData = meshDataListRef.current;
       const s = normScaleRef.current;
@@ -1453,22 +2131,8 @@ const LoadedModel = forwardRef<
     prevAssignedRef.current = { ...assignedMaterials };
 
     const standard: (MeshData & { material: THREE.Material; isSelected: boolean })[] = [];
-    const gems: { meshData: MeshData; refractionConfig: GemRefractionConfig; isSelected: boolean }[] = [];
+    const gems: { meshData: MeshData; materialSpec: ReferenceMaterialSpec; materialKey: string; isSelected: boolean }[] = [];
     let refractionGemCount = 0;
-
-    // Cheap fallback material for gems beyond the quality-tier cap
-    const gemFallbackMat = new THREE.MeshPhysicalMaterial({
-      color: new THREE.Color(0xffffff),
-      metalness: 0.0,
-      roughness: 0.0,
-      transmission: 0.8,
-      ior: 2.0,
-      thickness: 1.5,
-      envMapIntensity: 2.0,
-      clearcoat: 1.0,
-      clearcoatRoughness: 0.0,
-      side: THREE.DoubleSide,
-    });
 
     meshDataList.forEach((md) => {
       // Skip hidden meshes entirely
@@ -1476,6 +2140,8 @@ const LoadedModel = forwardRef<
 
       const isSelected = selectedMeshNames.has(md.name);
       const assigned = assignedMaterials[md.name];
+      const referenceKey = referenceKeyForMaterial(assigned, md.name);
+      const referenceSpec = referenceKey ? REFERENCE_MATERIALS[referenceKey] : undefined;
 
       // Selection highlight — show blue overlay when selected, UNLESS the user
       // explicitly applied a material after selecting (materialAppliedAfterSelect).
@@ -1485,39 +2151,62 @@ const LoadedModel = forwardRef<
       }
 
       // Check if this mesh is assigned a gemstone material with refraction config
-      if (assigned?.category === "gemstone" && assigned.refractionConfig) {
+      if (referenceSpec?.kind === "gem") {
         // ── GEM MODE: "simple" → use high-quality PBR transmission (crash-safe, no custom shader) ──
         if (gemMode === "simple") {
-          const simpleKey = `simple_gem_${md.name}_${assigned.id}`;
+          const simpleKey = `reference_fast_${md.name}_${referenceKey}`;
           let simpleMat = materialCache.current.get(simpleKey);
           if (!simpleMat) {
-            simpleMat = createSimpleGemMaterial(assigned.refractionConfig.color);
+            simpleMat = makeReferencePhysicalMaterial(referenceSpec);
             materialCache.current.set(simpleKey, simpleMat);
           }
           standard.push({ ...md, material: simpleMat, isSelected });
           return;
         }
 
-        // ── GEM MODE: "refraction" → use MeshRefractionMaterial overlay (capped) ──
+        if (!rawEnvironment) {
+          const placeholderKey = `reference_placeholder_${md.name}_${referenceKey}`;
+          let placeholder = materialCache.current.get(placeholderKey);
+          if (!placeholder) {
+            placeholder = makeReferenceGemPlaceholder(referenceSpec, md.geometry);
+            materialCache.current.set(placeholderKey, placeholder);
+          }
+          standard.push({ ...md, material: placeholder, isSelected });
+          return;
+        }
+
+        // Full BVH ray-traced gem shader, capped by the existing GPU-quality budget.
         if (refractionGemCount < Q.maxGemRefraction) {
-          gems.push({ meshData: md, refractionConfig: assigned.refractionConfig, isSelected });
-          const hiddenMat = new THREE.MeshBasicMaterial({ visible: false });
+          gems.push({ meshData: md, materialSpec: referenceSpec, materialKey: referenceKey!, isSelected });
+          const hiddenKey = `reference_hidden_${md.name}`;
+          let hiddenMat = materialCache.current.get(hiddenKey);
+          if (!hiddenMat) {
+            hiddenMat = new THREE.MeshBasicMaterial({ visible: false });
+            materialCache.current.set(hiddenKey, hiddenMat);
+          }
           standard.push({ ...md, material: hiddenMat, isSelected });
           refractionGemCount++;
         } else {
           // Over budget — use cheap fallback material (still looks like a gem, just no refraction)
-          const color = assigned.refractionConfig.color;
-          const fallback = gemFallbackMat.clone();
-          fallback.color = new THREE.Color(color);
+          const fallbackKey = `reference_fallback_${md.name}_${referenceKey}`;
+          let fallback = materialCache.current.get(fallbackKey);
+          if (!fallback) {
+            fallback = makeReferencePhysicalMaterial(referenceSpec);
+            materialCache.current.set(fallbackKey, fallback);
+          }
           standard.push({ ...md, material: fallback, isSelected });
         }
         return;
       }
 
-      const cacheKey = assigned ? `assigned_${md.name}_${assigned.id}` : `orig_${md.name}`;
+      const cacheKey = referenceSpec
+        ? `reference_${md.name}_${referenceKey}`
+        : assigned ? `assigned_${md.name}_${assigned.id}` : `orig_${md.name}`;
       let material = materialCache.current.get(cacheKey);
       if (!material) {
-        material = assigned ? assigned.create() : md.originalMaterial.clone();
+        material = referenceSpec
+          ? makeReferencePhysicalMaterial(referenceSpec)
+          : assigned ? assigned.create() : md.originalMaterial.clone();
         if ('side' in material) (material as THREE.MeshStandardMaterial).side = THREE.DoubleSide;
         materialCache.current.set(cacheKey, material);
       }
@@ -1525,14 +2214,29 @@ const LoadedModel = forwardRef<
     });
 
     return { standardElements: standard, gemElements: gems, refractionGemCount };
-  }, [meshDataList, assignedMaterials, selectedMeshNames, hiddenMeshNames, gemMode]);
+  }, [meshDataList, assignedMaterials, selectedMeshNames, hiddenMeshNames, gemMode, rawEnvironment, inv]);
 
   // Report gem stats to parent for DebugHUD (event-driven, not per-frame)
   const gemTotal = Object.values(assignedMaterials).filter(m => m?.category === "gemstone").length;
   const gemRefraction = gemElements.length;
   const gemFallback = gemTotal - gemRefraction;
   useEffect(() => {
-    onDebugGemStats?.(gemTotal, gemRefraction, gemFallback, Q.gemBounces);
+    let gemCount = 0;
+    let triangleCount = 0;
+    for (const mesh of meshDataList) {
+      if (hiddenMeshNames.has(mesh.name)) continue;
+      const positionCount = mesh.geometry.attributes.position?.count ?? 0;
+      triangleCount += (mesh.geometry.index?.count ?? positionCount) / 3;
+      const assigned = assignedMaterials[mesh.name];
+      const referenceKey = referenceKeyForMaterial(assigned, mesh.name);
+      if (referenceKey && REFERENCE_MATERIALS[referenceKey]?.kind !== "metal") gemCount++;
+      else if (!referenceKey && assigned?.category === "gemstone") gemCount++;
+    }
+    onSceneWeightChange?.(gemCount >= 18 || triangleCount > 350000);
+  }, [assignedMaterials, hiddenMeshNames, meshDataList, onSceneWeightChange]);
+
+  useEffect(() => {
+    onDebugGemStats?.(gemTotal, gemRefraction, gemFallback, 3);
   }, [gemTotal, gemRefraction, gemFallback, onDebugGemStats]);
 
   // ── Imperative transform sync: prevents React props from fighting TransformControls ──
@@ -1579,6 +2283,7 @@ const LoadedModel = forwardRef<
           ref={(r) => { if (r) meshRefs.current.set(md.name, r); }}
           geometry={md.geometry}
           material={md.material}
+          castShadow
           onClick={(e: ThreeEvent<MouseEvent>) => {
             e.stopPropagation();
             if (_isTransformDragging) return;
@@ -1587,7 +2292,7 @@ const LoadedModel = forwardRef<
         />
       ))}
 
-      {/* Diamond overlay: refraction material rendered separately */}
+      {/* BVH gemstone overlay rendered separately from transform-authority meshes. */}
       {gemElements.map((gem) => (
         <SyncedGemOverlay
           key={`gem_${gem.meshData.name}`}
@@ -1596,7 +2301,8 @@ const LoadedModel = forwardRef<
           position={gem.meshData.position}
           quaternion={gem.meshData.quaternion}
           scale={gem.meshData.scale}
-          refractionConfig={gem.refractionConfig}
+          materialSpec={gem.materialSpec}
+          materialKey={gem.materialKey}
           isSelected={gem.isSelected}
           meshRefs={meshRefs}
           onMeshClick={onMeshClick}
@@ -1619,42 +2325,13 @@ const LoadedModel = forwardRef<
 
 LoadedModel.displayName = "LoadedModel";
 
-// ── Preload diamond HDRI at Canvas mount time ──
-// This ensures the heavy HDR texture + shader compilation happens eagerly,
-// preventing a black-screen stall when a gem material is first applied.
-function DiamondHDRIPreloader() {
-  const envMap = useLoader(RGBELoader, "/hdri/diamond-studio.hdr");
-  useEffect(() => {
-    if (envMap) {
-      envMap.mapping = THREE.EquirectangularReflectionMapping;
-      console.log("[DiamondHDRIPreloader] Diamond HDRI preloaded and ready");
-    }
-  }, [envMap]);
-  return null;
-}
-
-// ── Diamond/Gem Overlay with MeshRefractionMaterial ──
-// Renders gemstone meshes using real refraction (MeshRefractionMaterial from drei)
-// Uses a dedicated HDRI envMap loaded via RGBELoader, synced per frame.
-
-function DiamondEnvMapLoader({ onEnvMapReady }: { onEnvMapReady: (map: THREE.Texture) => void }) {
-  const envMap = useLoader(RGBELoader, "/hdri/diamond-studio.hdr");
-  const { scene } = useThree();
-
-  useEffect(() => {
-    if (envMap) {
-      envMap.mapping = THREE.EquirectangularReflectionMapping;
-      onEnvMapReady(envMap);
-    }
-  }, [envMap, onEnvMapReady]);
-
-  return null;
-}
+// Gem overlay: the hidden source mesh remains the transform authority while
+// the reference implementation's custom BVH shader renders on top.
 
 /**
- * SyncedGemOverlay — renders a single gem mesh with MeshRefractionMaterial.
+ * SyncedGemOverlay renders one gem mesh with the reference BVH shader.
  * Syncs world transform from the source (hidden) mesh every frame.
- * Exact replica of user's ModelViewer diamond overlay pattern.
+ * Existing transforms and multi-selection remain authoritative.
  */
 function SyncedGemOverlay({
   meshName,
@@ -1662,7 +2339,8 @@ function SyncedGemOverlay({
   position,
   quaternion,
   scale,
-  refractionConfig,
+  materialSpec,
+  materialKey,
   isSelected,
   meshRefs,
   onMeshClick,
@@ -1672,13 +2350,13 @@ function SyncedGemOverlay({
   position: THREE.Vector3;
   quaternion: THREE.Quaternion;
   scale: THREE.Vector3;
-  refractionConfig: GemRefractionConfig;
+  materialSpec: ReferenceMaterialSpec;
+  materialKey: string;
   isSelected: boolean;
   meshRefs: React.MutableRefObject<Map<string, THREE.Mesh>>;
   onMeshClick: (name: string, multi: boolean) => void;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
-  const inv = useInvalidate();
 
   // Pre-allocate reusable objects to avoid GC pressure in frame loop
   const _pos = useMemo(() => new THREE.Vector3(), []);
@@ -1699,13 +2377,14 @@ function SyncedGemOverlay({
   });
 
   return (
-    <DiamondEnvMapConsumer
+    <ReferenceGemMesh
       meshRef={meshRef}
       geometry={geometry}
       position={position}
       quaternion={quaternion}
       scale={scale}
-      refractionConfig={refractionConfig}
+      materialSpec={materialSpec}
+      materialKey={materialKey}
       isSelected={isSelected}
       meshName={meshName}
       onMeshClick={onMeshClick}
@@ -1714,15 +2393,16 @@ function SyncedGemOverlay({
 }
 
 /**
- * Consumes the diamond envMap from context and renders MeshRefractionMaterial.
+ * Consumes the active reference HDR and renders the custom BVH gem material.
  */
-function DiamondEnvMapConsumer({
+function ReferenceGemMesh({
   meshRef,
   geometry,
   position,
   quaternion,
   scale,
-  refractionConfig,
+  materialSpec,
+  materialKey,
   isSelected,
   meshName,
   onMeshClick,
@@ -1732,20 +2412,57 @@ function DiamondEnvMapConsumer({
   position: THREE.Vector3;
   quaternion: THREE.Quaternion;
   scale: THREE.Vector3;
-  refractionConfig: GemRefractionConfig;
+  materialSpec: ReferenceMaterialSpec;
+  materialKey: string;
   isSelected: boolean;
   meshName: string;
   onMeshClick: (name: string, multi: boolean) => void;
 }) {
-  const envMap = useLoader(RGBELoader, "/hdri/diamond-studio.hdr");
+  const { rawEnvironment } = React.useContext(ReferenceEnvironmentContext);
+  const gemMaterial = useMemo(() => {
+    const filter = new THREE.Color(materialSpec.color).lerp(
+      new THREE.Color(materialSpec.atten ?? materialSpec.color),
+      materialSpec.atten === 0xffffff ? 0 : 0.55,
+    );
+    const material = new THREE.ShaderMaterial({
+      uniforms: {
+        envMap: { value: rawEnvironment ?? referenceWhiteEnvironment },
+        bvh: { value: referenceBvhFor(geometry) },
+        modelMatrixInverse: { value: new THREE.Matrix4() },
+        bounces: { value: 3 },
+        ior: { value: materialSpec.ior ?? 1.5 },
+        aberrationStrength: { value: materialSpec.disp ?? 0.008 },
+        fresnel: { value: 0.25 },
+        colorFactor: { value: filter },
+        envIntensity: { value: 1.2 },
+        selected: { value: 0 },
+      },
+      vertexShader: REFERENCE_GEM_VERTEX_SHADER,
+      fragmentShader: REFERENCE_GEM_FRAGMENT_SHADER,
+      side: THREE.FrontSide,
+      toneMapped: true,
+    });
+    material.name = materialSpec.label;
+    material.userData.referenceGem = materialKey;
+    return material;
+  }, [geometry, materialKey, materialSpec, rawEnvironment]);
 
   useEffect(() => {
-    if (envMap) {
-      envMap.mapping = THREE.EquirectangularReflectionMapping;
-    }
-  }, [envMap]);
+    gemMaterial.uniforms.envMap.value = rawEnvironment ?? referenceWhiteEnvironment;
+    gemMaterial.needsUpdate = true;
+  }, [gemMaterial, rawEnvironment]);
 
-  if (!envMap) return null;
+  useEffect(() => () => gemMaterial.dispose(), [gemMaterial]);
+
+  const updateGemUniforms = useCallback(() => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    mesh.updateWorldMatrix(true, false);
+    gemMaterial.uniforms.modelMatrixInverse.value.copy(mesh.matrixWorld).invert();
+    gemMaterial.uniforms.selected.value = isSelected
+      ? 0.3 + 0.25 * Math.sin(performance.now() * 0.006)
+      : 0;
+  }, [gemMaterial, isSelected, meshRef]);
 
   return (
     <mesh
@@ -1754,23 +2471,15 @@ function DiamondEnvMapConsumer({
       position={position}
       quaternion={quaternion}
       scale={scale}
+      material={gemMaterial}
+      onBeforeRender={updateGemUniforms}
       castShadow
       onClick={(e: ThreeEvent<MouseEvent>) => {
         e.stopPropagation();
         if (_isTransformDragging) return;
         onMeshClick(meshName, e.nativeEvent.shiftKey || e.nativeEvent.ctrlKey || e.nativeEvent.metaKey);
       }}
-    >
-      <MeshRefractionMaterial
-        envMap={envMap}
-        color={new THREE.Color(refractionConfig.color)}
-        ior={refractionConfig.ior}
-        aberrationStrength={refractionConfig.sparkle * Q.aberrationScale}
-        bounces={Math.min(refractionConfig.bounces, Q.gemBounces)}
-        fresnel={refractionConfig.fresnel}
-        toneMapped={false}
-      />
-    </mesh>
+    />
   );
 }
 
@@ -1829,9 +2538,20 @@ const CADCanvas = forwardRef<CADCanvasHandle, CADCanvasProps>(
   ({ hasModel, glbUrl, additionalGlbUrls = [], selectedMeshNames, hiddenMeshNames = new Set(), onMeshClick, transformMode, onMeshesDetected, onTransformStart, onTransformEnd, lightIntensity = 1, onModelReady, magicTexturing = false, qualityMode = "balanced", gemMode = "simple", onGemModeForced }, ref) => {
     const modelUrl = glbUrl || "/models/ring.glb";
     const modelRef = useRef<CADCanvasHandle>(null);
+    const [heavyScene, setHeavyScene] = useState(false);
+
+    useEffect(() => () => {
+      if (THREE.ShaderChunk.tonemapping_pars_fragment.includes("StartCompression = 0.8 - 0.04")) {
+        THREE.ShaderChunk.tonemapping_pars_fragment = ORIGINAL_TONE_MAPPING_CHUNK;
+      }
+    }, []);
     
     // Compute effective quality settings based on mode
     const effectiveQ = useMemo(() => getSettingsForMode(qualityMode), [qualityMode]);
+    const baseDpr = useMemo(() => {
+      const deviceDpr = typeof window === "undefined" ? 1 : window.devicePixelRatio || 1;
+      return Math.min(deviceDpr, 2, effectiveQ.dpr[1]);
+    }, [effectiveQ]);
 
 
 
@@ -1877,7 +2597,7 @@ const CADCanvas = forwardRef<CADCanvasHandle, CADCanvasProps>(
       resetCamera: () => {
         const controls = getOrbitControls();
         if (!controls) return;
-        controls.object.position.set(0, 1.5, 5);
+        controls.object.position.set(0, 0.7, 5.4);
         controls.target.set(0, 0, 0);
         controls.update();
       },
@@ -1911,13 +2631,16 @@ const CADCanvas = forwardRef<CADCanvasHandle, CADCanvasProps>(
     useEffect(() => {
       const container = canvasContainerRef.current;
       if (!container) return;
+      let canvasEl: HTMLCanvasElement | null = null;
+      let onLost: ((event: Event) => void) | null = null;
+      let onRestored: (() => void) | null = null;
 
       // Small delay to let R3F mount the canvas
       const timer = setTimeout(() => {
-        const canvasEl = container.querySelector('canvas');
+        canvasEl = container.querySelector('canvas');
         if (!canvasEl) return;
 
-        const onLost = (e: Event) => {
+        onLost = (e: Event) => {
           e.preventDefault(); // allow restore
           contextLostCountRef.current++;
           const count = contextLostCountRef.current;
@@ -1946,7 +2669,7 @@ const CADCanvas = forwardRef<CADCanvasHandle, CADCanvasProps>(
           }
         };
 
-        const onRestored = () => {
+        onRestored = () => {
           console.log('[CADCanvas] ✓ WebGL context restored');
           if (debugActive) {
             setDebugStats(prev => ({ ...prev, contextLost: false }));
@@ -1960,14 +2683,13 @@ const CADCanvas = forwardRef<CADCanvasHandle, CADCanvasProps>(
 
         canvasEl.addEventListener('webglcontextlost', onLost);
         canvasEl.addEventListener('webglcontextrestored', onRestored);
-
-        return () => {
-          canvasEl.removeEventListener('webglcontextlost', onLost);
-          canvasEl.removeEventListener('webglcontextrestored', onRestored);
-        };
       }, 500);
 
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+        if (canvasEl && onLost) canvasEl.removeEventListener('webglcontextlost', onLost);
+        if (canvasEl && onRestored) canvasEl.removeEventListener('webglcontextrestored', onRestored);
+      };
     }, [debugActive, onGemModeForced]); // intentionally not including debugStats to avoid re-registering
 
     // Track loading state from LoadedModel
@@ -1991,37 +2713,33 @@ const CADCanvas = forwardRef<CADCanvasHandle, CADCanvasProps>(
         <Canvas
           gl={{
             antialias: effectiveQ.antialias,
-            alpha: true,
-            toneMapping: THREE.ACESFilmicToneMapping,
-            toneMappingExposure: 0.45 * lightIntensity,
+            alpha: false,
+            preserveDrawingBuffer: true,
+            toneMapping: THREE.CustomToneMapping,
+            toneMappingExposure: 1.0 * lightIntensity,
             powerPreference: effectiveQ.tier === "low" ? "low-power" : "high-performance",
           }}
-          dpr={[effectiveQ.dpr[0], Math.min(effectiveQ.dpr[1], 1.5)]}
-          camera={{ fov: 35, near: 0.1, far: 100, position: [0, 1.5, 5] }}
+          dpr={baseDpr}
+          camera={{ fov: 30, near: 0.1, far: 100, position: [0, 0.7, 5.4] }}
           onPointerMissed={() => { if (!_isTransformDragging) onMeshClick("", false); }}
           frameloop="demand"
           onCreated={({ gl }) => {
-            gl.setClearColor(0x000000, 0);
+            installReferenceNeutralToneMapping();
+            gl.toneMapping = THREE.CustomToneMapping;
+            gl.toneMappingExposure = 1.0 * lightIntensity;
             gl.outputColorSpace = THREE.SRGBColorSpace;
+            gl.shadowMap.enabled = true;
+            gl.shadowMap.type = THREE.PCFSoftShadowMap;
           }}
         >
         <Suspense fallback={null}>
-            {/* Preload diamond HDRI so first gem application doesn't cause a black flash */}
-            <DiamondHDRIPreloader />
+          <MotionAdaptiveProvider baseDpr={baseDpr} heavyScene={heavyScene}>
+          <ReferenceStudioEnvironment>
             {/* Dynamic light intensity sync */}
             <LightController intensity={lightIntensity} />
+            <ReferenceStudioLighting />
             {/* Lighting — scaled by lightIntensity */}
-            <ambientLight intensity={0.08 * lightIntensity} />
-            <directionalLight position={[3, 5, 3]} intensity={0.6 * lightIntensity} color="#f5f0e8" />
-            {effectiveQ.maxLights >= 4 && (
-              <directionalLight position={[-3, 2, -3]} intensity={0.3 * lightIntensity} color="#e8e4dc" />
-            )}
-            <hemisphereLight args={["#d4cfc8", "#8a8580", 0.15 * lightIntensity]} />
-            {effectiveQ.maxLights >= 5 && (
-              <spotLight position={[0, 8, 0]} intensity={0.25 * lightIntensity} angle={0.5} penumbra={1} color="#fff5e6" />
-            )}
 
-            <Environment files="/hdri/jewelry-studio-v2.hdr" environmentIntensity={0.35 * lightIntensity} />
 
             
 
@@ -2044,6 +2762,7 @@ const CADCanvas = forwardRef<CADCanvasHandle, CADCanvasProps>(
                 magicTexturing={magicTexturing}
                 gemMode={gemMode}
                 onGemModeForced={onGemModeForced}
+                onSceneWeightChange={setHeavyScene}
                 onDebugGemStats={debugActive ? (total, refraction, fallback, bounces) => {
                   setDebugStats(prev => ({
                     ...prev,
@@ -2063,7 +2782,7 @@ const CADCanvas = forwardRef<CADCanvasHandle, CADCanvasProps>(
               enableDamping
               dampingFactor={0.03}
               minDistance={0.5}
-              maxDistance={50}
+              maxDistance={20}
               minPolarAngle={0}
               maxPolarAngle={Math.PI}
               makeDefault
@@ -2072,6 +2791,8 @@ const CADCanvas = forwardRef<CADCanvasHandle, CADCanvasProps>(
               <GizmoViewport labelColor="white" axisHeadScale={0.8} />
             </GizmoHelper>
 
+          </ReferenceStudioEnvironment>
+          </MotionAdaptiveProvider>
           </Suspense>
         </Canvas>
 
