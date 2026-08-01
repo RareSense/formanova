@@ -3,50 +3,30 @@ import { X } from 'lucide-react';
 import { BrandCard, BrandCardFaceToggle, type CardFace } from '@/components/brand/BrandCard';
 import { NovaIntroPanel, type NovaOnboardingStep, type InsightFeedItem } from '@/components/brand/NovaIntroPanel';
 import {
-  CREATIVE_ZAVA_DEMO,
-  INSIGHT_REVEAL_ORDER,
-  BACK_SIDE_KEYS,
+  INSIGHT_DISPLAY_ORDER,
   type InsightKey,
   type InsightFeedKey,
-  type CreativeZavaProfile,
-} from '@/components/brand/creative-zava-demo';
+} from '@/components/brand/brand-insight-meta';
+import {
+  EMPTY_BRAND_SCAN_INSIGHTS,
+  runBrandScan,
+  type BrandScanInsights,
+  type BrandScanResult,
+} from '@/lib/brand-scan-api';
+import { INVALID_URL_MESSAGE, isValidHttpUrl, normalizeUrl } from '@/lib/brand-profile-api';
 import { trackBrandFormOpened, trackBrandFormSubmitted } from '@/lib/posthog-events';
 
 export interface BrandDetails {
   brand_name: string;
   website_url: string;
+  storefront_url: string;
   physical_location: string;
   social_links: string[];
   based_in: string;
   target_markets: string[];
 }
 
-/** Users often type "mybrand.com" — the backend rejects anything that isn't http(s). */
-function normalizeUrl(value: string): string {
-  const v = value.trim();
-  if (!v) return '';
-  return /^https?:\/\//i.test(v) ? v : `https://${v}`;
-}
-
-/** How long each staggered scan-reveal is spaced apart, in ms. */
-const REVEAL_STEP_MS = 700;
-const REVEAL_START_DELAY_MS = 600;
-const REVEAL_FINISH_PAUSE_MS = 700;
-/** How long a back-side discovery holds the card flipped before returning. */
-const FLIP_HOLD_MS = 1400;
-
-/** Maps a feed key to the matching BrandCard back-face row for the auto-flip highlight. */
-const HIGHLIGHT_FIELD_MAP: Partial<Record<InsightFeedKey, NonNullable<Parameters<typeof BrandCard>[0]['highlightField']>>> = {
-  productFocus: 'productFocus',
-  targetMarkets: 'targetMarkets',
-  audience: 'audience',
-  location: 'basedIn',
-  website: 'website',
-  social: 'social',
-  otherInfo: 'otherInfo',
-};
-
-function insightValue(key: InsightFeedKey, profile: CreativeZavaProfile, website: string): string {
+function insightValue(key: InsightFeedKey, profile: BrandScanInsights, website: string): string {
   switch (key) {
     case 'identity': return profile.identity;
     case 'productFocus': return profile.productFocus;
@@ -59,6 +39,24 @@ function insightValue(key: InsightFeedKey, profile: CreativeZavaProfile, website
     case 'otherInfo': return profile.otherInfo;
     default: return '';
   }
+}
+
+function insightKeys(profile: BrandScanInsights): InsightKey[] {
+  return INSIGHT_DISPLAY_ORDER.filter((key) => {
+    if (key === 'website') return true;
+    if (key === 'palette') return profile.palette.length > 0;
+    return Boolean(insightValue(key, profile, ''));
+  });
+}
+
+function scanNotice(result: BrandScanResult): string | null {
+  if (result.status === 'partial' || result.readinessLevel === 'non_storefront') {
+    return 'Nova could only build a partial read from this URL. Review every available finding carefully before confirming.';
+  }
+  if (result.readinessLevel && result.readinessLevel !== 'full') {
+    return `This scan has ${result.readinessLevel.replace(/_/g, ' ')} readiness. Please review every finding before confirming.`;
+  }
+  return null;
 }
 
 interface Props {
@@ -74,27 +72,18 @@ interface Props {
 export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissible = true, source }: Props) {
   const [step, setStep] = useState<NovaOnboardingStep>('intro');
   const [brandName, setBrandName] = useState(initial?.brand_name ?? '');
-  const [website, setWebsite] = useState(initial?.website_url ?? '');
+  const [website, setWebsite] = useState(initial?.storefront_url || initial?.website_url || '');
   const [brandNameError, setBrandNameError] = useState(false);
+  const [websiteError, setWebsiteError] = useState<string | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [scanStatus, setScanStatus] = useState('Starting your brand scan…');
+  const [resultNotice, setResultNotice] = useState<string | null>(null);
   const [cardFace, setCardFace] = useState<CardFace>('front');
-  const [revealedKeys, setRevealedKeys] = useState<InsightKey[]>([]);
-  const [profile, setProfile] = useState<CreativeZavaProfile>(() => ({
-    ...CREATIVE_ZAVA_DEMO,
-    palette: [...CREATIVE_ZAVA_DEMO.palette],
-    visualStyle: [...CREATIVE_ZAVA_DEMO.visualStyle],
-    targetMarkets: [...CREATIVE_ZAVA_DEMO.targetMarkets],
-    socialLinks: [...CREATIVE_ZAVA_DEMO.socialLinks],
-  }));
-  const [callSeconds, setCallSeconds] = useState(0);
-  const [muted, setMuted] = useState(false);
-  const [highlightKey, setHighlightKey] = useState<InsightFeedKey | null>(null);
+  const [availableKeys, setAvailableKeys] = useState<InsightKey[]>([]);
+  const [profile, setProfile] = useState<BrandScanInsights>(EMPTY_BRAND_SCAN_INSIGHTS);
 
   const overlayRef = useRef<HTMLDivElement>(null);
-  const cardFaceRef = useRef<CardFace>('front');
-  const previousFaceRef = useRef<CardFace>('front');
-  const flipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => { cardFaceRef.current = cardFace; }, [cardFace]);
+  const scanAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -108,70 +97,17 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
     if (open) trackBrandFormOpened({ source });
   }, [open, source]);
 
-  // Nova "speaks" the intro line, then the fields appear.
+  // A scan can outlive the modal unless it is explicitly cancelled.
   useEffect(() => {
-    if (!open || step !== 'intro') return;
-    const t = setTimeout(() => setStep('speaking'), 600);
-    return () => clearTimeout(t);
-  }, [open, step]);
-
-  useEffect(() => {
-    if (!open || step !== 'speaking') return;
-    const t = setTimeout(() => setStep('fields'), 5200);
-    return () => clearTimeout(t);
-  }, [open, step]);
-
-  // Call timer — ticks while the scan is live, freezes once done.
-  useEffect(() => {
-    if (step !== 'scanning') return;
-    const id = setInterval(() => setCallSeconds((s) => s + 1), 1000);
-    return () => clearInterval(id);
-  }, [step]);
-
-  // Briefly flips the card to Back and pulses the newly-discovered field, then
-  // returns to whichever face the user was already on. A new flip mid-hold
-  // extends the same hold window instead of stacking a second flip.
-  const triggerBackFlip = (key: InsightFeedKey) => {
-    if (!flipTimeoutRef.current) {
-      previousFaceRef.current = cardFaceRef.current;
-    } else {
-      clearTimeout(flipTimeoutRef.current);
-    }
-    setCardFace('back');
-    setHighlightKey(key);
-    flipTimeoutRef.current = setTimeout(() => {
-      setCardFace(previousFaceRef.current);
-      setHighlightKey(null);
-      flipTimeoutRef.current = null;
-    }, FLIP_HOLD_MS);
-  };
-
-  // Once the scan starts, findings reveal one at a time.
-  useEffect(() => {
-    if (step !== 'scanning') return;
-    setRevealedKeys([]);
-    setCallSeconds(0);
-    const timers = INSIGHT_REVEAL_ORDER.map((key, i) =>
-      setTimeout(() => {
-        setRevealedKeys((prev) => [...prev, key]);
-        if (BACK_SIDE_KEYS.has(key)) triggerBackFlip(key);
-      }, REVEAL_START_DELAY_MS + i * REVEAL_STEP_MS),
-    );
-    const finishTimer = setTimeout(
-      () => setStep('done'),
-      REVEAL_START_DELAY_MS + INSIGHT_REVEAL_ORDER.length * REVEAL_STEP_MS + REVEAL_FINISH_PAUSE_MS,
-    );
-    return () => {
-      timers.forEach(clearTimeout);
-      clearTimeout(finishTimer);
-    };
-  }, [step]);
+    if (!open) scanAbortRef.current?.abort();
+    return () => scanAbortRef.current?.abort();
+  }, [open]);
 
   if (!open) return null;
 
-  const revealed = (key: InsightKey) => step === 'done' || revealedKeys.includes(key);
+  const revealed = (key: InsightKey) => availableKeys.includes(key) && (step === 'done' || step === 'next');
 
-  const feedItems: InsightFeedItem[] = INSIGHT_REVEAL_ORDER.filter(revealed).map((key) => ({
+  const feedItems: InsightFeedItem[] = INSIGHT_DISPLAY_ORDER.filter(revealed).map((key) => ({
     key,
     value: insightValue(key, profile, website),
   }));
@@ -180,13 +116,50 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
     if (dismissible && e.target === overlayRef.current) onClose();
   };
 
-  const handleStartBuilding = () => {
-    if (!brandName.trim()) {
-      setBrandNameError(true);
-      return;
-    }
-    setBrandNameError(false);
+  const handleStartBuilding = async () => {
+    const normalizedWebsite = normalizeUrl(website);
+    const missingBrandName = !brandName.trim();
+    const invalidWebsite = !isValidHttpUrl(normalizedWebsite);
+    setBrandNameError(missingBrandName);
+    setWebsiteError(invalidWebsite ? INVALID_URL_MESSAGE : null);
+    setScanError(null);
+    if (missingBrandName || invalidWebsite) return;
+
+    scanAbortRef.current?.abort();
+    const controller = new AbortController();
+    scanAbortRef.current = controller;
+    setWebsite(normalizedWebsite);
+    setAvailableKeys([]);
+    setProfile(EMPTY_BRAND_SCAN_INSIGHTS);
+    setResultNotice(null);
+    setScanStatus('Starting your brand scan…');
     setStep('scanning');
+
+    try {
+      const result = await runBrandScan(normalizedWebsite, {
+        signal: controller.signal,
+        onStatus: () => setScanStatus('Analyzing your storefront and visual identity…'),
+      });
+      if (!result || controller.signal.aborted) return;
+      if (result.status.toLowerCase() === 'blocked') {
+        const reason = result.errorCode === 'robots_denied'
+          ? 'This site blocks automated scanning. Try your public storefront URL instead.'
+          : 'This storefront could not be scanned. Check the URL and try again.';
+        setScanError(reason);
+        setStep('fields');
+        return;
+      }
+      setProfile(result.insights);
+      setAvailableKeys(insightKeys(result.insights));
+      setResultNotice(scanNotice(result));
+      setStep('done');
+    } catch (error) {
+      if (controller.signal.aborted || (error instanceof Error && error.name === 'AbortError')) return;
+      setScanError(error instanceof Error ? error.message : 'The brand scan failed. Please try again.');
+      setStep('fields');
+    } finally {
+      if (scanAbortRef.current === controller) scanAbortRef.current = null;
+    }
   };
 
   const handleEditInsight = (key: InsightFeedKey, value: string) => {
@@ -207,19 +180,20 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
   };
 
   const handleFinish = () => {
-    const websiteUrl = normalizeUrl(website);
+    const storefrontUrl = normalizeUrl(website);
     trackBrandFormSubmitted({
       source,
-      has_website: Boolean(websiteUrl),
-      has_store: false,
-      has_location: true,
-      has_markets: true,
+      has_website: Boolean(initial?.website_url),
+      has_store: Boolean(storefrontUrl),
+      has_location: Boolean(profile.basedIn),
+      has_markets: profile.targetMarkets.length > 0,
       social_count: profile.socialLinks.length,
       has_brand_book: false,
     });
     onContinue({
       brand_name: brandName.trim(),
-      website_url: websiteUrl,
+      website_url: initial?.website_url ?? '',
+      storefront_url: storefrontUrl,
       physical_location: '',
       social_links: profile.socialLinks,
       based_in: profile.basedIn,
@@ -228,7 +202,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
   };
 
   const summaryLine = step === 'done'
-    ? `Here's what I understand about your brand so far: ${brandName.trim() || 'your brand'} is ${profile.identity.toLowerCase()} If anything feels off, you can edit it here or tell me what to change.`
+    ? `This is what I understand about ${brandName.trim() || 'your brand'}. Please correct anything that feels off.`
     : undefined;
 
   return (
@@ -261,14 +235,17 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
                 brandName={brandName}
                 onBrandNameChange={(v) => { setBrandName(v); setBrandNameError(false); }}
                 website={website}
-                onWebsiteChange={setWebsite}
+                onWebsiteChange={(value) => { setWebsite(value); setWebsiteError(null); setScanError(null); }}
                 brandNameError={brandNameError}
+                websiteError={websiteError}
+                scanError={scanError}
+                scanStatus={scanStatus}
+                scanNotice={resultNotice}
+                onSelectMessage={() => setStep('fields')}
                 onStartBuilding={handleStartBuilding}
+                onConfirm={() => setStep('next')}
+                onAddMore={() => setAvailableKeys((keys) => keys.includes('otherInfo') ? keys : [...keys, 'otherInfo'])}
                 onFinish={handleFinish}
-                callSeconds={callSeconds}
-                muted={muted}
-                onToggleMute={() => setMuted((m) => !m)}
-                onEndCall={() => setStep('done')}
                 insights={feedItems}
                 onEditInsight={handleEditInsight}
                 palette={profile.palette}
@@ -292,8 +269,8 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
                 />
                 <BrandCard
                   brandName={brandName}
-                  websiteUrl={revealed('website') ? website : ''}
-                  storeUrl=""
+                  websiteUrl=""
+                  storeUrl={revealed('website') ? website : ''}
                   basedIn={revealed('location') ? profile.basedIn : ''}
                   targetMarkets={revealed('targetMarkets') ? profile.targetMarkets : []}
                   socialLinks={revealed('social') ? profile.socialLinks : []}
@@ -304,7 +281,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
                   audience={revealed('audience') ? profile.audience : ''}
                   otherInfo={revealed('otherInfo') ? profile.otherInfo : ''}
                   accentColor={revealed('palette') ? profile.palette[0] : undefined}
-                  highlightField={highlightKey ? HIGHLIGHT_FIELD_MAP[highlightKey] : null}
+                  highlightField={null}
                   face={cardFace}
                 />
               </div>

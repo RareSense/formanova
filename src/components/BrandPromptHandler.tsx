@@ -64,6 +64,7 @@ export function BrandPromptHandler() {
           setInitialDetails({
             brand_name: data.brand_name ?? '',
             website_url: data.website_url ?? '',
+            storefront_url: data.storefront_url ?? '',
             physical_location: data.physical_location ?? '',
             social_links: data.social_links ?? [],
             based_in: data.based_in ?? '',
@@ -94,6 +95,7 @@ export function BrandPromptHandler() {
   const handleContinue = async (details: BrandDetails) => {
     const body: Record<string, unknown> = { brand_name: details.brand_name };
     if (details.website_url) body.website_url = details.website_url;
+    if (details.storefront_url) body.storefront_url = details.storefront_url;
     if (details.physical_location) body.physical_location = details.physical_location;
     if (details.social_links.length) body.social_links = details.social_links;
     if (details.based_in) body.based_in = details.based_in;

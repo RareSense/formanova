@@ -1,17 +1,38 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { JewelryBrandModal } from '@/components/JewelryBrandModal';
-import { CREATIVE_ZAVA_DEMO, INSIGHT_REVEAL_ORDER } from '@/components/brand/creative-zava-demo';
+import { runBrandScan, type BrandScanResult } from '@/lib/brand-scan-api';
 
-vi.mock('@/hooks/use-mobile', () => ({
-  useIsMobile: () => false,
-}));
-
+vi.mock('@/hooks/use-mobile', () => ({ useIsMobile: () => false }));
 vi.mock('@/lib/posthog-events', () => ({
   trackBrandFormOpened: vi.fn(),
   trackBrandFormSubmitted: vi.fn(),
 }));
+vi.mock('@/lib/brand-scan-api', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/brand-scan-api')>('@/lib/brand-scan-api');
+  return { ...actual, runBrandScan: vi.fn() };
+});
+
+const mockRunBrandScan = vi.mocked(runBrandScan);
+
+const completedScan: BrandScanResult = {
+  status: 'completed',
+  readinessLevel: 'full',
+  errorCode: null,
+  requestedUrl: 'https://example.com',
+  insights: {
+    identity: 'Modern fine jewelry with an editorial point of view.',
+    palette: ['#111111', '#F4E8D5'],
+    productFocus: 'Gold rings and necklaces',
+    visualStyle: ['Minimal', 'Editorial'],
+    targetMarkets: ['United States'],
+    audience: 'Design-conscious women',
+    basedIn: 'New York, USA',
+    socialLinks: ['https://instagram.com/example'],
+    otherInfo: '',
+  },
+};
 
 function renderModal(onContinue = vi.fn()) {
   render(
@@ -22,122 +43,93 @@ function renderModal(onContinue = vi.fn()) {
   return { onContinue };
 }
 
-/** Advances through intro -> speaking -> fields. */
-function advanceToFields() {
-  act(() => { vi.advanceTimersByTime(600); }); // intro -> speaking
-  act(() => { vi.advanceTimersByTime(5200); }); // speaking -> fields
+function openMessageForm() {
+  fireEvent.click(screen.getByRole('button', { name: 'Message Nova' }));
 }
 
-/** Advances through the full scanning -> done reveal sequence. */
-function advanceThroughScanning() {
-  const totalMs = 600 + INSIGHT_REVEAL_ORDER.length * 700 + 700 + 100;
-  act(() => { vi.advanceTimersByTime(totalMs); });
+function fillRequiredFields() {
+  fireEvent.change(screen.getByLabelText('Brand name'), { target: { value: 'Example Atelier' } });
+  fireEvent.change(screen.getByLabelText('Website or store URL'), { target: { value: 'example.com' } });
 }
 
 describe('JewelryBrandModal Nova onboarding', () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-  });
+  beforeEach(() => mockRunBrandScan.mockReset());
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it('opens on the Nova intro step with the bespoke card already visible', () => {
+  it('starts with message available and transparently marks voice as coming soon', () => {
     renderModal();
 
     expect(screen.getByRole('heading', { name: 'Nova' })).toBeInTheDocument();
-    expect(screen.getByText('AI Creative Consultant')).toBeInTheDocument();
-    expect(screen.getByText('Your Bespoke Card')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Talk to Nova.*coming soon/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Message Nova' })).toBeEnabled();
     expect(screen.queryByLabelText('Brand name')).not.toBeInTheDocument();
   });
 
-  it('simulates Nova speaking, then reveals the brand name and website fields', () => {
+  it('reveals dedicated brand and storefront fields after Message Nova', () => {
     renderModal();
+    openMessageForm();
 
-    act(() => { vi.advanceTimersByTime(600); });
-    expect(screen.getByTestId('nova-speaking-caption')).toBeInTheDocument();
-
-    act(() => { vi.advanceTimersByTime(5200); });
     expect(screen.getByLabelText('Brand name')).toBeInTheDocument();
     expect(screen.getByLabelText('Website or store URL')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start brand scan' })).toBeInTheDocument();
   });
 
-  it('blocks Continue and shows an error when brand name is missing', () => {
+  it('validates both required fields before starting the workflow', () => {
     renderModal();
-    advanceToFields();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    openMessageForm();
+    fireEvent.click(screen.getByRole('button', { name: 'Start brand scan' }));
 
     expect(screen.getByText('Brand name is required.')).toBeInTheDocument();
-    expect(screen.getByLabelText('Brand name')).toBeInTheDocument();
+    expect(screen.getByText(/Enter a valid URL/i)).toBeInTheDocument();
+    expect(mockRunBrandScan).not.toHaveBeenCalled();
   });
 
-  it('updates the card title live as the brand name is typed', () => {
-    renderModal();
-    advanceToFields();
-
-    fireEvent.change(screen.getByLabelText('Brand name'), { target: { value: 'Creative Zava' } });
-
-    expect(screen.getAllByText('Creative Zava').length).toBeGreaterThan(0);
-  });
-
-  it('progressively reveals findings during scanning, then calls onContinue with the (possibly edited) profile', () => {
+  it('renders real scan findings, allows corrections, and completes through Maybe later', async () => {
+    mockRunBrandScan.mockResolvedValue(completedScan);
     const { onContinue } = renderModal();
-    advanceToFields();
+    openMessageForm();
+    fillRequiredFields();
+    fireEvent.click(screen.getByRole('button', { name: 'Start brand scan' }));
 
-    fireEvent.change(screen.getByLabelText('Brand name'), { target: { value: 'Creative Zava' } });
-    fireEvent.change(screen.getByLabelText('Website or store URL'), { target: { value: 'creativezava.com' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-
-    expect(screen.getByTestId('nova-call-timer')).toBeInTheDocument();
-    expect(screen.queryByText(CREATIVE_ZAVA_DEMO.identity)).not.toBeInTheDocument();
-
-    advanceThroughScanning();
-
-    expect(screen.getAllByText(CREATIVE_ZAVA_DEMO.identity).length).toBeGreaterThan(0);
-    expect(screen.getByRole('button', { name: 'Continue to FormaNova' })).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Continue to FormaNova' }));
-
-    expect(onContinue).toHaveBeenCalledWith(
-      expect.objectContaining({
-        brand_name: 'Creative Zava',
-        website_url: 'https://creativezava.com',
-        based_in: CREATIVE_ZAVA_DEMO.basedIn,
-        target_markets: CREATIVE_ZAVA_DEMO.targetMarkets,
-        social_links: CREATIVE_ZAVA_DEMO.socialLinks,
-      }),
-    );
-  });
-
-  it('lets the user end the call early, jumping straight to the done step', () => {
-    renderModal();
-    advanceToFields();
-
-    fireEvent.change(screen.getByLabelText('Brand name'), { target: { value: 'Creative Zava' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    act(() => { vi.advanceTimersByTime(600); }); // reveal "identity"
-
-    fireEvent.click(screen.getByRole('button', { name: 'End call' }));
-
-    expect(screen.getByRole('button', { name: 'Continue to FormaNova' })).toBeInTheDocument();
-  });
-
-  it('edits an insight after scanning finishes and reflects it on the card', () => {
-    renderModal();
-    advanceToFields();
-
-    fireEvent.change(screen.getByLabelText('Brand name'), { target: { value: 'Creative Zava' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    advanceThroughScanning();
+    expect(screen.getByTestId('brand-scan-progress')).toBeInTheDocument();
+    expect(await screen.findByText(completedScan.insights.identity)).toBeInTheDocument();
+    expect(screen.queryByText('Contemporary fine jewelry for the modern minimalist.')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Show all findings/i }));
     fireEvent.click(screen.getByRole('button', { name: /Edit Brand identity/i }));
-    const input = screen.getByDisplayValue(CREATIVE_ZAVA_DEMO.identity);
-    fireEvent.change(input, { target: { value: 'Bold statement jewelry.' } });
+    fireEvent.change(screen.getByDisplayValue(completedScan.insights.identity), {
+      target: { value: 'Bold sculptural fine jewelry.' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(screen.getAllByText('Bold sculptural fine jewelry.').length).toBeGreaterThan(0);
 
-    expect(screen.getAllByText('Bold statement jewelry.').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Looks perfect' }));
+    expect(screen.getByRole('button', { name: /Call Nova now.*coming soon/i })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: /Maybe later/i }));
+
+    expect(onContinue).toHaveBeenCalledWith(expect.objectContaining({
+      brand_name: 'Example Atelier',
+      website_url: '',
+      storefront_url: 'https://example.com',
+      based_in: 'New York, USA',
+      target_markets: ['United States'],
+    }));
+  });
+
+  it('returns a robots-blocked scan to the form without faking findings', async () => {
+    mockRunBrandScan.mockResolvedValue({
+      ...completedScan,
+      status: 'blocked',
+      readinessLevel: null,
+      errorCode: 'robots_denied',
+      insights: { ...completedScan.insights, identity: '' },
+    });
+    renderModal();
+    openMessageForm();
+    fillRequiredFields();
+    fireEvent.click(screen.getByRole('button', { name: 'Start brand scan' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('blocks automated scanning');
+    await waitFor(() => expect(screen.getByLabelText('Website or store URL')).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: 'Looks perfect' })).not.toBeInTheDocument();
   });
 });

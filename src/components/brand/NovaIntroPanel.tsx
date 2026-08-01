@@ -1,15 +1,15 @@
 import { useState } from 'react';
-import { Lock, Mic, MicOff, PhoneOff, Pencil, Check, X, Plus } from 'lucide-react';
+import { AlertCircle, Check, Loader2, Lock, MessageCircle, Mic, Pencil, Plus, X } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { DARK_THEMES } from '@/components/ThemeLogo';
 import { cn } from '@/lib/utils';
 import { VoiceOrb, type VoiceOrbState } from '@/components/brand/VoiceOrb';
-import { INSIGHT_META, type InsightFeedKey } from '@/components/brand/creative-zava-demo';
+import { INSIGHT_META, type InsightFeedKey } from '@/components/brand/brand-insight-meta';
 
-export type NovaOnboardingStep = 'intro' | 'speaking' | 'fields' | 'scanning' | 'done';
+export type NovaOnboardingStep = 'intro' | 'fields' | 'scanning' | 'done' | 'next';
 
 export const NOVA_INTRO_LINE =
-  "Hi, I'm Nova. I'll learn about your brand so I can create a more bespoke FormaNova experience for you. To get started, please provide your brand name and website or store URL.";
+  "Hi, I'm Nova. I'll learn about your brand so I can create a more bespoke FormaNova experience for you.";
 
 const INPUT_CLASS =
   'w-full border border-border bg-background px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-foreground transition-colors';
@@ -26,24 +26,20 @@ interface NovaIntroPanelProps {
   website: string;
   onWebsiteChange: (value: string) => void;
   brandNameError?: boolean;
+  websiteError?: string | null;
+  scanError?: string | null;
+  scanStatus?: string;
+  scanNotice?: string | null;
+  onSelectMessage: () => void;
   onStartBuilding: () => void;
+  onConfirm: () => void;
+  onAddMore?: () => void;
   onFinish: () => void;
-  /** Seconds elapsed since the scanning "call" started. */
-  callSeconds?: number;
-  muted?: boolean;
-  onToggleMute?: () => void;
-  onEndCall?: () => void;
   insights?: InsightFeedItem[];
   onEditInsight?: (key: InsightFeedKey, value: string) => void;
   palette?: string[];
   onEditPalette?: (palette: string[]) => void;
   summaryLine?: string;
-}
-
-function formatCallTime(totalSeconds: number): string {
-  const m = Math.floor(totalSeconds / 60);
-  const s = totalSeconds % 60;
-  return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
 function InsightRow({
@@ -211,12 +207,15 @@ export function NovaIntroPanel({
   website,
   onWebsiteChange,
   brandNameError,
+  websiteError,
+  scanError,
+  scanStatus = 'Scanning your storefront…',
+  scanNotice,
+  onSelectMessage,
   onStartBuilding,
+  onConfirm,
+  onAddMore,
   onFinish,
-  callSeconds = 0,
-  muted = false,
-  onToggleMute,
-  onEndCall,
   insights = [],
   onEditInsight,
   palette = [],
@@ -228,8 +227,7 @@ export function NovaIntroPanel({
   const [showAllFindings, setShowAllFindings] = useState(false);
 
   let orbState: VoiceOrbState = 'idle';
-  if (step === 'speaking') orbState = 'speaking';
-  else if (step === 'scanning') orbState = 'connecting';
+  if (step === 'scanning') orbState = 'connecting';
   else if (step === 'done') orbState = 'speaking';
 
   const ctaClass = cn(
@@ -240,7 +238,7 @@ export function NovaIntroPanel({
   );
 
   const editable = step === 'done';
-  const isScreenScanning = step === 'scanning' || step === 'done';
+  const isDiscoveryScreen = step === 'scanning' || step === 'done';
   const hidden = insights.length > FEED_COLLAPSE_THRESHOLD && !showAllFindings
     ? insights.slice(0, insights.length - FEED_VISIBLE_COUNT)
     : [];
@@ -251,25 +249,33 @@ export function NovaIntroPanel({
   return (
     <div className="flex min-h-full flex-col items-center py-6 text-center">
       {/* 1. Animated Nova orb — always present */}
-      <VoiceOrb state={orbState} size={isScreenScanning ? 128 : 224} />
+      <VoiceOrb state={orbState} size={isDiscoveryScreen ? 128 : 224} />
 
       {/* Nova / AI Creative Consultant — omitted once the scanning screen starts, so
           the orb + timer + feed can own the space without repeated chrome. */}
-      {!isScreenScanning && (
+      {!isDiscoveryScreen && step !== 'next' && (
         <>
           <h2 className="mt-8 font-display text-5xl font-bold text-foreground sm:text-6xl">Nova</h2>
           <p className="mt-2 text-sm font-medium text-muted-foreground sm:text-base">AI Creative Consultant</p>
         </>
       )}
 
-      {/* Simulated speech — no chat bubble, just Nova "talking" */}
-      {step === 'speaking' && (
-        <p
-          data-testid="nova-speaking-caption"
-          className="mt-8 max-w-md animate-fade-in text-base italic leading-relaxed text-muted-foreground"
-        >
-          {NOVA_INTRO_LINE}
-        </p>
+      {/* Entry choice. Voice remains disabled until a real service is connected. */}
+      {step === 'intro' && (
+        <div className="mt-8 w-full max-w-sm space-y-3 animate-fade-in">
+          <p className="mb-5 text-sm leading-relaxed text-muted-foreground">{NOVA_INTRO_LINE}</p>
+          <button type="button" disabled className={cn(ctaClass, 'cursor-not-allowed opacity-55')}>
+            <Mic className="h-4 w-4" />
+            Talk to Nova <span className="text-xs font-normal">(coming soon)</span>
+          </button>
+          <button type="button" onClick={onSelectMessage} className="flex w-full items-center justify-center gap-2.5 border border-border py-4 text-sm font-medium text-foreground transition-colors hover:border-foreground">
+            <MessageCircle className="h-4 w-4" />
+            Message Nova
+          </button>
+          <p className="pt-2 text-xs leading-relaxed text-muted-foreground">
+            Your brand information is used only to personalise FormaNova. It is not sold, published, or used to train AI models.
+          </p>
+        </div>
       )}
 
       {/* Brand name + website/store URL, revealed once the intro finishes */}
@@ -302,13 +308,21 @@ export function NovaIntroPanel({
               onChange={(e) => onWebsiteChange(e.target.value)}
               maxLength={200}
               placeholder="yourbrand.com"
-              className={INPUT_CLASS}
+              className={cn(INPUT_CLASS, websiteError && 'border-destructive focus:border-destructive')}
             />
+            {websiteError && <p className="text-xs text-destructive">{websiteError}</p>}
           </div>
 
           <button type="button" onClick={onStartBuilding} className={ctaClass}>
-            Continue
+            Start brand scan
           </button>
+
+          {scanError && (
+            <p role="alert" className="flex items-start gap-2 border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              {scanError}
+            </p>
+          )}
 
           <p className="flex items-center justify-center gap-1.5 pt-1 text-xs text-muted-foreground">
             <Lock className="h-3.5 w-3.5 shrink-0" />
@@ -317,37 +331,25 @@ export function NovaIntroPanel({
         </div>
       )}
 
-      {/* Scanning / done — call controls (scanning only) + progressive insight feed */}
-      {isScreenScanning && (
+      {/* Real workflow progress followed by editable terminal findings. */}
+      {isDiscoveryScreen && (
         <div className="mt-6 w-full max-w-sm space-y-5 text-left">
           {step === 'scanning' && (
-            <div className="flex items-center justify-center gap-4">
-              <span data-testid="nova-call-timer" className="font-mono text-sm tabular-nums text-muted-foreground">
-                {formatCallTime(callSeconds)}
-              </span>
-              <button
-                type="button"
-                onClick={onToggleMute}
-                aria-label={muted ? 'Unmute' : 'Mute'}
-                aria-pressed={muted}
-                className="flex h-9 w-9 items-center justify-center border border-border text-foreground transition-colors hover:bg-foreground hover:text-background"
-              >
-                {muted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-              </button>
-              <button
-                type="button"
-                onClick={onEndCall}
-                aria-label="End call"
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-destructive text-destructive-foreground transition-opacity hover:opacity-90"
-              >
-                <PhoneOff className="h-4 w-4" />
-              </button>
+            <div data-testid="brand-scan-progress" className="flex items-center justify-center gap-3 border border-border p-4 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>{scanStatus}</span>
             </div>
           )}
 
           {step === 'done' && summaryLine && (
             <p data-testid="nova-summary-caption" className="animate-fade-in text-center text-sm italic leading-relaxed text-muted-foreground">
               {summaryLine}
+            </p>
+          )}
+
+          {step === 'done' && scanNotice && (
+            <p role="status" className="border border-border bg-muted/30 p-3 text-sm leading-relaxed text-muted-foreground">
+              {scanNotice}
             </p>
           )}
 
@@ -383,10 +385,30 @@ export function NovaIntroPanel({
           )}
 
           {step === 'done' && (
-            <button type="button" onClick={onFinish} className={ctaClass}>
-              Continue to FormaNova
-            </button>
+            <div className="space-y-3">
+              <button type="button" onClick={onConfirm} className={ctaClass}>
+                Looks perfect
+              </button>
+              <button type="button" onClick={onAddMore} className="flex w-full items-center justify-center gap-2 border border-border py-3 text-sm font-medium text-foreground hover:border-foreground">
+                <Plus className="h-4 w-4" /> Add something else
+              </button>
+            </div>
           )}
+        </div>
+      )}
+
+      {step === 'next' && (
+        <div className="mt-8 w-full max-w-sm space-y-3 animate-fade-in">
+          <h3 className="font-display text-3xl font-bold text-foreground">Your brand profile is ready</h3>
+          <p className="pb-3 text-sm leading-relaxed text-muted-foreground">
+            Would you like to continue with Nova now or come back later?
+          </p>
+          <button type="button" disabled className={cn(ctaClass, 'cursor-not-allowed opacity-55')}>
+            <Mic className="h-4 w-4" /> Call Nova now <span className="text-xs font-normal">(coming soon)</span>
+          </button>
+          <button type="button" onClick={onFinish} className="w-full border border-border py-4 text-sm font-medium text-foreground hover:border-foreground">
+            Maybe later — continue to FormaNova
+          </button>
         </div>
       )}
     </div>

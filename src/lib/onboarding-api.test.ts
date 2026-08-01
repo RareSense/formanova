@@ -49,6 +49,7 @@ describe('saveUserType', () => {
     await saveUserType('jewelry_brand', {
       brand_name: 'Ice Cartel',
       website_url: 'https://icecartel.com',
+      storefront_url: 'https://shop.icecartel.com',
       physical_location: '123 Main St, Miami',
       social_links: ['https://instagram.com/icecartel'],
     });
@@ -57,6 +58,7 @@ describe('saveUserType', () => {
       user_type: 'jewelry_brand',
       brand_name: 'Ice Cartel',
       website_url: 'https://icecartel.com',
+      storefront_url: 'https://shop.icecartel.com',
       physical_location: '123 Main St, Miami',
       social_links: ['https://instagram.com/icecartel'],
     });

@@ -77,6 +77,7 @@ export async function getCachedUserType(userId: string): Promise<UserType | null
 export interface BrandDetails {
   brand_name: string;
   website_url?: string;
+  storefront_url?: string;
   physical_location?: string;
   social_links?: string[];
   based_in?: string;
@@ -88,6 +89,7 @@ export async function saveUserType(userType: UserType, brandDetails?: BrandDetai
   if (brandDetails) {
     body.brand_name = brandDetails.brand_name;
     if (brandDetails.website_url) body.website_url = brandDetails.website_url;
+    if (brandDetails.storefront_url) body.storefront_url = brandDetails.storefront_url;
     if (brandDetails.physical_location) body.physical_location = brandDetails.physical_location;
     if (brandDetails.social_links?.length) body.social_links = brandDetails.social_links;
     if (brandDetails.based_in) body.based_in = brandDetails.based_in;

@@ -85,6 +85,7 @@ export function VoiceOrb({ state = 'idle', size = 320, audioLevel = 0, className
       data-orb-state={state}
       className={className}
       onClick={onClick}
+      disabled={!onClick}
       aria-label="Talk to Nova"
       animate={{ scale: prefersReducedMotion ? 1 : reactiveScale }}
       whileHover={prefersReducedMotion ? undefined : { scale: reactiveScale * 1.018 }}
