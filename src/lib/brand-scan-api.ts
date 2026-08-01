@@ -184,9 +184,11 @@ async function responseMessage(response: Response, fallback: string): Promise<st
 
 /**
  * Brand-scan workflow contract:
- * - start: POST /api/brand/scan
- * - status: GET /api/status/{workflow_id}, every 2s
- * - result: GET /api/result/{workflow_id}, only after terminal status
+ * Temporary staging diagnostic: these routes intentionally omit the normal
+ * /api prefix while backend verifies whether the two proxies behave differently.
+ * - start: POST /brand/scan
+ * - status: GET /status/{workflow_id}, every 2s
+ * - result: GET /result/{workflow_id}, only after terminal status
  * - timeout: 450s (scanner node timeout is 420s)
  * - terminal states: completed, failed, budget_exhausted
  * - transient status 404 budget: 10; other status-error budget: 5
@@ -200,7 +202,7 @@ export async function runBrandScan(
     onStatus?: (status: unknown) => void;
   } = {},
 ): Promise<BrandScanResult | null> {
-  const startResponse = await authenticatedFetch('/api/brand/scan', {
+  const startResponse = await authenticatedFetch('/brand/scan', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ storefront_url: storefrontUrl }),
@@ -216,8 +218,8 @@ export async function runBrandScan(
 
   const encodedId = encodeURIComponent(workflowId);
   const outcome = await pollWorkflow<BrandScanResult>({
-    fetchStatus: () => authenticatedFetch(`/api/status/${encodedId}`, { signal: options.signal }),
-    fetchResult: () => authenticatedFetch(`/api/result/${encodedId}`, { signal: options.signal }),
+    fetchStatus: () => authenticatedFetch(`/status/${encodedId}`, { signal: options.signal }),
+    fetchResult: () => authenticatedFetch(`/result/${encodedId}`, { signal: options.signal }),
     resolveState: resolveBrandScanState,
     parseResult: parseBrandScanResult,
     intervalMs: 2_000,

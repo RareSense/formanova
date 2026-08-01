@@ -87,7 +87,7 @@ describe('brand scan API', () => {
 
     await runBrandScan('https://atelier.example');
 
-    expect(mockAuthenticatedFetch).toHaveBeenCalledWith('/api/brand/scan', expect.objectContaining({
+    expect(mockAuthenticatedFetch).toHaveBeenCalledWith('/brand/scan', expect.objectContaining({
       method: 'POST',
       body: JSON.stringify({ storefront_url: 'https://atelier.example' }),
     }));
@@ -101,8 +101,8 @@ describe('brand scan API', () => {
     const options = mockPollWorkflow.mock.calls[0][0];
     await options.fetchStatus?.();
     await options.fetchResult();
-    expect(mockAuthenticatedFetch).toHaveBeenNthCalledWith(2, '/api/status/state-123', expect.any(Object));
-    expect(mockAuthenticatedFetch).toHaveBeenNthCalledWith(3, '/api/result/state-123', expect.any(Object));
+    expect(mockAuthenticatedFetch).toHaveBeenNthCalledWith(2, '/status/state-123', expect.any(Object));
+    expect(mockAuthenticatedFetch).toHaveBeenNthCalledWith(3, '/result/state-123', expect.any(Object));
   });
 
   it('surfaces backend validation detail when the start call fails', async () => {
