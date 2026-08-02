@@ -29,6 +29,7 @@ export interface BrandScanResult {
   status: string;
   readinessLevel: string | null;
   errorCode: string | null;
+  errorMessage: string | null;
   requestedUrl: string | null;
   insights: BrandScanInsights;
 }
@@ -46,7 +47,7 @@ function textValue(value: unknown): string {
   if (typeof value === 'number' || typeof value === 'boolean') return String(value);
   const record = asRecord(value);
   if (!record) return '';
-  for (const key of ['summary', 'description', 'value', 'hex', 'url', 'label', 'name']) {
+  for (const key of ['summary', 'description', 'message', 'detail', 'error', 'value', 'hex', 'url', 'label', 'name']) {
     const text = textValue(record[key]);
     if (text) return text;
   }
@@ -130,6 +131,7 @@ export function parseBrandScanResult(value: unknown): BrandScanResult {
     status: textValue(scan.status) || 'completed',
     readinessLevel: textValue(scan.readiness_level) || null,
     errorCode: textValue(scan.error_code) || null,
+    errorMessage: textValue(scan.error) || textValue(scan.message) || textValue(scan.detail) || null,
     requestedUrl: textValue(scan.requested_url) || null,
     insights: {
       identity,
@@ -159,6 +161,23 @@ export function parseBrandScanResult(value: unknown): BrandScanResult {
   };
 }
 
+function failedBrandScanResult(statusData: unknown, fallback: unknown): BrandScanResult {
+  const data = asRecord(statusData) ?? {};
+  const runtime = asRecord(data.runtime) ?? {};
+  const records = [data, runtime];
+  const state = resolveBrandScanState(statusData);
+  const fallbackMessage = fallback instanceof Error ? fallback.message : '';
+
+  return {
+    status: state === 'budget_exhausted' ? state : 'failed',
+    readinessLevel: null,
+    errorCode: textValue(firstValue(records, ['error_code', 'code'])) || null,
+    errorMessage: textValue(firstValue(records, ['error', 'message', 'detail'])) || fallbackMessage || null,
+    requestedUrl: textValue(firstValue(records, ['requested_url'])) || null,
+    insights: EMPTY_BRAND_SCAN_INSIGHTS,
+  };
+}
+
 export function resolveBrandScanState(value: unknown): string {
   const data = asRecord(value);
   const runtime = asRecord(data?.runtime);
@@ -179,6 +198,7 @@ async function responseMessage(response: Response, fallback: string): Promise<st
   if (typeof body?.detail === 'string') return body.detail;
   if (typeof body?.error === 'string') return body.error;
   if (typeof body?.message === 'string') return body.message;
+  if (typeof body?.storefront_url === 'string') return body.storefront_url;
   return fallback;
 }
 
@@ -189,7 +209,7 @@ async function responseMessage(response: Response, fallback: string): Promise<st
  * - result: GET /api/result/{workflow_id}, only after terminal status
  * - timeout: 450s (scanner node timeout is 420s)
  * - terminal states: completed, failed, budget_exhausted
- * - transient status 404 budget: 10; other status-error budget: 5
+ * - status 404 policy: fail immediately (unknown workflow); other status-error budget: 5
  * - cancellation: caller-owned AbortSignal, normally aborted on unmount/retry
  * - result parser: parseBrandScanResult above
  */
@@ -207,6 +227,9 @@ export async function runBrandScan(
     signal: options.signal,
   });
   if (!startResponse.ok) {
+    if (startResponse.status === 409) {
+      throw new Error('Brand scan is temporarily unavailable. Please try again later.');
+    }
     throw new Error(await responseMessage(startResponse, `Could not start the brand scan (${startResponse.status}).`));
   }
 
@@ -215,20 +238,33 @@ export async function runBrandScan(
   if (!workflowId) throw new Error('Brand scan did not return a workflow ID.');
 
   const encodedId = encodeURIComponent(workflowId);
-  const outcome = await pollWorkflow<BrandScanResult>({
-    fetchStatus: () => authenticatedFetch(`/api/status/${encodedId}`, { signal: options.signal }),
-    fetchResult: () => authenticatedFetch(`/api/result/${encodedId}`, { signal: options.signal }),
-    resolveState: resolveBrandScanState,
-    parseResult: parseBrandScanResult,
-    intervalMs: 2_000,
-    timeoutMs: 450_000,
-    max404s: 10,
-    maxPollErrors: 5,
-    maxResultRetries: 8,
-    resultRetryDelayMs: 1_000,
-    signal: options.signal,
-    onStatusData: options.onStatus,
-  });
+  let lastStatusData: unknown;
 
-  return outcome.status === 'completed' ? outcome.result : null;
+  try {
+    const outcome = await pollWorkflow<BrandScanResult>({
+      fetchStatus: () => authenticatedFetch(`/api/status/${encodedId}`, { signal: options.signal }),
+      fetchResult: () => authenticatedFetch(`/api/result/${encodedId}`, { signal: options.signal }),
+      resolveState: resolveBrandScanState,
+      parseResult: parseBrandScanResult,
+      intervalMs: 2_000,
+      timeoutMs: 450_000,
+      max404s: 1,
+      maxPollErrors: 5,
+      maxResultRetries: 8,
+      resultRetryDelayMs: 1_000,
+      signal: options.signal,
+      onStatusData: (statusData) => {
+        lastStatusData = statusData;
+        options.onStatus?.(statusData);
+      },
+    });
+
+    return outcome.status === 'completed' ? outcome.result : null;
+  } catch (error) {
+    const terminalState = resolveBrandScanState(lastStatusData);
+    if (terminalState === 'failed' || terminalState === 'budget_exhausted') {
+      return failedBrandScanResult(lastStatusData, error);
+    }
+    throw error;
+  }
 }

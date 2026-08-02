@@ -41,7 +41,7 @@ describe('NovaIntroPanel', () => {
     const { onBrandNameChange, onWebsiteChange, onStartBuilding } = renderPanel('fields');
 
     fireEvent.change(screen.getByLabelText('Brand name'), { target: { value: 'Example' } });
-    fireEvent.change(screen.getByLabelText('Website or store URL'), { target: { value: 'example.com' } });
+    fireEvent.change(screen.getByLabelText('Online store URL'), { target: { value: 'example.com' } });
     fireEvent.click(screen.getByRole('button', { name: 'Start brand scan' }));
 
     expect(onBrandNameChange).toHaveBeenCalledWith('Example');

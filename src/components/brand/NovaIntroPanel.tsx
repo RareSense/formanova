@@ -299,7 +299,7 @@ export function NovaIntroPanel({
 
           <div className="space-y-2">
             <label htmlFor="nova-website" className="text-sm font-medium text-foreground">
-              Website or store URL
+              Online store URL
             </label>
             <input
               id="nova-website"

@@ -44,6 +44,7 @@ describe('brand scan API', () => {
     expect(result).toMatchObject({
       status: 'completed',
       readinessLevel: 'full',
+      errorMessage: null,
       requestedUrl: 'https://atelier.example',
       insights: {
         identity: 'Sculptural fine jewelry with a modern point of view.',
@@ -94,7 +95,7 @@ describe('brand scan API', () => {
     expect(mockPollWorkflow).toHaveBeenCalledWith(expect.objectContaining({
       intervalMs: 2_000,
       timeoutMs: 450_000,
-      max404s: 10,
+      max404s: 1,
       maxPollErrors: 5,
     }));
 
@@ -106,9 +107,35 @@ describe('brand scan API', () => {
   });
 
   it('surfaces backend validation detail when the start call fails', async () => {
-    mockAuthenticatedFetch.mockResolvedValueOnce(jsonResponse({ detail: 'Unsafe storefront URL' }, 422));
+    mockAuthenticatedFetch.mockResolvedValueOnce(jsonResponse({ storefront_url: 'invalid URL' }, 422));
 
-    await expect(runBrandScan('http://127.0.0.1')).rejects.toThrow('Unsafe storefront URL');
+    await expect(runBrandScan('http://127.0.0.1')).rejects.toThrow('invalid URL');
+    expect(mockPollWorkflow).not.toHaveBeenCalled();
+  });
+
+  it('returns a terminal failed status as a normal scan outcome', async () => {
+    mockAuthenticatedFetch.mockResolvedValueOnce(jsonResponse({ workflow_id: 'state-failed' }));
+    mockPollWorkflow.mockImplementationOnce(async (options) => {
+      options.onStatusData?.({
+        status: 'failed',
+        error_code: 'scanner_unauthorized',
+        error: 'The storefront scanner could not be reached.',
+      });
+      throw new Error('Workflow failed');
+    });
+
+    await expect(runBrandScan('https://atelier.example')).resolves.toMatchObject({
+      status: 'failed',
+      errorCode: 'scanner_unauthorized',
+      errorMessage: 'The storefront scanner could not be reached.',
+    });
+  });
+
+  it('hides workflow-spec details from users on a 409 start response', async () => {
+    mockAuthenticatedFetch.mockResolvedValueOnce(jsonResponse({ detail: 'missing terminal edge' }, 409));
+
+    await expect(runBrandScan('https://atelier.example'))
+      .rejects.toThrow('Brand scan is temporarily unavailable. Please try again later.');
     expect(mockPollWorkflow).not.toHaveBeenCalled();
   });
 });

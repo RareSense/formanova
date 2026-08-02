@@ -56,6 +56,12 @@ function scanNotice(result: BrandScanResult): string | null {
   if (result.readinessLevel && result.readinessLevel !== 'full') {
     return `This scan has ${result.readinessLevel.replace(/_/g, ' ')} readiness. Please review every finding before confirming.`;
   }
+  const hasUsableInsight = Object.entries(result.insights).some(([, value]) => (
+    Array.isArray(value) ? value.length > 0 : Boolean(value)
+  ));
+  if (!hasUsableInsight) {
+    return 'Nova finished the scan but found very little usable brand information. Add or correct the details before confirming.';
+  }
   return null;
 }
 
@@ -141,8 +147,16 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
         onStatus: () => setScanStatus('Analyzing your storefront and visual identity…'),
       });
       if (!result || controller.signal.aborted) return;
-      if (result.status.toLowerCase() === 'blocked') {
-        const reason = result.errorCode === 'robots_denied'
+      const resultStatus = result.status.toLowerCase();
+      if (resultStatus === 'failed' || resultStatus === 'budget_exhausted') {
+        setScanError(result.errorMessage || 'The brand scan failed. Please try again.');
+        setStep('fields');
+        return;
+      }
+      if (resultStatus === 'blocked' || resultStatus === 'unsafe_url') {
+        const reason = resultStatus === 'unsafe_url' || result.errorCode === 'unsafe_url'
+          ? 'This URL could not be scanned safely. Enter the public URL of your online store.'
+          : result.errorCode === 'robots_denied'
           ? 'This site blocks automated scanning. Try your public storefront URL instead.'
           : 'This storefront could not be scanned. Check the URL and try again.';
         setScanError(reason);

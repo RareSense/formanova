@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { JewelryBrandModal } from '@/components/JewelryBrandModal';
-import { runBrandScan, type BrandScanResult } from '@/lib/brand-scan-api';
+import { EMPTY_BRAND_SCAN_INSIGHTS, runBrandScan, type BrandScanResult } from '@/lib/brand-scan-api';
 
 vi.mock('@/hooks/use-mobile', () => ({ useIsMobile: () => false }));
 vi.mock('@/lib/posthog-events', () => ({
@@ -20,6 +20,7 @@ const completedScan: BrandScanResult = {
   status: 'completed',
   readinessLevel: 'full',
   errorCode: null,
+  errorMessage: null,
   requestedUrl: 'https://example.com',
   insights: {
     identity: 'Modern fine jewelry with an editorial point of view.',
@@ -49,7 +50,7 @@ function openMessageForm() {
 
 function fillRequiredFields() {
   fireEvent.change(screen.getByLabelText('Brand name'), { target: { value: 'Example Atelier' } });
-  fireEvent.change(screen.getByLabelText('Website or store URL'), { target: { value: 'example.com' } });
+  fireEvent.change(screen.getByLabelText('Online store URL'), { target: { value: 'example.com' } });
 }
 
 describe('JewelryBrandModal Nova onboarding', () => {
@@ -69,7 +70,7 @@ describe('JewelryBrandModal Nova onboarding', () => {
     openMessageForm();
 
     expect(screen.getByLabelText('Brand name')).toBeInTheDocument();
-    expect(screen.getByLabelText('Website or store URL')).toBeInTheDocument();
+    expect(screen.getByLabelText('Online store URL')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Start brand scan' })).toBeInTheDocument();
   });
 
@@ -129,7 +130,25 @@ describe('JewelryBrandModal Nova onboarding', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start brand scan' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('blocks automated scanning');
-    await waitFor(() => expect(screen.getByLabelText('Website or store URL')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByLabelText('Online store URL')).toBeInTheDocument());
     expect(screen.queryByRole('button', { name: 'Looks perfect' })).not.toBeInTheDocument();
+  });
+
+  it('renders a terminal workflow failure and stops the spinner', async () => {
+    mockRunBrandScan.mockResolvedValue({
+      ...completedScan,
+      status: 'failed',
+      errorCode: 'scanner_unauthorized',
+      errorMessage: 'The storefront scanner could not be reached.',
+      insights: EMPTY_BRAND_SCAN_INSIGHTS,
+    });
+    renderModal();
+    openMessageForm();
+    fillRequiredFields();
+    fireEvent.click(screen.getByRole('button', { name: 'Start brand scan' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('The storefront scanner could not be reached.');
+    expect(screen.queryByTestId('brand-scan-progress')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Online store URL')).toBeInTheDocument();
   });
 });
