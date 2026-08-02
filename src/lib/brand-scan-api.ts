@@ -1,5 +1,16 @@
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { pollWorkflow } from '@/lib/poll-workflow';
+import {
+  EMPTY_BRAND_SCAN_PROGRESS,
+  mergeBrandScanProgress,
+  type BrandScanProgress,
+} from '@/lib/brand-scan-progress';
+
+export {
+  EMPTY_BRAND_SCAN_PROGRESS,
+  mergeBrandScanProgress,
+} from '@/lib/brand-scan-progress';
+export type { BrandScanPhase, BrandScanProgress } from '@/lib/brand-scan-progress';
 
 export interface BrandScanInsights {
   identity: string;
@@ -56,15 +67,64 @@ function textValue(value: unknown): string {
 
 function listValue(value: unknown): string[] {
   if (Array.isArray(value)) {
-    return value.map(textValue).filter(Boolean);
+    return uniqueValues(value.map(textValue).filter(Boolean));
   }
   const record = asRecord(value);
   if (record) {
-    return Object.values(record).flatMap(listValue).filter(Boolean);
+    if (record.values !== undefined) return listValue(record.values);
+    if (record.value !== undefined) return listValue(record.value);
+    return uniqueValues(Object.values(record).flatMap(listValue).filter(Boolean));
   }
   const text = textValue(value);
   if (!text) return [];
-  return text.split(/[,;|]/).map((item) => item.trim()).filter(Boolean);
+  return uniqueValues(text.split(/[,;|]/).map((item) => item.trim()).filter(Boolean));
+}
+
+function uniqueValues(values: string[]): string[] {
+  const seen = new Set<string>();
+  return values.filter((value) => {
+    const key = value.trim().toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function normalizeHexColor(value: string): string[] {
+  const colors: string[] = [];
+  for (const match of value.matchAll(/#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})(?![0-9a-f])/gi)) {
+    const raw = match[1];
+    const rgb = raw.length === 3 || raw.length === 4
+      ? raw.slice(0, 3).split('').map((part) => `${part}${part}`).join('')
+      : raw.slice(0, 6);
+    colors.push(`#${rgb.toUpperCase()}`);
+  }
+
+  const rgb = value.match(/rgba?\(\s*(\d{1,3})\s*[, ]\s*(\d{1,3})\s*[, ]\s*(\d{1,3})/i);
+  if (rgb) {
+    const hex = rgb.slice(1, 4)
+      .map((channel) => Math.min(255, Number(channel)).toString(16).padStart(2, '0'))
+      .join('');
+    colors.push(`#${hex.toUpperCase()}`);
+  }
+  return colors;
+}
+
+function colorListValue(value: unknown): string[] {
+  if (typeof value === 'string') return normalizeHexColor(value);
+  if (Array.isArray(value)) return uniqueValues(value.flatMap(colorListValue));
+
+  const record = asRecord(value);
+  if (!record) return [];
+  if (typeof record.r === 'number' && typeof record.g === 'number' && typeof record.b === 'number') {
+    return colorListValue(`rgb(${record.r}, ${record.g}, ${record.b})`);
+  }
+
+  for (const key of ['hex', 'hex_code', 'value', 'color', 'colour']) {
+    const colors = colorListValue(record[key]);
+    if (colors.length > 0) return colors;
+  }
+  return uniqueValues(Object.values(record).flatMap(colorListValue));
 }
 
 function firstValue(records: JsonRecord[], aliases: string[]): unknown {
@@ -74,6 +134,120 @@ function firstValue(records: JsonRecord[], aliases: string[]): unknown {
     }
   }
   return undefined;
+}
+
+function valuesFor(records: JsonRecord[], aliases: string[]): unknown[] {
+  return records.flatMap((record) => aliases
+    .filter((alias) => record[alias] !== undefined && record[alias] !== null)
+    .map((alias) => record[alias]));
+}
+
+function humanLabel(value: string): string {
+  return value.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function evidenceSocialLinks(evidence: JsonRecord): string[] {
+  const identityLinks = asRecord(evidence.identity_links);
+  const observations = Array.isArray(identityLinks?.observations) ? identityLinks.observations : [];
+  return uniqueValues(observations.flatMap((observation) => {
+    const record = asRecord(observation);
+    if (!record) return [];
+    const preferredUrl = textValue(record.normalized_url) || textValue(record.original_url);
+    return preferredUrl ? [preferredUrl] : [];
+  }));
+}
+
+function evidenceVisualStyles(evidence: JsonRecord): string[] {
+  const images = Array.isArray(evidence.images) ? evidence.images : [];
+  return uniqueValues(images.map((image) => {
+    const role = textValue(asRecord(image)?.visual_role);
+    return role ? humanLabel(role) : '';
+  }).filter(Boolean));
+}
+
+function homepageDescription(evidence: JsonRecord): string {
+  const pages = Array.isArray(evidence.pages) ? evidence.pages : [];
+  const homepage = pages.map(asRecord).find((page) => textValue(page?.page_type) === 'home');
+  return textValue(homepage?.description);
+}
+
+function channelSummary(value: unknown): string {
+  const channels = asRecord(value);
+  if (!channels) return '';
+  return Object.entries(channels).map(([channel, details]) => {
+    const record = asRecord(details);
+    if (!record) return `${humanLabel(channel)}: ${textValue(details)}`;
+    const facts = Object.entries(record)
+      .map(([key, fact]) => `${humanLabel(key)}: ${textValue(fact)}`)
+      .filter((fact) => !fact.endsWith(': '));
+    return facts.length > 0 ? `${humanLabel(channel)} — ${facts.join('; ')}` : '';
+  }).filter(Boolean).join('\n');
+}
+
+function supplementalInfo(records: JsonRecord[], scan: JsonRecord, evidence: JsonRecord): string {
+  const identity = asRecord(firstValue(records, ['brand_identity', 'visual_identity']));
+  const readiness = asRecord(evidence.intelligence_readiness);
+  const coverage = asRecord(evidence.coverage);
+  const genderFocus = listValue(firstValue(records, ['gender_focus']));
+  const audienceCues = listValue(firstValue(records, ['apparent_ethnicities']));
+  const pricePositioning = textValue(firstValue(records, ['price_positioning']));
+  const fonts = listValue(identity?.fonts);
+  const materials = listValue(evidence.discovered_material_terms);
+  const categories = listValue(evidence.discovered_categories);
+  const readinessReasons = listValue(readiness?.reasons);
+  const sources = listValue(firstValue([scan, ...records], ['sources']));
+  const confidenceValue = firstValue(records, ['confidence']);
+  const confidence = typeof confidenceValue === 'number'
+    ? `${Math.round(confidenceValue <= 1 ? confidenceValue * 100 : confidenceValue)}%`
+    : textValue(confidenceValue);
+  const model = asRecord(firstValue(records, ['model_demographics', 'model_profile']));
+  const visualDirection = asRecord(firstValue(records, ['visual_direction']));
+  const ownership = asRecord(firstValue(records, ['aesthetic_ownership']));
+  const detailLine = (label: string, value: unknown): string => {
+    const details = listValue(value);
+    return details.length > 0 ? `${label}: ${details.join(', ')}` : '';
+  };
+
+  return uniqueValues([
+    textValue(firstValue(records, ['other_info', 'other_details', 'additional_details', 'notable_details'])),
+    genderFocus.length > 0 ? `Gender focus: ${genderFocus.join(', ')}` : '',
+    audienceCues.length > 0 ? `Apparent audience cues: ${audienceCues.join(', ')}` : '',
+    pricePositioning ? `Price positioning: ${pricePositioning}` : '',
+    textValue(firstValue(records, ['seller_model']))
+      ? `Seller model: ${humanLabel(textValue(firstValue(records, ['seller_model'])))}`
+      : '',
+    textValue(firstValue(records, ['niche'])) ? `Niche: ${textValue(firstValue(records, ['niche']))}` : '',
+    detailLine('Brand voice', firstValue(records, ['voice'])),
+    detailLine('Photography language', firstValue(records, ['photography'])),
+    detailLine('Shot types', firstValue(records, ['shot_types_present', 'product_shot_types'])),
+    detailLine('Product shot style', firstValue(records, ['product_shot_style'])),
+    detailLine('Product shot mood', firstValue(records, ['product_shot_vibe'])),
+    model ? detailLine('Model presentation', [
+      model.gender_presentation,
+      model.ethnicity_presentation,
+      model.age_group_presentation,
+    ].map(textValue).filter(Boolean).map(humanLabel)) : '',
+    detailLine('Model styling', firstValue(records, ['model_styling_and_presentation'])),
+    detailLine('Model shot mood', firstValue(records, ['model_shot_vibe'])),
+    detailLine('Campaign and ad style', firstValue(records, ['campaign_or_ad_style'])),
+    detailLine('Preserve', visualDirection?.preserve),
+    detailLine('Explore', visualDirection?.explore),
+    detailLine('Avoid', visualDirection?.avoid),
+    detailLine('Merchant controlled aesthetic', ownership?.merchant_controlled),
+    detailLine('Assortment curation', ownership?.assortment_curation),
+    detailLine('Contradictions to confirm', firstValue(records, ['contradictions'])),
+    detailLine('Still missing', firstValue(records, ['missing_information'])),
+    detailLine('Useful confirmation questions', firstValue(records, ['merchant_confirmation_questions'])),
+    materials.length > 0 ? `Materials found: ${materials.join(', ')}` : '',
+    categories.length > 0 ? `Categories found: ${categories.join(', ')}` : '',
+    fonts.length > 0 ? `Brand fonts: ${fonts.join(', ')}` : '',
+    confidence ? `Confidence: ${confidence}` : '',
+    textValue(readiness?.level) ? `Scan readiness: ${humanLabel(textValue(readiness?.level))}` : '',
+    readinessReasons.length > 0 ? `Scan limitations: ${readinessReasons.join(' ')}` : '',
+    typeof coverage?.products === 'number' ? `Coverage: ${coverage.products} products, ${textValue(coverage.collections) || '0'} collections, ${textValue(coverage.representative_images) || '0'} representative images` : '',
+    sources.length > 0 ? `Sources analyzed: ${sources.join(', ')}` : '',
+    channelSummary(firstValue(records, ['channels'])),
+  ].filter(Boolean)).join('\n');
 }
 
 function collectCandidateRecords(scan: JsonRecord): JsonRecord[] {
@@ -119,44 +293,54 @@ function unwrapScanResponse(value: unknown): JsonRecord {
  */
 export function parseBrandScanResult(value: unknown): BrandScanResult {
   const scan = unwrapScanResponse(value);
+  const evidence = asRecord(scan.evidence) ?? {};
+  const readiness = asRecord(evidence.intelligence_readiness);
+  const marketScope = asRecord(evidence.market_scope);
   const records = collectCandidateRecords(scan);
   const identity = textValue(firstValue(records, [
-    'brand_summary', 'summary', 'identity', 'brand_identity', 'positioning', 'aesthetic',
-  ]));
-  const visualStyle = listValue(firstValue(records, [
-    'visual_style', 'visual_styles', 'style_tags', 'aesthetic_tags', 'photography_style', 'aesthetic',
-  ]));
+    'brand_summary', 'summary', 'identity', 'positioning',
+  ])) || homepageDescription(evidence);
+  const visualStyle = uniqueValues(valuesFor(records, [
+    'visual_style', 'visual_styles', 'style_tags', 'aesthetic_tags', 'aesthetic', 'photography_style',
+  ]).flatMap(listValue).concat(evidenceVisualStyles(evidence)));
+  const interpretedPalette = uniqueValues(valuesFor(records, [
+    'palette', 'color_palette', 'colour_palette', 'colors', 'colours', 'logo_colors',
+  ]).flatMap(colorListValue));
+  const measuredSitePalette = colorListValue(evidence.measured_site_palette);
+  const measuredPhotoPalette = colorListValue(evidence.measured_photo_palette);
+  const palette = interpretedPalette.length > 0
+    ? interpretedPalette
+    : measuredSitePalette.length > 0 ? measuredSitePalette : measuredPhotoPalette;
+  const productFocus = uniqueValues(valuesFor(records, [
+    'product_focus', 'product_categories', 'products', 'catalog_focus', 'category',
+  ]).flatMap(listValue).concat(listValue(evidence.discovered_categories)));
+  const targetMarkets = uniqueValues(valuesFor(records, [
+    'target_markets', 'markets', 'primary_markets', 'geographies',
+  ]).flatMap(listValue).concat(listValue(marketScope?.selected_markets)));
+  const socialLinks = uniqueValues(valuesFor(records, [
+    'social_links', 'socials', 'social_urls',
+  ]).flatMap(listValue).concat(evidenceSocialLinks(evidence)));
 
   return {
     status: textValue(scan.status) || 'completed',
-    readinessLevel: textValue(scan.readiness_level) || null,
+    readinessLevel: textValue(scan.readiness_level) || textValue(readiness?.level) || null,
     errorCode: textValue(scan.error_code) || null,
     errorMessage: textValue(scan.error) || textValue(scan.message) || textValue(scan.detail) || null,
-    requestedUrl: textValue(scan.requested_url) || null,
+    requestedUrl: textValue(scan.requested_url) || textValue(evidence.canonical_url) || null,
     insights: {
       identity,
-      palette: listValue(firstValue(records, [
-        'palette', 'color_palette', 'colour_palette', 'colors', 'colours', 'logo_colors',
-      ])),
-      productFocus: listValue(firstValue(records, [
-        'product_focus', 'product_categories', 'products', 'catalog_focus', 'category',
-      ])).join(', '),
+      palette,
+      productFocus: productFocus.join(', '),
       visualStyle,
-      targetMarkets: listValue(firstValue(records, [
-        'target_markets', 'markets', 'primary_markets', 'geographies',
-      ])),
-      audience: textValue(firstValue(records, [
-        'audience', 'target_audience', 'customer_profile', 'ideal_customer',
-      ])),
+      targetMarkets,
+      audience: uniqueValues(valuesFor(records, [
+        'audience', 'target_audience', 'likely_audience', 'customer_profile', 'ideal_customer',
+      ]).flatMap(listValue)).join(', '),
       basedIn: textValue(firstValue(records, [
         'based_in', 'location', 'brand_location', 'headquarters',
       ])),
-      socialLinks: listValue(firstValue(records, [
-        'social_links', 'socials', 'social_urls',
-      ])),
-      otherInfo: textValue(firstValue(records, [
-        'other_info', 'other_details', 'additional_details', 'notable_details',
-      ])),
+      socialLinks,
+      otherInfo: supplementalInfo(records, scan, evidence),
     },
   };
 }
@@ -218,6 +402,7 @@ export async function runBrandScan(
   options: {
     signal?: AbortSignal;
     onStatus?: (status: unknown) => void;
+    onProgress?: (progress: BrandScanProgress) => void;
   } = {},
 ): Promise<BrandScanResult | null> {
   const startResponse = await authenticatedFetch('/api/brand/scan', {
@@ -239,10 +424,34 @@ export async function runBrandScan(
 
   const encodedId = encodeURIComponent(workflowId);
   let lastStatusData: unknown;
+  let progress = EMPTY_BRAND_SCAN_PROGRESS;
+
+  const fetchStatusWithProgress = async (): Promise<Response> => {
+    const statusResponse = await authenticatedFetch(`/api/status/${encodedId}`, { signal: options.signal });
+    if (!statusResponse.ok) return statusResponse;
+
+    const statusData = await statusResponse.json();
+    let phaseData: unknown = null;
+    try {
+      const phaseResponse = await authenticatedFetch(`/api/status/${encodedId}/phases`, { signal: options.signal });
+      if (phaseResponse.ok) phaseData = await phaseResponse.json();
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') throw error;
+      // Progress is best effort. The durable scan and final result continue.
+    }
+
+    return new Response(JSON.stringify({
+      ...(asRecord(statusData) ?? {}),
+      scan_progress_events: phaseData,
+    }), {
+      status: statusResponse.status,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  };
 
   try {
     const outcome = await pollWorkflow<BrandScanResult>({
-      fetchStatus: () => authenticatedFetch(`/api/status/${encodedId}`, { signal: options.signal }),
+      fetchStatus: fetchStatusWithProgress,
       fetchResult: () => authenticatedFetch(`/api/result/${encodedId}`, { signal: options.signal }),
       resolveState: resolveBrandScanState,
       parseResult: parseBrandScanResult,
@@ -256,6 +465,8 @@ export async function runBrandScan(
       onStatusData: (statusData) => {
         lastStatusData = statusData;
         options.onStatus?.(statusData);
+        progress = mergeBrandScanProgress(progress, statusData);
+        options.onProgress?.(progress);
       },
     });
 

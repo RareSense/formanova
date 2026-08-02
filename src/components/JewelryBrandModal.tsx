@@ -9,8 +9,10 @@ import {
 } from '@/components/brand/brand-insight-meta';
 import {
   EMPTY_BRAND_SCAN_INSIGHTS,
+  EMPTY_BRAND_SCAN_PROGRESS,
   runBrandScan,
   type BrandScanInsights,
+  type BrandScanProgress,
   type BrandScanResult,
 } from '@/lib/brand-scan-api';
 import { INVALID_URL_MESSAGE, isValidHttpUrl, normalizeUrl } from '@/lib/brand-profile-api';
@@ -65,6 +67,23 @@ function scanNotice(result: BrandScanResult): string | null {
   return null;
 }
 
+function conciseCardDescriptor(identity: string): string {
+  const firstSentence = identity.trim().split(/(?<=[.!?])\s+/)[0] || '';
+  if (firstSentence.length <= 110) return firstSentence;
+  return `${firstSentence.slice(0, 107).trimEnd()}…`;
+}
+
+function conciseCardDetail(value: string): string {
+  return value.split('\n').map((line) => line.trim()).find(Boolean) || '';
+}
+
+function normalizePhysicalLocation(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  const looksLikeLink = /^(https?:\/\/|www\.|maps\.|goo\.gl\/maps|google\.[^/]+\/maps)/i.test(trimmed);
+  return looksLikeLink ? normalizeUrl(trimmed) : trimmed;
+}
+
 interface Props {
   open: boolean;
   onClose: () => void;
@@ -87,6 +106,14 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
   const [cardFace, setCardFace] = useState<CardFace>('front');
   const [availableKeys, setAvailableKeys] = useState<InsightKey[]>([]);
   const [profile, setProfile] = useState<BrandScanInsights>(EMPTY_BRAND_SCAN_INSIGHTS);
+  const [scanProgress, setScanProgress] = useState<BrandScanProgress>(EMPTY_BRAND_SCAN_PROGRESS);
+  const [physicalLocation, setPhysicalLocation] = useState(initial?.physical_location ?? '');
+  const [missingFields, setMissingFields] = useState({
+    basedIn: false,
+    targetMarkets: false,
+    socialLinks: false,
+    physicalLocation: false,
+  });
 
   const overlayRef = useRef<HTMLDivElement>(null);
   const scanAbortRef = useRef<AbortController | null>(null);
@@ -111,7 +138,8 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
 
   if (!open) return null;
 
-  const revealed = (key: InsightKey) => availableKeys.includes(key) && (step === 'done' || step === 'next');
+  const revealed = (key: InsightKey) => availableKeys.includes(key)
+    && (step === 'scanning' || step === 'done' || step === 'next');
 
   const feedItems: InsightFeedItem[] = INSIGHT_DISPLAY_ORDER.filter(revealed).map((key) => ({
     key,
@@ -135,8 +163,10 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
     const controller = new AbortController();
     scanAbortRef.current = controller;
     setWebsite(normalizedWebsite);
-    setAvailableKeys([]);
+    setAvailableKeys(['website']);
     setProfile(EMPTY_BRAND_SCAN_INSIGHTS);
+    setScanProgress(EMPTY_BRAND_SCAN_PROGRESS);
+    setMissingFields({ basedIn: false, targetMarkets: false, socialLinks: false, physicalLocation: false });
     setResultNotice(null);
     setScanStatus('Starting your brand scan…');
     setStep('scanning');
@@ -144,6 +174,25 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
     try {
       const result = await runBrandScan(normalizedWebsite, {
         signal: controller.signal,
+        onProgress: (progress) => {
+          setScanProgress(progress);
+          const discoveredPalette = progress.sitePalette.length > 0
+            ? progress.sitePalette
+            : progress.photoPalette;
+          setProfile((current) => ({
+            ...current,
+            palette: discoveredPalette.length > 0 ? discoveredPalette : current.palette,
+            productFocus: progress.productTitles.length > 0
+              ? progress.productTitles.join(', ')
+              : current.productFocus,
+          }));
+          setAvailableKeys((keys) => {
+            const next = new Set(keys);
+            if (discoveredPalette.length > 0) next.add('palette');
+            if (progress.productTitles.length > 0) next.add('productFocus');
+            return [...next];
+          });
+        },
         onStatus: () => setScanStatus('Analyzing your storefront and visual identity…'),
       });
       if (!result || controller.signal.aborted) return;
@@ -164,6 +213,12 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
         return;
       }
       setProfile(result.insights);
+      setMissingFields({
+        basedIn: !result.insights.basedIn,
+        targetMarkets: result.insights.targetMarkets.length === 0,
+        socialLinks: result.insights.socialLinks.length === 0,
+        physicalLocation: !physicalLocation.trim(),
+      });
       setAvailableKeys(insightKeys(result.insights));
       setResultNotice(scanNotice(result));
       setStep('done');
@@ -208,8 +263,8 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
       brand_name: brandName.trim(),
       website_url: initial?.website_url ?? '',
       storefront_url: storefrontUrl,
-      physical_location: '',
-      social_links: profile.socialLinks,
+      physical_location: normalizePhysicalLocation(physicalLocation),
+      social_links: profile.socialLinks.map(normalizeUrl).filter(isValidHttpUrl),
       based_in: profile.basedIn,
       target_markets: profile.targetMarkets,
     });
@@ -254,6 +309,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
                 websiteError={websiteError}
                 scanError={scanError}
                 scanStatus={scanStatus}
+                scanProgress={scanProgress}
                 scanNotice={resultNotice}
                 onSelectMessage={() => setStep('fields')}
                 onStartBuilding={handleStartBuilding}
@@ -265,6 +321,29 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
                 palette={profile.palette}
                 onEditPalette={(palette) => setProfile((prev) => ({ ...prev, palette }))}
                 summaryLine={summaryLine}
+                missingDetails={{
+                  showBasedIn: missingFields.basedIn,
+                  showTargetMarkets: missingFields.targetMarkets,
+                  showSocialLinks: missingFields.socialLinks,
+                  showPhysicalLocation: missingFields.physicalLocation,
+                  basedIn: profile.basedIn,
+                  targetMarkets: profile.targetMarkets,
+                  socialLinks: profile.socialLinks,
+                  physicalLocation,
+                  onBasedInChange: (value) => {
+                    setProfile((current) => ({ ...current, basedIn: value }));
+                    setAvailableKeys((keys) => keys.includes('location') ? keys : [...keys, 'location']);
+                  },
+                  onTargetMarketsChange: (value) => {
+                    setProfile((current) => ({ ...current, targetMarkets: value }));
+                    setAvailableKeys((keys) => keys.includes('targetMarkets') ? keys : [...keys, 'targetMarkets']);
+                  },
+                  onSocialLinksChange: (value) => {
+                    setProfile((current) => ({ ...current, socialLinks: value }));
+                    setAvailableKeys((keys) => keys.includes('social') ? keys : [...keys, 'social']);
+                  },
+                  onPhysicalLocationChange: setPhysicalLocation,
+                }}
               />
             </div>
 
@@ -288,12 +367,12 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
                   basedIn={revealed('location') ? profile.basedIn : ''}
                   targetMarkets={revealed('targetMarkets') ? profile.targetMarkets : []}
                   socialLinks={revealed('social') ? profile.socialLinks : []}
-                  descriptor={revealed('identity') ? profile.identity : ''}
-                  styleTags={revealed('visualStyle') ? profile.visualStyle : []}
-                  paletteSwatches={revealed('palette') ? profile.palette : []}
+                  descriptor={revealed('identity') ? conciseCardDescriptor(profile.identity) : ''}
+                  styleTags={revealed('visualStyle') ? profile.visualStyle.slice(0, 3) : []}
+                  paletteSwatches={revealed('palette') ? profile.palette.slice(0, 6) : []}
                   productFocus={revealed('productFocus') ? profile.productFocus : ''}
                   audience={revealed('audience') ? profile.audience : ''}
-                  otherInfo={revealed('otherInfo') ? profile.otherInfo : ''}
+                  otherInfo={revealed('otherInfo') ? conciseCardDetail(profile.otherInfo) : ''}
                   accentColor={revealed('palette') ? profile.palette[0] : undefined}
                   highlightField={null}
                   face={cardFace}

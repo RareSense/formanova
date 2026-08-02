@@ -92,10 +92,9 @@ describe('JewelryBrandModal Nova onboarding', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start brand scan' }));
 
     expect(screen.getByTestId('brand-scan-progress')).toBeInTheDocument();
-    expect(await screen.findByText(completedScan.insights.identity)).toBeInTheDocument();
+    expect((await screen.findAllByText(completedScan.insights.identity)).length).toBeGreaterThan(0);
     expect(screen.queryByText('Contemporary fine jewelry for the modern minimalist.')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Show all findings/i }));
     fireEvent.click(screen.getByRole('button', { name: /Edit Brand identity/i }));
     fireEvent.change(screen.getByDisplayValue(completedScan.insights.identity), {
       target: { value: 'Bold sculptural fine jewelry.' },
@@ -150,5 +149,36 @@ describe('JewelryBrandModal Nova onboarding', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('The storefront scanner could not be reached.');
     expect(screen.queryByTestId('brand-scan-progress')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Online store URL')).toBeInTheDocument();
+  });
+
+  it('asks only for missing optional details and accepts links without a protocol', async () => {
+    mockRunBrandScan.mockResolvedValue({
+      ...completedScan,
+      insights: {
+        ...completedScan.insights,
+        targetMarkets: [],
+        basedIn: '',
+        socialLinks: [],
+      },
+    });
+    const { onContinue } = renderModal();
+    openMessageForm();
+    fillRequiredFields();
+    fireEvent.click(screen.getByRole('button', { name: 'Start brand scan' }));
+
+    expect(await screen.findByText('A few details we could not confirm')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Where is your brand based?'), { target: { value: 'Lahore, Pakistan' } });
+    fireEvent.change(screen.getByLabelText('Which markets matter most?'), { target: { value: 'Pakistan, UAE' } });
+    fireEvent.change(screen.getByLabelText('Main social profile'), { target: { value: 'instagram.com/example' } });
+    fireEvent.change(screen.getByLabelText('Physical store, if you have one'), { target: { value: 'maps.google.com/example' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Looks perfect' }));
+    fireEvent.click(screen.getByRole('button', { name: /Maybe later/i }));
+
+    expect(onContinue).toHaveBeenCalledWith(expect.objectContaining({
+      based_in: 'Lahore, Pakistan',
+      target_markets: ['Pakistan', 'UAE'],
+      social_links: ['https://instagram.com/example'],
+      physical_location: 'https://maps.google.com/example',
+    }));
   });
 });

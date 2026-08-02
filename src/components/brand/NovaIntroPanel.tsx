@@ -5,6 +5,12 @@ import { DARK_THEMES } from '@/components/ThemeLogo';
 import { cn } from '@/lib/utils';
 import { VoiceOrb, type VoiceOrbState } from '@/components/brand/VoiceOrb';
 import { INSIGHT_META, type InsightFeedKey } from '@/components/brand/brand-insight-meta';
+import { MissingBrandDetails, type MissingBrandDetailsProps } from '@/components/brand/MissingBrandDetails';
+import {
+  EMPTY_BRAND_SCAN_PROGRESS,
+  type BrandScanPhase,
+  type BrandScanProgress,
+} from '@/lib/brand-scan-api';
 
 export type NovaOnboardingStep = 'intro' | 'fields' | 'scanning' | 'done' | 'next';
 
@@ -29,6 +35,7 @@ interface NovaIntroPanelProps {
   websiteError?: string | null;
   scanError?: string | null;
   scanStatus?: string;
+  scanProgress?: BrandScanProgress;
   scanNotice?: string | null;
   onSelectMessage: () => void;
   onStartBuilding: () => void;
@@ -40,6 +47,7 @@ interface NovaIntroPanelProps {
   palette?: string[];
   onEditPalette?: (palette: string[]) => void;
   summaryLine?: string;
+  missingDetails?: MissingBrandDetailsProps;
 }
 
 function InsightRow({
@@ -73,15 +81,16 @@ function InsightRow({
 
       {editing ? (
         <div className="mt-2 flex items-start gap-2">
-          <input
+          <textarea
             autoFocus
+            rows={3}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') commit();
+              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) commit();
               if (e.key === 'Escape') { setDraft(item.value); setEditing(false); }
             }}
-            className="w-full border border-border bg-background px-2.5 py-1.5 text-sm text-foreground outline-none focus:border-foreground"
+            className="min-h-20 w-full resize-y border border-border bg-background px-2.5 py-1.5 text-sm text-foreground outline-none focus:border-foreground"
           />
           <button
             type="button"
@@ -102,7 +111,7 @@ function InsightRow({
         </div>
       ) : (
         <div className="mt-1 flex items-center justify-between gap-2">
-          <p className="min-w-0 truncate text-sm text-foreground">{item.value}</p>
+          <p className="min-w-0 whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">{item.value}</p>
           {editable && (
             <button
               type="button"
@@ -157,7 +166,7 @@ function PaletteRow({
 
       <div className="mt-2 flex flex-wrap items-center gap-2.5">
         {colors.map((hex, i) => (
-          <div key={`${hex}-${i}`} className="relative">
+          <div key={`${hex}-${i}`} className="relative flex items-center gap-1.5">
             <label
               className="block h-7 w-7 cursor-pointer rounded-full border border-border shadow-sm"
               style={{ backgroundColor: hex }}
@@ -170,6 +179,7 @@ function PaletteRow({
                 disabled={!editing}
               />
             </label>
+            <span className="font-mono text-[10px] uppercase text-muted-foreground">{hex}</span>
             {editing && colors.length > 1 && (
               <button
                 type="button"
@@ -197,8 +207,20 @@ function PaletteRow({
   );
 }
 
-const FEED_COLLAPSE_THRESHOLD = 5;
-const FEED_VISIBLE_COUNT = 4;
+const PHASE_COPY: Record<BrandScanPhase, string> = {
+  queued: 'Waiting to start',
+  discovery: 'Finding your pages',
+  product_probes: 'Reading your products',
+  browser: 'Rendering your storefront',
+  images: 'Selecting your images',
+  processing: 'Extracting colors and fonts',
+  ai_analysis: 'Writing your brand read',
+};
+
+function phaseLabel(progress: BrandScanProgress, fallback: string): string {
+  if (!progress.currentPhase) return fallback;
+  return PHASE_COPY[progress.currentPhase];
+}
 
 export function NovaIntroPanel({
   step,
@@ -210,6 +232,7 @@ export function NovaIntroPanel({
   websiteError,
   scanError,
   scanStatus = 'Scanning your storefront…',
+  scanProgress = EMPTY_BRAND_SCAN_PROGRESS,
   scanNotice,
   onSelectMessage,
   onStartBuilding,
@@ -221,10 +244,10 @@ export function NovaIntroPanel({
   palette = [],
   onEditPalette,
   summaryLine,
+  missingDetails,
 }: NovaIntroPanelProps) {
   const { theme } = useTheme();
   const isDark = DARK_THEMES.has(theme);
-  const [showAllFindings, setShowAllFindings] = useState(false);
 
   let orbState: VoiceOrbState = 'idle';
   if (step === 'scanning') orbState = 'connecting';
@@ -239,12 +262,12 @@ export function NovaIntroPanel({
 
   const editable = step === 'done';
   const isDiscoveryScreen = step === 'scanning' || step === 'done';
-  const hidden = insights.length > FEED_COLLAPSE_THRESHOLD && !showAllFindings
-    ? insights.slice(0, insights.length - FEED_VISIBLE_COUNT)
-    : [];
-  const visible = insights.length > FEED_COLLAPSE_THRESHOLD && !showAllFindings
-    ? insights.slice(insights.length - FEED_VISIBLE_COUNT)
-    : insights;
+  const liveScanLabel = scanProgress.currentPhase === 'queued' && scanProgress.queuePosition
+    ? 'Waiting to start, position ' + scanProgress.queuePosition + ' in line'
+    : phaseLabel(scanProgress, scanStatus);
+  const livePalette = scanProgress.sitePalette.length > 0
+    ? scanProgress.sitePalette
+    : scanProgress.photoPalette;
 
   return (
     <div className="flex min-h-full flex-col items-center py-6 text-center">
@@ -335,9 +358,41 @@ export function NovaIntroPanel({
       {isDiscoveryScreen && (
         <div className="mt-6 w-full max-w-sm space-y-5 text-left">
           {step === 'scanning' && (
-            <div data-testid="brand-scan-progress" className="flex items-center justify-center gap-3 border border-border p-4 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>{scanStatus}</span>
+            <div data-testid="brand-scan-progress" className="space-y-3 border border-border p-4 text-sm text-muted-foreground">
+              <div className="flex items-center gap-3">
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin text-foreground" />
+                <span className="min-w-0 flex-1 font-medium text-foreground">{liveScanLabel}</span>
+                <span className="text-xs tabular-nums">{scanProgress.progressPercent} percent</span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full origin-left rounded-full bg-foreground transition-transform duration-700"
+                  style={{ transform: 'scaleX(' + scanProgress.progressPercent / 100 + ')' }}
+                />
+              </div>
+              {scanProgress.currentPhase === 'ai_analysis' && !scanProgress.brandReadReady && (
+                <p className="text-xs leading-relaxed">This detailed step can take a little longer.</p>
+              )}
+              {livePalette.length > 0 && (
+                <div className="flex gap-2" aria-label="Colors discovered so far">
+                  {livePalette.slice(0, 8).map((color) => (
+                    <span
+                      key={color}
+                      className="h-6 w-6 rounded-full border border-border animate-fade-in"
+                      style={{ backgroundColor: color }}
+                      title={color}
+                    />
+                  ))}
+                </div>
+              )}
+              <div className="space-y-1 text-xs">
+                {scanProgress.productCount !== null && (
+                  <p>Found {scanProgress.productCount} {scanProgress.productCount === 1 ? 'product' : 'products'}</p>
+                )}
+                {scanProgress.imageCount !== null && <p>Selected {scanProgress.imageCount} representative images</p>}
+                {scanProgress.fonts.length > 0 && <p>Type styles: {scanProgress.fonts.join(', ')}</p>}
+                {scanProgress.brandReadReady && <p className="font-medium text-foreground">Your brand read is ready</p>}
+              </div>
             </div>
           )}
 
@@ -355,16 +410,7 @@ export function NovaIntroPanel({
 
           {insights.length > 0 && (
             <div className="space-y-2.5">
-              {hidden.length > 0 && !showAllFindings && (
-                <button
-                  type="button"
-                  onClick={() => setShowAllFindings(true)}
-                  className="w-full border border-dashed border-border py-2 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground"
-                >
-                  Show all findings ({insights.length})
-                </button>
-              )}
-              {visible.map((item) =>
+              {insights.map((item) =>
                 item.key === 'palette' ? (
                   <PaletteRow
                     key="palette"
@@ -386,6 +432,7 @@ export function NovaIntroPanel({
 
           {step === 'done' && (
             <div className="space-y-3">
+              {missingDetails && <MissingBrandDetails {...missingDetails} />}
               <button type="button" onClick={onConfirm} className={ctaClass}>
                 Looks perfect
               </button>

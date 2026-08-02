@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { NovaIntroPanel, type NovaOnboardingStep } from '@/components/brand/NovaIntroPanel';
+import { EMPTY_BRAND_SCAN_PROGRESS } from '@/lib/brand-scan-api';
 
 function renderPanel(step: NovaOnboardingStep, overrides: Partial<Parameters<typeof NovaIntroPanel>[0]> = {}) {
   const handlers = {
@@ -80,6 +81,45 @@ describe('NovaIntroPanel', () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
     expect(onAddMore).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('button', { name: /Edit Brand identity/i })).toBeInTheDocument();
+  });
+
+  it('reveals measured scanner progress without pretending the final read is complete', () => {
+    renderPanel('scanning', {
+      scanProgress: {
+        ...EMPTY_BRAND_SCAN_PROGRESS,
+        currentPhase: 'processing',
+        completedPhases: ['discovery', 'product_probes', 'browser', 'images', 'processing'],
+        progressPercent: 78,
+        productCount: 24,
+        imageCount: 9,
+        sitePalette: ['#111111', '#F4E8D5'],
+        fonts: ['Didot', 'Inter'],
+      },
+    });
+
+    expect(screen.getByTestId('brand-scan-progress')).toHaveTextContent('Extracting colors and fonts');
+    expect(screen.getByText('Found 24 products')).toBeInTheDocument();
+    expect(screen.getByText('Selected 9 representative images')).toBeInTheDocument();
+    expect(screen.getByText('Type styles: Didot, Inter')).toBeInTheDocument();
+    expect(screen.queryByText('Your brand read is ready')).not.toBeInTheDocument();
+  });
+
+  it('shows every finding without collapsing or cropping long values', () => {
+    const longIdentity = 'A detailed identity paragraph that should remain fully visible instead of being cut off with an ellipsis.';
+    renderPanel('done', {
+      insights: [
+        { key: 'identity', value: longIdentity },
+        { key: 'productFocus', value: 'Rings' },
+        { key: 'visualStyle', value: 'Editorial' },
+        { key: 'targetMarkets', value: 'United States' },
+        { key: 'audience', value: 'Collectors' },
+        { key: 'otherInfo', value: 'Price positioning: premium\nConfidence: 91%' },
+      ],
+    });
+
+    expect(screen.getByText(longIdentity)).toBeInTheDocument();
+    expect(screen.getByText(/Price positioning: premium/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Show all findings/i })).not.toBeInTheDocument();
   });
 
   it('offers an honest call-now placeholder and a working later path', () => {
