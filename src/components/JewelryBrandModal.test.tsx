@@ -151,6 +151,56 @@ describe('JewelryBrandModal Nova onboarding', () => {
     expect(screen.getByLabelText('Online store URL')).toBeInTheDocument();
   });
 
+  it('offers URL retry or manual setup for a non-storefront result', async () => {
+    mockRunBrandScan.mockResolvedValue({
+      ...completedScan,
+      status: 'partial',
+      readinessLevel: 'non_storefront',
+      insights: EMPTY_BRAND_SCAN_INSIGHTS,
+    });
+    renderModal();
+    openMessageForm();
+    fillRequiredFields();
+    fireEvent.click(screen.getByRole('button', { name: 'Start brand scan' }));
+
+    expect(await screen.findByText(/couldn’t find an online store/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Set up manually' }));
+
+    expect(await screen.findByText(/set up Example Atelier manually/i)).toBeInTheDocument();
+    expect(screen.getByText('A few details we could not confirm')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Rescan storefront' })).not.toBeInTheDocument();
+  });
+
+  it('shows evidence without promising a completed AI read when analysis fails', async () => {
+    mockRunBrandScan.mockResolvedValue({
+      ...completedScan,
+      status: 'partial',
+      readinessLevel: 'full',
+      errorCode: 'ai_analysis_failed',
+      insights: { ...completedScan.insights, identity: '' },
+    });
+    renderModal();
+    openMessageForm();
+    fillRequiredFields();
+    fireEvent.click(screen.getByRole('button', { name: 'Start brand scan' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('AI brand read did not finish');
+    expect(screen.getAllByText('Gold rings and necklaces').length).toBeGreaterThan(0);
+  });
+
+  it('forces only the explicit rescan action', async () => {
+    mockRunBrandScan.mockResolvedValue(completedScan);
+    renderModal();
+    openMessageForm();
+    fillRequiredFields();
+    fireEvent.click(screen.getByRole('button', { name: 'Start brand scan' }));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Rescan storefront' }));
+    await waitFor(() => expect(mockRunBrandScan).toHaveBeenCalledTimes(2));
+    expect(mockRunBrandScan.mock.calls[0][1]).toMatchObject({ force: false });
+    expect(mockRunBrandScan.mock.calls[1][1]).toMatchObject({ force: true });
+  });
+
   it('asks only for missing optional details and accepts links without a protocol', async () => {
     mockRunBrandScan.mockResolvedValue({
       ...completedScan,

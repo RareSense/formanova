@@ -1,18 +1,18 @@
 import { useState } from 'react';
-import { AlertCircle, Check, Loader2, Lock, MessageCircle, Mic, Pencil, Plus, X } from 'lucide-react';
+import { AlertCircle, Check, Lock, MessageCircle, Mic, Pencil, Plus, RotateCcw, X } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { DARK_THEMES } from '@/components/ThemeLogo';
 import { cn } from '@/lib/utils';
 import { VoiceOrb, type VoiceOrbState } from '@/components/brand/VoiceOrb';
 import { INSIGHT_META, type InsightFeedKey } from '@/components/brand/brand-insight-meta';
 import { MissingBrandDetails, type MissingBrandDetailsProps } from '@/components/brand/MissingBrandDetails';
+import { BrandScanProgressPanel } from '@/components/brand/BrandScanProgressPanel';
 import {
   EMPTY_BRAND_SCAN_PROGRESS,
-  type BrandScanPhase,
   type BrandScanProgress,
 } from '@/lib/brand-scan-api';
 
-export type NovaOnboardingStep = 'intro' | 'fields' | 'scanning' | 'done' | 'next';
+export type NovaOnboardingStep = 'intro' | 'fields' | 'scanning' | 'non_storefront' | 'done' | 'next';
 
 export const NOVA_INTRO_LINE =
   "Hi, I'm Nova. I'll learn about your brand so I can create a more bespoke FormaNova experience for you.";
@@ -39,6 +39,9 @@ interface NovaIntroPanelProps {
   scanNotice?: string | null;
   onSelectMessage: () => void;
   onStartBuilding: () => void;
+  onRetryStorefront: () => void;
+  onManualSetup: () => void;
+  onRescan?: () => void;
   onConfirm: () => void;
   onAddMore?: () => void;
   onFinish: () => void;
@@ -207,21 +210,6 @@ function PaletteRow({
   );
 }
 
-const PHASE_COPY: Record<BrandScanPhase, string> = {
-  queued: 'Waiting to start',
-  discovery: 'Finding your pages',
-  product_probes: 'Reading your products',
-  browser: 'Rendering your storefront',
-  images: 'Selecting your images',
-  processing: 'Extracting colors and fonts',
-  ai_analysis: 'Writing your brand read',
-};
-
-function phaseLabel(progress: BrandScanProgress, fallback: string): string {
-  if (!progress.currentPhase) return fallback;
-  return PHASE_COPY[progress.currentPhase];
-}
-
 export function NovaIntroPanel({
   step,
   brandName,
@@ -236,6 +224,9 @@ export function NovaIntroPanel({
   scanNotice,
   onSelectMessage,
   onStartBuilding,
+  onRetryStorefront,
+  onManualSetup,
+  onRescan,
   onConfirm,
   onAddMore,
   onFinish,
@@ -261,13 +252,7 @@ export function NovaIntroPanel({
   );
 
   const editable = step === 'done';
-  const isDiscoveryScreen = step === 'scanning' || step === 'done';
-  const liveScanLabel = scanProgress.currentPhase === 'queued' && scanProgress.queuePosition
-    ? 'Waiting to start, position ' + scanProgress.queuePosition + ' in line'
-    : phaseLabel(scanProgress, scanStatus);
-  const livePalette = scanProgress.sitePalette.length > 0
-    ? scanProgress.sitePalette
-    : scanProgress.photoPalette;
+  const isDiscoveryScreen = step === 'scanning' || step === 'non_storefront' || step === 'done';
 
   return (
     <div className="flex min-h-full flex-col items-center py-6 text-center">
@@ -358,41 +343,28 @@ export function NovaIntroPanel({
       {isDiscoveryScreen && (
         <div className="mt-6 w-full max-w-sm space-y-5 text-left">
           {step === 'scanning' && (
-            <div data-testid="brand-scan-progress" className="space-y-3 border border-border p-4 text-sm text-muted-foreground">
-              <div className="flex items-center gap-3">
-                <Loader2 className="h-4 w-4 shrink-0 animate-spin text-foreground" />
-                <span className="min-w-0 flex-1 font-medium text-foreground">{liveScanLabel}</span>
-                <span className="text-xs tabular-nums">{scanProgress.progressPercent} percent</span>
+            <BrandScanProgressPanel progress={scanProgress} fallbackStatus={scanStatus} />
+          )}
+
+          {step === 'non_storefront' && (
+            <div className="space-y-4 border border-border p-5 text-center animate-fade-in">
+              <AlertCircle className="mx-auto h-6 w-6 text-muted-foreground" />
+              <div className="space-y-2">
+                <h3 className="font-display text-2xl font-bold text-foreground">We couldn’t find an online store</h3>
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  Check that you entered your public shop address, or continue by adding your brand details manually.
+                </p>
               </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full origin-left rounded-full bg-foreground transition-transform duration-700"
-                  style={{ transform: 'scaleX(' + scanProgress.progressPercent / 100 + ')' }}
-                />
-              </div>
-              {scanProgress.currentPhase === 'ai_analysis' && !scanProgress.brandReadReady && (
-                <p className="text-xs leading-relaxed">This detailed step can take a little longer.</p>
-              )}
-              {livePalette.length > 0 && (
-                <div className="flex gap-2" aria-label="Colors discovered so far">
-                  {livePalette.slice(0, 8).map((color) => (
-                    <span
-                      key={color}
-                      className="h-6 w-6 rounded-full border border-border animate-fade-in"
-                      style={{ backgroundColor: color }}
-                      title={color}
-                    />
-                  ))}
-                </div>
-              )}
-              <div className="space-y-1 text-xs">
-                {scanProgress.productCount !== null && (
-                  <p>Found {scanProgress.productCount} {scanProgress.productCount === 1 ? 'product' : 'products'}</p>
-                )}
-                {scanProgress.imageCount !== null && <p>Selected {scanProgress.imageCount} representative images</p>}
-                {scanProgress.fonts.length > 0 && <p>Type styles: {scanProgress.fonts.join(', ')}</p>}
-                {scanProgress.brandReadReady && <p className="font-medium text-foreground">Your brand read is ready</p>}
-              </div>
+              <button type="button" onClick={onRetryStorefront} className={ctaClass}>
+                Try another URL
+              </button>
+              <button
+                type="button"
+                onClick={onManualSetup}
+                className="w-full border border-border py-3 text-sm font-medium text-foreground hover:border-foreground"
+              >
+                Set up manually
+              </button>
             </div>
           )}
 
@@ -439,6 +411,11 @@ export function NovaIntroPanel({
               <button type="button" onClick={onAddMore} className="flex w-full items-center justify-center gap-2 border border-border py-3 text-sm font-medium text-foreground hover:border-foreground">
                 <Plus className="h-4 w-4" /> Add something else
               </button>
+              {onRescan && (
+                <button type="button" onClick={onRescan} className="flex w-full items-center justify-center gap-2 py-3 text-sm font-medium text-muted-foreground hover:text-foreground">
+                  <RotateCcw className="h-4 w-4" /> Rescan storefront
+                </button>
+              )}
             </div>
           )}
         </div>

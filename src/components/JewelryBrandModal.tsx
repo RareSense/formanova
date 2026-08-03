@@ -52,11 +52,23 @@ function insightKeys(profile: BrandScanInsights): InsightKey[] {
 }
 
 function scanNotice(result: BrandScanResult): string | null {
-  if (result.status === 'partial' || result.readinessLevel === 'non_storefront') {
+  const status = result.status.toLowerCase();
+  const readiness = result.readinessLevel?.toLowerCase() ?? null;
+  const errorCode = result.errorCode?.toLowerCase() ?? null;
+  if (errorCode === 'saved_profile_missing') {
+    return result.errorMessage || 'Your saved scan could not be loaded. Rescan the storefront to refresh it.';
+  }
+  if (readiness === 'full' && status === 'partial' && (errorCode === 'ai_analysis_failed' || errorCode === 'ai_timeout')) {
+    return 'We found strong storefront evidence, but the AI brand read did not finish. You can review the evidence now and rescan later.';
+  }
+  if (readiness === 'non_storefront') {
+    return 'We could not find an online store at this address.';
+  }
+  if (status === 'partial') {
     return 'Nova could only build a partial read from this URL. Review every available finding carefully before confirming.';
   }
-  if (result.readinessLevel && result.readinessLevel !== 'full') {
-    return `This scan has ${result.readinessLevel.replace(/_/g, ' ')} readiness. Please review every finding before confirming.`;
+  if (readiness && readiness !== 'full') {
+    return `This scan has ${readiness.replace(/_/g, ' ')} readiness. Please review every finding before confirming.`;
   }
   const hasUsableInsight = Object.entries(result.insights).some(([, value]) => (
     Array.isArray(value) ? value.length > 0 : Boolean(value)
@@ -107,6 +119,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
   const [availableKeys, setAvailableKeys] = useState<InsightKey[]>([]);
   const [profile, setProfile] = useState<BrandScanInsights>(EMPTY_BRAND_SCAN_INSIGHTS);
   const [scanProgress, setScanProgress] = useState<BrandScanProgress>(EMPTY_BRAND_SCAN_PROGRESS);
+  const [manualSetup, setManualSetup] = useState(false);
   const [physicalLocation, setPhysicalLocation] = useState(initial?.physical_location ?? '');
   const [missingFields, setMissingFields] = useState({
     basedIn: false,
@@ -150,7 +163,7 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
     if (dismissible && e.target === overlayRef.current) onClose();
   };
 
-  const handleStartBuilding = async () => {
+  const handleStartBuilding = async (force = false) => {
     const normalizedWebsite = normalizeUrl(website);
     const missingBrandName = !brandName.trim();
     const invalidWebsite = !isValidHttpUrl(normalizedWebsite);
@@ -168,12 +181,14 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
     setScanProgress(EMPTY_BRAND_SCAN_PROGRESS);
     setMissingFields({ basedIn: false, targetMarkets: false, socialLinks: false, physicalLocation: false });
     setResultNotice(null);
+    setManualSetup(false);
     setScanStatus('Starting your brand scan…');
     setStep('scanning');
 
     try {
       const result = await runBrandScan(normalizedWebsite, {
         signal: controller.signal,
+        force,
         onProgress: (progress) => {
           setScanProgress(progress);
           const discoveredPalette = progress.sitePalette.length > 0
@@ -212,6 +227,12 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
         setStep('fields');
         return;
       }
+      if (result.readinessLevel?.toLowerCase() === 'non_storefront') {
+        setProfile(EMPTY_BRAND_SCAN_INSIGHTS);
+        setAvailableKeys([]);
+        setStep('non_storefront');
+        return;
+      }
       setProfile(result.insights);
       setMissingFields({
         basedIn: !result.insights.basedIn,
@@ -229,6 +250,22 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
     } finally {
       if (scanAbortRef.current === controller) scanAbortRef.current = null;
     }
+  };
+
+  const handleRetryStorefront = () => {
+    setScanError(null);
+    setResultNotice(null);
+    setStep('fields');
+  };
+
+  const handleManualSetup = () => {
+    setWebsite('');
+    setProfile(EMPTY_BRAND_SCAN_INSIGHTS);
+    setAvailableKeys([]);
+    setManualSetup(true);
+    setResultNotice('Add whatever you know now. You can update these details later from your profile.');
+    setMissingFields({ basedIn: true, targetMarkets: true, socialLinks: true, physicalLocation: true });
+    setStep('done');
   };
 
   const handleEditInsight = (key: InsightFeedKey, value: string) => {
@@ -271,7 +308,9 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
   };
 
   const summaryLine = step === 'done'
-    ? `This is what I understand about ${brandName.trim() || 'your brand'}. Please correct anything that feels off.`
+    ? manualSetup
+      ? `Let’s set up ${brandName.trim() || 'your brand'} manually.`
+      : `This is what I understand about ${brandName.trim() || 'your brand'}. Please correct anything that feels off.`
     : undefined;
 
   return (
@@ -312,7 +351,10 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
                 scanProgress={scanProgress}
                 scanNotice={resultNotice}
                 onSelectMessage={() => setStep('fields')}
-                onStartBuilding={handleStartBuilding}
+                onStartBuilding={() => { void handleStartBuilding(); }}
+                onRetryStorefront={handleRetryStorefront}
+                onManualSetup={handleManualSetup}
+                onRescan={manualSetup ? undefined : () => { void handleStartBuilding(true); }}
                 onConfirm={() => setStep('next')}
                 onAddMore={() => setAvailableKeys((keys) => keys.includes('otherInfo') ? keys : [...keys, 'otherInfo'])}
                 onFinish={handleFinish}

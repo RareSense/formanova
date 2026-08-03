@@ -41,6 +41,14 @@ export const EMPTY_BRAND_SCAN_PROGRESS: BrandScanProgress = {
 
 type JsonRecord = Record<string, unknown>;
 
+interface NormalizedBrandScanEvent {
+  key: string;
+  name: string;
+  phase: BrandScanPhase | null;
+  payload: JsonRecord;
+  tMs: number;
+}
+
 const SCAN_PHASES: BrandScanPhase[] = [
   'discovery',
   'product_probes',
@@ -111,7 +119,46 @@ function phaseValue(value: unknown): BrandScanPhase | null {
     : null;
 }
 
-export function mergeBrandScanProgress(previous: BrandScanProgress, value: unknown): BrandScanProgress {
+function normalizedEvents(value: unknown): NormalizedBrandScanEvent[] {
+  return scanEvents(value).map((event, index) => {
+    const data = asRecord(event.data);
+    const nestedPayload = asRecord(data?.payload);
+    const payload = asRecord(event.payload) ?? nestedPayload ?? data ?? event;
+    const directName = textValue(
+      event.event
+      ?? data?.event
+      ?? event.kind
+      ?? data?.kind
+      ?? payload.kind,
+    ).toLowerCase();
+    const phase = phaseValue(
+      payload.phase
+      ?? data?.phase
+      ?? event.phase
+      ?? (directName === 'queued' || SCAN_PHASES.includes(directName as BrandScanPhase)
+        ? directName
+        : undefined),
+    );
+    const name = directName && directName !== 'phase'
+      ? directName
+      : phase ?? textValue(event.event_type ?? data?.event_type ?? event.type).toLowerCase();
+    const elapsed = Number(data?.t_ms ?? event.t_ms ?? payload.t_ms ?? 0);
+    const tMs = Number.isFinite(elapsed) ? Math.max(0, elapsed) : 0;
+    const eventId = textValue(event.id ?? data?.id ?? event.seq ?? data?.seq);
+    const scanId = textValue(event.scan_id ?? data?.scan_id);
+    const fallbackKey = `${name || 'event'}:${tMs}:${JSON.stringify(payload)}:${index}`;
+
+    return {
+      key: eventId ? `${scanId}:${eventId}` : fallbackKey,
+      name,
+      phase,
+      payload,
+      tMs,
+    };
+  });
+}
+
+function applyEvent(previous: BrandScanProgress, event: NormalizedBrandScanEvent): BrandScanProgress {
   const next: BrandScanProgress = {
     ...previous,
     completedPhases: [...previous.completedPhases],
@@ -121,46 +168,97 @@ export function mergeBrandScanProgress(previous: BrandScanProgress, value: unkno
     fonts: [...previous.fonts],
   };
 
-  for (const event of scanEvents(value)) {
-    const payload = asRecord(event.payload) ?? event;
-    const eventType = textValue(event.event_type || event.type).toLowerCase();
-    const phase = phaseValue(payload.phase ?? event.phase);
-    const elapsed = Number(event.t_ms ?? payload.t_ms ?? 0);
-    if (Number.isFinite(elapsed)) next.elapsedMs = Math.max(next.elapsedMs, elapsed);
+  next.elapsedMs = Math.max(next.elapsedMs, event.tMs);
 
-    if (phase && (eventType === 'phase' || !eventType || payload.phase !== undefined)) {
-      next.currentPhase = phase;
-      if (!next.completedPhases.includes(phase)) next.completedPhases.push(phase);
-      if (phase === 'queued') {
-        const position = Number(payload.position);
-        next.queuePosition = Number.isFinite(position) ? position : null;
-      } else {
-        next.queuePosition = null;
-      }
+  if (event.phase) {
+    next.currentPhase = event.phase;
+    if (!next.completedPhases.includes(event.phase)) next.completedPhases.push(event.phase);
+    if (event.phase === 'queued') {
+      const position = Number(event.payload.position);
+      next.queuePosition = Number.isFinite(position) ? position : null;
+    } else {
+      next.queuePosition = null;
     }
+  }
 
-    const kind = textValue(event.kind ?? payload.kind).toLowerCase();
-    if (kind === 'products_found') {
-      const count = Number(payload.count);
-      next.productCount = Number.isFinite(count) ? count : next.productCount;
-      next.productTitles = listValue(payload.titles).slice(0, 5);
-    } else if (kind === 'images_selected') {
-      const count = Number(payload.count);
-      next.imageCount = Number.isFinite(count) ? count : next.imageCount;
-    } else if (kind === 'palette_extracted') {
-      next.sitePalette = colors(payload.site);
-      next.photoPalette = colors(payload.photo);
-    } else if (kind === 'fonts_detected') {
-      next.fonts = listValue(payload.families).slice(0, 6);
-    } else if (kind === 'screenshot_ready') {
-      next.screenshotReady = true;
-    } else if (kind === 'interpretation_ready') {
-      next.brandReadReady = true;
-    }
+  if (event.name === 'products_found') {
+    const count = Number(event.payload.count);
+    next.productCount = Number.isFinite(count) ? count : next.productCount;
+    next.productTitles = listValue(event.payload.titles).slice(0, 5);
+  } else if (event.name === 'images_selected') {
+    const count = Number(event.payload.count);
+    next.imageCount = Number.isFinite(count) ? count : next.imageCount;
+  } else if (event.name === 'palette_extracted') {
+    const combined = colors(event.payload.hexes);
+    next.sitePalette = combined.length > 0 ? combined : colors(event.payload.site);
+    next.photoPalette = colors(event.payload.photo);
+  } else if (event.name === 'fonts_detected') {
+    next.fonts = listValue(event.payload.families).slice(0, 6);
+  } else if (event.name === 'screenshot_ready') {
+    next.screenshotReady = true;
+  } else if (event.name === 'interpretation_ready') {
+    next.brandReadReady = true;
   }
 
   const visibleCompleted = next.completedPhases.filter((phase) => phase !== 'queued').length;
   const computedPercent = next.currentPhase === 'queued' ? 4 : Math.min(92, 8 + visibleCompleted * 14);
   next.progressPercent = Math.max(previous.progressPercent, computedPercent);
   return next;
+}
+
+export function mergeBrandScanProgress(previous: BrandScanProgress, value: unknown): BrandScanProgress {
+  return normalizedEvents(value).reduce(applyEvent, previous);
+}
+
+export interface BrandScanProgressTimeline {
+  ingest: (value: unknown) => void;
+  stop: () => void;
+}
+
+/**
+ * Replays newly observed events on their scanner-authored t_ms timeline.
+ * Late events reveal immediately, while coalesced events retain their own spacing.
+ */
+export function createBrandScanProgressTimeline(
+  onProgress: (progress: BrandScanProgress) => void,
+  initial: BrandScanProgress = EMPTY_BRAND_SCAN_PROGRESS,
+): BrandScanProgressTimeline {
+  let progress = initial;
+  let stopped = false;
+  let lastTMs: number | null = null;
+  let lastDueAt = Date.now();
+  const seen = new Set<string>();
+  const timers = new Set<ReturnType<typeof setTimeout>>();
+
+  return {
+    ingest(value) {
+      const now = Date.now();
+      const fresh = normalizedEvents(value)
+        .filter((event) => {
+          if (seen.has(event.key)) return false;
+          seen.add(event.key);
+          return true;
+        })
+        .sort((left, right) => left.tMs - right.tMs);
+
+      for (const event of fresh) {
+        const gap = lastTMs === null ? 0 : Math.max(0, event.tMs - lastTMs);
+        const dueAt = Math.max(now, lastDueAt + gap);
+        lastTMs = event.tMs;
+        lastDueAt = dueAt;
+        const timer = setTimeout(() => {
+          timers.delete(timer);
+          if (stopped) return;
+          progress = applyEvent(progress, event);
+          onProgress(progress);
+        }, Math.max(0, dueAt - Date.now()));
+        timers.add(timer);
+      }
+    },
+    stop() {
+      stopped = true;
+      for (const timer of timers) clearTimeout(timer);
+      timers.clear();
+    },
+  };
 }

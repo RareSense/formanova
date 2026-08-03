@@ -10,6 +10,9 @@ function renderPanel(step: NovaOnboardingStep, overrides: Partial<Parameters<typ
     onWebsiteChange: vi.fn(),
     onSelectMessage: vi.fn(),
     onStartBuilding: vi.fn(),
+    onRetryStorefront: vi.fn(),
+    onManualSetup: vi.fn(),
+    onRescan: vi.fn(),
     onConfirm: vi.fn(),
     onAddMore: vi.fn(),
     onFinish: vi.fn(),
@@ -91,17 +94,31 @@ describe('NovaIntroPanel', () => {
         completedPhases: ['discovery', 'product_probes', 'browser', 'images', 'processing'],
         progressPercent: 78,
         productCount: 24,
+        productTitles: ['Halo Ring', 'Pearl Drop'],
         imageCount: 9,
         sitePalette: ['#111111', '#F4E8D5'],
         fonts: ['Didot', 'Inter'],
+        screenshotReady: true,
       },
     });
 
     expect(screen.getByTestId('brand-scan-progress')).toHaveTextContent('Extracting colors and fonts');
     expect(screen.getByText('Found 24 products')).toBeInTheDocument();
+    expect(screen.getByText('Halo Ring, Pearl Drop')).toBeInTheDocument();
     expect(screen.getByText('Selected 9 representative images')).toBeInTheDocument();
     expect(screen.getByText('Type styles: Didot, Inter')).toBeInTheDocument();
+    expect(screen.getByTestId('brand-scan-screenshot-placeholder')).toBeInTheDocument();
     expect(screen.queryByText('Your brand read is ready')).not.toBeInTheDocument();
+  });
+
+  it('offers retry and manual setup when no storefront is found', () => {
+    const { onRetryStorefront, onManualSetup } = renderPanel('non_storefront');
+
+    expect(screen.getByText(/couldn’t find an online store/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Try another URL' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Set up manually' }));
+    expect(onRetryStorefront).toHaveBeenCalledTimes(1);
+    expect(onManualSetup).toHaveBeenCalledTimes(1);
   });
 
   it('shows every finding without collapsing or cropping long values', () => {

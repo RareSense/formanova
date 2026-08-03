@@ -1,6 +1,7 @@
-import { authenticatedFetch } from '@/lib/authenticated-fetch';
+import { AuthExpiredError, authenticatedFetch } from '@/lib/authenticated-fetch';
 import { pollWorkflow } from '@/lib/poll-workflow';
 import {
+  createBrandScanProgressTimeline,
   EMPTY_BRAND_SCAN_PROGRESS,
   mergeBrandScanProgress,
   type BrandScanProgress,
@@ -42,6 +43,7 @@ export interface BrandScanResult {
   errorCode: string | null;
   errorMessage: string | null;
   requestedUrl: string | null;
+  confirmedAt?: string | null;
   insights: BrandScanInsights;
 }
 
@@ -279,6 +281,9 @@ function unwrapScanResponse(value: unknown): JsonRecord {
   if (!result) throw new Error('Brand scan returned an invalid result.');
   const nodes = result.scan_storefront;
   if (Array.isArray(nodes)) {
+    if (nodes.length === 0) {
+      return { status: 'partial', readiness_level: 'non_storefront' };
+    }
     const first = asRecord(nodes[0]);
     if (first) return first;
   }
@@ -293,7 +298,8 @@ function unwrapScanResponse(value: unknown): JsonRecord {
  */
 export function parseBrandScanResult(value: unknown): BrandScanResult {
   const scan = unwrapScanResponse(value);
-  const evidence = asRecord(scan.evidence) ?? {};
+  const rootActual = asRecord(scan.actual);
+  const evidence = asRecord(scan.evidence) ?? asRecord(rootActual?.evidence) ?? {};
   const readiness = asRecord(evidence.intelligence_readiness);
   const marketScope = asRecord(evidence.market_scope);
   const records = collectCandidateRecords(scan);
@@ -366,7 +372,9 @@ export function resolveBrandScanState(value: unknown): string {
   const data = asRecord(value);
   const runtime = asRecord(data?.runtime);
   const progress = asRecord(data?.progress);
-  const raw = textValue(runtime?.state)
+  const phaseState = textValue(data?.phase_state).toLowerCase();
+  const raw = (phaseState && phaseState !== 'unknown' ? phaseState : '')
+    || textValue(runtime?.state)
     || textValue(progress?.state)
     || textValue(data?.state)
     || textValue(data?.status)
@@ -374,6 +382,7 @@ export function resolveBrandScanState(value: unknown): string {
   const normalized = raw.toLowerCase();
   if (normalized === 'complete' || normalized === 'succeeded' || normalized === 'success') return 'completed';
   if (normalized === 'error' || normalized === 'errored') return 'failed';
+  if (['timed_out', 'timeout', 'cancelled', 'canceled', 'terminated'].includes(normalized)) return 'failed';
   return normalized;
 }
 
@@ -386,14 +395,44 @@ async function responseMessage(response: Response, fallback: string): Promise<st
   return fallback;
 }
 
+async function fetchRecentBrandScanResult(signal?: AbortSignal): Promise<BrandScanResult> {
+  const response = await authenticatedFetch('/api/user/profile', { signal });
+  if (!response.ok) {
+    throw new Error(await responseMessage(response, 'Could not load your saved brand scan.'));
+  }
+  const profile = asRecord(await response.json()) ?? {};
+  const actual = asRecord(profile.actual) ?? {};
+  const confirmedAt = textValue(profile.confirmed_at) || null;
+  if (Object.keys(actual).length === 0) {
+    return {
+      status: 'partial',
+      readinessLevel: null,
+      errorCode: 'saved_profile_missing',
+      errorMessage: 'The saved scan is unavailable. Rescan the storefront to refresh it.',
+      requestedUrl: textValue(profile.storefront_url) || null,
+      confirmedAt,
+      insights: EMPTY_BRAND_SCAN_INSIGHTS,
+    };
+  }
+
+  return {
+    ...parseBrandScanResult({
+      status: 'completed',
+      requested_url: profile.storefront_url,
+      actual,
+    }),
+    confirmedAt,
+  };
+}
+
 /**
  * Brand-scan workflow contract:
  * - start: POST /api/brand/scan
- * - status: GET /api/status/{workflow_id}, every 2s
+ * - status: GET /api/status/{workflow_id} plus /phases, every 1s
  * - result: GET /api/result/{workflow_id}, only after terminal status
  * - timeout: 450s (scanner node timeout is 420s)
- * - terminal states: completed, failed, budget_exhausted
- * - status 404 policy: fail immediately (unknown workflow); other status-error budget: 5
+ * - terminal states: completed; failed/budget_exhausted/timed_out/cancelled/terminated fail
+ * - status 404 policy: use /phases while available; otherwise fail immediately
  * - cancellation: caller-owned AbortSignal, normally aborted on unmount/retry
  * - result parser: parseBrandScanResult above
  */
@@ -401,14 +440,17 @@ export async function runBrandScan(
   storefrontUrl: string,
   options: {
     signal?: AbortSignal;
+    force?: boolean;
     onStatus?: (status: unknown) => void;
     onProgress?: (progress: BrandScanProgress) => void;
   } = {},
 ): Promise<BrandScanResult | null> {
+  const startBody: { storefront_url: string; force?: boolean } = { storefront_url: storefrontUrl };
+  if (options.force) startBody.force = true;
   const startResponse = await authenticatedFetch('/api/brand/scan', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ storefront_url: storefrontUrl }),
+    body: JSON.stringify(startBody),
     signal: options.signal,
   });
   if (!startResponse.ok) {
@@ -421,30 +463,48 @@ export async function runBrandScan(
   const startData = await startResponse.json();
   const workflowId = textValue(startData?.workflow_id);
   if (!workflowId) throw new Error('Brand scan did not return a workflow ID.');
+  if (textValue(startData?.deduplicated).toLowerCase() === 'recent') {
+    return fetchRecentBrandScanResult(options.signal);
+  }
 
   const encodedId = encodeURIComponent(workflowId);
   let lastStatusData: unknown;
-  let progress = EMPTY_BRAND_SCAN_PROGRESS;
+  const progressTimeline = options.onProgress
+    ? createBrandScanProgressTimeline(options.onProgress)
+    : null;
 
   const fetchStatusWithProgress = async (): Promise<Response> => {
-    const statusResponse = await authenticatedFetch(`/api/status/${encodedId}`, { signal: options.signal });
-    if (!statusResponse.ok) return statusResponse;
-
-    const statusData = await statusResponse.json();
-    let phaseData: unknown = null;
-    try {
-      const phaseResponse = await authenticatedFetch(`/api/status/${encodedId}/phases`, { signal: options.signal });
-      if (phaseResponse.ok) phaseData = await phaseResponse.json();
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') throw error;
-      // Progress is best effort. The durable scan and final result continue.
+    const [statusAttempt, phaseAttempt] = await Promise.allSettled([
+      authenticatedFetch(`/api/status/${encodedId}`, { signal: options.signal }),
+      authenticatedFetch(`/api/status/${encodedId}/phases`, { signal: options.signal }),
+    ]);
+    const attempts = [statusAttempt, phaseAttempt];
+    for (const attempt of attempts) {
+      if (attempt.status !== 'rejected') continue;
+      const error = attempt.reason;
+      if (error instanceof AuthExpiredError || (error instanceof Error && error.name === 'AbortError')) throw error;
     }
+    const rejected = attempts.find((attempt) => attempt.status === 'rejected');
+
+    const statusResponse = statusAttempt.status === 'fulfilled' ? statusAttempt.value : null;
+    const phaseResponse = phaseAttempt.status === 'fulfilled' ? phaseAttempt.value : null;
+    const phaseData = phaseResponse?.ok ? await phaseResponse.json() : null;
+
+    if (!statusResponse?.ok && !phaseResponse?.ok) {
+      if (statusResponse) return statusResponse;
+      if (phaseResponse) return phaseResponse;
+      throw rejected?.status === 'rejected' ? rejected.reason : new Error('Brand scan status is unavailable.');
+    }
+
+    const statusData = statusResponse?.ok ? await statusResponse.json() : {};
+    const phaseRecord = asRecord(phaseData);
 
     return new Response(JSON.stringify({
       ...(asRecord(statusData) ?? {}),
+      phase_state: textValue(phaseRecord?.state),
       scan_progress_events: phaseData,
     }), {
-      status: statusResponse.status,
+      status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
   };
@@ -455,7 +515,7 @@ export async function runBrandScan(
       fetchResult: () => authenticatedFetch(`/api/result/${encodedId}`, { signal: options.signal }),
       resolveState: resolveBrandScanState,
       parseResult: parseBrandScanResult,
-      intervalMs: 2_000,
+      intervalMs: 1_000,
       timeoutMs: 450_000,
       max404s: 1,
       maxPollErrors: 5,
@@ -465,8 +525,7 @@ export async function runBrandScan(
       onStatusData: (statusData) => {
         lastStatusData = statusData;
         options.onStatus?.(statusData);
-        progress = mergeBrandScanProgress(progress, statusData);
-        options.onProgress?.(progress);
+        progressTimeline?.ingest(statusData);
       },
     });
 
@@ -477,5 +536,7 @@ export async function runBrandScan(
       return failedBrandScanResult(lastStatusData, error);
     }
     throw error;
+  } finally {
+    progressTimeline?.stop();
   }
 }

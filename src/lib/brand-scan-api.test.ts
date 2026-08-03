@@ -8,6 +8,7 @@ import {
   resolveBrandScanState,
   runBrandScan,
 } from '@/lib/brand-scan-api';
+import { createBrandScanProgressTimeline } from '@/lib/brand-scan-progress';
 
 vi.mock('@/lib/authenticated-fetch', () => ({ authenticatedFetch: vi.fn() }));
 vi.mock('@/lib/poll-workflow', () => ({ pollWorkflow: vi.fn() }));
@@ -103,7 +104,7 @@ describe('brand scan API', () => {
       body: JSON.stringify({ storefront_url: 'https://atelier.example' }),
     }));
     expect(mockPollWorkflow).toHaveBeenCalledWith(expect.objectContaining({
-      intervalMs: 2_000,
+      intervalMs: 1_000,
       timeoutMs: 450_000,
       max404s: 1,
       maxPollErrors: 5,
@@ -115,6 +116,63 @@ describe('brand scan API', () => {
     expect(mockAuthenticatedFetch).toHaveBeenNthCalledWith(2, '/api/status/state-123', expect.any(Object));
     expect(mockAuthenticatedFetch).toHaveBeenNthCalledWith(3, '/api/status/state-123/phases', expect.any(Object));
     expect(mockAuthenticatedFetch).toHaveBeenNthCalledWith(4, '/api/result/state-123', expect.any(Object));
+  });
+
+  it('loads durable profile data without polling a recent deduplicated workflow', async () => {
+    mockAuthenticatedFetch
+      .mockResolvedValueOnce(jsonResponse({ workflow_id: 'state-old', deduplicated: 'recent' }))
+      .mockResolvedValueOnce(jsonResponse({
+        storefront_url: 'https://atelier.example',
+        confirmed_at: '2026-07-20T12:00:00',
+        actual: {
+          summary: 'Sculptural jewelry with a bold point of view.',
+          palette: ['#112233', '#DDEEFF'],
+          evidence: { intelligence_readiness: { level: 'full' } },
+        },
+      }));
+
+    const result = await runBrandScan('https://atelier.example');
+
+    expect(mockPollWorkflow).not.toHaveBeenCalled();
+    expect(mockAuthenticatedFetch).toHaveBeenCalledTimes(2);
+    expect(mockAuthenticatedFetch).toHaveBeenNthCalledWith(2, '/api/user/profile', expect.any(Object));
+    expect(result).toMatchObject({
+      status: 'completed',
+      readinessLevel: 'full',
+      confirmedAt: '2026-07-20T12:00:00',
+      insights: {
+        identity: 'Sculptural jewelry with a bold point of view.',
+        palette: ['#112233', '#DDEEFF'],
+      },
+    });
+  });
+
+  it('returns a recoverable rescan outcome when a recent profile is unexpectedly empty', async () => {
+    mockAuthenticatedFetch
+      .mockResolvedValueOnce(jsonResponse({ workflow_id: 'state-old', deduplicated: 'recent' }))
+      .mockResolvedValueOnce(jsonResponse({ storefront_url: 'https://atelier.example', actual: {}, confirmed_at: null }));
+
+    await expect(runBrandScan('https://atelier.example')).resolves.toMatchObject({
+      status: 'partial',
+      errorCode: 'saved_profile_missing',
+      confirmedAt: null,
+    });
+    expect(mockPollWorkflow).not.toHaveBeenCalled();
+  });
+
+  it('uses the phases state when the normal status endpoint is temporarily missing', async () => {
+    mockAuthenticatedFetch
+      .mockResolvedValueOnce(jsonResponse({ workflow_id: 'state-phase-fallback' }))
+      .mockResolvedValueOnce(jsonResponse({}, 404))
+      .mockResolvedValueOnce(jsonResponse({ state: 'completed', events: [] }));
+    mockPollWorkflow.mockImplementationOnce(async (options) => {
+      const response = await options.fetchStatus?.();
+      expect(response?.ok).toBe(true);
+      expect(await response?.json()).toMatchObject({ phase_state: 'completed' });
+      return { status: 'cancelled' };
+    });
+
+    await expect(runBrandScan('https://atelier.example')).resolves.toBeNull();
   });
 
   it('keeps scan progress append-only and accepts corrected product discovery', () => {
@@ -159,6 +217,51 @@ describe('brand scan API', () => {
     expect(progress.brandReadReady).toBe(true);
   });
 
+  it('parses the GraphFlow event/data envelope and its palette hexes', () => {
+    const progress = mergeBrandScanProgress(EMPTY_BRAND_SCAN_PROGRESS, {
+      state: 'running',
+      events: [
+        { id: '1', event: 'queued', data: { t_ms: 10, position: 3 } },
+        { id: '2', event: 'processing', data: { t_ms: 31_000 } },
+        { id: '3', event: 'palette_extracted', data: { t_ms: 31_200, hexes: ['#00f', '#f00', '#0f0'] } },
+        { id: '4', event: 'fonts_detected', data: { t_ms: 31_240, families: ['Inter'] } },
+      ],
+    });
+
+    expect(progress.currentPhase).toBe('processing');
+    expect(progress.sitePalette).toEqual(['#0000FF', '#FF0000', '#00FF00']);
+    expect(progress.fonts).toEqual(['Inter']);
+    expect(progress.elapsedMs).toBe(31_240);
+  });
+
+  it('keeps coalesced event reveals separated by their t_ms gap', () => {
+    vi.useFakeTimers();
+    try {
+      const updates: typeof EMPTY_BRAND_SCAN_PROGRESS[] = [];
+      const timeline = createBrandScanProgressTimeline((progress) => updates.push(progress));
+      const response = {
+        events: [
+          { id: '3', event: 'palette_extracted', data: { t_ms: 31_200, hexes: ['#111111'] } },
+          { id: '4', event: 'fonts_detected', data: { t_ms: 31_240, families: ['Inter'] } },
+        ],
+      };
+
+      timeline.ingest(response);
+      timeline.ingest(response);
+      vi.advanceTimersByTime(0);
+      expect(updates).toHaveLength(1);
+      expect(updates[0].sitePalette).toEqual(['#111111']);
+      expect(updates[0].fonts).toEqual([]);
+
+      vi.advanceTimersByTime(40);
+      expect(updates).toHaveLength(2);
+      expect(updates[1].fonts).toEqual(['Inter']);
+      timeline.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('uses the progress proxy even when the status payload has an empty phase list', () => {
     const progress = mergeBrandScanProgress(EMPTY_BRAND_SCAN_PROGRESS, {
       status: 'running',
@@ -169,6 +272,13 @@ describe('brand scan API', () => {
     });
 
     expect(progress.currentPhase).toBe('images');
+  });
+
+  it('normalizes a literal zero-result scan as non-storefront', () => {
+    expect(parseBrandScanResult({ scan_storefront: [] })).toMatchObject({
+      status: 'partial',
+      readinessLevel: 'non_storefront',
+    });
   });
 
   it('surfaces backend validation detail when the start call fails', async () => {
@@ -194,6 +304,29 @@ describe('brand scan API', () => {
       errorCode: 'scanner_unauthorized',
       errorMessage: 'The storefront scanner could not be reached.',
     });
+  });
+
+  it('treats a timed-out phase state as a terminal failure', async () => {
+    mockAuthenticatedFetch.mockResolvedValueOnce(jsonResponse({ workflow_id: 'state-timeout' }));
+    mockPollWorkflow.mockImplementationOnce(async (options) => {
+      options.onStatusData?.({ phase_state: 'timed_out' });
+      throw new Error('Workflow failed');
+    });
+
+    await expect(runBrandScan('https://atelier.example')).resolves.toMatchObject({
+      status: 'failed',
+    });
+  });
+
+  it('sends force only for an explicit rescan', async () => {
+    mockAuthenticatedFetch.mockResolvedValueOnce(jsonResponse({ workflow_id: 'state-rescan' }));
+    mockPollWorkflow.mockResolvedValueOnce({ status: 'cancelled' });
+
+    await runBrandScan('https://atelier.example', { force: true });
+
+    expect(mockAuthenticatedFetch).toHaveBeenCalledWith('/api/brand/scan', expect.objectContaining({
+      body: JSON.stringify({ storefront_url: 'https://atelier.example', force: true }),
+    }));
   });
 
   it('keeps only exact unique palette colors and retains documented analysis details', () => {
