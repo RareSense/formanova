@@ -52,6 +52,8 @@ interface NormalizedBrandScanEvent {
   phase: BrandScanPhase | null;
   payload: JsonRecord;
   tMs: number;
+  /** Monotonic within a scan and immutable once emitted. Ordering authority. */
+  seq: number | null;
 }
 
 const SCAN_PHASES: BrandScanPhase[] = [
@@ -158,16 +160,24 @@ function normalizedEvents(value: unknown): NormalizedBrandScanEvent[] {
       : phase ?? textValue(event.event_type ?? data?.event_type ?? event.type).toLowerCase();
     const elapsed = Number(data?.t_ms ?? event.t_ms ?? payload.t_ms ?? 0);
     const tMs = Number.isFinite(elapsed) ? Math.max(0, elapsed) : 0;
-    const eventId = textValue(event.id ?? data?.id ?? event.seq ?? data?.seq);
-    const scanId = textValue(event.scan_id ?? data?.scan_id);
+    // `seq` is monotonic within a scan and immutable once emitted, so it is the
+    // identity. `scan_id` must NOT appear in the key: it legitimately changes
+    // over a scan's life (pending-xxx, then the stored run id, then null once
+    // the activity ends), which made the same event look new each time it
+    // changed and re-applied it. The timeline instance is already scoped to one
+    // workflow, so `seq` alone is unique.
+    const rawSeq = Number(data?.seq ?? event.seq ?? payload.seq);
+    const seq = Number.isFinite(rawSeq) ? rawSeq : null;
+    const eventId = textValue(event.id ?? data?.id);
     const fallbackKey = `${name || 'event'}:${tMs}:${JSON.stringify(payload)}:${index}`;
 
     return {
-      key: eventId ? `${scanId}:${eventId}` : fallbackKey,
+      key: seq !== null ? `seq:${seq}` : eventId ? `id:${eventId}` : fallbackKey,
       name,
       phase,
       payload,
       tMs,
+      seq,
     };
   });
 }
@@ -284,7 +294,13 @@ export function createBrandScanProgressTimeline(
           seen.add(event.key);
           return true;
         })
-        .sort((left, right) => left.tMs - right.tMs);
+        // Order by seq where present: it is the authority, and t_ms ties are
+        // common (palette and fonts are emitted at the same millisecond).
+        .sort((left, right) => (
+          left.seq !== null && right.seq !== null
+            ? left.seq - right.seq
+            : left.tMs - right.tMs
+        ));
 
       if (fresh.length === 0) return;
       progress = fresh.reduce(applyEvent, progress);

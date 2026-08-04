@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { EMPTY_BRAND_SCAN_PROGRESS, mergeBrandScanProgress } from '@/lib/brand-scan-progress';
+import {
+  EMPTY_BRAND_SCAN_PROGRESS,
+  createBrandScanProgressTimeline,
+  mergeBrandScanProgress,
+  type BrandScanProgress,
+} from '@/lib/brand-scan-progress';
 
 /** Wraps payloads in the envelope the deployed scanner actually sends. */
 function events(...items: Array<{ kind: string; payload: Record<string, unknown>; t?: number }>) {
@@ -68,6 +73,52 @@ describe('brand scan progress accumulation', () => {
     );
 
     expect(second.fonts).toEqual(['Didot', 'Inter']);
+  });
+
+  it('treats an event as the same event when scan_id changes mid-scan', () => {
+    // The scanner reports a pending handle while in flight, then the stored run
+    // id, then null once the activity ends. Keying on scan_id made the same seq
+    // look like a new event each time it changed.
+    const build = (scanId: string | null) => ({
+      events: [{
+        id: '2',
+        event: 'data',
+        data: {
+          event_type: 'data',
+          kind: 'products_found',
+          payload: { count: 18, titles: ['Nakshi Bangle'] },
+          scan_id: scanId,
+          seq: 2,
+          t_ms: 8911,
+        },
+      }],
+    });
+
+    const updates: BrandScanProgress[] = [];
+    const timeline = createBrandScanProgressTimeline((p) => updates.push(p));
+
+    timeline.ingest(build('pending-f9fea0e546aa'));
+    expect(updates).toHaveLength(1);
+
+    timeline.ingest(build('20260804T073201Z-www-isharya-com-45ca7a6c'));
+    timeline.ingest(build(null));
+
+    // Same seq, so nothing new to reveal.
+    expect(updates).toHaveLength(1);
+    timeline.stop();
+  });
+
+  it('applies events in seq order when t_ms ties', () => {
+    // palette_extracted and fonts_detected are emitted at the same millisecond.
+    const progress = mergeBrandScanProgress(EMPTY_BRAND_SCAN_PROGRESS, {
+      events: [
+        { id: '9', event: 'data', data: { kind: 'fonts_detected', payload: { families: ['Poppins'] }, seq: 9, t_ms: 36419 } },
+        { id: '8', event: 'data', data: { kind: 'palette_extracted', payload: { hexes: ['#7A2233'] }, seq: 8, t_ms: 36419 } },
+      ],
+    });
+
+    expect(progress.fonts).toEqual(['Poppins']);
+    expect(progress.sitePalette).toEqual(['#7A2233']);
   });
 
   it('records the page the scanner reported rendering', () => {

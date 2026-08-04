@@ -394,7 +394,9 @@ async function fetchRecentBrandScanResult(signal?: AbortSignal): Promise<BrandSc
  * - start: POST /api/brand/scan
  * - status: GET /api/status/{workflow_id} plus /phases, every 1s
  * - result: GET /api/result/{workflow_id}, only after terminal status
- * - timeout: 450s (scanner node timeout is 420s)
+ * - timeout: 450s (scanner wall-clock limit is 300s as of 2026-08-04; it was
+ *   180s when the malabargoldanddiamonds run died. The client window stays
+ *   above it deliberately so the scanner's own error surfaces, not ours.)
  * - terminal states: completed; failed/budget_exhausted/timed_out/cancelled/terminated fail
  * - status 404 policy: use /phases while available; otherwise fail immediately
  * - cancellation: caller-owned AbortSignal, normally aborted on unmount/retry
