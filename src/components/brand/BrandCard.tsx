@@ -333,8 +333,8 @@ export function BrandCard({
       {name && (
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute right-[17%] top-1/2 -translate-y-1/2 font-card leading-none"
-          style={{ color: pal.emboss, fontSize: '27cqw' }}
+          className="pointer-events-none absolute right-[14%] top-1/2 -translate-y-1/2 font-card leading-none"
+          style={{ color: pal.emboss, fontSize: '30cqw' }}
         >
           {name.charAt(0).toUpperCase()}
         </span>
@@ -359,9 +359,11 @@ export function BrandCard({
             src={pendant}
             alt=""
             aria-hidden="true"
-            /* Exactly main's treatment. The card is desktop-only now, so it
-               stays near 3:2 and needs no width cap. */
-            className="pointer-events-none absolute right-4 top-1/2 h-[76%] w-auto -translate-y-1/2 object-contain animate-fade-in sm:right-6"
+            /* The imagery owns the right side, as in the approved card: tall
+               enough for the chain to run to the top edge, and wide enough to
+               balance the type block. At 76% it read as a small ornament
+               floating in empty space. */
+            className="pointer-events-none absolute right-[5%] top-1/2 h-[88%] w-auto -translate-y-1/2 object-contain animate-fade-in"
           />
         </>
       )}
@@ -372,7 +374,7 @@ export function BrandCard({
           <ThemeLogo variant="plain" className="h-6 sm:h-7" width={140} height={28} />
           <Sparkle className="-translate-y-1.5 text-[11px]" />
         </span>
-        <p className="flex items-center gap-1.5 font-mono uppercase tracking-[0.25em]" style={{ color: pal.ink, fontSize: 'clamp(8px, 1.7cqw, 10px)' }}>
+        <p className="flex items-center gap-1.5 font-mono uppercase tracking-[0.25em]" style={{ color: pal.ink, fontSize: 'clamp(8.5px, 1.85cqw, 11px)' }}>
           Private Brand Space
           <Sparkle className="text-[10px]" />
         </p>
@@ -385,18 +387,20 @@ export function BrandCard({
           fixed-height (flip) face never pushes the footer out of the card. */}
       <div className="relative flex min-h-0 w-[70%] flex-1 flex-col justify-center">
         {name && (
-          <p className="font-card font-medium tracking-[0.01em]" style={titleStyle(name)}>
+          <p className="font-card font-medium tracking-[0.03em]" style={titleStyle(name)}>
             {name}
           </p>
         )}
-        <p className="mt-2.5 font-mono uppercase tracking-[0.28em]" style={{ color: pal.support, fontSize: 'clamp(8.5px, 1.85cqw, 11px)' }}>
+        {/* Sized and inked to read as a real subtitle, as on the approved
+            card. At 1.85cqw in muted grey it read as a caption. */}
+        <p className="mt-3 font-card uppercase tracking-[0.22em]" style={{ color: pal.ink, fontSize: 'clamp(9.5px, 2.15cqw, 13px)' }}>
           Bespoke Jewelry Brand Experience
         </p>
         <div className="mt-3.5">{sparkleRule}</div>
         {(descriptor ?? 'Designed around your brand, every time.') && (
           <p
-            className="mt-3.5 animate-fade-in font-card italic"
-            style={{ color: pal.support, fontSize: 'clamp(11px, 2.6cqw, 15px)' }}
+            className="mt-4 animate-fade-in font-card italic"
+            style={{ color: pal.ink, fontSize: 'clamp(12px, 2.8cqw, 17px)' }}
           >
             {descriptor ?? 'Designed around your brand, every time.'}
           </p>
@@ -421,9 +425,9 @@ export function BrandCard({
       </div>
 
       {/* Bottom-right pairing */}
-      {/* Anchored bottom-left, diagonal to the logo. Floating it right left the
-          bottom-left quadrant empty and the composition unbalanced. */}
-      <p className="relative mt-auto min-w-0 max-w-[70%] shrink-0 self-start truncate pt-3 font-card uppercase tracking-[0.25em]" style={{ color: pal.ink, fontSize: 'clamp(8.5px, 1.85cqw, 11px)' }}>
+      {/* Bottom-right, sitting under the imagery, as in the approved card. The
+          bottom-left is meant to be quiet; the pendant carries the right. */}
+      <p className="relative mt-auto min-w-0 max-w-[70%] shrink-0 self-end truncate pt-3 font-card uppercase tracking-[0.25em]" style={{ color: pal.ink, fontSize: 'clamp(8.5px, 1.85cqw, 11px)' }}>
         {name ? `${name} × FormaNova` : 'FormaNova'}
       </p>
     </>
