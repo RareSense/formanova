@@ -279,7 +279,21 @@ export function BrandCard({
     ? tintColor(paletteSwatches[0], isDark ? 0.82 : 0.88, isDark)
     : pal.surface;
 
-  const bandHeight = 'clamp(9px, 2.2cqw, 15px)';
+  // A few wide segments read as a brand's colour statement; six narrow ones
+  // read as a noisy strip. Near-black and near-white are dropped so the band
+  // shows the brand's actual colour rather than its ink and paper.
+  const bandColors = (() => {
+    const expressive = paletteSwatches.filter((hex) => {
+      const m = /^#([0-9a-f]{6})$/i.exec(hex.trim());
+      if (!m) return true;
+      const n = parseInt(m[1], 16);
+      const lum = 0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255);
+      return lum > 26 && lum < 242;
+    });
+    return (expressive.length >= 3 ? expressive : paletteSwatches).slice(0, 4);
+  })();
+
+  const bandHeight = 'clamp(10px, 2.6cqw, 18px)';
 
   const frame = (
     children: React.ReactNode,
@@ -319,7 +333,7 @@ export function BrandCard({
           className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] flex animate-fade-in"
           style={{ height: bandHeight }}
         >
-          {paletteSwatches.map((hex, i) => (
+          {bandColors.map((hex, i) => (
             <span key={`${hex}-${i}`} className="flex-1" style={{ backgroundColor: hex }} />
           ))}
         </div>
