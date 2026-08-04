@@ -90,7 +90,9 @@ function titleStyle(name: string): React.CSSProperties {
     return {
       whiteSpace: 'nowrap',
       fontSize: `clamp(${fluid(34, 8)}, min(${cap}px, ${(120 / len).toFixed(1)}cqw), ${cap}px)`,
-      lineHeight: 1.1,
+      // 1.1 clipped descenders on the brand's own name (measured 53/58 on
+      // "Isharya"). Display type still reads tight at 1.22.
+      lineHeight: 1.22,
     };
   }
   return {
@@ -405,7 +407,8 @@ export function BrandCard({
               <span
                 key={tag}
                 className="border px-2 py-0.5 font-mono uppercase tracking-[0.1em]"
-                style={{ borderColor: pal.line, color: pal.support, fontSize: 'clamp(7px, 1.6cqw, 9px)' }}
+                /* 7px uppercase mono was below any readable minimum. */
+                style={{ borderColor: pal.line, color: pal.support, fontSize: 'clamp(9px, 1.9cqw, 11px)' }}
               >
                 {tag}
               </span>
@@ -418,7 +421,9 @@ export function BrandCard({
       </div>
 
       {/* Bottom-right pairing */}
-      <p className="relative mt-auto min-w-0 max-w-full shrink-0 self-end truncate pt-3 font-card uppercase tracking-[0.25em]" style={{ color: pal.ink, fontSize: 'clamp(8.5px, 1.85cqw, 11px)' }}>
+      {/* Anchored bottom-left, diagonal to the logo. Floating it right left the
+          bottom-left quadrant empty and the composition unbalanced. */}
+      <p className="relative mt-auto min-w-0 max-w-[70%] shrink-0 self-start truncate pt-3 font-card uppercase tracking-[0.25em]" style={{ color: pal.ink, fontSize: 'clamp(8.5px, 1.85cqw, 11px)' }}>
         {name ? `${name} × FormaNova` : 'FormaNova'}
       </p>
     </>

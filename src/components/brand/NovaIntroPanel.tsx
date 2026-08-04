@@ -196,7 +196,8 @@ function PaletteRow({
         {colors.map((hex, i) => (
           <div key={`${hex}-${i}`} className="relative flex items-center gap-1.5">
             <label
-              className="block h-7 w-7 cursor-pointer border border-border shadow-sm"
+              title={hex}
+              className="block h-8 w-8 cursor-pointer border border-border shadow-sm"
               style={{ backgroundColor: hex }}
             >
               <input
@@ -207,7 +208,9 @@ function PaletteRow({
                 disabled={!editing}
               />
             </label>
-            <span className="font-mono text-[10px] uppercase text-muted-foreground">{hex}</span>
+            {/* Hex codes only while editing. Shown always, eight swatches plus
+                labels wrapped to three rows and buried the actual colours. */}
+            {editing && <span className="font-mono text-[10px] uppercase text-muted-foreground">{hex}</span>}
             {editing && colors.length > 1 && (
               <button
                 type="button"
