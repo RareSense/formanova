@@ -152,6 +152,33 @@ describe('NovaIntroPanel', () => {
     expect(screen.getByTestId('scan-finding-productFocus')).toHaveTextContent('12 products');
   });
 
+  it('names the page being read instead of a generic stage label', () => {
+    renderPanel('scanning', {
+      scanProgress: {
+        ...EMPTY_BRAND_SCAN_PROGRESS,
+        currentPhase: 'browser',
+        progressPercent: 40,
+        lastPageUrl: 'https://www.quirksmith.com/collections/earrings',
+      },
+    });
+
+    expect(screen.getByTestId('brand-scan-progress'))
+      .toHaveTextContent('Reading quirksmith.com/collections/earrings');
+  });
+
+  it('falls back to the stage label while interpreting, where no page applies', () => {
+    renderPanel('scanning', {
+      scanProgress: {
+        ...EMPTY_BRAND_SCAN_PROGRESS,
+        currentPhase: 'ai_analysis',
+        progressPercent: 90,
+        lastPageUrl: 'https://www.quirksmith.com/collections/earrings',
+      },
+    });
+
+    expect(screen.getByTestId('brand-scan-progress')).toHaveTextContent('Writing your brand read');
+  });
+
   it('shows no placeholder rows for findings the scan has not produced', () => {
     renderPanel('scanning', {
       scanProgress: {

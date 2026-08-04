@@ -5,6 +5,7 @@ import { DARK_THEMES } from '@/components/ThemeLogo';
 import { cn } from '@/lib/utils';
 import { VoiceOrb, type VoiceOrbState } from '@/components/brand/VoiceOrb';
 import { INSIGHT_META, type InsightFeedKey } from '@/components/brand/brand-insight-meta';
+import { BrandFindingRow } from '@/components/brand/BrandFindingRow';
 import { MissingBrandDetails, type MissingBrandDetailsProps } from '@/components/brand/MissingBrandDetails';
 import { BrandScanProgressPanel } from '@/components/brand/BrandScanProgressPanel';
 import {
@@ -57,16 +58,22 @@ function InsightRow({
   item,
   editable,
   onSave,
+  accent,
+  isDark,
 }: {
   item: InsightFeedItem;
   editable: boolean;
   onSave: (value: string) => void;
+  accent?: string;
+  isDark: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(item.value);
   const [saved, setSaved] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const meta = INSIGHT_META[item.key];
-  const Icon = meta.icon;
+  /** Past this, a finding is an appendix rather than a headline. */
+  const isLong = item.value.length > 220;
 
   const commit = () => {
     onSave(draft.trim());
@@ -75,14 +82,9 @@ function InsightRow({
     setTimeout(() => setSaved(false), 1600);
   };
 
-  return (
-    <div className="border border-border bg-background/60 px-3.5 py-3 text-left">
-      <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-        <Icon className="h-3.5 w-3.5 shrink-0" />
-        {meta.label}
-      </div>
-
-      {editing ? (
+  if (editing) {
+    return (
+      <BrandFindingRow finding={item.key} accent={accent} isDark={isDark}>
         <div className="mt-2 flex items-start gap-2">
           <textarea
             autoFocus
@@ -112,22 +114,46 @@ function InsightRow({
             <X className="h-4 w-4" />
           </button>
         </div>
-      ) : (
-        <div className="mt-1 flex items-center justify-between gap-2">
-          <p className="min-w-0 whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">{item.value}</p>
-          {editable && (
-            <button
-              type="button"
-              onClick={() => { setDraft(item.value); setEditing(true); }}
-              aria-label={`Edit ${meta.label}`}
-              className="flex h-7 w-7 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
-            >
-              {saved ? <Check className="h-3.5 w-3.5 text-formanova-success" /> : <Pencil className="h-3.5 w-3.5" />}
-            </button>
-          )}
-        </div>
+      </BrandFindingRow>
+    );
+  }
+
+  return (
+    <BrandFindingRow
+      finding={item.key}
+      accent={accent}
+      isDark={isDark}
+      trailing={editable && (
+        <button
+          type="button"
+          onClick={() => { setDraft(item.value); setEditing(true); }}
+          aria-label={`Edit ${meta.label}`}
+          className="flex h-7 w-7 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+        >
+          {saved ? <Check className="h-3.5 w-3.5 text-formanova-success" /> : <Pencil className="h-3.5 w-3.5" />}
+        </button>
       )}
-    </div>
+    >
+      <p
+        className={cn(
+          'mt-0.5 whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground',
+          isLong && !expanded && 'line-clamp-2',
+        )}
+      >
+        {item.value}
+      </p>
+      {/* Long appendix findings (the scanner's "other details" dump) would
+          otherwise swallow the panel. Collapsed by default, never lost. */}
+      {isLong && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-1 text-xs font-medium text-muted-foreground underline underline-offset-2 transition-colors hover:text-foreground"
+        >
+          {expanded ? 'Show less' : 'Show more'}
+        </button>
+      )}
+    </BrandFindingRow>
   );
 }
 
@@ -135,43 +161,42 @@ function PaletteRow({
   colors,
   editable,
   onSave,
+  accent,
+  isDark,
 }: {
   colors: string[];
   editable: boolean;
   onSave: (colors: string[]) => void;
+  accent?: string;
+  isDark: boolean;
 }) {
   const [editing, setEditing] = useState(false);
-  const meta = INSIGHT_META.palette;
-  const Icon = meta.icon;
 
   const replaceAt = (i: number, hex: string) => onSave(colors.map((c, idx) => (idx === i ? hex : c)));
   const removeAt = (i: number) => onSave(colors.filter((_, idx) => idx !== i));
   const add = () => onSave([...colors, '#8A8A8A']);
 
   return (
-    <div className="border border-border bg-background/60 px-3.5 py-3 text-left">
-      <div className="flex items-center justify-between gap-2 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-        <span className="flex items-center gap-2">
-          <Icon className="h-3.5 w-3.5 shrink-0" />
-          {meta.label}
-        </span>
-        {editable && (
-          <button
-            type="button"
-            onClick={() => setEditing((v) => !v)}
-            aria-label={editing ? 'Done editing colors' : 'Edit color palette'}
-            className="flex h-7 w-7 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
-          >
-            {editing ? <Check className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
-          </button>
-        )}
-      </div>
-
+    <BrandFindingRow
+      finding="palette"
+      accent={accent}
+      isDark={isDark}
+      trailing={editable && (
+        <button
+          type="button"
+          onClick={() => setEditing((v) => !v)}
+          aria-label={editing ? 'Done editing colors' : 'Edit color palette'}
+          className="flex h-7 w-7 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+        >
+          {editing ? <Check className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
+        </button>
+      )}
+    >
       <div className="mt-2 flex flex-wrap items-center gap-2.5">
         {colors.map((hex, i) => (
           <div key={`${hex}-${i}`} className="relative flex items-center gap-1.5">
             <label
-              className="block h-7 w-7 cursor-pointer rounded-full border border-border shadow-sm"
+              className="block h-7 w-7 cursor-pointer border border-border shadow-sm"
               style={{ backgroundColor: hex }}
             >
               <input
@@ -200,13 +225,13 @@ function PaletteRow({
             type="button"
             onClick={add}
             aria-label="Add color"
-            className="flex h-7 w-7 items-center justify-center rounded-full border border-dashed border-border text-muted-foreground hover:text-foreground"
+            className="flex h-7 w-7 items-center justify-center border border-dashed border-border text-muted-foreground hover:text-foreground"
           >
             <Plus className="h-3.5 w-3.5" />
           </button>
         )}
       </div>
-    </div>
+    </BrandFindingRow>
   );
 }
 
@@ -380,7 +405,10 @@ export function NovaIntroPanel({
             </p>
           )}
 
-          {insights.length > 0 && (
+          {/* While scanning, the live feed above is the single source for
+              findings. Rendering the editable list too showed the palette
+              (and every other finding) twice on the same screen. */}
+          {step !== 'scanning' && insights.length > 0 && (
             <div className="space-y-2.5">
               {insights.map((item) =>
                 item.key === 'palette' ? (
@@ -388,6 +416,8 @@ export function NovaIntroPanel({
                     key="palette"
                     colors={palette}
                     editable={editable}
+                    accent={palette[0]}
+                    isDark={isDark}
                     onSave={(colors) => onEditPalette?.(colors)}
                   />
                 ) : (
@@ -395,6 +425,8 @@ export function NovaIntroPanel({
                     key={item.key}
                     item={item}
                     editable={editable}
+                    accent={palette[0]}
+                    isDark={isDark}
                     onSave={(value) => onEditInsight?.(item.key, value)}
                   />
                 ),

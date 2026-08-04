@@ -357,10 +357,9 @@ export function BrandCard({
             src={pendant}
             alt=""
             aria-hidden="true"
-            /* Height keeps main's presence on a 3:2 card; the width cap stops
-               it ballooning over the type when a tall back face drives the
-               shared height in flip view. */
-            className="pointer-events-none absolute right-4 top-1/2 h-[76%] w-auto max-w-[38%] -translate-y-1/2 object-contain animate-fade-in sm:right-6"
+            /* Exactly main's treatment. The card is desktop-only now, so it
+               stays near 3:2 and needs no width cap. */
+            className="pointer-events-none absolute right-4 top-1/2 h-[76%] w-auto -translate-y-1/2 object-contain animate-fade-in sm:right-6"
           />
         </>
       )}

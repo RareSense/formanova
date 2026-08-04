@@ -22,6 +22,8 @@ export interface BrandScanProgress {
   fonts: string[];
   screenshotReady: boolean;
   brandReadReady: boolean;
+  /** Most recent real page the scanner reported working on, if any. */
+  lastPageUrl: string | null;
   elapsedMs: number;
 }
 
@@ -38,6 +40,7 @@ export const EMPTY_BRAND_SCAN_PROGRESS: BrandScanProgress = {
   fonts: [],
   screenshotReady: false,
   brandReadReady: false,
+  lastPageUrl: null,
   elapsedMs: 0,
 };
 
@@ -192,21 +195,36 @@ function applyEvent(previous: BrandScanProgress, event: NormalizedBrandScanEvent
     }
   }
 
+  // Findings accumulate. The scanner revisits phases and can re-emit a stage
+  // with an empty payload (observed: product_probes running twice, the second
+  // reporting zero products). Overwriting unconditionally made findings the
+  // merchant had already seen disappear mid-scan, so an empty field is only
+  // ever treated as "nothing new here", never as "forget what you found".
   if (event.name === 'products_found') {
     const count = Number(event.payload.count);
-    next.productCount = Number.isFinite(count) ? count : next.productCount;
-    next.productTitles = listValue(event.payload.titles).slice(0, 5);
+    if (Number.isFinite(count) && (count > 0 || next.productCount === null)) {
+      next.productCount = count;
+    }
+    const titles = listValue(event.payload.titles).slice(0, 5);
+    if (titles.length > 0) next.productTitles = titles;
   } else if (event.name === 'images_selected') {
     const count = Number(event.payload.count);
     next.imageCount = Number.isFinite(count) ? count : next.imageCount;
   } else if (event.name === 'palette_extracted') {
     const combined = colors(event.payload.hexes);
-    next.sitePalette = combined.length > 0 ? combined : colors(event.payload.site);
-    next.photoPalette = colors(event.payload.photo);
+    const site = combined.length > 0 ? combined : colors(event.payload.site);
+    const photo = colors(event.payload.photo);
+    if (site.length > 0) next.sitePalette = site;
+    if (photo.length > 0) next.photoPalette = photo;
   } else if (event.name === 'fonts_detected') {
-    next.fonts = listValue(event.payload.families).slice(0, 6);
+    const families = listValue(event.payload.families).slice(0, 6);
+    if (families.length > 0) next.fonts = families;
   } else if (event.name === 'screenshot_ready') {
     next.screenshotReady = true;
+    // Lets the status line name the page actually being read instead of a
+    // generic stage label.
+    const pageUrl = textValue(event.payload.page_url);
+    if (pageUrl) next.lastPageUrl = pageUrl;
   } else if (event.name === 'interpretation_ready') {
     next.brandReadReady = true;
   }
@@ -237,18 +255,17 @@ export interface BrandScanProgressTimeline {
 }
 
 /**
- * Longest pause allowed between two reveals from the same batch. A poll can
- * return a whole scan at once (a rejoined or slow-flushing workflow), and
- * replaying that on the raw t_ms timeline would stretch reveals across minutes
- * the merchant no longer has to wait.
- */
-const MAX_REVEAL_GAP_MS = 1_200;
-
-/**
- * Replays newly observed events on their scanner-authored t_ms timeline.
- * Late events reveal immediately, coalesced events keep their relative order and
- * spacing up to `MAX_REVEAL_GAP_MS`, and anything still queued when the scan
- * ends is flushed rather than dropped.
+ * Applies newly observed events the moment they are seen.
+ *
+ * Reveals used to be queued behind timers and spaced out to look like a live
+ * drip. That was a lie the merchant paid for: the scanner already emits its
+ * findings on its own schedule (products land within seconds, palette and
+ * fonts only in the final phase), so the stagger added lag on top of a wait
+ * that was already backend-bound, and a batch arriving late replayed slowly
+ * enough to look like everything rendered at the end.
+ *
+ * Events are deduplicated by key and applied in t_ms order, so a poll that
+ * returns the whole scan at once is still applied in the order it happened.
  */
 export function createBrandScanProgressTimeline(
   onProgress: (progress: BrandScanProgress) => void,
@@ -256,21 +273,11 @@ export function createBrandScanProgressTimeline(
 ): BrandScanProgressTimeline {
   let progress = initial;
   let stopped = false;
-  let lastTMs: number | null = null;
-  let lastDueAt = Date.now();
   const seen = new Set<string>();
-  const timers = new Set<ReturnType<typeof setTimeout>>();
-  const pending: NormalizedBrandScanEvent[] = [];
-
-  const reveal = (event: NormalizedBrandScanEvent) => {
-    const index = pending.indexOf(event);
-    if (index >= 0) pending.splice(index, 1);
-    progress = applyEvent(progress, event);
-  };
 
   return {
     ingest(value) {
-      const now = Date.now();
+      if (stopped) return;
       const fresh = normalizedEvents(value)
         .filter((event) => {
           if (seen.has(event.key)) return false;
@@ -279,28 +286,12 @@ export function createBrandScanProgressTimeline(
         })
         .sort((left, right) => left.tMs - right.tMs);
 
-      for (const event of fresh) {
-        const gap = lastTMs === null ? 0 : Math.min(MAX_REVEAL_GAP_MS, Math.max(0, event.tMs - lastTMs));
-        const dueAt = Math.max(now, lastDueAt + gap);
-        lastTMs = event.tMs;
-        lastDueAt = dueAt;
-        pending.push(event);
-        const timer = setTimeout(() => {
-          timers.delete(timer);
-          if (stopped) return;
-          reveal(event);
-          onProgress(progress);
-        }, Math.max(0, dueAt - Date.now()));
-        timers.add(timer);
-      }
+      if (fresh.length === 0) return;
+      progress = fresh.reduce(applyEvent, progress);
+      onProgress(progress);
     },
     stop() {
       stopped = true;
-      for (const timer of timers) clearTimeout(timer);
-      timers.clear();
-      if (pending.length === 0) return;
-      for (const event of [...pending]) reveal(event);
-      onProgress(progress);
     },
   };
 }

@@ -234,7 +234,9 @@ describe('JewelryBrandModal Nova onboarding', () => {
     expect(screen.getAllByText('Gold Vermeil Hoop').length).toBeGreaterThan(1);
     expect(screen.getByText('SimonMono')).toBeInTheDocument();
     expect(screen.getByLabelText('Colors discovered so far')).toBeInTheDocument();
-    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '38');
+    // The findings themselves are the progress signal; there is no bar.
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+    expect(screen.getByTestId('brand-scan-progress')).toHaveTextContent('Reading your products');
   });
 
   it('returns to the form instead of a frozen spinner when a running scan is dismissed', async () => {

@@ -324,32 +324,38 @@ describe('brand scan API', () => {
     }
   });
 
-  it('keeps coalesced event reveals separated by their t_ms gap', () => {
-    vi.useFakeTimers();
-    try {
-      const updates: typeof EMPTY_BRAND_SCAN_PROGRESS[] = [];
-      const timeline = createBrandScanProgressTimeline((progress) => updates.push(progress));
-      const response = {
-        events: [
-          { id: '3', event: 'palette_extracted', data: { t_ms: 31_200, hexes: ['#111111'] } },
-          { id: '4', event: 'fonts_detected', data: { t_ms: 31_240, families: ['Inter'] } },
-        ],
-      };
+  it('reveals findings as soon as they are observed, without replay delay', () => {
+    const updates: typeof EMPTY_BRAND_SCAN_PROGRESS[] = [];
+    const timeline = createBrandScanProgressTimeline((progress) => updates.push(progress));
+    const response = {
+      events: [
+        { id: '3', event: 'palette_extracted', data: { t_ms: 31_200, hexes: ['#111111'] } },
+        { id: '4', event: 'fonts_detected', data: { t_ms: 31_240, families: ['Inter'] } },
+      ],
+    };
 
-      timeline.ingest(response);
-      timeline.ingest(response);
-      vi.advanceTimersByTime(0);
-      expect(updates).toHaveLength(1);
-      expect(updates[0].sitePalette).toEqual(['#111111']);
-      expect(updates[0].fonts).toEqual([]);
+    timeline.ingest(response);
 
-      vi.advanceTimersByTime(40);
-      expect(updates).toHaveLength(2);
-      expect(updates[1].fonts).toEqual(['Inter']);
-      timeline.stop();
-    } finally {
-      vi.useRealTimers();
-    }
+    // No timers to advance: the merchant sees both findings on the poll that
+    // carried them. The scanner's own pacing is the only pacing.
+    expect(updates).toHaveLength(1);
+    expect(updates[0].sitePalette).toEqual(['#111111']);
+    expect(updates[0].fonts).toEqual(['Inter']);
+
+    // Re-polling the same events must not re-notify.
+    timeline.ingest(response);
+    expect(updates).toHaveLength(1);
+    timeline.stop();
+  });
+
+  it('ignores events arriving after the timeline stops', () => {
+    const updates: typeof EMPTY_BRAND_SCAN_PROGRESS[] = [];
+    const timeline = createBrandScanProgressTimeline((progress) => updates.push(progress));
+
+    timeline.stop();
+    timeline.ingest({ events: [{ id: '1', event: 'fonts_detected', data: { t_ms: 10, families: ['Inter'] } }] });
+
+    expect(updates).toHaveLength(0);
   });
 
   it('uses the progress proxy even when the status payload has an empty phase list', () => {
