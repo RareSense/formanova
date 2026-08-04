@@ -234,6 +234,96 @@ describe('brand scan API', () => {
     expect(progress.elapsedMs).toBe(31_240);
   });
 
+  // Verbatim envelope recorded from staging on 2026-08-03. The discriminator lives in
+  // data.kind; the outer `event` field only names the envelope type.
+  const DEPLOYED_PHASE_EVENTS = [
+    { id: '0', event: 'phase', data: { event_type: 'phase', kind: 'discovery', payload: { ordinal: 2, phase: 'discovery', total: 8 }, seq: 0, t_ms: 0 } },
+    { id: '1', event: 'phase', data: { event_type: 'phase', kind: 'product_probes', payload: { ordinal: 3, phase: 'product_probes', total: 8 }, seq: 1, t_ms: 1_530 } },
+    { id: '2', event: 'data', data: { event_type: 'data', kind: 'products_found', payload: { count: 17, titles: ['18k Gold Vermeil', 'Sterling Silver / 6.5 inches'] }, seq: 2, t_ms: 3_773 } },
+    { id: '4', event: 'data', data: { event_type: 'data', kind: 'screenshot_ready', payload: { artifact_path: '/opt/runs/P001_home.jpg', page_url: 'https://mejuri.com/' }, seq: 4, t_ms: 16_271 } },
+    { id: '6', event: 'data', data: { event_type: 'data', kind: 'images_selected', payload: { count: 16 }, seq: 6, t_ms: 64_740 } },
+    { id: '8', event: 'data', data: { event_type: 'data', kind: 'palette_extracted', payload: {
+      site: [{ hex: '#FFFFFF', page_frequency: 0.6, source: 'site', weight: 0.6 }],
+      photo: [
+        { hex: '#F8F8F7', page_frequency: null, source: 'product_image', weight: 0.508 },
+        { hex: '#0F0D0D', page_frequency: null, source: 'product_image', weight: 0.076 },
+      ],
+    }, seq: 8, t_ms: 65_842 } },
+    { id: '9', event: 'data', data: { event_type: 'data', kind: 'fonts_detected', payload: { families: ['SimonMono', 'SyndicatGrotesk'] }, seq: 9, t_ms: 65_842 } },
+    { id: '10', event: 'phase', data: { event_type: 'phase', kind: 'ai_analysis', payload: { ordinal: 7, phase: 'ai_analysis', total: 8 }, seq: 10, t_ms: 65_878 } },
+  ];
+
+  it('reveals live discoveries from the deployed event/data.kind envelope', () => {
+    const progress = mergeBrandScanProgress(EMPTY_BRAND_SCAN_PROGRESS, {
+      state: 'running',
+      scan_id: 'pending-795750142afc',
+      events: DEPLOYED_PHASE_EVENTS,
+    });
+
+    expect(progress.productCount).toBe(17);
+    expect(progress.productTitles).toEqual(['18k Gold Vermeil', 'Sterling Silver / 6.5 inches']);
+    expect(progress.imageCount).toBe(16);
+    expect(progress.fonts).toEqual(['SimonMono', 'SyndicatGrotesk']);
+    expect(progress.screenshotReady).toBe(true);
+    expect(progress.currentPhase).toBe('ai_analysis');
+  });
+
+  it('normalizes weighted object palette entries from the deployed envelope', () => {
+    const progress = mergeBrandScanProgress(EMPTY_BRAND_SCAN_PROGRESS, {
+      events: DEPLOYED_PHASE_EVENTS,
+    });
+
+    expect(progress.sitePalette).toEqual(['#FFFFFF']);
+    expect(progress.photoPalette).toEqual(['#F8F8F7', '#0F0D0D']);
+  });
+
+  it('reports scanner-authored phase ordinals as progress', () => {
+    const progress = mergeBrandScanProgress(EMPTY_BRAND_SCAN_PROGRESS, {
+      events: DEPLOYED_PHASE_EVENTS,
+    });
+
+    // ai_analysis is ordinal 7 of 8 ; the old fixed ladder reported 92 percent here.
+    expect(progress.progressPercent).toBe(88);
+  });
+
+  it('flushes events still queued for reveal when the timeline stops', () => {
+    vi.useFakeTimers();
+    try {
+      const updates: typeof EMPTY_BRAND_SCAN_PROGRESS[] = [];
+      const timeline = createBrandScanProgressTimeline((progress) => updates.push(progress));
+
+      // A whole scan arriving in one late poll must not be discarded when polling ends.
+      timeline.ingest({ events: DEPLOYED_PHASE_EVENTS });
+      vi.advanceTimersByTime(0);
+      timeline.stop();
+
+      const last = updates[updates.length - 1];
+      expect(last.productCount).toBe(17);
+      expect(last.fonts).toEqual(['SimonMono', 'SyndicatGrotesk']);
+      expect(last.photoPalette).toEqual(['#F8F8F7', '#0F0D0D']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('caps replay spacing so a coalesced batch reveals within the scan', () => {
+    vi.useFakeTimers();
+    try {
+      const updates: typeof EMPTY_BRAND_SCAN_PROGRESS[] = [];
+      const timeline = createBrandScanProgressTimeline((progress) => updates.push(progress));
+      timeline.ingest({ events: DEPLOYED_PHASE_EVENTS });
+
+      // t_ms spans 65.9s; replay must not stretch the reveal across that whole span.
+      vi.advanceTimersByTime(10_000);
+      const last = updates[updates.length - 1];
+      expect(last.currentPhase).toBe('ai_analysis');
+      expect(last.fonts).toEqual(['SimonMono', 'SyndicatGrotesk']);
+      timeline.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps coalesced event reveals separated by their t_ms gap', () => {
     vi.useFakeTimers();
     try {

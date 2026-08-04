@@ -375,7 +375,7 @@ export function NovaIntroPanel({
           )}
 
           {step === 'done' && scanNotice && (
-            <p role="status" className="border border-border bg-muted/30 p-3 text-sm leading-relaxed text-muted-foreground">
+            <p data-testid="scan-result-notice" role="status" className="border border-border bg-muted/30 p-3 text-sm leading-relaxed text-muted-foreground">
               {scanNotice}
             </p>
           )}

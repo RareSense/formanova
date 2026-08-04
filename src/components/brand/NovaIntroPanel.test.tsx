@@ -103,12 +103,85 @@ describe('NovaIntroPanel', () => {
     });
 
     expect(screen.getByTestId('brand-scan-progress')).toHaveTextContent('Extracting colors and fonts');
-    expect(screen.getByText('Found 24 products')).toBeInTheDocument();
+    // Findings are shown as their real values, not narrated as prose.
     expect(screen.getByText('Halo Ring, Pearl Drop')).toBeInTheDocument();
-    expect(screen.getByText('Selected 9 representative images')).toBeInTheDocument();
-    expect(screen.getByText('Type styles: Didot, Inter')).toBeInTheDocument();
-    expect(screen.getByTestId('brand-scan-screenshot-placeholder')).toBeInTheDocument();
-    expect(screen.queryByText('Your brand read is ready')).not.toBeInTheDocument();
+    expect(screen.getByText('Didot, Inter')).toBeInTheDocument();
+    expect(screen.getByLabelText('Colors discovered so far')).toBeInTheDocument();
+    expect(screen.getByTestId('brand-scan-screenshot-captured')).toBeInTheDocument();
+    expect(screen.queryByTestId('brand-read-ready')).not.toBeInTheDocument();
+  });
+
+  it('confirms completion instead of silently dropping the analyzing rows', () => {
+    renderPanel('scanning', {
+      scanProgress: {
+        ...EMPTY_BRAND_SCAN_PROGRESS,
+        currentPhase: 'ai_analysis',
+        progressPercent: 96,
+        sitePalette: ['#7A2233'],
+        brandReadReady: true,
+      },
+    });
+
+    expect(screen.getByTestId('brand-read-ready')).toBeInTheDocument();
+    expect(screen.queryByTestId('scan-finding-identity')).not.toBeInTheDocument();
+  });
+
+  it('does not badge a zero-product read as a finding', () => {
+    renderPanel('scanning', {
+      scanProgress: {
+        ...EMPTY_BRAND_SCAN_PROGRESS,
+        currentPhase: 'product_probes',
+        progressPercent: 30,
+        productCount: 0,
+      },
+    });
+
+    expect(screen.queryByTestId('scan-finding-productFocus')).not.toBeInTheDocument();
+  });
+
+  it('falls back to a product count when no titles were captured', () => {
+    renderPanel('scanning', {
+      scanProgress: {
+        ...EMPTY_BRAND_SCAN_PROGRESS,
+        currentPhase: 'product_probes',
+        progressPercent: 30,
+        productCount: 12,
+      },
+    });
+
+    expect(screen.getByTestId('scan-finding-productFocus')).toHaveTextContent('12 products');
+  });
+
+  it('shows no placeholder rows for findings the scan has not produced', () => {
+    renderPanel('scanning', {
+      scanProgress: {
+        ...EMPTY_BRAND_SCAN_PROGRESS,
+        currentPhase: 'discovery',
+        progressPercent: 12,
+      },
+    });
+
+    // Nothing discovered yet, so the feed states nothing rather than listing
+    // fields as unidentified.
+    expect(screen.queryByTestId('scan-finding-palette')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('scan-finding-productFocus')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('scan-finding-targetMarkets')).not.toBeInTheDocument();
+    expect(screen.queryByText(/not identified/i)).not.toBeInTheDocument();
+  });
+
+  it('marks interpreted findings as analyzing only once that pass is running', () => {
+    renderPanel('scanning', {
+      scanProgress: {
+        ...EMPTY_BRAND_SCAN_PROGRESS,
+        currentPhase: 'ai_analysis',
+        progressPercent: 88,
+        sitePalette: ['#7A2233'],
+      },
+    });
+
+    expect(screen.getByTestId('scan-finding-palette')).toBeInTheDocument();
+    expect(screen.getByTestId('scan-finding-targetMarkets')).toHaveTextContent('Analyzing');
+    expect(screen.getByTestId('scan-finding-identity')).toHaveTextContent('Analyzing');
   });
 
   it('offers retry and manual setup when no storefront is found', () => {

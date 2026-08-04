@@ -1,3 +1,5 @@
+import { colorListValue } from '@/lib/brand-colors';
+
 export type BrandScanPhase =
   | 'queued'
   | 'discovery'
@@ -80,15 +82,12 @@ function listValue(value: unknown): string[] {
   return text ? unique(text.split(/[,;|]/)) : [];
 }
 
+/**
+ * Palette entries arrive either as hex strings or as weighted records such as
+ * `{ hex, weight, source }`. Both are normalized by the shared colour reader.
+ */
 function colors(value: unknown): string[] {
-  return unique(listValue(value).flatMap((item) => {
-    const match = item.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
-    if (!match) return [];
-    const raw = match[1];
-    return ['#' + (raw.length === 3
-      ? raw.split('').map((part) => part + part).join('')
-      : raw).toUpperCase()];
-  }));
+  return colorListValue(value);
 }
 
 function scanEvents(value: unknown): JsonRecord[] {
@@ -112,6 +111,18 @@ function scanEvents(value: unknown): JsonRecord[] {
   return [];
 }
 
+/**
+ * Names that describe the *envelope* rather than what was discovered. The
+ * deployed scanner sends `{ event: 'data', data: { kind: 'products_found' } }`,
+ * so the outer field must never win over an inner `kind`.
+ */
+const ENVELOPE_EVENT_NAMES = new Set(['data', 'phase', 'event', 'progress', 'message']);
+
+function discoveryName(...candidates: unknown[]): string {
+  const names = candidates.map((candidate) => textValue(candidate).toLowerCase()).filter(Boolean);
+  return names.find((name) => !ENVELOPE_EVENT_NAMES.has(name)) ?? names[0] ?? '';
+}
+
 function phaseValue(value: unknown): BrandScanPhase | null {
   const normalized = textValue(value).toLowerCase();
   return ['queued', ...SCAN_PHASES].includes(normalized)
@@ -124,13 +135,13 @@ function normalizedEvents(value: unknown): NormalizedBrandScanEvent[] {
     const data = asRecord(event.data);
     const nestedPayload = asRecord(data?.payload);
     const payload = asRecord(event.payload) ?? nestedPayload ?? data ?? event;
-    const directName = textValue(
-      event.event
-      ?? data?.event
-      ?? event.kind
-      ?? data?.kind
-      ?? payload.kind,
-    ).toLowerCase();
+    const directName = discoveryName(
+      event.kind,
+      data?.kind,
+      payload.kind,
+      event.event,
+      data?.event,
+    );
     const phase = phaseValue(
       payload.phase
       ?? data?.phase
@@ -200,9 +211,19 @@ function applyEvent(previous: BrandScanProgress, event: NormalizedBrandScanEvent
     next.brandReadReady = true;
   }
 
+  // Phase events carry the scanner's own `ordinal` of `total`, which is more
+  // honest than counting the phases this client happens to have seen.
+  const ordinal = Number(event.payload.ordinal);
+  const total = Number(event.payload.total);
+  const measuredPercent = event.phase && event.phase !== 'queued'
+    && Number.isFinite(ordinal) && Number.isFinite(total) && total > 0
+    ? Math.round((ordinal / total) * 100)
+    : null;
   const visibleCompleted = next.completedPhases.filter((phase) => phase !== 'queued').length;
-  const computedPercent = next.currentPhase === 'queued' ? 4 : Math.min(92, 8 + visibleCompleted * 14);
-  next.progressPercent = Math.max(previous.progressPercent, computedPercent);
+  const computedPercent = next.currentPhase === 'queued'
+    ? 4
+    : measuredPercent ?? Math.min(92, 8 + visibleCompleted * 14);
+  next.progressPercent = Math.max(previous.progressPercent, Math.min(96, computedPercent));
   return next;
 }
 
@@ -216,8 +237,18 @@ export interface BrandScanProgressTimeline {
 }
 
 /**
+ * Longest pause allowed between two reveals from the same batch. A poll can
+ * return a whole scan at once (a rejoined or slow-flushing workflow), and
+ * replaying that on the raw t_ms timeline would stretch reveals across minutes
+ * the merchant no longer has to wait.
+ */
+const MAX_REVEAL_GAP_MS = 1_200;
+
+/**
  * Replays newly observed events on their scanner-authored t_ms timeline.
- * Late events reveal immediately, while coalesced events retain their own spacing.
+ * Late events reveal immediately, coalesced events keep their relative order and
+ * spacing up to `MAX_REVEAL_GAP_MS`, and anything still queued when the scan
+ * ends is flushed rather than dropped.
  */
 export function createBrandScanProgressTimeline(
   onProgress: (progress: BrandScanProgress) => void,
@@ -229,6 +260,13 @@ export function createBrandScanProgressTimeline(
   let lastDueAt = Date.now();
   const seen = new Set<string>();
   const timers = new Set<ReturnType<typeof setTimeout>>();
+  const pending: NormalizedBrandScanEvent[] = [];
+
+  const reveal = (event: NormalizedBrandScanEvent) => {
+    const index = pending.indexOf(event);
+    if (index >= 0) pending.splice(index, 1);
+    progress = applyEvent(progress, event);
+  };
 
   return {
     ingest(value) {
@@ -242,14 +280,15 @@ export function createBrandScanProgressTimeline(
         .sort((left, right) => left.tMs - right.tMs);
 
       for (const event of fresh) {
-        const gap = lastTMs === null ? 0 : Math.max(0, event.tMs - lastTMs);
+        const gap = lastTMs === null ? 0 : Math.min(MAX_REVEAL_GAP_MS, Math.max(0, event.tMs - lastTMs));
         const dueAt = Math.max(now, lastDueAt + gap);
         lastTMs = event.tMs;
         lastDueAt = dueAt;
+        pending.push(event);
         const timer = setTimeout(() => {
           timers.delete(timer);
           if (stopped) return;
-          progress = applyEvent(progress, event);
+          reveal(event);
           onProgress(progress);
         }, Math.max(0, dueAt - Date.now()));
         timers.add(timer);
@@ -259,6 +298,9 @@ export function createBrandScanProgressTimeline(
       stopped = true;
       for (const timer of timers) clearTimeout(timer);
       timers.clear();
+      if (pending.length === 0) return;
+      for (const event of [...pending]) reveal(event);
+      onProgress(progress);
     },
   };
 }

@@ -2,7 +2,13 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { JewelryBrandModal } from '@/components/JewelryBrandModal';
-import { EMPTY_BRAND_SCAN_INSIGHTS, runBrandScan, type BrandScanResult } from '@/lib/brand-scan-api';
+import {
+  EMPTY_BRAND_SCAN_INSIGHTS,
+  EMPTY_BRAND_SCAN_PROGRESS,
+  mergeBrandScanProgress,
+  runBrandScan,
+  type BrandScanResult,
+} from '@/lib/brand-scan-api';
 
 vi.mock('@/hooks/use-mobile', () => ({ useIsMobile: () => false }));
 vi.mock('@/lib/posthog-events', () => ({
@@ -36,12 +42,17 @@ const completedScan: BrandScanResult = {
 };
 
 function renderModal(onContinue = vi.fn()) {
-  render(
+  const view = render(
     <ThemeProvider>
       <JewelryBrandModal open onClose={vi.fn()} onContinue={onContinue} source="onboarding" />
     </ThemeProvider>,
   );
-  return { onContinue };
+  const setOpen = (open: boolean) => view.rerender(
+    <ThemeProvider>
+      <JewelryBrandModal open={open} onClose={vi.fn()} onContinue={onContinue} source="onboarding" />
+    </ThemeProvider>,
+  );
+  return { onContinue, setOpen };
 }
 
 function openMessageForm() {
@@ -54,7 +65,9 @@ function fillRequiredFields() {
 }
 
 describe('JewelryBrandModal Nova onboarding', () => {
-  beforeEach(() => mockRunBrandScan.mockReset());
+  // Block body on purpose: mockReset() returns the mock, and Vitest treats a
+  // function returned from a hook as a teardown callback and would invoke it.
+  beforeEach(() => { mockRunBrandScan.mockReset(); });
 
   it('starts with message available and transparently marks voice as coming soon', () => {
     renderModal();
@@ -184,8 +197,60 @@ describe('JewelryBrandModal Nova onboarding', () => {
     fillRequiredFields();
     fireEvent.click(screen.getByRole('button', { name: 'Start brand scan' }));
 
-    expect(await screen.findByRole('status')).toHaveTextContent('AI brand read did not finish');
+    const notice = await screen.findByTestId('scan-result-notice');
+    expect(notice).toHaveAttribute('role', 'status');
+    expect(notice).toHaveTextContent('AI brand read did not finish');
     expect(screen.getAllByText('Gold rings and necklaces').length).toBeGreaterThan(0);
+  });
+
+  it('exposes the scanner as a labelled modal dialog', () => {
+    renderModal();
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(dialog).toHaveAccessibleName('Set up your brand with Nova');
+  });
+
+  it('reveals live discoveries streamed while the scan is still running', async () => {
+    // Envelope recorded from staging: the discriminator lives in data.kind.
+    mockRunBrandScan.mockImplementation(async (_url, options) => {
+      options?.onProgress?.(mergeBrandScanProgress(EMPTY_BRAND_SCAN_PROGRESS, {
+        events: [
+          { id: '1', event: 'phase', data: { event_type: 'phase', kind: 'product_probes', payload: { ordinal: 3, phase: 'product_probes', total: 8 }, t_ms: 1_530 } },
+          { id: '2', event: 'data', data: { event_type: 'data', kind: 'products_found', payload: { count: 17, titles: ['Gold Vermeil Hoop'] }, t_ms: 3_773 } },
+          { id: '3', event: 'data', data: { event_type: 'data', kind: 'palette_extracted', payload: { photo: [{ hex: '#F8F8F7', weight: 0.5 }] }, t_ms: 4_000 } },
+          { id: '4', event: 'data', data: { event_type: 'data', kind: 'fonts_detected', payload: { families: ['SimonMono'] }, t_ms: 4_100 } },
+        ],
+      }));
+      return new Promise(() => {}) as Promise<BrandScanResult>;
+    });
+    renderModal();
+    openMessageForm();
+    fillRequiredFields();
+    fireEvent.click(screen.getByRole('button', { name: 'Start brand scan' }));
+
+    expect(await screen.findByTestId('scan-finding-productFocus')).toBeInTheDocument();
+    // Titles reach the progress panel, the insight feed and the bespoke card.
+    expect(screen.getAllByText('Gold Vermeil Hoop').length).toBeGreaterThan(1);
+    expect(screen.getByText('SimonMono')).toBeInTheDocument();
+    expect(screen.getByLabelText('Colors discovered so far')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '38');
+  });
+
+  it('returns to the form instead of a frozen spinner when a running scan is dismissed', async () => {
+    mockRunBrandScan.mockReturnValue(new Promise(() => {}) as Promise<BrandScanResult>);
+    const { setOpen } = renderModal();
+    openMessageForm();
+    fillRequiredFields();
+    fireEvent.click(screen.getByRole('button', { name: 'Start brand scan' }));
+    expect(await screen.findByTestId('brand-scan-progress')).toBeInTheDocument();
+
+    setOpen(false);
+    setOpen(true);
+
+    expect(screen.queryByTestId('brand-scan-progress')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start brand scan' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Online store URL')).toHaveValue('https://example.com');
   });
 
   it('forces only the explicit rescan action', async () => {

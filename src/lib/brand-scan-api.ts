@@ -1,5 +1,6 @@
 import { AuthExpiredError, authenticatedFetch } from '@/lib/authenticated-fetch';
 import { pollWorkflow } from '@/lib/poll-workflow';
+import { colorListValue } from '@/lib/brand-colors';
 import {
   createBrandScanProgressTimeline,
   EMPTY_BRAND_SCAN_PROGRESS,
@@ -90,43 +91,6 @@ function uniqueValues(values: string[]): string[] {
     seen.add(key);
     return true;
   });
-}
-
-function normalizeHexColor(value: string): string[] {
-  const colors: string[] = [];
-  for (const match of value.matchAll(/#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})(?![0-9a-f])/gi)) {
-    const raw = match[1];
-    const rgb = raw.length === 3 || raw.length === 4
-      ? raw.slice(0, 3).split('').map((part) => `${part}${part}`).join('')
-      : raw.slice(0, 6);
-    colors.push(`#${rgb.toUpperCase()}`);
-  }
-
-  const rgb = value.match(/rgba?\(\s*(\d{1,3})\s*[, ]\s*(\d{1,3})\s*[, ]\s*(\d{1,3})/i);
-  if (rgb) {
-    const hex = rgb.slice(1, 4)
-      .map((channel) => Math.min(255, Number(channel)).toString(16).padStart(2, '0'))
-      .join('');
-    colors.push(`#${hex.toUpperCase()}`);
-  }
-  return colors;
-}
-
-function colorListValue(value: unknown): string[] {
-  if (typeof value === 'string') return normalizeHexColor(value);
-  if (Array.isArray(value)) return uniqueValues(value.flatMap(colorListValue));
-
-  const record = asRecord(value);
-  if (!record) return [];
-  if (typeof record.r === 'number' && typeof record.g === 'number' && typeof record.b === 'number') {
-    return colorListValue(`rgb(${record.r}, ${record.g}, ${record.b})`);
-  }
-
-  for (const key of ['hex', 'hex_code', 'value', 'color', 'colour']) {
-    const colors = colorListValue(record[key]);
-    if (colors.length > 0) return colors;
-  }
-  return uniqueValues(Object.values(record).flatMap(colorListValue));
 }
 
 function firstValue(records: JsonRecord[], aliases: string[]): unknown {

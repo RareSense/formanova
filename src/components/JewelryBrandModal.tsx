@@ -143,9 +143,15 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
     if (open) trackBrandFormOpened({ source });
   }, [open, source]);
 
-  // A scan can outlive the modal unless it is explicitly cancelled.
+  // A scan can outlive the modal unless it is explicitly cancelled. Closing also
+  // rewinds the scanning step, so reopening offers the form again instead of a
+  // spinner for a scan that was already aborted.
   useEffect(() => {
-    if (!open) scanAbortRef.current?.abort();
+    if (!open) {
+      scanAbortRef.current?.abort();
+      setStep((current) => (current === 'scanning' ? 'fields' : current));
+      setScanProgress(EMPTY_BRAND_SCAN_PROGRESS);
+    }
     return () => scanAbortRef.current?.abort();
   }, [open]);
 
@@ -319,7 +325,12 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-3 py-4 sm:px-4 sm:py-6 lg:backdrop-blur-md"
       onClick={handleOverlayClick}
     >
-      <div className="relative flex max-h-[92vh] min-h-[85vh] w-full max-w-6xl flex-col border border-border bg-background">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Set up your brand with Nova"
+        className="relative flex max-h-[92vh] min-h-[85vh] w-full max-w-7xl flex-col border border-border bg-background"
+      >
 
         {dismissible && (
           <button
@@ -334,10 +345,14 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
 
         {/* Body — scrolls when content outgrows the viewport */}
         <div className="flex min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-12 sm:py-16">
-          <div className="grid w-full flex-1 grid-cols-1 gap-10 self-center lg:grid-cols-2 lg:gap-0">
+          {/* The card column keeps the larger share, as on main. An even split
+              starved a 3:2 card of width, which cost it height too. */}
+          <div className="grid w-full flex-1 grid-cols-1 gap-10 self-center lg:grid-cols-[minmax(0,10fr)_minmax(0,13fr)] lg:gap-0">
 
-            {/* Nova — orb, simulated speech, fields, then the live scanning feed */}
-            <div className="order-2 flex flex-col lg:order-1 lg:pr-12">
+            {/* Nova — orb, simulated speech, fields, then the live scanning feed.
+                Comes first in DOM order so a phone shows the active task before
+                the preview card. */}
+            <div className="flex flex-col lg:pr-12">
               <NovaIntroPanel
                 step={step}
                 brandName={brandName}
@@ -389,8 +404,9 @@ export function JewelryBrandModal({ open, onClose, onContinue, initial, dismissi
               />
             </div>
 
-            {/* Persistent bespoke card — visible from the very first paint */}
-            <div className="order-1 lg:order-2 lg:border-l lg:border-border lg:pl-12">
+            {/* Persistent bespoke card — desktop only. On phones the scan feed
+                owns the screen; the card is not shown. */}
+            <div className="hidden lg:block lg:border-l lg:border-border lg:pl-12">
               <div className="mx-auto max-w-md lg:sticky lg:top-0 lg:max-w-none">
                 <div className="mb-4 flex items-center justify-between gap-4">
                   <p className="font-card text-sm uppercase tracking-[0.22em] text-foreground">

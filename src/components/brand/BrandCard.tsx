@@ -1,5 +1,6 @@
 import { Globe, ShoppingBag, MapPin, Compass, Tag, Info, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { tintColor } from '@/lib/brand-colors';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ThemeLogo, DARK_THEMES } from '@/components/ThemeLogo';
 import { socialIconFor, extractHandle } from '@/components/brand/social-icons';
@@ -160,13 +161,27 @@ interface DetailRowProps {
 function DetailRow({ Icon, value, pal, href, highlighted }: DetailRowProps) {
   const content = (
     <>
-      <Icon className="h-[18px] w-[18px] shrink-0" />
-      <span className="h-6 w-px shrink-0" style={{ backgroundColor: pal.line }} />
-      <span className="min-w-0 truncate" style={{ fontSize: 'clamp(11px, 2.4cqw, 14px)' }}>{value}</span>
+      <Icon className="mt-px h-[18px] w-[18px] shrink-0" />
+      <span className="w-px shrink-0 self-stretch" style={{ backgroundColor: pal.line }} />
+      {/* Wraps to a second line instead of clipping mid-word. Longer findings
+          (product focus, audience) were previously cut off entirely. */}
+      <span
+        className="min-w-0 break-words"
+        style={{
+          fontSize: 'clamp(11px, 2.4cqw, 14px)',
+          lineHeight: 1.35,
+          display: '-webkit-box',
+          WebkitBoxOrient: 'vertical',
+          WebkitLineClamp: 2,
+          overflow: 'hidden',
+        }}
+      >
+        {value}
+      </span>
     </>
   );
   const rowClass = cn(
-    'flex min-w-0 items-center gap-2.5 rounded-sm border-b px-1 -mx-1 pb-2',
+    'flex min-w-0 items-start gap-2.5 rounded-sm border-b px-1 -mx-1 pb-2',
     highlighted && 'animate-highlight-flash',
   );
   if (href) {
@@ -254,46 +269,59 @@ export function BrandCard({
     </div>
   );
 
-  // Artistic wash: when a brand palette has been detected, its colors paint
-  // the card's surface directly (not just a thin accent line) via layered
-  // corner gradients blended into the base surface. Text stays a separate,
-  // later-painted layer so legibility is untouched regardless of intensity.
-  const paletteWash =
-    paletteSwatches.length > 0
-      ? `radial-gradient(120% 90% at 6% 0%, ${paletteSwatches[0]} 0%, transparent 55%),
-         radial-gradient(120% 100% at 100% 10%, ${paletteSwatches[2] ?? paletteSwatches[0]} 0%, transparent 60%),
-         radial-gradient(140% 120% at 92% 100%, ${paletteSwatches[1] ?? paletteSwatches[0]} 0%, transparent 55%),
-         linear-gradient(135deg, ${paletteSwatches[3] ?? paletteSwatches[0]} 0%, transparent 70%)`
-      : undefined;
+  // A detected palette tints the card's paper rather than painting over it.
+  // Saturated brand colours at full strength buried the ink, so the surface
+  // takes a heavily-lightened wash of the dominant colour and the palette
+  // itself is stated honestly in the bottom band.
+  const surface = paletteSwatches.length > 0
+    ? tintColor(paletteSwatches[0], isDark ? 0.82 : 0.88, isDark)
+    : pal.surface;
 
-  const frame = (children: React.ReactNode, opts?: { abs?: boolean; back?: boolean }) => (
+  const bandHeight = 'clamp(9px, 2.2cqw, 15px)';
+
+  const frame = (
+    children: React.ReactNode,
+    opts?: { abs?: boolean; back?: boolean; grow?: boolean },
+  ) => (
     <div
       className={cn(
         'flex flex-col overflow-hidden rounded-2xl border',
-        opts?.abs ? 'absolute inset-0 [backface-visibility:hidden]' : 'relative aspect-[3/2] w-full',
-        opts?.abs && opts?.back && '[transform:rotateY(180deg)]',
+        opts?.abs && 'absolute inset-0 [backface-visibility:hidden]',
+        !opts?.abs && (opts?.grow ? 'relative w-full' : 'relative aspect-[3/2] w-full'),
+        // The flipped face is hidden until the card turns, whether it is the
+        // absolutely-placed one or the in-flow one driving the height.
+        opts?.back && '[backface-visibility:hidden] [transform:rotateY(180deg)]',
       )}
       style={{
-        backgroundColor: pal.surface,
+        // Stacked preview: 3:2 is a floor, not a cage. `overflow-hidden`
+        // zeroes a flex item's automatic minimum size, so the minimum is
+        // expressed against the wrapper's container width instead.
+        ...(opts?.grow ? { minHeight: '66.6667cqw' } : null),
+        backgroundColor: surface,
         borderColor: pal.line,
         color: pal.ink,
         boxShadow: '0 24px 50px -20px hsl(var(--foreground) / 0.45)',
         containerType: 'inline-size',
         padding: 'clamp(16px, 4.8cqw, 30px)',
+        paddingBottom: paletteSwatches.length > 0
+          ? `calc(clamp(16px, 4.8cqw, 30px) + ${bandHeight})`
+          : undefined,
       }}
     >
-      {paletteWash && (
+      <div className="relative z-[1] flex min-h-0 flex-1 flex-col">{children}</div>
+      {paletteSwatches.length > 0 && (
+        /* Full-bleed square band: the real detected palette, flush to the
+           card's bottom edge. Never dots, never rounded. */
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 animate-fade-in"
-          style={{
-            background: paletteWash,
-            opacity: isDark ? 0.5 : 0.4,
-            mixBlendMode: isDark ? 'screen' : 'multiply',
-          }}
-        />
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] flex animate-fade-in"
+          style={{ height: bandHeight }}
+        >
+          {paletteSwatches.map((hex, i) => (
+            <span key={`${hex}-${i}`} className="flex-1" style={{ backgroundColor: hex }} />
+          ))}
+        </div>
       )}
-      <div className="relative z-[1] flex min-h-0 flex-1 flex-col">{children}</div>
     </div>
   );
 
@@ -312,12 +340,29 @@ export function BrandCard({
 
       {/* Pendant cutout: contained, aspect preserved, anchored center-right */}
       {showImagery && (
-        <img
-          src={pendant}
-          alt=""
-          aria-hidden="true"
-          className="pointer-events-none absolute right-4 top-[38%] h-[52%] w-auto -translate-y-1/2 object-contain animate-fade-in sm:right-6"
-        />
+        <>
+          {/* Editorial wash: the detected palette bleeds off the right edge and
+              fades into the paper, so the imagery sits in a composition rather
+              than floating on a flat card. */}
+          {paletteSwatches.length > 0 && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-y-0 right-0 w-[58%] animate-fade-in"
+              style={{
+                background: `radial-gradient(120% 85% at 88% 42%, ${tintColor(paletteSwatches[1] ?? paletteSwatches[0], isDark ? 0.55 : 0.35, isDark)} 0%, transparent 68%)`,
+              }}
+            />
+          )}
+          <img
+            src={pendant}
+            alt=""
+            aria-hidden="true"
+            /* Height keeps main's presence on a 3:2 card; the width cap stops
+               it ballooning over the type when a tall back face drives the
+               shared height in flip view. */
+            className="pointer-events-none absolute right-4 top-1/2 h-[76%] w-auto max-w-[38%] -translate-y-1/2 object-contain animate-fade-in sm:right-6"
+          />
+        </>
       )}
 
       {/* Top row */}
@@ -335,7 +380,9 @@ export function BrandCard({
       {/* Identity block: constant width, top-anchored (not centered) so extra
           findings revealed below (descriptor, tags, palette) grow downward
           instead of pulling the name upward toward the top row */}
-      <div className="relative flex min-h-0 w-[70%] flex-1 flex-col justify-start pt-3">
+      {/* Optically centred as on main. `min-h-0` keeps this compressible so a
+          fixed-height (flip) face never pushes the footer out of the card. */}
+      <div className="relative flex min-h-0 w-[70%] flex-1 flex-col justify-center">
         {name && (
           <p className="font-card font-medium tracking-[0.01em]" style={titleStyle(name)}>
             {name}
@@ -366,28 +413,13 @@ export function BrandCard({
             ))}
           </div>
         )}
-        {paletteSwatches.length > 0 && (
-          <div className="mt-3.5 flex animate-fade-in items-center gap-2">
-            {paletteSwatches.map((hex, i) => (
-              <span
-                key={`${hex}-${i}`}
-                aria-hidden="true"
-                className="shrink-0 rounded-full border-2 shadow-sm"
-                style={{
-                  backgroundColor: hex,
-                  borderColor: pal.surface,
-                  width: 'clamp(14px, 3.4cqw, 22px)',
-                  height: 'clamp(14px, 3.4cqw, 22px)',
-                  boxShadow: '0 1px 3px hsl(0 0% 0% / 0.18)',
-                }}
-              />
-            ))}
-          </div>
-        )}
+        {/* The palette is painted as a full-bleed band on the card's bottom
+            edge (see `frame`), not inline here, so the identity block keeps
+            its breathing room as more findings arrive. */}
       </div>
 
       {/* Bottom-right pairing */}
-      <p className="relative min-w-0 max-w-full self-end truncate font-card uppercase tracking-[0.25em]" style={{ color: pal.ink, fontSize: 'clamp(8.5px, 1.85cqw, 11px)' }}>
+      <p className="relative mt-auto min-w-0 max-w-full shrink-0 self-end truncate pt-3 font-card uppercase tracking-[0.25em]" style={{ color: pal.ink, fontSize: 'clamp(8.5px, 1.85cqw, 11px)' }}>
         {name ? `${name} × FormaNova` : 'FormaNova'}
       </p>
     </>
@@ -401,7 +433,14 @@ export function BrandCard({
       <div className="mt-2.5">{sparkleRule}</div>
 
       {(site || store || basedIn.trim() || markets.length > 0 || links.length > 0 || productFocus.trim() || audience.trim() || otherInfo.trim()) && (
-        <div className="mt-7 grid grid-cols-2 content-start gap-x-9 gap-y-5">
+        /* Collapses to a single column on narrow cards so values wrap
+           naturally instead of breaking mid-word. */
+        <div
+          className="mt-7 grid content-start gap-x-9 gap-y-5"
+          /* At most two columns however wide the card gets, dropping to one
+             when a column would be too narrow to hold a value unbroken. */
+          style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(max(45%, 260px), 1fr))' }}
+        >
           {site && <DetailRow Icon={Globe} value={site} pal={pal} href={toHref(websiteUrl)} highlighted={highlightField === 'website'} />}
           {store && <DetailRow Icon={ShoppingBag} value={store} pal={pal} href={toHref(storeUrl)} highlighted={highlightField === 'store'} />}
           {basedIn.trim() && <DetailRow Icon={MapPin} value={basedIn.trim()} pal={pal} highlighted={highlightField === 'basedIn'} />}
@@ -427,21 +466,33 @@ export function BrandCard({
   if (face === 'both') {
     return (
       <div className={cn('w-full select-none space-y-5 [perspective:1400px]', className)}>
-        <div className="brand-card-tilt [transform-style:preserve-3d]">{frame(front)}</div>
-        <div className="brand-card-tilt [transform-style:preserve-3d]">{frame(back)}</div>
+        {/* Each face keeps 3:2 as a MINIMUM but grows when a narrow card
+            cannot hold every finding. Locking the ratio clipped real
+            findings on phones. */}
+        <div className="brand-card-tilt [transform-style:preserve-3d]" style={{ containerType: 'inline-size' }}>
+          {frame(front, { grow: true })}
+        </div>
+        <div className="brand-card-tilt [transform-style:preserve-3d]" style={{ containerType: 'inline-size' }}>
+          {frame(back, { grow: true })}
+        </div>
       </div>
     );
   }
 
+  // Flip view: the back face renders in normal flow so it DRIVES the shared
+  // height, with the front laid over it. Both faces stay identical in size
+  // (required for the flip), and a back face carrying many findings grows the
+  // card instead of having rows clipped away — which is what a fixed 3:2 box
+  // did on phones, where the grid can only afford one column.
   return (
     <div className={cn('w-full select-none [perspective:1400px]', className)}>
-      <div className="brand-card-tilt [transform-style:preserve-3d]">
+      <div className="brand-card-tilt [transform-style:preserve-3d]" style={{ containerType: 'inline-size' }}>
         <div
-          className="relative aspect-[3/2] w-full transition-transform duration-700 ease-out [transform-style:preserve-3d]"
+          className="relative w-full transition-transform duration-700 ease-out [transform-style:preserve-3d]"
           style={{ transform: face === 'back' ? 'rotateY(180deg)' : undefined }}
         >
+          {frame(back, { back: true, grow: true })}
           {frame(front, { abs: true })}
-          {frame(back, { abs: true, back: true })}
         </div>
       </div>
     </div>
