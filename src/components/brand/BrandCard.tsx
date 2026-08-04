@@ -343,27 +343,27 @@ export function BrandCard({
       {/* Pendant cutout: contained, aspect preserved, anchored center-right */}
       {showImagery && (
         <>
-          {/* Editorial wash: the detected palette bleeds off the right edge and
-              fades into the paper, so the imagery sits in a composition rather
-              than floating on a flat card. */}
-          {paletteSwatches.length > 0 && (
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-y-0 right-0 w-[58%] animate-fade-in"
-              style={{
-                background: `radial-gradient(120% 85% at 88% 42%, ${tintColor(paletteSwatches[1] ?? paletteSwatches[0], isDark ? 0.55 : 0.35, isDark)} 0%, transparent 68%)`,
-              }}
-            />
-          )}
+          {/* No decorative wash behind the imagery. The gradient rendered as a
+              hard-edged rectangle (its box never reached transparent before
+              the edges) and flattened the pendant against the surface. The
+              palette already tints the whole card and states itself in the
+              bottom band; the approved card has clean paper here. */}
           <img
             src={pendant}
             alt=""
             aria-hidden="true"
-            /* The imagery owns the right side, as in the approved card: tall
-               enough for the chain to run to the top edge, and wide enough to
-               balance the type block. At 76% it read as a small ornament
-               floating in empty space. */
-            className="pointer-events-none absolute right-[5%] top-1/2 h-[88%] w-auto -translate-y-1/2 object-contain animate-fade-in"
+            /* Measured against the approved card, the imagery is about a
+               quarter of the card's width. 88% height overshot to 37% and was
+               clipped by the frame; the width cap holds the proportion
+               whatever the pendant's intrinsic aspect ratio. */
+            className="pointer-events-none absolute inset-y-[6%] right-[6%] w-[27%] object-contain animate-fade-in"
+            /* The asset carries its own light background rather than being a
+               true cutout, so its rectangle was visible against a
+               palette-tinted surface. Feathered into the card. */
+            style={{
+              WebkitMaskImage: 'radial-gradient(72% 72% at 52% 46%, #000 58%, transparent 100%)',
+              maskImage: 'radial-gradient(72% 72% at 52% 46%, #000 58%, transparent 100%)',
+            }}
           />
         </>
       )}
