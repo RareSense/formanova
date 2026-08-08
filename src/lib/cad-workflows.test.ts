@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   buildCadEditStartBody,
   buildCadGenerationStartBody,
+  buildImageCadStartBody,
   CAD_EDIT_RETURN_NODES,
   CAD_GENERATION_RETURN_NODES,
+  CAD_IMAGE_GENERATION_RETURN_NODES,
+  MAX_CAD_REFERENCE_IMAGES,
 } from './cad-workflows';
 
 describe('CAD workflow request bodies', () => {
@@ -76,5 +79,48 @@ describe('CAD workflow request bodies', () => {
     // import.meta.env.VITE_PIPELINE_API_URL is '' in test env
     const body = buildCadEditStartBody('desc', 'json-source-789', null);
     expect(body.payload).not.toHaveProperty('state_backend_url');
+  });
+});
+
+describe('image-to-CAD reference images', () => {
+  it('sends a single reference image as a one-element array', () => {
+    expect(buildImageCadStartBody(['data:image/webp;base64,AAA'], '  halo ring  ', 'gemini')).toEqual({
+      payload: {
+        tier: 'standard',
+        prompt: 'halo ring',
+        reference_images: ['data:image/webp;base64,AAA'],
+        max_attempts: 3,
+        skip_validation: false,
+      },
+      return_nodes: [...CAD_IMAGE_GENERATION_RETURN_NODES],
+    });
+  });
+
+  it('preserves the order of up to five reference images', () => {
+    const uris = ['a', 'b', 'c', 'd', 'e'].map(c => `data:image/webp;base64,${c}`);
+    const body = buildImageCadStartBody(uris, 'ring', 'gemini');
+    expect(body.payload.reference_images).toEqual(uris);
+    expect(body.payload.reference_images).toHaveLength(MAX_CAD_REFERENCE_IMAGES);
+  });
+
+  it('copies the array so later caller mutation cannot change the sent payload', () => {
+    const uris = ['data:image/webp;base64,AAA'];
+    const body = buildImageCadStartBody(uris, 'ring', 'gemini');
+    uris.push('data:image/webp;base64,BBB');
+    expect(body.payload.reference_images).toEqual(['data:image/webp;base64,AAA']);
+  });
+
+  it('rejects an empty reference image list', () => {
+    expect(() => buildImageCadStartBody([], 'ring', 'gemini')).toThrow(/at least one/i);
+  });
+
+  it('rejects more than five reference images', () => {
+    const uris = Array.from({ length: 6 }, (_, i) => `data:image/webp;base64,${i}`);
+    expect(() => buildImageCadStartBody(uris, 'ring', 'gemini')).toThrow(/at most 5/i);
+  });
+
+  it('does not send the legacy singular reference_image field', () => {
+    const body = buildImageCadStartBody(['data:image/webp;base64,AAA'], 'ring', 'gemini');
+    expect(body.payload).not.toHaveProperty('reference_image');
   });
 });

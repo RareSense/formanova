@@ -44,16 +44,29 @@ export const CAD_IMAGE_GENERATION_RETURN_NODES = [
   'build_corrected',
 ] as const;
 
+/**
+ * sketch_generate_v1 accepts 1 to 5 reference images. The first is required;
+ * the rest are optional additional angles of the same design.
+ */
+export const MIN_CAD_REFERENCE_IMAGES = 1;
+export const MAX_CAD_REFERENCE_IMAGES = 5;
+
 export function buildImageCadStartBody(
-  referenceImageDataUri: string,
+  referenceImageDataUris: string[],
   prompt: string,
   model?: string | null,
 ) {
+  if (referenceImageDataUris.length < MIN_CAD_REFERENCE_IMAGES) {
+    throw new Error('At least one reference image is required');
+  }
+  if (referenceImageDataUris.length > MAX_CAD_REFERENCE_IMAGES) {
+    throw new Error(`At most ${MAX_CAD_REFERENCE_IMAGES} reference images are allowed`);
+  }
   return {
     payload: {
       tier: resolveCadGenerationTier(model),
       prompt: prompt.trim(),
-      reference_image: referenceImageDataUri,
+      reference_images: [...referenceImageDataUris],
       max_attempts: 3,
       skip_validation: false,
     },
