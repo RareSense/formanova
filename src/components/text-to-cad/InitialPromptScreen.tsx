@@ -66,7 +66,7 @@ export default function InitialPromptScreen({
         {/* Title */}
         <div className="text-center mb-6">
           <h1 className="font-display text-4xl md:text-5xl tracking-[0.2em] text-foreground uppercase mb-2">
-            Text to CAD
+            Text to 3D
           </h1>
           <p className="font-mono text-[11px] text-muted-foreground tracking-[0.15em] uppercase">
             Describe your ring design

@@ -431,7 +431,7 @@ export default function Generations() {
             >
               <ScissorGLBGrid>
                 <WorkflowSection
-                  title="Text to CAD"
+                  title="Text to 3D"
                   subtitle="AI-generated 3D models from text"
                   icon={SectionIcons.cadText}
                   workflows={cadTextSection.workflows}
@@ -445,7 +445,7 @@ export default function Generations() {
                 />
                 {cadSketchSection && (
                   <WorkflowSection
-                    title="Image to CAD"
+                    title="Image to 3D"
                     subtitle="3D models generated from photos and sketches"
                     icon={SectionIcons.cadSketch}
                     workflows={cadSketchSection.workflows}

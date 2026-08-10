@@ -8,7 +8,7 @@ import cadToCatalogImg from "@/assets/cad-studio/cad-to-catalog-card.webp";
 
 const cadFeatures = [
   {
-    title: "Text to CAD",
+    title: "Text to 3D",
     description: "Generate jewelry CAD concepts from text prompts.",
     route: "/text-to-cad",
     comingSoon: false,

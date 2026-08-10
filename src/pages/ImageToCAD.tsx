@@ -10,6 +10,7 @@ import { InsufficientCreditsInline } from "@/components/InsufficientCreditsInlin
 import { useAuth } from "@/contexts/AuthContext";
 import { isCadUploadEnabled } from "@/lib/feature-flags";
 import { MAX_RING_CAD_REFERENCE_IMAGES } from "@/lib/ring-cad-nurbs-api";
+import { authenticatedFetch, AuthExpiredError } from "@/lib/authenticated-fetch";
 import { runMicroBenchmark } from "@/lib/gpu-detect";
 import { useImageToCADWorkflow } from "@/hooks/useImageToCADWorkflow";
 import { useCADMeshEditor } from "@/hooks/useCADMeshEditor";
@@ -143,6 +144,34 @@ export default function ImageToCAD() {
     editor.resetMeshEditor();
   }, [workflow, editor]);
 
+  /**
+   * Downloads the NURBS .3dm, which is the machinable deliverable. It is built
+   * server-side, so it is the pristine generated ring and cannot reflect any
+   * viewport mesh edits - the GLB export below covers that case.
+   */
+  const handleDownloadThreedm = useCallback(async () => {
+    const uri = workflow.threedmArtifact?.uri;
+    if (!uri) { toast.error("No CAD file available for this model"); return; }
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
+    const fileName = `ring-${timestamp}.3dm`;
+    import('@/lib/posthog-events').then(m => m.trackDownloadClicked({ file_name: fileName, file_type: '3dm', context: 'image-to-cad' }));
+    try {
+      const response = await authenticatedFetch(uri);
+      if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
+      const blob = await response.blob();
+      if (!blob || blob.size === 0) throw new Error("Empty file");
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = fileName;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch (err) {
+      if (err instanceof AuthExpiredError) return;
+      console.error('[Download 3dm]', err);
+      toast.error("Failed to download the CAD file");
+    }
+  }, [workflow.threedmArtifact]);
+
   const handleDownloadGlb = useCallback(async () => {
     const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
     const defaultName = `model-${timestamp}.glb`;
@@ -242,7 +271,7 @@ export default function ImageToCAD() {
   return (
     <>
       <Helmet>
-        <title>Image to CAD | FormaNova</title>
+        <title>Image to 3D | FormaNova</title>
         <meta name="description" content="Upload a jewelry sketch or reference image and convert it into a 3D CAD model with AI-powered accuracy." />
         <link rel="canonical" href="/image-to-cad" />
         <meta name="robots" content="noindex, nofollow" />
@@ -279,7 +308,8 @@ export default function ImageToCAD() {
               }}
               onGlbUpload={() => {}}
               onReset={workflow.hasModel ? handleReset : undefined}
-              pageTitle="Image to CAD"
+              pageTitle="Image to 3D"
+              showEdit={false}
               referenceImagePreviewUrl={referenceImagePreviewUrls[0] ?? null}
               onClearReferenceImage={() => handleRemoveReferenceImage(0)}
               creditBlock={creditBlockUI}
@@ -432,6 +462,8 @@ export default function ImageToCAD() {
               currentStep={workflow.progressStep}
               retryAttempt={workflow.retryAttempt}
               onRetry={() => workflow.simulateGeneration()}
+              estimateText="This usually takes 10 to 45 minutes"
+              failureMessage={workflow.failureMessage}
             />
             <ViewportSideTools
               visible={workflow.hasModel && !workflow.isGenerating && !workflow.isModelLoading}
@@ -442,7 +474,7 @@ export default function ImageToCAD() {
               onRedo={editor.handleRedo}
               undoCount={editor.undoStack.length}
               redoCount={editor.redoStack.length}
-              onDownload={handleDownloadGlb}
+              onDownload={workflow.threedmArtifact ? handleDownloadThreedm : handleDownloadGlb}
               onFullscreen={() => {
                 const el = document.querySelector('[data-cad-viewport]') as HTMLElement;
                 if (el) { document.fullscreenElement ? document.exitFullscreen() : el.requestFullscreen(); }

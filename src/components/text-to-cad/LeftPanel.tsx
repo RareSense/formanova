@@ -29,6 +29,12 @@ interface LeftPanelProps {
   referenceImagePreviewUrl?: string | null;
   onClearReferenceImage?: () => void;
   pageTitle?: string;
+  /**
+   * Shows the "Edit Your Ring" section. Defaults to true so Text-to-CAD is
+   * unchanged. Image-to-CAD passes false: ring_cad_nurbs_v1 has no edit
+   * workflow, so Apply Edit would post its run id to ring_edit_v1.
+   */
+  showEdit?: boolean;
 }
 
 export default function LeftPanel({
@@ -41,6 +47,7 @@ export default function LeftPanel({
   referenceImagePreviewUrl,
   onClearReferenceImage,
   pageTitle,
+  showEdit = true,
 }: LeftPanelProps) {
   const glbInputRef = useRef<HTMLInputElement>(null);
   const { cost: generationCost, loading: generationCostLoading } = useEstimatedCost({ workflowName: CAD_GENERATION_WORKFLOW, model });
@@ -239,7 +246,7 @@ export default function LeftPanel({
 
         {/* Edit section */}
         <AnimatePresence>
-          {hasModel && (
+          {hasModel && showEdit && (
             <motion.section
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}

@@ -41,7 +41,15 @@ export const RING_CAD_TIER_CREDITS: Record<string, number> = {
 /** Any tier outside the table - or omitting llm_tier entirely - bills at 100. */
 export const RING_CAD_UNLISTED_TIER_CREDITS = 100;
 
-export const RING_CAD_DEFAULT_TIER: RingCadTier = RING_CAD_TIERS.OPUS_5;
+/**
+ * Fixed tier for Image-to-CAD. No picker is exposed, consistent with
+ * CAD_MODEL_SELECTOR_ENABLED being false. Fable 5 has adaptive reasoning
+ * always on and bills at 100 credits.
+ */
+export const RING_CAD_DEFAULT_TIER: RingCadTier = RING_CAD_TIERS.FABLE_5;
+
+/** Credit cost of a generation at the fixed tier above. */
+export const RING_CAD_GENERATION_CREDITS = RING_CAD_TIER_CREDITS[RING_CAD_DEFAULT_TIER];
 
 export function resolveRingCadCredits(tier?: string | null): number {
   if (!tier) return RING_CAD_UNLISTED_TIER_CREDITS;

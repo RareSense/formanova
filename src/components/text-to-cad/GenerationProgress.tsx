@@ -15,6 +15,11 @@ const NODE_LABELS: Record<string, string> = {
   success_original_glb: "Your 3D design is ready",
   failed_final: "Could not complete generation",
   _loading: "Loading model into viewport",
+  // ring_cad_nurbs_v1 reports progress through node_visit_seq rather than named
+  // nodes, so these three stand in for the phases the page distinguishes.
+  analyzing: "Analyzing your design",
+  building: "Building your 3D ring",
+  repairing: "Fixing the model",
 };
 
 const TERMINAL_NODES = new Set(["success_final", "success_original_glb", "failed_final"]);
@@ -31,6 +36,10 @@ interface GenerationProgressProps {
   retryAttempt?: number;
   maxAttempts?: number;
   onRetry?: () => void;
+  /** Replaces the default wait estimate. Runs vary a lot by workflow. */
+  estimateText?: string;
+  /** Backend-authored failure copy, shown instead of the generic message. */
+  failureMessage?: string | null;
 }
 
 export default function GenerationProgress({
@@ -39,6 +48,8 @@ export default function GenerationProgress({
   retryAttempt,
   maxAttempts = 3,
   onRetry,
+  estimateText,
+  failureMessage,
 }: GenerationProgressProps) {
   const [elapsed, setElapsed] = useState(0);
   const workflowStartRef = useRef(Date.now());
@@ -100,7 +111,7 @@ export default function GenerationProgress({
                   {formatElapsed(elapsed)}
                 </span>
                 <span className="text-[11px] italic text-muted-foreground/40 text-center">
-                  This may take more than 10 minutes
+                  {estimateText ?? "This may take more than 10 minutes"}
                 </span>
               </>
             )}
@@ -110,7 +121,7 @@ export default function GenerationProgress({
         {isFailed && (
           <div className="flex flex-col items-center gap-4 mt-2">
             <p className="text-[11px] text-muted-foreground/70 max-w-xs text-center leading-relaxed">
-              Our AI service was unable to complete this generation. Please try again in a few minutes.
+              {failureMessage ?? "Our AI service was unable to complete this generation. Please try again in a few minutes."}
             </p>
             {onRetry && (
               <button

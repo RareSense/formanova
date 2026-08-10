@@ -9,6 +9,7 @@ import {
   isRingCadRepairing,
   MAX_RING_CAD_REFERENCE_IMAGES,
   RING_CAD_DEFAULT_TIER,
+  RING_CAD_GENERATION_CREDITS,
   RING_CAD_TIERS,
   RING_CAD_TOTAL_NODES,
 } from './ring-cad-nurbs-api';
@@ -88,9 +89,15 @@ describe('ring_cad_nurbs_v1 start body', () => {
     expect(payload).not.toHaveProperty('llm_model');
   });
 
-  it('defaults to the Opus 5 tier', () => {
+  it('defaults to the fixed Fable 5 tier', () => {
     const { payload } = buildRingCadStartBody({ referenceImages: [IMG(1)] });
     expect(payload.llm_tier).toBe(RING_CAD_DEFAULT_TIER);
+    expect(RING_CAD_DEFAULT_TIER).toBe(RING_CAD_TIERS.FABLE_5);
+  });
+
+  it('prices the fixed tier at 100 credits', () => {
+    expect(RING_CAD_GENERATION_CREDITS).toBe(100);
+    expect(resolveRingCadCredits(RING_CAD_DEFAULT_TIER)).toBe(100);
   });
 
   it('never sends credentials in the payload, which is persisted and readable', () => {
