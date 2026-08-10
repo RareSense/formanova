@@ -4,24 +4,26 @@ import { motion } from "framer-motion";
 import { ArrowRight, Layers, ImageIcon } from "lucide-react";
 
 import textToCadImg from "@/assets/text-to-cad-thumb.webp";
-import cadToCatalogImg from "@/assets/cad-studio/cad-to-catalog-card.webp";
+// PLACEHOLDER card art. Swap for a dedicated image-to-3d card asset when one
+// exists; keep it .webp, matching the other cards.
+import imageTo3dImg from "@/assets/examples/cad-example-3.webp";
 
 const cadFeatures = [
   {
     title: "Text to 3D",
-    description: "Generate jewelry CAD concepts from text prompts.",
+    description: "Describe your ring and generate a 3D model from the text.",
     route: "/text-to-cad",
     comingSoon: false,
     icon: Layers,
     image: textToCadImg,
   },
   {
-    title: "CAD to Catalog",
-    description: "Turn your 3D CAD models into polished catalog-ready images.",
-    route: "/cad-to-catalog",
-    comingSoon: true,
+    title: "Image to 3D",
+    description: "Upload up to five reference images and generate a 3D model.",
+    route: "/image-to-cad",
+    comingSoon: false,
     icon: ImageIcon,
-    image: cadToCatalogImg,
+    image: imageTo3dImg,
   },
 ];
 
