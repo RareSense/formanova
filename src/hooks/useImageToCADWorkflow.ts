@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useCredits } from "@/contexts/CreditsContext";
+import { useGenerations } from "@/contexts/GenerationsContext";
 import { toast } from "sonner";
 import { performCreditPreflight, type PreflightResult } from "@/lib/credit-preflight";
 import { TOOL_COSTS } from "@/lib/credits-api";
@@ -66,6 +67,7 @@ export function useImageToCADWorkflow({
   onWorkspaceActivate,
 }: WorkflowParams) {
   const { refreshCredits } = useCredits();
+  const { generations, trackCadGeneration } = useGenerations();
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -81,16 +83,65 @@ export function useImageToCADWorkflow({
   const [editPrompt, setEditPrompt] = useState("");
   /** The machinable deliverable. Present only for ring_cad_nurbs_v1 runs. */
   const [threedmArtifact, setThreedmArtifact] = useState<ArtifactRef | null>(null);
-  /** 0..1, derived from node_visit_seq rather than a named progress node. */
-  const [progressFraction, setProgressFraction] = useState(0);
   /** Backend-authored failure copy, safe to show the user directly. */
   const [failureMessage, setFailureMessage] = useState<string | null>(null);
   /** Exports fine but some part is not a closed solid - flag before manufacture. */
   const [notAllSolid, setNotAllSolid] = useState(false);
 
   const pollAbortRef = useRef<AbortController | null>(null);
+  const generationStartRef = useRef<number>(0);
+  /**
+   * Set by handleKeepCreating. While true the on-page overlay stops following
+   * the run, so results land via the toast instead of yanking the user back
+   * into a workspace they deliberately left.
+   */
+  const hasNavigatedAway = useRef(false);
 
   useEffect(() => () => { pollAbortRef.current?.abort(); }, []);
+
+  const trackedRun = generations.find(g => g.workflowId === sourceWorkflowId && g.kind === 'cad');
+
+  // Mirror the context-owned run into local state for the on-page overlay.
+  useEffect(() => {
+    if (!trackedRun || hasNavigatedAway.current) return;
+
+    if (trackedRun.status === 'running') {
+      setProgressStep(trackedRun.generationStep.startsWith('Fixing') ? 'repairing' : 'building');
+      return;
+    }
+
+    if (trackedRun.status === 'failed') {
+      setProgressStep('failed_final');
+      setIsGenerating(false);
+      setGenerationFailed(true);
+      return;
+    }
+
+    if (trackedRun.status === 'completed' && trackedRun.glbUrl) {
+      setGlbUrl(trackedRun.glbUrl);
+      setGlbArtifact({ uri: trackedRun.glbUrl, type: 'model/gltf-binary', bytes: 0, sha256: '' });
+      if (trackedRun.threedmUrl) {
+        setThreedmArtifact({ uri: trackedRun.threedmUrl, url: trackedRun.threedmUrl, type: 'model/3dm', bytes: 0, sha256: '' });
+      }
+      trackCadGenerationCompleted({
+        category: 'ring',
+        prompt_length: prompt.trim().length,
+        duration_ms: Date.now() - (generationStartRef.current || Date.now()),
+      });
+      setProgressStep('_loading');
+      setIsModelLoading(true);
+      setIsGenerating(false);
+      setHasModel(true);
+    }
+  }, [trackedRun?.status, trackedRun?.glbUrl, trackedRun?.threedmUrl, trackedRun?.generationStep]); // eslint-disable-line react-hooks/exhaustive-deps -- prompt/trackedRun object excluded: only the run's own transitions should re-drive the overlay, and including the object would re-fire on every progress tick
+
+  /** Leaves the run running in the background and returns to the upload screen. */
+  const handleKeepCreating = useCallback(() => {
+    hasNavigatedAway.current = true;
+    setIsGenerating(false);
+    setProgressStep('');
+    setGenerationFailed(false);
+  }, []);
 
   const simulateGeneration = useCallback(async () => {
     if (isGenerating) return;
@@ -159,69 +210,18 @@ export function useImageToCADWorkflow({
       if (!workflow_id) throw new Error("No workflow_id returned");
       setSourceWorkflowId(workflow_id);
 
-      pollAbortRef.current?.abort();
-      const pollAbort = new AbortController();
-      pollAbortRef.current = pollAbort;
+      // Hand the run to GenerationsContext, which polls above the routes. That
+      // is what lets the user press Keep Creating and leave: this hook's own
+      // poll below only drives the on-page overlay while they stay.
+      trackCadGeneration({
+        workflowId: workflow_id,
+        label: prompt.trim() ? prompt.trim().slice(0, 40) : 'Image to 3D',
+      });
 
-      let genPollResult: PollWorkflowResult<unknown>;
-      try {
-        genPollResult = await pollWorkflow<unknown>({
-          mode: 'status-then-result',
-          fetchStatus: () => authenticatedFetch(`/api/status/${encodeURIComponent(workflow_id)}`, { signal: pollAbort.signal }),
-          // /result blocks until the run finishes, so it is fetched once, after
-          // status reports terminal - never as a poll.
-          fetchResult: () => authenticatedFetch(`/api/result/${encodeURIComponent(workflow_id)}`),
-          resolveState: (statusData) => {
-            const s = statusData as { runtime?: { state?: string } };
-            return (s.runtime?.state || 'unknown').toLowerCase();
-          },
-          parseResult: (d) => d,
-          onStatusData: (statusData) => {
-            // Progress comes from node_visit_seq, not named nodes: this workflow
-            // has 46 of them and does not report a current-node label.
-            setProgressFraction(ringCadProgressFraction(statusData));
-            setProgressStep(isRingCadRepairing(statusData) ? "repairing" : "building");
-          },
-          intervalMs: 5000,
-          timeoutMs: RING_CAD_POLL_TIMEOUT_MS,
-          max404s: 13,
-          maxPollErrors: 10,
-          maxResultRetries: 1,
-          signal: pollAbort.signal,
-        });
-      } catch (err) {
-        if (err instanceof AuthExpiredError) return;
-        throw err;
-      }
-
-      if (genPollResult.status === 'cancelled') return;
-
-      const raw = genPollResult.result;
-
-      if (!isRingCadSuccess(raw)) {
-        const failure = parseRingCadFailure(raw);
-        setFailureMessage(failure.userMessage);
-        setProgressStep("failed_final");
-        setIsGenerating(false);
-        setGenerationFailed(true);
-        // A failed run releases the whole credit hold, so the balance changed.
-        refreshCredits().catch(() => {});
-        return;
-      }
-
-      // All three validation_status values are successes carrying a usable ring.
-      const parsed = parseRingCadResult(raw);
-      setThreedmArtifact(parsed.threedmArtifact);
-      setNotAllSolid(parsed.notAllSolid);
-      if (parsed.glbArtifact) setGlbArtifact(parsed.glbArtifact);
-      if (parsed.glbUrl) setGlbUrl(parsed.glbUrl);
-
-      trackCadGenerationCompleted({ category: 'ring', prompt_length: prompt.trim().length, duration_ms: Date.now() - cadGenStartTime });
-      setProgressStep("_loading");
-      setIsModelLoading(true);
-      setIsGenerating(false);
-      refreshCredits().catch(() => {});
-      setHasModel(true);
+      // Polling is now GenerationsContext's job. The effect below mirrors that
+      // run's state into this hook so the on-page overlay still updates while
+      // the user stays, without a second poll hitting the same endpoints.
+      generationStartRef.current = cadGenStartTime;
 
     } catch (err) {
       console.error("ImageToCAD generation failed:", err);
@@ -229,7 +229,7 @@ export function useImageToCADWorkflow({
       setProgressStep("");
       setGenerationFailed(true);
     }
-  }, [prompt, referenceImages, tier, isGenerating, refreshCredits, onWorkspaceActivate]);
+  }, [prompt, referenceImages, tier, isGenerating, refreshCredits, onWorkspaceActivate, trackCadGeneration]);
 
   const runEditWithPrompt = useCallback(async (promptText: string, label: string) => {
     if (!promptText.trim()) { toast.error("Please describe the edit"); return; }
@@ -339,6 +339,7 @@ export function useImageToCADWorkflow({
   }, [editPrompt, runEditWithPrompt]);
 
   const resetWorkflow = useCallback(() => {
+    hasNavigatedAway.current = false;
     setHasModel(false);
     setRetryAttempt(0);
     setProgressStep("");
@@ -357,8 +358,9 @@ export function useImageToCADWorkflow({
     sourceWorkflowId, setSourceWorkflowId,
     editPrompt, setEditPrompt,
     threedmArtifact, setThreedmArtifact,
-    progressFraction, failureMessage, notAllSolid,
+    failureMessage, notAllSolid,
     simulateGeneration, simulateEdit,
+    handleKeepCreating,
     resetWorkflow,
   };
 }

@@ -463,8 +463,9 @@ export default function ImageToCAD() {
               currentStep={workflow.progressStep}
               retryAttempt={workflow.retryAttempt}
               onRetry={() => workflow.simulateGeneration()}
-              estimateText="This usually takes 10 to 45 minutes"
+              estimateText="This usually takes around 15 minutes"
               failureMessage={workflow.failureMessage}
+              onKeepCreating={() => { workflow.handleKeepCreating(); setWorkspaceActive(false); }}
             />
             <ViewportSideTools
               visible={workflow.hasModel && !workflow.isGenerating && !workflow.isModelLoading}

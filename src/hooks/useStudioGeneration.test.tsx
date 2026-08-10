@@ -81,6 +81,7 @@ function makeContextValue(overrides: Partial<GenerationsContextValue> = {}): Gen
   const base: GenerationsContextValue = {
     generations: [],
     trackGeneration: vi.fn(),
+    trackCadGeneration: vi.fn(),
     clearGeneration: vi.fn(),
   };
   // Use Object.defineProperties so that getters on overrides are preserved
@@ -346,7 +347,8 @@ describe('useStudioGeneration', () => {
     const ctx = makeContextValue({
       get generations() { return ctxGenerations; },
       trackGeneration: vi.fn(),
-      clearGeneration: vi.fn(),
+      trackCadGeneration: vi.fn(),
+    clearGeneration: vi.fn(),
     });
 
     const { result, rerender } = renderHook(() => useStudioGeneration(baseOptions()), { wrapper: wrapper(ctx) });
@@ -376,7 +378,8 @@ describe('useStudioGeneration', () => {
     const ctx = makeContextValue({
       generations: [runningGeneration],
       trackGeneration: vi.fn(),
-      clearGeneration: vi.fn(),
+      trackCadGeneration: vi.fn(),
+    clearGeneration: vi.fn(),
     });
 
     const { result } = renderHook(() => useStudioGeneration(baseOptions()), { wrapper: wrapper(ctx) });
@@ -662,7 +665,8 @@ describe('useStudioGeneration', () => {
     const ctx = makeContextValue({
       get generations() { return ctxGenerations; },
       trackGeneration: vi.fn(),
-      clearGeneration: vi.fn(),
+      trackCadGeneration: vi.fn(),
+    clearGeneration: vi.fn(),
     });
 
     const { result, rerender } = renderHook(() => useStudioGeneration(baseOptions()), { wrapper: wrapper(ctx) });
@@ -693,7 +697,8 @@ describe('useStudioGeneration', () => {
     const ctx = makeContextValue({
       get generations() { return ctxGenerations; },
       trackGeneration: vi.fn(),
-      clearGeneration: vi.fn(),
+      trackCadGeneration: vi.fn(),
+    clearGeneration: vi.fn(),
     });
 
     const { result, rerender } = renderHook(() => useStudioGeneration(baseOptions()), { wrapper: wrapper(ctx) });

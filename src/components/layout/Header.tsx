@@ -17,7 +17,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
 import { useUserType } from '@/hooks/useUserType';
 import { useCredits } from '@/contexts/CreditsContext';
-import { useGenerations } from '@/contexts/GenerationsContext';
+import { useGenerations, buildCadRestorePath } from '@/contexts/GenerationsContext';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -66,6 +66,15 @@ function GenerationIndicator() {
 
   const handleClick = () => {
     if (!mostRecent) return;
+    // Image-to-3D restores through the workspace deep link, not the studio.
+    if (mostRecent.kind === 'cad') {
+      navigate(
+        mostRecent.status === 'completed'
+          ? buildCadRestorePath(mostRecent.workflowId, mostRecent.glbUrl ?? null)
+          : '/image-to-cad',
+      );
+      return;
+    }
     if (mostRecent.status === 'completed') {
       navigate(`/studio/${mostRecent.jewelryType}`, {
         state: {

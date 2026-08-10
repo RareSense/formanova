@@ -378,3 +378,86 @@ describe('GenerationsContext', () => {
     expect(mockAuthenticatedFetch).toHaveBeenNthCalledWith(2, '/api/result/wf-6');
   });
 });
+
+describe('GenerationsContext - Image to 3D runs', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPollWorkflow.mockReturnValue(new Promise(() => {}));
+  });
+
+  const CAD_RESULT = {
+    ok: true,
+    status: 'completed',
+    validation_status: 'applied',
+    threedm_artifact: { uri: 'azure://a/r.3dm', url: 'https://s/r.3dm', type: '', bytes: 1, sha256: '' },
+    glb_artifact: { uri: 'azure://a/r.glb', url: 'https://s/r.glb', type: '', bytes: 1, sha256: '' },
+  };
+
+  it('tracks a cad run tagged with kind so it never mixes with photoshoots', () => {
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    act(() => { result.current.trackCadGeneration({ workflowId: 'cad-1' }); });
+
+    expect(result.current.generations).toHaveLength(1);
+    expect(result.current.generations[0].kind).toBe('cad');
+    expect(result.current.generations[0].status).toBe('running');
+    // Photoshoot-shaped fields carry inert defaults, never bogus values.
+    expect(result.current.generations[0].resultImages).toEqual([]);
+  });
+
+  it('defaults the cad poll ceiling to the 90 minute spec limit', () => {
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    act(() => { result.current.trackCadGeneration({ workflowId: 'cad-1' }); });
+    expect(result.current.generations[0].timeoutMs).toBe(90 * 60 * 1000);
+  });
+
+  it('stores the glb and 3dm urls on completion', async () => {
+    mockPollWorkflow.mockResolvedValue({ status: 'completed', result: CAD_RESULT } as never);
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    act(() => { result.current.trackCadGeneration({ workflowId: 'cad-1' }); });
+
+    await waitFor(() => expect(result.current.generations[0].status).toBe('completed'));
+    expect(result.current.generations[0].glbUrl).toBe('https://s/r.glb');
+    expect(result.current.generations[0].threedmUrl).toBe('https://s/r.3dm');
+    expect(mockMarkCompleted).toHaveBeenCalledWith('cad-1', expect.any(Number));
+  });
+
+  it('marks a failed cad run failed rather than completed', async () => {
+    mockPollWorkflow.mockResolvedValue({
+      status: 'completed',
+      result: { ok: false, status: 'failed', phase: 'cad_export', user_message: 'Could not build.' },
+    } as never);
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    act(() => { result.current.trackCadGeneration({ workflowId: 'cad-1' }); });
+
+    await waitFor(() => expect(result.current.generations[0].status).toBe('failed'));
+    expect(mockMarkFailed).toHaveBeenCalled();
+  });
+
+  it('runs cad and photoshoot generations side by side', async () => {
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    act(() => {
+      result.current.trackCadGeneration({ workflowId: 'cad-1' });
+      result.current.trackGeneration({
+        workflowId: 'photo-1', isProductShot: false, jewelryType: 'rings',
+        jewelryUrl: 'j', modelUrl: 'm', aspectRatio: '3:4',
+        resolution: '1K' as never, generationCost: 10,
+      });
+    });
+
+    expect(result.current.generations).toHaveLength(2);
+    expect(result.current.generations.filter(g => g.kind === 'cad')).toHaveLength(1);
+    // Photoshoot rows stay untagged, preserving their existing meaning.
+    expect(result.current.generations.find(g => g.workflowId === 'photo-1')!.kind).toBeUndefined();
+  });
+
+  it('aborts a cad poll when the generation is cleared', async () => {
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    act(() => { result.current.trackCadGeneration({ workflowId: 'cad-1' }); });
+    await waitFor(() => expect(mockPollWorkflow).toHaveBeenCalled());
+    const signal = mockPollWorkflow.mock.calls[0][0].signal as AbortSignal;
+
+    act(() => { result.current.clearGeneration('cad-1'); });
+    expect(signal.aborted).toBe(true);
+    expect(result.current.generations).toHaveLength(0);
+  });
+});

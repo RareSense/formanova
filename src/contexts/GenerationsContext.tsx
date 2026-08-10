@@ -10,6 +10,14 @@ import { azureUriToUrl } from '@/lib/azure-utils';
 import type { PhotoshootResultResponse } from '@/lib/photoshoot-api';
 import type { Resolution } from '@/components/studio/OutputSettingsPills';
 import { getWorkflowDetails } from '@/lib/generation-history-api';
+import {
+  RING_CAD_POLL_TIMEOUT_MS,
+  isRingCadRepairing,
+  isRingCadSuccess,
+  parseRingCadFailure,
+  parseRingCadResult,
+  ringCadProgressFraction,
+} from '@/lib/ring-cad-nurbs-api';
 import { extractPhotoThumbnail, extractProductShotThumbnail } from '@/lib/generation-enrichment';
 
 const STUDIO_RESULT_RETRY_DELAY_MS = 3000;
@@ -19,6 +27,16 @@ const STUDIO_RESULT_MAX_RETRIES = 100;
 // Default poll ceiling for photoshoot/fix runs. Slow workflows (e.g. upscale)
 // override this via TrackGenerationParams.timeoutMs.
 const DEFAULT_POLL_TIMEOUT_MS = 720_000;
+
+/**
+ * Deep link that restores a finished Image-to-3D run into the workspace.
+ * ImageToCAD reads ?glb= and ?workflow_id= on mount and seeds the viewport.
+ */
+export function buildCadRestorePath(workflowId: string, glbUrl: string | null): string {
+  const params = new URLSearchParams({ workflow_id: workflowId });
+  if (glbUrl) params.set('glb', glbUrl);
+  return `/image-to-cad?${params.toString()}`;
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -58,7 +76,20 @@ export interface TrackedGeneration {
   parentWorkflowId?: string;
   /** Original model/reference image of the parent generation (upscale carries this). */
   parentModelUrl?: string;
+  /**
+   * Which pipeline this run belongs to. Absent means 'photoshoot' so every
+   * existing row and call site keeps its current meaning.
+   */
+  kind?: GenerationKind;
+  /** CAD only: GLB preview url, used to restore the viewport. */
+  glbUrl?: string | null;
+  /** CAD only: the machinable NURBS .3dm deliverable. */
+  threedmUrl?: string | null;
+  /** CAD only: label for the completion toast. */
+  label?: string;
 }
+
+export type GenerationKind = 'photoshoot' | 'cad';
 
 export interface TrackGenerationParams {
   workflowId: string;
@@ -77,9 +108,23 @@ export interface TrackGenerationParams {
   parentModelUrl?: string;
 }
 
+/**
+ * Image-to-3D run. CAD produces a GLB preview and a NURBS .3dm rather than
+ * images, so it shares only the queue, the header indicator and the completion
+ * toast with photoshoots - never their result shape.
+ */
+export interface TrackCadGenerationParams {
+  workflowId: string;
+  /** Shown in the completion toast so a user with several runs can tell them apart. */
+  label?: string;
+  /** Poll ceiling; ring_cad_nurbs_v1 runs can take up to 90 minutes. */
+  timeoutMs?: number;
+}
+
 export interface GenerationsContextValue {
   generations: TrackedGeneration[];
   trackGeneration: (params: TrackGenerationParams) => void;
+  trackCadGeneration: (params: TrackCadGenerationParams) => void;
   clearGeneration: (workflowId: string) => void;
 }
 
@@ -248,6 +293,38 @@ export function GenerationsContextProvider({ children }: { children: React.React
     ]);
   }, []);
 
+  /**
+   * Queues an Image-to-3D run. Photoshoot-shaped fields are filled with inert
+   * defaults so the shared queue, header indicator and toast keep working
+   * without every consumer having to special-case CAD.
+   */
+  const trackCadGeneration = useCallback((params: TrackCadGenerationParams) => {
+    setGenerations(prev => [
+      ...prev,
+      {
+        kind: 'cad',
+        workflowId: params.workflowId,
+        status: 'running',
+        progress: 5,
+        generationStep: 'Analyzing your design...',
+        resultImages: [],
+        outputAssetId: null,
+        jewelryUrl: '',
+        modelUrl: '',
+        isProductShot: false,
+        jewelryType: 'ring',
+        startedAt: Date.now(),
+        aspectRatio: '1:1',
+        resolution: '1K' as Resolution,
+        generationCost: null,
+        glbUrl: null,
+        threedmUrl: null,
+        ...(params.label ? { label: params.label } : {}),
+        timeoutMs: params.timeoutMs ?? RING_CAD_POLL_TIMEOUT_MS,
+      },
+    ]);
+  }, []);
+
   const clearGeneration = useCallback((workflowId: string) => {
     const ctrl = controllers.current.get(workflowId);
     if (ctrl) {
@@ -259,6 +336,121 @@ export function GenerationsContextProvider({ children }: { children: React.React
 
   // Start polling for any newly-tracked running generation.
   // Uses the running workflowId set as dep so progress-tick re-renders don't restart polls.
+  /**
+   * Poll loop for Image-to-3D runs. Mirrors the photoshoot loop's lifecycle
+   * (ticker cleared on abort, controller removed on settle, credits refreshed,
+   * toast with a restore action) but uses the CAD status/result contract.
+   */
+  const pollCadGeneration = useCallback((
+    gen: TrackedGeneration,
+    ctrl: AbortController,
+    startTime: number,
+  ) => {
+    // Runs take 10-45 minutes, so ease the bar toward 90 to show liveness.
+    const ticker = setInterval(() => {
+      setGenerations(prev => prev.map(g => {
+        if (g.workflowId !== gen.workflowId || g.status !== 'running') return g;
+        return { ...g, progress: Math.min(g.progress + Math.max((90 - g.progress) * 0.01, 0.05), 90) };
+      }));
+    }, 1000);
+    ctrl.signal.addEventListener('abort', () => clearInterval(ticker), { once: true });
+
+    pollWorkflow<unknown>({
+      mode: 'status-then-result',
+      fetchStatus: () => authenticatedFetch(`/api/status/${gen.workflowId}`, { signal: ctrl.signal }),
+      // /result blocks until the run finishes, so it is fetched once, after
+      // status reports terminal - never as a poll.
+      fetchResult: () => authenticatedFetch(`/api/result/${gen.workflowId}`),
+      resolveState: (statusData) => {
+        const s = statusData as { runtime?: { state?: string } };
+        return (s.runtime?.state || 'unknown').toLowerCase();
+      },
+      onStatusData: (statusData) => {
+        const pct = Math.round(ringCadProgressFraction(statusData) * 90);
+        const step = isRingCadRepairing(statusData) ? 'Fixing the model...' : 'Building your 3D ring...';
+        setGenerations(prev => prev.map(g =>
+          g.workflowId === gen.workflowId
+            ? { ...g, progress: Math.max(g.progress, pct), generationStep: step }
+            : g
+        ));
+      },
+      parseResult: (d) => d,
+      intervalMs: 5000,
+      timeoutMs: gen.timeoutMs ?? RING_CAD_POLL_TIMEOUT_MS,
+      max404s: 13,
+      maxPollErrors: 10,
+      maxResultRetries: 1,
+      signal: ctrl.signal,
+    }).then(pollResult => {
+      clearInterval(ticker);
+      if (pollResult.status === 'cancelled') return;
+      controllers.current.delete(gen.workflowId);
+
+      const raw = pollResult.result;
+
+      if (!isRingCadSuccess(raw)) {
+        const failure = parseRingCadFailure(raw);
+        setGenerations(prev => prev.map(g =>
+          g.workflowId === gen.workflowId ? { ...g, status: 'failed', progress: 100 } : g
+        ));
+        markGenerationFailed(gen.workflowId, failure.userMessage ?? 'CAD run failed', startTime);
+        // A failed run releases the entire credit hold.
+        refreshCredits();
+        toast({
+          title: 'Your 3D ring could not be generated',
+          description: failure.userMessage
+            ?? 'The run did not complete. Your credits were not charged.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const parsed = parseRingCadResult(raw);
+      const duration = Math.round((Date.now() - startTime) / 1000);
+      setGenerations(prev => prev.map(g =>
+        g.workflowId === gen.workflowId
+          ? {
+              ...g,
+              status: 'completed',
+              progress: 100,
+              glbUrl: parsed.glbUrl,
+              threedmUrl: parsed.threedmArtifact?.url ?? null,
+            }
+          : g
+      ));
+      markGenerationCompleted(gen.workflowId, startTime);
+      refreshCredits();
+
+      toast({
+        title: 'Your 3D ring is ready',
+        description: `${gen.label ?? 'Image to 3D'} · ${duration}s`,
+        action: (
+          <ToastAction
+            altText="View Result"
+            onClick={() => navigate(buildCadRestorePath(gen.workflowId, parsed.glbUrl))}
+          >
+            View Result
+          </ToastAction>
+        ),
+      });
+    }).catch(err => {
+      clearInterval(ticker);
+      controllers.current.delete(gen.workflowId);
+      if (ctrl.signal.aborted) return;
+      console.error('[GenerationsContext] CAD poll failed:', err);
+      setGenerations(prev => prev.map(g =>
+        g.workflowId === gen.workflowId ? { ...g, status: 'failed', progress: 100 } : g
+      ));
+      markGenerationFailed(gen.workflowId, 'CAD poll failed', startTime);
+      refreshCredits();
+      toast({
+        title: 'Your 3D ring could not be generated',
+        description: 'The run did not complete. Your credits were not charged.',
+        variant: 'destructive',
+      });
+    });
+  }, [navigate, refreshCredits, toast]);
+
   const runningKey = generations
     .filter(g => g.status === 'running')
     .map(g => g.workflowId)
@@ -273,6 +465,14 @@ export function GenerationsContextProvider({ children }: { children: React.React
       const ctrl = new AbortController();
       controllers.current.set(gen.workflowId, ctrl);
       const startTime = gen.startedAt;
+
+      // Image-to-3D polls the same endpoints but reports progress through
+      // node_visit_seq and returns a flat CAD result, so it runs its own loop
+      // and leaves the photoshoot path below completely untouched.
+      if (gen.kind === 'cad') {
+        pollCadGeneration(gen, ctrl, startTime);
+        continue;
+      }
 
       // Smooth progress animation while polling
       const ticker = setInterval(() => {
@@ -508,7 +708,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
   }, []);
 
   return (
-    <GenerationsContext.Provider value={{ generations, trackGeneration, clearGeneration }}>
+    <GenerationsContext.Provider value={{ generations, trackGeneration, trackCadGeneration, clearGeneration }}>
       {children}
     </GenerationsContext.Provider>
   );

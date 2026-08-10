@@ -40,6 +40,11 @@ interface GenerationProgressProps {
   estimateText?: string;
   /** Backend-authored failure copy, shown instead of the generic message. */
   failureMessage?: string | null;
+  /**
+   * Leaves the run going in the background and returns the user to the upload
+   * screen. Omit to keep the overlay blocking (Text-to-3D still does).
+   */
+  onKeepCreating?: () => void;
 }
 
 export default function GenerationProgress({
@@ -50,6 +55,7 @@ export default function GenerationProgress({
   onRetry,
   estimateText,
   failureMessage,
+  onKeepCreating,
 }: GenerationProgressProps) {
   const [elapsed, setElapsed] = useState(0);
   const workflowStartRef = useRef(Date.now());
@@ -113,6 +119,14 @@ export default function GenerationProgress({
                 <span className="text-[11px] italic text-muted-foreground/40 text-center">
                   {estimateText ?? "This may take more than 10 minutes"}
                 </span>
+                {onKeepCreating && (
+                  <button
+                    onClick={onKeepCreating}
+                    className="mt-4 px-6 py-3 text-[12px] font-bold uppercase tracking-[0.2em] border border-border text-foreground hover:bg-accent/60 transition-colors"
+                  >
+                    Keep Creating
+                  </button>
+                )}
               </>
             )}
           </motion.div>
