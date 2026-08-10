@@ -176,6 +176,13 @@ export interface RingCadResult {
   validationStatus: RingCadValidationStatus | null;
   diagnostics: RingCadDiagnostics;
   notAllSolid: boolean;
+  /**
+   * True when the corrected model was unavailable and an earlier stage's output
+   * was used instead. Worth telling the user their ring is the pre-review build.
+   */
+  usedFallbackStage: boolean;
+  /** Which result field the returned model actually came from. */
+  sourceStage: string | null;
 }
 
 export type RingCadFailurePhase =
@@ -225,12 +232,43 @@ export function isRingCadSuccess(data: unknown): boolean {
   return d.ok === true || d.status === 'completed';
 }
 
+/**
+ * Newest-first ladder of result fields to read a model from. The corrected
+ * build is preferred; when a later stage failed to produce one, fall back to the
+ * most recent earlier stage that did. Losing the corrections is much better than
+ * showing the user nothing for a run that charged them.
+ */
+const THREEDM_STAGES = ['threedm_artifact', 'prevalidation_threedm_artifact'] as const;
+const GLB_STAGES = ['glb_artifact', 'prevalidation_glb_artifact'] as const;
+
+/** Walks a ladder and reports which field the artifact actually came from. */
+function readStagedArtifact(
+  d: Record<string, unknown>,
+  stages: readonly string[],
+): { artifact: ArtifactRef | null; stage: string | null; fellBack: boolean } {
+  for (let i = 0; i < stages.length; i++) {
+    const artifact = readArtifact(d[stages[i]]);
+    if (artifact) return { artifact, stage: stages[i], fellBack: i > 0 };
+  }
+  // Last resort: any *_artifact key that names this model type, so an unexpected
+  // stage name still yields a model rather than an empty screen.
+  const suffix = stages[0].includes('threedm') ? 'threedm' : 'glb';
+  for (const [key, value] of Object.entries(d)) {
+    if (!key.endsWith('_artifact') || !key.includes(suffix)) continue;
+    const artifact = readArtifact(value);
+    if (artifact) return { artifact, stage: key, fellBack: true };
+  }
+  return { artifact: null, stage: null, fellBack: false };
+}
+
 /** The result is a flat object, not the nested node_results shape of older CAD workflows. */
 export function parseRingCadResult(data: unknown): RingCadResult {
   const d = (data ?? {}) as Record<string, unknown>;
 
-  const threedmArtifact = readArtifact(d.threedm_artifact);
-  const glbArtifact = readArtifact(d.glb_artifact);
+  const threedm = readStagedArtifact(d, THREEDM_STAGES);
+  const glb = readStagedArtifact(d, GLB_STAGES);
+  const threedmArtifact = threedm.artifact;
+  const glbArtifact = glb.artifact;
   const diagnostics = (d.cad_diagnostics && typeof d.cad_diagnostics === 'object'
     ? d.cad_diagnostics
     : {}) as RingCadDiagnostics;
@@ -252,6 +290,8 @@ export function parseRingCadResult(data: unknown): RingCadResult {
     validationStatus,
     diagnostics,
     notAllSolid: diagnostics.not_all_solid === true,
+    usedFallbackStage: threedm.fellBack || glb.fellBack,
+    sourceStage: threedm.stage ?? glb.stage,
   };
 }
 

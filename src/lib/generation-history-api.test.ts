@@ -181,6 +181,14 @@ describe('resolveSourceType', () => {
     expect(resolveSourceType('cad_render', '')).toBe('cad_render');
   });
 
+  it('classifies ring_cad_nurbs_v1 as Image-to-3D, not a CAD render', () => {
+    // The name contains "cad" but neither "sketch" nor "image", so without an
+    // explicit rule it falls through to cad_render and lands in the wrong
+    // history section.
+    expect(inferSourceType('ring_cad_nurbs_v1')).toBe('cad_sketch');
+    expect(resolveSourceType('', 'ring_cad_nurbs_v1')).toBe('cad_sketch');
+  });
+
   it('prefers the backend value over the workflow name', () => {
     // Name would parse to photo, but the backend says product -> backend wins.
     expect(resolveSourceType('product_shot', 'jewelry_photoshoot')).toBe('product_shot');

@@ -344,6 +344,11 @@ export function inferSourceType(name: string): SourceType {
   )
     return 'cad_text';
 
+  // Image-to-3D workflows. ring_cad_nurbs_v1 names neither 'sketch' nor 'image'
+  // but does contain 'cad', so it must be matched before the cad_render check
+  // or it lands in the wrong history section.
+  if (lower.includes('ring_cad_nurbs') || lower.includes('ring-cad-nurbs')) return 'cad_sketch';
+
   // Sketch-to-CAD workflows
   if (lower.includes('sketch')) return 'cad_sketch';
 

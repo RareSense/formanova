@@ -20,19 +20,22 @@ function includesAny(value: string, needles: string[]): boolean {
 const WORKFLOW_RULES: WorkflowRule[] = [
   {
     sourceType: "cad_sketch",
-    label: "Sketch to CAD",
-    historyTitle: "Sketch to CAD",
+    label: "Image to 3D",
+    historyTitle: "Image to 3D",
     historySubtitle: "AI-generated 3D models from reference images",
     loadRoute: "/image-to-cad",
     priority: 100,
     matches: (name) =>
+      // ring_cad_nurbs_v1 names neither "sketch" nor "image", and contains
+      // "cad", so without this it would fall through to the CAD Render rule.
+      includesAny(name, ["ring_cad_nurbs", "ring-cad-nurbs"]) ||
       includesAny(name, ["sketch_generate", "sketch-generate"]) ||
       (includesAny(name, ["sketch", "image"]) && includesAny(name, ["cad", "ring"])),
   },
   {
     sourceType: "cad_text",
-    label: "Generate CAD Design",
-    historyTitle: "Generate CAD Design",
+    label: "Text to 3D",
+    historyTitle: "Text to 3D",
     historySubtitle: "AI-generated 3D models from text",
     loadRoute: "/text-to-cad",
     priority: 90,

@@ -206,6 +206,38 @@ describe('ring_cad_nurbs_v1 result parsing', () => {
     expect(r.threedmArtifact?.url).toContain(`/api/artifacts/${sha}`);
   });
 
+  it('falls back to the pre-validation stage when the corrected model is missing', () => {
+    const { threedm_artifact, glb_artifact, ...withoutFinal } = RESULT;
+    const r = parseRingCadResult({
+      ...withoutFinal,
+      prevalidation_threedm_artifact: { uri: 'azure://a/pre.3dm', url: 'https://s/pre.3dm', type: '', bytes: 1, sha256: '' },
+      prevalidation_glb_artifact: { uri: 'azure://a/pre.glb', url: 'https://s/pre.glb', type: '', bytes: 1, sha256: '' },
+    });
+    expect(r.threedmArtifact?.url).toBe('https://s/pre.3dm');
+    expect(r.glbUrl).toBe('https://s/pre.glb');
+    expect(r.usedFallbackStage).toBe(true);
+    expect(r.sourceStage).toBe('prevalidation_threedm_artifact');
+  });
+
+  it('prefers the corrected model over the pre-validation one', () => {
+    const r = parseRingCadResult({
+      ...RESULT,
+      prevalidation_threedm_artifact: { uri: 'azure://a/pre.3dm', url: 'https://s/pre.3dm', type: '', bytes: 1, sha256: '' },
+    });
+    expect(r.sourceStage).toBe('threedm_artifact');
+    expect(r.usedFallbackStage).toBe(false);
+  });
+
+  it('recovers a model from an unrecognised stage rather than showing nothing', () => {
+    const r = parseRingCadResult({
+      ok: true,
+      status: 'completed',
+      some_future_threedm_artifact: { uri: 'azure://a/x.3dm', url: 'https://s/x.3dm', type: '', bytes: 1, sha256: '' },
+    });
+    expect(r.threedmArtifact?.url).toBe('https://s/x.3dm');
+    expect(r.usedFallbackStage).toBe(true);
+  });
+
   it('does not report success for a failed run', () => {
     expect(isRingCadSuccess({ ok: false, status: 'failed', phase: 'cad_export' })).toBe(false);
   });
