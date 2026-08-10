@@ -150,7 +150,8 @@ export default function ImageToCAD() {
    * viewport mesh edits - the GLB export below covers that case.
    */
   const handleDownloadThreedm = useCallback(async () => {
-    const uri = workflow.threedmArtifact?.uri;
+    // .url, never .uri: the raw reference is azure:// and is not fetchable.
+    const uri = workflow.threedmArtifact?.url;
     if (!uri) { toast.error("No CAD file available for this model"); return; }
     const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
     const fileName = `ring-${timestamp}.3dm`;

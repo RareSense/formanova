@@ -1,3 +1,5 @@
+import { azureUriToUrl } from '@/lib/azure-utils';
+
 /**
  * ring-cad-nurbs-api.ts
  *
@@ -72,7 +74,14 @@ export const RING_CAD_TOTAL_NODES = 46;
 
 /** A stored blob reference, the same shape the run produces internally. */
 export interface ArtifactRef {
+  /** Raw backend reference; often azure://, which is NOT fetchable as-is. */
   uri: string;
+  /**
+   * Browser-ready URL: the signed url when the backend supplies one, otherwise
+   * uri resolved through azureUriToUrl (the same-origin, auth-gated artifact
+   * proxy). Always fetch this, never uri.
+   */
+  url: string;
   type: string;
   bytes: number;
   sha256: string;
@@ -188,11 +197,20 @@ export interface RingCadFailure {
 
 function readArtifact(value: unknown): ArtifactRef | null {
   if (!value || typeof value !== 'object') return null;
-  const a = value as Partial<ArtifactRef> & { url?: string };
-  const uri = a.uri ?? a.url;
-  if (typeof uri !== 'string' || !uri) return null;
+  const a = value as Partial<ArtifactRef>;
+  const signedUrl = typeof a.url === 'string' && a.url ? a.url : '';
+  const rawUri = typeof a.uri === 'string' && a.uri ? a.uri : '';
+  if (!signedUrl && !rawUri) return null;
+  // The backend hands back a signed url for artifacts; prefer it. Otherwise the
+  // uri is azure://, which must go through azureUriToUrl to reach the
+  // same-origin artifact proxy - it is not fetchable directly (AI_RULES 4).
+  // url may end up '' if the reference is neither signed nor resolvable; the
+  // artifact is still reported, since the run did produce it. Callers must
+  // check .url before fetching rather than assuming it is usable.
+  const url = signedUrl || azureUriToUrl(rawUri);
   return {
-    uri,
+    uri: rawUri || signedUrl,
+    url,
     type: typeof a.type === 'string' ? a.type : '',
     bytes: typeof a.bytes === 'number' ? a.bytes : 0,
     sha256: typeof a.sha256 === 'string' ? a.sha256 : '',
@@ -230,7 +248,7 @@ export function parseRingCadResult(data: unknown): RingCadResult {
   return {
     threedmArtifact,
     glbArtifact,
-    glbUrl: glbArtifact?.uri ?? null,
+    glbUrl: glbArtifact?.url ?? null,
     validationStatus,
     diagnostics,
     notAllSolid: diagnostics.not_all_solid === true,

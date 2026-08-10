@@ -148,8 +148,16 @@ describe('ring_cad_nurbs_v1 result parsing', () => {
   it('reads the flat artifact fields', () => {
     const r = parseRingCadResult(RESULT);
     expect(r.threedmArtifact?.uri).toBe('azure://a/ring.3dm');
-    expect(r.glbUrl).toBe('azure://a/ring.glb');
+    expect(r.glbArtifact?.uri).toBe('azure://a/ring.glb');
     expect(r.validationStatus).toBe('applied');
+  });
+
+  it('exposes the signed url as glbUrl for the viewport', () => {
+    const r = parseRingCadResult({
+      ...RESULT,
+      glb_artifact: { uri: 'azure://a/ring.glb', url: 'https://signed.example/ring.glb', type: '', bytes: 1, sha256: '' },
+    });
+    expect(r.glbUrl).toBe('https://signed.example/ring.glb');
   });
 
   it('treats all three validation statuses as success', () => {
@@ -167,6 +175,35 @@ describe('ring_cad_nurbs_v1 result parsing', () => {
 
   it('throws when neither model artifact is present', () => {
     expect(() => parseRingCadResult({ ok: true, status: 'completed' })).toThrow(/no cad model/i);
+  });
+
+  it('prefers the backend signed url over the raw azure uri', () => {
+    const r = parseRingCadResult({
+      ...RESULT,
+      threedm_artifact: { uri: 'azure://c/ring.3dm', url: 'https://signed.example/ring.3dm', type: '', bytes: 1, sha256: '' },
+    });
+    expect(r.threedmArtifact?.url).toBe('https://signed.example/ring.3dm');
+  });
+
+  it('still reports the artifact when the reference cannot be resolved to a url', () => {
+    // The run produced a ring, so claiming there is no model would be wrong.
+    // Callers check .url before fetching.
+    const r = parseRingCadResult(RESULT);
+    expect(r.threedmArtifact).not.toBeNull();
+    expect(r.threedmArtifact?.uri).toBe('azure://a/ring.3dm');
+  });
+
+  it('never leaves an azure:// uri as the fetchable url', () => {
+    const sha = 'a'.repeat(64);
+    const r = parseRingCadResult({
+      ...RESULT,
+      threedm_artifact: { uri: `azure://agentic-artifacts/hashed/${sha}.3dm`, type: '', bytes: 1, sha256: sha },
+      glb_artifact: { uri: `azure://agentic-artifacts/hashed/${sha}.glb`, type: '', bytes: 1, sha256: sha },
+    });
+    expect(r.threedmArtifact?.url.startsWith('azure://')).toBe(false);
+    expect(r.glbUrl?.startsWith('azure://')).toBe(false);
+    // Content-addressed artifacts resolve to the same-origin auth-gated proxy.
+    expect(r.threedmArtifact?.url).toContain(`/api/artifacts/${sha}`);
   });
 
   it('does not report success for a failed run', () => {
