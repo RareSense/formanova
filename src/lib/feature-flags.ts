@@ -48,14 +48,11 @@ export function isCadUploadEnabled(email: string | undefined | null): boolean {
 }
 
 /**
- * Image-to-CAD generation history section (sketch_generate_v1).
- * Owner: engineering. Reason: feature in early access, not ready for all users.
- * Removal: when Image-to-CAD ships publicly — delete flag and show section unconditionally.
- * Allowlist: VITE_IMAGE_TO_CAD_ALLOWLIST_EMAILS (comma-separated emails in .env).
+ * Image to 3D shipped publicly — the flag was removed per its own removal
+ * condition and the history section renders for everyone.
+ * VITE_IMAGE_TO_CAD_ALLOWLIST_EMAILS is no longer read and can be dropped
+ * from .env files.
  */
-export function isImageToCadEnabled(email: string | undefined | null): boolean {
-  return isAllowlistedEmail(email, 'VITE_IMAGE_TO_CAD_ALLOWLIST_EMAILS');
-}
 
 /**
  * "What best describes you?" onboarding screen — enabled for all users.

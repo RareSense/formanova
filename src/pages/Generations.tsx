@@ -27,7 +27,6 @@ import {
   type CachePayload,
 } from '@/lib/generation-history-utils';
 import { WorkflowSection, SectionIcons } from '@/components/generations/WorkflowSection';
-import { isImageToCadEnabled } from '@/lib/feature-flags';
 import { ScissorGLBGrid } from '@/components/generations/ScissorGLBGrid';
 import CADRuntimeErrorBoundary from '@/components/cad/CADRuntimeErrorBoundary';
 
@@ -344,8 +343,7 @@ export default function Generations() {
   const productShotSection = getSection('product_shot', productShotPage, true);
   const cadRenderSection = getSection('cad_render', cadRenderPage, true);
   const cadTextSection = getSection('cad_text', cadTextPage);
-  const imageToCadEnabled = isImageToCadEnabled(user?.email);
-  const cadSketchSection = imageToCadEnabled ? getSection('cad_sketch', cadSketchPage) : null;
+  const cadSketchSection = getSection('cad_sketch', cadSketchPage);
 
   return (
     <>
