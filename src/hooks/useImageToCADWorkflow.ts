@@ -225,8 +225,12 @@ export function useImageToCADWorkflow({
 
     } catch (err) {
       console.error("ImageToCAD generation failed:", err);
+      // Surface the real reason. A start failure (bad payload, workflow not
+      // active on this environment) is actionable, and hiding it behind the
+      // generic message means the user only sees it with DevTools open.
+      setFailureMessage(err instanceof Error && err.message ? err.message : null);
       setIsGenerating(false);
-      setProgressStep("");
+      setProgressStep("failed_final");
       setGenerationFailed(true);
     }
   }, [prompt, referenceImages, tier, isGenerating, refreshCredits, onWorkspaceActivate, trackCadGeneration]);
