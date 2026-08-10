@@ -26,6 +26,7 @@ import { RGBELoader } from 'three-stdlib';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Box } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
+import { azureUriToUrl } from '@/lib/azure-utils';
 
 const __DEV__ = import.meta.env.DEV;
 
@@ -76,6 +77,30 @@ function cacheScene(url: string, scene: THREE.Group) {
 // glbErrors, since that cache has no expiry.
 const GLB_FETCH_MAX_ATTEMPTS = 3;
 const GLB_FETCH_RETRY_DELAY_MS = 400;
+
+/**
+ * Resolves whatever reference a caller passed into something fetchable.
+ *
+ * Callers hand us the raw `artifact.uri` from the pipeline, which is normally
+ * `azure://…`. That scheme cannot be fetched, so every such card failed to load.
+ * Route it through azureUriToUrl (the repo's single source of truth), which maps
+ * content-addressed artifacts onto the same-origin auth-gated /api/artifacts
+ * proxy and leaves ordinary http(s) URLs alone.
+ *
+ * Returns '' when the reference cannot be resolved, so the caller shows the
+ * error state instead of issuing a request that can never succeed.
+ */
+export function resolveGlbUrl(rawUrl: string): string {
+  if (!rawUrl) return '';
+  const resolved = azureUriToUrl(rawUrl);
+  if (!resolved || resolved.startsWith('azure://')) return '';
+  return resolved;
+}
+
+/** Same-origin proxy paths are auth-gated; public blob URLs are not. */
+export function glbUrlNeedsAuth(url: string): boolean {
+  return url.includes('/artifacts/') || url.startsWith('/api/');
+}
 
 export async function fetchGlbArrayBuffer(
   url: string,
@@ -319,9 +344,12 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
     let promise = glbLoading.get(card.glbUrl);
     if (!promise) {
       promise = (async () => {
-        const needsAuth = card.glbUrl.includes('/artifacts/');
-        const fetchFn = needsAuth ? authenticatedFetch : fetch;
-        const arrayBuffer = await fetchGlbArrayBuffer(card.glbUrl, fetchFn);
+        const fetchUrl = resolveGlbUrl(card.glbUrl);
+        if (!fetchUrl) {
+          throw new Error(`Unresolvable GLB reference: ${card.glbUrl}`);
+        }
+        const fetchFn = glbUrlNeedsAuth(fetchUrl) ? authenticatedFetch : fetch;
+        const arrayBuffer = await fetchGlbArrayBuffer(fetchUrl, fetchFn);
 
         return new Promise<THREE.Group>((resolve, reject) => {
           gltfLoaderRef.current.parse(

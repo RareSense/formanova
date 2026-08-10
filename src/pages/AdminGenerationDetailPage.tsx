@@ -160,17 +160,31 @@ function extractGlbFromSteps(steps: AdminGenerationStep[]): string | null {
   for (const step of steps) {
     const out = step.output as Record<string, unknown> | null;
     if (!out) continue;
-    const glbArtUri = (out.glb_artifact as any)?.uri ?? (out.original_glb_artifact as any)?.uri;
-    if (typeof glbArtUri === 'string') return azureUriToUrl(glbArtUri) || glbArtUri;
+    // Prefer a backend-signed url when present; otherwise resolve the azure://
+    // reference. Never fall back to the raw uri: azure:// cannot be fetched, so
+    // returning it guarantees the viewer fails instead of showing "No 3D output".
+    const glbArt = (out.glb_artifact ?? out.original_glb_artifact) as any;
+    const glbArtUrl = typeof glbArt?.url === 'string' ? glbArt.url : undefined;
+    if (glbArtUrl) return glbArtUrl;
+    if (typeof glbArt?.uri === 'string') {
+      const resolved = azureUriToUrl(glbArt.uri);
+      if (resolved) return resolved;
+    }
     const glbPath = out.glb_path;
     if (glbPath) {
       const p = typeof glbPath === 'string' ? glbPath : (glbPath as any)?.uri;
-      if (typeof p === 'string') return azureUriToUrl(p) || p;
+      if (typeof p === 'string') {
+        const resolved = azureUriToUrl(p);
+        if (resolved) return resolved;
+      }
     }
   }
   for (const step of steps) {
     const uri = deepFindGlbUri(step.output);
-    if (uri) return azureUriToUrl(uri) || uri;
+    if (uri) {
+      const resolved = azureUriToUrl(uri);
+      if (resolved) return resolved;
+    }
   }
   return null;
 }
@@ -333,11 +347,15 @@ function InvalidRequestState({ message }: { message: string }) {
 }
 
 function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
-  const isCadText = resolveSourceType(detail.source_type, detail.workflow_name) === 'cad_text';
-  const textPrompt = isCadText
-    ? findText(detail.input_payload, ['prompt', 'description', 'ring_description', 'text_input', 'input_text', 'text', 'query'])
+  // Both CAD families produce a GLB. cad_sketch (Image to 3D, including
+  // ring_cad_nurbs_v1) was excluded here, so its runs always rendered
+  // "No 3D output" no matter what the pipeline returned.
+  const cadSourceType = resolveSourceType(detail.source_type, detail.workflow_name);
+  const isCadModel = cadSourceType === 'cad_text' || cadSourceType === 'cad_sketch';
+  const textPrompt = isCadModel
+    ? findText(detail.input_payload, ['prompt', 'description', 'ring_description', 'text_input', 'input_text', 'text', 'query', 'user_description'])
     : null;
-  const cadGlbUrl = isCadText ? extractGlbFromSteps(detail.steps) : null;
+  const cadGlbUrl = isCadModel ? extractGlbFromSteps(detail.steps) : null;
 
   const stepOutputImageUrls = detail.steps.flatMap((step) =>
     extractImageUrls(step.output)
@@ -457,7 +475,7 @@ function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
             <MetaItem label="Complaint" value={detail.feedback ? 'Yes' : 'No'} />
           </div>
 
-          {isCadText ? (
+          {isCadModel ? (
             <div className="space-y-4">
               {textPrompt && (
                 <div className="space-y-2">
