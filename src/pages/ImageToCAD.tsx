@@ -9,6 +9,7 @@ import type { ImperativePanelHandle } from "react-resizable-panels";
 import { InsufficientCreditsInline } from "@/components/InsufficientCreditsInline";
 import { useAuth } from "@/contexts/AuthContext";
 import { isCadUploadEnabled } from "@/lib/feature-flags";
+import { MAX_RING_CAD_REFERENCE_IMAGES } from "@/lib/ring-cad-nurbs-api";
 import { runMicroBenchmark } from "@/lib/gpu-detect";
 import { useImageToCADWorkflow } from "@/hooks/useImageToCADWorkflow";
 import { useCADMeshEditor } from "@/hooks/useCADMeshEditor";
@@ -34,8 +35,10 @@ export default function ImageToCAD() {
   const showCadUpload = isCadUploadEnabled(user?.email);
 
   const [model] = useState("gemini");
-  const [referenceImage, setReferenceImage] = useState<File | null>(null);
-  const [referenceImagePreviewUrl, setReferenceImagePreviewUrl] = useState<string | null>(null);
+  // Ordered reference set: index 0 is the primary image, 1..4 optional extra angles.
+  // Files and preview URLs are kept in lockstep so index i always describes one image.
+  const [referenceImages, setReferenceImages] = useState<File[]>([]);
+  const [referenceImagePreviewUrls, setReferenceImagePreviewUrls] = useState<string[]>([]);
   const [transformMode, setTransformMode] = useState("orbit");
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(true);
@@ -50,6 +53,10 @@ export default function ImageToCAD() {
   const canvasRef = useRef<CADCanvasHandle>(null);
   const leftPanelRef = useRef<ImperativePanelHandle>(null);
   const rightPanelRef = useRef<ImperativePanelHandle>(null);
+  // Mirrors referenceImagePreviewUrls so the unmount cleanup sees the latest set
+  // without re-running (and revoking live URLs) on every change.
+  const referenceImagePreviewUrlsRef = useRef<string[]>([]);
+  useEffect(() => { referenceImagePreviewUrlsRef.current = referenceImagePreviewUrls; }, [referenceImagePreviewUrls]);
 
   const editor = useCADMeshEditor({ canvasRef, transformMode, setTransformMode });
 
@@ -58,7 +65,7 @@ export default function ImageToCAD() {
   const workflow = useImageToCADWorkflow({
     model,
     prompt,
-    referenceImage,
+    referenceImages,
     pushUndo: editor.pushUndo,
     userId: user?.id,
     onWorkspaceActivate: activateWorkspace,
@@ -92,9 +99,37 @@ export default function ImageToCAD() {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount; workflow/navigate/searchParams excluded so re-navigation doesn't re-seed state
   }, []);
 
-  const handleReferenceImageChange = useCallback((file: File | null, previewUrl: string | null) => {
-    setReferenceImage(file);
-    setReferenceImagePreviewUrl(previewUrl);
+  const handleAddReferenceImages = useCallback((files: File[]) => {
+    if (files.length === 0) return;
+    const urls = files.map(f => URL.createObjectURL(f));
+    setReferenceImages(prev => [...prev, ...files].slice(0, MAX_RING_CAD_REFERENCE_IMAGES));
+    setReferenceImagePreviewUrls(prev => [...prev, ...urls].slice(0, MAX_RING_CAD_REFERENCE_IMAGES));
+  }, []);
+
+  const handleRemoveReferenceImage = useCallback((index: number) => {
+    setReferenceImagePreviewUrls(prev => {
+      const url = prev[index];
+      if (url?.startsWith("blob:")) URL.revokeObjectURL(url);
+      return prev.filter((_, i) => i !== index);
+    });
+    setReferenceImages(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const handleReplaceReferenceImages = useCallback((files: File[]) => {
+    const capped = files.slice(0, MAX_RING_CAD_REFERENCE_IMAGES);
+    const urls = capped.map(f => URL.createObjectURL(f));
+    setReferenceImagePreviewUrls(prev => {
+      prev.forEach(u => { if (u.startsWith("blob:")) URL.revokeObjectURL(u); });
+      return urls;
+    });
+    setReferenceImages(capped);
+  }, []);
+
+  // Release any outstanding object URLs when the page unmounts.
+  useEffect(() => () => {
+    referenceImagePreviewUrlsRef.current.forEach(u => {
+      if (u.startsWith("blob:")) URL.revokeObjectURL(u);
+    });
   }, []);
 
   const handleModelReady = useCallback(() => {
@@ -185,8 +220,10 @@ export default function ImageToCAD() {
           setPrompt={setPrompt}
           isGenerating={workflow.isGenerating}
           onGenerate={workflow.simulateGeneration}
-          referenceImagePreviewUrl={referenceImagePreviewUrl}
-          onReferenceImageChange={handleReferenceImageChange}
+          referenceImagePreviewUrls={referenceImagePreviewUrls}
+          onAddReferenceImages={handleAddReferenceImages}
+          onRemoveReferenceImage={handleRemoveReferenceImage}
+          onReplaceReferenceImages={handleReplaceReferenceImages}
           onGlbUpload={showCadUpload ? (file) => {
             setWorkspaceActive(true);
             workflow.setHasModel(true);
@@ -243,8 +280,8 @@ export default function ImageToCAD() {
               onGlbUpload={() => {}}
               onReset={workflow.hasModel ? handleReset : undefined}
               pageTitle="Image to CAD"
-              referenceImagePreviewUrl={referenceImagePreviewUrl}
-              onClearReferenceImage={() => handleReferenceImageChange(null, null)}
+              referenceImagePreviewUrl={referenceImagePreviewUrls[0] ?? null}
+              onClearReferenceImage={() => handleRemoveReferenceImage(0)}
               creditBlock={creditBlockUI}
             />
           )}

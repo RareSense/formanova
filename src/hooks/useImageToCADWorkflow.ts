@@ -20,6 +20,19 @@ import {
   buildCadGenerationStartBody,
 } from "@/lib/cad-workflows";
 import { resolveCadGenerationTier } from "@/lib/cad-tier";
+import {
+  RING_CAD_NURBS_WORKFLOW,
+  RING_CAD_DEFAULT_TIER,
+  RING_CAD_POLL_TIMEOUT_MS,
+  buildRingCadStartBody,
+  parseRingCadResult,
+  parseRingCadFailure,
+  isRingCadSuccess,
+  resolveRingCadCredits,
+  ringCadProgressFraction,
+  isRingCadRepairing,
+  type ArtifactRef,
+} from "@/lib/ring-cad-nurbs-api";
 import { trackPaywallHit, trackCadGenerationCompleted } from "@/lib/posthog-events";
 
 function fileToDataUri(file: File): Promise<string> {
@@ -34,13 +47,24 @@ function fileToDataUri(file: File): Promise<string> {
 interface WorkflowParams {
   model: string;
   prompt: string;
-  referenceImage: File | null;
+  /** Ordered reference set, 0..5 images. Index 0 is IMAGE 1 and wins every conflict. */
+  referenceImages: File[];
+  /** ring_cad_nurbs_v1 tier; selects both the model and the price. */
+  tier?: string;
   pushUndo: (label: string) => void;
   userId: string | undefined;
   onWorkspaceActivate: () => void;
 }
 
-export function useImageToCADWorkflow({ model, prompt, referenceImage, pushUndo, userId, onWorkspaceActivate }: WorkflowParams) {
+export function useImageToCADWorkflow({
+  model,
+  prompt,
+  referenceImages,
+  tier = RING_CAD_DEFAULT_TIER,
+  pushUndo,
+  userId,
+  onWorkspaceActivate,
+}: WorkflowParams) {
   const { refreshCredits } = useCredits();
 
   const [isGenerating, setIsGenerating] = useState(false);
@@ -55,6 +79,14 @@ export function useImageToCADWorkflow({ model, prompt, referenceImage, pushUndo,
   const [glbArtifact, setGlbArtifact] = useState<{ uri: string; type: string; bytes: number; sha256: string } | null>(null);
   const [sourceWorkflowId, setSourceWorkflowId] = useState<string | null>(null);
   const [editPrompt, setEditPrompt] = useState("");
+  /** The machinable deliverable. Present only for ring_cad_nurbs_v1 runs. */
+  const [threedmArtifact, setThreedmArtifact] = useState<ArtifactRef | null>(null);
+  /** 0..1, derived from node_visit_seq rather than a named progress node. */
+  const [progressFraction, setProgressFraction] = useState(0);
+  /** Backend-authored failure copy, safe to show the user directly. */
+  const [failureMessage, setFailureMessage] = useState<string | null>(null);
+  /** Exports fine but some part is not a closed solid - flag before manufacture. */
+  const [notAllSolid, setNotAllSolid] = useState(false);
 
   const pollAbortRef = useRef<AbortController | null>(null);
 
@@ -62,22 +94,22 @@ export function useImageToCADWorkflow({ model, prompt, referenceImage, pushUndo,
 
   const simulateGeneration = useCallback(async () => {
     if (isGenerating) return;
-    const hasImage = !!referenceImage;
+    const imageCount = referenceImages.length;
     const hasPrompt = !!prompt.trim();
-    if (!hasImage && !hasPrompt) {
+    if (imageCount === 0 && !hasPrompt) {
       toast.error("Upload an image or describe your ring first");
       return;
     }
 
-    const workflow = hasImage ? CAD_IMAGE_GENERATION_WORKFLOW : CAD_GENERATION_WORKFLOW;
-    const modelKey = `${workflow}:${model}`;
-    const requiredCredits = TOOL_COSTS[modelKey] ?? TOOL_COSTS.cad_generation ?? 5;
+    // The tier is the price selector for ring_cad_nurbs_v1 (70 or 100 credits).
+    const fallbackCredits = resolveRingCadCredits(tier);
 
     try {
-      const tier = resolveCadGenerationTier(model);
-      const result = await performCreditPreflight(workflow, 1, { model, pricingContext: { tier } });
+      const result = await performCreditPreflight(RING_CAD_NURBS_WORKFLOW, 1, {
+        pricingContext: { llm_tier: tier },
+      });
       const balance = result.currentBalance;
-      const cost = result.estimatedCredits > 0 ? result.estimatedCredits : requiredCredits;
+      const cost = result.estimatedCredits > 0 ? result.estimatedCredits : fallbackCredits;
       if (balance < cost) {
         setCreditBlock({ approved: false, estimatedCredits: cost, currentBalance: balance });
         trackPaywallHit({ category: 'ring', steps_completed: 1 });
@@ -94,21 +126,25 @@ export function useImageToCADWorkflow({ model, prompt, referenceImage, pushUndo,
     onWorkspaceActivate();
     setIsGenerating(true);
     setGenerationFailed(false);
+    setFailureMessage(null);
     setRetryAttempt(0);
     setHasModel(false);
     setSourceWorkflowId(null);
-    setProgressStep(hasImage ? "generate_from_sketch" : "generate_initial");
+    setThreedmArtifact(null);
+    setProgressStep("analyzing");
 
     try {
-      let requestBody: object;
-      if (hasImage) {
-        const dataUri = await fileToDataUri(referenceImage!);
-        requestBody = buildImageCadStartBody(dataUri, prompt, model);
-      } else {
-        requestBody = buildCadGenerationStartBody(prompt, model);
-      }
+      // Images go up as data: URLs; the server stores them content-addressed.
+      const dataUris = await Promise.all(referenceImages.map(fileToDataUri));
+      const requestBody = buildRingCadStartBody({
+        referenceImages: dataUris,
+        userDescription: prompt,
+        tier,
+      });
 
-      const startRes = await authenticatedFetch(`/api/run/${workflow}`, {
+      // JWT only - the tenant API key and on-behalf-of header are applied by the
+      // backend proxy and must never be sent from the browser (AI_RULES section 1).
+      const startRes = await authenticatedFetch(`/api/run/state/${RING_CAD_NURBS_WORKFLOW}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody),
@@ -121,35 +157,33 @@ export function useImageToCADWorkflow({ model, prompt, referenceImage, pushUndo,
 
       const { workflow_id } = await startRes.json();
       if (!workflow_id) throw new Error("No workflow_id returned");
+      setSourceWorkflowId(workflow_id);
 
       pollAbortRef.current?.abort();
       const pollAbort = new AbortController();
       pollAbortRef.current = pollAbort;
 
-      let genPollResult: PollWorkflowResult<CadGenerationResult>;
+      let genPollResult: PollWorkflowResult<unknown>;
       try {
-        genPollResult = await pollWorkflow<CadGenerationResult>({
+        genPollResult = await pollWorkflow<unknown>({
           mode: 'status-then-result',
           fetchStatus: () => authenticatedFetch(`/api/status/${encodeURIComponent(workflow_id)}`, { signal: pollAbort.signal }),
+          // /result blocks until the run finishes, so it is fetched once, after
+          // status reports terminal - never as a poll.
           fetchResult: () => authenticatedFetch(`/api/result/${encodeURIComponent(workflow_id)}`),
           resolveState: (statusData) => {
-            const s = statusData as { runtime?: { state?: string }; progress?: { state?: string }; state?: string };
-            const state = (s.runtime?.state || s.progress?.state || s.state || 'unknown').toLowerCase();
-            return (['failed', 'budget_exhausted', 'terminated', 'cancelled', 'timed_out', 'timeout'].includes(state)) ? 'completed' : state;
-          },
-          resolveProgressNode: resolveCadProgressNode,
-          parseResult: (d) => parseCadResult(d, 'generation'),
-          onProgress: ({ node, retryCount }) => {
-            setProgressStep(node);
-            if (retryCount > 0) setRetryAttempt(retryCount);
-          },
-          onStatusData: (statusData) => {
             const s = statusData as { runtime?: { state?: string } };
-            const state = (s.runtime?.state || "").toLowerCase();
-            if (state === "failed" || state === "budget_exhausted") setProgressStep("failed_final");
+            return (s.runtime?.state || 'unknown').toLowerCase();
           },
-          intervalMs: 2000,
-          timeoutMs: 60 * 60 * 1000,
+          parseResult: (d) => d,
+          onStatusData: (statusData) => {
+            // Progress comes from node_visit_seq, not named nodes: this workflow
+            // has 46 of them and does not report a current-node label.
+            setProgressFraction(ringCadProgressFraction(statusData));
+            setProgressStep(isRingCadRepairing(statusData) ? "repairing" : "building");
+          },
+          intervalMs: 5000,
+          timeoutMs: RING_CAD_POLL_TIMEOUT_MS,
           max404s: 13,
           maxPollErrors: 10,
           maxResultRetries: 1,
@@ -162,16 +196,32 @@ export function useImageToCADWorkflow({ model, prompt, referenceImage, pushUndo,
 
       if (genPollResult.status === 'cancelled') return;
 
-      const { glb_url, artifact: genArtifact } = genPollResult.result;
-      setGlbArtifact(genArtifact);
-      setGlbUrl(glb_url);
+      const raw = genPollResult.result;
+
+      if (!isRingCadSuccess(raw)) {
+        const failure = parseRingCadFailure(raw);
+        setFailureMessage(failure.userMessage);
+        setProgressStep("failed_final");
+        setIsGenerating(false);
+        setGenerationFailed(true);
+        // A failed run releases the whole credit hold, so the balance changed.
+        refreshCredits().catch(() => {});
+        return;
+      }
+
+      // All three validation_status values are successes carrying a usable ring.
+      const parsed = parseRingCadResult(raw);
+      setThreedmArtifact(parsed.threedmArtifact);
+      setNotAllSolid(parsed.notAllSolid);
+      if (parsed.glbArtifact) setGlbArtifact(parsed.glbArtifact);
+      if (parsed.glbUrl) setGlbUrl(parsed.glbUrl);
+
       trackCadGenerationCompleted({ category: 'ring', prompt_length: prompt.trim().length, duration_ms: Date.now() - cadGenStartTime });
       setProgressStep("_loading");
       setIsModelLoading(true);
       setIsGenerating(false);
       refreshCredits().catch(() => {});
       setHasModel(true);
-      setSourceWorkflowId(workflow_id);
 
     } catch (err) {
       console.error("ImageToCAD generation failed:", err);
@@ -179,7 +229,7 @@ export function useImageToCADWorkflow({ model, prompt, referenceImage, pushUndo,
       setProgressStep("");
       setGenerationFailed(true);
     }
-  }, [prompt, model, referenceImage, isGenerating, refreshCredits, onWorkspaceActivate]);
+  }, [prompt, referenceImages, tier, isGenerating, refreshCredits, onWorkspaceActivate]);
 
   const runEditWithPrompt = useCallback(async (promptText: string, label: string) => {
     if (!promptText.trim()) { toast.error("Please describe the edit"); return; }
@@ -306,6 +356,8 @@ export function useImageToCADWorkflow({ model, prompt, referenceImage, pushUndo,
     glbUrl, setGlbUrl, glbArtifact, setGlbArtifact,
     sourceWorkflowId, setSourceWorkflowId,
     editPrompt, setEditPrompt,
+    threedmArtifact, setThreedmArtifact,
+    progressFraction, failureMessage, notAllSolid,
     simulateGeneration, simulateEdit,
     resetWorkflow,
   };
