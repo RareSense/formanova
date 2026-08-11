@@ -26,8 +26,8 @@ import { azureUriToUrl } from '@/lib/azure-utils';
  * bypasses tier routing, silently dropping the token cap and reasoning config.
  */
 export const RING_CAD_TIERS = {
-  FABLE_5: 'claude_fable_5_openrouter',
-  OPUS_5: 'claude_opus_5_openrouter',
+  FABLE_5: 'claude_fable_5_anthropic',
+  OPUS_5: 'claude_opus_5_anthropic',
   GPT_5_6_SOL: 'gpt_5_6_sol_openrouter',
 } as const;
 
