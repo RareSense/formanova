@@ -206,6 +206,23 @@ describe('ring_cad_nurbs_v1 result parsing', () => {
     expect(r.threedmArtifact?.url).toContain(`/api/artifacts/${sha}`);
   });
 
+  it('collapses a cross-origin content-addressed backend url to the same-origin proxy', () => {
+    // Real backend shape: url is the backend's own host, not a signed blob URL,
+    // and the browser can't fetch it cross-origin without credentials.
+    const sha = 'b'.repeat(64);
+    const r = parseRingCadResult({
+      ...RESULT,
+      glb_artifact: {
+        uri: `azure://agentic-artifacts/hashed/${sha}`,
+        url: `https://staging-gsdgds12.formanova.ai/api/artifacts/${sha}`,
+        type: 'model/gltf-binary',
+        bytes: 1,
+        sha256: sha,
+      },
+    });
+    expect(r.glbUrl).toBe(`/api/artifacts/${sha}`);
+  });
+
   it('falls back to the pre-validation stage when the corrected model is missing', () => {
     const { threedm_artifact, glb_artifact, ...withoutFinal } = RESULT;
     const r = parseRingCadResult({

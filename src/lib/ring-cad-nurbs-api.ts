@@ -208,13 +208,14 @@ function readArtifact(value: unknown): ArtifactRef | null {
   const signedUrl = typeof a.url === 'string' && a.url ? a.url : '';
   const rawUri = typeof a.uri === 'string' && a.uri ? a.uri : '';
   if (!signedUrl && !rawUri) return null;
-  // The backend hands back a signed url for artifacts; prefer it. Otherwise the
-  // uri is azure://, which must go through azureUriToUrl to reach the
-  // same-origin artifact proxy - it is not fetchable directly (AI_RULES 4).
-  // url may end up '' if the reference is neither signed nor resolvable; the
-  // artifact is still reported, since the run did produce it. Callers must
-  // check .url before fetching rather than assuming it is usable.
-  const url = signedUrl || azureUriToUrl(rawUri);
+  // Prefer the backend's url field, falling back to uri, but always route the
+  // candidate through azureUriToUrl: a content-addressed artifact - azure://
+  // or a raw http(s) host with a sha256 in its path, including the backend's
+  // own cross-origin /api/artifacts/<sha> host - collapses to this app's
+  // same-origin, auth-gated artifact proxy (AI_RULES 4). A genuine one-off
+  // signed URL has no matching sha in its path, so it passes through as-is.
+  const candidate = signedUrl || rawUri;
+  const url = azureUriToUrl(candidate) || candidate;
   return {
     uri: rawUri || signedUrl,
     url,
