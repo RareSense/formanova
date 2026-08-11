@@ -239,27 +239,30 @@ describe('ring_cad_nurbs_v1 result parsing', () => {
   });
 
   it('does not report success for a failed run', () => {
-    expect(isRingCadSuccess({ ok: false, status: 'failed', phase: 'cad_export' })).toBe(false);
+    expect(isRingCadSuccess({ ok: false, status: 'failed', phase: 'fail_cad' })).toBe(false);
   });
 });
 
 describe('ring_cad_nurbs_v1 failure parsing', () => {
-  it('surfaces the backend user_message and marks cad_export retryable', () => {
+  it('surfaces the backend user_message and marks fail_cad retryable', () => {
     const f = parseRingCadFailure({
       ok: false,
       status: 'failed',
-      phase: 'cad_export',
+      phase: 'fail_cad',
       error_category: 'build',
       failure_origin: 'run_cad',
       user_message: 'The ring could not be built. Please try again.',
     });
     expect(f.userMessage).toBe('The ring could not be built. Please try again.');
-    expect(f.phase).toBe('cad_export');
+    expect(f.phase).toBe('fail_cad');
     expect(f.retryable).toBe(true);
   });
 
   it('does not mark other phases retryable', () => {
-    expect(parseRingCadFailure({ phase: 'module_prompts' }).retryable).toBe(false);
+    expect(parseRingCadFailure({ phase: 'fail_phase2' }).retryable).toBe(false);
+    expect(parseRingCadFailure({ phase: 'fail_phase3' }).retryable).toBe(false);
+    expect(parseRingCadFailure({ phase: 'fail_modules' }).retryable).toBe(false);
+    expect(parseRingCadFailure({ phase: 'fail_validation_capture' }).retryable).toBe(false);
     expect(parseRingCadFailure({}).retryable).toBe(false);
   });
 });

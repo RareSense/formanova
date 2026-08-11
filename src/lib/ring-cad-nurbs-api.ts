@@ -186,11 +186,11 @@ export interface RingCadResult {
 }
 
 export type RingCadFailurePhase =
-  | 'module_prompts'
-  | 'module_generation'
-  | 'module_assembly'
-  | 'cad_export'
-  | 'validation_prompt';
+  | 'fail_phase2'
+  | 'fail_phase3'
+  | 'fail_modules'
+  | 'fail_cad'
+  | 'fail_validation_capture';
 
 export interface RingCadFailure {
   phase: RingCadFailurePhase | null;
@@ -304,7 +304,9 @@ export function parseRingCadFailure(data: unknown): RingCadFailure {
     errorCategory: str(d.error_category),
     failureOrigin: str(d.failure_origin),
     userMessage: str(d.user_message),
-    retryable: phase === 'cad_export',
+    // fail_cad is the commonest failure and the failed run is free, so it's
+    // worth a retry (spec section 8).
+    retryable: phase === 'fail_cad',
   };
 }
 
