@@ -13,7 +13,6 @@ import { getWorkflowDetails } from '@/lib/generation-history-api';
 import {
   RING_CAD_POLL_TIMEOUT_MS,
   isRingCadRepairing,
-  isRingCadSuccess,
   parseRingCadFailure,
   parseRingCadResult,
   ringCadProgressFraction,
@@ -388,7 +387,16 @@ export function GenerationsContextProvider({ children }: { children: React.React
 
       const raw = pollResult.result;
 
-      if (!isRingCadSuccess(raw)) {
+      // /status already reported runtime.state "completed" - pollWorkflow only
+      // resolves here on that signal (a "failed" state throws and is caught
+      // below instead). The /result body's own ok/status fields are not part
+      // of the documented contract, so the real success check is whether a
+      // model artifact is actually present - falling back through whatever
+      // stage did produce one, same as parseRingCadResult already does.
+      let parsed: ReturnType<typeof parseRingCadResult>;
+      try {
+        parsed = parseRingCadResult(raw);
+      } catch {
         const failure = parseRingCadFailure(raw);
         setGenerations(prev => prev.map(g =>
           g.workflowId === gen.workflowId ? { ...g, status: 'failed', progress: 100 } : g
@@ -404,8 +412,6 @@ export function GenerationsContextProvider({ children }: { children: React.React
         });
         return;
       }
-
-      const parsed = parseRingCadResult(raw);
       const duration = Math.round((Date.now() - startTime) / 1000);
       setGenerations(prev => prev.map(g =>
         g.workflowId === gen.workflowId

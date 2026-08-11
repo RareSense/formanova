@@ -28,7 +28,6 @@ import {
   buildRingCadStartBody,
   parseRingCadResult,
   parseRingCadFailure,
-  isRingCadSuccess,
   resolveRingCadCredits,
   ringCadProgressFraction,
   isRingCadRepairing,
