@@ -35,19 +35,23 @@ Multi-mesh transform: all selected meshes rotate/scale around a shared bounding-
 
 ## LeftPanel.tsx
 
+The CAD Edit/Rebuild workflow (`ring_edit_v1`, Rebuild/Add-On part tools) was
+removed entirely -- there is no in-place edit capability. `LeftPanel` only
+drives generation.
+
 Props (all required unless marked):
 ```ts
 model / setModel         -- AI model id ("gemini" | "claude-opus")
-prompt / setPrompt       -- initial generation prompt
-editPrompt / setEditPrompt
-isGenerating / isEditing / hasModel  -- booleans that gate UI sections
-onGenerate / onEdit      -- trigger generation/edit
+prompt / setPrompt       -- generation prompt (optional once a reference image exists)
+isGenerating / hasModel  -- booleans that gate UI sections
+onGenerate               -- trigger generation
 magicTexturing / onMagicTexturingChange
 onGlbUpload(file: File)
-onRebuildPart?(partId, description)  -- optional, gated by CAD_EDIT_TOOLS_ENABLED
-onAddPart?(description)              -- optional, gated by CAD_EDIT_TOOLS_ENABLED
 onReset?()
 creditBlock?: React.ReactNode        -- slot for credit cost display
+referenceImagePreviewUrl?: string | null
+onClearReferenceImage?()
+pageTitle?: string
 ```
 
 AI model selector is commented out (hidden until model selection ships). Do not re-enable it without a feature flag.
@@ -80,6 +84,7 @@ Central constants for this directory:
 
 ## Key invariants
 - Material definitions live in `src/components/cad-studio/materials.ts` only. Never copy them here.
-- `CAD_EDIT_TOOLS_ENABLED` in `src/lib/feature-flags.ts` is `false` -- Edit/Rebuild UI is hidden. Do not render those sections unconditionally.
+- There is no CAD Edit/Rebuild workflow -- it was removed entirely (no `CAD_EDIT_WORKFLOW`, no Rebuild/Add-On UI). Do not reintroduce it without a new product decision.
 - `CAD_MODEL_SELECTOR_ENABLED` is `false` -- model quality picker stays hidden.
+- Text-to-CAD and Image-to-CAD both generate through `ring_cad_nurbs_v1` via the shared `useImageToCADWorkflow` hook -- do not reintroduce a second inline poll loop for generation.
 - All PostHog events must be imported from `src/lib/posthog-events.ts`, never from `posthog-js` directly.

@@ -19,12 +19,6 @@ function isAllowlistedEmail(email: string | undefined | null, envKey: string): b
 }
 
 /**
- * CAD Edit/Rebuild tools — controlled by VITE_CAD_EDIT_TOOLS_ENABLED env var.
- * Set to "true" to show; anything else (or absent) keeps them hidden.
- */
-export const CAD_EDIT_TOOLS_ENABLED = import.meta.env.VITE_CAD_EDIT_TOOLS_ENABLED === 'true';
-
-/**
  * GLB rename UI in the Text-to-CAD history card — controlled by VITE_CAD_RENAME_ENABLED.
  * Set to "true" to show the pencil/rename; anything else (or absent) keeps it hidden.
  */

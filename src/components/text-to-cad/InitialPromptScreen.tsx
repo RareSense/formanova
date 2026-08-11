@@ -2,7 +2,8 @@ import { useRef, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { useEstimatedCost } from "@/hooks/use-estimated-cost";
-import { AI_MODELS } from "./types";
+import { RING_CAD_NURBS_WORKFLOW } from "@/lib/ring-cad-nurbs-api";
+import ReferenceImageUploader from "./ReferenceImageUploader";
 
 const EXAMPLE_PROMPTS = [
   "Serpentine ring with a coiled snake design",
@@ -22,15 +23,28 @@ interface InitialPromptScreenProps {
   onGenerate: () => void;
   onGlbUpload?: (file: File) => void;
   creditBlock?: React.ReactNode;
+  /** Ordered previews; index 0 is the primary reference. Length 0..MAX_RING_CAD_REFERENCE_IMAGES. */
+  referenceImagePreviewUrls: string[];
+  /** Appends images, respecting the max. Caller owns File state and object-URL lifetime. */
+  onAddReferenceImages: (files: File[]) => void;
+  onRemoveReferenceImage: (index: number) => void;
 }
 
 export default function InitialPromptScreen({
   model, setModel, prompt, setPrompt,
   isGenerating, onGenerate, onGlbUpload, creditBlock,
+  referenceImagePreviewUrls, onAddReferenceImages, onRemoveReferenceImage,
 }: InitialPromptScreenProps) {
   const glbInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const { cost: estimatedCost, loading: costLoading } = useEstimatedCost({ workflowName: 'ring_generate_v1', model });
+  // ring_cad_nurbs_v1 handles text-only, one image, or 2-5 images under one
+  // workflow name — the payload shape changes, the price estimate call does not.
+  const { cost: estimatedCost, loading: costLoading } = useEstimatedCost({ workflowName: RING_CAD_NURBS_WORKFLOW, model });
+
+  const imageCount = referenceImagePreviewUrls.length;
+  // Either input alone is sufficient: text-only (0 images) requires text,
+  // an image (1+) makes text optional — matches useImageToCADWorkflow's rule.
+  const canGenerate = imageCount > 0 || !!prompt.trim();
 
   const handleGlbUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -40,7 +54,7 @@ export default function InitialPromptScreen({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (prompt.trim() && !isGenerating) onGenerate();
+      if (canGenerate && !isGenerating) onGenerate();
     }
   };
 
@@ -56,12 +70,12 @@ export default function InitialPromptScreen({
   }, [prompt, autoResize]);
 
   return (
-    <div className="flex-1 flex items-center justify-center bg-background">
+    <div className="flex-1 flex items-center justify-center bg-background overflow-y-auto">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
-        className="w-full max-w-[1100px] px-6"
+        className="w-full max-w-[1100px] px-6 py-6"
       >
         {/* Title */}
         <div className="text-center mb-6">
@@ -69,8 +83,18 @@ export default function InitialPromptScreen({
             Text to 3D
           </h1>
           <p className="font-mono text-[11px] text-muted-foreground tracking-[0.15em] uppercase">
-            Describe your ring design
+            Describe your ring design, or add a reference image
           </p>
+        </div>
+
+        <div className="max-w-[680px] mx-auto">
+          <ReferenceImageUploader
+            referenceImagePreviewUrls={referenceImagePreviewUrls}
+            onAddReferenceImages={onAddReferenceImages}
+            onRemoveReferenceImage={onRemoveReferenceImage}
+            primaryLabel="Optional: add a reference image"
+            primaryHint="Drag & drop · click to browse · paste (Ctrl+V)"
+          />
         </div>
 
         {/* Prompt */}
@@ -106,7 +130,7 @@ export default function InitialPromptScreen({
           <div className="max-w-[680px] mx-auto">
             <button
               onClick={onGenerate}
-              disabled={isGenerating || !prompt.trim()}
+              disabled={isGenerating || !canGenerate}
               className="w-full py-4 text-[13px] font-bold uppercase tracking-[0.2em] cursor-pointer transition-all duration-200 bg-primary text-primary-foreground disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90 active:scale-[0.99] flex items-center justify-center gap-2"
             >
               {isGenerating ? "Generating…" : (

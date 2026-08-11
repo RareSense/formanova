@@ -61,6 +61,7 @@ describe('generation-history-api URL shapes', () => {
 
     await expect(fetchCadResult('wf-edit')).resolves.toEqual({
       glb_url: 'gs://bucket/edit.glb',
+      threedm_url: null,
       azure_source: 'build_retry',
     });
   });
@@ -74,6 +75,7 @@ describe('generation-history-api URL shapes', () => {
 
     await expect(fetchCadResult('wf-failed')).resolves.toEqual({
       glb_url: 'gs://bucket/initial.glb',
+      threedm_url: null,
       azure_source: 'build_initial',
     });
   });
@@ -87,6 +89,34 @@ describe('generation-history-api URL shapes', () => {
 
     await expect(fetchCadResult('wf-final')).resolves.toEqual({
       glb_url: 'gs://bucket/final.glb',
+      threedm_url: null,
+      azure_source: 'success_final',
+    });
+  });
+
+  it('fetchCadResult reads the flat ring_cad_nurbs_v1 shape, including threedm_url', async () => {
+    const threedmSha = 'a'.repeat(64);
+    const glbSha = 'b'.repeat(64);
+    mockAuthFetch.mockReturnValueOnce(okJson({
+      threedm_artifact: { uri: `azure://container/${threedmSha}.3dm`, type: 'model/3dm', bytes: 10, sha256: threedmSha },
+      glb_artifact: { uri: `azure://container/${glbSha}.glb`, type: 'model/gltf-binary', bytes: 20, sha256: glbSha },
+    }));
+
+    await expect(fetchCadResult('wf-nurbs')).resolves.toEqual({
+      glb_url: `/api/artifacts/${glbSha}`,
+      threedm_url: `/api/artifacts/${threedmSha}`,
+      azure_source: 'threedm_artifact',
+    });
+  });
+
+  it('fetchCadResult falls back to the legacy nested shape when the flat shape has no artifacts', async () => {
+    mockAuthFetch.mockReturnValueOnce(okJson({
+      success_final: [{ glb_artifact: { uri: 'gs://bucket/legacy.glb' } }],
+    }));
+
+    await expect(fetchCadResult('wf-legacy')).resolves.toEqual({
+      glb_url: 'gs://bucket/legacy.glb',
+      threedm_url: null,
       azure_source: 'success_final',
     });
   });

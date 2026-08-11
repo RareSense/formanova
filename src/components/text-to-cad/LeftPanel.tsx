@@ -1,62 +1,40 @@
 import { useRef, useCallback, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Diamond, ChevronDown, ChevronRight, RotateCcw, X, Maximize2 } from "lucide-react";
+import { Diamond, RotateCcw, X, Maximize2 } from "lucide-react";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { useEstimatedCost } from "@/hooks/use-estimated-cost";
-import { PART_REGEN_PARTS } from "./types";
-import { CAD_EDIT_WORKFLOW, CAD_GENERATION_WORKFLOW } from "@/lib/cad-workflows";
-import { CAD_EDIT_TOOLS_ENABLED } from "@/lib/feature-flags";
+import { RING_CAD_NURBS_WORKFLOW } from "@/lib/ring-cad-nurbs-api";
 
 interface LeftPanelProps {
   model: string;
   setModel: (m: string) => void;
   prompt: string;
   setPrompt: (p: string) => void;
-  editPrompt: string;
-  setEditPrompt: (p: string) => void;
   isGenerating: boolean;
-  isEditing: boolean;
   hasModel: boolean;
   onGenerate: () => void;
-  onEdit: () => void;
   magicTexturing: boolean;
   onMagicTexturingChange: (on: boolean) => void;
   onGlbUpload: (file: File) => void;
-  onRebuildPart?: (partId: string, description: string) => void;
-  onAddPart?: (description: string) => void;
   onReset?: () => void;
   creditBlock?: React.ReactNode;
   referenceImagePreviewUrl?: string | null;
   onClearReferenceImage?: () => void;
   pageTitle?: string;
-  /**
-   * Shows the "Edit Your Ring" section. Defaults to true so Text-to-CAD is
-   * unchanged. Image-to-CAD passes false: ring_cad_nurbs_v1 has no edit
-   * workflow, so Apply Edit would post its run id to ring_edit_v1.
-   */
-  showEdit?: boolean;
 }
 
 export default function LeftPanel({
-  model, setModel, prompt, setPrompt, editPrompt, setEditPrompt,
-  isGenerating, isEditing, hasModel,
-  onGenerate, onEdit, magicTexturing, onMagicTexturingChange, onGlbUpload,
-  onRebuildPart, onAddPart,
+  model, setModel, prompt, setPrompt,
+  isGenerating, hasModel,
+  onGenerate, magicTexturing, onMagicTexturingChange, onGlbUpload,
   onReset,
   creditBlock,
   referenceImagePreviewUrl,
   onClearReferenceImage,
   pageTitle,
-  showEdit = true,
 }: LeftPanelProps) {
   const glbInputRef = useRef<HTMLInputElement>(null);
-  const { cost: generationCost, loading: generationCostLoading } = useEstimatedCost({ workflowName: CAD_GENERATION_WORKFLOW, model });
-  const { cost: editCost, loading: editCostLoading } = useEstimatedCost({ workflowName: CAD_EDIT_WORKFLOW, model });
-  const [rebuildOpen, setRebuildOpen] = useState(false);
-  const [addPartOpen, setAddPartOpen] = useState(false);
-  const [selectedPart, setSelectedPart] = useState<string | null>(null);
-  const [rebuildDesc, setRebuildDesc] = useState("");
-  const [newPartDesc, setNewPartDesc] = useState("");
+  const { cost: generationCost, loading: generationCostLoading } = useEstimatedCost({ workflowName: RING_CAD_NURBS_WORKFLOW, model });
   const [imageLightboxOpen, setImageLightboxOpen] = useState(false);
 
   const handleGlbUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -243,163 +221,6 @@ export default function LeftPanel({
             <p className="font-body text-[13px] text-foreground/70 leading-relaxed">{prompt}</p>
           </section>
         )}
-
-        {/* Edit section */}
-        <AnimatePresence>
-          {hasModel && showEdit && (
-            <motion.section
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="relative p-4 lg:p-5 bg-muted/30 border border-border min-w-0 overflow-hidden"
-            >
-              <h3 className="font-display text-base lg:text-lg tracking-[0.12em] lg:tracking-[0.15em] text-foreground uppercase mb-1">Edit Your Ring</h3>
-              <p className="font-mono text-[9px] lg:text-[10px] text-muted-foreground mb-4 tracking-wide">Describe the change you want to apply</p>
-
-              {/* Text edit prompt */}
-              <textarea
-                value={editPrompt}
-                onChange={(e) => setEditPrompt(e.target.value)}
-                placeholder="Describe what to change, e.g.: Make the roses larger, add more petals, twist the band tighter"
-                className="w-full min-h-[70px] px-4 py-3.5 text-[13px] text-foreground placeholder:text-muted-foreground/50 resize-y font-body transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-ring bg-muted/30 border border-border"
-              />
-
-              <button
-                onClick={onEdit}
-                disabled={isGenerating || !editPrompt.trim()}
-                className="w-full py-3 lg:py-4 px-3 lg:px-4 mt-3 text-[11px] lg:text-[13px] font-bold uppercase tracking-[0.1em] lg:tracking-[0.2em] cursor-pointer transition-all duration-200 bg-primary text-primary-foreground disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90 active:scale-[0.99] flex items-center justify-center gap-2 flex-wrap"
-              >
-                <span>Apply Edit</span>
-                <span className="inline-flex items-center gap-1 opacity-80 flex-shrink-0">
-                  <span className="text-[11px] lg:text-[13px] font-mono font-semibold">≤</span>
-                  <img src={creditCoinIcon} alt="" className="w-5 h-5" />
-                  <span className="text-[11px] lg:text-[13px] font-mono font-semibold">{editCostLoading ? '…' : (editCost !== null ? editCost : '—')}</span>
-                </span>
-              </button>
-
-              {/* ═══ PRIMARY PART TOOLS ═══ */}
-              <div className={`${CAD_EDIT_TOOLS_ENABLED ? '' : 'hidden'} mt-6 space-y-3`}>
-                <h4 className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Part Tools</h4>
-
-                {/* Rebuild Parts — primary card */}
-                <div className="border-2 border-border bg-card p-3 lg:p-4">
-                  <button
-                    onClick={() => setRebuildOpen(!rebuildOpen)}
-                    className="w-full flex items-center justify-between cursor-pointer"
-                  >
-                    <div className="text-left mr-2">
-                      <span className="font-display text-sm lg:text-base tracking-[0.12em] text-foreground uppercase block">⚙ Rebuild</span>
-                      <span className="font-mono text-[9px] lg:text-[10px] text-muted-foreground mt-1 block">Select and regenerate any component</span>
-                    </div>
-                    {rebuildOpen
-                      ? <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                      : <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                    }
-                  </button>
-                  <AnimatePresence>
-                    {rebuildOpen && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="pt-4 space-y-3">
-                          <div className="grid grid-cols-2 gap-1.5">
-                            {PART_REGEN_PARTS.map((part, idx) => (
-                              <button
-                                key={part.id}
-                                onClick={() => setSelectedPart(part.id)}
-                                className={`py-2.5 px-1 text-[10px] font-semibold uppercase tracking-wide cursor-pointer transition-all duration-150 border text-center ${
-                                  PART_REGEN_PARTS.length % 2 !== 0 && idx === PART_REGEN_PARTS.length - 1 ? "col-span-2" : ""
-                                } ${
-                                  selectedPart === part.id
-                                    ? "text-primary-foreground bg-primary border-primary"
-                                    : "text-muted-foreground hover:text-foreground bg-muted/20 border-border/50"
-                                }`}
-                              >
-                                {part.icon} {part.label}
-                              </button>
-                            ))}
-                          </div>
-                          <input
-                            value={rebuildDesc}
-                            onChange={(e) => setRebuildDesc(e.target.value)}
-                            placeholder="How should this part look..."
-                            className="w-full px-4 py-3 text-[12px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring font-body bg-muted/30 border border-border"
-                          />
-                          <button
-                            disabled={!selectedPart || isGenerating}
-                            onClick={() => selectedPart && onRebuildPart?.(selectedPart, rebuildDesc)}
-                            className="w-full py-2.5 lg:py-3.5 px-3 lg:px-4 text-[11px] lg:text-[12px] font-bold uppercase tracking-[0.1em] lg:tracking-[0.18em] cursor-pointer transition-all duration-200 bg-primary text-primary-foreground disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90 active:scale-[0.98] flex items-center justify-center gap-2 flex-wrap"
-                          >
-                            <span>Rebuild Part</span>
-                            <span className="inline-flex items-center gap-1 opacity-80 flex-shrink-0">
-                              <span className="text-[11px] lg:text-[12px] font-mono font-semibold">≤</span>
-                              <img src={creditCoinIcon} alt="" className="w-4 h-4" />
-                              <span className="text-[11px] lg:text-[12px] font-mono font-semibold">{editCostLoading ? '…' : (editCost !== null ? editCost : '—')}</span>
-                            </span>
-                          </button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-
-                {/* Add Parts — primary card */}
-                <div className="border-2 border-border bg-card p-3 lg:p-4">
-                  <button
-                    onClick={() => setAddPartOpen(!addPartOpen)}
-                    className="w-full flex items-center justify-between cursor-pointer"
-                  >
-                    <div className="text-left mr-2">
-                      <span className="font-display text-sm lg:text-base tracking-[0.12em] text-foreground uppercase block">✚ Add On</span>
-                      <span className="font-mono text-[9px] lg:text-[10px] text-muted-foreground mt-1 block">Generate and add a new element</span>
-                    </div>
-                    {addPartOpen
-                      ? <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                      : <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                    }
-                  </button>
-                  <AnimatePresence>
-                    {addPartOpen && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="pt-4 space-y-3">
-                          <input
-                            value={newPartDesc}
-                            onChange={(e) => setNewPartDesc(e.target.value)}
-                            placeholder="Describe a new part to add..."
-                            className="w-full px-4 py-3 text-[12px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring font-body bg-muted/30 border border-border"
-                          />
-                          <button
-                            disabled={isGenerating || !newPartDesc.trim()}
-                            onClick={() => onAddPart?.(newPartDesc)}
-                            className="w-full py-2.5 lg:py-3.5 px-3 lg:px-4 text-[11px] lg:text-[12px] font-bold uppercase tracking-[0.1em] lg:tracking-[0.18em] cursor-pointer transition-all duration-200 bg-primary text-primary-foreground disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90 active:scale-[0.98] flex items-center justify-center gap-2 flex-wrap"
-                          >
-                            <span>Import Custom 3D Component</span>
-                            <span className="inline-flex items-center gap-1 opacity-80 flex-shrink-0">
-                              <span className="text-[11px] lg:text-[12px] font-mono font-semibold">≤</span>
-                              <img src={creditCoinIcon} alt="" className="w-4 h-4" />
-                              <span className="text-[11px] lg:text-[12px] font-mono font-semibold">{editCostLoading ? '…' : (editCost !== null ? editCost : '—')}</span>
-                            </span>
-                          </button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </div>
-
-            </motion.section>
-          )}
-        </AnimatePresence>
       </div>
 
 

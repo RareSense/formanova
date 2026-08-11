@@ -1,0 +1,264 @@
+import { useRef, useCallback, useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Diamond, X, Maximize2, ImageIcon } from "lucide-react";
+import { MAX_RING_CAD_REFERENCE_IMAGES } from "@/lib/ring-cad-nurbs-api";
+
+interface ReferenceImageUploaderProps {
+  /** Ordered previews; index 0 is the primary reference. Length 0..MAX_RING_CAD_REFERENCE_IMAGES. */
+  referenceImagePreviewUrls: string[];
+  /** Appends images, respecting the max. Caller owns File state and object-URL lifetime. */
+  onAddReferenceImages: (files: File[]) => void;
+  onRemoveReferenceImage: (index: number) => void;
+  primaryLabel?: string;
+  primaryHint?: string;
+}
+
+/**
+ * Shared image reference drop zone: primary drop target, progressive
+ * "additional angles" grid, drag/drop/paste handling, and a lightbox.
+ * Used by both the text-first (InitialPromptScreen) and image-first
+ * (ImagePromptScreen) entry screens so the interaction pattern — and any
+ * future change to it — lives in exactly one place.
+ */
+export default function ReferenceImageUploader({
+  referenceImagePreviewUrls,
+  onAddReferenceImages,
+  onRemoveReferenceImage,
+  primaryLabel = "Drop your ring image or sketch here",
+  primaryHint = "Drag & drop · click to browse · paste (Ctrl+V)",
+}: ReferenceImageUploaderProps) {
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const extraInputRef = useRef<HTMLInputElement>(null);
+  const dropZoneRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  const primaryPreviewUrl = referenceImagePreviewUrls[0] ?? null;
+  const imageCount = referenceImagePreviewUrls.length;
+  const remainingSlots = MAX_RING_CAD_REFERENCE_IMAGES - imageCount;
+
+  /** Filters to images and clamps to the remaining slots, telling the user when it clamps. */
+  const acceptFiles = useCallback((fileList: FileList | File[] | null) => {
+    const images = Array.from(fileList ?? []).filter(f => f.type.startsWith("image/"));
+    if (images.length === 0) return;
+    if (remainingSlots <= 0) {
+      toast.error(`You can use up to ${MAX_RING_CAD_REFERENCE_IMAGES} reference images`);
+      return;
+    }
+    if (images.length > remainingSlots) {
+      toast.error(`Only ${remainingSlots} more ${remainingSlots === 1 ? 'image' : 'images'} can be added (max ${MAX_RING_CAD_REFERENCE_IMAGES})`);
+    }
+    onAddReferenceImages(images.slice(0, remainingSlots));
+  }, [remainingSlots, onAddReferenceImages]);
+
+  const handleImageInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    acceptFiles(e.target.files);
+    e.target.value = "";
+  }, [acceptFiles]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    if (!dropZoneRef.current?.contains(e.relatedTarget as Node)) {
+      setIsDragging(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    acceptFiles(e.dataTransfer.files);
+  }, [acceptFiles]);
+
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const files = Array.from(e.clipboardData?.items ?? [])
+        .filter(i => i.type.startsWith("image/"))
+        .map(i => i.getAsFile())
+        .filter((f): f is File => f !== null);
+      if (files.length) acceptFiles(files);
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [acceptFiles]);
+
+  // Escape closes the lightbox (WCAG 2.2 - dismissible overlay)
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setLightboxIndex(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [lightboxIndex]);
+
+  return (
+    <div>
+      {/* Lightbox */}
+      <AnimatePresence>
+        {lightboxIndex !== null && referenceImagePreviewUrls[lightboxIndex] && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+            onClick={() => setLightboxIndex(null)}
+          >
+            <motion.img
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+              src={referenceImagePreviewUrls[lightboxIndex]}
+              alt={`Reference image ${lightboxIndex + 1} of ${imageCount}, full view`}
+              className="max-w-full max-h-full object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <button
+              onClick={() => setLightboxIndex(null)}
+              aria-label="Close full view"
+              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
+            >
+              <X className="w-4 h-4 text-foreground/70" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <input ref={imageInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageInputChange} />
+      <input ref={extraInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageInputChange} />
+
+      {/* Image drop zone — primary */}
+      <div
+        ref={dropZoneRef}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onClick={() => !primaryPreviewUrl && imageInputRef.current?.click()}
+        className={`relative w-full border flex items-center justify-center transition-all duration-200 mb-3 ${
+          isDragging
+            ? "border-foreground/60 bg-foreground/5"
+            : "border-foreground/40 hover:border-foreground/60 hover:bg-foreground/5 bg-muted/10"
+        } ${!primaryPreviewUrl ? "cursor-pointer" : ""}`}
+        style={{ minHeight: 240 }}
+      >
+        {primaryPreviewUrl ? (
+          <>
+            <img
+              src={primaryPreviewUrl}
+              alt="Primary reference ring"
+              className="w-full object-contain p-3"
+              style={{ maxHeight: 320 }}
+            />
+            <button
+              onClick={(e) => { e.stopPropagation(); onRemoveReferenceImage(0); }}
+              className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
+              aria-label="Remove primary image"
+            >
+              <X className="w-3 h-3 text-foreground/70" />
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); setLightboxIndex(0); }}
+              className="absolute top-2 right-10 w-6 h-6 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
+              aria-label="Expand primary image"
+            >
+              <Maximize2 className="w-3 h-3 text-foreground/70" />
+            </button>
+          </>
+        ) : (
+          <div className="flex flex-col items-center text-center px-6 py-10">
+            <div className="relative mx-auto w-20 h-20 mb-6">
+              <div className="absolute inset-0 rounded-full bg-primary/10 animate-ping motion-reduce:animate-none" style={{ animationDuration: '2.5s' }} />
+              <div className="absolute inset-0 rounded-full bg-primary/5 border-2 border-primary/20 flex items-center justify-center">
+                <Diamond className="h-9 w-9 text-primary" />
+              </div>
+            </div>
+            <p className="font-display text-lg tracking-[0.1em] text-foreground uppercase mb-1.5">
+              {primaryLabel}
+            </p>
+            <p className="text-sm text-muted-foreground mb-6">
+              {primaryHint}
+            </p>
+            <Button variant="outline" size="lg" className="gap-2 pointer-events-none">
+              <ImageIcon className="h-4 w-4" />
+              Browse ring files
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Additional angles — revealed only once a primary image exists (progressive disclosure) */}
+      {primaryPreviewUrl && (
+        <div className="mb-3">
+          <div className="flex items-baseline justify-between mb-2">
+            <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              Additional angles
+            </h3>
+            <span className="font-mono text-[10px] tracking-[0.15em] text-muted-foreground/60 tabular-nums">
+              {imageCount}/{MAX_RING_CAD_REFERENCE_IMAGES}
+            </span>
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            {Array.from({ length: MAX_RING_CAD_REFERENCE_IMAGES - 1 }, (_, slot) => {
+              // Slot n holds reference image n+1 (index 0 is the primary zone above).
+              const index = slot + 1;
+              const url = referenceImagePreviewUrls[index];
+
+              if (url) {
+                return (
+                  <div key={index} className="relative aspect-square border border-border bg-muted/10 overflow-hidden">
+                    <img src={url} alt={`Reference angle ${index}`} className="w-full h-full object-cover" />
+                    <button
+                      onClick={() => onRemoveReferenceImage(index)}
+                      className="absolute top-1 right-1 w-6 h-6 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
+                      aria-label={`Remove reference angle ${index}`}
+                    >
+                      <X className="w-3 h-3 text-foreground/70" />
+                    </button>
+                    <button
+                      onClick={() => setLightboxIndex(index)}
+                      className="absolute bottom-1 right-1 w-6 h-6 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
+                      aria-label={`Expand reference angle ${index}`}
+                    >
+                      <Maximize2 className="w-3 h-3 text-foreground/70" />
+                    </button>
+                  </div>
+                );
+              }
+
+              // The first empty slot is the add target; later ones stay inert placeholders
+              // so the strip keeps a stable 4-up layout with no shift as images are added.
+              const isNextSlot = index === imageCount;
+              return (
+                <button
+                  key={index}
+                  type="button"
+                  disabled={!isNextSlot}
+                  onClick={() => extraInputRef.current?.click()}
+                  aria-label={`Add reference angle ${index}`}
+                  className={`aspect-square border border-dashed flex flex-col items-center justify-center gap-1 transition-colors duration-200 ${
+                    isNextSlot
+                      ? "border-foreground/40 hover:border-foreground/60 hover:bg-foreground/5 bg-muted/10"
+                      : "border-border/40 bg-muted/5"
+                  }`}
+                >
+                  <Diamond className={`h-5 w-5 ${isNextSlot ? "text-primary" : "text-muted-foreground/30"}`} />
+                  {isNextSlot && (
+                    <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground">
+                      Add
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground/70 leading-relaxed">
+            Optional. More angles of the same ring give the model a better read on depth and profile.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
