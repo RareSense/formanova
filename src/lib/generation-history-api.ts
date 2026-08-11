@@ -5,6 +5,8 @@
  */
 
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
+import { azureUriToUrl } from '@/lib/azure-utils';
+import { parseRingCadResult } from '@/lib/ring-cad-nurbs-api';
 const __DEV__ = import.meta.env.DEV;
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -210,14 +212,23 @@ export async function getWorkflowDetails(
 
 /**
  * Fetch the final result for a CAD workflow using the /result endpoint.
- * Applies the deterministic sink-based fallback rule:
+ *
+ * ring_cad_nurbs_v1 returns a flat object (threedm_artifact/glb_artifact at
+ * the top level) — that shape is tried first via parseRingCadResult. Older
+ * CAD workflows (ring_generate_v1, ring_edit_v1) return the nested
+ * node_results shape below and never carry a .3dm, so threedm_url is null
+ * for those. Both paths route through azureUriToUrl so every returned URL is
+ * this app's same-origin, auth-gated artifact proxy rather than a raw
+ * azure:// reference or an unauthenticated cross-origin host.
+ *
+ * Legacy sink-based fallback rule:
  *   success_final → glb_artifact (final output, preferred) → original_glb_artifact (intermediate)
  *   success_original_glb → original_glb_artifact
  *   failed_final → null (no fallback)
  */
 export async function fetchCadResult(
   workflowId: string,
-): Promise<{ glb_url: string | null; azure_source: string | null }> {
+): Promise<{ glb_url: string | null; threedm_url: string | null; azure_source: string | null }> {
   function extractArtifactUri(results: Record<string, unknown>, nodeKey: string, artifactKey: string): string | null {
     const node = results[nodeKey];
     if (!node) return null;
@@ -231,25 +242,48 @@ export async function fetchCadResult(
     return null;
   }
 
+  const resolveUrl = (uri: string | null): string | null => (uri ? (azureUriToUrl(uri) || uri) : null);
+
   try {
     const res = await authenticatedFetch(
       `/api/result/${workflowId}`,
     );
-    if (!res.ok) return { glb_url: null, azure_source: null };
+    if (!res.ok) return { glb_url: null, threedm_url: null, azure_source: null };
 
-    const data = await res.json();
+    const data = await res.json() as Record<string, unknown>;
+
+    // 0. ring_cad_nurbs_v1's flat (or sink-node-keyed) result shape, tried
+    // first — but only when the response isn't one of the older workflows'
+    // known sink shapes. parseRingCadResult's deep search would otherwise
+    // find artifacts nested inside success_final/build_retry/etc and bypass
+    // the legacy precedence rules (success_final > success_original_glb >
+    // failed_final's build_initial-only rule > build_retry) below.
+    const LEGACY_SINK_KEYS = ['success_final', 'success_original_glb', 'failed_final', 'build_retry', 'build_initial'];
+    const isLegacyShape = LEGACY_SINK_KEYS.some((key) => key in data);
+    if (!isLegacyShape) {
+      try {
+        const flat = parseRingCadResult(data);
+        return {
+          glb_url: flat.glbArtifact?.url ?? null,
+          threedm_url: flat.threedmArtifact?.url ?? null,
+          azure_source: flat.sourceStage,
+        };
+      } catch {
+        // Not a ring_cad_nurbs_v1 result — fall through to the legacy nested shape.
+      }
+    }
 
     // 1. success_final: prefer glb_artifact (final output), fallback original_glb_artifact
     const finalUri = extractArtifactUri(data, 'success_final', 'glb_artifact')
       || extractArtifactUri(data, 'success_final', 'original_glb_artifact');
     if (finalUri) {
-      return { glb_url: finalUri, azure_source: 'success_final' };
+      return { glb_url: resolveUrl(finalUri), threedm_url: null, azure_source: 'success_final' };
     }
 
     // 2. success_original_glb: use original_glb_artifact only
     const originalUri = extractArtifactUri(data, 'success_original_glb', 'original_glb_artifact');
     if (originalUri) {
-      return { glb_url: originalUri, azure_source: 'success_original_glb' };
+      return { glb_url: resolveUrl(originalUri), threedm_url: null, azure_source: 'success_original_glb' };
     }
 
     // 3. failed_final: only build_initial is allowed as fallback
@@ -258,9 +292,9 @@ export async function fetchCadResult(
       const failedInitialUri = extractArtifactUri(data, 'build_initial', 'glb_artifact')
         || extractArtifactUri(data, 'build_initial', 'original_glb_artifact');
       if (failedInitialUri) {
-        return { glb_url: failedInitialUri, azure_source: 'build_initial' };
+        return { glb_url: resolveUrl(failedInitialUri), threedm_url: null, azure_source: 'build_initial' };
       }
-      return { glb_url: null, azure_source: 'failed_final' };
+      return { glb_url: null, threedm_url: null, azure_source: 'failed_final' };
     }
 
     // 4. ring_edit_v1 currently returns build nodes rather than success sinks.
@@ -269,13 +303,13 @@ export async function fetchCadResult(
       || extractArtifactUri(data, 'build_initial', 'glb_artifact')
       || extractArtifactUri(data, 'build_initial', 'original_glb_artifact');
     if (buildUri) {
-      return { glb_url: buildUri, azure_source: 'build_retry' };
+      return { glb_url: resolveUrl(buildUri), threedm_url: null, azure_source: 'build_retry' };
     }
 
-    return { glb_url: null, azure_source: null };
+    return { glb_url: null, threedm_url: null, azure_source: null };
   } catch (e) {
     if (__DEV__) console.warn('[HistoryAPI] fetchCadResult error:', workflowId, e);
-    return { glb_url: null, azure_source: null };
+    return { glb_url: null, threedm_url: null, azure_source: null };
   }
 }
 

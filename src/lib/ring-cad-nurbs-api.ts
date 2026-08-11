@@ -225,6 +225,35 @@ function readArtifact(value: unknown): ArtifactRef | null {
   };
 }
 
+/**
+ * Bounded depth-first search for the first value at a key matching `predicate`,
+ * anywhere inside nested objects/arrays. A request that omits `return_nodes`
+ * can make the backend fall back to a sink-node-keyed response instead of this
+ * workflow's documented flat shape - e.g. `{ validation_run_cad: [{ glb_artifact:
+ * {...} }] }` instead of `{ glb_artifact: {...} }` at the top level. Depth is
+ * capped so one unmatched field never triggers an unbounded tree walk.
+ */
+const MAX_DEEP_SEARCH_DEPTH = 6;
+
+function findKeyDeep(
+  node: unknown,
+  predicate: (key: string) => boolean,
+  depth = 0,
+): unknown {
+  if (depth > MAX_DEEP_SEARCH_DEPTH || !node || typeof node !== 'object') return undefined;
+  const values = Array.isArray(node) ? node : Object.values(node as Record<string, unknown>);
+  if (!Array.isArray(node)) {
+    for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+      if (predicate(key)) return value;
+    }
+  }
+  for (const value of values) {
+    const found = findKeyDeep(value, predicate, depth + 1);
+    if (found !== undefined) return found;
+  }
+  return undefined;
+}
+
 /** True for the three terminal states that produced a usable ring. */
 export function isRingCadSuccess(data: unknown): boolean {
   const d = (data ?? {}) as Record<string, unknown>;
@@ -251,18 +280,28 @@ function readStagedArtifact(
     const artifact = readArtifact(d[stages[i]]);
     if (artifact) return { artifact, stage: stages[i], fellBack: i > 0 };
   }
-  // Last resort: any *_artifact key that names this model type, so an unexpected
-  // stage name still yields a model rather than an empty screen.
+  // Any *_artifact key that names this model type, so an unexpected stage
+  // name still yields a model rather than an empty screen.
   const suffix = stages[0].includes('threedm') ? 'threedm' : 'glb';
+  const matchesArtifactKey = (key: string) => key.endsWith('_artifact') && key.includes(suffix);
   for (const [key, value] of Object.entries(d)) {
-    if (!key.endsWith('_artifact') || !key.includes(suffix)) continue;
+    if (!matchesArtifactKey(key)) continue;
     const artifact = readArtifact(value);
     if (artifact) return { artifact, stage: key, fellBack: true };
   }
+  // Last resort: the response may be sink-node-keyed rather than flat (see
+  // findKeyDeep). Search the whole tree before concluding there is no model.
+  const deepArtifact = readArtifact(findKeyDeep(d, matchesArtifactKey));
+  if (deepArtifact) return { artifact: deepArtifact, stage: 'deep-scan', fellBack: true };
   return { artifact: null, stage: null, fellBack: false };
 }
 
-/** The result is a flat object, not the nested node_results shape of older CAD workflows. */
+/**
+ * The documented shape is flat, unlike the nested node_results shape of older
+ * CAD workflows - but omitting return_nodes on the start request can make the
+ * backend fall back to a sink-node-keyed response instead (see findKeyDeep),
+ * so every field here is read flat-first and deep-search-second.
+ */
 export function parseRingCadResult(data: unknown): RingCadResult {
   const d = (data ?? {}) as Record<string, unknown>;
 
@@ -270,11 +309,24 @@ export function parseRingCadResult(data: unknown): RingCadResult {
   const glb = readStagedArtifact(d, GLB_STAGES);
   const threedmArtifact = threedm.artifact;
   const glbArtifact = glb.artifact;
-  const diagnostics = (d.cad_diagnostics && typeof d.cad_diagnostics === 'object'
-    ? d.cad_diagnostics
+
+  // cad_diagnostics is the documented flat-shape field; a sink-node-keyed
+  // response nests the per-node tool output under a different key entirely
+  // (observed as plain "diagnostics" on the cad_runner node), so fall back to
+  // a deep search for either name when it's missing at the top level.
+  let diagnosticsRaw: unknown = d.cad_diagnostics;
+  if (!diagnosticsRaw || typeof diagnosticsRaw !== 'object') {
+    diagnosticsRaw = findKeyDeep(d, (key) => key === 'cad_diagnostics' || key === 'diagnostics');
+  }
+  const diagnostics = (diagnosticsRaw && typeof diagnosticsRaw === 'object'
+    ? diagnosticsRaw
     : {}) as RingCadDiagnostics;
 
-  const rawStatus = typeof d.validation_status === 'string' ? d.validation_status : null;
+  let rawStatus = typeof d.validation_status === 'string' ? d.validation_status : null;
+  if (!rawStatus) {
+    const deepStatus = findKeyDeep(d, (key) => key === 'validation_status');
+    rawStatus = typeof deepStatus === 'string' ? deepStatus : null;
+  }
   const validationStatus =
     rawStatus === 'applied' || rawStatus === 'not_applied' || rawStatus === 'errored'
       ? rawStatus

@@ -258,6 +258,43 @@ describe('ring_cad_nurbs_v1 result parsing', () => {
   it('does not report success for a failed run', () => {
     expect(isRingCadSuccess({ ok: false, status: 'failed', phase: 'fail_cad' })).toBe(false);
   });
+
+  it('recovers a model from a sink-node-keyed response (no return_nodes sent)', () => {
+    // Observed shape when the start request omits return_nodes: the backend
+    // keys the response by sink node id instead of returning the flat shape.
+    const r = parseRingCadResult({
+      validation_run_cad: [
+        {
+          ok: true,
+          tool: 'cad_runner',
+          glb_artifact: { uri: 'azure://a/ring.glb', url: 'https://s/ring.glb', type: '', bytes: 1, sha256: '' },
+          threedm_artifact: { uri: 'azure://a/ring.3dm', url: 'https://s/ring.3dm', type: '', bytes: 1, sha256: '' },
+          diagnostics: { part_count: 50, not_all_solid: false },
+        },
+      ],
+      output_asset_id: null,
+    });
+    expect(r.threedmArtifact?.url).toBe('https://s/ring.3dm');
+    expect(r.glbUrl).toBe('https://s/ring.glb');
+    expect(r.usedFallbackStage).toBe(true);
+    expect(r.diagnostics.part_count).toBe(50);
+    expect(r.notAllSolid).toBe(false);
+  });
+
+  it('prefers the flat top-level shape over a nested one when both exist', () => {
+    const r = parseRingCadResult({
+      ...RESULT,
+      validation_run_cad: [
+        {
+          glb_artifact: { uri: 'azure://a/nested.glb', url: 'https://s/nested.glb', type: '', bytes: 1, sha256: '' },
+        },
+      ],
+    });
+    // Top-level glb_artifact (from RESULT) wins, not the nested sink-node one.
+    expect(r.glbUrl).not.toBe('https://s/nested.glb');
+    expect(r.usedFallbackStage).toBe(false);
+    expect(r.sourceStage).toBe('threedm_artifact');
+  });
 });
 
 describe('ring_cad_nurbs_v1 failure parsing', () => {
