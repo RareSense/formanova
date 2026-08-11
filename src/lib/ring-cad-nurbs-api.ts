@@ -302,29 +302,59 @@ function readStagedArtifact(
  * backend fall back to a sink-node-keyed response instead (see findKeyDeep),
  * so every field here is read flat-first and deep-search-second.
  */
+// Confirmed sink-node keys (backend v2 state-runtime, traced against
+// state_runtime_workflow.py by another dev's agent): a missing return_nodes
+// on the start request wraps the real flat-shape object in a single-element
+// array under one of these three keys, one per outcome branch. The key
+// itself IS the validation_status signal - there is no separate field for it
+// inside the wrapped object.
+const SINK_NODE_VALIDATION_STATUS: Record<string, RingCadValidationStatus> = {
+  final_validated: 'applied',
+  final_prevalidation: 'not_applied',
+  final_validation_errored: 'errored',
+};
+
+/** Unwraps a confirmed sink-node envelope, if present, reporting its implied outcome. */
+function unwrapSinkNode(
+  root: Record<string, unknown>,
+): { node: Record<string, unknown>; validationStatus: RingCadValidationStatus | null } {
+  for (const [key, status] of Object.entries(SINK_NODE_VALIDATION_STATUS)) {
+    const sink = root[key];
+    if (Array.isArray(sink) && sink[0] && typeof sink[0] === 'object') {
+      return { node: sink[0] as Record<string, unknown>, validationStatus: status };
+    }
+  }
+  return { node: root, validationStatus: null };
+}
+
 export function parseRingCadResult(data: unknown): RingCadResult {
-  const d = (data ?? {}) as Record<string, unknown>;
+  const root = (data ?? {}) as Record<string, unknown>;
+  const { node: d, validationStatus: sinkValidationStatus } = unwrapSinkNode(root);
 
   const threedm = readStagedArtifact(d, THREEDM_STAGES);
   const glb = readStagedArtifact(d, GLB_STAGES);
   const threedmArtifact = threedm.artifact;
   const glbArtifact = glb.artifact;
 
-  // cad_diagnostics is the documented flat-shape field; a sink-node-keyed
-  // response nests the per-node tool output under a different key entirely
-  // (observed as plain "diagnostics" on the cad_runner node), so fall back to
-  // a deep search for either name when it's missing at the top level.
+  // cad_diagnostics is the documented flat-shape field; an unrecognised
+  // sink-node shape nests the per-node tool output under a different key
+  // entirely (observed as plain "diagnostics" on the cad_runner node), so
+  // fall back to a deep search of the whole original response for either
+  // name when it's missing on the (possibly already-unwrapped) node.
   let diagnosticsRaw: unknown = d.cad_diagnostics;
   if (!diagnosticsRaw || typeof diagnosticsRaw !== 'object') {
-    diagnosticsRaw = findKeyDeep(d, (key) => key === 'cad_diagnostics' || key === 'diagnostics');
+    diagnosticsRaw = findKeyDeep(root, (key) => key === 'cad_diagnostics' || key === 'diagnostics');
   }
   const diagnostics = (diagnosticsRaw && typeof diagnosticsRaw === 'object'
     ? diagnosticsRaw
     : {}) as RingCadDiagnostics;
 
-  let rawStatus = typeof d.validation_status === 'string' ? d.validation_status : null;
+  // The sink key's implied status wins when present (it's the authoritative
+  // signal for that shape); otherwise read an explicit field, falling back
+  // to a deep search for it anywhere in the original response.
+  let rawStatus: string | null = sinkValidationStatus ?? (typeof d.validation_status === 'string' ? d.validation_status : null);
   if (!rawStatus) {
-    const deepStatus = findKeyDeep(d, (key) => key === 'validation_status');
+    const deepStatus = findKeyDeep(root, (key) => key === 'validation_status');
     rawStatus = typeof deepStatus === 'string' ? deepStatus : null;
   }
   const validationStatus =

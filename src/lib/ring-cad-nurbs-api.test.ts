@@ -295,6 +295,30 @@ describe('ring_cad_nurbs_v1 result parsing', () => {
     expect(r.usedFallbackStage).toBe(false);
     expect(r.sourceStage).toBe('threedm_artifact');
   });
+
+  it.each([
+    ['final_validated', 'applied'],
+    ['final_prevalidation', 'not_applied'],
+    ['final_validation_errored', 'errored'],
+  ] as const)('unwraps the confirmed %s sink envelope and derives validation_status %s', (sinkKey, expectedStatus) => {
+    const r = parseRingCadResult({
+      [sinkKey]: [
+        {
+          ok: true,
+          glb_artifact: { uri: 'azure://a/ring.glb', url: 'https://s/ring.glb', type: '', bytes: 1, sha256: '' },
+          threedm_artifact: { uri: 'azure://a/ring.3dm', url: 'https://s/ring.3dm', type: '', bytes: 1, sha256: '' },
+          screenshots: ['s1.png', 's2.png'],
+          cad_diagnostics: { part_count: 12, not_all_solid: false },
+        },
+      ],
+      output_asset_id: null,
+      source_type: 'ring_cad_nurbs_v1',
+    });
+    expect(r.glbUrl).toBe('https://s/ring.glb');
+    expect(r.threedmArtifact?.url).toBe('https://s/ring.3dm');
+    expect(r.validationStatus).toBe(expectedStatus);
+    expect(r.diagnostics.part_count).toBe(12);
+  });
 });
 
 describe('ring_cad_nurbs_v1 failure parsing', () => {
