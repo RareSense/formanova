@@ -18,6 +18,7 @@ import {
   type AdminGenerationDetail,
 } from '@/lib/admin-generations-api';
 import { resolveSourceType } from '@/lib/generation-history-api';
+import { parseRingCadResult } from '@/lib/ring-cad-nurbs-api';
 import type { AdminGenerationStep } from '@/lib/admin-generations-api';
 import { ScissorGLBGrid, GLBPreviewSlot } from '@/components/generations/ScissorGLBGrid';
 import { Badge } from '@/components/ui/badge';
@@ -155,6 +156,22 @@ function extractGlbFromSteps(steps: AdminGenerationStep[]): string | null {
       }
     }
     return null;
+  }
+
+  // ring_cad_nurbs_v1 steps nest the artifact under a `result` (or sink-node)
+  // wrapper and use extensionless content-addressed proxy URLs (/api/artifacts/
+  // <sha256>, no ".glb" suffix), which the string-matching fallback below can
+  // never find. Try the shared, key-based parser first — it already handles
+  // both the nesting and the extensionless URL shape (see ring-cad-nurbs-api.ts).
+  for (const step of steps) {
+    const out = step.output as Record<string, unknown> | null;
+    if (!out) continue;
+    try {
+      const parsed = parseRingCadResult(out);
+      if (parsed.glbArtifact?.url) return parsed.glbArtifact.url;
+    } catch {
+      // Not a ring_cad_nurbs_v1-shaped step — fall through to the checks below.
+    }
   }
 
   for (const step of steps) {
