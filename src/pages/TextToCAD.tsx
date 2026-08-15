@@ -139,6 +139,12 @@ export default function TextToCAD() {
 
     if (!workspaceActive) setWorkspaceActive(true);
 
+    // Detach from any leftover tracked generation so a background completion
+    // can't force-overwrite what the user just uploaded (useImageToCADWorkflow's
+    // trackedRun mirror effect fires on sourceWorkflowId regardless of on-screen
+    // state, unless the user explicitly left via Keep Creating).
+    workflow.setSourceWorkflowId(null);
+
     // Check if scene actually has meshes — after Ctrl+A + Delete, hasModel may be true
     // but the scene is empty, so we should treat it as a fresh upload.
     const sceneHasMeshes = editor.meshesRef.current.length > 0;
@@ -154,7 +160,6 @@ export default function TextToCAD() {
       workflow.setIsModelLoading(true);
       workflow.setProgressStep("_loading");
       workflow.setGlbUrl(url);
-      workflow.setSourceWorkflowId(null);
       workflow.setHasModel(true);
       editor.setMeshes([]);
     }
