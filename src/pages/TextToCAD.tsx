@@ -122,7 +122,15 @@ export default function TextToCAD() {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount; workflow/navigate/searchParams excluded so re-navigation doesn't re-seed state
   }, []);
 
-  // Called when CADCanvas has fully parsed, textured, and rendered the model
+  // Called when CADCanvas has fully parsed, textured, and rendered the model.
+  // Depend only on the stable setter this uses (React guarantees setState
+  // identity is stable) rather than the whole `workflow` object, which is a
+  // fresh literal every render — a `[workflow]` dependency here defeats
+  // memoization, giving CADCanvas a new onModelReady on every unrelated
+  // TextToCAD re-render. Since onModelReady is itself a dependency of an
+  // internal CADCanvas effect that reprocesses the mesh and re-fires this
+  // callback, that churn caused visible flicker plus a spurious second call
+  // landing after wasManualUploadRef had already been reset to false.
   const handleModelReady = useCallback(() => {
     workflow.setIsModelLoading(false);
     if (wasManualUploadRef.current) {
@@ -131,7 +139,7 @@ export default function TextToCAD() {
     } else {
       toast.success("Ring generated successfully");
     }
-  }, [workflow]);
+  }, [workflow.setIsModelLoading]);
 
   const handleGlbUpload = useCallback((file: File) => {
     const url = URL.createObjectURL(file);
