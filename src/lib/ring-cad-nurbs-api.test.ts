@@ -89,15 +89,15 @@ describe('ring_cad_nurbs_v1 start body', () => {
     expect(payload).not.toHaveProperty('llm_model');
   });
 
-  it('defaults to the fixed Fable 5 tier', () => {
+  it('defaults to the fixed Opus 5 tier', () => {
     const { payload } = buildRingCadStartBody({ referenceImages: [IMG(1)] });
     expect(payload.llm_tier).toBe(RING_CAD_DEFAULT_TIER);
-    expect(RING_CAD_DEFAULT_TIER).toBe(RING_CAD_TIERS.FABLE_5);
+    expect(RING_CAD_DEFAULT_TIER).toBe(RING_CAD_TIERS.OPUS_5);
   });
 
-  it('prices the fixed tier at 100 credits', () => {
-    expect(RING_CAD_GENERATION_CREDITS).toBe(100);
-    expect(resolveRingCadCredits(RING_CAD_DEFAULT_TIER)).toBe(100);
+  it('prices the fixed tier at 70 credits', () => {
+    expect(RING_CAD_GENERATION_CREDITS).toBe(70);
+    expect(resolveRingCadCredits(RING_CAD_DEFAULT_TIER)).toBe(70);
   });
 
   it('never sends credentials in the payload, which is persisted and readable', () => {

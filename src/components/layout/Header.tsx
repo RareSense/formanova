@@ -66,12 +66,13 @@ function GenerationIndicator() {
 
   const handleClick = () => {
     if (!mostRecent) return;
-    // Image-to-3D restores through the workspace deep link, not the studio.
+    // CAD restores through the workspace deep link, not the studio.
     if (mostRecent.kind === 'cad') {
+      const cadRoute = mostRecent.cadRoute ?? '/image-to-cad';
       navigate(
         mostRecent.status === 'completed'
-          ? buildCadRestorePath(mostRecent.workflowId, mostRecent.glbUrl ?? null)
-          : '/image-to-cad',
+          ? buildCadRestorePath(mostRecent.workflowId, mostRecent.glbUrl ?? null, cadRoute)
+          : cadRoute,
       );
       return;
     }

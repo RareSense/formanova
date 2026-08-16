@@ -66,6 +66,7 @@ export default function ImageToCAD() {
     model,
     prompt,
     referenceImages,
+    cadRoute: '/image-to-cad',
     pushUndo: editor.pushUndo,
     userId: user?.id,
     onWorkspaceActivate: activateWorkspace,
@@ -429,7 +430,7 @@ export default function ImageToCAD() {
               currentStep={workflow.progressStep}
               retryAttempt={workflow.retryAttempt}
               onRetry={() => workflow.simulateGeneration()}
-              estimateText="This usually takes around 15 minutes"
+              estimateText="This can take up to 30 minutes"
               failureMessage={workflow.failureMessage}
               onKeepCreating={() => { workflow.handleKeepCreating(); setWorkspaceActive(false); }}
             />

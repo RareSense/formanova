@@ -28,13 +28,18 @@ const STUDIO_RESULT_MAX_RETRIES = 100;
 const DEFAULT_POLL_TIMEOUT_MS = 720_000;
 
 /**
- * Deep link that restores a finished Image-to-3D run into the workspace.
- * ImageToCAD reads ?glb= and ?workflow_id= on mount and seeds the viewport.
+ * Deep link that restores a finished CAD run into the workspace it was
+ * started from. Both TextToCAD and ImageToCAD read ?glb= and ?workflow_id=
+ * on mount and seed the viewport; cadRoute picks which page to land on.
  */
-export function buildCadRestorePath(workflowId: string, glbUrl: string | null): string {
+export function buildCadRestorePath(
+  workflowId: string,
+  glbUrl: string | null,
+  cadRoute: '/text-to-cad' | '/image-to-cad' = '/image-to-cad',
+): string {
   const params = new URLSearchParams({ workflow_id: workflowId });
   if (glbUrl) params.set('glb', glbUrl);
-  return `/image-to-cad?${params.toString()}`;
+  return `${cadRoute}?${params.toString()}`;
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────
@@ -86,6 +91,8 @@ export interface TrackedGeneration {
   threedmUrl?: string | null;
   /** CAD only: label for the completion toast. */
   label?: string;
+  /** CAD only: which page started this run, so restore paths return to the right one. */
+  cadRoute?: '/text-to-cad' | '/image-to-cad';
 }
 
 export type GenerationKind = 'photoshoot' | 'cad';
@@ -118,6 +125,8 @@ export interface TrackCadGenerationParams {
   label?: string;
   /** Poll ceiling; ring_cad_nurbs_v1 runs can take up to 90 minutes. */
   timeoutMs?: number;
+  /** Which page started this run, so restore paths return to the right one. */
+  cadRoute?: '/text-to-cad' | '/image-to-cad';
 }
 
 export interface GenerationsContextValue {
@@ -319,6 +328,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
         glbUrl: null,
         threedmUrl: null,
         ...(params.label ? { label: params.label } : {}),
+        cadRoute: params.cadRoute ?? '/image-to-cad',
         timeoutMs: params.timeoutMs ?? RING_CAD_POLL_TIMEOUT_MS,
       },
     ]);
@@ -433,7 +443,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
         action: (
           <ToastAction
             altText="View Result"
-            onClick={() => navigate(buildCadRestorePath(gen.workflowId, parsed.glbUrl))}
+            onClick={() => navigate(buildCadRestorePath(gen.workflowId, parsed.glbUrl, gen.cadRoute))}
           >
             View Result
           </ToastAction>

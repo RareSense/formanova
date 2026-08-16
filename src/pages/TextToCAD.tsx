@@ -86,6 +86,7 @@ export default function TextToCAD() {
     model,
     prompt,
     referenceImages,
+    cadRoute: '/text-to-cad',
     onWorkspaceActivate: activateWorkspace,
   });
 
@@ -683,8 +684,9 @@ export default function TextToCAD() {
               currentStep={workflow.progressStep}
               retryAttempt={workflow.retryAttempt}
               onRetry={() => workflow.simulateGeneration()}
-              estimateText="This usually takes around 15 minutes"
+              estimateText="This can take up to 30 minutes"
               failureMessage={workflow.failureMessage}
+              onKeepCreating={() => { workflow.handleKeepCreating(); setWorkspaceActive(false); }}
             />
             <ViewportSideTools
               visible={workflow.hasModel && !workflow.isGenerating && !workflow.isModelLoading}

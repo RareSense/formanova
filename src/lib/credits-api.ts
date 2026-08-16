@@ -39,10 +39,11 @@ export const TOOL_COSTS: Record<string, number> = {
   ring_full_pipeline: 85,
   ring_generate_v1: 85,
   ring_edit_v1: 85,
-  // Image-to-CAD (NURBS). Priced by llm_tier: 70 for Opus 5 / GPT-5.6 Sol,
-  // 100 for Fable 5 and any unlisted tier. The page fixes the tier to Fable 5,
-  // so this fallback matches that. Only used if /credits/estimate fails.
-  ring_cad_nurbs_v1: 100,
+  // Text-to-CAD / Image-to-CAD (NURBS). Priced by llm_tier: 70 for Opus 5 /
+  // GPT-5.6 Sol, 100 for Fable 5 and any unlisted tier. The page fixes the
+  // tier to Opus 5, so this fallback matches that. Only used if
+  // /credits/estimate fails.
+  ring_cad_nurbs_v1: 70,
   // Model-specific costs for ring_generate_v1
   'ring_generate_v1:gemini': 85,
   'ring_generate_v1:claude-sonnet': 120,

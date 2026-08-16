@@ -42,7 +42,7 @@ interface GenerationProgressProps {
   failureMessage?: string | null;
   /**
    * Leaves the run going in the background and returns the user to the upload
-   * screen. Omit to keep the overlay blocking (Text-to-3D still does).
+   * screen. Omit to keep the overlay blocking.
    */
   onKeepCreating?: () => void;
 }
@@ -120,12 +120,19 @@ export default function GenerationProgress({
                   {estimateText ?? "This may take more than 10 minutes"}
                 </span>
                 {onKeepCreating && (
-                  <button
-                    onClick={onKeepCreating}
-                    className="mt-4 px-6 py-3 text-[12px] font-bold uppercase tracking-[0.2em] border border-border text-foreground hover:bg-accent/60 transition-colors"
-                  >
-                    Keep Creating
-                  </button>
+                  <>
+                    <div className="mt-3 px-4 py-2.5 max-w-[260px] bg-primary/10 border border-primary/30 text-center">
+                      <span className="text-[11px] font-semibold text-foreground/90 leading-relaxed">
+                        Grab a coffee, this can take up to 30 minutes. It will be saved to your generation history, so it is safe to leave.
+                      </span>
+                    </div>
+                    <button
+                      onClick={onKeepCreating}
+                      className="mt-2 px-6 py-3 text-[12px] font-bold uppercase tracking-[0.2em] border border-border text-foreground hover:bg-accent/60 transition-colors"
+                    >
+                      Keep Creating
+                    </button>
+                  </>
                 )}
               </>
             )}

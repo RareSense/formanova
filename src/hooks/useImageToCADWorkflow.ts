@@ -33,6 +33,8 @@ interface WorkflowParams {
   referenceImages: File[];
   /** ring_cad_nurbs_v1 tier; selects both the model and the price. */
   tier?: string;
+  /** Which page owns this run, so the header/toast restore link returns here. */
+  cadRoute: '/text-to-cad' | '/image-to-cad';
   onWorkspaceActivate: () => void;
 }
 
@@ -41,6 +43,7 @@ export function useImageToCADWorkflow({
   prompt,
   referenceImages,
   tier = RING_CAD_DEFAULT_TIER,
+  cadRoute,
   onWorkspaceActivate,
 }: WorkflowParams) {
   const { generations, trackCadGeneration } = useGenerations();
@@ -190,6 +193,7 @@ export function useImageToCADWorkflow({
       trackCadGeneration({
         workflowId: workflow_id,
         label: prompt.trim() ? prompt.trim().slice(0, 40) : 'Image to 3D',
+        cadRoute,
       });
 
       // Polling is now GenerationsContext's job. The effect below mirrors that
@@ -207,7 +211,7 @@ export function useImageToCADWorkflow({
       setProgressStep("failed_final");
       setGenerationFailed(true);
     }
-  }, [prompt, referenceImages, tier, isGenerating, onWorkspaceActivate, trackCadGeneration]);
+  }, [prompt, referenceImages, tier, cadRoute, isGenerating, onWorkspaceActivate, trackCadGeneration]);
 
   const resetWorkflow = useCallback(() => {
     hasNavigatedAway.current = false;

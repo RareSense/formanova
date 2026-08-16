@@ -27,7 +27,7 @@ import { azureUriToUrl } from '@/lib/azure-utils';
  */
 export const RING_CAD_TIERS = {
   FABLE_5: 'claude_fable_5_openrouter',
-  OPUS_5: 'claude_opus_5_anthropic',
+  OPUS_5: 'claude_opus_5_openrouter',
   GPT_5_6_SOL: 'gpt_5_6_sol_openrouter',
 } as const;
 
@@ -44,11 +44,11 @@ export const RING_CAD_TIER_CREDITS: Record<string, number> = {
 export const RING_CAD_UNLISTED_TIER_CREDITS = 100;
 
 /**
- * Fixed tier for Image-to-CAD. No picker is exposed, consistent with
- * CAD_MODEL_SELECTOR_ENABLED being false. Fable 5 has adaptive reasoning
- * always on and bills at 100 credits.
+ * Fixed tier for both Text-to-CAD and Image-to-CAD. No picker is exposed,
+ * consistent with CAD_MODEL_SELECTOR_ENABLED being false. Opus 5 (routed
+ * through OpenRouter) bills at 70 credits.
  */
-export const RING_CAD_DEFAULT_TIER: RingCadTier = RING_CAD_TIERS.FABLE_5;
+export const RING_CAD_DEFAULT_TIER: RingCadTier = RING_CAD_TIERS.OPUS_5;
 
 /** Credit cost of a generation at the fixed tier above. */
 export const RING_CAD_GENERATION_CREDITS = RING_CAD_TIER_CREDITS[RING_CAD_DEFAULT_TIER];
