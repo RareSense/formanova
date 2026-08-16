@@ -151,6 +151,10 @@ export function useImageToCADWorkflow({
     }
 
     const cadGenStartTime = Date.now();
+    // A previous run's Keep Creating leaves this true, which would otherwise
+    // permanently block this hook's trackedRun mirror effect from ever
+    // syncing this new run's progress/completion into the on-page viewport.
+    hasNavigatedAway.current = false;
     onWorkspaceActivate();
     setIsGenerating(true);
     setGenerationFailed(false);
