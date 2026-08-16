@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MAX_RING_CAD_REFERENCE_IMAGES } from "@/lib/ring-cad-nurbs-api";
+import { normalizeImageFiles } from "@/lib/image-normalize";
 
 /**
  * Owns the ordered reference-image set shared by Text-to-CAD and Image-to-CAD:
@@ -16,10 +17,16 @@ export function useReferenceImages() {
   const previewUrlsRef = useRef<string[]>([]);
   useEffect(() => { previewUrlsRef.current = referenceImagePreviewUrls; }, [referenceImagePreviewUrls]);
 
-  const addReferenceImages = useCallback((files: File[]) => {
+  const addReferenceImages = useCallback(async (files: File[]) => {
     if (files.length === 0) return;
-    const urls = files.map(f => URL.createObjectURL(f));
-    setReferenceImages(prev => [...prev, ...files].slice(0, MAX_RING_CAD_REFERENCE_IMAGES));
+    // CAD reference images skip the compression pass photoshoot uploads get
+    // (useStudioUpload.ts), but still need format normalization: the backend's
+    // ring_cad_nurbs_v1 geometry-analysis LLM only accepts real JPEG/PNG/WEBP
+    // bytes, and AVIF/HEIC uploads (or non-JPEG bytes wearing a .jpg extension)
+    // were being sent through unconverted, failing with a provider 400.
+    const normalized = await normalizeImageFiles(files);
+    const urls = normalized.map(f => URL.createObjectURL(f));
+    setReferenceImages(prev => [...prev, ...normalized].slice(0, MAX_RING_CAD_REFERENCE_IMAGES));
     setReferenceImagePreviewUrls(prev => [...prev, ...urls].slice(0, MAX_RING_CAD_REFERENCE_IMAGES));
   }, []);
 
@@ -32,14 +39,15 @@ export function useReferenceImages() {
     setReferenceImages(prev => prev.filter((_, i) => i !== index));
   }, []);
 
-  const replaceReferenceImages = useCallback((files: File[]) => {
+  const replaceReferenceImages = useCallback(async (files: File[]) => {
     const capped = files.slice(0, MAX_RING_CAD_REFERENCE_IMAGES);
-    const urls = capped.map(f => URL.createObjectURL(f));
+    const normalized = await normalizeImageFiles(capped);
+    const urls = normalized.map(f => URL.createObjectURL(f));
     setReferenceImagePreviewUrls(prev => {
       prev.forEach(u => { if (u.startsWith("blob:")) URL.revokeObjectURL(u); });
       return urls;
     });
-    setReferenceImages(capped);
+    setReferenceImages(normalized);
   }, []);
 
   const clearReferenceImages = useCallback(() => {
