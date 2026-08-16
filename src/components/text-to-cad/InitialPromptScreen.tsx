@@ -3,7 +3,6 @@ import { motion } from "framer-motion";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { useEstimatedCost } from "@/hooks/use-estimated-cost";
 import { RING_CAD_NURBS_WORKFLOW } from "@/lib/ring-cad-nurbs-api";
-import ReferenceImageUploader from "./ReferenceImageUploader";
 
 const EXAMPLE_PROMPTS = [
   "Serpentine ring with a coiled snake design",
@@ -83,18 +82,8 @@ export default function InitialPromptScreen({
             Text to 3D
           </h1>
           <p className="font-mono text-[11px] text-muted-foreground tracking-[0.15em] uppercase">
-            Describe your ring design, or add a reference image
+            Describe your ring design
           </p>
-        </div>
-
-        <div className="max-w-[680px] mx-auto">
-          <ReferenceImageUploader
-            referenceImagePreviewUrls={referenceImagePreviewUrls}
-            onAddReferenceImages={onAddReferenceImages}
-            onRemoveReferenceImage={onRemoveReferenceImage}
-            primaryLabel="Optional: add a reference image"
-            primaryHint="Drag & drop · click to browse · paste (Ctrl+V)"
-          />
         </div>
 
         {/* Prompt */}
