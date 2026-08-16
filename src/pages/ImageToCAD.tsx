@@ -99,10 +99,14 @@ export default function ImageToCAD() {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount; workflow/navigate/searchParams excluded so re-navigation doesn't re-seed state
   }, []);
 
+  // Depend only on the stable setter this uses, not the whole `workflow`
+  // object (a fresh literal every render) — see TextToCAD.tsx's handleModelReady
+  // for why a `[workflow]` dependency here causes CADCanvas to re-fire this
+  // callback (and reprocess the mesh, causing flicker) on unrelated re-renders.
   const handleModelReady = useCallback(() => {
     workflow.setIsModelLoading(false);
     toast.success("Ring generated successfully");
-  }, [workflow]);
+  }, [workflow.setIsModelLoading]);
 
   const handleReset = useCallback(() => {
     workflow.resetWorkflow();
