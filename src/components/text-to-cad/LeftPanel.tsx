@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Diamond, RotateCcw, X, Maximize2 } from "lucide-react";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { useEstimatedCost } from "@/hooks/use-estimated-cost";
-import { RING_CAD_NURBS_WORKFLOW } from "@/lib/ring-cad-nurbs-api";
+import { RING_CAD_NURBS_WORKFLOW, MAX_RING_CAD_REFERENCE_IMAGES } from "@/lib/ring-cad-nurbs-api";
 
 interface LeftPanelProps {
   model: string;
@@ -18,8 +18,8 @@ interface LeftPanelProps {
   onGlbUpload: (file: File) => void;
   onReset?: () => void;
   creditBlock?: React.ReactNode;
-  referenceImagePreviewUrl?: string | null;
-  onClearReferenceImage?: () => void;
+  referenceImagePreviewUrls?: string[];
+  onRemoveReferenceImage?: (index: number) => void;
   pageTitle?: string;
 }
 
@@ -29,44 +29,46 @@ export default function LeftPanel({
   onGenerate, magicTexturing, onMagicTexturingChange, onGlbUpload,
   onReset,
   creditBlock,
-  referenceImagePreviewUrl,
-  onClearReferenceImage,
+  referenceImagePreviewUrls = [],
+  onRemoveReferenceImage,
   pageTitle,
 }: LeftPanelProps) {
   const glbInputRef = useRef<HTMLInputElement>(null);
   const { cost: generationCost, loading: generationCostLoading } = useEstimatedCost({ workflowName: RING_CAD_NURBS_WORKFLOW, model });
-  const [imageLightboxOpen, setImageLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   const handleGlbUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) onGlbUpload(file);
   }, [onGlbUpload]);
 
-  const isImageMode = !!(referenceImagePreviewUrl || pageTitle);
+  const primaryPreviewUrl = referenceImagePreviewUrls[0] ?? null;
+  const imageCount = referenceImagePreviewUrls.length;
+  const isImageMode = !!(primaryPreviewUrl || pageTitle);
 
   return (
     <div className="flex flex-col bg-card border-r border-border h-full min-w-0 overflow-hidden">
       {/* Image lightbox */}
       <AnimatePresence>
-        {imageLightboxOpen && referenceImagePreviewUrl && (
+        {lightboxIndex !== null && referenceImagePreviewUrls[lightboxIndex] && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
-            onClick={() => setImageLightboxOpen(false)}
+            onClick={() => setLightboxIndex(null)}
           >
             <motion.img
               initial={{ scale: 0.9 }}
               animate={{ scale: 1 }}
               exit={{ scale: 0.9 }}
-              src={referenceImagePreviewUrl}
+              src={referenceImagePreviewUrls[lightboxIndex]}
               alt="Reference design"
               className="max-w-full max-h-full object-contain"
               onClick={(e) => e.stopPropagation()}
             />
             <button
-              onClick={() => setImageLightboxOpen(false)}
+              onClick={() => setLightboxIndex(null)}
               className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
             >
               <X className="w-4 h-4 text-foreground/70" />
@@ -86,28 +88,35 @@ export default function LeftPanel({
       <div className="flex-1 overflow-y-auto px-4 lg:px-6 py-6 space-y-6 scrollbar-thin min-w-0"
         style={{ scrollbarWidth: "thin" }}
       >
-        {/* Reference image — image-to-cad mode */}
-        {referenceImagePreviewUrl && (
+        {/* Reference image(s) — image-to-cad mode */}
+        {primaryPreviewUrl && (
           <section>
-            <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-2">Reference Image</h3>
+            <div className="flex items-baseline justify-between mb-2">
+              <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Reference Image</h3>
+              {imageCount > 1 && (
+                <span className="font-mono text-[10px] tracking-[0.15em] text-muted-foreground/60 tabular-nums">
+                  {imageCount}/{MAX_RING_CAD_REFERENCE_IMAGES}
+                </span>
+              )}
+            </div>
             <div className="relative border border-border bg-muted/10 overflow-hidden">
               <img
-                src={referenceImagePreviewUrl}
+                src={primaryPreviewUrl}
                 alt="Reference design"
                 className="w-full object-contain cursor-pointer"
                 style={{ maxHeight: 180 }}
-                onClick={() => setImageLightboxOpen(true)}
+                onClick={() => setLightboxIndex(0)}
               />
               <button
-                onClick={() => setImageLightboxOpen(true)}
+                onClick={() => setLightboxIndex(0)}
                 className="absolute top-1.5 right-8 w-6 h-6 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
                 aria-label="Expand image"
               >
                 <Maximize2 className="w-3 h-3 text-foreground/70" />
               </button>
-              {onClearReferenceImage && (
+              {onRemoveReferenceImage && (
                 <button
-                  onClick={onClearReferenceImage}
+                  onClick={() => onRemoveReferenceImage(0)}
                   className="absolute top-1.5 right-1.5 w-6 h-6 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
                   aria-label="Remove image"
                 >
@@ -115,6 +124,36 @@ export default function LeftPanel({
                 </button>
               )}
             </div>
+
+            {/* Additional angles, if any were uploaded */}
+            {imageCount > 1 && (
+              <div className="grid grid-cols-4 gap-2 mt-2">
+                {referenceImagePreviewUrls.slice(1).map((url, i) => {
+                  const index = i + 1;
+                  return (
+                    <div key={index} className="relative aspect-square border border-border bg-muted/10 overflow-hidden">
+                      <img src={url} alt={`Reference angle ${index}`} className="w-full h-full object-cover" />
+                      {onRemoveReferenceImage && (
+                        <button
+                          onClick={() => onRemoveReferenceImage(index)}
+                          className="absolute top-1 right-1 w-6 h-6 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
+                          aria-label={`Remove reference angle ${index}`}
+                        >
+                          <X className="w-3 h-3 text-foreground/70" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setLightboxIndex(index)}
+                        className="absolute bottom-1 right-1 w-6 h-6 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
+                        aria-label={`Expand reference angle ${index}`}
+                      >
+                        <Maximize2 className="w-3 h-3 text-foreground/70" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </section>
         )}
 
@@ -163,7 +202,7 @@ export default function LeftPanel({
           {!creditBlock && (
             <button
               onClick={onGenerate}
-              disabled={isGenerating || (!prompt.trim() && !referenceImagePreviewUrl)}
+              disabled={isGenerating || (!prompt.trim() && !primaryPreviewUrl)}
               className="w-full py-3 lg:py-4 px-3 lg:px-4 mt-4 text-[11px] lg:text-[13px] font-bold uppercase tracking-[0.1em] lg:tracking-[0.2em] cursor-pointer transition-all duration-200 bg-primary text-primary-foreground disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90 active:scale-[0.99] flex items-center justify-center gap-2 flex-wrap"
             >
               {isGenerating ? "Generating…" : (

@@ -508,8 +508,8 @@ export default function TextToCAD() {
               }}
               onGlbUpload={handleGlbUpload}
               onReset={workflow.hasModel ? handleReset : undefined}
-              referenceImagePreviewUrl={referenceImagePreviewUrls[0] ?? null}
-              onClearReferenceImage={() => removeReferenceImage(0)}
+              referenceImagePreviewUrls={referenceImagePreviewUrls}
+              onRemoveReferenceImage={removeReferenceImage}
               creditBlock={creditBlockUI}
             />
           )}

@@ -277,8 +277,8 @@ export default function ImageToCAD() {
               onGlbUpload={() => {}}
               onReset={workflow.hasModel ? handleReset : undefined}
               pageTitle="Image to 3D"
-              referenceImagePreviewUrl={referenceImagePreviewUrls[0] ?? null}
-              onClearReferenceImage={() => removeReferenceImage(0)}
+              referenceImagePreviewUrls={referenceImagePreviewUrls}
+              onRemoveReferenceImage={removeReferenceImage}
               creditBlock={creditBlockUI}
             />
           )}

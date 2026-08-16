@@ -49,8 +49,8 @@ magicTexturing / onMagicTexturingChange
 onGlbUpload(file: File)
 onReset?()
 creditBlock?: React.ReactNode        -- slot for credit cost display
-referenceImagePreviewUrl?: string | null
-onClearReferenceImage?()
+referenceImagePreviewUrls?: string[]  -- all uploaded reference images, not just the primary
+onRemoveReferenceImage?(index: number)
 pageTitle?: string
 ```
 
