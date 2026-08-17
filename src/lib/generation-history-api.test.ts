@@ -37,6 +37,16 @@ describe('generation-history-api URL shapes', () => {
     expect(url).not.toContain('formanova.ai');
   });
 
+  it('classifies the consolidated ring workflow from its reference image count', async () => {
+    mockAuthFetch.mockReturnValueOnce(okJson({ workflows: [
+      { workflow_id: 'text', name: 'ring_cad_nurbs_v1', status: 'completed', source_type: 'unknown', input: { reference_image_count: 0 } },
+      { workflow_id: 'image', name: 'ring_cad_nurbs_v1', status: 'completed', source_type: 'unknown', input: { reference_image_count: 2 } },
+    ] }));
+
+    const workflows = await listMyWorkflows();
+    expect(workflows.map(workflow => workflow.source_type)).toEqual(['text_to_cad', 'image_to_cad']);
+  });
+
   it('getWorkflowDetails calls a relative /history path', async () => {
     mockAuthFetch.mockReturnValueOnce(okJson({ summary: {}, steps: [] }));
     await getWorkflowDetails('wf-1');
@@ -137,14 +147,14 @@ describe('inferSourceType', () => {
     expect(inferSourceType('PRODUCT_SHOT')).toBe('product_shot');
   });
 
-  it('identifies cad_text workflows', () => {
-    expect(inferSourceType('ring_full_pipeline')).toBe('cad_text');
-    expect(inferSourceType('ring_generate')).toBe('cad_text');
-    expect(inferSourceType('text_to_cad')).toBe('cad_text');
-    expect(inferSourceType('text-to-cad')).toBe('cad_text');
-    expect(inferSourceType('ring-generate')).toBe('cad_text');
-    expect(inferSourceType('ring_pipeline_v2')).toBe('cad_text');
-    expect(inferSourceType('ring_generate_v3')).toBe('cad_text');
+  it('identifies text_to_cad workflows', () => {
+    expect(inferSourceType('ring_full_pipeline')).toBe('text_to_cad');
+    expect(inferSourceType('ring_generate')).toBe('text_to_cad');
+    expect(inferSourceType('text_to_cad')).toBe('text_to_cad');
+    expect(inferSourceType('text-to-cad')).toBe('text_to_cad');
+    expect(inferSourceType('ring-generate')).toBe('text_to_cad');
+    expect(inferSourceType('ring_pipeline_v2')).toBe('text_to_cad');
+    expect(inferSourceType('ring_generate_v3')).toBe('text_to_cad');
   });
 
   it('identifies cad_render workflows', () => {
@@ -187,8 +197,8 @@ describe('inferSourceType', () => {
     expect(inferSourceType('product_shot_jewelry')).toBe('product_shot');
   });
 
-  it('cad_text takes priority over cad_render for ring pipelines', () => {
-    expect(inferSourceType('ring_full_pipeline')).toBe('cad_text');
+  it('text_to_cad takes priority over cad_render for ring pipelines', () => {
+    expect(inferSourceType('ring_full_pipeline')).toBe('text_to_cad');
   });
 
   it('returns unknown for unrecognised names', () => {
@@ -206,8 +216,10 @@ describe('resolveSourceType', () => {
     expect(resolveSourceType('upscale', '')).toBe('photo');
     expect(resolveSourceType('product_shot', '')).toBe('product_shot');
     expect(resolveSourceType('product_fix', '')).toBe('product_shot');
-    expect(resolveSourceType('cad_text', '')).toBe('cad_text');
-    expect(resolveSourceType('cad_sketch', '')).toBe('cad_sketch');
+    expect(resolveSourceType('text_to_cad', '')).toBe('text_to_cad');
+    expect(resolveSourceType('image_to_cad', '')).toBe('image_to_cad');
+    expect(resolveSourceType('cad_text', '')).toBe('text_to_cad');
+    expect(resolveSourceType('cad_sketch', '')).toBe('image_to_cad');
     expect(resolveSourceType('cad_render', '')).toBe('cad_render');
   });
 
@@ -215,8 +227,11 @@ describe('resolveSourceType', () => {
     // The name contains "cad" but neither "sketch" nor "image", so without an
     // explicit rule it falls through to cad_render and lands in the wrong
     // history section.
-    expect(inferSourceType('ring_cad_nurbs_v1')).toBe('cad_sketch');
-    expect(resolveSourceType('', 'ring_cad_nurbs_v1')).toBe('cad_sketch');
+    expect(inferSourceType('ring_cad_nurbs_v1')).toBe('image_to_cad');
+    expect(resolveSourceType('', 'ring_cad_nurbs_v1')).toBe('image_to_cad');
+    expect(resolveSourceType('unknown', 'ring_cad_nurbs_v1', 0)).toBe('text_to_cad');
+    expect(resolveSourceType('unknown', 'ring_cad_nurbs_v1', 1)).toBe('image_to_cad');
+    expect(resolveSourceType('cad_sketch', 'ring_cad_nurbs_v1', 0)).toBe('image_to_cad');
   });
 
   it('prefers the backend value over the workflow name', () => {
@@ -238,7 +253,7 @@ describe('resolveSourceType', () => {
   it('falls back to name parsing when the field is absent', () => {
     expect(resolveSourceType(undefined, 'jewelry_photoshoots_generator')).toBe('photo');
     expect(resolveSourceType(null, 'Product_shot_pipeline')).toBe('product_shot');
-    expect(resolveSourceType(undefined, 'ring_full_pipeline')).toBe('cad_text');
+    expect(resolveSourceType(undefined, 'ring_full_pipeline')).toBe('text_to_cad');
   });
 
   it('falls back to name parsing when the backend value is unknown or unrecognised', () => {

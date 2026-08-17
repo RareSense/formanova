@@ -11,7 +11,7 @@ const __DEV__ = import.meta.env.DEV;
 
 // ─── Types ──────────────────────────────────────────────────────────
 
-export type SourceType = 'photo' | 'product_shot' | 'cad_render' | 'cad_text' | 'cad_sketch' | 'unknown';
+export type SourceType = 'photo' | 'product_shot' | 'cad_render' | 'text_to_cad' | 'image_to_cad' | 'unknown';
 
 export interface WorkflowSummary {
   workflow_id: string;
@@ -22,12 +22,14 @@ export interface WorkflowSummary {
   source_type: SourceType;
   /** Optional thumbnail extracted from workflow details (populated client-side) */
   thumbnail_url?: string;
-  /** All angle screenshots for cad_text workflows (populated client-side) */
+  /** All angle screenshots for Text-to-CAD workflows (populated client-side) */
   screenshots?: { angle: string; url: string }[];
   /** GLB download URL (populated client-side from workflow details) */
   glb_url?: string | null;
   /** GLB file name extracted from the azure URI */
   glb_filename?: string | null;
+  /** Machinable Rhino file returned by ring_cad_nurbs_v1 */
+  threedm_url?: string | null;
   /** AI model tier used (e.g. 'gemini', 'claude-sonnet', 'claude-opus') — populated client-side */
   ai_model?: string | null;
   /** Mode from workflow input (e.g. 'lite', 'standard', 'premium') — available in list response */
@@ -127,8 +129,15 @@ export async function listMyWorkflows(
 
   const mapped = raw.map((w: any) => {
     const name = w.name ?? '';
-    // Prefer the backend source_type; fall back to name parsing only when absent/unknown.
-    const sourceType = resolveSourceType(w.source_type, name);
+    const referenceImageCount = typeof w.input?.reference_image_count === 'number'
+      ? w.input.reference_image_count
+      : Array.isArray(w.input?.reference_images)
+        ? w.input.reference_images.length
+        : null;
+    // The consolidated ring workflow serves both text and image inputs, so its
+    // actual input count is the only reliable discriminator when the backend
+    // still returns source_type="unknown".
+    const sourceType = resolveSourceType(w.source_type, name, referenceImageCount);
     if (sourceType === 'unknown' && __DEV__) {
       console.warn('[HistoryAPI] unknown source_type for workflow:', { id: w.workflow_id ?? w.id, name, status: w.status, backend_source_type: w.source_type });
     }
@@ -148,9 +157,9 @@ export async function listMyWorkflows(
     console.log('[HistoryAPI] source_type breakdown:', {
       photo: mapped.filter(w => w.source_type === 'photo').length,
       product_shot: mapped.filter(w => w.source_type === 'product_shot').length,
-      cad_text: mapped.filter(w => w.source_type === 'cad_text').length,
+      text_to_cad: mapped.filter(w => w.source_type === 'text_to_cad').length,
       cad_render: mapped.filter(w => w.source_type === 'cad_render').length,
-      cad_sketch: mapped.filter(w => w.source_type === 'cad_sketch').length,
+      image_to_cad: mapped.filter(w => w.source_type === 'image_to_cad').length,
       unknown: mapped.filter(w => w.source_type === 'unknown').length,
     });
   }
@@ -376,15 +385,15 @@ export function inferSourceType(name: string): SourceType {
     (lower.includes('ring') && lower.includes('pipeline')) ||
     (lower.includes('ring') && lower.includes('generate'))
   )
-    return 'cad_text';
+    return 'text_to_cad';
 
   // Image-to-3D workflows. ring_cad_nurbs_v1 names neither 'sketch' nor 'image'
   // but does contain 'cad', so it must be matched before the cad_render check
   // or it lands in the wrong history section.
-  if (lower.includes('ring_cad_nurbs') || lower.includes('ring-cad-nurbs')) return 'cad_sketch';
+  if (lower.includes('ring_cad_nurbs') || lower.includes('ring-cad-nurbs')) return 'image_to_cad';
 
   // Sketch-to-CAD workflows
-  if (lower.includes('sketch')) return 'cad_sketch';
+  if (lower.includes('sketch')) return 'image_to_cad';
 
   // CAD render workflows
   if (lower.includes('cad') || lower.includes('render')) return 'cad_render';
@@ -421,7 +430,7 @@ export function inferSourceType(name: string): SourceType {
 /**
  * Backend `source_type` enum -> the app's coarser SourceType bucket.
  * The backend distinguishes generate vs fix vs upscale within a family; the UI only
- * cares about the family bucket (photo / product_shot / cad_*), so fixes and upscales
+ * cares about the family bucket, so fixes and upscales
  * collapse into their generate family. Unrecognized/future values are intentionally
  * absent here so they fall through to unknown (or the name-parse fallback).
  */
@@ -431,8 +440,12 @@ const BACKEND_SOURCE_TYPE_MAP: Record<string, SourceType> = {
   upscale: 'photo',
   product_shot: 'product_shot',
   product_fix: 'product_shot',
-  cad_text: 'cad_text',
-  cad_sketch: 'cad_sketch',
+  text_to_cad: 'text_to_cad',
+  image_to_cad: 'image_to_cad',
+  // Backward-compatible API aliases. They are normalized at this boundary and
+  // never become the application's canonical source type.
+  cad_text: 'text_to_cad',
+  cad_sketch: 'image_to_cad',
   cad_render: 'cad_render',
 };
 
@@ -444,18 +457,32 @@ const BACKEND_SOURCE_TYPE_MAP: Record<string, SourceType> = {
  * This is strictly >= the old name-only behavior: a good backend value wins, otherwise
  * we do exactly what we did before, so nothing that classified before can regress.
  */
-export function resolveSourceType(rawSourceType: unknown, workflowName: string): SourceType {
+export function resolveSourceType(
+  rawSourceType: unknown,
+  workflowName: string,
+  referenceImageCount: number | null = null,
+): SourceType {
+  const normalizedName = (workflowName ?? '').toLowerCase();
   // High Effort ("higher_tier") runs are classified by their workflow name, which
   // is unambiguous (jewelry_photoshoots_generator_higher_tier -> photo,
   // Product_shot_pipeline_higher_tier -> product_shot, likewise the fixes). Name
   // wins here so these always land in their shot-type section like the normal
   // flows, even if the backend source_type is missing OR mislabeled.
-  if ((workflowName ?? '').toLowerCase().includes('higher_tier')) {
+  if (normalizedName.includes('higher_tier')) {
     return inferSourceType(workflowName);
   }
   if (typeof rawSourceType === 'string') {
     const mapped = BACKEND_SOURCE_TYPE_MAP[rawSourceType];
     if (mapped) return mapped;
+  }
+  // Compatibility fallback for the consolidated CAD workflow while older
+  // backend rows still return source_type="unknown". A recognized backend
+  // source_type above always remains authoritative.
+  if (
+    (normalizedName.includes('ring_cad_nurbs') || normalizedName.includes('ring-cad-nurbs')) &&
+    referenceImageCount !== null
+  ) {
+    return referenceImageCount === 0 ? 'text_to_cad' : 'image_to_cad';
   }
   return inferSourceType(workflowName);
 }

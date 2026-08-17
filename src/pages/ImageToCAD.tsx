@@ -87,15 +87,12 @@ export default function ImageToCAD() {
 
   useEffect(() => {
     const glbParam = searchParams.get('glb');
-    if (!glbParam) return;
     const workflowIdParam = searchParams.get('workflow_id');
-    setWorkspaceActive(true);
-    workflow.setHasModel(true);
-    workflow.setIsModelLoading(true);
-    workflow.setProgressStep("_loading");
-    workflow.setGlbUrl(glbParam);
-    workflow.setSourceWorkflowId(workflowIdParam?.trim() || null);
-    workflow.setGlbArtifact({ uri: glbParam, type: 'model/gltf-binary', bytes: 0, sha256: '' });
+    const workflowId = workflowIdParam?.trim() || null;
+    if (!glbParam && !workflowId) return;
+    void workflow.restoreCompletedWorkflow(workflowId, glbParam).then((restored) => {
+      if (!restored) toast.error('Could not load this CAD result');
+    });
     navigate('/image-to-cad', { replace: true });
   // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount; workflow/navigate/searchParams excluded so re-navigation doesn't re-seed state
   }, []);
@@ -430,7 +427,7 @@ export default function ImageToCAD() {
               currentStep={workflow.progressStep}
               retryAttempt={workflow.retryAttempt}
               onRetry={() => workflow.simulateGeneration()}
-              estimateText="This can take up to 30 minutes"
+              estimateText="Complex designs can take over an hour"
               failureMessage={workflow.failureMessage}
               onKeepCreating={() => { workflow.handleKeepCreating(); setWorkspaceActive(false); }}
             />
@@ -444,6 +441,7 @@ export default function ImageToCAD() {
               undoCount={editor.undoStack.length}
               redoCount={editor.redoStack.length}
               onDownload={workflow.threedmArtifact ? handleDownloadThreedm : handleDownloadGlb}
+              downloadLabel={workflow.threedmArtifact ? "Download 3DM" : "Export GLB"}
               onFullscreen={() => {
                 const el = document.querySelector('[data-cad-viewport]') as HTMLElement;
                 if (el) { document.fullscreenElement ? document.exitFullscreen() : el.requestFullscreen(); }

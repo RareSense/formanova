@@ -175,6 +175,59 @@ describe('extractCadTextData', () => {
     const result = extractCadTextData(steps);
     expect(result.glb_url).toBe('https://cdn.example.com/bucket/model.glb');
   });
+
+  it('extracts typed extensionless artifacts from ring_cad_nurbs_v1 output.result', () => {
+    const glbSha = 'b'.repeat(64);
+    const threedmSha = 'd'.repeat(64);
+    const screenshotSha = 'c'.repeat(64);
+    const steps = [
+      {
+        tool: 'capture_3d_screenshots',
+        output: {
+          result: {
+            screenshots: [{
+              name: 'front',
+              artifact: {
+                uri: `/api/artifacts/${screenshotSha}`,
+                url: `https://staging.example/api/artifacts/${screenshotSha}`,
+                type: 'image/png',
+              },
+            }],
+          },
+        },
+      },
+      {
+        tool: 'cad_runner',
+        output_data: {
+          result: {
+            glb_artifact: {
+              uri: `/api/artifacts/${glbSha}`,
+              url: `/api/artifacts/${glbSha}`,
+              type: 'model/gltf-binary',
+              bytes: 20,
+              sha256: glbSha,
+            },
+            threedm_artifact: {
+              uri: `/api/artifacts/${threedmSha}`,
+              url: `/api/artifacts/${threedmSha}`,
+              type: 'model/vnd.rhino.3dm',
+              bytes: 10,
+              sha256: threedmSha,
+            },
+          },
+        },
+      },
+    ];
+
+    const result = extractCadTextData(steps);
+    expect(result.glb_url).toBe(`/api/artifacts/${glbSha}`);
+    expect(result.threedm_url).toBe(`/api/artifacts/${threedmSha}`);
+    expect(result.glb_filename).toBe('model.glb');
+    expect(result.screenshots).toEqual([{
+      angle: 'front',
+      url: `https://staging.example/api/artifacts/${screenshotSha}`,
+    }]);
+  });
 });
 
 // -- extractProductShotThumbnail - step-based (sync) --

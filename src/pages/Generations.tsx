@@ -32,7 +32,7 @@ import CADRuntimeErrorBoundary from '@/components/cad/CADRuntimeErrorBoundary';
 
 const PER_PAGE = 5;
 
-type SourceType = 'photo' | 'product_shot' | 'cad_render' | 'cad_text' | 'cad_sketch';
+type SourceType = 'photo' | 'product_shot' | 'cad_render' | 'text_to_cad' | 'image_to_cad';
 
 interface SectionState {
   workflows: WorkflowSummary[];
@@ -56,8 +56,8 @@ export default function Generations() {
   const [photoPage, setPhotoPage] = useState(1);
   const [productShotPage, setProductShotPage] = useState(1);
   const [cadRenderPage, setCadRenderPage] = useState(1);
-  const [cadTextPage, setCadTextPage] = useState(1);
-  const [cadSketchPage, setCadSketchPage] = useState(1);
+  const [textCadPage, setTextCadPage] = useState(1);
+  const [imageCadPage, setImageCadPage] = useState(1);
 
   // Track enriched IDs + their data for sessionStorage persistence
   const enrichedRef = useRef<Record<string, Partial<WorkflowSummary>>>({});
@@ -182,7 +182,7 @@ export default function Generations() {
   // ── Pagination helper ─────────────────────────────────────────────
     const getSection = useCallback(
     (source: SourceType, page: number, requireImage = false): SectionState => {
-      const isCadSource = source === 'cad_text' || source === 'cad_sketch';
+      const isCadSource = source === 'text_to_cad' || source === 'image_to_cad';
       const statusOk = isCadSource
         ? (w: WorkflowSummary) => w.status === 'completed' || w.status === 'failed'
         : (w: WorkflowSummary) => w.status === 'completed';
@@ -190,7 +190,7 @@ export default function Generations() {
         if (w.source_type !== source || !statusOk(w)) return false;
         // Skip photo/product_shot/cad_render cards that enriched but have no thumbnail
         if (requireImage && w.thumbnail_url === '') return false;
-        // Skip cad_text/cad_sketch cards that finished enriching but have no GLB
+        // Skip CAD cards that finished enriching but have no GLB.
         if (isCadSource && w.screenshots !== undefined && !w.glb_url) return false;
         return true;
       });
@@ -212,7 +212,7 @@ export default function Generations() {
 
     const allUnenriched = allWorkflows.filter(
       w => w.thumbnail_url === undefined && !enrichedRef.current[w.workflow_id] &&
-           (w.status === 'completed' || (w.source_type === 'cad_text' && w.status === 'failed'))
+           (w.status === 'completed' || (w.source_type === 'text_to_cad' && w.status === 'failed'))
     );
 
     if (allUnenriched.length === 0) return;
@@ -243,15 +243,19 @@ export default function Generations() {
         const batch = allUnenriched.slice(i, i + 3);
         await Promise.allSettled(
           batch.map(async (wf) => {
-            if (wf.source_type === 'cad_text' || wf.source_type === 'cad_sketch') {
+            if (wf.source_type === 'text_to_cad' || wf.source_type === 'image_to_cad') {
               const details = await getWorkflowDetails(wf.workflow_id);
               const stepData = extractCadTextData(details.steps ?? []);
               if (!cancelled) applyEnrichment(wf.workflow_id, stepData);
 
               if (!stepData.glb_url) {
                 const cadResult = await withTimeout(fetchCadResult(wf.workflow_id), 5000);
-                if (!cancelled && cadResult?.glb_url) {
-                  applyEnrichment(wf.workflow_id, { ...stepData, glb_url: cadResult.glb_url });
+                if (!cancelled && cadResult && (cadResult.glb_url || cadResult.threedm_url)) {
+                  applyEnrichment(wf.workflow_id, {
+                    ...stepData,
+                    glb_url: cadResult.glb_url,
+                    threedm_url: cadResult.threedm_url,
+                  });
                 }
               }
               return;
@@ -342,8 +346,8 @@ export default function Generations() {
   const photoSection = getSection('photo', photoPage, true);
   const productShotSection = getSection('product_shot', productShotPage, true);
   const cadRenderSection = getSection('cad_render', cadRenderPage, true);
-  const cadTextSection = getSection('cad_text', cadTextPage);
-  const cadSketchSection = getSection('cad_sketch', cadSketchPage);
+  const textCadSection = getSection('text_to_cad', textCadPage);
+  const imageCadSection = getSection('image_to_cad', imageCadPage);
 
   return (
     <>
@@ -425,34 +429,34 @@ export default function Generations() {
             <CADRuntimeErrorBoundary
               title="CAD Previews Unavailable"
               description="The 3D preview grid hit a rendering problem. Your generation history is still available."
-              resetKeys={[cadTextPage, cadSketchPage]}
+              resetKeys={[textCadPage, imageCadPage]}
             >
               <ScissorGLBGrid>
                 <WorkflowSection
-                  title="Text to 3D"
-                  subtitle="AI-generated 3D models from text"
-                  icon={SectionIcons.cadText}
-                  workflows={cadTextSection.workflows}
-                  loading={cadTextSection.loading}
-                  currentPage={cadTextSection.page}
-                  totalPages={cadTextSection.totalPages}
+                  title="Text to CAD"
+                  subtitle="CAD models generated from text"
+                  icon={SectionIcons.textToCad}
+                  workflows={textCadSection.workflows}
+                  loading={textCadSection.loading}
+                  currentPage={textCadSection.page}
+                  totalPages={textCadSection.totalPages}
                   columns={3}
-                  indexOffset={(cadTextPage - 1) * PER_PAGE}
-                  onPageChange={setCadTextPage}
+                  indexOffset={(textCadPage - 1) * PER_PAGE}
+                  onPageChange={setTextCadPage}
                   onWorkflowClick={() => {}}
                 />
-                {cadSketchSection && (
+                {imageCadSection && (
                   <WorkflowSection
-                    title="Image to 3D"
-                    subtitle="3D models generated from photos and sketches"
-                    icon={SectionIcons.cadSketch}
-                    workflows={cadSketchSection.workflows}
-                    loading={cadSketchSection.loading}
-                    currentPage={cadSketchSection.page}
-                    totalPages={cadSketchSection.totalPages}
+                    title="Image to CAD"
+                    subtitle="CAD models generated from reference images"
+                    icon={SectionIcons.imageToCad}
+                    workflows={imageCadSection.workflows}
+                    loading={imageCadSection.loading}
+                    currentPage={imageCadSection.page}
+                    totalPages={imageCadSection.totalPages}
                     columns={3}
-                    indexOffset={(cadSketchPage - 1) * PER_PAGE}
-                    onPageChange={setCadSketchPage}
+                    indexOffset={(imageCadPage - 1) * PER_PAGE}
+                    onPageChange={setImageCadPage}
                     onWorkflowClick={() => {}}
                   />
                 )}

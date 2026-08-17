@@ -5,9 +5,9 @@
  */
 import { useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { listMyWorkflows, getWorkflowDetails, type WorkflowSummary } from '@/lib/generation-history-api';
+import { listMyWorkflows, getWorkflowDetails, fetchCadResult, type WorkflowSummary } from '@/lib/generation-history-api';
 
-const CACHE_KEY = 'formanova_gen_cache_v3';
+const CACHE_KEY = 'formanova_gen_cache_v5';
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 interface CachePayload {
@@ -73,7 +73,7 @@ export function usePrefetchGenerations() {
         // Start background enrichment for the first ~15 workflows (covers page 1 of all sections)
         const { extractPhotoThumbnail, extractCadTextData, extractProductShotThumbnail } = await getExtractors();
         const toEnrich = valid
-          .filter(w => w.status === 'completed' || (w.source_type === 'cad_text' && w.status === 'failed'))
+          .filter(w => w.status === 'completed' || (w.source_type === 'text_to_cad' && w.status === 'failed'))
           .slice(0, 15);
 
         for (let i = 0; i < toEnrich.length; i += 3) {
@@ -86,8 +86,18 @@ export function usePrefetchGenerations() {
                 const thumb = extractProductShotThumbnail(details.steps ?? []);
                 return { id: wf.workflow_id, thumbnail_url: thumb ?? '' };
               }
-              if (wf.source_type === 'cad_text') {
-                return { id: wf.workflow_id, ...extractCadTextData(details.steps ?? []) };
+              if (wf.source_type === 'text_to_cad' || wf.source_type === 'image_to_cad') {
+                const stepData = extractCadTextData(details.steps ?? []);
+                if (stepData.glb_url && stepData.threedm_url) {
+                  return { id: wf.workflow_id, ...stepData };
+                }
+                const cadResult = await fetchCadResult(wf.workflow_id);
+                return {
+                  id: wf.workflow_id,
+                  ...stepData,
+                  glb_url: stepData.glb_url ?? cadResult.glb_url,
+                  threedm_url: stepData.threedm_url ?? cadResult.threedm_url,
+                };
               }
               const thumb = extractPhotoThumbnail(details.steps ?? []);
               return { id: wf.workflow_id, thumbnail_url: thumb ?? '' };

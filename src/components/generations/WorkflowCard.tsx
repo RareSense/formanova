@@ -134,6 +134,29 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
     }
   };
 
+  const handleDownloadThreedm = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!workflow.threedm_url) return;
+    const fileName = `${shownBaseName}.3dm`;
+    import('@/lib/posthog-events').then(m => m.trackDownloadClicked({ file_name: fileName, file_type: '3dm', context: 'generations' }));
+    try {
+      const resp = await authenticatedFetch(workflow.threedm_url);
+      if (!resp.ok) throw new Error(`Download failed: ${resp.status}`);
+      const blob = await resp.blob();
+      if (blob.size === 0) throw new Error('Download returned an empty file');
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+    } catch (err) {
+      console.error('[WorkflowCard] 3DM download error:', err);
+    }
+  };
+
   const handleLoadInStudio = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!workflow.glb_url) return;
@@ -246,6 +269,18 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
             <div className="flex items-center gap-1.5 flex-shrink-0">
               {workflow.glb_url ? (
                 <>
+                  {workflow.threedm_url && (
+                    <Button
+                      size="sm"
+                      onClick={handleDownloadThreedm}
+                      className="h-7 px-2.5 font-mono text-[9px] tracking-wider uppercase gap-1 whitespace-nowrap"
+                      title="Download machinable 3DM"
+                      aria-label="Download 3DM"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      3DM
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="ghost"
@@ -293,7 +328,7 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
 // ─── Exported card dispatcher ───────────────────────────────────────────────
 
 export function WorkflowCard({ workflow, index = 0, onClick: _onClick, onUpscaled }: WorkflowCardProps) {
-  if (workflow.source_type === 'cad_text') {
+  if (workflow.source_type === 'text_to_cad' || workflow.source_type === 'image_to_cad') {
     return <CadTextCard workflow={workflow} index={index} />;
   }
 

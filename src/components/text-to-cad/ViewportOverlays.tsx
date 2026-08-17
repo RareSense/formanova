@@ -124,7 +124,7 @@ function SideTooltip({ label }: { label: string }) {
   );
 }
 
-export function ViewportSideTools({ visible, onZoomIn, onZoomOut, onResetView, onUndo, onRedo, undoCount, redoCount, onDownload, onDownloadStl, onFullscreen, onDisplayMenu, onKeyboardShortcuts, onEstimateWeight, weightLoading, stlExporting }: {
+export function ViewportSideTools({ visible, onZoomIn, onZoomOut, onResetView, onUndo, onRedo, undoCount, redoCount, onDownload, downloadLabel = "Export GLB", onDownloadStl, onFullscreen, onDisplayMenu, onKeyboardShortcuts, onEstimateWeight, weightLoading, stlExporting }: {
   visible: boolean;
   onZoomIn: () => void;
   onZoomOut: () => void;
@@ -134,6 +134,7 @@ export function ViewportSideTools({ visible, onZoomIn, onZoomOut, onResetView, o
   undoCount: number;
   redoCount: number;
   onDownload: () => void;
+  downloadLabel?: string;
   onDownloadStl?: () => void;
   onFullscreen?: () => void;
   onDisplayMenu?: () => void;
@@ -201,8 +202,14 @@ export function ViewportSideTools({ visible, onZoomIn, onZoomOut, onResetView, o
       <SideDivider />
 
       {/* Export */}
-      <button onClick={onDownload} className={`${SIDE_BTN} text-primary hover:text-primary`} title="Download">
-        <SideTooltip label="Download" />
+      <button onClick={onDownload} className={`${SIDE_BTN} text-primary hover:text-primary`} title={downloadLabel}>
+        {downloadLabel === "Download 3DM" ? (
+          <span className="absolute right-full mr-2 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] whitespace-nowrap bg-primary text-primary-foreground border border-primary shadow-lg">
+            Download 3DM
+          </span>
+        ) : (
+          <SideTooltip label={downloadLabel} />
+        )}
         <Download className="w-3.5 h-3.5" />
       </button>
       {onEstimateWeight && (

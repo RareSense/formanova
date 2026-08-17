@@ -1,4 +1,4 @@
-export type SourceType = "photo" | "product_shot" | "cad_render" | "cad_text" | "cad_sketch" | "unknown";
+export type SourceType = "photo" | "product_shot" | "cad_render" | "text_to_cad" | "image_to_cad" | "unknown";
 
 export interface WorkflowTypeMeta {
   sourceType: SourceType;
@@ -19,10 +19,10 @@ function includesAny(value: string, needles: string[]): boolean {
 
 const WORKFLOW_RULES: WorkflowRule[] = [
   {
-    sourceType: "cad_sketch",
-    label: "Image to 3D",
-    historyTitle: "Image to 3D",
-    historySubtitle: "AI-generated 3D models from reference images",
+    sourceType: "image_to_cad",
+    label: "Image to CAD",
+    historyTitle: "Image to CAD",
+    historySubtitle: "CAD models generated from reference images",
     loadRoute: "/image-to-cad",
     priority: 100,
     matches: (name) =>
@@ -33,10 +33,10 @@ const WORKFLOW_RULES: WorkflowRule[] = [
       (includesAny(name, ["sketch", "image"]) && includesAny(name, ["cad", "ring"])),
   },
   {
-    sourceType: "cad_text",
-    label: "Text to 3D",
-    historyTitle: "Text to 3D",
-    historySubtitle: "AI-generated 3D models from text",
+    sourceType: "text_to_cad",
+    label: "Text to CAD",
+    historyTitle: "Text to CAD",
+    historySubtitle: "CAD models generated from text",
     loadRoute: "/text-to-cad",
     priority: 90,
     matches: (name) =>

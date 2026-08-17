@@ -16,6 +16,7 @@ import {
   type ArtifactRef,
 } from "@/lib/ring-cad-nurbs-api";
 import { trackPaywallHit, trackCadGenerationCompleted } from "@/lib/posthog-events";
+import { fetchCadResult } from "@/lib/generation-history-api";
 
 function fileToDataUri(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -94,7 +95,14 @@ export function useImageToCADWorkflow({
       return;
     }
 
-    if (trackedRun.status === 'completed' && trackedRun.glbUrl) {
+    if (trackedRun.status === 'completed') {
+      // Backend completion is terminal even if result hydration is still in
+      // flight. Never leave the generation overlay running on GLB parsing.
+      setIsGenerating(false);
+      if (!trackedRun.glbUrl) {
+        setProgressStep('');
+        return;
+      }
       setGlbUrl(trackedRun.glbUrl);
       setGlbArtifact({ uri: trackedRun.glbUrl, type: 'model/gltf-binary', bytes: 0, sha256: '' });
       if (trackedRun.threedmUrl) {
@@ -107,7 +115,6 @@ export function useImageToCADWorkflow({
       });
       setProgressStep('_loading');
       setIsModelLoading(true);
-      setIsGenerating(false);
       setHasModel(true);
     }
   }, [trackedRun?.status, trackedRun?.glbUrl, trackedRun?.threedmUrl, trackedRun?.generationStep]); // eslint-disable-line react-hooks/exhaustive-deps -- prompt/trackedRun object excluded: only the run's own transitions should re-drive the overlay, and including the object would re-fire on every progress tick
@@ -119,6 +126,56 @@ export function useImageToCADWorkflow({
     setProgressStep('');
     setGenerationFailed(false);
   }, []);
+
+  /**
+   * Restores a completed CAD run from a stable workflow id. The GLB query
+   * parameter is only an eager-render hint; /api/result remains the source of
+   * truth so refresh/new-session links also recover the machinable 3DM.
+   */
+  const restoreCompletedWorkflow = useCallback(async (
+    workflowId: string | null,
+    fallbackGlbUrl?: string | null,
+  ): Promise<boolean> => {
+    hasNavigatedAway.current = false;
+    onWorkspaceActivate();
+    setIsGenerating(false);
+    setGenerationFailed(false);
+    setFailureMessage(null);
+    setSourceWorkflowId(workflowId);
+    setThreedmArtifact(null);
+
+    const seedGlb = (url: string) => {
+      setHasModel(true);
+      setIsModelLoading(true);
+      setProgressStep('_loading');
+      setGlbUrl(url);
+      setGlbArtifact({ uri: url, type: 'model/gltf-binary', bytes: 0, sha256: '' });
+    };
+
+    if (fallbackGlbUrl) seedGlb(fallbackGlbUrl);
+
+    const result = workflowId ? await fetchCadResult(workflowId) : null;
+    const resolvedGlbUrl = result?.glb_url ?? fallbackGlbUrl ?? null;
+    if (!resolvedGlbUrl) {
+      setIsModelLoading(false);
+      setProgressStep('');
+      setGenerationFailed(true);
+      setFailureMessage('The completed CAD result could not be loaded.');
+      return false;
+    }
+
+    if (resolvedGlbUrl !== fallbackGlbUrl) seedGlb(resolvedGlbUrl);
+    if (result?.threedm_url) {
+      setThreedmArtifact({
+        uri: result.threedm_url,
+        url: result.threedm_url,
+        type: 'model/vnd.rhino.3dm',
+        bytes: 0,
+        sha256: '',
+      });
+    }
+    return true;
+  }, [onWorkspaceActivate]);
 
   const simulateGeneration = useCallback(async () => {
     if (isGenerating) return;
@@ -238,6 +295,7 @@ export function useImageToCADWorkflow({
     threedmArtifact, setThreedmArtifact,
     failureMessage, notAllSolid,
     simulateGeneration,
+    restoreCompletedWorkflow,
     handleKeepCreating,
     resetWorkflow,
   };

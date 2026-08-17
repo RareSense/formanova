@@ -26,6 +26,56 @@ const STUDIO_RESULT_MAX_RETRIES = 100;
 // Default poll ceiling for photoshoot/fix runs. Slow workflows (e.g. upscale)
 // override this via TrackGenerationParams.timeoutMs.
 const DEFAULT_POLL_TIMEOUT_MS = 720_000;
+const CAD_TRACKING_STORAGE_KEY = 'formanova_running_cad_v1';
+const CAD_TRACKING_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+interface PersistedCadGeneration {
+  workflowId: string;
+  startedAt: number;
+  cadRoute: '/text-to-cad' | '/image-to-cad';
+  timeoutMs: number;
+}
+
+function loadPersistedCadGenerations(): TrackedGeneration[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(CAD_TRACKING_STORAGE_KEY);
+    if (!raw) return [];
+    const now = Date.now();
+    const rows = JSON.parse(raw) as PersistedCadGeneration[];
+    if (!Array.isArray(rows)) return [];
+    return rows
+      .filter(row =>
+        typeof row?.workflowId === 'string' &&
+        typeof row?.startedAt === 'number' &&
+        now - row.startedAt < CAD_TRACKING_MAX_AGE_MS
+      )
+      .map(row => ({
+        kind: 'cad' as const,
+        workflowId: row.workflowId,
+        status: 'running' as const,
+        progress: 5,
+        generationStep: 'Reconnecting to your 3D ring...',
+        resultImages: [],
+        outputAssetId: null,
+        jewelryUrl: '',
+        modelUrl: '',
+        isProductShot: false,
+        jewelryType: 'ring',
+        startedAt: row.startedAt,
+        aspectRatio: '1:1',
+        resolution: '1K' as Resolution,
+        generationCost: null,
+        glbUrl: null,
+        threedmUrl: null,
+        cadRoute: row.cadRoute ?? '/image-to-cad',
+        timeoutMs: row.timeoutMs ?? RING_CAD_POLL_TIMEOUT_MS,
+      }));
+  } catch {
+    try { localStorage.removeItem(CAD_TRACKING_STORAGE_KEY); } catch { /* unavailable storage */ }
+    return [];
+  }
+}
 
 /**
  * Deep link that restores a finished CAD run into the workspace it was
@@ -270,11 +320,18 @@ async function fallbackResultImagesFromHistory(
 // ── Provider ─────────────────────────────────────────────────────────────
 
 export function GenerationsContextProvider({ children }: { children: React.ReactNode }) {
-  const [generations, setGenerations] = useState<TrackedGeneration[]>([]);
+  const [generations, setGenerations] = useState<TrackedGeneration[]>(loadPersistedCadGenerations);
+  const generationsRef = useRef<TrackedGeneration[]>(generations);
   const controllers = useRef<Map<string, AbortController>>(new Map());
+  const settledCadIds = useRef<Set<string>>(new Set());
+  const reconcilingCadIds = useRef<Set<string>>(new Set());
   const { refreshCredits } = useCredits();
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    generationsRef.current = generations;
+  }, [generations]);
 
   const trackGeneration = useCallback((params: TrackGenerationParams) => {
     setGenerations(prev => [
@@ -307,9 +364,8 @@ export function GenerationsContextProvider({ children }: { children: React.React
    * without every consumer having to special-case CAD.
    */
   const trackCadGeneration = useCallback((params: TrackCadGenerationParams) => {
-    setGenerations(prev => [
-      ...prev,
-      {
+    setGenerations(prev => {
+      const next: TrackedGeneration = {
         kind: 'cad',
         workflowId: params.workflowId,
         status: 'running',
@@ -330,8 +386,9 @@ export function GenerationsContextProvider({ children }: { children: React.React
         ...(params.label ? { label: params.label } : {}),
         cadRoute: params.cadRoute ?? '/image-to-cad',
         timeoutMs: params.timeoutMs ?? RING_CAD_POLL_TIMEOUT_MS,
-      },
-    ]);
+      };
+      return [...prev.filter(g => g.workflowId !== params.workflowId), next];
+    });
   }, []);
 
   const clearGeneration = useCallback((workflowId: string) => {
@@ -393,6 +450,8 @@ export function GenerationsContextProvider({ children }: { children: React.React
     }).then(pollResult => {
       clearInterval(ticker);
       if (pollResult.status === 'cancelled') return;
+      if (settledCadIds.current.has(gen.workflowId)) return;
+      settledCadIds.current.add(gen.workflowId);
       controllers.current.delete(gen.workflowId);
 
       const raw = pollResult.result;
@@ -471,6 +530,137 @@ export function GenerationsContextProvider({ children }: { children: React.React
     .filter(g => g.status === 'running')
     .map(g => g.workflowId)
     .join(',');
+
+  // Persist only the minimum needed to reconnect CAD polling after a refresh
+  // or browser restart. Prompts and artifact URLs are deliberately excluded.
+  const persistedCadKey = JSON.stringify(
+    generations
+      .filter(g => g.kind === 'cad' && g.status === 'running')
+      .map(g => ({
+        workflowId: g.workflowId,
+        startedAt: g.startedAt,
+        cadRoute: g.cadRoute ?? '/image-to-cad',
+        timeoutMs: g.timeoutMs ?? RING_CAD_POLL_TIMEOUT_MS,
+      })),
+  );
+
+  useEffect(() => {
+    try {
+      const rows = JSON.parse(persistedCadKey) as PersistedCadGeneration[];
+      if (rows.length > 0) localStorage.setItem(CAD_TRACKING_STORAGE_KEY, persistedCadKey);
+      else localStorage.removeItem(CAD_TRACKING_STORAGE_KEY);
+    } catch {
+      // Storage is best-effort; the live poll remains authoritative.
+    }
+  }, [persistedCadKey]);
+
+  // Browser background throttling, transient poll failures, or a stale tab
+  // must never leave a terminal backend workflow displayed as "Generating".
+  // Reconcile independently of the long poll on an interval and whenever the
+  // user returns to the tab.
+  const reconcileCadGenerations = useCallback(async () => {
+    const runningCad = generationsRef.current.filter(g => g.kind === 'cad' && g.status === 'running');
+    for (const gen of runningCad) {
+      if (settledCadIds.current.has(gen.workflowId) || reconcilingCadIds.current.has(gen.workflowId)) continue;
+      reconcilingCadIds.current.add(gen.workflowId);
+      try {
+        const statusResponse = await authenticatedFetch(`/api/status/${gen.workflowId}`);
+        if (!statusResponse.ok) continue;
+        const statusData = await statusResponse.json() as { runtime?: { state?: string } };
+        const state = (statusData.runtime?.state ?? '').toLowerCase();
+        if (state === 'completed') {
+          settledCadIds.current.add(gen.workflowId);
+          controllers.current.get(gen.workflowId)?.abort();
+          controllers.current.delete(gen.workflowId);
+
+          // Terminal backend state clears the running UI immediately. Result
+          // hydration is a separate bounded operation and must never keep the
+          // generation spinner alive.
+          setGenerations(prev => prev.map(g =>
+            g.workflowId === gen.workflowId
+              ? { ...g, status: 'completed', progress: 100, generationStep: 'Loading completed result...' }
+              : g
+          ));
+          markGenerationCompleted(gen.workflowId, gen.startedAt);
+          refreshCredits();
+
+          let parsed: ReturnType<typeof parseRingCadResult> | null = null;
+          const resultController = new AbortController();
+          const resultTimeout = window.setTimeout(() => resultController.abort(), 15_000);
+          try {
+            const resultResponse = await authenticatedFetch(`/api/result/${gen.workflowId}`, {
+              signal: resultController.signal,
+            });
+            if (resultResponse.ok) parsed = parseRingCadResult(await resultResponse.json());
+          } catch {
+            // Completion is still terminal. The restore link will retry result loading.
+          } finally {
+            window.clearTimeout(resultTimeout);
+          }
+
+          setGenerations(prev => prev.map(g =>
+            g.workflowId === gen.workflowId
+              ? {
+                  ...g,
+                  status: 'completed',
+                  progress: 100,
+                  generationStep: parsed ? 'Completed' : 'Completed — result unavailable',
+                  glbUrl: parsed?.glbUrl ?? null,
+                  threedmUrl: parsed?.threedmArtifact?.url ?? null,
+                }
+              : g
+          ));
+          toast({
+            title: parsed ? 'Your 3D ring is ready' : 'Your 3D ring finished',
+            description: parsed
+              ? (gen.label ?? 'Open the completed CAD result')
+              : 'The result could not be loaded yet. Open it to retry.',
+            action: (
+              <ToastAction
+                altText="View Result"
+                onClick={() => navigate(buildCadRestorePath(gen.workflowId, parsed?.glbUrl ?? null, gen.cadRoute))}
+              >
+                View Result
+              </ToastAction>
+            ),
+          });
+          continue;
+        }
+
+        if (['failed', 'cancelled', 'canceled', 'timed_out'].includes(state)) {
+          settledCadIds.current.add(gen.workflowId);
+          controllers.current.get(gen.workflowId)?.abort();
+          controllers.current.delete(gen.workflowId);
+          setGenerations(prev => prev.map(g =>
+            g.workflowId === gen.workflowId ? { ...g, status: 'failed', progress: 100 } : g
+          ));
+          markGenerationFailed(gen.workflowId, `CAD workflow ${state}`, gen.startedAt);
+          refreshCredits();
+        }
+      } catch {
+        // The primary poll owns transient-error UI; reconciliation stays silent.
+      } finally {
+        reconcilingCadIds.current.delete(gen.workflowId);
+      }
+    }
+  }, [navigate, refreshCredits, toast]);
+
+  useEffect(() => {
+    const reconcileOnReturn = () => {
+      if (document.visibilityState === 'visible') void reconcileCadGenerations();
+    };
+    const interval = window.setInterval(() => void reconcileCadGenerations(), 30_000);
+    window.addEventListener('focus', reconcileOnReturn);
+    window.addEventListener('online', reconcileOnReturn);
+    document.addEventListener('visibilitychange', reconcileOnReturn);
+    void reconcileCadGenerations();
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', reconcileOnReturn);
+      window.removeEventListener('online', reconcileOnReturn);
+      document.removeEventListener('visibilitychange', reconcileOnReturn);
+    };
+  }, [reconcileCadGenerations]);
 
   useEffect(() => {
     const running = generations.filter(g => g.status === 'running');

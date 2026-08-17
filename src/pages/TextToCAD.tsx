@@ -16,7 +16,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { isWeightStlEnabled, isCadUploadEnabled } from "@/lib/feature-flags";
 import { useImageToCADWorkflow } from "@/hooks/useImageToCADWorkflow";
 import { useCADMeshEditor } from "@/hooks/useCADMeshEditor";
-import { useReferenceImages } from "@/hooks/useReferenceImages";
 
 import MeshPanel from "@/components/text-to-cad/MeshPanel";
 import CADCanvas from "@/components/text-to-cad/CADCanvas";
@@ -34,6 +33,8 @@ import GemToggle from "@/components/text-to-cad/QualityToggle";
 import { runMicroBenchmark } from "@/lib/gpu-detect";
 import type { GemMode } from "@/components/text-to-cad/CADCanvas";
 
+const NO_REFERENCE_IMAGES: File[] = [];
+
 export default function TextToCAD() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -43,12 +44,6 @@ export default function TextToCAD() {
 
   const [model] = useState("gemini");
   const [prompt, setPrompt] = useState("");
-  const {
-    referenceImages,
-    referenceImagePreviewUrls,
-    addReferenceImages,
-    removeReferenceImage,
-  } = useReferenceImages();
   const [transformMode, setTransformMode] = useState("orbit");
   const wasManualUploadRef = useRef(false);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
@@ -85,7 +80,7 @@ export default function TextToCAD() {
   const workflow = useImageToCADWorkflow({
     model,
     prompt,
-    referenceImages,
+    referenceImages: NO_REFERENCE_IMAGES,
     cadRoute: '/text-to-cad',
     onWorkspaceActivate: activateWorkspace,
   });
@@ -103,21 +98,17 @@ export default function TextToCAD() {
     else rightPanelRef.current?.collapse();
   }, [workflow.hasModel]);
 
-  // Boot directly into the workspace when ?glb= param is present (e.g. from Generations page)
+  // Boot directly into the workspace from a stable workflow result link. The
+  // optional GLB param renders eagerly; the workflow id restores the full
+  // result, including the machinable 3DM, after refresh/new session.
   useEffect(() => {
     const glbParam = searchParams.get('glb');
-    if (!glbParam) return;
     const workflowIdParam = searchParams.get('workflow_id');
-    setWorkspaceActive(true);
-    workflow.setHasModel(true);
-    workflow.setIsModelLoading(true);
-    workflow.setProgressStep("_loading");
-    workflow.setGlbUrl(glbParam);
-    workflow.setSourceWorkflowId(workflowIdParam?.trim() || null);
-    // Synthesise an artifact so weight/STL tools work on history-loaded models.
-    // Only the uri field is used by the backend to fetch the file; type/bytes/sha256
-    // are metadata that we don't have here but won't block the API calls.
-    workflow.setGlbArtifact({ uri: glbParam, type: 'model/gltf-binary', bytes: 0, sha256: '' });
+    const workflowId = workflowIdParam?.trim() || null;
+    if (!glbParam && !workflowId) return;
+    void workflow.restoreCompletedWorkflow(workflowId, glbParam).then((restored) => {
+      if (!restored) toast.error('Could not load this CAD result');
+    });
     // Clean the param from the URL without triggering a re-render loop
     navigate('/text-to-cad', { replace: true });
   // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount; workflow/navigate/searchParams excluded so re-navigation doesn't re-seed state
@@ -454,9 +445,6 @@ export default function TextToCAD() {
           isGenerating={workflow.isGenerating}
           onGenerate={workflow.simulateGeneration}
           onGlbUpload={showCadUpload ? handleGlbUpload : undefined}
-          referenceImagePreviewUrls={referenceImagePreviewUrls}
-          onAddReferenceImages={addReferenceImages}
-          onRemoveReferenceImage={removeReferenceImage}
           creditBlock={creditBlockUI}
         />
       </div>
@@ -509,8 +497,6 @@ export default function TextToCAD() {
               }}
               onGlbUpload={handleGlbUpload}
               onReset={workflow.hasModel ? handleReset : undefined}
-              referenceImagePreviewUrls={referenceImagePreviewUrls}
-              onRemoveReferenceImage={removeReferenceImage}
               creditBlock={creditBlockUI}
             />
           )}
@@ -684,7 +670,7 @@ export default function TextToCAD() {
               currentStep={workflow.progressStep}
               retryAttempt={workflow.retryAttempt}
               onRetry={() => workflow.simulateGeneration()}
-              estimateText="This can take up to 30 minutes"
+              estimateText="Complex designs can take over an hour"
               failureMessage={workflow.failureMessage}
               onKeepCreating={() => { workflow.handleKeepCreating(); setWorkspaceActive(false); }}
             />
@@ -698,6 +684,7 @@ export default function TextToCAD() {
               undoCount={editor.undoStack.length}
               redoCount={editor.redoStack.length}
               onDownload={workflow.threedmArtifact ? handleDownloadThreedm : handleDownloadGlb}
+              downloadLabel={workflow.threedmArtifact ? "Download 3DM" : "Export GLB"}
               onEstimateWeight={showWeightStl ? handleEstimateWeight : undefined}
               weightLoading={weightLoading}
               onDownloadStl={showWeightStl ? handleDownloadStl : undefined}

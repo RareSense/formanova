@@ -132,6 +132,6 @@ export const SectionIcons = {
   photo: <PeopleIcon className="h-4 w-4" />,
   productShot: <RingIcon className="h-4 w-4" />,
   cadRender: <Box className="h-4 w-4" />,
-  cadText: <RingIcon className="h-4 w-4" />,
-  cadSketch: <ImageIcon className="h-4 w-4" />,
+  textToCad: <RingIcon className="h-4 w-4" />,
+  imageToCad: <ImageIcon className="h-4 w-4" />,
 };

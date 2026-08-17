@@ -24,6 +24,7 @@ import { pollWorkflow } from '@/lib/poll-workflow';
 import { markGenerationCompleted, markGenerationFailed } from '@/lib/generation-lifecycle';
 import { getWorkflowDetails } from '@/lib/generation-history-api';
 import { extractPhotoThumbnail, extractProductShotThumbnail } from '@/lib/generation-enrichment';
+import { authenticatedFetch } from '@/lib/authenticated-fetch';
 
 const mockPollWorkflow = vi.mocked(pollWorkflow);
 const mockMarkCompleted = vi.mocked(markGenerationCompleted);
@@ -31,6 +32,15 @@ const mockMarkFailed = vi.mocked(markGenerationFailed);
 const mockGetWorkflowDetails = vi.mocked(getWorkflowDetails);
 const mockExtractPhotoThumbnail = vi.mocked(extractPhotoThumbnail);
 const mockExtractProductShotThumbnail = vi.mocked(extractProductShotThumbnail);
+const mockAuthenticatedFetch = vi.mocked(authenticatedFetch);
+
+function jsonResponse(body: unknown, status = 200): Response {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    json: () => Promise.resolve(body),
+  } as Response;
+}
 
 function wrapper({ children }: { children: React.ReactNode }) {
   return <MemoryRouter><GenerationsContextProvider>{children}</GenerationsContextProvider></MemoryRouter>;
@@ -39,6 +49,7 @@ function wrapper({ children }: { children: React.ReactNode }) {
 describe('GenerationsContext', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
     // Default: never resolves (long-running generation)
     mockPollWorkflow.mockReturnValue(new Promise(() => {}));
     mockGetWorkflowDetails.mockResolvedValue({ summary: { id: 'wf', name: '', status: 'completed', created_at: '', finished_at: null }, steps: [] });
@@ -382,6 +393,7 @@ describe('GenerationsContext', () => {
 describe('GenerationsContext - Image to 3D runs', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
     mockPollWorkflow.mockReturnValue(new Promise(() => {}));
   });
 
@@ -419,6 +431,38 @@ describe('GenerationsContext - Image to 3D runs', () => {
     expect(result.current.generations[0].glbUrl).toBe('https://s/r.glb');
     expect(result.current.generations[0].threedmUrl).toBe('https://s/r.3dm');
     expect(mockMarkCompleted).toHaveBeenCalledWith('cad-1', expect.any(Number));
+  });
+
+  it('persists a running CAD id and restores it after provider remount', async () => {
+    const first = renderHook(() => useGenerations(), { wrapper });
+    act(() => { first.result.current.trackCadGeneration({ workflowId: 'cad-persisted', cadRoute: '/text-to-cad' }); });
+
+    await waitFor(() => {
+      expect(localStorage.getItem('formanova_running_cad_v1')).toContain('cad-persisted');
+    });
+    first.unmount();
+
+    const second = renderHook(() => useGenerations(), { wrapper });
+    expect(second.result.current.generations[0]).toMatchObject({
+      workflowId: 'cad-persisted',
+      kind: 'cad',
+      status: 'running',
+      cadRoute: '/text-to-cad',
+    });
+  });
+
+  it('reconciles a stale running tab when the backend is already completed', async () => {
+    mockAuthenticatedFetch
+      .mockResolvedValueOnce(jsonResponse({ runtime: { state: 'completed' } }))
+      .mockResolvedValueOnce(jsonResponse(CAD_RESULT));
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    act(() => { result.current.trackCadGeneration({ workflowId: 'cad-stale' }); });
+
+    act(() => { window.dispatchEvent(new Event('focus')); });
+
+    await waitFor(() => expect(result.current.generations[0].status).toBe('completed'));
+    expect(result.current.generations[0].glbUrl).toBe('https://s/r.glb');
+    expect(result.current.generations[0].threedmUrl).toBe('https://s/r.3dm');
   });
 
   it('marks a failed cad run failed rather than completed', async () => {

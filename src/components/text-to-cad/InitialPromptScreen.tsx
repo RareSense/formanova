@@ -22,28 +22,17 @@ interface InitialPromptScreenProps {
   onGenerate: () => void;
   onGlbUpload?: (file: File) => void;
   creditBlock?: React.ReactNode;
-  /** Ordered previews; index 0 is the primary reference. Length 0..MAX_RING_CAD_REFERENCE_IMAGES. */
-  referenceImagePreviewUrls: string[];
-  /** Appends images, respecting the max. Caller owns File state and object-URL lifetime. */
-  onAddReferenceImages: (files: File[]) => void;
-  onRemoveReferenceImage: (index: number) => void;
 }
 
 export default function InitialPromptScreen({
   model, setModel, prompt, setPrompt,
   isGenerating, onGenerate, onGlbUpload, creditBlock,
-  referenceImagePreviewUrls, onAddReferenceImages, onRemoveReferenceImage,
 }: InitialPromptScreenProps) {
   const glbInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  // ring_cad_nurbs_v1 handles text-only, one image, or 2-5 images under one
-  // workflow name — the payload shape changes, the price estimate call does not.
   const { cost: estimatedCost, loading: costLoading } = useEstimatedCost({ workflowName: RING_CAD_NURBS_WORKFLOW, model });
 
-  const imageCount = referenceImagePreviewUrls.length;
-  // Either input alone is sufficient: text-only (0 images) requires text,
-  // an image (1+) makes text optional — matches useImageToCADWorkflow's rule.
-  const canGenerate = imageCount > 0 || !!prompt.trim();
+  const canGenerate = !!prompt.trim();
 
   const handleGlbUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

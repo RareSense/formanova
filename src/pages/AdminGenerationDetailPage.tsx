@@ -5,19 +5,21 @@ import {
   AlertTriangle,
   ArrowLeft,
   ChevronDown,
+  Download,
   ImageOff,
   Loader2,
   MessageSquareWarning,
 } from 'lucide-react';
 
 import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
+import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { azureUriToUrl } from '@/lib/azure-utils';
 import {
   AdminGenerationsApiError,
   getAdminGenerationDetail,
   type AdminGenerationDetail,
 } from '@/lib/admin-generations-api';
-import { resolveSourceType } from '@/lib/generation-history-api';
+import { fetchCadResult, resolveSourceType } from '@/lib/generation-history-api';
 import { parseRingCadResult } from '@/lib/ring-cad-nurbs-api';
 import type { AdminGenerationStep } from '@/lib/admin-generations-api';
 import { ScissorGLBGrid, GLBPreviewSlot } from '@/components/generations/ScissorGLBGrid';
@@ -25,6 +27,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { toast } from 'sonner';
 
 function formatDateTime(value: string | null): string {
   if (!value) return '-';
@@ -140,6 +143,25 @@ function findText(value: unknown, keys: string[]): string | null {
     }
   }
 
+  return null;
+}
+
+function getReferenceImageCount(value: unknown): number | null {
+  if (!value || typeof value !== 'object') return null;
+  const root = value as Record<string, unknown>;
+  const nested = root.payload && typeof root.payload === 'object'
+    ? root.payload as Record<string, unknown>
+    : null;
+
+  for (const candidate of [root, nested]) {
+    if (!candidate) continue;
+    if (typeof candidate.reference_image_count === 'number') {
+      return candidate.reference_image_count;
+    }
+    for (const key of ['reference_images', 'reference_image_urls']) {
+      if (Array.isArray(candidate[key])) return candidate[key].length;
+    }
+  }
   return null;
 }
 
@@ -364,15 +386,56 @@ function InvalidRequestState({ message }: { message: string }) {
 }
 
 function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
-  // Both CAD families produce a GLB. cad_sketch (Image to 3D, including
-  // ring_cad_nurbs_v1) was excluded here, so its runs always rendered
+  // Both CAD families produce a GLB. Image-to-CAD (including ring_cad_nurbs_v1)
+  // was excluded here, so its runs always rendered
   // "No 3D output" no matter what the pipeline returned.
-  const cadSourceType = resolveSourceType(detail.source_type, detail.workflow_name);
-  const isCadModel = cadSourceType === 'cad_text' || cadSourceType === 'cad_sketch';
+  const referenceImageCount = getReferenceImageCount(detail.input_payload);
+  const cadSourceType = resolveSourceType(detail.source_type, detail.workflow_name, referenceImageCount);
+  const isCadModel = cadSourceType === 'text_to_cad' || cadSourceType === 'image_to_cad';
+  const cadResultQuery = useQuery({
+    queryKey: ['admin-cad-result', detail.workflow_id],
+    queryFn: () => fetchCadResult(detail.workflow_id),
+    enabled: isCadModel && detail.status === 'completed',
+    staleTime: Infinity,
+    retry: 1,
+  });
+  const [downloading3dm, setDownloading3dm] = useState(false);
   const textPrompt = isCadModel
     ? findText(detail.input_payload, ['prompt', 'description', 'ring_description', 'text_input', 'input_text', 'text', 'query', 'user_description'])
     : null;
-  const cadGlbUrl = isCadModel ? extractGlbFromSteps(detail.steps) : null;
+  const cadGlbUrl = isCadModel
+    ? cadResultQuery.data?.glb_url ?? extractGlbFromSteps(detail.steps)
+    : null;
+  const cadThreedmUrl = isCadModel ? cadResultQuery.data?.threedm_url ?? null : null;
+  const cadSourceLabel = cadSourceType === 'text_to_cad'
+    ? 'Text to CAD'
+    : cadSourceType === 'image_to_cad'
+      ? 'Image to CAD'
+      : null;
+
+  async function handleDownload3dm() {
+    if (!cadThreedmUrl || downloading3dm) return;
+    setDownloading3dm(true);
+    try {
+      const response = await authenticatedFetch(cadThreedmUrl);
+      if (!response.ok) throw new Error(`3DM download failed: ${response.status}`);
+      const blob = await response.blob();
+      if (blob.size === 0) throw new Error('3DM download was empty');
+      const blobUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = blobUrl;
+      anchor.download = `${detail.workflow_id}.3dm`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+    } catch (error) {
+      console.error('[Admin CAD 3DM download]', error);
+      toast.error('Failed to download the 3DM file');
+    } finally {
+      setDownloading3dm(false);
+    }
+  }
 
   const stepOutputImageUrls = detail.steps.flatMap((step) =>
     extractImageUrls(step.output)
@@ -477,6 +540,7 @@ function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
           <MetaItem label="Provider Cost" value={formatCredits(detail.total_provider_cost)} />
           <MetaItem label="Workflow ID" value={detail.workflow_id} />
           <MetaItem label="Status" value={detail.status.replace(/_/g, ' ')} />
+          {cadSourceLabel && <MetaItem label="CAD Source" value={cadSourceLabel} />}
         </CardContent>
       </Card>
 
@@ -517,6 +581,10 @@ function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
                       />
                     </ScissorGLBGrid>
                   </div>
+                ) : cadResultQuery.isLoading ? (
+                  <div className="flex w-40 aspect-[4/3] items-center justify-center rounded-md border border-border bg-muted/20">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
                 ) : (
                   <div className="flex w-40 aspect-[4/3] items-center justify-center rounded-md border border-border bg-muted/20">
                     <div className="flex flex-col items-center gap-2 text-muted-foreground/50">
@@ -524,6 +592,18 @@ function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
                       <span className="font-mono text-[10px] uppercase tracking-widest text-center">No 3D output</span>
                     </div>
                   </div>
+                )}
+                {cadThreedmUrl && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleDownload3dm}
+                    disabled={downloading3dm}
+                    className="font-mono text-[10px] uppercase tracking-widest"
+                  >
+                    {downloading3dm ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                    Download 3DM
+                  </Button>
                 )}
               </div>
             </div>

@@ -1,7 +1,7 @@
 import { type WorkflowSummary } from '@/lib/generation-history-api';
 import { getAssetDisplayName, type UserAsset } from '@/lib/assets-api';
 
-const CACHE_KEY = 'formanova_gen_cache_v3';
+const CACHE_KEY = 'formanova_gen_cache_v5';
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 export interface CachePayload {
@@ -103,7 +103,7 @@ export function sortByCreatedDesc<T extends { created_at?: string }>(items: T[])
 
 export function buildOrderedCadAssetNameMap(workflows: WorkflowSummary[], assets: UserAsset[]): Record<string, string> {
   const cadWorkflows = sortByCreatedDesc(
-    workflows.filter(w => w.source_type === 'cad_text' && w.status === 'completed'),
+    workflows.filter(w => w.source_type === 'text_to_cad' && w.status === 'completed'),
   );
   const cadAssetNames = sortByCreatedDesc(assets)
     .map(getAssetDisplayName)
