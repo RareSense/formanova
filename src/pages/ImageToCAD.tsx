@@ -210,7 +210,7 @@ export default function ImageToCAD() {
   // ── Phase 1: Initial prompt screen ──
   if (!workspaceActive) {
     return (
-      <div className="h-[calc(100vh-5rem)] flex bg-background" tabIndex={0}>
+      <div className="min-h-[calc(100vh-5rem)] flex bg-background" tabIndex={0}>
         <ImagePromptScreen
           model={model}
           prompt={prompt}

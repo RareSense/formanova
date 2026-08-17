@@ -84,7 +84,11 @@ export default function GenerationProgress({
   const label = NODE_LABELS[currentStep] || "";
 
   return (
-    <div className="absolute inset-0 z-[100] flex items-center justify-center bg-background backdrop-blur-sm">
+    // Always black, matching the CAD viewport's own forced-dark background
+    // (see the inline style="#000000" on the viewport container in
+    // TextToCAD.tsx/ImageToCAD.tsx) - this overlay must not flip white in
+    // Light theme, since the viewport around it never does either.
+    <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black backdrop-blur-sm">
       <div className="flex flex-col items-center gap-6 w-full max-w-sm mx-auto">
         {/* Diamond spinner — same as photo studio */}
         {!isTerminal && (
@@ -122,8 +126,8 @@ export default function GenerationProgress({
                 {onKeepCreating && (
                   <>
                     <div className="mt-3 px-4 py-2.5 max-w-[260px] bg-primary/10 border border-primary/30 text-center">
-                      <span className="text-[11px] font-semibold text-foreground/90 leading-relaxed">
-                        Grab a coffee, this can take up to 30 minutes. It will be saved to your generation history, so it is safe to leave.
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.15em] text-foreground/80 leading-relaxed">
+                        Safe to leave. Saved to your generation history.
                       </span>
                     </div>
                     <button

@@ -92,7 +92,7 @@ export default function ImagePromptScreen({
   const canGenerate = imageCount > 0;
 
   return (
-    <div className="flex-1 flex items-center justify-center bg-background overflow-y-auto">
+    <div className="w-full flex items-start justify-center bg-background">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
