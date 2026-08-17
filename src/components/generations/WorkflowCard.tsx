@@ -9,8 +9,15 @@ import type { WorkflowSummary } from '@/lib/generation-history-api';
 import { SnapshotPreviewModal } from './SnapshotPreviewModal';
 import { GLBPreviewSlot } from './ScissorGLBGrid';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
-import { downloadAsset, isShaLikeName, renameAsset } from '@/lib/assets-api';
-import { truncateDisplayName, formatLocal, formatLocalDateOnly, itemVariants, CreditsBadge } from './workflow-card-shared';
+import { isShaLikeName, renameAsset } from '@/lib/assets-api';
+import {
+  buildCadArtifactFilename,
+  formatLocal,
+  getCadArtifactBaseName,
+  itemVariants,
+  truncateDisplayName,
+  CreditsBadge,
+} from './workflow-card-shared';
 import { PhotoCard } from './PhotoCard';
 
 const CAD_RENAMES_KEY = 'formanova_cad_renames';
@@ -41,16 +48,6 @@ interface WorkflowCardProps {
 
 // ─── Text-to-CAD card ──────────────────────────────────────────────────────
 
-// Model ID -> display label mapping
-const MODEL_LABELS: Record<string, string> = {
-  gemini: 'Lite',
-  'claude-sonnet': 'Standard',
-  'claude-opus': 'Premium',
-  lite: 'Lite',
-  standard: 'Standard',
-  premium: 'Premium',
-};
-
 function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: number }) {
   const navigate = useNavigate();
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
@@ -67,34 +64,25 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
   }, [workflow.output_asset_name]);
 
   const dateStr = workflow.created_at ? formatLocal(workflow.created_at) : '—';
-  const dateOnlyStr = workflow.created_at ? formatLocalDateOnly(workflow.created_at) : '—';
   const shots = workflow.screenshots ?? [];
   const hasShots = shots.length > 0;
   const isEnriching = workflow.screenshots === undefined;
-  const isFailed = workflow.status === 'failed';
-
-  const modelLabel = workflow.mode
-    ? MODEL_LABELS[workflow.mode.toLowerCase()] ?? workflow.mode
-    : workflow.ai_model
-      ? MODEL_LABELS[workflow.ai_model] ?? workflow.ai_model
-      : null;
 
   // Derive the shown filename (user rename takes priority)
   const rawFilename = workflow.glb_filename || 'model.glb';
-  const extension = rawFilename.includes('.') ? rawFilename.split('.').pop()! : 'glb';
-  const baseName = rawFilename.replace(/\.[^.]+$/, '');
-  const shownBaseName = displayName ?? baseName;
-  const shownFilename = `${shownBaseName}.${extension}`;
-  const visibleFilename = `${truncateDisplayName(shownBaseName)}.${extension}`;
+  const baseName = getCadArtifactBaseName(null, rawFilename);
+  const shownBaseName = getCadArtifactBaseName(displayName, rawFilename);
+  const shownFilename = buildCadArtifactFilename(displayName, rawFilename, 'glb');
+  const visibleFilename = `${truncateDisplayName(shownBaseName)}.glb`;
 
   const handleStartRename = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setRenameValue(displayName || baseName);
+    setRenameValue(shownBaseName);
     setIsRenaming(true);
   };
 
   const handleConfirmRename = useCallback(async () => {
-    const sanitized = renameValue.trim().replace(/[<>:"/\\|?*]/g, '_');
+    const sanitized = getCadArtifactBaseName(renameValue, rawFilename);
     if (sanitized && sanitized !== baseName && workflow.output_asset_id) {
       setDisplayName(sanitized);
       saveStoredRename(workflow.workflow_id, sanitized);
@@ -105,7 +93,7 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
       }
     }
     setIsRenaming(false);
-  }, [renameValue, baseName, workflow.workflow_id, workflow.output_asset_id]);
+  }, [renameValue, baseName, rawFilename, workflow.workflow_id, workflow.output_asset_id]);
 
   const handleCancelRename = () => {
     setIsRenaming(false);
@@ -116,19 +104,18 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
     if (!workflow.glb_url) return;
     import('@/lib/posthog-events').then(m => m.trackDownloadClicked({ file_name: shownFilename, file_type: 'glb', context: 'generations' }));
     try {
-      if (workflow.output_asset_id) {
-        await downloadAsset(workflow.output_asset_id);
-        return;
-      }
       const resp = await authenticatedFetch(workflow.glb_url);
       if (!resp.ok) throw new Error(`Download failed: ${resp.status}`);
       const blob = await resp.blob();
+      if (blob.size === 0) throw new Error('Download returned an empty file');
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = blobUrl;
       a.download = shownFilename;
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(blobUrl);
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
     } catch (err) {
       console.error('[WorkflowCard] GLB download error:', err);
     }
@@ -137,7 +124,7 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
   const handleDownloadThreedm = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!workflow.threedm_url) return;
-    const fileName = `${shownBaseName}.3dm`;
+    const fileName = buildCadArtifactFilename(displayName, rawFilename, '3dm');
     import('@/lib/posthog-events').then(m => m.trackDownloadClicked({ file_name: fileName, file_type: '3dm', context: 'generations' }));
     try {
       const resp = await authenticatedFetch(workflow.threedm_url);
@@ -173,23 +160,17 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
         variants={itemVariants}
         className="marta-frame overflow-hidden"
       >
-        {/* Card header: number + model tier + date */}
-        <div className="flex items-center justify-end sm:justify-between px-4 pt-4 pb-3 gap-2">
+        {/* Card header: public metadata only. */}
+        <div className="flex items-center justify-between px-4 pt-4 pb-3 gap-2">
           <div className="hidden sm:flex items-center gap-2 min-w-0">
             <span className="font-mono text-[11px] tracking-[0.15em] text-muted-foreground/70 select-none">
               #{index}
             </span>
-            {modelLabel && (
-              <span className="font-mono text-[9px] tracking-[0.15em] uppercase px-2 py-0.5 border border-border bg-muted/40 text-muted-foreground">
-                {modelLabel}
-              </span>
-            )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <span className="hidden sm:inline-flex"><CreditsBadge credits={workflow.credits_spent} /></span>
             <span className="font-mono text-[10px] tracking-wider text-muted-foreground whitespace-nowrap">
-              <span className="sm:hidden">{dateOnlyStr}</span>
-              <span className="hidden sm:inline">{dateStr}</span>
+              {dateStr}
             </span>
           </div>
         </div>
@@ -219,12 +200,12 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
 
         {/* ── File box — only shown when GLB is available or still loading ── */}
         {(workflow.glb_url || isEnriching) && (
-          <div className="mx-4 mb-4 flex items-center gap-2 rounded-sm border border-border/50 bg-muted/20 px-3 py-2.5">
+          <div className="mx-3 mb-4 flex flex-col gap-3 rounded-sm border border-border/50 bg-muted/20 px-3 py-3 sm:mx-4">
             {/* Left: filename + rename */}
             <div className="flex items-center gap-1.5 flex-1 min-w-0">
               <Box className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
               {isRenaming ? (
-                <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                <div className="flex min-w-0 flex-1 items-center gap-1" onClick={e => e.stopPropagation()}>
                   <Input
                     value={renameValue}
                     onChange={(e) => setRenameValue(e.target.value)}
@@ -234,9 +215,9 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
                     }}
                     autoFocus
                     maxLength={50}
-                    className="h-6 font-mono text-[10px] tracking-wider px-1.5 py-0 min-w-[80px] max-w-[140px]"
+                    className="h-7 min-w-0 flex-1 px-1.5 py-0 font-mono text-[10px] tracking-wider"
                   />
-                  <span className="text-[10px] text-muted-foreground font-mono">.{extension}</span>
+                  <span className="text-[10px] text-muted-foreground font-mono">.glb</span>
                   <button onClick={handleConfirmRename} className="p-0.5 hover:text-foreground text-muted-foreground transition-colors">
                     <Check className="h-3 w-3" />
                   </button>
@@ -245,9 +226,9 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center gap-1.5">
+                <div className="flex min-w-0 items-center gap-1.5">
                   <span
-                    className="font-mono text-[10px] tracking-wider text-foreground truncate max-w-[140px]"
+                    className="truncate font-mono text-[10px] tracking-wider text-foreground"
                     title={shownFilename}
                   >
                     {isEnriching ? '—' : visibleFilename}
@@ -266,39 +247,41 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
             </div>
 
             {/* Right: action buttons */}
-            <div className="flex items-center gap-1.5 flex-shrink-0">
+            <div className="grid w-full grid-cols-1 gap-2 min-[420px]:grid-cols-2">
               {workflow.glb_url ? (
                 <>
                   {workflow.threedm_url && (
                     <Button
                       size="sm"
+                      variant="outline"
                       onClick={handleDownloadThreedm}
-                      className="h-7 px-2.5 font-mono text-[9px] tracking-wider uppercase gap-1 whitespace-nowrap"
+                      className="h-9 w-full gap-1.5 border-[hsl(var(--formanova-hero-accent))] bg-transparent px-3 font-mono text-[9px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"
                       title="Download machinable 3DM"
                       aria-label="Download 3DM"
                     >
                       <Download className="h-3.5 w-3.5" />
-                      3DM
+                      Download 3DM
                     </Button>
                   )}
                   <Button
                     size="sm"
-                    variant="ghost"
-                    onClick={handleDownloadGlb}
-                    className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                    title="Download GLB"
-                    aria-label="Download GLB"
+                    variant="outline"
+                    onClick={handleLoadInStudio}
+                    className="h-9 w-full gap-1.5 border-border bg-transparent px-3 font-mono text-[9px] uppercase tracking-wider hover:bg-muted/40"
                   >
-                    <Download className="h-3.5 w-3.5" />
+                    <Layers className="h-3.5 w-3.5 shrink-0" />
+                    Open in Studio
                   </Button>
                   <Button
                     size="sm"
-                    onClick={handleLoadInStudio}
-                    className="h-7 px-2.5 font-mono text-[9px] tracking-wider uppercase gap-1 whitespace-nowrap"
+                    variant="outline"
+                    onClick={handleDownloadGlb}
+                    className="h-9 w-full gap-1.5 border-border bg-transparent px-3 font-mono text-[9px] uppercase tracking-wider text-muted-foreground hover:bg-muted/40 hover:text-foreground min-[420px]:col-span-2"
+                    title="Export GLB preview model"
+                    aria-label="Export GLB"
                   >
-                    <Layers className="h-3 w-3 flex-shrink-0" />
-                    <span className="hidden sm:inline">Load in Studio</span>
-                    <span className="sm:hidden">Studio</span>
+                    <Download className="h-3.5 w-3.5 shrink-0" />
+                    Export GLB
                   </Button>
                 </>
               ) : (

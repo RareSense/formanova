@@ -20,10 +20,11 @@ import {
   saveCache,
   preloadImage,
   withTimeout,
+  retryNullable,
+  isVisibleGeneration,
   getAssetWorkflowId,
   getArtifactKey,
   getAssetArtifactKeys,
-  buildOrderedCadAssetNameMap,
   type CachePayload,
 } from '@/lib/generation-history-utils';
 import { WorkflowSection, SectionIcons } from '@/components/generations/WorkflowSection';
@@ -55,7 +56,6 @@ export default function Generations() {
 
   const [photoPage, setPhotoPage] = useState(1);
   const [productShotPage, setProductShotPage] = useState(1);
-  const [cadRenderPage, setCadRenderPage] = useState(1);
   const [textCadPage, setTextCadPage] = useState(1);
   const [imageCadPage, setImageCadPage] = useState(1);
 
@@ -65,8 +65,7 @@ export default function Generations() {
     byAssetId: Record<string, string>;
     byWorkflowId: Record<string, string>;
     byArtifactKey: Record<string, string>;
-    byOrderedCadWorkflowId: Record<string, string>;
-  }>({ byAssetId: {}, byWorkflowId: {}, byArtifactKey: {}, byOrderedCadWorkflowId: {} });
+  }>({ byAssetId: {}, byWorkflowId: {}, byArtifactKey: {} });
 
   const resolveGeneratedAssetName = useCallback((workflow: WorkflowSummary): string | null => {
     const maps = generatedAssetNamesRef.current;
@@ -76,7 +75,6 @@ export default function Generations() {
       (workflow.output_asset_id ? maps.byAssetId[workflow.output_asset_id] : undefined) ||
       maps.byWorkflowId[workflow.workflow_id] ||
       (artifactKey ? maps.byArtifactKey[artifactKey] : undefined) ||
-      maps.byOrderedCadWorkflowId[workflow.workflow_id] ||
       null
     );
   }, []);
@@ -88,14 +86,20 @@ export default function Generations() {
     // Try cache first for instant render
     const cached = loadCache();
     if (cached) {
+      const visibleCachedWorkflows = cached.workflows.filter(isVisibleGeneration);
       const normalizedEnriched = Object.fromEntries(
         Object.entries(cached.enriched).filter(([workflowId, data]) => {
-          const workflow = cached.workflows.find((w) => w.workflow_id === workflowId);
-          return !(workflow?.source_type === 'product_shot' && data.thumbnail_url === '');
+          const workflow = visibleCachedWorkflows.find((w) => w.workflow_id === workflowId);
+          if (!workflow) return false;
+          if (Object.keys(data).length === 0) return false;
+          if (workflow?.source_type === 'product_shot' && data.thumbnail_url === '') return false;
+          const isCad = workflow?.source_type === 'text_to_cad' || workflow?.source_type === 'image_to_cad';
+          if (isCad && data.screenshots !== undefined && !data.glb_url) return false;
+          return true;
         }),
       );
       // Apply cached enrichment data on top of workflow list
-      const hydrated = cached.workflows.map(w => {
+      const hydrated = visibleCachedWorkflows.map(w => {
         const e = normalizedEnriched[w.workflow_id];
         return e ? { ...w, ...e } : w;
       });
@@ -122,7 +126,7 @@ export default function Generations() {
       try {
         if (!cached) setGlobalLoading(true);
         const rawWorkflows = await listMyWorkflows(100, 0);
-        const workflows = rawWorkflows.filter(w => w.source_type !== 'unknown');
+        const workflows = rawWorkflows.filter(w => w.source_type !== 'unknown' && isVisibleGeneration(w));
         if (import.meta.env.DEV) console.log('[Generations] fetched:', rawWorkflows.length, '→ valid:', workflows.length);
 
         // Build generated asset name maps. Some older workflow rows do not expose
@@ -130,13 +134,11 @@ export default function Generations() {
         const assetNameMap: Record<string, string> = {};
         const workflowAssetNameMap: Record<string, string> = {};
         const artifactAssetNameMap: Record<string, string> = {};
-        let orderedCadWorkflowNameMap: Record<string, string> = {};
         try {
           const [photos, cads] = await Promise.all([
             fetchUserAssets('generated_photo', 0, 100),
             fetchUserAssets('generated_cad', 0, 100),
           ]);
-          orderedCadWorkflowNameMap = buildOrderedCadAssetNameMap(workflows, cads.items);
           [...photos.items, ...cads.items].forEach(a => {
             const name = getAssetDisplayName(a);
             if (!name) return;
@@ -153,7 +155,6 @@ export default function Generations() {
           byAssetId: assetNameMap,
           byWorkflowId: workflowAssetNameMap,
           byArtifactKey: artifactAssetNameMap,
-          byOrderedCadWorkflowId: orderedCadWorkflowNameMap,
         };
 
         // Re-apply enriched data + asset names
@@ -183,14 +184,11 @@ export default function Generations() {
     const getSection = useCallback(
     (source: SourceType, page: number, requireImage = false): SectionState => {
       const isCadSource = source === 'text_to_cad' || source === 'image_to_cad';
-      const statusOk = isCadSource
-        ? (w: WorkflowSummary) => w.status === 'completed' || w.status === 'failed'
-        : (w: WorkflowSummary) => w.status === 'completed';
       const filtered = allWorkflows.filter((w) => {
-        if (w.source_type !== source || !statusOk(w)) return false;
+        if (w.source_type !== source || !isVisibleGeneration(w)) return false;
         // Skip photo/product_shot/cad_render cards that enriched but have no thumbnail
         if (requireImage && w.thumbnail_url === '') return false;
-        // Skip CAD cards that finished enriching but have no GLB.
+        // Successful CAD runs without an artifact are not actionable.
         if (isCadSource && w.screenshots !== undefined && !w.glb_url) return false;
         return true;
       });
@@ -212,7 +210,7 @@ export default function Generations() {
 
     const allUnenriched = allWorkflows.filter(
       w => w.thumbnail_url === undefined && !enrichedRef.current[w.workflow_id] &&
-           (w.status === 'completed' || (w.source_type === 'text_to_cad' && w.status === 'failed'))
+           isVisibleGeneration(w)
     );
 
     if (allUnenriched.length === 0) return;
@@ -244,7 +242,18 @@ export default function Generations() {
         await Promise.allSettled(
           batch.map(async (wf) => {
             if (wf.source_type === 'text_to_cad' || wf.source_type === 'image_to_cad') {
-              const details = await getWorkflowDetails(wf.workflow_id);
+              const details = await retryNullable(
+                () => withTimeout(getWorkflowDetails(wf.workflow_id), 5000),
+                2,
+              );
+              if (!details) {
+                if (!cancelled) applyEnrichment(wf.workflow_id, {
+                  thumbnail_url: '',
+                  screenshots: [],
+                  glb_url: null,
+                });
+                return;
+              }
               const stepData = extractCadTextData(details.steps ?? []);
               if (!cancelled) applyEnrichment(wf.workflow_id, stepData);
 
@@ -261,13 +270,27 @@ export default function Generations() {
               return;
             }
             if (wf.source_type === 'product_shot') {
-              const details = await getWorkflowDetails(wf.workflow_id);
+              const details = await retryNullable(
+                () => withTimeout(getWorkflowDetails(wf.workflow_id), 5000),
+                2,
+              );
+              if (!details) {
+                if (!cancelled) applyEnrichment(wf.workflow_id, { thumbnail_url: '' });
+                return;
+              }
               const thumbnail_url = extractProductShotThumbnail(details.steps ?? []);
               if (thumbnail_url) preloadImage(thumbnail_url);
               if (!cancelled) applyEnrichment(wf.workflow_id, { thumbnail_url: thumbnail_url ?? '' });
               return;
             }
-            const details = await getWorkflowDetails(wf.workflow_id);
+            const details = await retryNullable(
+              () => withTimeout(getWorkflowDetails(wf.workflow_id), 5000),
+              2,
+            );
+            if (!details) {
+              if (!cancelled) applyEnrichment(wf.workflow_id, { thumbnail_url: '' });
+              return;
+            }
             const thumbnail_url = extractPhotoThumbnail(details.steps ?? []);
             if (thumbnail_url) preloadImage(thumbnail_url);
             if (!cancelled) applyEnrichment(wf.workflow_id, { thumbnail_url: thumbnail_url ?? '' });
@@ -296,7 +319,7 @@ export default function Generations() {
     const needsAudit = allWorkflows.filter(
       w => w.credits_spent === undefined &&
            !auditFetchedRef.current.has(w.workflow_id) &&
-           (w.status === 'completed' || w.status === 'failed')
+           isVisibleGeneration(w)
     );
 
     if (needsAudit.length === 0) return;
@@ -345,7 +368,6 @@ export default function Generations() {
 
   const photoSection = getSection('photo', photoPage, true);
   const productShotSection = getSection('product_shot', productShotPage, true);
-  const cadRenderSection = getSection('cad_render', cadRenderPage, true);
   const textCadSection = getSection('text_to_cad', textCadPage);
   const imageCadSection = getSection('image_to_cad', imageCadPage);
 
@@ -363,9 +385,9 @@ export default function Generations() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="mb-8 flex items-end justify-between"
+          className="mb-10"
         >
-          <div>
+          <div className="max-w-2xl">
             <Link
               to="/dashboard"
               className="inline-flex items-center gap-1.5 font-mono text-[9px] tracking-[0.3em] text-muted-foreground uppercase hover:text-foreground transition-colors mb-2"
@@ -373,6 +395,12 @@ export default function Generations() {
               <ArrowLeft className="h-3 w-3" />
               Dashboard
             </Link>
+            <h1 className="font-display text-4xl uppercase tracking-wide text-foreground md:text-5xl">
+              Generations
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Review, rename, download, and reopen your generated jewelry assets.
+            </p>
           </div>
         </motion.div>
 

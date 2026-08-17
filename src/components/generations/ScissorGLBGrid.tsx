@@ -27,6 +27,11 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Box } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { azureUriToUrl } from '@/lib/azure-utils';
+import {
+  applyHistoryPreviewMaterials,
+  markEmbeddedGltfMaterials,
+} from './scissor-glb-materials';
+import { PendingCardRegistrationQueue } from './scissor-glb-registration';
 
 const __DEV__ = import.meta.env.DEV;
 
@@ -198,6 +203,8 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
   const rafRef = useRef<number>(0);
   const envMapRef = useRef<THREE.Texture | null>(null);
   const gltfLoaderRef = useRef(new GLTFLoader());
+  const pendingRegistrationsRef = useRef(new PendingCardRegistrationQueue<HTMLDivElement>());
+  const [rendererReady, setRendererReady] = useState(false);
 
   /** Notify all listeners for a given card id */
   const notifyListeners = useCallback((id: string) => {
@@ -213,6 +220,7 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    const pendingRegistrations = pendingRegistrationsRef.current;
 
     const renderer = new THREE.WebGLRenderer({
       canvas,
@@ -225,6 +233,7 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.setClearColor(0x000000, 0);
     rendererRef.current = renderer;
+    setRendererReady(true);
 
     // Preload HDRI environment
     const rgbeLoader = new RGBELoader();
@@ -250,6 +259,7 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
       renderer.dispose();
       envMapRef.current?.dispose();
       rendererRef.current = null;
+      pendingRegistrations.clear();
       observer.disconnect();
     };
   }, []);
@@ -356,6 +366,7 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
             arrayBuffer,
             '',
             (gltf) => {
+              markEmbeddedGltfMaterials(gltf);
               cacheScene(card.glbUrl, gltf.scene);
               resolve(gltf.scene.clone(true));
             },
@@ -389,29 +400,7 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
     model.position.set(-center.x * scale, -center.y * scale, -center.z * scale);
     model.scale.setScalar(scale);
 
-    const gemRe = /diamond|gem|stone|crystal|jewel|brill|ruby|emerald|sapphire|topaz|opal|garnet|amethyst|pearl|cz|cubic|solitaire|pave|prong_stone|accent_stone|center_stone|main_stone/i;
-    const metalRe = /band|ring|shank|prong|setting|mount|bezel|basket|gallery|shoulder|bridge|head|collet|metal|gold|silver|platinum|frame|base/i;
-
-    model.traverse((child) => {
-      if ((child as THREE.Mesh).isMesh) {
-        const mesh = child as THREE.Mesh;
-        const lower = mesh.name.toLowerCase();
-        const origMat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
-        const phys = origMat as THREE.MeshPhysicalMaterial;
-        let isGem = gemRe.test(lower);
-        if (metalRe.test(lower)) isGem = false;
-        if (!gemRe.test(lower) && !metalRe.test(lower)) {
-          if (phys?.transmission > 0.5 || phys?.ior > 2.0) isGem = true;
-        }
-        mesh.material = new THREE.MeshStandardMaterial({
-          color: isGem ? 0x1a3a6b : 0x77dd77,
-          metalness: 0,
-          roughness: isGem ? 0.6 : 0.8,
-          flatShading: true,
-          side: THREE.DoubleSide,
-        });
-      }
-    });
+    applyHistoryPreviewMaterials(model);
 
     card.scene.add(model);
 
@@ -428,7 +417,12 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
     if (cardsRef.current.has(id)) return;
 
     const renderer = rendererRef.current;
-    if (!renderer) return;
+    if (!renderer) {
+      pendingRegistrationsRef.current.upsert({ id, glbUrl, element: div });
+      return;
+    }
+
+    pendingRegistrationsRef.current.delete(id);
 
     const scene = new THREE.Scene();
     scene.background = getThemeBgColor();
@@ -473,7 +467,15 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
     loadGlb(entry);
   }, [loadGlb]);
 
+  useEffect(() => {
+    if (!rendererReady || !rendererRef.current) return;
+    pendingRegistrationsRef.current.drain(({ id, glbUrl, element }) => {
+      registerCard(id, glbUrl, element);
+    });
+  }, [rendererReady, registerCard]);
+
   const unregisterCard = useCallback((id: string) => {
+    pendingRegistrationsRef.current.delete(id);
     const card = cardsRef.current.get(id);
     if (card) {
       card.controls.dispose();

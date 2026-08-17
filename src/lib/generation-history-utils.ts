@@ -1,5 +1,5 @@
 import { type WorkflowSummary } from '@/lib/generation-history-api';
-import { getAssetDisplayName, type UserAsset } from '@/lib/assets-api';
+import { type UserAsset } from '@/lib/assets-api';
 
 const CACHE_KEY = 'formanova_gen_cache_v5';
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -46,6 +46,21 @@ export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | nul
   });
 }
 
+export async function retryNullable<T>(
+  task: () => Promise<T | null>,
+  attempts = 2,
+): Promise<T | null> {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const result = await task();
+      if (result !== null) return result;
+    } catch {
+      // Retry bounded transient failures; the caller owns the terminal state.
+    }
+  }
+  return null;
+}
+
 export async function batchSettled<T>(
   tasks: Array<() => Promise<T>>,
   concurrency = 5,
@@ -56,6 +71,10 @@ export async function batchSettled<T>(
     results.push(...(await Promise.allSettled(batch)));
   }
   return results;
+}
+
+export function isVisibleGeneration(workflow: Pick<WorkflowSummary, 'status'>): boolean {
+  return workflow.status === 'completed';
 }
 
 export function getAssetWorkflowId(asset: UserAsset): string | null {
@@ -78,7 +97,11 @@ export function getArtifactKey(value?: string | null): string | null {
   const artifactMatch = clean.match(/\/artifacts\/([^/]+)/);
   if (artifactMatch?.[1]) return artifactMatch[1];
   const file = clean.split('/').pop();
-  return file || null;
+  if (!file) return null;
+  const stem = file.replace(/\.[^.]+$/, '');
+  return /^(?:[a-f0-9]{32,}|[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12})$/i.test(stem)
+    ? stem
+    : null;
 }
 
 export function getAssetArtifactKeys(asset: UserAsset): string[] {
@@ -95,23 +118,4 @@ export function getAssetArtifactKeys(asset: UserAsset): string[] {
     getArtifactKey(asset.metadata?.artifact_url),
     getArtifactKey(asset.metadata?.url),
   ].filter((v): v is string => Boolean(v));
-}
-
-export function sortByCreatedDesc<T extends { created_at?: string }>(items: T[]): T[] {
-  return [...items].sort((a, b) => Date.parse(b.created_at ?? '') - Date.parse(a.created_at ?? ''));
-}
-
-export function buildOrderedCadAssetNameMap(workflows: WorkflowSummary[], assets: UserAsset[]): Record<string, string> {
-  const cadWorkflows = sortByCreatedDesc(
-    workflows.filter(w => w.source_type === 'text_to_cad' && w.status === 'completed'),
-  );
-  const cadAssetNames = sortByCreatedDesc(assets)
-    .map(getAssetDisplayName)
-    .filter(Boolean);
-
-  return cadWorkflows.reduce<Record<string, string>>((acc, workflow, index) => {
-    const name = cadAssetNames[index];
-    if (name) acc[workflow.workflow_id] = name;
-    return acc;
-  }, {});
 }

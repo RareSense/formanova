@@ -17,13 +17,9 @@ const localDateFmt = new Intl.DateTimeFormat(undefined, {
   dateStyle: 'medium',
   timeStyle: 'short',
 });
-const localDateOnlyFmt = new Intl.DateTimeFormat(undefined, {
-  dateStyle: 'medium',
-});
-
-function normalizeTimestamp(ts: string): string {
+export function normalizeTimestamp(ts: string): string {
   let normalized = ts.trim();
-  if (normalized && !/[Zz]$/.test(normalized) && !/[+-]\d{2}:\d{2}$/.test(normalized)) {
+  if (normalized && !/[Zz]$/.test(normalized) && !/[+-]\d{2}:?\d{2}$/.test(normalized)) {
     normalized += 'Z';
   }
   return normalized;
@@ -33,8 +29,26 @@ export function formatLocal(ts: string): string {
   return localDateFmt.format(new Date(normalizeTimestamp(ts)));
 }
 
-export function formatLocalDateOnly(ts: string): string {
-  return localDateOnlyFmt.format(new Date(normalizeTimestamp(ts)));
+export type CadArtifactExtension = 'glb' | '3dm';
+
+export function getCadArtifactBaseName(
+  displayName?: string | null,
+  sourceFilename = 'model.glb',
+): string {
+  const candidate = (displayName?.trim() || sourceFilename.trim() || 'model.glb')
+    .replace(/\.(?:glb|3dm)$/i, '')
+    .replace(/[<>:"/\\|?*]/g, '_')
+    .replace(/[. ]+$/g, '')
+    .trim();
+  return candidate || 'model';
+}
+
+export function buildCadArtifactFilename(
+  displayName: string | null | undefined,
+  sourceFilename: string | null | undefined,
+  extension: CadArtifactExtension,
+): string {
+  return `${getCadArtifactBaseName(displayName, sourceFilename || 'model.glb')}.${extension}`;
 }
 
 export const itemVariants = {

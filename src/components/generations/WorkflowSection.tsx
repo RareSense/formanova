@@ -45,12 +45,15 @@ export function WorkflowSection({
 }: WorkflowSectionProps) {
   const gridClass =
     columns === 5
-      ? 'grid gap-2 grid-cols-3 sm:grid-cols-4 lg:grid-cols-5'
+      ? 'grid grid-cols-1 gap-2 min-[360px]:grid-cols-2 md:grid-cols-4 lg:grid-cols-5'
       : columns === 4
       ? 'grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'
       : columns === 3
-      ? 'grid gap-3 sm:grid-cols-2 lg:grid-cols-3'
+      ? 'grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3'
       : 'grid gap-3 md:grid-cols-2';
+
+  if (!loading && workflows.length === 0) return null;
+
   return (
     <section className="mb-14">
       {/* Section Header */}
@@ -81,18 +84,6 @@ export function WorkflowSection({
               <Skeleton className="h-3 w-24" />
             </div>
           ))}
-        </div>
-      )}
-
-      {/* Empty state */}
-      {!loading && workflows.length === 0 && (
-        <div className="marta-frame p-12 flex flex-col items-center justify-center text-center">
-          <div className="w-12 h-12 flex items-center justify-center bg-muted mb-4">
-            {icon}
-          </div>
-          <p className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground uppercase">
-            No generation history yet
-          </p>
         </div>
       )}
 

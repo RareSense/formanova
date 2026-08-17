@@ -16,6 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { isWeightStlEnabled, isCadUploadEnabled } from "@/lib/feature-flags";
 import { useImageToCADWorkflow } from "@/hooks/useImageToCADWorkflow";
 import { useCADMeshEditor } from "@/hooks/useCADMeshEditor";
+import { useNotificationEmail } from "@/hooks/useNotificationEmail";
 
 import MeshPanel from "@/components/text-to-cad/MeshPanel";
 import CADCanvas from "@/components/text-to-cad/CADCanvas";
@@ -39,6 +40,7 @@ export default function TextToCAD() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
+  const notificationEmail = useNotificationEmail(user?.email);
   const showWeightStl = isWeightStlEnabled(user?.email);
   const showCadUpload = isCadUploadEnabled(user?.email);
 
@@ -668,11 +670,18 @@ export default function TextToCAD() {
             <GenerationProgress
               visible={workflow.isGenerating || workflow.isModelLoading}
               currentStep={workflow.progressStep}
-              retryAttempt={workflow.retryAttempt}
               onRetry={() => workflow.simulateGeneration()}
-              estimateText="Complex designs can take over an hour"
               failureMessage={workflow.failureMessage}
-              onKeepCreating={() => { workflow.handleKeepCreating(); setWorkspaceActive(false); }}
+              notificationEmail={notificationEmail.notificationEmail}
+              notificationEmailLoading={notificationEmail.isLoading}
+              notificationEmailSaving={notificationEmail.isSaving}
+              notificationEmailError={notificationEmail.error}
+              onSaveNotificationEmail={notificationEmail.saveNotificationEmail}
+              onKeepCreating={() => {
+                workflow.handleKeepCreating();
+                setPrompt("");
+                setWorkspaceActive(false);
+              }}
             />
             <ViewportSideTools
               visible={workflow.hasModel && !workflow.isGenerating && !workflow.isModelLoading}

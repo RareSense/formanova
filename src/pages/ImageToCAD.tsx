@@ -14,6 +14,7 @@ import { runMicroBenchmark } from "@/lib/gpu-detect";
 import { useImageToCADWorkflow } from "@/hooks/useImageToCADWorkflow";
 import { useCADMeshEditor } from "@/hooks/useCADMeshEditor";
 import { useReferenceImages } from "@/hooks/useReferenceImages";
+import { useNotificationEmail } from "@/hooks/useNotificationEmail";
 import { useCADKeyboardShortcuts } from "@/hooks/use-cad-keyboard-shortcuts";
 
 import ImagePromptScreen from "@/components/text-to-cad/ImagePromptScreen";
@@ -33,6 +34,7 @@ export default function ImageToCAD() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
+  const notificationEmail = useNotificationEmail(user?.email);
   const showCadUpload = isCadUploadEnabled(user?.email);
 
   const [model] = useState("gemini");
@@ -42,6 +44,7 @@ export default function ImageToCAD() {
     addReferenceImages,
     removeReferenceImage,
     replaceReferenceImages,
+    clearReferenceImages,
   } = useReferenceImages();
   const [transformMode, setTransformMode] = useState("orbit");
   const [leftCollapsed, setLeftCollapsed] = useState(false);
@@ -425,11 +428,19 @@ export default function ImageToCAD() {
             <GenerationProgress
               visible={workflow.isGenerating || workflow.isModelLoading}
               currentStep={workflow.progressStep}
-              retryAttempt={workflow.retryAttempt}
               onRetry={() => workflow.simulateGeneration()}
-              estimateText="Complex designs can take over an hour"
               failureMessage={workflow.failureMessage}
-              onKeepCreating={() => { workflow.handleKeepCreating(); setWorkspaceActive(false); }}
+              notificationEmail={notificationEmail.notificationEmail}
+              notificationEmailLoading={notificationEmail.isLoading}
+              notificationEmailSaving={notificationEmail.isSaving}
+              notificationEmailError={notificationEmail.error}
+              onSaveNotificationEmail={notificationEmail.saveNotificationEmail}
+              onKeepCreating={() => {
+                workflow.handleKeepCreating();
+                setPrompt("");
+                clearReferenceImages();
+                setWorkspaceActive(false);
+              }}
             />
             <ViewportSideTools
               visible={workflow.hasModel && !workflow.isGenerating && !workflow.isModelLoading}
