@@ -6,8 +6,14 @@
 
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { azureUriToUrl } from '@/lib/azure-utils';
-import { parseRingCadResult } from '@/lib/ring-cad-nurbs-api';
+import { fetchCadResult } from '@/lib/cad-result-api';
 const __DEV__ = import.meta.env.DEV;
+
+// Re-exported so existing imports (WorkflowCard.tsx, useImageToCADWorkflow.ts,
+// CadWorkflowModal.tsx, etc.) keep working — the fetch/parse logic itself now
+// lives in cad-result-api.ts (split out to stay under AI_RULES.md's file-size
+// guideline).
+export { fetchCadResult };
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -40,6 +46,10 @@ export interface WorkflowSummary {
   output_asset_id?: string | null;
   /** User-friendly name from the vault asset (e.g. "Photoshoot 3") — populated during enrichment */
   output_asset_name?: string | null;
+  /** Text-to-CAD design brief the user typed for this run, if any. Empty/absent for image_to_cad. */
+  prompt?: string | null;
+  /** Reference images the user uploaded for this run, resolved to same-origin artifact-proxy URLs. Empty for text_to_cad. */
+  reference_image_urls?: string[];
 }
 
 export interface WorkflowStep {
@@ -129,11 +139,19 @@ export async function listMyWorkflows(
 
   const mapped = raw.map((w: any) => {
     const name = w.name ?? '';
+    // reference_image_artifacts is the real field name the backend sends
+    // (denormalise_payload output — confirmed against
+    // temporal-agentic-pipeline's tests/unit/test_workflow_helpers.py).
+    // reference_images never matched real data; kept as a defensive fallback
+    // only in case an older/alternate response shape used that name instead.
+    const referenceImageArtifacts: Array<{ uri?: string }> = Array.isArray(w.input?.reference_image_artifacts)
+      ? w.input.reference_image_artifacts
+      : Array.isArray(w.input?.reference_images)
+        ? w.input.reference_images
+        : [];
     const referenceImageCount = typeof w.input?.reference_image_count === 'number'
       ? w.input.reference_image_count
-      : Array.isArray(w.input?.reference_images)
-        ? w.input.reference_images.length
-        : null;
+      : referenceImageArtifacts.length || null;
     // The consolidated ring workflow serves both text and image inputs, so its
     // actual input count is the only reliable discriminator when the backend
     // still returns source_type="unknown".
@@ -144,6 +162,12 @@ export async function listMyWorkflows(
     if (sourceType === 'unknown' && __DEV__) {
       console.warn('[HistoryAPI] unknown source_type for workflow:', { id: w.workflow_id ?? w.id, name, status: w.status, backend_source_type: w.source_type });
     }
+    const prompt = typeof w.input?.user_description === 'string' && w.input.user_description.trim()
+      ? w.input.user_description.trim()
+      : null;
+    const referenceImageUrls = referenceImageArtifacts
+      .map((artifact) => azureUriToUrl(artifact?.uri))
+      .filter((url): url is string => Boolean(url));
     return {
       workflow_id: w.workflow_id ?? w.id,
       name,
@@ -157,6 +181,8 @@ export async function listMyWorkflows(
       mode: w.input?.mode ?? null,
       output_asset_id: extractOutputAssetId(w),
       output_asset_name: extractOutputAssetName(w),
+      prompt,
+      reference_image_urls: referenceImageUrls,
     };
   });
   if (__DEV__) {
@@ -221,111 +247,6 @@ export async function getWorkflowDetails(
       output: s.output ?? s.output_data ?? {},
     })),
   };
-}
-
-// ─── CAD Result (sink-based fallback) ───────────────────────────────
-
-/**
- * Fetch the final result for a CAD workflow using the /result endpoint.
- *
- * ring_cad_nurbs_v1 returns a flat object (threedm_artifact/glb_artifact at
- * the top level) — that shape is tried first via parseRingCadResult. Older
- * CAD workflows (ring_generate_v1, ring_edit_v1) return the nested
- * node_results shape below and never carry a .3dm, so threedm_url is null
- * for those. Both paths route through azureUriToUrl so every returned URL is
- * this app's same-origin, auth-gated artifact proxy rather than a raw
- * azure:// reference or an unauthenticated cross-origin host.
- *
- * Legacy sink-based fallback rule:
- *   success_final → glb_artifact (final output, preferred) → original_glb_artifact (intermediate)
- *   success_original_glb → original_glb_artifact
- *   failed_final → null (no fallback)
- */
-export async function fetchCadResult(
-  workflowId: string,
-): Promise<{ glb_url: string | null; threedm_url: string | null; azure_source: string | null }> {
-  function extractArtifactUri(results: Record<string, unknown>, nodeKey: string, artifactKey: string): string | null {
-    const node = results[nodeKey];
-    if (!node) return null;
-    const arr = Array.isArray(node) ? node : [node];
-    for (const entry of arr) {
-      const rec = entry as Record<string, unknown> | null;
-      if (!rec) continue;
-      const artifact = rec[artifactKey] as Record<string, unknown> | undefined;
-      if (artifact && typeof artifact.uri === 'string') return artifact.uri;
-    }
-    return null;
-  }
-
-  const resolveUrl = (uri: string | null): string | null => (uri ? (azureUriToUrl(uri) || uri) : null);
-
-  try {
-    const res = await authenticatedFetch(
-      `/api/result/${workflowId}`,
-    );
-    if (!res.ok) return { glb_url: null, threedm_url: null, azure_source: null };
-
-    const data = await res.json() as Record<string, unknown>;
-
-    // 0. ring_cad_nurbs_v1's flat (or sink-node-keyed) result shape, tried
-    // first — but only when the response isn't one of the older workflows'
-    // known sink shapes. parseRingCadResult's deep search would otherwise
-    // find artifacts nested inside success_final/build_retry/etc and bypass
-    // the legacy precedence rules (success_final > success_original_glb >
-    // failed_final's build_initial-only rule > build_retry) below.
-    const LEGACY_SINK_KEYS = ['success_final', 'success_original_glb', 'failed_final', 'build_retry', 'build_initial'];
-    const isLegacyShape = LEGACY_SINK_KEYS.some((key) => key in data);
-    if (!isLegacyShape) {
-      try {
-        const flat = parseRingCadResult(data);
-        return {
-          glb_url: flat.glbArtifact?.url ?? null,
-          threedm_url: flat.threedmArtifact?.url ?? null,
-          azure_source: flat.sourceStage,
-        };
-      } catch {
-        // Not a ring_cad_nurbs_v1 result — fall through to the legacy nested shape.
-      }
-    }
-
-    // 1. success_final: prefer glb_artifact (final output), fallback original_glb_artifact
-    const finalUri = extractArtifactUri(data, 'success_final', 'glb_artifact')
-      || extractArtifactUri(data, 'success_final', 'original_glb_artifact');
-    if (finalUri) {
-      return { glb_url: resolveUrl(finalUri), threedm_url: null, azure_source: 'success_final' };
-    }
-
-    // 2. success_original_glb: use original_glb_artifact only
-    const originalUri = extractArtifactUri(data, 'success_original_glb', 'original_glb_artifact');
-    if (originalUri) {
-      return { glb_url: resolveUrl(originalUri), threedm_url: null, azure_source: 'success_original_glb' };
-    }
-
-    // 3. failed_final: only build_initial is allowed as fallback
-    const failedArr = data['failed_final'];
-    if (Array.isArray(failedArr) && failedArr.length > 0) {
-      const failedInitialUri = extractArtifactUri(data, 'build_initial', 'glb_artifact')
-        || extractArtifactUri(data, 'build_initial', 'original_glb_artifact');
-      if (failedInitialUri) {
-        return { glb_url: resolveUrl(failedInitialUri), threedm_url: null, azure_source: 'build_initial' };
-      }
-      return { glb_url: null, threedm_url: null, azure_source: 'failed_final' };
-    }
-
-    // 4. ring_edit_v1 currently returns build nodes rather than success sinks.
-    const buildUri = extractArtifactUri(data, 'build_retry', 'glb_artifact')
-      || extractArtifactUri(data, 'build_retry', 'original_glb_artifact')
-      || extractArtifactUri(data, 'build_initial', 'glb_artifact')
-      || extractArtifactUri(data, 'build_initial', 'original_glb_artifact');
-    if (buildUri) {
-      return { glb_url: resolveUrl(buildUri), threedm_url: null, azure_source: 'build_retry' };
-    }
-
-    return { glb_url: null, threedm_url: null, azure_source: null };
-  } catch (e) {
-    if (__DEV__) console.warn('[HistoryAPI] fetchCadResult error:', workflowId, e);
-    return { glb_url: null, threedm_url: null, azure_source: null };
-  }
 }
 
 // ─── Credit Audit ───────────────────────────────────────────────────

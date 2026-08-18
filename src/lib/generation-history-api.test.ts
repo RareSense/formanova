@@ -78,6 +78,66 @@ describe('generation-history-api URL shapes', () => {
     expect(workflow.credits_spent).toBe(70);
   });
 
+  it('extracts prompt and reference_image_urls from the real backend field names', async () => {
+    mockAuthFetch.mockReturnValueOnce(okJson({ workflows: [
+      {
+        workflow_id: 'text',
+        name: 'ring_cad_nurbs_v1',
+        status: 'completed',
+        source_type: 'text_to_cad',
+        input: { reference_image_count: 0, user_description: '  A twisted vine ring  ' },
+      },
+      {
+        workflow_id: 'image',
+        name: 'ring_cad_nurbs_v1',
+        status: 'completed',
+        source_type: 'image_to_cad',
+        input: {
+          reference_image_count: 1,
+          reference_image_artifacts: [{ type: 'image/png', uri: 'azure://x/hashed/aa11bb22cc33dd44ee55ff66aa11bb22cc33dd44ee55ff66aa11bb22cc33dd44' }],
+        },
+      },
+    ] }));
+
+    const [textWf, imageWf] = await listMyWorkflows();
+    expect(textWf.prompt).toBe('A twisted vine ring');
+    expect(textWf.reference_image_urls).toEqual([]);
+    expect(imageWf.prompt).toBeNull();
+    expect(imageWf.reference_image_urls).toEqual(['/api/artifacts/aa11bb22cc33dd44ee55ff66aa11bb22cc33dd44ee55ff66aa11bb22cc33dd44']);
+  });
+
+  it('falls back to the legacy reference_images field name when present', async () => {
+    mockAuthFetch.mockReturnValueOnce(okJson({ workflows: [
+      {
+        workflow_id: 'legacy',
+        name: 'ring_cad_nurbs_v1',
+        status: 'completed',
+        source_type: 'image_to_cad',
+        input: {
+          reference_images: [{ uri: 'azure://x/hashed/bb11bb22cc33dd44ee55ff66aa11bb22cc33dd44ee55ff66aa11bb22cc33dd44' }],
+        },
+      },
+    ] }));
+
+    const [workflow] = await listMyWorkflows();
+    expect(workflow.reference_image_urls).toEqual(['/api/artifacts/bb11bb22cc33dd44ee55ff66aa11bb22cc33dd44ee55ff66aa11bb22cc33dd44']);
+  });
+
+  it('treats an empty/whitespace-only user_description as no prompt', async () => {
+    mockAuthFetch.mockReturnValueOnce(okJson({ workflows: [
+      {
+        workflow_id: 'blank',
+        name: 'ring_cad_nurbs_v1',
+        status: 'completed',
+        source_type: 'text_to_cad',
+        input: { user_description: '   ' },
+      },
+    ] }));
+
+    const [workflow] = await listMyWorkflows();
+    expect(workflow.prompt).toBeNull();
+  });
+
   it('getWorkflowDetails calls a relative /history path', async () => {
     mockAuthFetch.mockReturnValueOnce(okJson({ summary: {}, steps: [] }));
     await getWorkflowDetails('wf-1');

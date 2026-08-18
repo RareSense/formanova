@@ -11,17 +11,25 @@ const VT_BTN_ACTIVE = `${VT_BTN} text-primary-foreground bg-primary`;
 export function ViewportToolbar({
   mode,
   setMode,
+  onDownload,
+  downloadLabel = "Download 3DM",
 }: {
   mode: string;
   setMode: (m: string) => void;
   transformData?: unknown;
   onTransformChange?: unknown;
   onResetTransform?: unknown;
+  /** Result-level action ("what I do with the finished object"), deliberately
+   * separated from the mode toolbar ("how I interact with the object") and
+   * from the viewport-utility strip in ViewportSideTools — see the design
+   * rationale in git history for this component. Omit to hide the button. */
+  onDownload?: () => void;
+  downloadLabel?: string;
 }) {
   const isTransformActive = mode !== "orbit"; // kept for potential future use
 
   return (
-    <div className="absolute top-0 left-0 right-0 z-50 flex flex-col items-center pt-2 pointer-events-none">
+    <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-center pt-2 pointer-events-none">
       {/* Centered mode buttons */}
       <div className="pointer-events-auto flex gap-0 bg-card border border-border shadow-lg">
         {TRANSFORM_MODES.map((tm) => (
@@ -34,6 +42,18 @@ export function ViewportToolbar({
           </button>
         ))}
       </div>
+
+      {/* Result-level action, pinned to the right edge — deliberately not
+          adjacent to the mode buttons, so it doesn't read as another mode. */}
+      {onDownload && (
+        <button
+          onClick={onDownload}
+          className="pointer-events-auto absolute right-8 flex h-[40px] items-center gap-2 border border-primary bg-primary px-4 text-[11px] font-bold uppercase tracking-[0.12em] text-primary-foreground shadow-lg transition-opacity hover:opacity-90 active:scale-[0.98]"
+        >
+          <Download className="h-3.5 w-3.5" />
+          {downloadLabel}
+        </button>
+      )}
     </div>
   );
 }
@@ -124,7 +144,7 @@ function SideTooltip({ label }: { label: string }) {
   );
 }
 
-export function ViewportSideTools({ visible, onZoomIn, onZoomOut, onResetView, onUndo, onRedo, undoCount, redoCount, onDownload, downloadLabel = "Export GLB", onDownloadStl, onFullscreen, onDisplayMenu, onKeyboardShortcuts, onEstimateWeight, weightLoading, stlExporting }: {
+export function ViewportSideTools({ visible, onZoomIn, onZoomOut, onResetView, onUndo, onRedo, undoCount, redoCount, onDownloadStl, onFullscreen, onDisplayMenu, onKeyboardShortcuts, onEstimateWeight, weightLoading, stlExporting }: {
   visible: boolean;
   onZoomIn: () => void;
   onZoomOut: () => void;
@@ -133,8 +153,6 @@ export function ViewportSideTools({ visible, onZoomIn, onZoomOut, onResetView, o
   onRedo: () => void;
   undoCount: number;
   redoCount: number;
-  onDownload: () => void;
-  downloadLabel?: string;
   onDownloadStl?: () => void;
   onFullscreen?: () => void;
   onDisplayMenu?: () => void;
@@ -201,17 +219,9 @@ export function ViewportSideTools({ visible, onZoomIn, onZoomOut, onResetView, o
 
       <SideDivider />
 
-      {/* Export */}
-      <button onClick={onDownload} className={`${SIDE_BTN} text-primary hover:text-primary`} title={downloadLabel}>
-        {downloadLabel === "Download 3DM" ? (
-          <span className="absolute right-full mr-2 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] whitespace-nowrap bg-primary text-primary-foreground border border-primary shadow-lg">
-            Download 3DM
-          </span>
-        ) : (
-          <SideTooltip label={downloadLabel} />
-        )}
-        <Download className="w-3.5 h-3.5" />
-      </button>
+      {/* Download 3DM moved to ViewportToolbar (top-right, alongside the mode
+          buttons) — it's a result-level action, not a viewport utility. This
+          strip keeps Estimate Weight and Print (STL), which are utilities. */}
       {onEstimateWeight && (
         <button
           onClick={onEstimateWeight}

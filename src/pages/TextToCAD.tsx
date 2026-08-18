@@ -608,6 +608,12 @@ export default function TextToCAD() {
                 transformData={editor.selectedTransform}
                 onTransformChange={editor.handleNumericTransformChange}
                 onResetTransform={() => editor.handleSceneAction("reset-transform")}
+                // Same visibility rule the download action had in ViewportSideTools
+                // before the move — hidden mid-regeneration, not just mid-initial-generation.
+                onDownload={!workflow.isGenerating && !workflow.isModelLoading
+                  ? (workflow.threedmArtifact ? handleDownloadThreedm : handleDownloadGlb)
+                  : undefined}
+                downloadLabel={workflow.threedmArtifact ? "Download 3DM" : "Export GLB"}
               />
             )}
 
@@ -698,8 +704,6 @@ export default function TextToCAD() {
               onRedo={editor.handleRedo}
               undoCount={editor.undoStack.length}
               redoCount={editor.redoStack.length}
-              onDownload={workflow.threedmArtifact ? handleDownloadThreedm : handleDownloadGlb}
-              downloadLabel={workflow.threedmArtifact ? "Download 3DM" : "Export GLB"}
               onEstimateWeight={showWeightStl ? handleEstimateWeight : undefined}
               weightLoading={weightLoading}
               onDownloadStl={showWeightStl ? handleDownloadStl : undefined}
