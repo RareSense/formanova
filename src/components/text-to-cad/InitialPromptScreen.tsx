@@ -149,6 +149,25 @@ export default function InitialPromptScreen({
               </div>
             )}
 
+            {/* Upload CAD File — gated for the existing Text-to-CAD allowlist. */}
+            {onGlbUpload && (
+              <div className="mx-auto mt-4 max-w-[680px] text-center">
+                <input
+                  ref={glbInputRef}
+                  type="file"
+                  accept=".glb,.gltf"
+                  className="hidden"
+                  onChange={handleGlbUpload}
+                />
+                <button
+                  onClick={() => glbInputRef.current?.click()}
+                  className="cursor-pointer font-mono text-[11px] uppercase tracking-[0.15em] text-muted-foreground underline decoration-border underline-offset-4 transition-colors duration-150 hover:text-foreground hover:decoration-foreground"
+                >
+                  Or upload a CAD file (.glb)
+                </button>
+              </div>
+            )}
+
           </div>
 
           {/* "My Prompts" — mounted unconditionally so its own history check can
