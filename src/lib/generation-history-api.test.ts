@@ -47,6 +47,21 @@ describe('generation-history-api URL shapes', () => {
     expect(workflows.map(workflow => workflow.source_type)).toEqual(['text_to_cad', 'image_to_cad']);
   });
 
+  it('keeps regular generation families and maps cad_render_v1', async () => {
+    mockAuthFetch.mockReturnValueOnce(okJson({ workflows: [
+      { workflow_id: 'model', name: 'jewelry_photoshoots_generator', status: 'completed', source_type: 'model_shot' },
+      { workflow_id: 'product', name: 'Product_shot_pipeline', status: 'completed', source_type: 'product_shot' },
+      { workflow_id: 'render', name: 'cad_render_v1', status: 'completed', source_type: 'unknown' },
+    ] }));
+
+    const workflows = await listMyWorkflows();
+    expect(workflows.map(workflow => workflow.source_type)).toEqual([
+      'photo',
+      'product_shot',
+      'cad_render',
+    ]);
+  });
+
   it('keeps the actual workflow charge from the History summary', async () => {
     mockAuthFetch.mockReturnValueOnce(okJson({ workflows: [
       {
