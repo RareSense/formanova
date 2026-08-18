@@ -141,7 +141,7 @@ export default function CadHistoryLibrary({ variant, onSelectPrompt, onSelectIma
         </div>
       </div>
 
-      <div className={`flex min-h-0 flex-1 flex-col border border-border/30 ${variant === "images" ? (panelH ?? "") : ""}`}>
+      <div className={`flex min-h-0 flex-col border border-border/30 ${variant === "images" ? `flex-none ${panelH ?? ""}` : "flex-1"}`}>
         {isSearchable && (
           <div className="flex-shrink-0 border-b border-border/20 px-2 py-1.5">
             <div className="relative">
