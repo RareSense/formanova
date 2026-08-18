@@ -6,7 +6,7 @@ import { RING_CAD_NURBS_WORKFLOW } from "@/lib/ring-cad-nurbs-api";
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import ReferenceImageUploader from "./ReferenceImageUploader";
 import CadHistoryLibrary from "./CadHistoryLibrary";
-import { CATEGORY_EXAMPLES, UploadGuidePanel } from "@/components/studio/StudioVaultUploadStep";
+import { CATEGORY_EXAMPLES } from "@/components/studio/StudioVaultUploadStep";
 
 import cadExample1 from "@/assets/examples/cad-example-1.webp";
 import cadExample2 from "@/assets/examples/cad-example-2.webp";
@@ -37,6 +37,18 @@ const EXAMPLE_DESIGNS = [
     prompt: "Wide dome cluster ring, oval center stone surrounded by six oval accents, filigree openwork shoulders",
   },
 ];
+
+function RingReferenceExamples() {
+  return (
+    <div className={`grid grid-cols-2 gap-3 overflow-hidden border border-border/30 p-3 ${PANEL_H}`}>
+      {CATEGORY_EXAMPLES.rings.allowed.map((image, index) => (
+        <div key={image} className="min-h-0 overflow-hidden border border-border/20 bg-muted/10">
+          <img src={image} alt={`Ring reference example ${index + 1}`} className="h-full w-full object-cover" />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 interface ImagePromptScreenProps {
   model: string;
@@ -137,14 +149,13 @@ export default function ImagePromptScreen({
                   <p className="mt-1.5 text-sm text-muted-foreground">Upload a photo or sketch of your ring</p>
                 </div>
               </div>
-            )}
 
             <div className="flex flex-col gap-3">
               <ReferenceImageUploader
                 referenceImagePreviewUrls={referenceImagePreviewUrls}
                 onAddReferenceImages={onAddReferenceImages}
                 onRemoveReferenceImage={onRemoveReferenceImage}
-                canvasClassName={hasImageHistory ? PANEL_H : undefined}
+                canvasClassName={PANEL_H}
               />
 
               {/* Text prompt — secondary */}
@@ -229,7 +240,7 @@ export default function ImagePromptScreen({
                   <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">Upload Guide</h3>
                   <p className="mt-1.5 text-sm text-muted-foreground">For best results, use clear ring photos</p>
                 </div>
-                <UploadGuidePanel examples={CATEGORY_EXAMPLES.rings} categoryType="rings" />
+                <RingReferenceExamples />
               </>
             )}
           </div>
