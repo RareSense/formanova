@@ -70,7 +70,7 @@ import psBlurClear      from '@/assets/examples/ps-blur-clear-input.webp';
 import psLightingDim    from '@/assets/examples/ps-lighting-dim-input.webp';
 import psBlur           from '@/assets/examples/ps-blur-input.webp';
 
-const CATEGORY_EXAMPLES: Record<string, { allowed: string[]; notAllowed: string[] }> = {
+export const CATEGORY_EXAMPLES: Record<string, { allowed: string[]; notAllowed: string[] }> = {
   necklace:  { allowed: [necklaceAllowed1, necklaceAllowed2, necklaceAllowed3, necklaceAllowed4],   notAllowed: [necklaceNotAllowed1, necklaceNotAllowed2, necklaceNotAllowed3] },
   earrings:  { allowed: [earringAllowed1,  earringAllowed2,  earringAllowed3,  earringAllowed4],    notAllowed: [earringNotAllowed1,  earringNotAllowed2,  earringNotAllowed3]  },
   bracelets: { allowed: [braceletAllowed1, braceletAllowed2, braceletAllowed3, braceletAllowed4],   notAllowed: [braceletNotAllowed1, braceletNotAllowed2, braceletNotAllowed3] },
@@ -82,7 +82,7 @@ const CATEGORY_EXAMPLES: Record<string, { allowed: string[]; notAllowed: string[
 const CANVAS_H = 'h-[500px] md:h-[640px]';
 
 // ── Upload Guide — 2×2 recommended photos, shown to users with no uploads yet ──
-function UploadGuidePanel({
+export function UploadGuidePanel({
   examples,
   categoryType,
   isProductShot,

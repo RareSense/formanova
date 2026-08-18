@@ -6,6 +6,7 @@ import { RING_CAD_NURBS_WORKFLOW } from "@/lib/ring-cad-nurbs-api";
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import ReferenceImageUploader from "./ReferenceImageUploader";
 import CadHistoryLibrary from "./CadHistoryLibrary";
+import { CATEGORY_EXAMPLES, UploadGuidePanel } from "@/components/studio/StudioVaultUploadStep";
 
 import cadExample1 from "@/assets/examples/cad-example-1.webp";
 import cadExample2 from "@/assets/examples/cad-example-2.webp";
@@ -125,27 +126,10 @@ export default function ImagePromptScreen({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
-        className={hasImageHistory ? "w-full max-w-[1000px] px-4 sm:px-6 py-6" : "w-full max-w-[680px] px-4 sm:px-6 py-6"}
+        className="w-full max-w-[1000px] px-4 py-6 sm:px-6"
       >
-        {/* Keep the page identifier for the empty first-use state. Once the
-            paired panels are visible, their own headers provide the hierarchy
-            and match Photo Studio's two-column layout. */}
-        {!hasImageHistory && (
-          <div className="mb-6 text-center">
-            <h1 className="mb-2 font-display text-4xl uppercase tracking-[0.2em] text-foreground md:text-5xl">
-              Generate 3D Ring
-            </h1>
-            <p className="font-mono text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
-              Upload a photo or sketch of your design
-            </p>
-          </div>
-        )}
-
-        <div className={hasImageHistory ? "grid gap-8 lg:gap-10 lg:grid-cols-3" : ""}>
-          <div className={hasImageHistory ? "lg:col-span-2" : ""}>
-            {/* Left header — same classes as CadHistoryLibrary's own title
-                block, so both panels' boxes start at the same Y. */}
-            {hasImageHistory && (
+        <div className="grid gap-8 lg:gap-10 lg:grid-cols-3">
+          <div className="lg:col-span-2">
               <div className="mb-2 flex items-start justify-between gap-3">
                 <div>
                   <span className="marta-label block mb-1">Step 1</span>
@@ -235,10 +219,19 @@ export default function ImagePromptScreen({
 
           </div>
 
-          {/* "My Rings" — mounted unconditionally so its own history check can
-              flip hasImageHistory; visually contributes nothing until it does. */}
-          <div className={hasImageHistory ? "" : "hidden"}>
-            <CadHistoryLibrary variant="images" panelH={PANEL_H} onSelectImages={handleLibraryImageSelect} onHasHistoryChange={setHasImageHistory} />
+          <div>
+            {hasImageHistory ? (
+              <CadHistoryLibrary variant="images" panelH={PANEL_H} onSelectImages={handleLibraryImageSelect} onHasHistoryChange={setHasImageHistory} />
+            ) : (
+              <>
+                <div className="mb-2">
+                  <span className="marta-label block mb-1 invisible" aria-hidden="true">Step 1</span>
+                  <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">Upload Guide</h3>
+                  <p className="mt-1.5 text-sm text-muted-foreground">For best results, use clear ring photos</p>
+                </div>
+                <UploadGuidePanel examples={CATEGORY_EXAMPLES.rings} categoryType="rings" />
+              </>
+            )}
           </div>
         </div>
       </motion.div>
