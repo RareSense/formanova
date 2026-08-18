@@ -435,9 +435,12 @@ export function resolveSourceType(
     const mapped = BACKEND_SOURCE_TYPE_MAP[rawSourceType];
     if (mapped) return mapped;
   }
-  // Compatibility fallback for the consolidated CAD workflow while older
-  // backend rows still return source_type="unknown". A recognized backend
-  // source_type above always remains authoritative.
+  // Backend now resolves text_to_cad/image_to_cad server-side for the
+  // consolidated CAD workflow (temporal-agentic-pipeline PR #52, confirmed
+  // deployed) and always wins above when it returns a recognized value.
+  // This only fires for backend's own deliberate "unknown" (payload missing,
+  // >5 images, or 0 images with no description) — picks a sensible bucket
+  // from the count instead of leaving the workflow in an Unknown section.
   if (
     (normalizedName.includes('ring_cad_nurbs') || normalizedName.includes('ring-cad-nurbs')) &&
     referenceImageCount !== null

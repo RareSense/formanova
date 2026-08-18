@@ -25,9 +25,9 @@ Generated CAD Product Vault, which is still a separate, larger effort).
    return a correctly-resolved `source_type: "text_to_cad" | "image_to_cad" | "unknown"`
    for `ring_cad_nurbs_v1`, computed from the *actual stored*
    `reference_image_artifacts` list — not a client-declared count.
-   **Action before relying on this:** confirm it's deployed to whatever API
-   `VITE_PIPELINE_API_URL` points at (staging/prod), not just merged to the
-   backend repo's `main`. A merge doesn't imply deployment.
+   **Confirmed deployed and live (2026-08-18).** `resolveSourceType()`
+   (`generation-history-api.ts`) already checks the backend value first, so
+   no frontend change was needed — it started winning automatically.
 
 2. **The data this feature needs is already in the existing list response,
    unused.** `GET /history/workflows/me`'s `input` field
