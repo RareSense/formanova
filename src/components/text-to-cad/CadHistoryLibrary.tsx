@@ -11,6 +11,7 @@ import { useEffect } from "react";
 import { useAuthenticatedImage } from "@/hooks/useAuthenticatedImage";
 import { useCadHistoryLibrary, type CadLibraryEntry } from "@/hooks/useCadHistoryLibrary";
 import { Search, ChevronLeft, ChevronRight, Diamond } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 
 const localDateFmt = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
 
@@ -126,8 +127,18 @@ export default function CadHistoryLibrary({ variant, onSelectPrompt, onSelectIma
   return (
     <div className="flex h-full flex-col">
       <div className="mb-2">
-        <h3 className="font-display text-2xl uppercase tracking-tight text-foreground">{title}</h3>
-        <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">{title}</h3>
+            <p className="mt-1.5 text-sm text-muted-foreground">{subtitle}</p>
+          </div>
+          {variant === "images" && (
+            <div className="mt-8 flex shrink-0 items-center gap-2">
+              <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Show all</span>
+              <Switch checked={false} disabled aria-label="Show all rings coming soon" />
+            </div>
+          )}
+        </div>
       </div>
 
       <div className={`flex min-h-0 flex-1 flex-col border border-border/30 ${variant === "images" ? (panelH ?? "") : ""}`}>

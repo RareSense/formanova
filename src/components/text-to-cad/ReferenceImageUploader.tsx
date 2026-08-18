@@ -12,6 +12,8 @@ interface ReferenceImageUploaderProps {
   onRemoveReferenceImage: (index: number) => void;
   primaryLabel?: string;
   primaryHint?: string;
+  /** Allows Image-to-CAD to use the same tall upload canvas as Photo Studio. */
+  canvasClassName?: string;
 }
 
 /**
@@ -27,6 +29,7 @@ export default function ReferenceImageUploader({
   onRemoveReferenceImage,
   primaryLabel = "Drop your ring image or sketch here",
   primaryHint = "Drag & drop · click to browse · paste (Ctrl+V)",
+  canvasClassName = "h-[150px] sm:h-[170px]",
 }: ReferenceImageUploaderProps) {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const extraInputRef = useRef<HTMLInputElement>(null);
@@ -106,7 +109,7 @@ export default function ReferenceImageUploader({
           state is one full-width drop zone; all 5 slots appear equal size in
           a single row once any image exists — no primary/secondary
           distinction, no enlarge icon, just the image and a remove control. */}
-      <div className="h-[150px] overflow-hidden border border-border/30 sm:h-[170px]">
+      <div className={`${canvasClassName} overflow-hidden border border-border/30`}>
         <div
           className="grid h-full min-h-0 gap-2 p-2"
           style={{ gridTemplateColumns: `repeat(${primaryPreviewUrl ? MAX_RING_CAD_REFERENCE_IMAGES : 1}, minmax(0, 1fr))` }}

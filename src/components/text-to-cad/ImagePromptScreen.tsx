@@ -16,7 +16,7 @@ import cadExample4 from "@/assets/examples/cad-example-4.webp";
 // so the two columns frame identically — same top edge (both start right
 // below their own header) and same bottom edge, matching Photo Studio's
 // CANVAS_H technique (StudioVaultUploadStep.tsx).
-const PANEL_H = "h-[460px] sm:h-[520px]";
+const PANEL_H = "h-[500px] md:h-[640px]";
 
 const EXAMPLE_DESIGNS = [
   {
@@ -141,26 +141,30 @@ export default function ImagePromptScreen({
           </div>
         )}
 
-        <div className={hasImageHistory ? "grid gap-8 lg:grid-cols-3" : ""}>
+        <div className={hasImageHistory ? "grid gap-8 lg:gap-10 lg:grid-cols-3" : ""}>
           <div className={hasImageHistory ? "lg:col-span-2" : ""}>
             {/* Left header — same classes as CadHistoryLibrary's own title
                 block, so both panels' boxes start at the same Y. */}
             {hasImageHistory && (
-              <div className="mb-2">
-                <h3 className="font-display text-2xl uppercase tracking-tight text-foreground">Reference Images</h3>
-                <p className="mt-0.5 text-sm text-muted-foreground">Up to 5 photos of the same ring</p>
+              <div className="mb-2 flex items-start justify-between gap-3">
+                <div>
+                  <span className="marta-label block mb-1">Step 1</span>
+                  <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">Upload Your Ring</h3>
+                  <p className="mt-1.5 text-sm text-muted-foreground">Upload a photo or sketch of your ring</p>
+                </div>
               </div>
             )}
 
-            <div className={`flex flex-col gap-3 border border-border/30 p-3 ${hasImageHistory ? PANEL_H : ""}`}>
+            <div className={`flex flex-col gap-3 ${hasImageHistory ? `${PANEL_H} min-h-0` : ""}`}>
               <ReferenceImageUploader
                 referenceImagePreviewUrls={referenceImagePreviewUrls}
                 onAddReferenceImages={onAddReferenceImages}
                 onRemoveReferenceImage={onRemoveReferenceImage}
+                canvasClassName={hasImageHistory ? "h-[360px] md:h-[500px]" : undefined}
               />
 
               {/* Text prompt — secondary */}
-              <div className={`relative transition-opacity duration-200 ${primaryPreviewUrl ? "opacity-100" : "opacity-40"}`}>
+              <div className={`relative flex-shrink-0 transition-opacity duration-200 ${primaryPreviewUrl ? "opacity-100" : "opacity-40"}`}>
                 <textarea
                   ref={textareaRef}
                   value={prompt}
