@@ -155,12 +155,12 @@ export default function ImagePromptScreen({
               </div>
             )}
 
-            <div className={`flex flex-col gap-3 ${hasImageHistory ? `${PANEL_H} min-h-0` : ""}`}>
+            <div className="flex flex-col gap-3">
               <ReferenceImageUploader
                 referenceImagePreviewUrls={referenceImagePreviewUrls}
                 onAddReferenceImages={onAddReferenceImages}
                 onRemoveReferenceImage={onRemoveReferenceImage}
-                canvasClassName={hasImageHistory ? "h-[360px] md:h-[500px]" : undefined}
+                canvasClassName={hasImageHistory ? PANEL_H : undefined}
               />
 
               {/* Text prompt — secondary */}
