@@ -146,7 +146,7 @@ export default function CadHistoryLibrary({ variant, onSelectPrompt, onSelectIma
         {!error && items.length === 0 && <EmptyGuide variant={variant} />}
 
         {!error && items.length > 0 && variant === "prompts" && (
-          <div className="flex-1 space-y-2 overflow-y-auto p-2">
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
             {items.map((entry) => (
               <PromptCard
                 key={entry.workflowId}
@@ -158,7 +158,7 @@ export default function CadHistoryLibrary({ variant, onSelectPrompt, onSelectIma
         )}
 
         {!error && items.length > 0 && variant === "images" && (
-          <div className="flex-1 overflow-y-auto p-2">
+          <div className="min-h-0 flex-1 overflow-y-auto p-2">
             {/* True masonry: every reference image is its own tile at its
                 natural aspect ratio, packed into 3 columns with small
                 consistent gaps — matches Photo Studio's My Models panel. */}
