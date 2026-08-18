@@ -31,18 +31,6 @@ interface CadHistoryLibraryProps {
   onHasHistoryChange?: (hasHistory: boolean) => void;
 }
 
-function PromptThumb({ url }: { url: string | null }) {
-  const resolved = useAuthenticatedImage(url);
-  if (!resolved) {
-    return (
-      <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center border border-border/40 bg-muted/30">
-        <Diamond className="h-4 w-4 text-muted-foreground/40" />
-      </div>
-    );
-  }
-  return <img src={resolved} alt="" className="h-12 w-12 flex-shrink-0 border border-border/40 object-cover" />;
-}
-
 function ImageThumb({ url, onSelect }: { url: string; onSelect: () => void }) {
   const resolved = useAuthenticatedImage(url);
   return (
@@ -68,17 +56,14 @@ function PromptCard({ entry, onSelect }: { entry: CadLibraryEntry; onSelect: () 
     <button
       type="button"
       onClick={onSelect}
-      className="flex w-full items-start gap-3 border-b border-border/20 px-3 py-3 text-left transition-colors hover:bg-[hsl(var(--formanova-hero-accent))]/5"
+      className="flex w-full flex-col items-start gap-1 border-b border-border/20 px-3 py-3 text-left transition-colors hover:bg-[hsl(var(--formanova-hero-accent))]/5"
     >
-      <PromptThumb url={entry.referenceImageUrls[0] ?? null} />
-      <div className="min-w-0 flex-1">
-        <p className="line-clamp-2 font-body text-[13px] italic leading-snug text-foreground">
-          {entry.prompt}
-        </p>
-        <p className="mt-1 font-mono text-[9px] uppercase tracking-wider text-muted-foreground/60">
-          {formatLocalTimestamp(entry.createdAt)}
-        </p>
-      </div>
+      <p className="line-clamp-2 font-body text-[13px] italic leading-snug text-foreground">
+        {entry.prompt}
+      </p>
+      <p className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground/60">
+        {formatLocalTimestamp(entry.createdAt)}
+      </p>
     </button>
   );
 }
@@ -156,10 +141,13 @@ export default function CadHistoryLibrary({ variant, onSelectPrompt, onSelectIma
 
         {!error && items.length > 0 && variant === "images" && (
           <div className="flex-1 overflow-y-auto p-2">
+            {/* Every image from every past upload, not just the primary angle of
+                each generation — a multi-image upload (2-5 reference angles)
+                would otherwise hide all but the first from being reused. */}
             <div className="grid grid-cols-3 gap-2">
               {items.flatMap((entry) =>
-                entry.referenceImageUrls.slice(0, 1).map((url) => (
-                  <ImageThumb key={entry.workflowId} url={url} onSelect={() => onSelectImage?.(url)} />
+                entry.referenceImageUrls.map((url, index) => (
+                  <ImageThumb key={`${entry.workflowId}-${index}`} url={url} onSelect={() => onSelectImage?.(url)} />
                 )),
               )}
             </div>

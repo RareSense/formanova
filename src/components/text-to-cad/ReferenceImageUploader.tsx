@@ -143,65 +143,67 @@ export default function ReferenceImageUploader({
       <input ref={imageInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageInputChange} />
       <input ref={extraInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageInputChange} />
 
-      {/* Empty state — one full-width drop zone. Becomes the first cell of the
-          equal-size grid below the moment any image is added, so there is
-          never a moment where the primary image reads as "the big one" and
-          later angles read as an afterthought. */}
-      {!primaryPreviewUrl && (
-        <div
-          ref={dropZoneRef}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          onClick={() => imageInputRef.current?.click()}
-          className={`relative w-full border flex items-center justify-center transition-all duration-200 mb-3 cursor-pointer ${
-            isDragging
-              ? "border-foreground/60 bg-foreground/5"
-              : "border-foreground/40 hover:border-foreground/60 hover:bg-foreground/5 bg-muted/10"
-          }`}
-          style={{ minHeight: 240 }}
-        >
-          <div className="flex flex-col items-center text-center px-6 py-10">
-            <div className="relative mx-auto w-20 h-20 mb-6">
-              <div className="absolute inset-0 rounded-full bg-primary/10 animate-ping motion-reduce:animate-none" style={{ animationDuration: '2.5s' }} />
-              <div className="absolute inset-0 rounded-full bg-primary/5 border-2 border-primary/20 flex items-center justify-center">
-                <Diamond className="h-9 w-9 text-primary" />
-              </div>
-            </div>
-            <p className="font-display text-lg tracking-[0.1em] text-foreground uppercase mb-1.5">
-              {primaryLabel}
-            </p>
-            <p className="text-sm text-muted-foreground mb-6">
-              {primaryHint}
-            </p>
-            <Button variant="outline" size="lg" className="gap-2 pointer-events-none">
-              <ImageIcon className="h-4 w-4" />
-              Browse ring files
-            </Button>
-          </div>
+      {primaryPreviewUrl && (
+        <div className="mb-2 flex items-baseline justify-between">
+          <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            Reference images
+          </h3>
+          <span className="font-mono text-[10px] tracking-[0.15em] text-muted-foreground/60 tabular-nums">
+            {imageCount}/{MAX_RING_CAD_REFERENCE_IMAGES}
+          </span>
         </div>
       )}
 
-      {/* Reference images — every slot (including the primary) is the same
-          size, so no angle reads as more or less important than another. */}
-      {primaryPreviewUrl && (
-        <div className="mb-3">
-          <div className="flex items-baseline justify-between mb-2">
-            <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-              Reference images
-            </h3>
-            <span className="font-mono text-[10px] tracking-[0.15em] text-muted-foreground/60 tabular-nums">
-              {imageCount}/{MAX_RING_CAD_REFERENCE_IMAGES}
-            </span>
-          </div>
-          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-            {Array.from({ length: MAX_RING_CAD_REFERENCE_IMAGES }, (_, index) => {
+      {/* Same fixed-height single-row canvas as Photo Studio's High Effort
+          upload (HighEffortUploadCanvas): one full-width drop zone when
+          empty (reads as the plain low-effort canvas), all slots equal size
+          in a single row once any image exists — cover and every angle get
+          identical treatment, none reads as more or less important. */}
+      <div className="mb-3 h-[260px] overflow-hidden border border-border/30 sm:h-[300px]">
+        <div
+          className="grid h-full min-h-0 gap-2 p-2"
+          style={{ gridTemplateColumns: `repeat(${primaryPreviewUrl ? MAX_RING_CAD_REFERENCE_IMAGES : 1}, minmax(0, 1fr))` }}
+        >
+          {!primaryPreviewUrl ? (
+            <div
+              ref={dropZoneRef}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={() => imageInputRef.current?.click()}
+              className={`relative h-full min-h-0 min-w-0 flex items-center justify-center border-2 border-dashed transition-all duration-200 cursor-pointer ${
+                isDragging
+                  ? "border-foreground/60 bg-foreground/5"
+                  : "border-foreground/40 hover:border-foreground/60 hover:bg-foreground/5 bg-muted/10"
+              }`}
+            >
+              <div className="flex flex-col items-center text-center px-6">
+                <div className="relative mx-auto w-16 h-16 mb-4">
+                  <div className="absolute inset-0 rounded-full bg-primary/10 animate-ping motion-reduce:animate-none" style={{ animationDuration: '2.5s' }} />
+                  <div className="absolute inset-0 rounded-full bg-primary/5 border-2 border-primary/20 flex items-center justify-center">
+                    <Diamond className="h-7 w-7 text-primary" />
+                  </div>
+                </div>
+                <p className="font-display text-lg tracking-[0.1em] text-foreground uppercase mb-1.5">
+                  {primaryLabel}
+                </p>
+                <p className="text-sm text-muted-foreground mb-5">
+                  {primaryHint}
+                </p>
+                <Button variant="outline" size="lg" className="gap-2 pointer-events-none">
+                  <ImageIcon className="h-4 w-4" />
+                  Browse ring files
+                </Button>
+              </div>
+            </div>
+          ) : (
+            Array.from({ length: MAX_RING_CAD_REFERENCE_IMAGES }, (_, index) => {
               const url = referenceImagePreviewUrls[index];
 
               if (url) {
                 return (
-                  <div key={index} className="relative aspect-square border border-border bg-muted/10 overflow-hidden">
-                    <img src={url} alt={index === 0 ? "Primary reference ring" : `Reference angle ${index}`} className="w-full h-full object-contain p-1" />
+                  <div key={index} className="relative h-full min-h-0 min-w-0 overflow-hidden border border-border bg-muted/10">
+                    <img src={url} alt={index === 0 ? "Primary reference ring" : `Reference angle ${index}`} className="h-full w-full object-contain p-1" />
                     <button
                       onClick={() => onRemoveReferenceImage(index)}
                       className="absolute top-1 right-1 w-6 h-6 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
@@ -221,7 +223,7 @@ export default function ReferenceImageUploader({
               }
 
               // The first empty slot is the add target; later ones stay inert placeholders
-              // so the grid keeps a stable layout with no shift as images are added.
+              // so the row keeps a stable layout with no shift as images are added.
               const isNextSlot = index === imageCount;
               return (
                 <button
@@ -230,7 +232,7 @@ export default function ReferenceImageUploader({
                   disabled={!isNextSlot}
                   onClick={() => extraInputRef.current?.click()}
                   aria-label={`Add reference angle ${index}`}
-                  className={`aspect-square border border-dashed flex flex-col items-center justify-center gap-1 transition-colors duration-200 ${
+                  className={`h-full min-h-0 min-w-0 border border-dashed flex flex-col items-center justify-center gap-1 transition-colors duration-200 ${
                     isNextSlot
                       ? "border-foreground/40 hover:border-foreground/60 hover:bg-foreground/5 bg-muted/10"
                       : "border-border/40 bg-muted/5"
@@ -244,12 +246,15 @@ export default function ReferenceImageUploader({
                   )}
                 </button>
               );
-            })}
-          </div>
-          <p className="mt-2 text-[11px] text-muted-foreground/70 leading-relaxed">
-            Optional. More angles of the same ring give the model a better read on depth and profile.
-          </p>
+            })
+          )}
         </div>
+      </div>
+
+      {primaryPreviewUrl && (
+        <p className="mt-2 mb-3 text-[11px] text-muted-foreground/70 leading-relaxed">
+          Optional. More angles of the same ring give the model a better read on depth and profile.
+        </p>
       )}
     </div>
   );

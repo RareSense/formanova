@@ -74,6 +74,24 @@ describe('CadHistoryLibrary', () => {
     expect(onSelectImage).toHaveBeenCalledWith('/api/artifacts/abc');
   });
 
+  it('shows every image from a multi-image upload, not just the primary angle', () => {
+    const onSelectImage = vi.fn();
+    mockUseCadHistoryLibrary.mockReturnValue(baseState({
+      isSearchable: false,
+      items: [
+        { workflowId: 'wf-multi', createdAt: '2026-08-15T00:00:00Z', prompt: null, referenceImageUrls: ['/api/artifacts/angle-1', '/api/artifacts/angle-2', '/api/artifacts/angle-3'] },
+        { workflowId: 'wf-single', createdAt: '2026-08-14T00:00:00Z', prompt: null, referenceImageUrls: ['/api/artifacts/single'] },
+      ],
+    }));
+    render(<CadHistoryLibrary variant="images" onSelectImage={onSelectImage} />);
+
+    const buttons = screen.getAllByRole('button', { name: 'Reuse this reference image' });
+    expect(buttons).toHaveLength(4);
+
+    fireEvent.click(buttons[1]);
+    expect(onSelectImage).toHaveBeenCalledWith('/api/artifacts/angle-2');
+  });
+
   it('shows an error message instead of the grid when the fetch failed', () => {
     mockUseCadHistoryLibrary.mockReturnValue(baseState({ error: 'Could not load your past designs.' }));
     render(<CadHistoryLibrary variant="prompts" />);
