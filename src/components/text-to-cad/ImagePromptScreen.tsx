@@ -138,7 +138,7 @@ export default function ImagePromptScreen({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
-        className="w-full px-3 py-6 sm:px-6 lg:px-3"
+        className="w-full px-3 pb-6 pt-20 sm:px-6 lg:px-3"
       >
         <div className="grid gap-8 lg:gap-10 lg:grid-cols-3">
           <div className="lg:col-span-2">
