@@ -149,24 +149,6 @@ export default function InitialPromptScreen({
               </div>
             )}
 
-            {/* Upload CAD File — gated */}
-            {onGlbUpload && (
-              <div className="mt-4 max-w-[680px] mx-auto text-center">
-                <input
-                  ref={glbInputRef}
-                  type="file"
-                  accept=".glb,.gltf"
-                  className="hidden"
-                  onChange={handleGlbUpload}
-                />
-                <button
-                  onClick={() => glbInputRef.current?.click()}
-                  className="font-mono text-[11px] uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground transition-colors duration-150 cursor-pointer underline underline-offset-4 decoration-border hover:decoration-foreground"
-                >
-                  Or upload a CAD file (.glb)
-                </button>
-              </div>
-            )}
           </div>
 
           {/* "My Prompts" — mounted unconditionally so its own history check can

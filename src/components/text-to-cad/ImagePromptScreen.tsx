@@ -233,24 +233,6 @@ export default function ImagePromptScreen({
               </div>
             )}
 
-            {/* Upload GLB — gated */}
-            {onGlbUpload && (
-              <div className="mt-4 text-center">
-                <input
-                  ref={glbInputRef}
-                  type="file"
-                  accept=".glb,.gltf"
-                  className="hidden"
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) onGlbUpload(f); e.target.value = ""; }}
-                />
-                <button
-                  onClick={() => glbInputRef.current?.click()}
-                  className="font-mono text-[11px] uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground transition-colors duration-150 cursor-pointer underline underline-offset-4 decoration-border hover:decoration-foreground"
-                >
-                  Or upload a CAD file (.glb)
-                </button>
-              </div>
-            )}
           </div>
 
           {/* "My Rings" — mounted unconditionally so its own history check can
