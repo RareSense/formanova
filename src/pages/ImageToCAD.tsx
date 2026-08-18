@@ -43,7 +43,6 @@ export default function ImageToCAD() {
   const activeTier = RING_CAD_DEFAULT_TIER;
   const {
     referenceImages,
-    tier: activeTier,
     referenceImagePreviewUrls,
     addReferenceImages,
     removeReferenceImage,
@@ -73,6 +72,7 @@ export default function ImageToCAD() {
     model,
     prompt,
     referenceImages,
+    tier: activeTier,
     cadRoute: '/image-to-cad',
     pushUndo: editor.pushUndo,
     userId: user?.id,
