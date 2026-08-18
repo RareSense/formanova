@@ -165,14 +165,14 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2 flex-shrink-0">
             <span
-              className="inline-flex items-center gap-1 font-mono text-[8px] uppercase tracking-wide text-muted-foreground"
+              className="inline-flex min-h-8 items-center gap-1.5 border border-border/70 bg-muted/25 px-2.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-foreground"
               aria-label={workflow.credits_spent == null ? 'Credits used unavailable' : `${workflow.credits_spent} credits used`}
             >
-              <img src={creditCoinIcon} alt="" className="h-3 w-3" />
+              <img src={creditCoinIcon} alt="" className="h-4 w-4" />
               {workflow.credits_spent === undefined
-                ? 'Credits…'
+                ? 'Calculating credits…'
                 : workflow.credits_spent === null
-                  ? 'Credits —'
+                  ? 'Credits unavailable'
                   : `${workflow.credits_spent} credits used`}
             </span>
             <span className="font-mono text-[10px] tracking-wider text-muted-foreground whitespace-nowrap">

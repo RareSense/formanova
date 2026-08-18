@@ -138,6 +138,9 @@ export async function listMyWorkflows(
     // actual input count is the only reliable discriminator when the backend
     // still returns source_type="unknown".
     const sourceType = resolveSourceType(w.source_type, name, referenceImageCount);
+    const summaryCredits = [w.credits_spent, w.actual_user_billed, w.actual_cost]
+      .map(numericCredits)
+      .find((value): value is number => value !== null);
     if (sourceType === 'unknown' && __DEV__) {
       console.warn('[HistoryAPI] unknown source_type for workflow:', { id: w.workflow_id ?? w.id, name, status: w.status, backend_source_type: w.source_type });
     }
@@ -148,6 +151,9 @@ export async function listMyWorkflows(
       created_at: w.created_at ?? w.started_at ?? '',
       finished_at: w.finished_at ?? null,
       source_type: sourceType,
+      // Prefer the backend's already-computed workflow charge. The separate
+      // audit request remains the fallback when this summary omits billing.
+      credits_spent: summaryCredits,
       mode: w.input?.mode ?? null,
       output_asset_id: extractOutputAssetId(w),
       output_asset_name: extractOutputAssetName(w),

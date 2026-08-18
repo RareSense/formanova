@@ -47,6 +47,22 @@ describe('generation-history-api URL shapes', () => {
     expect(workflows.map(workflow => workflow.source_type)).toEqual(['text_to_cad', 'image_to_cad']);
   });
 
+  it('keeps the actual workflow charge from the History summary', async () => {
+    mockAuthFetch.mockReturnValueOnce(okJson({ workflows: [
+      {
+        workflow_id: 'cad-with-cost',
+        name: 'ring_cad_nurbs_v1',
+        status: 'completed',
+        source_type: 'text_to_cad',
+        actual_cost: '70',
+        input: { reference_image_count: 0 },
+      },
+    ] }));
+
+    const [workflow] = await listMyWorkflows();
+    expect(workflow.credits_spent).toBe(70);
+  });
+
   it('getWorkflowDetails calls a relative /history path', async () => {
     mockAuthFetch.mockReturnValueOnce(okJson({ summary: {}, steps: [] }));
     await getWorkflowDetails('wf-1');
