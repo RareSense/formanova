@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { inferSourceType, resolveSourceType } from './generation-history-api';
+import { extractWorkflowCredits, inferSourceType, resolveSourceType } from './generation-history-api';
 
 // -- URL tests: verify no hardcoded production domain --
 
@@ -137,6 +137,21 @@ describe('generation-history-api URL shapes', () => {
     const [url] = mockAuthFetch.mock.calls[0];
     expect(url).toMatch(/^\/api\/credits\/audit\//);
     expect(url).not.toContain('formanova.ai');
+  });
+});
+
+describe('credit audit parsing', () => {
+  it('sums the shipped array response shape', () => {
+    expect(extractWorkflowCredits([{ cost: 40 }, { cost: 30 }])).toBe(70);
+  });
+
+  it('reads wrapped actual billing and numeric strings', () => {
+    expect(extractWorkflowCredits({ data: { actual_user_billed: '70' } })).toBe(70);
+  });
+
+  it('preserves a legitimate zero-credit audit', () => {
+    expect(extractWorkflowCredits([{ cost: 0 }])).toBe(0);
+    expect(extractWorkflowCredits({ line_items: [] })).toBeNull();
   });
 });
 

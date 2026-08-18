@@ -229,7 +229,9 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
     });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.8;
+    // History previews share a canvas and HDRI; keep highlights quieter than
+    // the full editor so metallic fallback materials do not clip or wash out.
+    renderer.toneMappingExposure = 0.65;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.setClearColor(0x000000, 0);
     rendererRef.current = renderer;

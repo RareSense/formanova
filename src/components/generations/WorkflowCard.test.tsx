@@ -1,7 +1,7 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WorkflowSummary } from '@/lib/generation-history-api';
 
 vi.mock('./ScissorGLBGrid', () => ({
@@ -9,8 +9,28 @@ vi.mock('./ScissorGLBGrid', () => ({
 }));
 vi.mock('./SnapshotPreviewModal', () => ({ SnapshotPreviewModal: () => null }));
 vi.mock('./PhotoCard', () => ({ PhotoCard: () => null }));
+vi.mock('@/lib/generation-history-api', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/generation-history-api')>('@/lib/generation-history-api');
+  return { ...actual, fetchCadResult: vi.fn() };
+});
+vi.mock('./cad-artifact-download', async () => {
+  const actual = await vi.importActual<typeof import('./cad-artifact-download')>('./cad-artifact-download');
+  return { ...actual, downloadCadArtifact: vi.fn() };
+});
 
 import { WorkflowCard } from './WorkflowCard';
+import { fetchCadResult } from '@/lib/generation-history-api';
+import { downloadCadArtifact } from './cad-artifact-download';
+
+beforeEach(() => {
+  localStorage.clear();
+  vi.clearAllMocks();
+  vi.mocked(fetchCadResult).mockResolvedValue({
+    glb_url: '/fresh/preview-glb',
+    threedm_url: '/fresh/manufacturing-3dm',
+    azure_source: null,
+  });
+});
 
 const cadWorkflow: WorkflowSummary = {
   workflow_id: 'workflow-1',
@@ -23,6 +43,7 @@ const cadWorkflow: WorkflowSummary = {
   glb_url: '/api/artifacts/glb',
   glb_filename: 'ring.glb',
   threedm_url: '/api/artifacts/3dm',
+  output_asset_id: 'asset-1',
   mode: 'INTERNAL_MODE_SENTINEL',
   ai_model: 'INTERNAL_PROVIDER_SENTINEL',
 };
@@ -49,7 +70,72 @@ describe('CAD generation history card', () => {
     expect(screen.getAllByRole('button').map((button) => button.textContent?.trim()).filter(Boolean)).toEqual([
       'Download 3DM',
       'Open in Studio',
-      'Export GLB',
     ]);
+
+    const threedm = screen.getByRole('button', { name: 'Download 3DM' });
+    const studio = screen.getByRole('button', { name: 'Open in Studio' });
+    expect(threedm.className).toContain('h-11');
+    expect(screen.getByRole('region', { name: 'Manufacturing deliverable' })).toBeTruthy();
+    expect(screen.getByText('Native Rhino 3DM')).toBeTruthy();
+    expect(studio.className).toContain('h-9');
+    expect(screen.queryByRole('button', { name: 'Export GLB' })).toBeNull();
+  });
+
+  it('uses an extension-free design name for the 3DM filename', () => {
+    render(
+      <MemoryRouter>
+        <WorkflowCard workflow={cadWorkflow} index={1} onClick={() => {}} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText('Design name')).toBeTruthy();
+    expect(screen.getByText('ring.3dm')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rename design' }));
+    expect((screen.getByRole('textbox') as HTMLInputElement).value).toBe('ring');
+    expect(screen.queryByText('.glb')).toBeNull();
+  });
+
+  it('renames the 3DM file locally without an output asset id', () => {
+    render(
+      <MemoryRouter>
+        <WorkflowCard workflow={{ ...cadWorkflow, output_asset_id: null }} index={1} onClick={() => {}} />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rename design' }));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Customer Ring' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save design name' }));
+
+    expect(screen.getByText('Customer Ring.3dm')).toBeTruthy();
+  });
+
+  it('downloads the refreshed 3DM URL with the renamed 3DM filename and type', async () => {
+    render(
+      <MemoryRouter>
+        <WorkflowCard workflow={{ ...cadWorkflow, output_asset_id: null }} index={1} onClick={() => {}} />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rename design' }));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Customer Ring' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save design name' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Download 3DM' }));
+
+    await waitFor(() => expect(downloadCadArtifact).toHaveBeenCalledWith(
+      '/fresh/manufacturing-3dm',
+      'Customer Ring.3dm',
+      '3dm',
+    ));
+  });
+
+  it('shows credits used explicitly, including zero', () => {
+    render(
+      <MemoryRouter>
+        <WorkflowCard workflow={{ ...cadWorkflow, credits_spent: 0 }} index={1} onClick={() => {}} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText('0 credits used')).toBeTruthy();
   });
 });

@@ -275,7 +275,6 @@ export default function ImageToCAD() {
                 if (on) canvasRef.current?.applyMagicTextures();
                 else canvasRef.current?.removeAllTextures();
               }}
-              onGlbUpload={() => {}}
               onReset={workflow.hasModel ? handleReset : undefined}
               pageTitle="Image to 3D"
               referenceImagePreviewUrls={referenceImagePreviewUrls}

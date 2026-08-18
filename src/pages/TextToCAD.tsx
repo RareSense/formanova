@@ -497,7 +497,6 @@ export default function TextToCAD() {
                   canvasRef.current?.removeAllTextures();
                 }
               }}
-              onGlbUpload={handleGlbUpload}
               onReset={workflow.hasModel ? handleReset : undefined}
               creditBlock={creditBlockUI}
             />

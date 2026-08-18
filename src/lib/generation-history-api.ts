@@ -344,22 +344,8 @@ export async function fetchWorkflowCreditAudit(
     }
 
     const data = await res.json();
-
-    // 1. Top-level actual_user_billed (final amount deducted from wallet)
-    if (typeof data.actual_user_billed === 'number') return data.actual_user_billed;
-
-    // 2. Nested under financials
-    if (typeof data.financials?.actual_user_billed === 'number') return data.financials.actual_user_billed;
-
-    // 3. Fallback to other common field names
-    const total = data.total_charged ?? data.total_cost ?? data.total ?? data.credits_spent ?? null;
-    if (typeof total === 'number') return total;
-
-    // 4. Sum line_items costs
-    if (Array.isArray(data.line_items)) {
-      const sum = data.line_items.reduce((acc: number, item: any) => acc + (item.cost ?? item.amount ?? item.credits ?? 0), 0);
-      if (sum > 0) return sum;
-    }
+    const credits = extractWorkflowCredits(data);
+    if (credits !== null) return credits;
 
     if (__DEV__) console.warn('[HistoryAPI] credit audit: could not extract cost from response', workflowId, Object.keys(data));
     return null;
@@ -367,6 +353,53 @@ export async function fetchWorkflowCreditAudit(
     if (__DEV__) console.warn('[HistoryAPI] credit audit error:', workflowId, e);
     return null;
   }
+}
+
+function numericCredits(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value) && value >= 0) return value;
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+  }
+  return null;
+}
+
+/** Normalizes every currently shipped credit-audit response shape. */
+export function extractWorkflowCredits(payload: unknown): number | null {
+  if (Array.isArray(payload)) {
+    let found = false;
+    const total = payload.reduce((sum, item) => {
+      const record = item && typeof item === 'object' ? item as Record<string, unknown> : {};
+      const value = numericCredits(record.cost ?? record.amount ?? record.credits);
+      if (value === null) return sum;
+      found = true;
+      return sum + value;
+    }, 0);
+    return found ? total : null;
+  }
+
+  if (!payload || typeof payload !== 'object') return null;
+  const data = payload as Record<string, any>;
+  const wrappers = [data, data.data, data.result, data.financials].filter(
+    (value): value is Record<string, any> => Boolean(value && typeof value === 'object' && !Array.isArray(value)),
+  );
+
+  for (const record of wrappers) {
+    for (const key of ['actual_user_billed', 'total_charged', 'total_cost', 'total', 'credits_spent']) {
+      const value = numericCredits(record[key]);
+      if (value !== null) return value;
+    }
+  }
+
+  for (const record of wrappers) {
+    const items = record.line_items ?? record.items ?? record.audit;
+    if (Array.isArray(items)) {
+      const total = extractWorkflowCredits(items);
+      if (total !== null) return total;
+    }
+  }
+
+  return null;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────

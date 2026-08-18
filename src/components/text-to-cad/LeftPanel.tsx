@@ -1,6 +1,6 @@
-import { useRef, useCallback, useState } from "react";
+import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Diamond, RotateCcw, X, Maximize2 } from "lucide-react";
+import { RotateCcw, X, Maximize2 } from "lucide-react";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { useEstimatedCost } from "@/hooks/use-estimated-cost";
 import { RING_CAD_NURBS_WORKFLOW, MAX_RING_CAD_REFERENCE_IMAGES } from "@/lib/ring-cad-nurbs-api";
@@ -15,7 +15,6 @@ interface LeftPanelProps {
   onGenerate: () => void;
   magicTexturing: boolean;
   onMagicTexturingChange: (on: boolean) => void;
-  onGlbUpload: (file: File) => void;
   onReset?: () => void;
   creditBlock?: React.ReactNode;
   referenceImagePreviewUrls?: string[];
@@ -26,21 +25,15 @@ interface LeftPanelProps {
 export default function LeftPanel({
   model, setModel, prompt, setPrompt,
   isGenerating, hasModel,
-  onGenerate, magicTexturing, onMagicTexturingChange, onGlbUpload,
+  onGenerate, magicTexturing, onMagicTexturingChange,
   onReset,
   creditBlock,
   referenceImagePreviewUrls = [],
   onRemoveReferenceImage,
   pageTitle,
 }: LeftPanelProps) {
-  const glbInputRef = useRef<HTMLInputElement>(null);
   const { cost: generationCost, loading: generationCostLoading } = useEstimatedCost({ workflowName: RING_CAD_NURBS_WORKFLOW, model });
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-
-  const handleGlbUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) onGlbUpload(file);
-  }, [onGlbUpload]);
 
   const primaryPreviewUrl = referenceImagePreviewUrls[0] ?? null;
   const imageCount = referenceImagePreviewUrls.length;
@@ -221,20 +214,6 @@ export default function LeftPanel({
           {/* Magic Texture removed — materials managed via right panel */}
 
           {/* Upload GLB — only shown when a model exists */}
-          <input type="file" ref={glbInputRef} accept=".glb,.gltf" className="hidden" onChange={handleGlbUpload} />
-          {hasModel && (
-            <button
-              onClick={() => glbInputRef.current?.click()}
-              disabled={isGenerating}
-              className="w-full py-2.5 lg:py-3.5 px-3 lg:px-4 mt-3 text-[11px] lg:text-[12px] font-bold uppercase tracking-[0.1em] lg:tracking-[0.2em] cursor-pointer transition-all duration-200 text-muted-foreground disabled:opacity-30 disabled:cursor-not-allowed hover:text-foreground flex items-center justify-center gap-2 bg-muted/30 border border-border flex-wrap"
-            >
-              <span className="w-6 h-6 rounded-full border border-primary/60 flex items-center justify-center shrink-0 shadow-[0_0_8px_hsl(var(--primary)/0.4)] text-primary">
-                <Diamond className="w-3 h-3" />
-              </span>
-              <span>Upload Ring Part</span>
-            </button>
-          )}
-
           {/* Magic Texturing checkbox — hidden, keep for future re-enable
           {hasModel && (
             <label className="w-full mt-3 flex items-center gap-2.5 py-3 px-1 cursor-pointer select-none group">

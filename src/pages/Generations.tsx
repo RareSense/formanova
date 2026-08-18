@@ -335,7 +335,10 @@ export default function Generations() {
         const batch = needsAudit.slice(i, i + 3);
         const results = await Promise.allSettled(
           batch.map(async wf => {
-            const credits = await fetchWorkflowCreditAudit(wf.workflow_id);
+            const credits = await retryNullable(
+              () => withTimeout(fetchWorkflowCreditAudit(wf.workflow_id), 5000),
+              3,
+            );
             return { id: wf.workflow_id, credits_spent: credits };
           })
         );

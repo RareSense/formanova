@@ -2,13 +2,13 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Box, Download, Pencil, Check, X, Layers } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import type { WorkflowSummary } from '@/lib/generation-history-api';
+import { fetchCadResult, type WorkflowSummary } from '@/lib/generation-history-api';
 import { SnapshotPreviewModal } from './SnapshotPreviewModal';
 import { GLBPreviewSlot } from './ScissorGLBGrid';
-import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { isShaLikeName, renameAsset } from '@/lib/assets-api';
 import {
   buildCadArtifactFilename,
@@ -16,9 +16,13 @@ import {
   getCadArtifactBaseName,
   itemVariants,
   truncateDisplayName,
-  CreditsBadge,
 } from './workflow-card-shared';
 import { PhotoCard } from './PhotoCard';
+import { withTimeout } from '@/lib/generation-history-utils';
+import {
+  downloadCadArtifact,
+  selectCadArtifactUrl,
+} from './cad-artifact-download';
 
 const CAD_RENAMES_KEY = 'formanova_cad_renames';
 
@@ -56,6 +60,7 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
     () => getStoredRename(loadStoredRenames(), workflow.workflow_id) ?? workflow.output_asset_name ?? null
   );
   const [renameValue, setRenameValue] = useState('');
+  const [isDownloadingThreedm, setIsDownloadingThreedm] = useState(false);
 
   useEffect(() => {
     if (workflow.output_asset_name && !getStoredRename(loadStoredRenames(), workflow.workflow_id)) {
@@ -68,12 +73,13 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
   const hasShots = shots.length > 0;
   const isEnriching = workflow.screenshots === undefined;
 
-  // Derive the shown filename (user rename takes priority)
+  // The editable design name becomes the manufacturing download filename.
   const rawFilename = workflow.glb_filename || 'model.glb';
-  const baseName = getCadArtifactBaseName(null, rawFilename);
   const shownBaseName = getCadArtifactBaseName(displayName, rawFilename);
-  const shownFilename = buildCadArtifactFilename(displayName, rawFilename, 'glb');
-  const visibleFilename = `${truncateDisplayName(shownBaseName)}.glb`;
+  const threedmFilename = buildCadArtifactFilename(displayName, rawFilename, '3dm');
+  const visibleBaseName = truncateDisplayName(shownBaseName);
+  const supportsThreedm = Boolean(workflow.threedm_url) || /ring[_-]cad[_-]nurbs/i.test(workflow.name);
+  const renameInputId = `cad-design-name-${workflow.workflow_id}`;
 
   const handleStartRename = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -83,64 +89,54 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
 
   const handleConfirmRename = useCallback(async () => {
     const sanitized = getCadArtifactBaseName(renameValue, rawFilename);
-    if (sanitized && sanitized !== baseName && workflow.output_asset_id) {
+    if (sanitized && sanitized !== shownBaseName) {
       setDisplayName(sanitized);
       saveStoredRename(workflow.workflow_id, sanitized);
-      try {
-        await renameAsset(workflow.output_asset_id, sanitized);
-      } catch (err) {
-        console.error('[WorkflowCard] rename asset error:', err);
+      if (workflow.output_asset_id) {
+        try {
+          await renameAsset(workflow.output_asset_id, sanitized);
+        } catch (err) {
+          console.error('[WorkflowCard] rename asset error:', err);
+          toast.error('The design name was saved on this device, but could not be synced.');
+        }
       }
     }
     setIsRenaming(false);
-  }, [renameValue, baseName, rawFilename, workflow.workflow_id, workflow.output_asset_id]);
+  }, [renameValue, rawFilename, shownBaseName, workflow.workflow_id, workflow.output_asset_id]);
 
   const handleCancelRename = () => {
     setIsRenaming(false);
   };
 
-  const handleDownloadGlb = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!workflow.glb_url) return;
-    import('@/lib/posthog-events').then(m => m.trackDownloadClicked({ file_name: shownFilename, file_type: 'glb', context: 'generations' }));
-    try {
-      const resp = await authenticatedFetch(workflow.glb_url);
-      if (!resp.ok) throw new Error(`Download failed: ${resp.status}`);
-      const blob = await resp.blob();
-      if (blob.size === 0) throw new Error('Download returned an empty file');
-      const blobUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = shownFilename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
-    } catch (err) {
-      console.error('[WorkflowCard] GLB download error:', err);
-    }
-  };
-
   const handleDownloadThreedm = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!workflow.threedm_url) return;
-    const fileName = buildCadArtifactFilename(displayName, rawFilename, '3dm');
-    import('@/lib/posthog-events').then(m => m.trackDownloadClicked({ file_name: fileName, file_type: '3dm', context: 'generations' }));
+    if (isDownloadingThreedm) return;
+
+    setIsDownloadingThreedm(true);
     try {
-      const resp = await authenticatedFetch(workflow.threedm_url);
-      if (!resp.ok) throw new Error(`Download failed: ${resp.status}`);
-      const blob = await resp.blob();
-      if (blob.size === 0) throw new Error('Download returned an empty file');
-      const blobUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+      // Refresh the typed result at click time. History cache data may be old,
+      // but GLB and 3DM must never be selected positionally or by extension.
+      const fresh = await withTimeout(fetchCadResult(workflow.workflow_id), 5000);
+      const url = selectCadArtifactUrl('3dm', fresh, workflow);
+      if (!url) throw new Error('3DM is not available for this design.');
+
+      try {
+        await downloadCadArtifact(url, threedmFilename, '3dm');
+      } catch (freshError) {
+        const cachedUrl = selectCadArtifactUrl('3dm', null, workflow);
+        if (!cachedUrl || cachedUrl === url) throw freshError;
+        await downloadCadArtifact(cachedUrl, threedmFilename, '3dm');
+      }
+      import('@/lib/posthog-events').then(m => m.trackDownloadClicked({
+        file_name: threedmFilename,
+        file_type: '3dm',
+        context: 'generations',
+      }));
     } catch (err) {
       console.error('[WorkflowCard] 3DM download error:', err);
+      toast.error(err instanceof Error ? err.message : 'Could not download the 3DM file.');
+    } finally {
+      setIsDownloadingThreedm(false);
     }
   };
 
@@ -167,8 +163,18 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
               #{index}
             </span>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <span className="hidden sm:inline-flex"><CreditsBadge credits={workflow.credits_spent} /></span>
+          <div className="flex flex-wrap items-center justify-end gap-2 flex-shrink-0">
+            <span
+              className="inline-flex items-center gap-1 font-mono text-[8px] uppercase tracking-wide text-muted-foreground"
+              aria-label={workflow.credits_spent == null ? 'Credits used unavailable' : `${workflow.credits_spent} credits used`}
+            >
+              <img src={creditCoinIcon} alt="" className="h-3 w-3" />
+              {workflow.credits_spent === undefined
+                ? 'Credits…'
+                : workflow.credits_spent === null
+                  ? 'Credits —'
+                  : `${workflow.credits_spent} credits used`}
+            </span>
             <span className="font-mono text-[10px] tracking-wider text-muted-foreground whitespace-nowrap">
               {dateStr}
             </span>
@@ -183,12 +189,6 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
               glbUrl={workflow.glb_url}
               className="w-full aspect-[4/3] bg-background/50 border border-border/30"
             />
-            {workflow.credits_spent != null && (
-              <div className="sm:hidden absolute top-0 left-0 flex items-center gap-1 bg-background/80 backdrop-blur-sm px-1.5 py-0.5 border-r border-b border-border/30">
-                <img src={creditCoinIcon} alt="" className="w-3 h-3" />
-                <span className="font-mono text-[9px] text-foreground">{workflow.credits_spent}</span>
-              </div>
-            )}
           </div>
         )}
         {!workflow.glb_url && isEnriching && (
@@ -201,12 +201,23 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
         {/* ── File box — only shown when GLB is available or still loading ── */}
         {(workflow.glb_url || isEnriching) && (
           <div className="mx-3 mb-4 flex flex-col gap-3 rounded-sm border border-border/50 bg-muted/20 px-3 py-3 sm:mx-4">
-            {/* Left: filename + rename */}
-            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+            {/* Shared design name: both artifact extensions are derived below. */}
+            <div className="flex min-w-0 flex-1 items-start gap-1.5">
               <Box className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
-              {isRenaming ? (
+              <div className="min-w-0 flex-1">
+                {isRenaming ? (
+                  <label htmlFor={renameInputId} className="mb-1 block font-mono text-[8px] uppercase tracking-[0.16em] text-muted-foreground">
+                    Design name
+                  </label>
+                ) : (
+                  <p className="mb-1 font-mono text-[8px] uppercase tracking-[0.16em] text-muted-foreground">
+                    Design name
+                  </p>
+                )}
+                {isRenaming ? (
                 <div className="flex min-w-0 flex-1 items-center gap-1" onClick={e => e.stopPropagation()}>
                   <Input
+                    id={renameInputId}
                     value={renameValue}
                     onChange={(e) => setRenameValue(e.target.value)}
                     onKeyDown={(e) => {
@@ -215,81 +226,86 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
                     }}
                     autoFocus
                     maxLength={50}
-                    className="h-7 min-w-0 flex-1 px-1.5 py-0 font-mono text-[10px] tracking-wider"
+                    className="h-11 min-w-0 flex-1 px-3 py-0 font-mono text-[10px] tracking-wider"
                   />
-                  <span className="text-[10px] text-muted-foreground font-mono">.glb</span>
-                  <button onClick={handleConfirmRename} className="p-0.5 hover:text-foreground text-muted-foreground transition-colors">
-                    <Check className="h-3 w-3" />
+                  <button onClick={handleConfirmRename} aria-label="Save design name" className="inline-flex h-11 w-11 items-center justify-center border border-border text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground">
+                    <Check className="h-3.5 w-3.5" />
                   </button>
-                  <button onClick={handleCancelRename} className="p-0.5 hover:text-foreground text-muted-foreground transition-colors">
-                    <X className="h-3 w-3" />
+                  <button onClick={handleCancelRename} aria-label="Cancel design rename" className="inline-flex h-11 w-11 items-center justify-center border border-border text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground">
+                    <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
-              ) : (
+                ) : (
                 <div className="flex min-w-0 items-center gap-1.5">
                   <span
                     className="truncate font-mono text-[10px] tracking-wider text-foreground"
-                    title={shownFilename}
+                    title={shownBaseName}
                   >
-                    {isEnriching ? '—' : visibleFilename}
+                    {isEnriching ? '—' : visibleBaseName}
                   </span>
-                  {!isEnriching && workflow.glb_url && workflow.output_asset_id && (
+                  {!isEnriching && workflow.glb_url && (
                     <button
                       onClick={handleStartRename}
-                      className="p-0.5 hover:text-foreground text-muted-foreground/50 transition-colors flex-shrink-0"
-                      aria-label="Rename file"
+                      className="inline-flex h-11 w-11 flex-shrink-0 items-center justify-center text-muted-foreground/60 transition-colors hover:bg-muted/40 hover:text-foreground"
+                      aria-label="Rename design"
                     >
-                      <Pencil className="h-3 w-3" />
+                      <Pencil className="h-3.5 w-3.5" />
                     </button>
                   )}
                 </div>
-              )}
+                )}
+              </div>
             </div>
 
-            {/* Right: action buttons */}
-            <div className="grid w-full grid-cols-1 gap-2 min-[420px]:grid-cols-2">
-              {workflow.glb_url ? (
-                <>
-                  {workflow.threedm_url && (
+            {workflow.glb_url ? (
+              <div className="flex w-full flex-col gap-2">
+                {supportsThreedm && (
+                  <section
+                    aria-label="Manufacturing deliverable"
+                    className="border border-[hsl(var(--formanova-hero-accent))]/45 bg-[hsl(var(--formanova-hero-accent))]/[0.04] p-2.5"
+                  >
+                    <div className="mb-2 flex items-end justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-mono text-[8px] font-semibold uppercase tracking-[0.16em] text-[hsl(var(--formanova-hero-accent))]">
+                          Manufacturing file
+                        </p>
+                        <p className="mt-0.5 text-[10px] leading-4 text-muted-foreground">
+                          Native Rhino 3DM
+                        </p>
+                      </div>
+                      <span className="min-w-0 truncate font-mono text-[8px] uppercase tracking-[0.12em] text-muted-foreground" title={threedmFilename}>
+                        {threedmFilename}
+                      </span>
+                    </div>
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={handleDownloadThreedm}
-                      className="h-9 w-full gap-1.5 border-[hsl(var(--formanova-hero-accent))] bg-transparent px-3 font-mono text-[9px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"
+                      disabled={isDownloadingThreedm}
+                      className="h-11 w-full gap-1.5 border-[hsl(var(--formanova-hero-accent))] bg-transparent px-3 font-mono text-[9px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"
                       title="Download machinable 3DM"
                       aria-label="Download 3DM"
                     >
                       <Download className="h-3.5 w-3.5" />
-                      Download 3DM
+                      {isDownloadingThreedm ? 'Checking 3DM…' : 'Download 3DM'}
                     </Button>
-                  )}
+                  </section>
+                )}
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={handleLoadInStudio}
-                    className="h-9 w-full gap-1.5 border-border bg-transparent px-3 font-mono text-[9px] uppercase tracking-wider hover:bg-muted/40"
+                    className="h-9 w-full gap-1.5 border-border bg-transparent px-3 font-mono text-[9px] uppercase tracking-wider text-muted-foreground hover:bg-muted/40 hover:text-foreground"
                   >
                     <Layers className="h-3.5 w-3.5 shrink-0" />
                     Open in Studio
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleDownloadGlb}
-                    className="h-9 w-full gap-1.5 border-border bg-transparent px-3 font-mono text-[9px] uppercase tracking-wider text-muted-foreground hover:bg-muted/40 hover:text-foreground min-[420px]:col-span-2"
-                    title="Export GLB preview model"
-                    aria-label="Export GLB"
-                  >
-                    <Download className="h-3.5 w-3.5 shrink-0" />
-                    Export GLB
-                  </Button>
-                </>
-              ) : (
-                <span className="font-mono text-[9px] tracking-wider text-muted-foreground/40 uppercase">
-                  Loading…
-                </span>
-              )}
-            </div>
+              </div>
+            ) : (
+              <span className="font-mono text-[9px] tracking-wider text-muted-foreground/40 uppercase">
+                Loading…
+              </span>
+            )}
           </div>
         )}
       </motion.div>
