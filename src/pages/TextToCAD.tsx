@@ -34,7 +34,7 @@ import {
 import GemToggle from "@/components/text-to-cad/QualityToggle";
 import { runMicroBenchmark } from "@/lib/gpu-detect";
 import type { GemMode } from "@/components/text-to-cad/CADCanvas";
-import { RING_CAD_TIERS } from "@/lib/ring-cad-nurbs-api";
+import { RING_CAD_DEFAULT_TIER, RING_CAD_TIERS } from "@/lib/ring-cad-nurbs-api";
 
 const NO_REFERENCE_IMAGES: File[] = [];
 
@@ -48,6 +48,7 @@ export default function TextToCAD() {
   const requestedTier = searchParams.get('tier') === RING_CAD_TIERS.GPT_5_6_SOL
     ? RING_CAD_TIERS.GPT_5_6_SOL
     : undefined;
+  const activeTier = requestedTier ?? RING_CAD_DEFAULT_TIER;
 
   const [model] = useState("gemini");
   const [prompt, setPrompt] = useState("");
@@ -88,7 +89,7 @@ export default function TextToCAD() {
     model,
     prompt,
     referenceImages: NO_REFERENCE_IMAGES,
-    tier: requestedTier,
+    tier: activeTier,
     cadRoute: '/text-to-cad',
     onWorkspaceActivate: activateWorkspace,
   });
@@ -448,6 +449,7 @@ export default function TextToCAD() {
       <div className="h-[calc(100vh-5rem)] flex bg-background" tabIndex={0}>
         <InitialPromptScreen
           model={model}
+          tier={activeTier}
           setModel={() => {}}
           prompt={prompt}
           setPrompt={setPrompt}

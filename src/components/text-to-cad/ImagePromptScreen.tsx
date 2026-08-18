@@ -6,7 +6,6 @@ import { RING_CAD_NURBS_WORKFLOW } from "@/lib/ring-cad-nurbs-api";
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import ReferenceImageUploader from "./ReferenceImageUploader";
 import CadHistoryLibrary from "./CadHistoryLibrary";
-import { CATEGORY_EXAMPLES } from "@/components/studio/StudioVaultUploadStep";
 
 import cadExample1 from "@/assets/examples/cad-example-1.webp";
 import cadExample2 from "@/assets/examples/cad-example-2.webp";
@@ -38,13 +37,22 @@ const EXAMPLE_DESIGNS = [
   },
 ];
 
-function RingReferenceExamples() {
+function RingReferenceExamples({ onSelect }: { onSelect: (example: typeof EXAMPLE_DESIGNS[0]) => void }) {
   return (
     <div className={`grid grid-cols-2 gap-3 overflow-hidden border border-border/30 p-3 ${PANEL_H}`}>
-      {CATEGORY_EXAMPLES.rings.allowed.map((image, index) => (
-        <div key={image} className="min-h-0 overflow-hidden border border-border/20 bg-muted/10">
-          <img src={image} alt={`Ring reference example ${index + 1}`} className="h-full w-full object-cover" />
-        </div>
+      {EXAMPLE_DESIGNS.map((example, index) => (
+        <button
+          key={example.image}
+          type="button"
+          onClick={() => onSelect(example)}
+          className="group relative min-h-0 overflow-hidden border border-border/20 bg-muted/10 transition-colors hover:border-foreground/30"
+          aria-label={`Use ring example ${index + 1}`}
+        >
+          <img src={example.image} alt={`Ring example ${index + 1}`} className="h-full w-full object-cover" />
+          <div className="absolute inset-0 flex items-center justify-center bg-background/85 p-4 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
+            <p className="text-center font-mono text-[10px] leading-[1.6] text-foreground/80">{example.prompt}</p>
+          </div>
+        </button>
       ))}
     </div>
   );
@@ -52,6 +60,7 @@ function RingReferenceExamples() {
 
 interface ImagePromptScreenProps {
   model: string;
+  tier: string;
   prompt: string;
   setPrompt: (p: string) => void;
   isGenerating: boolean;
@@ -68,7 +77,7 @@ interface ImagePromptScreenProps {
 }
 
 export default function ImagePromptScreen({
-  model, prompt, setPrompt,
+  model, tier, prompt, setPrompt,
   isGenerating, onGenerate, creditBlock,
   referenceImagePreviewUrls,
   onAddReferenceImages, onRemoveReferenceImage, onReplaceReferenceImages,
@@ -83,7 +92,11 @@ export default function ImagePromptScreen({
 
   // ring_cad_nurbs_v1 handles every input mode (text-only, one image, 2-5
   // images) — the workflow name never changes, only the payload shape does.
-  const { cost: estimatedCost, loading: costLoading } = useEstimatedCost({ workflowName: RING_CAD_NURBS_WORKFLOW, model });
+  const { cost: estimatedCost, loading: costLoading } = useEstimatedCost({
+    workflowName: RING_CAD_NURBS_WORKFLOW,
+    model,
+    pricingContext: { llm_tier: tier },
+  });
 
   const handleExampleClick = useCallback(async (example: typeof EXAMPLE_DESIGNS[0]) => {
     setPrompt(example.prompt);
@@ -159,7 +172,7 @@ export default function ImagePromptScreen({
               />
 
               {/* Text prompt — secondary */}
-              <div className={`relative flex-shrink-0 transition-opacity duration-200 ${primaryPreviewUrl ? "opacity-100" : "opacity-40"}`}>
+              <div className="relative flex-shrink-0">
                 <textarea
                   ref={textareaRef}
                   value={prompt}
@@ -167,7 +180,7 @@ export default function ImagePromptScreen({
                   onKeyDown={handleKeyDown}
                   placeholder="Add optional description"
                   rows={2}
-                  className={`w-full min-h-[52px] max-h-[200px] px-5 py-2.5 pb-7 text-[14px] text-foreground placeholder:text-muted-foreground/50 resize-none font-body leading-relaxed transition-all duration-200 focus:outline-none bg-muted/20 border overflow-y-auto ${primaryPreviewUrl ? "border-border focus:ring-1 focus:ring-border" : "border-border/30 pointer-events-none"}`}
+                  className="min-h-[64px] max-h-[200px] w-full resize-none overflow-y-auto border border-border/60 bg-background px-5 py-3 pb-7 font-body text-[14px] leading-relaxed text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-foreground/40 focus:ring-1 focus:ring-border"
                 />
                 {prompt.length > 0 && (
                   <button
@@ -194,7 +207,6 @@ export default function ImagePromptScreen({
                       <>
                         Generate 3D Ring
                         <span className="inline-flex items-center gap-1 ml-1 opacity-80">
-                          <span className="text-[13px] font-mono font-semibold">≤</span>
                           <img src={creditCoinIcon} alt="" className="w-5 h-5" />
                           <span className="text-[13px] font-mono font-semibold">{costLoading ? '…' : (estimatedCost !== null ? estimatedCost : '—')}</span>
                         </span>
@@ -205,29 +217,6 @@ export default function ImagePromptScreen({
               </div>
             </div>
 
-            {/* Example designs — replaced by "My Rings" once the user has history */}
-            {!hasImageHistory && (
-              <div className="mt-6">
-                <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-3">
-                  Try an example
-                </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                  {EXAMPLE_DESIGNS.map((ex, i) => (
-                    <button
-                      key={i}
-                      onClick={() => handleExampleClick(ex)}
-                      className="relative aspect-square border border-border hover:border-foreground/20 overflow-hidden transition-all duration-150 bg-muted/10 group"
-                    >
-                      <img src={ex.image} alt={`Ring example ${i + 1}`} className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-background/85 flex items-center justify-center p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                        <p className="font-mono text-[10px] text-foreground/80 leading-[1.6] text-center">{ex.prompt}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
           </div>
 
           <div>
@@ -237,10 +226,10 @@ export default function ImagePromptScreen({
               <>
                 <div className="mb-2">
                   <span className="marta-label block mb-1 invisible" aria-hidden="true">Step 1</span>
-                  <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">Upload Guide</h3>
-                  <p className="mt-1.5 text-sm text-muted-foreground">For best results, use clear ring photos</p>
+                  <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">Try an Example</h3>
+                  <p className="mt-1.5 text-sm text-muted-foreground">Choose one to load its image and prompt</p>
                 </div>
-                <RingReferenceExamples />
+                <RingReferenceExamples onSelect={handleExampleClick} />
               </>
             )}
           </div>

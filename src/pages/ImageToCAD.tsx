@@ -30,6 +30,7 @@ import GenerationProgress from "@/components/text-to-cad/GenerationProgress";
 import { ViewportToolbar, ViewportSideTools } from "@/components/text-to-cad/ViewportOverlays";
 import GemToggle from "@/components/text-to-cad/QualityToggle";
 import type { GemMode } from "@/components/text-to-cad/CADCanvas";
+import { RING_CAD_DEFAULT_TIER } from "@/lib/ring-cad-nurbs-api";
 
 export default function ImageToCAD() {
   const navigate = useNavigate();
@@ -39,8 +40,10 @@ export default function ImageToCAD() {
   const showCadUpload = isCadUploadEnabled(user?.email);
 
   const [model] = useState("gemini");
+  const activeTier = RING_CAD_DEFAULT_TIER;
   const {
     referenceImages,
+    tier: activeTier,
     referenceImagePreviewUrls,
     addReferenceImages,
     removeReferenceImage,
@@ -218,6 +221,7 @@ export default function ImageToCAD() {
       <div className="min-h-[calc(100vh-5rem)] flex bg-background" tabIndex={0}>
         <ImagePromptScreen
           model={model}
+          tier={activeTier}
           prompt={prompt}
           setPrompt={setPrompt}
           isGenerating={workflow.isGenerating}

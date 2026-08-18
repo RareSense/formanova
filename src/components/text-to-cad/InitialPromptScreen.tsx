@@ -16,6 +16,7 @@ const EXAMPLE_PROMPTS = [
 
 interface InitialPromptScreenProps {
   model: string;
+  tier: string;
   setModel: (m: string) => void;
   prompt: string;
   setPrompt: (p: string) => void;
@@ -26,12 +27,16 @@ interface InitialPromptScreenProps {
 }
 
 export default function InitialPromptScreen({
-  model, setModel, prompt, setPrompt,
+  model, tier, setModel, prompt, setPrompt,
   isGenerating, onGenerate, onGlbUpload, creditBlock,
 }: InitialPromptScreenProps) {
   const glbInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const { cost: estimatedCost, loading: costLoading } = useEstimatedCost({ workflowName: RING_CAD_NURBS_WORKFLOW, model });
+  const { cost: estimatedCost, loading: costLoading } = useEstimatedCost({
+    workflowName: RING_CAD_NURBS_WORKFLOW,
+    model,
+    pricingContext: { llm_tier: tier },
+  });
   const [hasPromptHistory, setHasPromptHistory] = useState(false);
 
   const canGenerate = !!prompt.trim();
@@ -119,7 +124,6 @@ export default function InitialPromptScreen({
                     <>
                       Generate 3D Ring
                       <span className="inline-flex items-center gap-1 ml-1 opacity-80">
-                        <span className="text-[13px] font-mono font-semibold">≤</span>
                         <img src={creditCoinIcon} alt="" className="w-5 h-5" />
                         <span className="text-[13px] font-mono font-semibold">{costLoading ? '…' : (estimatedCost !== null ? estimatedCost : '—')}</span>
                       </span>
