@@ -61,21 +61,21 @@ describe('CadHistoryLibrary', () => {
     expect(onSelectPrompt).toHaveBeenCalledWith('Twisted vine ring');
   });
 
-  it('selecting an image card calls onSelectImage with its url, and hides the search box for images', () => {
-    const onSelectImage = vi.fn();
+  it('selecting a single-image card calls onSelectImages with its url, and hides the search box for images', () => {
+    const onSelectImages = vi.fn();
     mockUseCadHistoryLibrary.mockReturnValue(baseState({
       isSearchable: false,
       items: [{ workflowId: 'wf-2', createdAt: '2026-08-15T00:00:00Z', prompt: null, referenceImageUrls: ['/api/artifacts/abc'] }],
     }));
-    render(<CadHistoryLibrary variant="images" onSelectImage={onSelectImage} />);
+    render(<CadHistoryLibrary variant="images" onSelectImages={onSelectImages} />);
 
     expect(screen.queryByPlaceholderText('Search prompts...')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Reuse this reference image' }));
-    expect(onSelectImage).toHaveBeenCalledWith('/api/artifacts/abc');
+    expect(onSelectImages).toHaveBeenCalledWith(['/api/artifacts/abc']);
   });
 
-  it('shows every image from a multi-image upload, not just the primary angle', () => {
-    const onSelectImage = vi.fn();
+  it('shows every image from a multi-image upload as its own tile, not just the primary angle', () => {
+    const onSelectImages = vi.fn();
     mockUseCadHistoryLibrary.mockReturnValue(baseState({
       isSearchable: false,
       items: [
@@ -83,13 +83,23 @@ describe('CadHistoryLibrary', () => {
         { workflowId: 'wf-single', createdAt: '2026-08-14T00:00:00Z', prompt: null, referenceImageUrls: ['/api/artifacts/single'] },
       ],
     }));
-    render(<CadHistoryLibrary variant="images" onSelectImage={onSelectImage} />);
+    render(<CadHistoryLibrary variant="images" onSelectImages={onSelectImages} />);
 
-    const buttons = screen.getAllByRole('button', { name: 'Reuse this reference image' });
-    expect(buttons).toHaveLength(4);
+    const tiles = screen.getAllByRole('button', { name: 'Reuse this reference image' });
+    expect(tiles).toHaveLength(4);
 
-    fireEvent.click(buttons[1]);
-    expect(onSelectImage).toHaveBeenCalledWith('/api/artifacts/angle-2');
+    fireEvent.click(tiles[1]);
+    expect(onSelectImages).toHaveBeenCalledWith(['/api/artifacts/angle-2']);
+  });
+
+  it('strips raw markdown emphasis from prompt text before rendering', () => {
+    mockUseCadHistoryLibrary.mockReturnValue(baseState({
+      items: [{ workflowId: 'wf-md', createdAt: '2026-08-17T15:27:00Z', prompt: 'Create a **spider-shaped statement ring** with the spider centered symmetrically', referenceImageUrls: [] }],
+    }));
+    render(<CadHistoryLibrary variant="prompts" />);
+
+    expect(screen.getByText('Create a spider-shaped statement ring with the spider centered symmetrically')).toBeTruthy();
+    expect(screen.queryByText(/\*\*/)).toBeNull();
   });
 
   it('shows an error message instead of the grid when the fetch failed', () => {

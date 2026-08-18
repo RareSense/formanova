@@ -1,8 +1,7 @@
 import { useRef, useCallback, useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Diamond, X, Maximize2, ImageIcon } from "lucide-react";
+import { Diamond, X, ImageIcon } from "lucide-react";
 import { MAX_RING_CAD_REFERENCE_IMAGES } from "@/lib/ring-cad-nurbs-api";
 
 interface ReferenceImageUploaderProps {
@@ -33,9 +32,6 @@ export default function ReferenceImageUploader({
   const extraInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const lightboxCloseButtonRef = useRef<HTMLButtonElement>(null);
-  const lightboxTriggerRef = useRef<HTMLElement | null>(null);
 
   const primaryPreviewUrl = referenceImagePreviewUrls[0] ?? null;
   const imageCount = referenceImagePreviewUrls.length;
@@ -89,57 +85,8 @@ export default function ReferenceImageUploader({
     return () => window.removeEventListener("paste", onPaste);
   }, [acceptFiles]);
 
-  // Escape closes the lightbox (WCAG 2.2 - dismissible overlay)
-  useEffect(() => {
-    if (lightboxIndex === null) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setLightboxIndex(null); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [lightboxIndex]);
-
-  // Move focus into the dialog on open, and back to the "Expand" button that
-  // triggered it on close, so keyboard/screen-reader users aren't dropped.
-  useEffect(() => {
-    if (lightboxIndex !== null) lightboxCloseButtonRef.current?.focus();
-    else lightboxTriggerRef.current?.focus();
-  }, [lightboxIndex]);
-
   return (
     <div>
-      {/* Lightbox */}
-      <AnimatePresence>
-        {lightboxIndex !== null && referenceImagePreviewUrls[lightboxIndex] && (
-          <motion.div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Reference image preview"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
-            onClick={() => setLightboxIndex(null)}
-          >
-            <motion.img
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.9 }}
-              src={referenceImagePreviewUrls[lightboxIndex]}
-              alt={`Reference image ${lightboxIndex + 1} of ${imageCount}, full view`}
-              className="max-w-full max-h-full object-contain"
-              onClick={(e) => e.stopPropagation()}
-            />
-            <button
-              ref={lightboxCloseButtonRef}
-              onClick={() => setLightboxIndex(null)}
-              aria-label="Close full view"
-              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
-            >
-              <X className="w-4 h-4 text-foreground/70" />
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       <input ref={imageInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageInputChange} />
       <input ref={extraInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageInputChange} />
 
@@ -154,12 +101,12 @@ export default function ReferenceImageUploader({
         </div>
       )}
 
-      {/* Same fixed-height single-row canvas as Photo Studio's High Effort
-          upload (HighEffortUploadCanvas): one full-width drop zone when
-          empty (reads as the plain low-effort canvas), all slots equal size
-          in a single row once any image exists — cover and every angle get
-          identical treatment, none reads as more or less important. */}
-      <div className="mb-3 h-[260px] overflow-hidden border border-border/30 sm:h-[300px]">
+      {/* Compact single-row canvas: much shorter than a tall multi-row grid so
+          5 equal slots read as square-ish tiles, not tall thin cards. Empty
+          state is one full-width drop zone; all 5 slots appear equal size in
+          a single row once any image exists — no primary/secondary
+          distinction, no enlarge icon, just the image and a remove control. */}
+      <div className="h-[150px] overflow-hidden border border-border/30 sm:h-[170px]">
         <div
           className="grid h-full min-h-0 gap-2 p-2"
           style={{ gridTemplateColumns: `repeat(${primaryPreviewUrl ? MAX_RING_CAD_REFERENCE_IMAGES : 1}, minmax(0, 1fr))` }}
@@ -177,23 +124,19 @@ export default function ReferenceImageUploader({
                   : "border-foreground/40 hover:border-foreground/60 hover:bg-foreground/5 bg-muted/10"
               }`}
             >
-              <div className="flex flex-col items-center text-center px-6">
-                <div className="relative mx-auto w-16 h-16 mb-4">
+              <div className="flex flex-col items-center gap-1.5 text-center px-4">
+                <div className="relative mx-auto h-9 w-9">
                   <div className="absolute inset-0 rounded-full bg-primary/10 animate-ping motion-reduce:animate-none" style={{ animationDuration: '2.5s' }} />
                   <div className="absolute inset-0 rounded-full bg-primary/5 border-2 border-primary/20 flex items-center justify-center">
-                    <Diamond className="h-7 w-7 text-primary" />
+                    <Diamond className="h-4 w-4 text-primary" />
                   </div>
                 </div>
-                <p className="font-display text-lg tracking-[0.1em] text-foreground uppercase mb-1.5">
+                <p className="font-display text-sm tracking-[0.08em] text-foreground uppercase">
                   {primaryLabel}
                 </p>
-                <p className="text-sm text-muted-foreground mb-5">
+                <p className="text-xs text-muted-foreground">
                   {primaryHint}
                 </p>
-                <Button variant="outline" size="lg" className="gap-2 pointer-events-none">
-                  <ImageIcon className="h-4 w-4" />
-                  Browse ring files
-                </Button>
               </div>
             </div>
           ) : (
@@ -210,13 +153,6 @@ export default function ReferenceImageUploader({
                       aria-label={index === 0 ? "Remove primary image" : `Remove reference angle ${index}`}
                     >
                       <X className="w-3 h-3 text-foreground/70" />
-                    </button>
-                    <button
-                      onClick={(e) => { lightboxTriggerRef.current = e.currentTarget; setLightboxIndex(index); }}
-                      className="absolute bottom-1 right-1 w-6 h-6 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
-                      aria-label={index === 0 ? "Expand primary image" : `Expand reference angle ${index}`}
-                    >
-                      <Maximize2 className="w-3 h-3 text-foreground/70" />
                     </button>
                   </div>
                 );
@@ -252,7 +188,7 @@ export default function ReferenceImageUploader({
       </div>
 
       {primaryPreviewUrl && (
-        <p className="mt-2 mb-3 text-[11px] text-muted-foreground/70 leading-relaxed">
+        <p className="mt-2 text-[11px] text-muted-foreground/70 leading-relaxed">
           Optional. More angles of the same ring give the model a better read on depth and profile.
         </p>
       )}

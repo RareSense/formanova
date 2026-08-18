@@ -22,29 +22,47 @@ function formatLocalTimestamp(ts: string): string {
   return Number.isNaN(date.getTime()) ? "" : localDateFmt.format(date);
 }
 
+/** Prompts come back from the backend with raw markdown emphasis (e.g.
+ * `**spider-shaped**`) meant for a chat surface, not this card — strip it so
+ * the literal asterisks don't render. */
+function stripMarkdownEmphasis(text: string): string {
+  return text.replace(/\*\*(.*?)\*\*/g, "$1").replace(/(?<!\*)\*(?!\*)(.*?)\*(?!\*)/g, "$1");
+}
+
 interface CadHistoryLibraryProps {
   variant: "prompts" | "images";
   onSelectPrompt?: (prompt: string) => void;
-  onSelectImage?: (url: string) => void;
+  /** Fires with the one reference image URL that was clicked. */
+  onSelectImages?: (urls: string[]) => void;
   /** Fires once loading settles, so the caller can swap "Try an example" for
    * this panel without fetching the history twice. */
   onHasHistoryChange?: (hasHistory: boolean) => void;
+  /** Fixed height for the images-variant panel so it frames identically to
+   * the paired upload canvas on Image-to-CAD (shared height constant owned
+   * by the caller, e.g. ImagePromptScreen.tsx's PANEL_H). Ignored for prompts. */
+  panelH?: string;
 }
 
-function ImageThumb({ url, onSelect }: { url: string; onSelect: () => void }) {
+/**
+ * True masonry, one tile per image — mirrors Photo Studio's "My Models"
+ * panel (StudioModelStep.tsx / ModelCard.tsx), not the grouped product
+ * card: every past reference image is its own equally-weighted tile,
+ * natural aspect ratio preserved, no cover/badge/angle-strip grouping.
+ */
+function RingTile({ url, onSelect }: { url: string; onSelect: () => void }) {
   const resolved = useAuthenticatedImage(url);
   return (
     <button
       type="button"
       onClick={onSelect}
-      className="group relative aspect-square border border-border bg-muted/10 overflow-hidden hover:border-foreground/40 transition-colors"
       aria-label="Reuse this reference image"
+      className="mb-2 block w-full break-inside-avoid overflow-hidden transition-opacity hover:opacity-80"
     >
       {resolved ? (
-        <img src={resolved} alt="" className="h-full w-full object-contain p-1 transition-transform duration-200 group-hover:scale-105" />
+        <img src={resolved} alt="" loading="lazy" className="block w-full" />
       ) : (
-        <div className="flex h-full w-full items-center justify-center">
-          <Diamond className="h-5 w-5 text-muted-foreground/30" />
+        <div className="flex aspect-square w-full items-center justify-center bg-muted/20">
+          <Diamond className="h-4 w-4 text-muted-foreground/30" />
         </div>
       )}
     </button>
@@ -56,10 +74,10 @@ function PromptCard({ entry, onSelect }: { entry: CadLibraryEntry; onSelect: () 
     <button
       type="button"
       onClick={onSelect}
-      className="flex w-full flex-col items-start gap-1 border-b border-border/20 px-3 py-3 text-left transition-colors hover:bg-[hsl(var(--formanova-hero-accent))]/5"
+      className="flex w-full flex-col items-start gap-1.5 border border-border/20 bg-background px-3.5 py-3 text-left transition-colors hover:border-[hsl(var(--formanova-hero-accent))]/50 hover:bg-[hsl(var(--formanova-hero-accent))]/5"
     >
-      <p className="line-clamp-2 font-body text-[13px] italic leading-snug text-foreground">
-        {entry.prompt}
+      <p className="line-clamp-2 font-body text-[13px] italic leading-relaxed text-foreground">
+        {entry.prompt ? stripMarkdownEmphasis(entry.prompt) : ""}
       </p>
       <p className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground/60">
         {formatLocalTimestamp(entry.createdAt)}
@@ -84,7 +102,7 @@ function EmptyGuide({ variant }: { variant: "prompts" | "images" }) {
   );
 }
 
-export default function CadHistoryLibrary({ variant, onSelectPrompt, onSelectImage, onHasHistoryChange }: CadHistoryLibraryProps) {
+export default function CadHistoryLibrary({ variant, onSelectPrompt, onSelectImages, onHasHistoryChange, panelH }: CadHistoryLibraryProps) {
   const sourceType = variant === "prompts" ? "text_to_cad" : "image_to_cad";
   const { isLoading, error, hasHistory, isSearchable, items, search, setSearch, page, setPage, totalPages } =
     useCadHistoryLibrary(sourceType);
@@ -107,7 +125,7 @@ export default function CadHistoryLibrary({ variant, onSelectPrompt, onSelectIma
         <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col border border-border/30">
+      <div className={`flex min-h-0 flex-1 flex-col border border-border/30 ${variant === "images" ? (panelH ?? "") : ""}`}>
         {isSearchable && (
           <div className="flex-shrink-0 border-b border-border/20 px-2 py-1.5">
             <div className="relative">
@@ -128,7 +146,7 @@ export default function CadHistoryLibrary({ variant, onSelectPrompt, onSelectIma
         {!error && items.length === 0 && <EmptyGuide variant={variant} />}
 
         {!error && items.length > 0 && variant === "prompts" && (
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 space-y-2 overflow-y-auto p-2">
             {items.map((entry) => (
               <PromptCard
                 key={entry.workflowId}
@@ -141,21 +159,49 @@ export default function CadHistoryLibrary({ variant, onSelectPrompt, onSelectIma
 
         {!error && items.length > 0 && variant === "images" && (
           <div className="flex-1 overflow-y-auto p-2">
-            {/* Every image from every past upload, not just the primary angle of
-                each generation — a multi-image upload (2-5 reference angles)
-                would otherwise hide all but the first from being reused. */}
-            <div className="grid grid-cols-3 gap-2">
+            {/* True masonry: every reference image is its own tile at its
+                natural aspect ratio, packed into 3 columns with small
+                consistent gaps — matches Photo Studio's My Models panel. */}
+            <div className="columns-3 gap-2">
               {items.flatMap((entry) =>
                 entry.referenceImageUrls.map((url, index) => (
-                  <ImageThumb key={`${entry.workflowId}-${index}`} url={url} onSelect={() => onSelectImage?.(url)} />
+                  <RingTile key={`${entry.workflowId}-${index}`} url={url} onSelect={() => onSelectImages?.([url])} />
                 )),
               )}
             </div>
           </div>
         )}
+
+        {/* Pagination lives inside the fixed-height box for the images
+            variant so its bottom edge lines up with the paired upload
+            canvas's bottom edge (both end at panelH). Prompts keeps its
+            existing below-the-box placement, unchanged. */}
+        {variant === "images" && totalPages > 1 && (
+          <div className="flex flex-shrink-0 items-center justify-center gap-1 border-t border-border/20 py-1.5">
+            <button
+              onClick={() => setPage(page - 1)}
+              disabled={page === 0}
+              className="flex h-7 w-7 items-center justify-center text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
+              aria-label="Previous page"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
+              {page + 1} / {totalPages}
+            </span>
+            <button
+              onClick={() => setPage(page + 1)}
+              disabled={page >= totalPages - 1}
+              className="flex h-7 w-7 items-center justify-center text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
+              aria-label="Next page"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        )}
       </div>
 
-      {totalPages > 1 && (
+      {variant === "prompts" && totalPages > 1 && (
         <div className="mt-2 flex items-center justify-center gap-1">
           <button
             onClick={() => setPage(page - 1)}

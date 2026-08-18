@@ -12,6 +12,12 @@ import cadExample2 from "@/assets/examples/cad-example-2.webp";
 import cadExample3 from "@/assets/examples/cad-example-3.webp";
 import cadExample4 from "@/assets/examples/cad-example-4.webp";
 
+// Shared fixed height for the upload workspace box and the "My Rings" panel,
+// so the two columns frame identically — same top edge (both start right
+// below their own header) and same bottom edge, matching Photo Studio's
+// CANVAS_H technique (StudioVaultUploadStep.tsx).
+const PANEL_H = "h-[460px] sm:h-[520px]";
+
 const EXAMPLE_DESIGNS = [
   {
     image: cadExample1,
@@ -78,16 +84,20 @@ export default function ImagePromptScreen({
     }
   }, [setPrompt, onReplaceReferenceImages]);
 
-  // "My Rings" reuse — url is a same-origin, auth-gated /api/artifacts proxy
-  // URL (see useCadHistoryLibrary), so this must go through authenticatedFetch,
-  // unlike the bundled example assets above.
-  const handleLibraryImageSelect = useCallback(async (url: string) => {
+  // "My Rings" reuse — urls are same-origin, auth-gated /api/artifacts proxy
+  // URLs (see useCadHistoryLibrary), so these must go through authenticatedFetch,
+  // unlike the bundled example assets above. A multi-angle entry reuses as a
+  // whole set in one call, so all its images land together (respecting the
+  // existing 5-image cap in useReferenceImages).
+  const handleLibraryImageSelect = useCallback(async (urls: string[]) => {
     try {
-      const res = await authenticatedFetch(url);
-      if (!res.ok) throw new Error(`${res.status}`);
-      const blob = await res.blob();
-      const file = new File([blob], "reused-reference.webp", { type: blob.type || "image/webp" });
-      onAddReferenceImages([file]);
+      const files = await Promise.all(urls.map(async (url, index) => {
+        const res = await authenticatedFetch(url);
+        if (!res.ok) throw new Error(`${res.status}`);
+        const blob = await res.blob();
+        return new File([blob], `reused-reference-${index}.webp`, { type: blob.type || "image/webp" });
+      }));
+      onAddReferenceImages(files);
     } catch {
       // reuse failed -- silently no-op, same as the example-click failure path
     }
@@ -117,67 +127,81 @@ export default function ImagePromptScreen({
         transition={{ duration: 0.5, ease: "easeOut" }}
         className={hasImageHistory ? "w-full max-w-[1000px] px-4 sm:px-6 py-6" : "w-full max-w-[680px] px-4 sm:px-6 py-6"}
       >
+        {/* Title — full width, above both columns, so neither column's own
+            header has to compensate for it when framing to PANEL_H below. */}
+        <div className="text-center mb-6">
+          <h1 className="font-display text-4xl md:text-5xl tracking-[0.2em] text-foreground uppercase mb-2">
+            Generate 3D Ring
+          </h1>
+          <p className="font-mono text-[11px] text-muted-foreground tracking-[0.15em] uppercase">
+            Upload a photo or sketch of your design
+          </p>
+        </div>
+
         <div className={hasImageHistory ? "grid gap-8 lg:grid-cols-3" : ""}>
           <div className={hasImageHistory ? "lg:col-span-2" : ""}>
-            {/* Title */}
-            <div className="text-center mb-6">
-              <h1 className="font-display text-4xl md:text-5xl tracking-[0.2em] text-foreground uppercase mb-2">
-                Generate 3D Ring
-              </h1>
-              <p className="font-mono text-[11px] text-muted-foreground tracking-[0.15em] uppercase">
-                Upload a photo or sketch of your design
-              </p>
-            </div>
-
-            <ReferenceImageUploader
-              referenceImagePreviewUrls={referenceImagePreviewUrls}
-              onAddReferenceImages={onAddReferenceImages}
-              onRemoveReferenceImage={onRemoveReferenceImage}
-            />
-
-            {/* Text prompt — secondary */}
-            <div className={`relative mb-3 transition-opacity duration-200 ${primaryPreviewUrl ? "opacity-100" : "opacity-40"}`}>
-              <textarea
-                ref={textareaRef}
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Add optional description"
-                rows={2}
-                className={`w-full min-h-[52px] max-h-[200px] px-5 py-2.5 pb-7 text-[14px] text-foreground placeholder:text-muted-foreground/50 resize-none font-body leading-relaxed transition-all duration-200 focus:outline-none bg-muted/20 border overflow-y-auto ${primaryPreviewUrl ? "border-border focus:ring-1 focus:ring-border" : "border-border/30 pointer-events-none"}`}
-              />
-              {prompt.length > 0 && (
-                <button
-                  onClick={() => { setPrompt(""); textareaRef.current?.focus(); }}
-                  className="absolute bottom-2.5 right-8 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground/60 hover:text-foreground transition-colors duration-150 cursor-pointer z-10"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-
-            {/* Credit block */}
-            {creditBlock && <div className="mb-3">{creditBlock}</div>}
-
-            {/* Generate button */}
-            {!creditBlock && (
-              <button
-                onClick={onGenerate}
-                disabled={isGenerating || !canGenerate}
-                className="w-full py-4 text-[13px] font-bold uppercase tracking-[0.2em] cursor-pointer transition-all duration-200 bg-primary text-primary-foreground disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90 active:scale-[0.99] flex items-center justify-center gap-2"
-              >
-                {isGenerating ? "Generating…" : (
-                  <>
-                    Generate 3D Ring
-                    <span className="inline-flex items-center gap-1 ml-1 opacity-80">
-                      <span className="text-[13px] font-mono font-semibold">≤</span>
-                      <img src={creditCoinIcon} alt="" className="w-5 h-5" />
-                      <span className="text-[13px] font-mono font-semibold">{costLoading ? '…' : (estimatedCost !== null ? estimatedCost : '—')}</span>
-                    </span>
-                  </>
-                )}
-              </button>
+            {/* Left header — same classes as CadHistoryLibrary's own title
+                block, so both panels' boxes start at the same Y. */}
+            {hasImageHistory && (
+              <div className="mb-2">
+                <h3 className="font-display text-2xl uppercase tracking-tight text-foreground">Reference Images</h3>
+                <p className="mt-0.5 text-sm text-muted-foreground">Up to 5 photos of the same ring</p>
+              </div>
             )}
+
+            <div className={`flex flex-col gap-3 border border-border/30 p-3 ${hasImageHistory ? PANEL_H : ""}`}>
+              <ReferenceImageUploader
+                referenceImagePreviewUrls={referenceImagePreviewUrls}
+                onAddReferenceImages={onAddReferenceImages}
+                onRemoveReferenceImage={onRemoveReferenceImage}
+              />
+
+              {/* Text prompt — secondary */}
+              <div className={`relative transition-opacity duration-200 ${primaryPreviewUrl ? "opacity-100" : "opacity-40"}`}>
+                <textarea
+                  ref={textareaRef}
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Add optional description"
+                  rows={2}
+                  className={`w-full min-h-[52px] max-h-[200px] px-5 py-2.5 pb-7 text-[14px] text-foreground placeholder:text-muted-foreground/50 resize-none font-body leading-relaxed transition-all duration-200 focus:outline-none bg-muted/20 border overflow-y-auto ${primaryPreviewUrl ? "border-border focus:ring-1 focus:ring-border" : "border-border/30 pointer-events-none"}`}
+                />
+                {prompt.length > 0 && (
+                  <button
+                    onClick={() => { setPrompt(""); textareaRef.current?.focus(); }}
+                    className="absolute bottom-2.5 right-8 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground/60 hover:text-foreground transition-colors duration-150 cursor-pointer z-10"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+
+              {/* Credit block / Generate button — pinned to the bottom of the
+                  box via mt-auto, so it bottom-aligns with My Rings' own
+                  pagination row regardless of how much room the textarea took. */}
+              <div className="mt-auto">
+                {creditBlock && <div className="mb-3">{creditBlock}</div>}
+                {!creditBlock && (
+                  <button
+                    onClick={onGenerate}
+                    disabled={isGenerating || !canGenerate}
+                    className="w-full py-4 text-[13px] font-bold uppercase tracking-[0.2em] cursor-pointer transition-all duration-200 bg-primary text-primary-foreground disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90 active:scale-[0.99] flex items-center justify-center gap-2"
+                  >
+                    {isGenerating ? "Generating…" : (
+                      <>
+                        Generate 3D Ring
+                        <span className="inline-flex items-center gap-1 ml-1 opacity-80">
+                          <span className="text-[13px] font-mono font-semibold">≤</span>
+                          <img src={creditCoinIcon} alt="" className="w-5 h-5" />
+                          <span className="text-[13px] font-mono font-semibold">{costLoading ? '…' : (estimatedCost !== null ? estimatedCost : '—')}</span>
+                        </span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
 
             {/* Example designs — replaced by "My Rings" once the user has history */}
             {!hasImageHistory && (
@@ -225,7 +249,7 @@ export default function ImagePromptScreen({
           {/* "My Rings" — mounted unconditionally so its own history check can
               flip hasImageHistory; visually contributes nothing until it does. */}
           <div className={hasImageHistory ? "" : "hidden"}>
-            <CadHistoryLibrary variant="images" onSelectImage={handleLibraryImageSelect} onHasHistoryChange={setHasImageHistory} />
+            <CadHistoryLibrary variant="images" panelH={PANEL_H} onSelectImages={handleLibraryImageSelect} onHasHistoryChange={setHasImageHistory} />
           </div>
         </div>
       </motion.div>
