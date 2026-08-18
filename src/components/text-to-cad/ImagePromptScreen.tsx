@@ -127,16 +127,19 @@ export default function ImagePromptScreen({
         transition={{ duration: 0.5, ease: "easeOut" }}
         className={hasImageHistory ? "w-full max-w-[1000px] px-4 sm:px-6 py-6" : "w-full max-w-[680px] px-4 sm:px-6 py-6"}
       >
-        {/* Title — full width, above both columns, so neither column's own
-            header has to compensate for it when framing to PANEL_H below. */}
-        <div className="text-center mb-6">
-          <h1 className="font-display text-4xl md:text-5xl tracking-[0.2em] text-foreground uppercase mb-2">
-            Generate 3D Ring
-          </h1>
-          <p className="font-mono text-[11px] text-muted-foreground tracking-[0.15em] uppercase">
-            Upload a photo or sketch of your design
-          </p>
-        </div>
+        {/* Keep the page identifier for the empty first-use state. Once the
+            paired panels are visible, their own headers provide the hierarchy
+            and match Photo Studio's two-column layout. */}
+        {!hasImageHistory && (
+          <div className="mb-6 text-center">
+            <h1 className="mb-2 font-display text-4xl uppercase tracking-[0.2em] text-foreground md:text-5xl">
+              Generate 3D Ring
+            </h1>
+            <p className="font-mono text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
+              Upload a photo or sketch of your design
+            </p>
+          </div>
+        )}
 
         <div className={hasImageHistory ? "grid gap-8 lg:grid-cols-3" : ""}>
           <div className={hasImageHistory ? "lg:col-span-2" : ""}>

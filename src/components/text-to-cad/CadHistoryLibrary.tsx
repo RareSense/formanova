@@ -49,23 +49,28 @@ interface CadHistoryLibraryProps {
  * card: every past reference image is its own equally-weighted tile,
  * natural aspect ratio preserved, no cover/badge/angle-strip grouping.
  */
-function RingTile({ url, onSelect }: { url: string; onSelect: () => void }) {
+function RingTile({ url, createdAt, onSelect }: { url: string; createdAt: string; onSelect: () => void }) {
   const resolved = useAuthenticatedImage(url);
   return (
-    <button
-      type="button"
-      onClick={onSelect}
-      aria-label="Reuse this reference image"
-      className="mb-2 block w-full break-inside-avoid overflow-hidden transition-opacity hover:opacity-80"
-    >
-      {resolved ? (
-        <img src={resolved} alt="" loading="lazy" className="block w-full" />
-      ) : (
-        <div className="flex aspect-square w-full items-center justify-center bg-muted/20">
-          <Diamond className="h-4 w-4 text-muted-foreground/30" />
-        </div>
-      )}
-    </button>
+    <div className="mb-2 break-inside-avoid">
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-label="Reuse this reference image"
+        className="block w-full overflow-hidden transition-opacity hover:opacity-80"
+      >
+        {resolved ? (
+          <img src={resolved} alt="" loading="lazy" className="block w-full" />
+        ) : (
+          <div className="flex aspect-square w-full items-center justify-center bg-muted/20">
+            <Diamond className="h-4 w-4 text-muted-foreground/30" />
+          </div>
+        )}
+      </button>
+      <p className="mt-1 px-0.5 font-mono text-[9px] uppercase tracking-wider text-muted-foreground/60">
+        {formatLocalTimestamp(createdAt)}
+      </p>
+    </div>
   );
 }
 
@@ -132,9 +137,11 @@ export default function CadHistoryLibrary({ variant, onSelectPrompt, onSelectIma
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground/50" />
               <input
                 type="text"
-                placeholder="Search prompts..."
+                placeholder={variant === "images" ? "Search coming soon" : "Search prompts..."}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                disabled={variant === "images"}
+                aria-label={variant === "images" ? "Search rings coming soon" : "Search prompts"}
                 className="w-full border border-border/20 bg-muted/20 py-1.5 pl-7 pr-3 font-mono text-[10px] text-foreground placeholder:text-muted-foreground/40 outline-none transition-colors focus:border-border/60"
               />
             </div>
@@ -164,8 +171,8 @@ export default function CadHistoryLibrary({ variant, onSelectPrompt, onSelectIma
                 consistent gaps — matches Photo Studio's My Models panel. */}
             <div className="columns-3 gap-2">
               {items.flatMap((entry) =>
-                entry.referenceImageUrls.map((url, index) => (
-                  <RingTile key={`${entry.workflowId}-${index}`} url={url} onSelect={() => onSelectImages?.([url])} />
+                  entry.referenceImageUrls.map((url, index) => (
+                  <RingTile key={`${entry.workflowId}-${index}`} url={url} createdAt={entry.createdAt} onSelect={() => onSelectImages?.([url])} />
                 )),
               )}
             </div>

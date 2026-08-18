@@ -61,15 +61,14 @@ describe('CadHistoryLibrary', () => {
     expect(onSelectPrompt).toHaveBeenCalledWith('Twisted vine ring');
   });
 
-  it('selecting a single-image card calls onSelectImages with its url, and hides the search box for images', () => {
+  it('selecting a single-image card calls onSelectImages and shows the honest disabled search affordance', () => {
     const onSelectImages = vi.fn();
     mockUseCadHistoryLibrary.mockReturnValue(baseState({
-      isSearchable: false,
       items: [{ workflowId: 'wf-2', createdAt: '2026-08-15T00:00:00Z', prompt: null, referenceImageUrls: ['/api/artifacts/abc'] }],
     }));
     render(<CadHistoryLibrary variant="images" onSelectImages={onSelectImages} />);
 
-    expect(screen.queryByPlaceholderText('Search prompts...')).toBeNull();
+    expect(screen.getByPlaceholderText('Search coming soon')).toHaveProperty('disabled', true);
     fireEvent.click(screen.getByRole('button', { name: 'Reuse this reference image' }));
     expect(onSelectImages).toHaveBeenCalledWith(['/api/artifacts/abc']);
   });
@@ -77,7 +76,6 @@ describe('CadHistoryLibrary', () => {
   it('shows every image from a multi-image upload as its own tile, not just the primary angle', () => {
     const onSelectImages = vi.fn();
     mockUseCadHistoryLibrary.mockReturnValue(baseState({
-      isSearchable: false,
       items: [
         { workflowId: 'wf-multi', createdAt: '2026-08-15T00:00:00Z', prompt: null, referenceImageUrls: ['/api/artifacts/angle-1', '/api/artifacts/angle-2', '/api/artifacts/angle-3'] },
         { workflowId: 'wf-single', createdAt: '2026-08-14T00:00:00Z', prompt: null, referenceImageUrls: ['/api/artifacts/single'] },
