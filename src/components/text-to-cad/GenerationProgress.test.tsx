@@ -98,4 +98,44 @@ describe('GenerationProgress', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Try Again' }));
     expect(onRetry).toHaveBeenCalledOnce();
   });
+
+  it('requests WhatsApp/iMessage delivery through the alt-channel form', async () => {
+    const onRequestAltDelivery = vi.fn().mockResolvedValue(true);
+    render(
+      <GenerationProgress
+        visible
+        currentStep="building"
+        onRequestAltDelivery={onRequestAltDelivery}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Prefer WhatsApp or iMessage instead?' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'iMessage' }));
+    fireEvent.change(screen.getByLabelText('Phone number'), { target: { value: 'nope' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send request' }));
+    expect(screen.getByRole('alert').textContent).toContain('Enter a valid phone number.');
+    expect(onRequestAltDelivery).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText('Phone number'), { target: { value: '+1 555 123 4567' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send request' }));
+    await waitFor(() => expect(onRequestAltDelivery).toHaveBeenCalledWith('imessage', '+1 555 123 4567'));
+    await waitFor(() => expect(screen.queryByLabelText('Phone number')).toBeNull());
+  });
+
+  it('shows the confirmed alt-delivery channel and lets the user change it', () => {
+    render(
+      <GenerationProgress
+        visible
+        currentStep="building"
+        onRequestAltDelivery={vi.fn()}
+        altDeliveryPreference={{ channel: 'whatsapp', contact: '+1 555 123 4567' }}
+        altDeliveryRequested
+      />,
+    );
+
+    expect(screen.getByText(/reach out on/i).textContent).toContain('WhatsApp');
+    expect(screen.getByText(/reach out on/i).textContent).toContain('+1 555 123 4567');
+    fireEvent.click(screen.getByRole('button', { name: 'Change' }));
+    expect(screen.getByLabelText('Phone number')).toBeTruthy();
+  });
 });

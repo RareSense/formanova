@@ -55,7 +55,7 @@ export function WorkflowSection({
   if (!loading && workflows.length === 0) return null;
 
   return (
-    <section className="mb-14">
+    <section className="mb-14" aria-busy={loading}>
       {/* Section Header */}
       <div className="flex items-center gap-3 mb-6">
         <div className="w-8 h-8 flex items-center justify-center bg-primary/10 text-primary border border-border">

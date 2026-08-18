@@ -40,8 +40,11 @@ export async function isExpectedCadArtifact(blob: Blob, kind: CadArtifactKind): 
 
   if (blob.size < 32 || header.length < 32) return false;
   const text = new TextDecoder('ascii').decode(header);
+  // Bytes 24-31 are an 8-char right-justified, space-padded version number
+  // (openNURBS GetFirst32BytesOf3dmFile). Older Rhino files write 1-digit
+  // versions (e.g. "4"); don't require exactly 2.
   const version = text.slice(23).trim();
-  return text.startsWith('3D Geometry File Format') && /^\d{2}$/.test(version);
+  return text.startsWith('3D Geometry File Format') && /^\d{1,8}$/.test(version);
 }
 
 export async function downloadCadArtifact(

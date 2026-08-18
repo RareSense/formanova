@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WorkflowSummary } from '@/lib/generation-history-api';
@@ -127,6 +127,42 @@ describe('CAD generation history card', () => {
       'Customer Ring.3dm',
       '3dm',
     ));
+  });
+
+  it('falls back to the cached 3DM URL when the fresh result fetch times out', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(fetchCadResult).mockReturnValue(new Promise(() => {})); // never resolves
+      render(
+        <MemoryRouter>
+          <WorkflowCard workflow={cadWorkflow} index={1} onClick={() => {}} />
+        </MemoryRouter>,
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Download 3DM' }));
+      await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+
+      expect(downloadCadArtifact).toHaveBeenCalledWith('/api/artifacts/3dm', 'ring.3dm', '3dm');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('retries with the cached 3DM URL when the fresh URL download fails', async () => {
+    vi.mocked(downloadCadArtifact).mockImplementation(async (url) => {
+      if (url === '/fresh/manufacturing-3dm') throw new Error('bad file');
+    });
+
+    render(
+      <MemoryRouter>
+        <WorkflowCard workflow={cadWorkflow} index={1} onClick={() => {}} />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Download 3DM' }));
+
+    await waitFor(() => expect(downloadCadArtifact).toHaveBeenCalledWith('/api/artifacts/3dm', 'ring.3dm', '3dm'));
+    expect(downloadCadArtifact).toHaveBeenNthCalledWith(1, '/fresh/manufacturing-3dm', 'ring.3dm', '3dm');
   });
 
   it('shows credits used explicitly, including zero', () => {

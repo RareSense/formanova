@@ -34,6 +34,8 @@ export default function ReferenceImageUploader({
   const dropZoneRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const lightboxCloseButtonRef = useRef<HTMLButtonElement>(null);
+  const lightboxTriggerRef = useRef<HTMLElement | null>(null);
 
   const primaryPreviewUrl = referenceImagePreviewUrls[0] ?? null;
   const imageCount = referenceImagePreviewUrls.length;
@@ -95,12 +97,22 @@ export default function ReferenceImageUploader({
     return () => window.removeEventListener("keydown", onKey);
   }, [lightboxIndex]);
 
+  // Move focus into the dialog on open, and back to the "Expand" button that
+  // triggered it on close, so keyboard/screen-reader users aren't dropped.
+  useEffect(() => {
+    if (lightboxIndex !== null) lightboxCloseButtonRef.current?.focus();
+    else lightboxTriggerRef.current?.focus();
+  }, [lightboxIndex]);
+
   return (
     <div>
       {/* Lightbox */}
       <AnimatePresence>
         {lightboxIndex !== null && referenceImagePreviewUrls[lightboxIndex] && (
           <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Reference image preview"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -117,6 +129,7 @@ export default function ReferenceImageUploader({
               onClick={(e) => e.stopPropagation()}
             />
             <button
+              ref={lightboxCloseButtonRef}
               onClick={() => setLightboxIndex(null)}
               aria-label="Close full view"
               className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
@@ -130,44 +143,24 @@ export default function ReferenceImageUploader({
       <input ref={imageInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageInputChange} />
       <input ref={extraInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageInputChange} />
 
-      {/* Image drop zone — primary */}
-      <div
-        ref={dropZoneRef}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        onClick={() => !primaryPreviewUrl && imageInputRef.current?.click()}
-        className={`relative w-full border flex items-center justify-center transition-all duration-200 mb-3 ${
-          isDragging
-            ? "border-foreground/60 bg-foreground/5"
-            : "border-foreground/40 hover:border-foreground/60 hover:bg-foreground/5 bg-muted/10"
-        } ${!primaryPreviewUrl ? "cursor-pointer" : ""}`}
-        style={{ minHeight: 240 }}
-      >
-        {primaryPreviewUrl ? (
-          <>
-            <img
-              src={primaryPreviewUrl}
-              alt="Primary reference ring"
-              className="w-full object-contain p-3"
-              style={{ maxHeight: 320 }}
-            />
-            <button
-              onClick={(e) => { e.stopPropagation(); onRemoveReferenceImage(0); }}
-              className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
-              aria-label="Remove primary image"
-            >
-              <X className="w-3 h-3 text-foreground/70" />
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); setLightboxIndex(0); }}
-              className="absolute top-2 right-10 w-6 h-6 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
-              aria-label="Expand primary image"
-            >
-              <Maximize2 className="w-3 h-3 text-foreground/70" />
-            </button>
-          </>
-        ) : (
+      {/* Empty state — one full-width drop zone. Becomes the first cell of the
+          equal-size grid below the moment any image is added, so there is
+          never a moment where the primary image reads as "the big one" and
+          later angles read as an afterthought. */}
+      {!primaryPreviewUrl && (
+        <div
+          ref={dropZoneRef}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          onClick={() => imageInputRef.current?.click()}
+          className={`relative w-full border flex items-center justify-center transition-all duration-200 mb-3 cursor-pointer ${
+            isDragging
+              ? "border-foreground/60 bg-foreground/5"
+              : "border-foreground/40 hover:border-foreground/60 hover:bg-foreground/5 bg-muted/10"
+          }`}
+          style={{ minHeight: 240 }}
+        >
           <div className="flex flex-col items-center text-center px-6 py-10">
             <div className="relative mx-auto w-20 h-20 mb-6">
               <div className="absolute inset-0 rounded-full bg-primary/10 animate-ping motion-reduce:animate-none" style={{ animationDuration: '2.5s' }} />
@@ -186,41 +179,40 @@ export default function ReferenceImageUploader({
               Browse ring files
             </Button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Additional angles — revealed only once a primary image exists (progressive disclosure) */}
+      {/* Reference images — every slot (including the primary) is the same
+          size, so no angle reads as more or less important than another. */}
       {primaryPreviewUrl && (
         <div className="mb-3">
           <div className="flex items-baseline justify-between mb-2">
             <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-              Additional angles
+              Reference images
             </h3>
             <span className="font-mono text-[10px] tracking-[0.15em] text-muted-foreground/60 tabular-nums">
               {imageCount}/{MAX_RING_CAD_REFERENCE_IMAGES}
             </span>
           </div>
-          <div className="grid grid-cols-4 gap-2">
-            {Array.from({ length: MAX_RING_CAD_REFERENCE_IMAGES - 1 }, (_, slot) => {
-              // Slot n holds reference image n+1 (index 0 is the primary zone above).
-              const index = slot + 1;
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+            {Array.from({ length: MAX_RING_CAD_REFERENCE_IMAGES }, (_, index) => {
               const url = referenceImagePreviewUrls[index];
 
               if (url) {
                 return (
                   <div key={index} className="relative aspect-square border border-border bg-muted/10 overflow-hidden">
-                    <img src={url} alt={`Reference angle ${index}`} className="w-full h-full object-cover" />
+                    <img src={url} alt={index === 0 ? "Primary reference ring" : `Reference angle ${index}`} className="w-full h-full object-contain p-1" />
                     <button
                       onClick={() => onRemoveReferenceImage(index)}
                       className="absolute top-1 right-1 w-6 h-6 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
-                      aria-label={`Remove reference angle ${index}`}
+                      aria-label={index === 0 ? "Remove primary image" : `Remove reference angle ${index}`}
                     >
                       <X className="w-3 h-3 text-foreground/70" />
                     </button>
                     <button
-                      onClick={() => setLightboxIndex(index)}
+                      onClick={(e) => { lightboxTriggerRef.current = e.currentTarget; setLightboxIndex(index); }}
                       className="absolute bottom-1 right-1 w-6 h-6 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
-                      aria-label={`Expand reference angle ${index}`}
+                      aria-label={index === 0 ? "Expand primary image" : `Expand reference angle ${index}`}
                     >
                       <Maximize2 className="w-3 h-3 text-foreground/70" />
                     </button>
@@ -229,7 +221,7 @@ export default function ReferenceImageUploader({
               }
 
               // The first empty slot is the add target; later ones stay inert placeholders
-              // so the strip keeps a stable 4-up layout with no shift as images are added.
+              // so the grid keeps a stable layout with no shift as images are added.
               const isNextSlot = index === imageCount;
               return (
                 <button

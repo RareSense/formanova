@@ -26,114 +26,28 @@ import { RGBELoader } from 'three-stdlib';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Box } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
-import { azureUriToUrl } from '@/lib/azure-utils';
 import {
   applyHistoryPreviewMaterials,
   markEmbeddedGltfMaterials,
 } from './scissor-glb-materials';
 import { PendingCardRegistrationQueue } from './scissor-glb-registration';
+import { getThemeBgColor } from './scissor-glb-theme';
+import {
+  cacheScene,
+  disposeScene,
+  fetchGlbArrayBuffer,
+  getCachedScene,
+  glbErrors,
+  glbLoading,
+  glbUrlNeedsAuth,
+  resolveGlbUrl,
+} from './scissor-glb-cache';
+
+// Re-exported so existing imports (glb-url.test.ts, ScissorGLBGrid.test.ts)
+// keep working — the cache/fetch logic itself lives in scissor-glb-cache.ts.
+export { fetchGlbArrayBuffer, glbUrlNeedsAuth, resolveGlbUrl };
 
 const __DEV__ = import.meta.env.DEV;
-
-// ── LRU GLB Cache ────────────────────────────────────────────────────
-const MAX_CACHE = 20;
-
-interface CachedModel {
-  scene: THREE.Group;
-  lastUsed: number;
-}
-
-const glbCache = new Map<string, CachedModel>();
-const glbLoading = new Map<string, Promise<THREE.Group>>();
-const glbErrors = new Set<string>();
-
-function getCachedScene(url: string): THREE.Group | null {
-  const entry = glbCache.get(url);
-  if (entry) {
-    entry.lastUsed = Date.now();
-    return entry.scene.clone(true);
-  }
-  return null;
-}
-
-function cacheScene(url: string, scene: THREE.Group) {
-  if (glbCache.size >= MAX_CACHE) {
-    let oldestKey = '';
-    let oldestTime = Infinity;
-    for (const [key, val] of glbCache) {
-      if (val.lastUsed < oldestTime) {
-        oldestTime = val.lastUsed;
-        oldestKey = key;
-      }
-    }
-    if (oldestKey) {
-      const evicted = glbCache.get(oldestKey);
-      if (evicted) disposeScene(evicted.scene);
-      glbCache.delete(oldestKey);
-    }
-  }
-  glbCache.set(url, { scene: scene.clone(true), lastUsed: Date.now() });
-}
-
-// ── GLB fetch with retry ────────────────────────────────────────────
-// 5xx responses (e.g. a transient 503 from blob storage/CDN) are retried with
-// backoff; 4xx responses (404/403 - genuinely missing/forbidden) fail immediately.
-// Without this, one transient blip permanently marks the URL as errored via
-// glbErrors, since that cache has no expiry.
-const GLB_FETCH_MAX_ATTEMPTS = 3;
-const GLB_FETCH_RETRY_DELAY_MS = 400;
-
-/**
- * Resolves whatever reference a caller passed into something fetchable.
- *
- * Callers hand us the raw `artifact.uri` from the pipeline, which is normally
- * `azure://…`. That scheme cannot be fetched, so every such card failed to load.
- * Route it through azureUriToUrl (the repo's single source of truth), which maps
- * content-addressed artifacts onto the same-origin auth-gated /api/artifacts
- * proxy and leaves ordinary http(s) URLs alone.
- *
- * Returns '' when the reference cannot be resolved, so the caller shows the
- * error state instead of issuing a request that can never succeed.
- */
-export function resolveGlbUrl(rawUrl: string): string {
-  if (!rawUrl) return '';
-  const resolved = azureUriToUrl(rawUrl);
-  if (!resolved || resolved.startsWith('azure://')) return '';
-  return resolved;
-}
-
-/** Same-origin proxy paths are auth-gated; public blob URLs are not. */
-export function glbUrlNeedsAuth(url: string): boolean {
-  return url.includes('/artifacts/') || url.startsWith('/api/');
-}
-
-export async function fetchGlbArrayBuffer(
-  url: string,
-  fetchFn: (url: string) => Promise<Response>,
-  attempt = 0,
-): Promise<ArrayBuffer> {
-  const resp = await fetchFn(url);
-  if (!resp.ok) {
-    const isTransient = resp.status >= 500 && resp.status < 600;
-    if (isTransient && attempt < GLB_FETCH_MAX_ATTEMPTS - 1) {
-      await new Promise((r) => setTimeout(r, GLB_FETCH_RETRY_DELAY_MS * (attempt + 1)));
-      return fetchGlbArrayBuffer(url, fetchFn, attempt + 1);
-    }
-    throw new Error(`Failed to fetch GLB: ${resp.status}`);
-  }
-  return resp.arrayBuffer();
-}
-
-function disposeScene(obj: THREE.Object3D) {
-  obj.traverse((child) => {
-    if ((child as THREE.Mesh).isMesh) {
-      const mesh = child as THREE.Mesh;
-      mesh.geometry?.dispose();
-      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      mats.forEach((m) => m?.dispose());
-    }
-  });
-}
 
 // ── Card registration ────────────────────────────────────────────────
 
@@ -174,25 +88,6 @@ export function useScissorGrid() {
 interface ScissorGLBGridProps {
   children: React.ReactNode;
 }
-
-/** Read the current --background HSL token from :root and convert to a THREE.Color */
-function getThemeBgColor(): THREE.Color {
-  try {
-    const style = getComputedStyle(document.documentElement);
-    const raw = style.getPropertyValue('--background').trim(); // e.g. "0 0% 0%"
-    if (raw) {
-      const parts = raw.split(/\s+/);
-      if (parts.length >= 3) {
-        const h = parseFloat(parts[0]) / 360;
-        const s = parseFloat(parts[1]) / 100;
-        const l = parseFloat(parts[2]) / 100;
-        return new THREE.Color().setHSL(h, s, l);
-      }
-    }
-  } catch { /* fallback */ }
-  return new THREE.Color(0x0a0a0a);
-}
-
 
 export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -579,7 +474,7 @@ export function GLBPreviewSlot({ id, glbUrl, className = '' }: GLBPreviewSlotPro
     >
       {/* Loading state */}
       {!state.loaded && !state.error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-muted rounded-sm">
+        <div className="absolute inset-0 flex items-center justify-center bg-muted rounded-sm" role="status" aria-live="polite">
           <div className="flex flex-col items-center gap-2">
             <div className="w-5 h-5 border-2 border-foreground/20 border-t-foreground/60 rounded-full animate-spin" />
             <span className="font-mono text-[8px] tracking-[0.2em] text-muted-foreground uppercase">
@@ -590,10 +485,10 @@ export function GLBPreviewSlot({ id, glbUrl, className = '' }: GLBPreviewSlotPro
       )}
       {/* Error fallback */}
       {state.error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-muted rounded-sm">
+        <div className="absolute inset-0 flex items-center justify-center bg-muted rounded-sm" role="status" aria-live="polite">
           <div className="flex flex-col items-center gap-1.5">
             <Box className="h-5 w-5 text-muted-foreground/40" />
-            <span className="font-mono text-[8px] tracking-[0.2em] text-muted-foreground/60 uppercase">
+            <span className="font-mono text-[8px] tracking-[0.2em] text-muted-foreground uppercase">
               Preview unavailable
             </span>
           </div>

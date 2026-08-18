@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Box, Download, Pencil, Check, X, Layers } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -61,12 +61,21 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
   );
   const [renameValue, setRenameValue] = useState('');
   const [isDownloadingThreedm, setIsDownloadingThreedm] = useState(false);
+  const renameButtonRef = useRef<HTMLButtonElement>(null);
+  const wasRenamingRef = useRef(false);
 
   useEffect(() => {
     if (workflow.output_asset_name && !getStoredRename(loadStoredRenames(), workflow.workflow_id)) {
       setDisplayName(workflow.output_asset_name);
     }
   }, [workflow.output_asset_name]);
+
+  // Return focus to the pencil button once the rename form closes (save or
+  // cancel), so keyboard/screen-reader users aren't dropped on a removed field.
+  useEffect(() => {
+    if (wasRenamingRef.current && !isRenaming) renameButtonRef.current?.focus();
+    wasRenamingRef.current = isRenaming;
+  }, [isRenaming]);
 
   const dateStr = workflow.created_at ? formatLocal(workflow.created_at) : '—';
   const shots = workflow.screenshots ?? [];
@@ -167,6 +176,8 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
             <span
               className="inline-flex min-h-8 items-center gap-1.5 border border-border/70 bg-muted/25 px-2.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-foreground"
               aria-label={workflow.credits_spent == null ? 'Credits used unavailable' : `${workflow.credits_spent} credits used`}
+              role="status"
+              aria-live="polite"
             >
               <img src={creditCoinIcon} alt="" className="h-4 w-4" />
               {workflow.credits_spent === undefined
@@ -192,8 +203,12 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
           </div>
         )}
         {!workflow.glb_url && isEnriching && (
-          <div className="mx-4 mb-3 w-[calc(100%-2rem)] aspect-[4/3] bg-muted/30 flex items-center justify-center">
-            <div className="w-6 h-6 border-2 border-muted-foreground/20 border-t-muted-foreground/60 rounded-full animate-spin" />
+          <div
+            className="mx-4 mb-3 flex w-[calc(100%-2rem)] aspect-[4/3] items-center justify-center border border-border/30 bg-muted"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="w-6 h-6 border-2 border-foreground/20 border-t-foreground/60 rounded-full animate-spin" />
           </div>
         )}
 
@@ -240,11 +255,14 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
                   <span
                     className="truncate font-mono text-[10px] tracking-wider text-foreground"
                     title={shownBaseName}
+                    role="status"
+                    aria-live="polite"
                   >
                     {isEnriching ? '—' : visibleBaseName}
                   </span>
                   {!isEnriching && workflow.glb_url && (
                     <button
+                      ref={renameButtonRef}
                       onClick={handleStartRename}
                       className="inline-flex h-11 w-11 flex-shrink-0 items-center justify-center text-muted-foreground/60 transition-colors hover:bg-muted/40 hover:text-foreground"
                       aria-label="Rename design"
@@ -302,7 +320,7 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
                   </Button>
               </div>
             ) : (
-              <span className="font-mono text-[9px] tracking-wider text-muted-foreground/40 uppercase">
+              <span className="font-mono text-[9px] tracking-wider text-muted-foreground uppercase">
                 Loading…
               </span>
             )}
