@@ -371,3 +371,37 @@ describe('resolveSourceType', () => {
     expect(resolveSourceType('unknown', 'my_custom_workflow')).toBe('unknown');
   });
 });
+
+describe('extractWorkflowCredits on the real CAD audit payload', () => {
+  // Captured from GET /credits/audit on staging, 2026-08-20.
+  const cadAudit = {
+    summary: {
+      id: 'state-cea7d1956b5a4bbd9348fee3d956ef03',
+      name: 'ring_cad_nurbs_v1',
+      status: 'completed',
+      financials: {
+        credit_hold_amount: 60,
+        authorized_budget: 60,
+        released_credits_so_far: 60,
+        actual_user_billed: 60,
+        internal_provider_cost: 0,
+        profit_margin: 60,
+      },
+      policy: { policy_key: 'ring_cad_tiered_v2' },
+    },
+    line_items: Array.from({ length: 20 }, (_, i) => ({ tool: `tool_${i}`, cost: 0 })),
+  };
+
+  it('reads the charge from summary.financials, not the zeroed line items', () => {
+    expect(extractWorkflowCredits(cadAudit)).toBe(60);
+  });
+
+  it('refuses to report zero from a breakdown where every step is zero', () => {
+    // Without this guard a shape change would silently bring back "0 credits used".
+    expect(extractWorkflowCredits({ line_items: cadAudit.line_items })).toBeNull();
+  });
+
+  it('still sums a breakdown that carries real per-step costs', () => {
+    expect(extractWorkflowCredits({ line_items: [{ cost: 8 }, { cost: 2 }] })).toBe(10);
+  });
+});

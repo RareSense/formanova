@@ -307,7 +307,17 @@ export function extractWorkflowCredits(payload: unknown): number | null {
 
   if (!payload || typeof payload !== 'object') return null;
   const data = payload as Record<string, any>;
-  const wrappers = [data, data.data, data.result, data.financials].filter(
+  // The audit response nests the charge at summary.financials.actual_user_billed.
+  // Checking `financials` only at the root missed it by one level, which is why
+  // a 60-credit CAD run fell through to the line items below.
+  const wrappers = [
+    data,
+    data.data,
+    data.result,
+    data.financials,
+    data.summary,
+    data.summary?.financials,
+  ].filter(
     (value): value is Record<string, any> => Boolean(value && typeof value === 'object' && !Array.isArray(value)),
   );
 
@@ -318,11 +328,15 @@ export function extractWorkflowCredits(payload: unknown): number | null {
     }
   }
 
+  // Never report a breakdown that sums to zero. Every toolkit tool prices at 0
+  // per call, so a CAD audit carries 20 line items all reading 0 while the
+  // charge sits on the workflow row. A zero here means the cost lives
+  // elsewhere, not that the generation was free.
   for (const record of wrappers) {
     const items = record.line_items ?? record.items ?? record.audit;
     if (Array.isArray(items)) {
       const total = extractWorkflowCredits(items);
-      if (total !== null) return total;
+      if (total !== null && total > 0) return total;
     }
   }
 
