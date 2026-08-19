@@ -1,4 +1,5 @@
 import { azureUriToUrl } from '@/lib/azure-utils';
+import type { CadReferenceItem } from '@/lib/microservices-api';
 
 /**
  * ring-cad-nurbs-api.ts
@@ -87,8 +88,17 @@ export interface ArtifactRef {
   sha256: string;
 }
 
-/** Images may be sent as data: URLs (server stores them) or as existing refs. */
-export type ImageInput = string | ArtifactRef;
+/**
+ * Images may be sent as:
+ * - a `data:` URL, which the server stores content-addressed (legacy path,
+ *   still used while /upload/cad-reference is unavailable);
+ * - an existing ArtifactRef;
+ * - a CadReferenceItem straight from /upload/cad-reference, passed through
+ *   UNMODIFIED with all six keys. Backend confirmed (2026-08-19) that nothing
+ *   between their API boundary and the tool call strips or schema-validates
+ *   these, so the extra `asset_id`/`position` ride along harmlessly.
+ */
+export type ImageInput = string | ArtifactRef | CadReferenceItem;
 
 export interface RingCadStartParams {
   /** Ordered; index 0 is IMAGE 1 and wins every conflict. 0 to 5 entries. */

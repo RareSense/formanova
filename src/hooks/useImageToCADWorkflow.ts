@@ -15,17 +15,10 @@ import {
   isRingCadRepairing,
   type ArtifactRef,
 } from "@/lib/ring-cad-nurbs-api";
+import { buildReferenceInputs } from "@/lib/cad-reference-upload";
 import { trackPaywallHit, trackCadGenerationCompleted } from "@/lib/posthog-events";
 import { fetchCadResult } from "@/lib/generation-history-api";
 
-function fileToDataUri(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
 
 interface WorkflowParams {
   model: string;
@@ -223,10 +216,8 @@ export function useImageToCADWorkflow({
     setProgressStep("analyzing");
 
     try {
-      // Images go up as data: URLs; the server stores them content-addressed.
-      const dataUris = await Promise.all(referenceImages.map(fileToDataUri));
       const requestBody = buildRingCadStartBody({
-        referenceImages: dataUris,
+        referenceImages: await buildReferenceInputs(referenceImages),
         userDescription: prompt,
         tier,
       });
