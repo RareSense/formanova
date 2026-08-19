@@ -1,5 +1,7 @@
 import { useRef, useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { useEstimatedCost } from "@/hooks/use-estimated-cost";
 import { RING_CAD_NURBS_WORKFLOW } from "@/lib/ring-cad-nurbs-api";
@@ -92,8 +94,8 @@ export default function InitialPromptScreen({
                 onChange={(e) => setPrompt(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Describe your ring — e.g. A rose ring with three blooming roses, twisted vine band with thorns, and diamond accents"
-                rows={4}
-                className="w-full min-h-[130px] max-h-[60vh] px-5 py-4 pb-9 text-[15px] text-foreground placeholder:text-muted-foreground/40 resize-y font-body leading-relaxed transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-ring bg-muted/20 border border-border overflow-y-auto"
+                rows={6}
+                className="w-full min-h-[220px] max-h-[60vh] px-5 py-4 pb-9 text-[15px] text-foreground placeholder:text-muted-foreground/40 resize-y font-body leading-relaxed transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-ring bg-muted/20 border border-border overflow-y-auto"
               />
               {prompt.length > 0 && (
                 <button
@@ -112,24 +114,27 @@ export default function InitialPromptScreen({
             {/* Credit block */}
             {creditBlock && <div className="mb-3 max-w-[680px] mx-auto">{creditBlock}</div>}
 
-            {/* Generate */}
+            {/* Generate — matches Photo Studio's Next button: right-aligned,
+                gold gradient, size="lg". */}
             {!creditBlock && (
-              <div className="max-w-[680px] mx-auto">
-                <button
+              <div className="mx-auto flex max-w-[680px] items-center justify-end gap-3">
+                <Button
+                  size="lg"
                   onClick={onGenerate}
                   disabled={isGenerating || !canGenerate}
-                  className="w-full py-4 text-[13px] font-bold uppercase tracking-[0.2em] cursor-pointer transition-all duration-200 bg-primary text-primary-foreground disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90 active:scale-[0.99] flex items-center justify-center gap-2"
+                  className="gap-2.5 border-0 bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] px-10 font-display text-base uppercase tracking-wide text-background transition-opacity hover:opacity-90 disabled:opacity-60"
                 >
                   {isGenerating ? "Generating…" : (
                     <>
                       Generate 3D Ring
-                      <span className="inline-flex items-center gap-1 ml-1 opacity-80">
+                      <span className="inline-flex items-center gap-1 opacity-90">
                         <img src={creditCoinIcon} alt="" className="w-5 h-5" />
-                        <span className="text-[13px] font-mono font-semibold">{costLoading ? '…' : (estimatedCost !== null ? estimatedCost : '—')}</span>
+                        <span className="font-mono text-sm font-semibold">{costLoading ? '…' : (estimatedCost !== null ? estimatedCost : '—')}</span>
                       </span>
+                      <ArrowRight className="h-4 w-4" />
                     </>
                   )}
-                </button>
+                </Button>
               </div>
             )}
 

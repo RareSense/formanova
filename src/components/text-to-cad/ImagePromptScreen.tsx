@@ -1,5 +1,7 @@
 import { useRef, useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { useEstimatedCost } from "@/hooks/use-estimated-cost";
 import { RING_CAD_NURBS_WORKFLOW } from "@/lib/ring-cad-nurbs-api";
@@ -196,30 +198,33 @@ export default function ImagePromptScreen({
                 )}
               </div>
 
-              {/* Credit block / Generate button — pinned to the bottom of the
-                  box via mt-auto, so it bottom-aligns with My Rings' own
-                  pagination row regardless of how much room the textarea took. */}
-              <div className="mt-auto">
-                {creditBlock && <div className="mb-3">{creditBlock}</div>}
-                {!creditBlock && (
-                  <button
-                    onClick={onGenerate}
-                    disabled={isGenerating || !canGenerate}
-                    className="w-full py-4 text-[13px] font-bold uppercase tracking-[0.2em] cursor-pointer transition-all duration-200 bg-primary text-primary-foreground disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90 active:scale-[0.99] flex items-center justify-center gap-2"
-                  >
-                    {isGenerating ? "Generating…" : (
-                      <>
-                        Generate 3D Ring
-                        <span className="inline-flex items-center gap-1 ml-1 opacity-80">
-                          <img src={creditCoinIcon} alt="" className="w-5 h-5" />
-                          <span className="text-[13px] font-mono font-semibold">{costLoading ? '…' : (estimatedCost !== null ? estimatedCost : '—')}</span>
-                        </span>
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
             </div>
+
+            {/* Action area — matches Photo Studio's Next button exactly:
+                right-aligned below the canvas, gold gradient, size="lg". */}
+            {creditBlock ? (
+              <div className="mt-3">{creditBlock}</div>
+            ) : (
+              <div className="mt-3 flex items-center justify-end gap-3">
+                <Button
+                  size="lg"
+                  onClick={onGenerate}
+                  disabled={isGenerating || !canGenerate}
+                  className="gap-2.5 border-0 bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] px-10 font-display text-base uppercase tracking-wide text-background transition-opacity hover:opacity-90 disabled:opacity-60"
+                >
+                  {isGenerating ? "Generating…" : (
+                    <>
+                      Generate 3D Ring
+                      <span className="inline-flex items-center gap-1 opacity-90">
+                        <img src={creditCoinIcon} alt="" className="w-5 h-5" />
+                        <span className="font-mono text-sm font-semibold">{costLoading ? '…' : (estimatedCost !== null ? estimatedCost : '—')}</span>
+                      </span>
+                      <ArrowRight className="h-4 w-4" />
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
 
           </div>
 
