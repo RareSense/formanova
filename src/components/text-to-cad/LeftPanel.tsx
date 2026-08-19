@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { RotateCcw, X, Maximize2 } from "lucide-react";
+import { RotateCcw, X } from "lucide-react";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { useEstimatedCost } from "@/hooks/use-estimated-cost";
 import { RING_CAD_NURBS_WORKFLOW, MAX_RING_CAD_REFERENCE_IMAGES } from "@/lib/ring-cad-nurbs-api";
@@ -100,13 +100,8 @@ export default function LeftPanel({
                 style={{ maxHeight: 180 }}
                 onClick={() => setLightboxIndex(0)}
               />
-              <button
-                onClick={() => setLightboxIndex(0)}
-                className="absolute top-1.5 right-8 w-6 h-6 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
-                aria-label="Expand image"
-              >
-                <Maximize2 className="w-3 h-3 text-foreground/70" />
-              </button>
+              {/* No separate expand button: the image itself opens the
+                  lightbox, so a second control just covers the artwork. */}
               {onRemoveReferenceImage && (
                 <button
                   onClick={() => onRemoveReferenceImage(0)}
@@ -124,24 +119,27 @@ export default function LeftPanel({
                 {referenceImagePreviewUrls.slice(1).map((url, i) => {
                   const index = i + 1;
                   return (
-                    <div key={index} className="relative aspect-square border border-border bg-muted/10 overflow-hidden">
-                      <img src={url} alt={`Reference angle ${index}`} className="w-full h-full object-cover" />
+                    <div key={index} className="group relative aspect-square border border-border bg-muted/10 overflow-hidden">
+                      {/* The tile is the expand control, matching the primary
+                          image above. On a thumbnail this size a second button
+                          would cover most of the ring. */}
+                      <button
+                        type="button"
+                        onClick={() => setLightboxIndex(index)}
+                        aria-label={`Expand reference angle ${index}`}
+                        className="block h-full w-full"
+                      >
+                        <img src={url} alt={`Reference angle ${index}`} className="h-full w-full object-cover" />
+                      </button>
                       {onRemoveReferenceImage && (
                         <button
                           onClick={() => onRemoveReferenceImage(index)}
-                          className="absolute top-1 right-1 w-6 h-6 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
+                          className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center border border-border bg-card/80 opacity-0 transition-opacity hover:bg-accent/60 focus-visible:opacity-100 group-hover:opacity-100"
                           aria-label={`Remove reference angle ${index}`}
                         >
-                          <X className="w-3 h-3 text-foreground/70" />
+                          <X className="h-2.5 w-2.5 text-foreground/70" />
                         </button>
                       )}
-                      <button
-                        onClick={() => setLightboxIndex(index)}
-                        className="absolute bottom-1 right-1 w-6 h-6 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
-                        aria-label={`Expand reference angle ${index}`}
-                      >
-                        <Maximize2 className="w-3 h-3 text-foreground/70" />
-                      </button>
                     </div>
                   );
                 })}
