@@ -23,6 +23,7 @@ function baseState(overrides: Partial<ReturnType<typeof mockUseCadHistoryLibrary
     setSearch: vi.fn(),
     page: 0,
     setPage: vi.fn(),
+    renameEntry: vi.fn().mockResolvedValue(undefined),
     totalPages: 1,
     ...overrides,
   };
@@ -98,22 +99,39 @@ describe('CadHistoryLibrary', () => {
     expect(screen.queryByText('Show all')).toBeNull();
   });
 
-  it('shows every image from a multi-image upload as its own tile, not just the primary angle', () => {
+  it('groups a multi-image set into one card and reuses the whole set on click', () => {
     const onSelectImages = vi.fn();
+    const urls = ['/api/artifacts/angle-1', '/api/artifacts/angle-2', '/api/artifacts/angle-3'];
     mockUseCadHistoryLibrary.mockReturnValue(baseState({
-      isSearchable: true,
       items: [
-        { id: 'wf-multi', createdAt: '2026-08-15T00:00:00Z', prompt: null, referenceImageUrls: ['/api/artifacts/angle-1', '/api/artifacts/angle-2', '/api/artifacts/angle-3'] },
-        { id: 'wf-single', createdAt: '2026-08-14T00:00:00Z', prompt: null, referenceImageUrls: ['/api/artifacts/single'] },
+        { id: 'set-multi', createdAt: '2026-08-15T00:00:00Z', prompt: null, referenceImageUrls: urls, assetIds: ['a', 'b', 'c'], assetId: 'a', name: null },
+        { id: 'set-single', createdAt: '2026-08-14T00:00:00Z', prompt: null, referenceImageUrls: ['/api/artifacts/single'], assetIds: ['d'], assetId: 'd', name: null },
       ],
     }));
     render(<CadHistoryLibrary variant="images" onSelectImages={onSelectImages} />);
 
-    const tiles = screen.getAllByRole('button', { name: 'Reuse this reference image' });
-    expect(tiles).toHaveLength(4);
+    // One card per set, not one tile per image.
+    fireEvent.click(screen.getByRole('button', { name: 'Reuse these 3 reference images' }));
+    expect(onSelectImages).toHaveBeenCalledWith(urls);
+    expect(screen.getByRole('button', { name: 'Reuse this reference image' })).toBeTruthy();
 
-    fireEvent.click(tiles[1]);
-    expect(onSelectImages).toHaveBeenCalledWith(['/api/artifacts/angle-2']);
+    // Every angle is still reachable, via the strip below the cover.
+    expect(screen.getAllByRole('button', { name: /^Show angle/ })).toHaveLength(3);
+  });
+
+  it('renames a set through the hook, targeting the cover asset', async () => {
+    const renameEntry = vi.fn().mockResolvedValue(undefined);
+    mockUseCadHistoryLibrary.mockReturnValue(baseState({
+      renameEntry,
+      items: [{ id: 'set-1', createdAt: '2026-08-15T00:00:00Z', prompt: null, referenceImageUrls: ['/api/artifacts/abc'], assetIds: ['cover-id'], assetId: 'cover-id', name: null }],
+    }));
+    render(<CadHistoryLibrary variant="images" />);
+
+    fireEvent.click(screen.getByTitle('Click to rename'));
+    fireEvent.change(screen.getByPlaceholderText('Name this ring...'), { target: { value: 'Signet band' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save name' }));
+
+    expect(renameEntry).toHaveBeenCalledWith('cover-id', 'Signet band');
   });
 
   it('strips raw markdown emphasis from prompt text before rendering', () => {

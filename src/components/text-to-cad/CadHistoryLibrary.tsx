@@ -7,10 +7,10 @@
  * StudioVaultUploadStep (search bar, scrollable grid, pagination), per
  * docs/CAD_LIBRARY_PANEL_PLAN.md.
  */
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuthenticatedImage } from "@/hooks/useAuthenticatedImage";
 import { useCadHistoryLibrary, type CadLibraryEntry } from "@/hooks/useCadHistoryLibrary";
-import { Search, ChevronLeft, ChevronRight, Diamond } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Diamond, Layers, Pencil, Check, X } from "lucide-react";
 
 const localDateFmt = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
 
@@ -43,33 +43,138 @@ interface CadHistoryLibraryProps {
   panelH?: string;
 }
 
-/**
- * True masonry, one tile per image — mirrors Photo Studio's "My Models"
- * panel (StudioModelStep.tsx / ModelCard.tsx), not the grouped product
- * card: every past reference image is its own equally-weighted tile,
- * natural aspect ratio preserved, no cover/badge/angle-strip grouping.
- */
-function RingTile({ url, createdAt, onSelect }: { url: string; createdAt: string; onSelect: () => void }) {
+function RingThumb({ url, className }: { url: string; className: string }) {
   const resolved = useAuthenticatedImage(url);
+  if (!resolved) {
+    return (
+      <div className={`flex items-center justify-center bg-muted/20 ${className}`}>
+        <Diamond className="h-4 w-4 text-muted-foreground/30" />
+      </div>
+    );
+  }
+  return <img src={resolved} alt="" loading="lazy" className={className} />;
+}
+
+/**
+ * One card per uploaded set, mirroring Photo Studio's GroupedProductCard:
+ * cover shown big with a count badge, a centered strip of angle thumbnails
+ * below, and an inline rename row. Clicking a strip thumbnail swaps which
+ * angle is shown; clicking the cover reuses the whole set.
+ *
+ * Rename targets the cover asset, which is also what search matches on, so an
+ * unnamed set is unfindable until named.
+ */
+function RingCard({ entry, onSelect, onRename }: {
+  entry: CadLibraryEntry;
+  onSelect: (urls: string[]) => void;
+  onRename: (assetId: string, name: string) => Promise<void>;
+}) {
+  const urls = entry.referenceImageUrls;
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(entry.name ?? '');
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => { if (!editing) setDraft(entry.name ?? ''); }, [editing, entry.name]);
+
+  const commit = async () => {
+    setEditing(false);
+    const trimmed = draft.trim();
+    if (!entry.assetId || !trimmed || trimmed === entry.name) { setDraft(entry.name ?? ''); return; }
+    try {
+      await onRename(entry.assetId, trimmed);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1800);
+    } catch {
+      setDraft(entry.name ?? '');
+    }
+  };
+
   return (
     <div className="mb-2 break-inside-avoid">
       <button
         type="button"
-        onClick={onSelect}
-        aria-label="Reuse this reference image"
-        className="block w-full overflow-hidden transition-opacity hover:opacity-80"
+        onClick={() => onSelect(urls)}
+        aria-label={urls.length > 1 ? `Reuse these ${urls.length} reference images` : 'Reuse this reference image'}
+        className="group relative block w-full overflow-hidden border border-border/20 transition-colors hover:border-[hsl(var(--formanova-hero-accent))]/50"
       >
-        {resolved ? (
-          <img src={resolved} alt="" loading="lazy" className="block w-full" />
-        ) : (
-          <div className="flex aspect-square w-full items-center justify-center bg-muted/20">
-            <Diamond className="h-4 w-4 text-muted-foreground/30" />
+        <RingThumb url={urls[activeIndex] ?? urls[0]} className="block w-full" />
+        {urls.length > 1 && (
+          <div className="absolute left-1.5 top-1.5 flex items-center gap-1 bg-foreground/70 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] text-background">
+            <Layers className="h-2.5 w-2.5" /> {urls.length}
           </div>
         )}
+        <div className="absolute inset-0 flex items-center justify-center bg-foreground/0 transition-colors group-hover:bg-foreground/10">
+          <span className="bg-foreground/70 px-2 py-1 font-mono text-[9px] uppercase tracking-[0.15em] text-background opacity-0 transition-opacity group-hover:opacity-100">
+            Use
+          </span>
+        </div>
       </button>
-      <p className="mt-1 px-0.5 font-mono text-[9px] uppercase tracking-wider text-muted-foreground/60">
-        {formatLocalTimestamp(createdAt)}
-      </p>
+
+      {urls.length > 1 && (
+        <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1.5">
+          {urls.map((url, index) => (
+            <button
+              key={entry.assetIds[index] ?? index}
+              type="button"
+              onClick={() => setActiveIndex(index)}
+              aria-label={`Show angle ${index + 1}`}
+              className={`h-8 w-8 overflow-hidden border transition-colors ${
+                index === activeIndex ? 'border-[hsl(var(--formanova-hero-accent))]' : 'border-border/30 hover:border-foreground/40'
+              }`}
+            >
+              <RingThumb url={url} className="h-full w-full object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Rename row — fixed height so cards stay aligned, matching ModelCard. */}
+      <div className="flex h-9 items-center overflow-hidden px-1">
+        {editing ? (
+          <div className="flex w-full items-center gap-1">
+            <input
+              autoFocus
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void commit();
+                if (e.key === 'Escape') { setEditing(false); setDraft(entry.name ?? ''); }
+              }}
+              maxLength={50}
+              placeholder="Name this ring..."
+              className="min-w-0 flex-1 border border-foreground/20 bg-muted/30 px-1.5 py-0.5 font-mono text-[10px] text-foreground outline-none transition-colors focus:border-[hsl(var(--formanova-hero-accent))]"
+            />
+            <button onClick={() => { setEditing(false); setDraft(entry.name ?? ''); }} aria-label="Cancel rename" className="p-1 text-muted-foreground hover:text-foreground">
+              <X className="h-3 w-3" />
+            </button>
+            <button onClick={() => void commit()} aria-label="Save name" className="p-1 text-foreground hover:bg-muted/30">
+              <Check className="h-3 w-3" />
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => { setEditing(true); setDraft(entry.name ?? ''); }}
+            title="Click to rename"
+            className="group/rename flex h-full w-full items-center justify-center gap-1.5 transition-colors hover:bg-muted/20"
+          >
+            {saved ? (
+              <>
+                <Check className="h-3 w-3 flex-shrink-0 text-formanova-success" />
+                <span className="font-mono text-[10px] text-formanova-success">Saved!</span>
+              </>
+            ) : (
+              <>
+                <span className="truncate font-mono text-[10px] text-foreground" title={entry.name ?? undefined}>
+                  {entry.name || <span className="italic text-muted-foreground/60">Click to name</span>}
+                </span>
+                <Pencil className="h-3 w-3 flex-shrink-0 text-muted-foreground/40 transition-colors group-hover/rename:text-foreground/60" />
+              </>
+            )}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -109,7 +214,7 @@ function EmptyGuide({ variant }: { variant: "prompts" | "images" }) {
 
 export default function CadHistoryLibrary({ variant, onSelectPrompt, onSelectImages, onHasHistoryChange, panelH }: CadHistoryLibraryProps) {
   const sourceType = variant === "prompts" ? "text_to_cad" : "image_to_cad";
-  const { isLoading, error, hasHistory, isSearchable, items, search, setSearch, page, setPage, totalPages } =
+  const { isLoading, error, hasHistory, isSearchable, items, renameEntry, search, setSearch, page, setPage, totalPages } =
     useCadHistoryLibrary(sourceType);
 
   useEffect(() => {
@@ -126,6 +231,11 @@ export default function CadHistoryLibrary({ variant, onSelectPrompt, onSelectIma
   return (
     <div className="flex h-full flex-col">
       <div className="mb-2">
+        {/* Invisible spacer mirrors the left column's "Image to CAD · Step 1"
+            label so both headers are the same height and the two panels below
+            share a top and bottom edge. Same technique as Photo Studio's
+            StudioVaultUploadStep. */}
+        <span className="marta-label mb-1 block invisible" aria-hidden="true">Step 1</span>
         {/* No "Show all" toggle here, unlike Photo Studio: that switch filters
             between on_model / pdp intended_use, which CAD references have no
             equivalent of. A disabled copy of it would never become functional. */}
@@ -171,12 +281,15 @@ export default function CadHistoryLibrary({ variant, onSelectPrompt, onSelectIma
             {/* True masonry: every reference image is its own tile at its
                 natural aspect ratio, packed into 3 columns with small
                 consistent gaps — matches Photo Studio's My Models panel. */}
-            <div className="columns-3 gap-2">
-              {items.flatMap((entry) =>
-                  entry.referenceImageUrls.map((url, index) => (
-                  <RingTile key={`${entry.id}-${index}`} url={url} createdAt={entry.createdAt} onSelect={() => onSelectImages?.([url])} />
-                )),
-              )}
+            <div className="columns-2 gap-2">
+              {items.map((entry) => (
+                <RingCard
+                  key={entry.id}
+                  entry={entry}
+                  onSelect={(urls) => onSelectImages?.(urls)}
+                  onRename={renameEntry}
+                />
+              ))}
             </div>
           </div>
         )}

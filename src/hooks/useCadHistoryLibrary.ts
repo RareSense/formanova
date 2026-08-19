@@ -1,19 +1,54 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { listMyWorkflows, type SourceType } from '@/lib/generation-history-api';
-import { fetchUserAssets, getAssetDisplayName } from '@/lib/assets-api';
+import { fetchUserAssets, getAssetDisplayName, renameAsset, type UserAsset } from '@/lib/assets-api';
 
 export interface CadLibraryEntry {
-  /** Stable react key. Workflow id for prompt entries, asset id for vault images. */
+  /** Stable react key. Workflow id for prompts, set id (or asset id when
+   * ungrouped) for images. */
   id: string;
   createdAt: string;
   /** Design brief text — text_to_cad only. */
   prompt: string | null;
-  /** Reference images, as same-origin artifact-proxy URLs — image_to_cad only. */
+  /** Every image in this set, as same-origin artifact-proxy URLs. Index 0 is
+   * the cover — image_to_cad only. */
   referenceImageUrls: string[];
-  /** Vault asset id — image entries only. Enables rename via PATCH /assets/{id}. */
+  /** Asset ids, index-parallel to referenceImageUrls. */
+  assetIds: string[];
+  /** Cover asset id — what rename targets. Null for prompt entries. */
   assetId: string | null;
-  /** User-given asset name, if any — image entries only. */
+  /** Cover's user-given name, if any — image entries only. */
   name: string | null;
+}
+
+/** Groups vault assets into one entry per set, mirroring Photo Studio's
+ * buildVaultCards. An asset can belong to several sets, so it can appear in
+ * more than one entry; that is intended, not duplication. Assets with no set
+ * stand alone. Order follows first appearance so the grid does not reshuffle,
+ * and within a set the earliest-created asset is the cover. */
+function groupBySet(assets: UserAsset[]): CadLibraryEntry[] {
+  const groups = new Map<string, UserAsset[]>();
+  const order: string[] = [];
+  for (const a of assets) {
+    const keys = a.set_ids?.length ? a.set_ids : [a.input_group_id ?? `single:${a.id}`];
+    for (const key of keys) {
+      if (!groups.has(key)) { groups.set(key, []); order.push(key); }
+      groups.get(key)!.push(a);
+    }
+  }
+  return order.map((key) => {
+    const members = [...groups.get(key)!].sort((x, y) =>
+      x.created_at < y.created_at ? -1 : x.created_at > y.created_at ? 1 : 0);
+    const cover = members[0];
+    return {
+      id: key,
+      createdAt: cover.created_at,
+      prompt: null,
+      referenceImageUrls: members.map((m) => m.thumbnail_url),
+      assetIds: members.map((m) => m.id),
+      assetId: cover.id,
+      name: getAssetDisplayName(cover) || null,
+    };
+  });
 }
 
 const PAGE_SIZE = 10;
@@ -72,14 +107,7 @@ export function useCadHistoryLibrary(sourceType: Extract<SourceType, 'text_to_ca
           .then((res) => {
             if (cancelled) return;
             setServerTotal(res.total);
-            setEntries(res.items.map((a): CadLibraryEntry => ({
-              id: a.id,
-              createdAt: a.created_at,
-              prompt: null,
-              referenceImageUrls: [a.thumbnail_url],
-              assetId: a.id,
-              name: getAssetDisplayName(a) || null,
-            })));
+            setEntries(groupBySet(res.items));
           })
       : listMyWorkflows(100, 0)
           .then((workflows) => {
@@ -93,6 +121,7 @@ export function useCadHistoryLibrary(sourceType: Extract<SourceType, 'text_to_ca
                   createdAt: w.created_at,
                   prompt: w.prompt ?? null,
                   referenceImageUrls: [],
+                  assetIds: [],
                   assetId: null,
                   name: null,
                 })),
@@ -117,6 +146,13 @@ export function useCadHistoryLibrary(sourceType: Extract<SourceType, 'text_to_ca
     return entries.filter((e) => (e.prompt ?? '').toLowerCase().includes(term));
   }, [entries, search, isImages]);
 
+  /** Renames a vault asset, updating the local entry so the new name shows
+   * without a refetch (which would also reset the user's page and search). */
+  const renameEntry = useCallback(async (assetId: string, name: string) => {
+    await renameAsset(assetId, name);
+    setEntries(prev => prev?.map(e => (e.assetId === assetId ? { ...e, name } : e)) ?? prev);
+  }, []);
+
   const totalCount = isImages ? serverTotal : filtered.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   // Images arrive pre-paged from the server; prompts are sliced here.
@@ -131,6 +167,7 @@ export function useCadHistoryLibrary(sourceType: Extract<SourceType, 'text_to_ca
     isSearchable: true,
     items: pageItems,
     totalCount,
+    renameEntry,
     search,
     setSearch,
     page,

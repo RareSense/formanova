@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { useEstimatedCost } from "@/hooks/use-estimated-cost";
 import { RING_CAD_NURBS_WORKFLOW } from "@/lib/ring-cad-nurbs-api";
-import CadHistoryLibrary from "./CadHistoryLibrary";
 
 const EXAMPLE_PROMPTS = [
   "Serpentine ring with a coiled snake design",
@@ -39,7 +38,6 @@ export default function InitialPromptScreen({
     model,
     pricingContext: { llm_tier: tier },
   });
-  const [hasPromptHistory, setHasPromptHistory] = useState(false);
 
   const canGenerate = !!prompt.trim();
 
@@ -72,10 +70,9 @@ export default function InitialPromptScreen({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
-        className={hasPromptHistory ? "w-full max-w-[1000px] px-6 py-6" : "w-full max-w-[1100px] px-6 py-6"}
+        className="w-full max-w-[1100px] px-6 py-6"
       >
-        <div className={hasPromptHistory ? "grid gap-8 lg:grid-cols-3" : ""}>
-          <div className={hasPromptHistory ? "lg:col-span-2" : ""}>
+        <div>
             {/* Title */}
             <div className="text-center mb-6">
               <h1 className="font-display text-4xl md:text-5xl tracking-[0.2em] text-foreground uppercase mb-2">
@@ -138,9 +135,11 @@ export default function InitialPromptScreen({
               </div>
             )}
 
-            {/* Example Prompts — replaced by "My Prompts" once the user has history */}
-            {!hasPromptHistory && (
-              <div className="mt-6">
+            {/* Example prompts. "My Prompts" (reuse a past brief) is built and
+                tested but deliberately not mounted here: parked until backend
+                can persist prompts as first-class saved items rather than a
+                read of the generation log. See useCadHistoryLibrary. */}
+            <div className="mt-6">
                 <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-3">
                   Try an example
                 </h3>
@@ -155,8 +154,7 @@ export default function InitialPromptScreen({
                     </button>
                   ))}
                 </div>
-              </div>
-            )}
+            </div>
 
             {/* Upload CAD File — gated for the existing Text-to-CAD allowlist. */}
             {onGlbUpload && (
@@ -177,13 +175,6 @@ export default function InitialPromptScreen({
               </div>
             )}
 
-          </div>
-
-          {/* "My Prompts" — mounted unconditionally so its own history check can
-              flip hasPromptHistory; visually contributes nothing until it does. */}
-          <div className={hasPromptHistory ? "" : "hidden"}>
-            <CadHistoryLibrary variant="prompts" onSelectPrompt={setPrompt} onHasHistoryChange={setHasPromptHistory} />
-          </div>
         </div>
       </motion.div>
     </div>

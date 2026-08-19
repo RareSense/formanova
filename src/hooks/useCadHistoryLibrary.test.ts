@@ -110,8 +110,8 @@ describe('useCadHistoryLibrary — prompts (text_to_cad)', () => {
 describe('useCadHistoryLibrary — images (image_to_cad)', () => {
   it('reads the cad_reference vault, not generation history', async () => {
     mockFetchUserAssets.mockResolvedValue(assetPage([
-      asset({ id: 'asset-a', name: 'Signet band' }),
-      asset({ id: 'asset-b' }),
+      asset({ id: 'asset-a', name: 'Signet band', set_ids: ['set-1'] }),
+      asset({ id: 'asset-b', set_ids: ['set-1'] }),
     ]));
 
     const { result } = renderHook(() => useCadHistoryLibrary('image_to_cad'));
@@ -122,11 +122,14 @@ describe('useCadHistoryLibrary — images (image_to_cad)', () => {
     );
     expect(mockListMyWorkflows).not.toHaveBeenCalled();
 
-    // One entry per asset, carrying the id needed for rename.
-    expect(result.current.items.map((i) => i.id)).toEqual(['asset-a', 'asset-b']);
-    expect(result.current.items[0].assetId).toBe('asset-a');
-    expect(result.current.items[0].name).toBe('Signet band');
-    expect(result.current.items[0].referenceImageUrls).toEqual(['/api/artifacts/asset-a']);
+    // Grouped into one entry per set, like Photo Studio's vault cards.
+    expect(result.current.items.map((i) => i.id)).toEqual(['set-1']);
+    const [entry] = result.current.items;
+    expect(entry.referenceImageUrls).toEqual(['/api/artifacts/asset-a', '/api/artifacts/asset-b']);
+    expect(entry.assetIds).toEqual(['asset-a', 'asset-b']);
+    // Rename targets the cover, and the cover carries the displayed name.
+    expect(entry.assetId).toBe('asset-a');
+    expect(entry.name).toBe('Signet band');
   });
 
   it('is searchable, and sends the term to the server rather than filtering locally', async () => {
