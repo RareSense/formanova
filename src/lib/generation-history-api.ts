@@ -156,21 +156,9 @@ export async function listMyWorkflows(
     // actual input count is the only reliable discriminator when the backend
     // still returns source_type="unknown".
     const sourceType = resolveSourceType(w.source_type, name, referenceImageCount);
-    // `actual_user_billed` is what the user was charged. `actual_cost` is a
-    // different number and is 0 for CAD, because every toolkit tool prices at
-    // 0 per call and the charge sits on the workflow row instead. Reading a 0
-    // here used to settle the value and skip the audit below, which is why a
-    // 60-credit CAD run rendered as "0 credits used".
-    //
-    // So a zero on a completed run is treated as "not known yet" and left
-    // undefined, which sends it to /credits/audit/{id} where the real figure
-    // lives. A genuinely free run costs one extra request and still resolves.
-    const rawSummaryCredits = [w.actual_user_billed, w.actual_cost]
+    const summaryCredits = [w.credits_spent, w.actual_user_billed, w.actual_cost]
       .map(numericCredits)
       .find((value): value is number => value !== null);
-    const summaryCredits = rawSummaryCredits === 0 && (w.status ?? '') === 'completed'
-      ? undefined
-      : rawSummaryCredits;
     if (sourceType === 'unknown' && __DEV__) {
       console.warn('[HistoryAPI] unknown source_type for workflow:', { id: w.workflow_id ?? w.id, name, status: w.status, backend_source_type: w.source_type });
     }
