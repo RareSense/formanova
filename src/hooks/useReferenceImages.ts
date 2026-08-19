@@ -1,37 +1,60 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MAX_RING_CAD_REFERENCE_IMAGES } from "@/lib/ring-cad-nurbs-api";
 import { normalizeImageFiles } from "@/lib/image-normalize";
 import { uploadCadReferenceImages, type CadReferenceItem } from "@/lib/microservices-api";
 
+/** One reference image and everything that belongs to it. Held as a single
+ * array rather than parallel arrays so file, preview and uploaded item cannot
+ * drift out of alignment when images are added or removed concurrently. */
+interface ReferenceEntry {
+  file: File;
+  previewUrl: string;
+  /** Null while the upload is in flight, or if it failed. */
+  item: CadReferenceItem | null;
+}
+
 /**
  * Owns the ordered reference-image set shared by Text-to-CAD and Image-to-CAD:
- * files + their object-URL previews kept in lockstep, capped at
- * MAX_RING_CAD_REFERENCE_IMAGES, with object-URL lifetime cleanup on
+ * capped at MAX_RING_CAD_REFERENCE_IMAGES, with object-URL lifetime cleanup on
  * remove/replace/unmount. Index 0 is always the primary image.
  *
  * Images upload as soon as they are attached, not at generate time — matching
- * Photo Studio (useStudioUpload.ts uploads to Azure inside handleJewelryUpload).
- * That is what makes an image appear in "My Rings" immediately, and it means
- * uploading can be observed and debugged without paying for a generation.
+ * Photo Studio (useStudioUpload.ts uploads inside handleJewelryUpload). That is
+ * what makes an image appear in "My Rings" immediately, and it means uploading
+ * can be observed without paying for a generation.
  *
- * `uploadedItems` runs index-parallel to `referenceImages`; an entry is null
- * while its upload is in flight or if it failed, in which case generation falls
- * back to inlining that file as base64. Uploads are fire-and-forget: a failure
- * degrades rather than blocking the user from generating.
+ * Uploads are fire-and-forget: a failure leaves `item` null and generation
+ * inlines that file as base64 instead, so an upload problem never blocks the
+ * user from generating.
  *
  * Note each attach is its own /upload/cad-reference call, so each gets its own
  * server-minted set_id rather than one set per generation. That is invisible
  * today because "My Rings" renders a flat image grid and never groups by set.
  */
 export function useReferenceImages() {
-  const [referenceImages, setReferenceImages] = useState<File[]>([]);
-  const [referenceImagePreviewUrls, setReferenceImagePreviewUrls] = useState<string[]>([]);
-  const [uploadedItems, setUploadedItems] = useState<(CadReferenceItem | null)[]>([]);
+  const [entries, setEntries] = useState<ReferenceEntry[]>([]);
 
-  // Mirrors referenceImagePreviewUrls so the unmount cleanup sees the latest
-  // set without re-running (and revoking live URLs) on every change.
-  const previewUrlsRef = useRef<string[]>([]);
-  useEffect(() => { previewUrlsRef.current = referenceImagePreviewUrls; }, [referenceImagePreviewUrls]);
+  // Mirrors entries so unmount cleanup sees the latest set without re-running
+  // (and revoking live URLs) on every change.
+  const entriesRef = useRef<ReferenceEntry[]>([]);
+  useEffect(() => { entriesRef.current = entries; }, [entries]);
+
+  /** Uploads in the background and fills each file's slot when it lands.
+   * Matched by file identity, so a concurrent add or remove cannot land an
+   * item on the wrong image. */
+  const uploadInBackground = useCallback(async (files: File[]) => {
+    if (files.length === 0) return;
+    try {
+      const { items } = await uploadCadReferenceImages(files, { category: 'ring' });
+      setEntries(prev => prev.map(entry => {
+        const i = files.indexOf(entry.file);
+        return i !== -1 && items[i] ? { ...entry, item: items[i] } : entry;
+      }));
+    } catch (err) {
+      // Non-fatal: the file stays in the set and generation inlines it instead.
+      console.warn('[cad] reference upload failed; this image will be inlined at generate time', err);
+    }
+  }, []);
 
   const addReferenceImages = useCallback(async (files: File[]) => {
     if (files.length === 0) return;
@@ -41,86 +64,70 @@ export function useReferenceImages() {
     // bytes, and AVIF/HEIC uploads (or non-JPEG bytes wearing a .jpg extension)
     // were being sent through unconverted, failing with a provider 400.
     const normalized = await normalizeImageFiles(files);
-    const urls = normalized.map(f => URL.createObjectURL(f));
 
-    // Only the files that actually fit under the cap are worth uploading.
-    let accepted: File[] = [];
-    setReferenceImages(prev => {
-      const next = [...prev, ...normalized].slice(0, MAX_RING_CAD_REFERENCE_IMAGES);
-      accepted = next.slice(prev.length);
-      return next;
-    });
-    setReferenceImagePreviewUrls(prev => [...prev, ...urls].slice(0, MAX_RING_CAD_REFERENCE_IMAGES));
-    setUploadedItems(prev => [...prev, ...accepted.map(() => null)].slice(0, MAX_RING_CAD_REFERENCE_IMAGES));
+    // Cap before creating object URLs, so rejected files never leak one.
+    const room = MAX_RING_CAD_REFERENCE_IMAGES - entriesRef.current.length;
+    const accepted = normalized.slice(0, Math.max(0, room));
     if (accepted.length === 0) return;
 
-    // Fill the slots reserved above once the upload lands. Matched by identity
-    // rather than index, so a concurrent add or remove cannot land an item on
-    // the wrong image.
-    try {
-      const { items } = await uploadCadReferenceImages(accepted, { category: 'ring' });
-      setUploadedItems(prevItems => {
-        const next = [...prevItems];
-        setReferenceImages(currentFiles => {
-          accepted.forEach((file, i) => {
-            const slot = currentFiles.indexOf(file);
-            if (slot !== -1 && items[i]) next[slot] = items[i];
-          });
-          return currentFiles;
-        });
-        return next;
-      });
-    } catch (err) {
-      // Non-fatal: the file stays in the set and generation inlines it instead.
-      console.warn('[cad] reference upload failed; will inline this image at generate time', err);
-    }
-  }, []);
+    const added = accepted.map((file): ReferenceEntry => ({
+      file,
+      previewUrl: URL.createObjectURL(file),
+      item: null,
+    }));
+    // Keep the ref in step immediately: a second add can arrive before React
+    // re-renders, and would otherwise recompute `room` against a stale length.
+    entriesRef.current = [...entriesRef.current, ...added];
+    setEntries(prev => [...prev, ...added]);
+
+    void uploadInBackground(accepted);
+  }, [uploadInBackground]);
 
   const removeReferenceImage = useCallback((index: number) => {
-    setReferenceImagePreviewUrls(prev => {
-      const url = prev[index];
-      if (url?.startsWith("blob:")) URL.revokeObjectURL(url);
-      return prev.filter((_, i) => i !== index);
+    setEntries(prev => {
+      const target = prev[index];
+      if (target?.previewUrl.startsWith("blob:")) URL.revokeObjectURL(target.previewUrl);
+      const next = prev.filter((_, i) => i !== index);
+      entriesRef.current = next;
+      return next;
     });
-    setReferenceImages(prev => prev.filter((_, i) => i !== index));
-    // Keep the parallel array aligned, or later uploads land on the wrong image.
-    setUploadedItems(prev => prev.filter((_, i) => i !== index));
   }, []);
 
   const replaceReferenceImages = useCallback(async (files: File[]) => {
-    const capped = files.slice(0, MAX_RING_CAD_REFERENCE_IMAGES);
-    const normalized = await normalizeImageFiles(capped);
-    const urls = normalized.map(f => URL.createObjectURL(f));
-    setReferenceImagePreviewUrls(prev => {
-      prev.forEach(u => { if (u.startsWith("blob:")) URL.revokeObjectURL(u); });
-      return urls;
-    });
-    setReferenceImages(normalized);
-    setUploadedItems(normalized.map(() => null));
+    const normalized = await normalizeImageFiles(files.slice(0, MAX_RING_CAD_REFERENCE_IMAGES));
+    const added = normalized.map((file): ReferenceEntry => ({
+      file,
+      previewUrl: URL.createObjectURL(file),
+      item: null,
+    }));
 
-    try {
-      const { items } = await uploadCadReferenceImages(normalized, { category: 'ring' });
-      setUploadedItems(prev => (prev.length === items.length ? items : prev));
-    } catch (err) {
-      console.warn('[cad] reference upload failed; will inline these images at generate time', err);
-    }
-  }, []);
+    setEntries(prev => {
+      prev.forEach(e => { if (e.previewUrl.startsWith("blob:")) URL.revokeObjectURL(e.previewUrl); });
+      return added;
+    });
+    entriesRef.current = added;
+
+    void uploadInBackground(normalized);
+  }, [uploadInBackground]);
 
   const clearReferenceImages = useCallback(() => {
-    setReferenceImagePreviewUrls(prev => {
-      prev.forEach(u => { if (u.startsWith("blob:")) URL.revokeObjectURL(u); });
+    setEntries(prev => {
+      prev.forEach(e => { if (e.previewUrl.startsWith("blob:")) URL.revokeObjectURL(e.previewUrl); });
       return [];
     });
-    setReferenceImages([]);
-    setUploadedItems([]);
+    entriesRef.current = [];
   }, []);
 
   // Release any outstanding object URLs when the owning component unmounts.
   useEffect(() => () => {
-    previewUrlsRef.current.forEach(u => {
-      if (u.startsWith("blob:")) URL.revokeObjectURL(u);
+    entriesRef.current.forEach(e => {
+      if (e.previewUrl.startsWith("blob:")) URL.revokeObjectURL(e.previewUrl);
     });
   }, []);
+
+  const referenceImages = useMemo(() => entries.map(e => e.file), [entries]);
+  const referenceImagePreviewUrls = useMemo(() => entries.map(e => e.previewUrl), [entries]);
+  const uploadedItems = useMemo(() => entries.map(e => e.item), [entries]);
 
   return {
     referenceImages,
