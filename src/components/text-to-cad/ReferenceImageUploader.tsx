@@ -96,11 +96,10 @@ export default function ReferenceImageUploader({
       <input ref={imageInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageInputChange} />
       <input ref={extraInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageInputChange} />
 
+      {/* Just the count, no heading: the column header above already says
+          what this is, so labelling the canvas again is noise. */}
       {primaryPreviewUrl && (
-        <div className="mb-2 flex items-baseline justify-between">
-          <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-            Reference images
-          </h3>
+        <div className="mb-2 flex items-baseline justify-end">
           <span className="font-mono text-[10px] tracking-[0.15em] text-muted-foreground/60 tabular-nums">
             {imageCount}/{MAX_RING_CAD_REFERENCE_IMAGES}
           </span>
