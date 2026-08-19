@@ -162,19 +162,39 @@ export function ProductCard({
 interface VaultCard { groupId: string | null; cover: UserAsset; members: UserAsset[]; }
 
 /**
- * Collapse the flat jewelry-photo list into cards. Assets sharing an
- * input_group_id (a multi-angle set uploaded via POST /upload/bulk) become one
- * card; ungrouped assets stay standalone. Order follows first appearance so the
- * grid does not reshuffle. Cover = earliest-uploaded member (the backend returns
- * no is_cover flag, so we infer it from created_at; flagged to backend).
+ * Collapse the flat jewelry-photo list into cards. Assets sharing a set become
+ * one card; ungrouped assets stay standalone. Order follows first appearance so
+ * the grid does not reshuffle. Cover = earliest-uploaded member (the backend
+ * returns no is_cover flag, so we infer it from created_at; see caveat below).
+ *
+ * Membership reads `set_ids`, not `input_group_id`. Since the 2026-08-19
+ * backend grouping consolidation an asset can belong to SEVERAL sets — re-
+ * uploading an image the user already owns now adds it to the new set rather
+ * than leaving it welded to the first one — and a single-valued
+ * `input_group_id` cannot express that. An asset therefore appears in every
+ * card it is a member of, which is intended: previously it silently vanished
+ * from every set but the first. `input_group_id` is still honoured as a
+ * fallback for responses predating the consolidation.
+ *
+ * KNOWN GAP — cover selection in mixed sets. A reused asset keeps its original
+ * `created_at`, so in a set built from both new uploads and reused images the
+ * created_at sort can pick an older reused image as the cover instead of the
+ * intended first one. The backend stores an explicit per-set `position` that
+ * would resolve this, but it is not exposed on the GET /assets response yet
+ * (asked; see artifacts/claude-coordination). Until it is, this is unchanged
+ * from previous behaviour rather than newly broken.
  */
 export function buildVaultCards(assets: UserAsset[]): VaultCard[] {
   const groups = new Map<string, UserAsset[]>();
   const order: string[] = [];
   for (const a of assets) {
-    const key = a.input_group_id ?? `single:${a.id}`;
-    if (!groups.has(key)) { groups.set(key, []); order.push(key); }
-    groups.get(key)!.push(a);
+    const setIds = a.set_ids?.length
+      ? a.set_ids
+      : [a.input_group_id ?? `single:${a.id}`];
+    for (const key of setIds) {
+      if (!groups.has(key)) { groups.set(key, []); order.push(key); }
+      groups.get(key)!.push(a);
+    }
   }
   return order.map((key) => {
     const members = groups.get(key)!;

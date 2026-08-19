@@ -526,7 +526,10 @@ export function StudioVaultUploadStep({
                           />
                         ) : (
                           <ProductCard
-                            key={card.cover.id}
+                            // Keyed by set, not asset: since an asset can belong
+                            // to several sets it can cover more than one card,
+                            // and card.cover.id alone would collide.
+                            key={card.groupId ?? card.cover.id}
                             asset={card.cover}
                             isSelected={card.cover.id === activeProductAssetId}
                             onSelect={() => onProductSelect(card.cover.thumbnail_url, card.cover.id)}
