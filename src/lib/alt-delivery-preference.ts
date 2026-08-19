@@ -11,7 +11,11 @@ export interface AltDeliveryPreference {
 
 export function isValidAltDeliveryContact(value: string): boolean {
   const trimmed = value.trim();
-  return trimmed.length >= 7 && trimmed.length <= 20 && /^[+()\d][\d\s()-]*$/.test(trimmed);
+  if (trimmed.length > 24 || !/^[+()\d][\d\s()-]*$/.test(trimmed)) return false;
+  // Count digits, not characters: "+1 ()()()-" passes a length check while
+  // carrying a single digit, and nobody can be messaged on that.
+  const digits = trimmed.replace(/\D/g, "");
+  return digits.length >= 7 && digits.length <= 15;
 }
 
 /** Client-only for now — no backend field exists yet for a secondary contact. See docs/ALT_DELIVERY_BACKEND_SPEC.md. */

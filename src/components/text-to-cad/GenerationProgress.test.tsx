@@ -16,9 +16,9 @@ describe('GenerationProgress', () => {
     );
 
     expect(screen.getByRole('heading', { name: 'Your CAD is generating' })).toBeTruthy();
-    expect(screen.getByText('Complex designs can take up to 1 hour')).toBeTruthy();
-    expect(screen.getByText(/3DM download links/).textContent).toContain('cad@example.com');
-    expect(screen.getByText(/safely leave this page/i)).toBeTruthy();
+    expect(screen.getByText('up to 1 hour')).toBeTruthy();
+    expect(screen.getByText(/Send to/).parentElement?.textContent).toContain('cad@example.com');
+    expect(screen.getByText(/You can leave this page/i)).toBeTruthy();
     expect(screen.queryByText(/generation history/i)).toBeNull();
     expect(screen.queryByText(/elapsed/i)).toBeNull();
 
@@ -39,8 +39,8 @@ describe('GenerationProgress', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Use a different email' }));
-    const input = screen.getByRole('textbox', { name: 'Notification email' });
+    fireEvent.click(screen.getByRole('button', { name: /^Change/ }));
+    const input = screen.getByRole('textbox', { name: 'Send to' });
     fireEvent.change(input, { target: { value: 'invalid' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(screen.getByRole('alert').textContent).toContain('Enter a valid email address.');
@@ -49,7 +49,7 @@ describe('GenerationProgress', () => {
     fireEvent.change(input, { target: { value: 'new@example.com' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(onSave).toHaveBeenCalledWith('new@example.com'));
-    await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Notification email' })).toBeNull());
+    await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Send to' })).toBeNull());
   });
 
   it('supports cancel and exposes pending and server-error states', () => {
@@ -64,7 +64,7 @@ describe('GenerationProgress', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Use a different email' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Change/ }));
     expect(screen.getByRole('button', { name: 'Saving…' }).hasAttribute('disabled')).toBe(true);
     expect(screen.getByRole('alert').textContent).toContain('Could not save this address.');
 
@@ -77,7 +77,7 @@ describe('GenerationProgress', () => {
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(screen.queryByRole('textbox', { name: 'Notification email' })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Send to' })).toBeNull();
   });
 
   it('keeps loading and failure states accessible without nesting retry in the live region', async () => {
@@ -109,7 +109,7 @@ describe('GenerationProgress', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Prefer WhatsApp or iMessage instead?' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Use WhatsApp or iMessage instead' }));
     fireEvent.click(screen.getByRole('radio', { name: 'iMessage' }));
     fireEvent.change(screen.getByLabelText('Phone number'), { target: { value: 'nope' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send request' }));
@@ -120,6 +120,25 @@ describe('GenerationProgress', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Send request' }));
     await waitFor(() => expect(onRequestAltDelivery).toHaveBeenCalledWith('imessage', '+1 555 123 4567'));
     await waitFor(() => expect(screen.queryByLabelText('Phone number')).toBeNull());
+  });
+
+  it('prefixes the selected country code onto a national number', async () => {
+    const onRequestAltDelivery = vi.fn().mockResolvedValue(true);
+    render(
+      <GenerationProgress
+        visible
+        currentStep="building"
+        onRequestAltDelivery={onRequestAltDelivery}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Use WhatsApp or iMessage instead' }));
+    fireEvent.change(screen.getByLabelText('Country code'), { target: { value: '+44' } });
+    fireEvent.change(screen.getByLabelText('Phone number'), { target: { value: '7700 900123' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send request' }));
+
+    // Stored in full international form, so whoever replies knows the country.
+    await waitFor(() => expect(onRequestAltDelivery).toHaveBeenCalledWith('whatsapp', '+44 7700 900123'));
   });
 
   it('shows the confirmed alt-delivery channel and lets the user change it', () => {

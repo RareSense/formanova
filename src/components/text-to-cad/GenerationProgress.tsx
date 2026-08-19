@@ -1,8 +1,23 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Diamond } from "lucide-react";
+import { ArrowRight, Diamond, Mail, Pencil } from "lucide-react";
 import { isValidNotificationEmail } from "@/lib/notification-email-api";
 import { isValidAltDeliveryContact, type AltDeliveryChannel, type AltDeliveryPreference } from "@/lib/alt-delivery-preference";
+
+/** Dial codes we see most; the list stays short deliberately so the control
+ * reads as a picker rather than a wall of countries. */
+const DIAL_CODES = [
+  { code: "+1", label: "US/CA" },
+  { code: "+44", label: "UK" },
+  { code: "+91", label: "IN" },
+  { code: "+971", label: "AE" },
+  { code: "+92", label: "PK" },
+  { code: "+61", label: "AU" },
+  { code: "+49", label: "DE" },
+  { code: "+33", label: "FR" },
+  { code: "+39", label: "IT" },
+  { code: "+86", label: "CN" },
+] as const;
 
 const NODE_LABELS: Record<string, string> = {
   generate_initial: "Generating design",
@@ -46,7 +61,7 @@ export default function GenerationProgress({
   visible,
   currentStep,
   onRetry,
-  estimateText = "Complex designs can take up to 1 hour",
+  estimateText = "up to 1 hour",
   failureMessage,
   notificationEmail,
   notificationEmailLoading = false,
@@ -66,6 +81,7 @@ export default function GenerationProgress({
   const [isEditingAltDelivery, setIsEditingAltDelivery] = useState(false);
   const [altChannelDraft, setAltChannelDraft] = useState<AltDeliveryChannel>(altDeliveryPreference?.channel ?? "whatsapp");
   const [altContactDraft, setAltContactDraft] = useState(altDeliveryPreference?.contact ?? "");
+  const [altDialCode, setAltDialCode] = useState(DIAL_CODES[0].code);
   const [altValidationError, setAltValidationError] = useState<string | null>(null);
   const sectionRef = useRef<HTMLElement>(null);
   const changeEmailButtonRef = useRef<HTMLButtonElement>(null);
@@ -130,7 +146,13 @@ export default function GenerationProgress({
 
   const submitAltDelivery = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const normalizedContact = altContactDraft.trim();
+    // The stored contact is always the full international number, so the
+    // person messaging back never has to guess the country. A pasted number
+    // that already carries its own "+" is left alone rather than double-prefixed.
+    const typedContact = altContactDraft.trim();
+    const normalizedContact = typedContact.startsWith("+")
+      ? typedContact
+      : `${altDialCode} ${typedContact}`.trim();
     if (!isValidAltDeliveryContact(normalizedContact)) {
       setAltValidationError("Enter a valid phone number.");
       return;
@@ -155,10 +177,12 @@ export default function GenerationProgress({
           aria-live={isFailed ? "assertive" : "polite"}
           aria-atomic="true"
         >
+          {/* Neutral mark, accent reserved for the one moving arc: an
+              all-accent spinner competed with the copy for attention. */}
           {!isTerminal && (
             <div className="relative mx-auto mb-8 h-24 w-24" aria-hidden="true">
-              <div className="h-24 w-24 animate-spin rounded-full border-4 border-[hsl(var(--formanova-hero-accent))]/20 border-t-[hsl(var(--formanova-hero-accent))]" />
-              <Diamond className="absolute inset-0 m-auto h-10 w-10 text-[hsl(var(--formanova-hero-accent))]" strokeWidth={1.8} />
+              <div className="h-24 w-24 animate-spin rounded-full border-4 border-border/40 border-t-[hsl(var(--formanova-hero-accent))]" />
+              <Diamond className="absolute inset-0 m-auto h-10 w-10 text-foreground" strokeWidth={1.8} />
             </div>
           )}
 
@@ -170,11 +194,8 @@ export default function GenerationProgress({
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.18 }}
             >
-              {isActiveGeneration && (
-                <p className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-[hsl(var(--formanova-hero-accent))]">
-                  Generation in progress
-                </p>
-              )}
+              {/* No "Generation in progress" eyebrow: the heading directly
+                  below already says it, and the spinner says it again. */}
               <h1
                 id="cad-generation-heading"
                 className={`font-display text-[26px] uppercase tracking-[0.08em] sm:text-[30px] ${
@@ -186,11 +207,14 @@ export default function GenerationProgress({
 
               {isActiveGeneration && (
                 <>
-                  <p className="mt-3 text-sm font-semibold leading-6 text-foreground sm:text-[15px]">
-                    {estimateText}
+                  {/* The duration is the one thing worth colouring: it is what
+                      the user is actually deciding around. */}
+                  <p className="mt-3 text-sm leading-6 text-muted-foreground sm:text-[15px]">
+                    Estimated time:{" "}
+                    <span className="font-semibold text-[hsl(var(--formanova-hero-accent))]">{estimateText}</span>
                   </p>
                   <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                    You can safely leave this page. Your generation will continue in the background.
+                    You can leave this page. We&rsquo;ll send your CAD when it&rsquo;s ready.
                   </p>
                 </>
               )}
@@ -212,33 +236,35 @@ export default function GenerationProgress({
 
         {isActiveGeneration && (
           <div className="mt-5">
+            {/* One row, edit in place: the label and value stay put and only
+                the value becomes editable, so the layout does not jump. */}
+            <div className="mx-auto max-w-[470px] border-y border-border/40 py-3">
             {!isEditingEmail ? (
-              <div className="flex flex-wrap items-baseline justify-center gap-x-2 gap-y-1 text-xs leading-5 text-muted-foreground">
-                <span>
-                  We’ll email the 3DM download links to{" "}
-                  <strong className="break-all font-semibold text-foreground">
+              <div className="flex items-center gap-3 text-left">
+                <Mail className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] leading-4 text-muted-foreground">Send to</p>
+                  <p className="truncate text-sm text-foreground">
                     {notificationEmailLoading && !notificationEmail ? "your account email" : notificationEmail ?? "your account email"}
-                  </strong>{" "}
-                  when ready.
-                </span>
+                  </p>
+                </div>
                 {onSaveNotificationEmail && (
                   <button
                     ref={changeEmailButtonRef}
                     type="button"
                     onClick={beginEmailEdit}
-                    className="border-b border-[hsl(var(--formanova-hero-accent))]/70 bg-transparent text-[11px] font-medium text-[hsl(var(--formanova-hero-accent))] transition-colors hover:border-[hsl(var(--formanova-hero-accent))] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="inline-flex shrink-0 items-center gap-1.5 text-xs font-medium text-[hsl(var(--formanova-hero-accent))] transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    Use a different email
+                    Change
+                    <Pencil className="h-3 w-3" aria-hidden="true" />
                   </button>
                 )}
-                <span className="w-full text-[11px] italic text-muted-foreground/70">
-                  That link opens here and only works once you're signed in.
-                </span>
               </div>
             ) : (
-              <form className="mx-auto max-w-[470px] text-left" onSubmit={submitEmail} noValidate>
-                <label htmlFor="cad-notification-email" className="text-xs font-semibold text-foreground">
-                  Notification email
+              <form className="flex items-center gap-3 text-left" onSubmit={submitEmail} noValidate>
+                <Mail className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <label htmlFor="cad-notification-email" className="shrink-0 text-[11px] text-muted-foreground">
+                  Send to
                 </label>
                 <input
                   id="cad-notification-email"
@@ -253,32 +279,31 @@ export default function GenerationProgress({
                   aria-invalid={Boolean(emailError)}
                   aria-describedby={emailError ? "cad-notification-email-error" : undefined}
                   disabled={notificationEmailSaving}
-                  className="mt-2 h-11 w-full border border-foreground/35 bg-background px-3 text-sm text-foreground outline-none transition-colors focus:border-[hsl(var(--formanova-hero-accent))] focus:ring-1 focus:ring-[hsl(var(--formanova-hero-accent))] disabled:opacity-60"
+                  className="h-9 min-w-0 flex-1 border border-border bg-background px-2.5 text-sm text-foreground outline-none transition-colors focus:border-[hsl(var(--formanova-hero-accent))] focus:ring-1 focus:ring-[hsl(var(--formanova-hero-accent))] disabled:opacity-60"
                 />
-                {emailError && (
-                  <p id="cad-notification-email-error" role="alert" className="mt-2 text-xs text-destructive">
-                    {emailError}
-                  </p>
-                )}
-                <div className="mt-3 flex justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={cancelEmailEdit}
-                    disabled={notificationEmailSaving}
-                    className="h-9 px-4 text-xs text-muted-foreground underline decoration-border underline-offset-4 transition-colors hover:text-foreground disabled:opacity-60"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={notificationEmailSaving}
-                    className="h-9 border border-foreground/45 bg-background px-5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-foreground transition-colors hover:bg-accent/60 disabled:opacity-60"
-                  >
-                    {notificationEmailSaving ? "Saving…" : "Save"}
-                  </button>
-                </div>
+                <button
+                  type="submit"
+                  disabled={notificationEmailSaving}
+                  className="shrink-0 text-xs font-medium text-[hsl(var(--formanova-hero-accent))] transition-colors hover:text-foreground disabled:opacity-60"
+                >
+                  {notificationEmailSaving ? "Saving…" : "Save"}
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelEmailEdit}
+                  disabled={notificationEmailSaving}
+                  className="shrink-0 text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-60"
+                >
+                  Cancel
+                </button>
               </form>
             )}
+            {emailError && (
+              <p id="cad-notification-email-error" role="alert" className="mt-2 text-left text-xs text-destructive">
+                {emailError}
+              </p>
+            )}
+            </div>
           </div>
         )}
 
@@ -306,9 +331,9 @@ export default function GenerationProgress({
                   ref={altDeliveryButtonRef}
                   type="button"
                   onClick={() => setIsEditingAltDelivery(true)}
-                  className="text-[11px] font-medium text-muted-foreground underline decoration-border underline-offset-4 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="border-b border-[hsl(var(--formanova-hero-accent))]/70 bg-transparent text-[11px] font-medium text-[hsl(var(--formanova-hero-accent))] transition-colors hover:border-[hsl(var(--formanova-hero-accent))] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  Prefer WhatsApp or iMessage instead?
+                  Use WhatsApp or iMessage instead
                 </button>
               )
             ) : (
@@ -335,25 +360,38 @@ export default function GenerationProgress({
                 <label htmlFor="cad-alt-delivery-contact" className="mt-3 block text-xs font-semibold text-foreground">
                   Phone number
                 </label>
-                <input
-                  id="cad-alt-delivery-contact"
-                  type="tel"
-                  autoComplete="tel"
-                  autoFocus
-                  value={altContactDraft}
-                  onChange={event => {
-                    setAltContactDraft(event.target.value);
-                    setAltValidationError(null);
-                  }}
-                  aria-invalid={Boolean(altError)}
-                  aria-describedby={altError ? "cad-alt-delivery-error" : undefined}
-                  disabled={altDeliveryRequesting}
-                  placeholder="+1 555 123 4567"
-                  className="mt-2 h-11 w-full border border-foreground/35 bg-background px-3 text-sm text-foreground outline-none transition-colors focus:border-[hsl(var(--formanova-hero-accent))] focus:ring-1 focus:ring-[hsl(var(--formanova-hero-accent))] disabled:opacity-60"
-                />
-                <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-                  This isn’t automated yet — our team will message you there by hand once your CAD is ready.
-                </p>
+                <div className="mt-2 flex gap-2">
+                  <select
+                    aria-label="Country code"
+                    value={altDialCode}
+                    onChange={event => {
+                      setAltDialCode(event.target.value);
+                      setAltValidationError(null);
+                    }}
+                    disabled={altDeliveryRequesting}
+                    className="h-11 shrink-0 border border-foreground/35 bg-background px-2 text-sm text-foreground outline-none transition-colors focus:border-[hsl(var(--formanova-hero-accent))] focus:ring-1 focus:ring-[hsl(var(--formanova-hero-accent))] disabled:opacity-60"
+                  >
+                    {DIAL_CODES.map(({ code, label }) => (
+                      <option key={label} value={code}>{`${label} ${code}`}</option>
+                    ))}
+                  </select>
+                  <input
+                    id="cad-alt-delivery-contact"
+                    type="tel"
+                    autoComplete="tel-national"
+                    autoFocus
+                    value={altContactDraft}
+                    onChange={event => {
+                      setAltContactDraft(event.target.value);
+                      setAltValidationError(null);
+                    }}
+                    aria-invalid={Boolean(altError)}
+                    aria-describedby={altError ? "cad-alt-delivery-error" : undefined}
+                    disabled={altDeliveryRequesting}
+                    placeholder="555 123 4567"
+                    className="h-11 w-full min-w-0 border border-foreground/35 bg-background px-3 text-sm text-foreground outline-none transition-colors focus:border-[hsl(var(--formanova-hero-accent))] focus:ring-1 focus:ring-[hsl(var(--formanova-hero-accent))] disabled:opacity-60"
+                  />
+                </div>
                 {altError && (
                   <p id="cad-alt-delivery-error" role="alert" className="mt-2 text-xs text-destructive">
                     {altError}

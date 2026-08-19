@@ -24,6 +24,13 @@ describe('isValidAltDeliveryContact', () => {
     expect(isValidAltDeliveryContact('(555) 123-4567')).toBe(true);
   });
 
+  it('rejects punctuation padded out to look long enough', () => {
+    // Character length alone would pass these; digit count is what matters.
+    expect(isValidAltDeliveryContact('+1 ()()()-')).toBe(false);
+    expect(isValidAltDeliveryContact('(((((((())))))))')).toBe(false);
+    expect(isValidAltDeliveryContact('+1 234 567 890 123 456')).toBe(false);
+  });
+
   it('rejects too-short, too-long, and non-numeric input', () => {
     expect(isValidAltDeliveryContact('12345')).toBe(false);
     expect(isValidAltDeliveryContact('1'.repeat(21))).toBe(false);
