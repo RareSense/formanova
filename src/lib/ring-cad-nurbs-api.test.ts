@@ -4,12 +4,10 @@ import {
   isRingCadSuccess,
   parseRingCadFailure,
   parseRingCadResult,
-  resolveRingCadCredits,
   ringCadProgressFraction,
   isRingCadRepairing,
   MAX_RING_CAD_REFERENCE_IMAGES,
   RING_CAD_DEFAULT_TIER,
-  RING_CAD_GENERATION_CREDITS,
   RING_CAD_TIERS,
   RING_CAD_TOTAL_NODES,
 } from './ring-cad-nurbs-api';
@@ -95,9 +93,9 @@ describe('ring_cad_nurbs_v1 start body', () => {
     expect(RING_CAD_DEFAULT_TIER).toBe(RING_CAD_TIERS.OPUS_5);
   });
 
-  it('prices the fixed tier at 70 credits', () => {
-    expect(RING_CAD_GENERATION_CREDITS).toBe(70);
-    expect(resolveRingCadCredits(RING_CAD_DEFAULT_TIER)).toBe(70);
+  it('sends the fixed tier, which selects the model rather than the price', () => {
+    const { payload } = buildRingCadStartBody({ referenceImages: [IMG(1)] });
+    expect(payload.llm_tier).toBe(RING_CAD_DEFAULT_TIER);
   });
 
   it('never sends credentials in the payload, which is persisted and readable', () => {
@@ -121,19 +119,9 @@ describe('ring_cad_nurbs_v1 start body', () => {
   });
 });
 
-describe('ring_cad_nurbs_v1 pricing', () => {
-  it('prices the listed tiers', () => {
-    expect(resolveRingCadCredits(RING_CAD_TIERS.OPUS_5)).toBe(70);
-    expect(resolveRingCadCredits(RING_CAD_TIERS.GPT_5_6_SOL)).toBe(70);
-    expect(resolveRingCadCredits(RING_CAD_TIERS.FABLE_5)).toBe(100);
-  });
-
-  it('bills unlisted or missing tiers at the top rate, not free', () => {
-    expect(resolveRingCadCredits('claude_sonnet_5_openrouter')).toBe(100);
-    expect(resolveRingCadCredits(null)).toBe(100);
-    expect(resolveRingCadCredits(undefined)).toBe(100);
-  });
-});
+// No pricing tests here on purpose. Price is backend's, read from
+// /credits/estimate for display and from the credit audit for what was
+// charged. Asserting a number here would only pin a stale one.
 
 describe('ring_cad_nurbs_v1 result parsing', () => {
   const RESULT = {

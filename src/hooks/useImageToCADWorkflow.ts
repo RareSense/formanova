@@ -10,7 +10,6 @@ import {
   buildRingCadStartBody,
   parseRingCadResult,
   parseRingCadFailure,
-  resolveRingCadCredits,
   ringCadProgressFraction,
   isRingCadRepairing,
   type ArtifactRef,
@@ -184,16 +183,19 @@ export function useImageToCADWorkflow({
       return;
     }
 
-    // The tier is the price selector for ring_cad_nurbs_v1 (70 or 100 credits).
-    const fallbackCredits = resolveRingCadCredits(tier);
-
     try {
       const result = await performCreditPreflight(RING_CAD_NURBS_WORKFLOW, 1, {
         pricingContext: { llm_tier: tier },
       });
       const balance = result.currentBalance;
-      const cost = result.estimatedCredits > 0 ? result.estimatedCredits : fallbackCredits;
-      if (balance < cost) {
+      // No local fallback price. The tier price is backend's to set and it
+      // changes (70 to 60 during their token-usage test), so a number written
+      // here would quote a stale figure the moment it moves. When the estimate
+      // is unavailable we skip this gate and let the start call decide: it
+      // rejects with 402 and a message naming the shortfall, which is surfaced
+      // below. Backend is the authority on price either way.
+      const cost = result.estimatedCredits;
+      if (cost > 0 && balance < cost) {
         setCreditBlock({ approved: false, estimatedCredits: cost, currentBalance: balance });
         trackPaywallHit({ category: 'ring', steps_completed: 1 });
         return;

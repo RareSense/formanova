@@ -34,30 +34,20 @@ export const RING_CAD_TIERS = {
 
 export type RingCadTier = (typeof RING_CAD_TIERS)[keyof typeof RING_CAD_TIERS];
 
-/** Credit cost per generation, selected by tier. */
-export const RING_CAD_TIER_CREDITS: Record<string, number> = {
-  [RING_CAD_TIERS.FABLE_5]: 100,
-  [RING_CAD_TIERS.OPUS_5]: 70,
-  [RING_CAD_TIERS.GPT_5_6_SOL]: 70,
-};
-
-/** Any tier outside the table - or omitting llm_tier entirely - bills at 100. */
-export const RING_CAD_UNLISTED_TIER_CREDITS = 100;
-
 /**
  * Fixed tier for both Text-to-CAD and Image-to-CAD. No picker is exposed,
- * consistent with CAD_MODEL_SELECTOR_ENABLED being false. Opus 5 (routed
- * through OpenRouter) bills at 70 credits.
+ * consistent with CAD_MODEL_SELECTOR_ENABLED being false. This selects the
+ * model, not the price: what it costs is backend's to decide.
  */
 export const RING_CAD_DEFAULT_TIER: RingCadTier = RING_CAD_TIERS.OPUS_5;
 
-/** Credit cost of a generation at the fixed tier above. */
-export const RING_CAD_GENERATION_CREDITS = RING_CAD_TIER_CREDITS[RING_CAD_DEFAULT_TIER];
-
-export function resolveRingCadCredits(tier?: string | null): number {
-  if (!tier) return RING_CAD_UNLISTED_TIER_CREDITS;
-  return RING_CAD_TIER_CREDITS[tier] ?? RING_CAD_UNLISTED_TIER_CREDITS;
-}
+/**
+ * Price is not defined here on purpose. It is set by backend per llm_tier and
+ * it moves: it went from 70 to 60 during their token-usage test. Read it from
+ * POST /credits/estimate for display, and from the credit audit for what was
+ * actually charged. A constant in this file would quote a stale number the
+ * moment backend changes one.
+ */
 
 // -- Workflow identity and limits ------------------------------------------
 
