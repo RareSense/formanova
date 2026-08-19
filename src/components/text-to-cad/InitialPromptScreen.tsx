@@ -53,17 +53,6 @@ export default function InitialPromptScreen({
     }
   };
 
-  const autoResize = useCallback(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, 240) + "px";
-  }, []);
-
-  useEffect(() => {
-    autoResize();
-  }, [prompt, autoResize]);
-
   return (
     <div className="flex-1 flex items-center justify-center bg-background overflow-y-auto">
       <motion.div

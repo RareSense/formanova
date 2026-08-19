@@ -138,13 +138,6 @@ export default function ImagePromptScreen({
     }
   };
 
-  useEffect(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, 200) + "px";
-  }, [prompt]);
-
   const canGenerate = imageCount > 0;
 
   return (
@@ -185,8 +178,8 @@ export default function ImagePromptScreen({
                   onChange={(e) => setPrompt(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="Add optional description"
-                  rows={2}
-                  className="min-h-[64px] max-h-[200px] w-full resize-none overflow-y-auto border border-border/60 bg-background px-5 py-3 pb-7 font-body text-[14px] leading-relaxed text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-foreground/40 focus:ring-1 focus:ring-border"
+                  rows={3}
+                  className="min-h-[96px] max-h-[240px] w-full resize-y overflow-y-auto border border-border/60 bg-background px-5 py-3 pb-7 font-body text-[14px] leading-relaxed text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-foreground/40 focus:ring-1 focus:ring-border"
                 />
                 {prompt.length > 0 && (
                   <button

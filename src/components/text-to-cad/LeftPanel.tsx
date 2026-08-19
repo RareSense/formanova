@@ -185,7 +185,11 @@ export default function LeftPanel({
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             placeholder={isImageMode ? "Add optional description" : "Example: Create a rose ring with three blooming roses, twisted vine band with thorns, and diamond accents"}
-            className="w-full min-h-[80px] px-4 py-3 text-[13px] text-foreground placeholder:text-muted-foreground/50 resize-y font-body leading-relaxed transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-ring bg-muted/30 border border-border"
+            rows={4}
+            /* Fixed, modest default with a hard ceiling; the user can still drag
+               the corner grip to grow it. Without max-h a long brief expands the
+               textarea until it pushes the Generate button out of the panel. */
+            className="w-full min-h-[96px] max-h-[240px] resize-y overflow-y-auto border border-border bg-muted/30 px-4 py-3 font-body text-[13px] leading-relaxed text-foreground transition-all duration-200 placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
           />
 
           {/* Insufficient credits inline block */}
@@ -233,10 +237,14 @@ export default function LeftPanel({
         </section>
         )}
 
-        {/* Image mode — show prompt text before model loads (read-only, no header) */}
+        {/* Image mode — show prompt text before model loads (read-only, no header).
+            Bounded and scrollable: a long brief would otherwise run for hundreds
+            of pixels and push everything below it out of the panel. */}
         {isImageMode && !hasModel && prompt.trim() && (
           <section>
-            <p className="font-body text-[13px] text-foreground/70 leading-relaxed">{prompt}</p>
+            <div className="max-h-[140px] overflow-y-auto overscroll-contain border border-border/40 bg-muted/20 px-3 py-2.5">
+              <p className="font-body text-[13px] leading-relaxed text-foreground/70 [overflow-wrap:anywhere]">{prompt}</p>
+            </div>
           </section>
         )}
       </div>
