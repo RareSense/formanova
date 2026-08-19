@@ -29,10 +29,10 @@ function fileToDataUri(file: File): Promise<string> {
  * Pairs each file with the item produced when it was attached, falling back to
  * inlining that file as base64 where no item exists.
  *
- * A missing item means one of: the upload is still in flight, it failed, or
- * /upload/cad-reference is not deployed to this environment (prod, until
- * backend's deploy lands). All three degrade to the old base64 path so the
- * user can still generate — an upload problem must never block generating.
+ * A missing item means the upload is either still in flight or failed. Both
+ * degrade to inlining the file as base64 so the user can still generate: an
+ * upload problem must never block generating. (/upload/cad-reference went live
+ * in prod on 2026-08-20, so a missing endpoint is no longer one of the cases.)
  *
  * Items are passed through UNMODIFIED, all six keys including asset_id and
  * position: backend confirmed nothing between their API boundary and the tool

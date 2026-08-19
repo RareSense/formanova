@@ -21,6 +21,8 @@ import React, {
   useMemo,
 } from 'react';
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { applyNeutralToneMapping } from '@/lib/neutral-tone-mapping';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { RGBELoader } from 'three-stdlib';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -123,14 +125,22 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
       alpha: true,
     });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    // History previews share a canvas and HDRI; keep highlights quieter than
-    // the full editor so metallic fallback materials do not clip or wash out.
-    renderer.toneMappingExposure = 0.65;
+    // Same neutral curve and exposure as the Studio viewport. ACESFilmic at
+    // 0.65 rendered these previews darker than the design the user opens, and
+    // pulled saturation out of gold and coloured stones on the way.
+    applyNeutralToneMapping(renderer);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.setClearColor(0x000000, 0);
     rendererRef.current = renderer;
     setRendererReady(true);
+
+    // Neutral studio box as the immediate environment, replaced by the HDRI
+    // once it arrives. Studio does the same, and without it a preview rendered
+    // before the download finished would be lit by the directional alone.
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const roomTarget = pmrem.fromScene(new RoomEnvironment(), 0.04);
+    envMapRef.current = roomTarget.texture;
+    pmrem.dispose();
 
     // Preload HDRI environment
     const rgbeLoader = new RGBELoader();
@@ -324,10 +334,12 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
     const scene = new THREE.Scene();
     scene.background = getThemeBgColor();
 
-    const ambient = new THREE.AmbientLight(0xffffff, 0.4);
-    scene.add(ambient);
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    dirLight.position.set(5, 5, 5);
+    // Matches the Studio rig: one directional light at the same intensity and
+    // angle, with the environment doing the rest. The ambient light that used
+    // to sit here flattened the metal by filling the shadows that give it its
+    // shape.
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.55);
+    dirLight.position.set(1.5, 8, 2);
     scene.add(dirLight);
 
     if (envMapRef.current) {

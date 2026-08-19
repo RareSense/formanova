@@ -25,7 +25,8 @@ interface ReferenceEntry {
  *
  * Uploads are fire-and-forget: a failure leaves `item` null and generation
  * inlines that file as base64 instead, so an upload problem never blocks the
- * user from generating.
+ * user from generating. That path is now only for real failures, since the
+ * endpoint is live in prod as of 2026-08-20.
  *
  * Note each attach is its own /upload/cad-reference call, so each gets its own
  * server-minted set_id rather than one set per generation. That is invisible
