@@ -1,68 +1,52 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
-
-const mockUpload = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/microservices-api', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/microservices-api')>();
-  return { ...actual, uploadCadReferenceImages: mockUpload };
-});
-
+import { describe, expect, it } from 'vitest';
 import { buildReferenceInputs } from './cad-reference-upload';
-import { CadReferenceUploadError } from './microservices-api';
+import type { CadReferenceItem } from './microservices-api';
 
 function imageFile(name: string) {
   return new File(['x'], name, { type: 'image/jpeg' });
 }
 
-const ITEMS = [
-  { asset_id: 'id-a', uri: 'azure://a', sha256: 'sa', type: 'image/jpeg', bytes: 101, position: 0 },
-  { asset_id: 'id-b', uri: 'azure://b', sha256: 'sb', type: 'image/jpeg', bytes: 202, position: 1 },
-];
-
-beforeEach(() => {
-  mockUpload.mockReset();
-  vi.spyOn(console, 'warn').mockImplementation(() => {});
-});
+function item(id: string, position: number): CadReferenceItem {
+  return { asset_id: id, uri: `azure://${id}`, sha256: `sha-${id}`, type: 'image/jpeg', bytes: 100, position };
+}
 
 describe('buildReferenceInputs', () => {
-  it('returns the uploaded items unmodified, keeping all six keys', async () => {
-    mockUpload.mockResolvedValue({ items: ITEMS, set_id: 'grp-1' });
-
-    const result = await buildReferenceInputs([imageFile('a.jpg'), imageFile('b.jpg')]);
-
-    // Passed straight through: the workflow reads these objects as-is, and
-    // stripping asset_id/position would contradict the backend contract.
-    expect(result).toEqual(ITEMS);
-    expect(mockUpload).toHaveBeenCalledWith(expect.any(Array), { category: 'ring' });
+  it('returns nothing for an empty file list', async () => {
+    expect(await buildReferenceInputs([], [])).toEqual([]);
   });
 
-  it('sends no request at all for an empty file list', async () => {
-    expect(await buildReferenceInputs([])).toEqual([]);
-    expect(mockUpload).not.toHaveBeenCalled();
+  it('passes uploaded items through unmodified, keeping all six keys', async () => {
+    const items = [item('a', 0), item('b', 1)];
+
+    const result = await buildReferenceInputs([imageFile('a.jpg'), imageFile('b.jpg')], items);
+
+    // Straight through: stripping asset_id/position would break the contract.
+    expect(result).toEqual(items);
   });
 
-  it('falls back to inline base64 when the endpoint is not deployed (404)', async () => {
-    mockUpload.mockRejectedValue(new CadReferenceUploadError(404, 'not found'));
-
-    const result = await buildReferenceInputs([imageFile('a.jpg')]);
+  it('inlines a file as base64 when its upload is missing', async () => {
+    // Pending, failed, or endpoint not deployed all look the same here: null.
+    const result = await buildReferenceInputs([imageFile('a.jpg')], [null]);
 
     expect(result).toHaveLength(1);
-    expect(typeof result[0]).toBe('string');
     expect(result[0] as string).toMatch(/^data:/);
   });
 
-  it.each([
-    [400, 'unsupported image type'],
-    [401, 'missing auth'],
-    [422, 'too many files'],
-  ])('surfaces a %i rather than silently degrading to base64', async (status, message) => {
-    mockUpload.mockRejectedValue(new CadReferenceUploadError(status, message));
+  it('mixes uploaded items and inlined files, preserving order', async () => {
+    const result = await buildReferenceInputs(
+      [imageFile('a.jpg'), imageFile('b.jpg'), imageFile('c.jpg')],
+      [item('a', 0), null, item('c', 2)],
+    );
 
-    await expect(buildReferenceInputs([imageFile('a.jpg')])).rejects.toThrow(message);
+    expect(result[0]).toEqual(item('a', 0));
+    expect(result[1] as string).toMatch(/^data:/);
+    expect(result[2]).toEqual(item('c', 2));
   });
 
-  it('surfaces a non-upload error (e.g. network failure) untouched', async () => {
-    mockUpload.mockRejectedValue(new TypeError('Failed to fetch'));
+  it('inlines everything when no items are supplied at all', async () => {
+    const result = await buildReferenceInputs([imageFile('a.jpg'), imageFile('b.jpg')]);
 
-    await expect(buildReferenceInputs([imageFile('a.jpg')])).rejects.toThrow('Failed to fetch');
+    expect(result).toHaveLength(2);
+    expect(result.every((r) => typeof r === 'string' && r.startsWith('data:'))).toBe(true);
   });
 });

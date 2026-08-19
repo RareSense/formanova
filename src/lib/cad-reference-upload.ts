@@ -4,11 +4,16 @@
  * Turns the picked reference files into whatever `reference_image_artifacts`
  * should carry on the ring_cad_nurbs_v1 start call.
  *
+ * Uploading happens when an image is ATTACHED, not here — see
+ * useReferenceImages, which mirrors Photo Studio's handleJewelryUpload. By the
+ * time generation runs, each file normally already has its uploaded item, so
+ * this just pairs them up.
+ *
  * Split out of useImageToCADWorkflow so the fallback rule below is directly
  * testable without standing up the whole generation hook (AI_RULES section 10:
  * API/result-shape changes need tests).
  */
-import { uploadCadReferenceImages, CadReferenceUploadError } from '@/lib/microservices-api';
+import type { CadReferenceItem } from '@/lib/microservices-api';
 import type { ImageInput } from '@/lib/ring-cad-nurbs-api';
 
 function fileToDataUri(file: File): Promise<string> {
@@ -21,33 +26,27 @@ function fileToDataUri(file: File): Promise<string> {
 }
 
 /**
- * Preferred path: POST /upload/cad-reference, then pass the returned item
- * objects through unmodified (all six keys). This is what gives the images
- * real asset ids and set membership, which "My Rings" is built on.
+ * Pairs each file with the item produced when it was attached, falling back to
+ * inlining that file as base64 where no item exists.
  *
- * TEMPORARY FALLBACK — remove once /upload/cad-reference is live in prod.
- * Backend shipped it to staging on 2026-08-19 with the prod deploy pending,
- * and will send a "live in prod" note. Until then prod would 404 on every
- * generation, so a 404 — meaning the endpoint isn't deployed to THIS
- * environment — falls back to the previous inline-base64 behaviour.
+ * A missing item means one of: the upload is still in flight, it failed, or
+ * /upload/cad-reference is not deployed to this environment (prod, until
+ * backend's deploy lands). All three degrade to the old base64 path so the
+ * user can still generate — an upload problem must never block generating.
  *
- * Deliberately scoped to 404 alone: 400 (bad file), 401 (auth), and 422 (too
- * many files) are real failures and must surface rather than silently
- * degrading to a path that would hide them.
- *
- * Removal condition: delete this function's catch block (and the base64
- * helper) once prod is confirmed; `uploadCadReferenceImages` then stands alone.
+ * Items are passed through UNMODIFIED, all six keys including asset_id and
+ * position: backend confirmed nothing between their API boundary and the tool
+ * call strips or schema-validates these elements.
  */
-export async function buildReferenceInputs(files: File[]): Promise<ImageInput[]> {
+export async function buildReferenceInputs(
+  files: File[],
+  uploadedItems: (CadReferenceItem | null)[] = [],
+): Promise<ImageInput[]> {
   if (files.length === 0) return [];
-  try {
-    const { items } = await uploadCadReferenceImages(files, { category: 'ring' });
-    return items;
-  } catch (err) {
-    if (err instanceof CadReferenceUploadError && err.status === 404) {
-      console.warn('[cad] /upload/cad-reference not deployed here; falling back to inline base64');
-      return Promise.all(files.map(fileToDataUri));
-    }
-    throw err;
-  }
+  return Promise.all(
+    files.map((file, i) => {
+      const item = uploadedItems[i];
+      return item ? Promise.resolve(item as ImageInput) : fileToDataUri(file);
+    }),
+  );
 }
