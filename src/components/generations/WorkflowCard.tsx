@@ -301,11 +301,11 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
                       onClick={handleDownloadThreedm}
                       disabled={isDownloadingThreedm}
                       className="h-11 w-full gap-1.5 border-[hsl(var(--formanova-hero-accent))] bg-transparent px-3 font-mono text-[9px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"
-                      title="Download machinable 3DM"
-                      aria-label="Download 3DM"
+                      title="Download the machinable .3dm"
+                      aria-label="Download .3dm"
                     >
                       <Download className="h-3.5 w-3.5" />
-                      {isDownloadingThreedm ? 'Checking 3DM…' : 'Download 3DM'}
+                      {isDownloadingThreedm ? 'Checking .3dm…' : 'Download .3dm'}
                     </Button>
                   </section>
                 )}
@@ -313,7 +313,7 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
                     size="sm"
                     variant="outline"
                     onClick={handleLoadInStudio}
-                    className="h-9 w-full gap-1.5 border-border bg-transparent px-3 font-mono text-[9px] uppercase tracking-wider text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+                    className="h-11 w-full gap-1.5 border-border bg-transparent px-3 font-mono text-[9px] uppercase tracking-wider text-foreground hover:bg-muted/40 hover:text-foreground"
                   >
                     <Layers className="h-3.5 w-3.5 shrink-0" />
                     Open in Studio

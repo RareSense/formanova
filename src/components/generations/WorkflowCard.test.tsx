@@ -68,16 +68,22 @@ describe('CAD generation history card', () => {
     );
 
     expect(screen.getAllByRole('button').map((button) => button.textContent?.trim()).filter(Boolean)).toEqual([
-      'Download 3DM',
+      'Download .3dm',
       'Open in Studio',
     ]);
 
-    const threedm = screen.getByRole('button', { name: 'Download 3DM' });
+    const threedm = screen.getByRole('button', { name: 'Download .3dm' });
     const studio = screen.getByRole('button', { name: 'Open in Studio' });
+    // Sibling actions match in height and width rather than one sitting
+    // shorter than the other.
     expect(threedm.className).toContain('h-11');
+    expect(studio.className).toContain('h-11');
+    expect(threedm.className).toContain('w-full');
+    expect(studio.className).toContain('w-full');
+    // Secondary, but still legible: not washed out to muted.
+    expect(studio.className).toContain('text-foreground');
     expect(screen.getByRole('region', { name: 'Manufacturing deliverable' })).toBeTruthy();
     expect(screen.getByText('Native Rhino 3DM')).toBeTruthy();
-    expect(studio.className).toContain('h-9');
     expect(screen.queryByRole('button', { name: 'Export GLB' })).toBeNull();
   });
 
@@ -120,7 +126,7 @@ describe('CAD generation history card', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Rename design' }));
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Customer Ring' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save design name' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Download 3DM' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Download .3dm' }));
 
     await waitFor(() => expect(downloadCadArtifact).toHaveBeenCalledWith(
       '/fresh/manufacturing-3dm',
@@ -139,7 +145,7 @@ describe('CAD generation history card', () => {
         </MemoryRouter>,
       );
 
-      fireEvent.click(screen.getByRole('button', { name: 'Download 3DM' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Download .3dm' }));
       await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
 
       expect(downloadCadArtifact).toHaveBeenCalledWith('/api/artifacts/3dm', 'ring.3dm', '3dm');
@@ -159,7 +165,7 @@ describe('CAD generation history card', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Download 3DM' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Download .3dm' }));
 
     await waitFor(() => expect(downloadCadArtifact).toHaveBeenCalledWith('/api/artifacts/3dm', 'ring.3dm', '3dm'));
     expect(downloadCadArtifact).toHaveBeenNthCalledWith(1, '/fresh/manufacturing-3dm', 'ring.3dm', '3dm');
