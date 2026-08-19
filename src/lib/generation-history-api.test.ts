@@ -371,3 +371,32 @@ describe('resolveSourceType', () => {
     expect(resolveSourceType('unknown', 'my_custom_workflow')).toBe('unknown');
   });
 });
+
+describe('credits on the history summary', () => {
+  it('keeps a real billed figure from the summary', async () => {
+    mockAuthFetch.mockReturnValueOnce(okJson([
+      { workflow_id: 'a', name: 'ring_cad_nurbs_v1', status: 'completed', actual_user_billed: 60 },
+    ]));
+    const [wf] = await listMyWorkflows();
+    expect(wf.credits_spent).toBe(60);
+  });
+
+  it('does not let a zero on a completed run settle the value', async () => {
+    // actual_cost is 0 for CAD because every tool prices at 0 per call and the
+    // charge sits on the workflow row. Accepting it would render "0 credits
+    // used" for a run that really cost 60, and skip the audit that knows better.
+    mockAuthFetch.mockReturnValueOnce(okJson([
+      { workflow_id: 'a', name: 'ring_cad_nurbs_v1', status: 'completed', actual_cost: 0 },
+    ]));
+    const [wf] = await listMyWorkflows();
+    expect(wf.credits_spent).toBeUndefined();
+  });
+
+  it('still reports zero for a failed run, which is refunded and really is free', async () => {
+    mockAuthFetch.mockReturnValueOnce(okJson([
+      { workflow_id: 'a', name: 'ring_cad_nurbs_v1', status: 'failed', actual_cost: 0 },
+    ]));
+    const [wf] = await listMyWorkflows();
+    expect(wf.credits_spent).toBe(0);
+  });
+});
