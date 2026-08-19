@@ -14,6 +14,8 @@ interface ReferenceImageUploaderProps {
   primaryHint?: string;
   /** Allows Image-to-CAD to use the same tall upload canvas as Photo Studio. */
   canvasClassName?: string;
+  /** Uses Photo Studio's full-size empty drop affordance. */
+  photoStudioEmptyState?: boolean;
 }
 
 /**
@@ -30,6 +32,7 @@ export default function ReferenceImageUploader({
   primaryLabel = "Drop your ring image or sketch here",
   primaryHint = "Drag & drop · click to browse · paste (Ctrl+V)",
   canvasClassName = "h-[150px] sm:h-[170px]",
+  photoStudioEmptyState = false,
 }: ReferenceImageUploaderProps) {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const extraInputRef = useRef<HTMLInputElement>(null);
@@ -104,46 +107,71 @@ export default function ReferenceImageUploader({
         </div>
       )}
 
-      {/* Compact single-row canvas: much shorter than a tall multi-row grid so
-          5 equal slots read as square-ish tiles, not tall thin cards. Empty
-          state is one full-width drop zone; all 5 slots appear equal size in
-          a single row once any image exists — no primary/secondary
-          distinction, no enlarge icon, just the image and a remove control. */}
-      <div className={`${canvasClassName} overflow-hidden border border-border/30`}>
+      {/* Empty state mirrors Photo Studio's upload canvas. Once an image is
+          selected, the canvas becomes five stable, equal slots. */}
+      {!primaryPreviewUrl && photoStudioEmptyState ? (
         <div
-          className="grid h-full min-h-0 gap-2 p-2"
-          style={{ gridTemplateColumns: `repeat(${primaryPreviewUrl ? MAX_RING_CAD_REFERENCE_IMAGES : 1}, minmax(0, 1fr))` }}
+          ref={dropZoneRef}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          onClick={() => imageInputRef.current?.click()}
+          className={`relative flex flex-col items-center justify-center border border-dashed text-center transition-all cursor-pointer ${canvasClassName} ${
+            isDragging
+              ? "border-foreground/60 bg-foreground/5"
+              : "border-border/40 hover:border-foreground/40 hover:bg-foreground/5"
+          }`}
         >
-          {!primaryPreviewUrl ? (
+          <div className="relative mx-auto mb-6 h-20 w-20">
             <div
-              ref={dropZoneRef}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              onClick={() => imageInputRef.current?.click()}
-              className={`relative h-full min-h-0 min-w-0 flex items-center justify-center border-2 border-dashed transition-all duration-200 cursor-pointer ${
-                isDragging
-                  ? "border-foreground/60 bg-foreground/5"
-                  : "border-foreground/40 hover:border-foreground/60 hover:bg-foreground/5 bg-muted/10"
-              }`}
-            >
-              <div className="flex flex-col items-center gap-1.5 text-center px-4">
-                <div className="relative mx-auto h-9 w-9">
-                  <div className="absolute inset-0 rounded-full bg-primary/10 animate-ping motion-reduce:animate-none" style={{ animationDuration: '2.5s' }} />
-                  <div className="absolute inset-0 rounded-full bg-primary/5 border-2 border-primary/20 flex items-center justify-center">
-                    <Diamond className="h-4 w-4 text-primary" />
-                  </div>
-                </div>
-                <p className="font-display text-sm tracking-[0.08em] text-foreground uppercase">
-                  {primaryLabel}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {primaryHint}
-                </p>
-              </div>
+              className="absolute inset-0 rounded-full bg-primary/10 animate-ping motion-reduce:animate-none"
+              style={{ animationDuration: "2.5s" }}
+            />
+            <div className="absolute inset-0 flex items-center justify-center rounded-full border-2 border-primary/20 bg-primary/5">
+              <Diamond className="h-9 w-9 text-primary" />
             </div>
-          ) : (
-            Array.from({ length: MAX_RING_CAD_REFERENCE_IMAGES }, (_, index) => {
+          </div>
+          <p className="mb-1.5 font-display text-lg font-medium">{primaryLabel}</p>
+          <p className="mb-6 text-sm text-muted-foreground">{primaryHint}</p>
+          <Button variant="outline" size="lg" className="gap-2 pointer-events-none">
+            <ImageIcon className="h-4 w-4" />
+            Browse ring files
+          </Button>
+        </div>
+      ) : (
+        <div className={`${canvasClassName} overflow-hidden border border-border/30`}>
+          <div
+            className="grid h-full min-h-0 gap-2 p-2"
+            style={{ gridTemplateColumns: `repeat(${primaryPreviewUrl ? MAX_RING_CAD_REFERENCE_IMAGES : 1}, minmax(0, 1fr))` }}
+          >
+            {!primaryPreviewUrl ? (
+              <div
+                ref={dropZoneRef}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onClick={() => imageInputRef.current?.click()}
+                className={`relative flex h-full min-h-0 min-w-0 items-center justify-center border-2 border-dashed transition-all duration-200 cursor-pointer ${
+                  isDragging
+                    ? "border-foreground/60 bg-foreground/5"
+                    : "border-foreground/40 bg-muted/10 hover:border-foreground/60 hover:bg-foreground/5"
+                }`}
+              >
+                <div className="flex flex-col items-center gap-1.5 px-4 text-center">
+                  <div className="relative mx-auto h-9 w-9">
+                    <div
+                      className="absolute inset-0 rounded-full bg-primary/10 animate-ping motion-reduce:animate-none"
+                      style={{ animationDuration: "2.5s" }}
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center rounded-full border-2 border-primary/20 bg-primary/5">
+                      <Diamond className="h-4 w-4 text-primary" />
+                    </div>
+                  </div>
+                  <p className="font-display text-sm uppercase tracking-[0.08em] text-foreground">{primaryLabel}</p>
+                  <p className="text-xs text-muted-foreground">{primaryHint}</p>
+                </div>
+              </div>
+            ) : Array.from({ length: MAX_RING_CAD_REFERENCE_IMAGES }, (_, index) => {
               const url = referenceImagePreviewUrls[index];
 
               if (url) {
@@ -185,10 +213,10 @@ export default function ReferenceImageUploader({
                   )}
                 </button>
               );
-            })
-          )}
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {primaryPreviewUrl && (
         <p className="mt-2 text-[11px] text-muted-foreground/70 leading-relaxed">

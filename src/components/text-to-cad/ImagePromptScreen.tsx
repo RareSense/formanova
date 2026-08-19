@@ -157,9 +157,11 @@ export default function ImagePromptScreen({
           <div className="lg:col-span-2">
               <div className="mb-2 flex items-start justify-between gap-3">
                 <div>
-                  <span className="marta-label block mb-1">Step 1</span>
-                  <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">Upload Your Ring</h3>
-                  <p className="mt-1.5 text-sm text-muted-foreground">Upload a photo or sketch of your ring</p>
+                  <span className="marta-label block mb-1">Image to CAD &middot; Step 1</span>
+                  <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">Upload Your Ring Images</h3>
+                  <p className="mt-1.5 text-sm text-muted-foreground">
+                    Upload 1&ndash;5 photos or sketches of the same ring to inspire your CAD design.
+                  </p>
                 </div>
               </div>
 
@@ -168,7 +170,9 @@ export default function ImagePromptScreen({
                 referenceImagePreviewUrls={referenceImagePreviewUrls}
                 onAddReferenceImages={onAddReferenceImages}
                 onRemoveReferenceImage={onRemoveReferenceImage}
+                primaryLabel="Drop your ring images or sketches here"
                 canvasClassName={PANEL_H}
+                photoStudioEmptyState
               />
 
               {/* Text prompt — secondary */}
