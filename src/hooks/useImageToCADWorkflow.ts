@@ -249,7 +249,7 @@ export function useImageToCADWorkflow({
       // poll below only drives the on-page overlay while they stay.
       trackCadGeneration({
         workflowId: workflow_id,
-        label: prompt.trim() ? prompt.trim().slice(0, 40) : 'Image to 3D',
+        label: prompt.trim() ? prompt.trim().slice(0, 40) : 'Image to CAD',
         cadRoute,
       });
 

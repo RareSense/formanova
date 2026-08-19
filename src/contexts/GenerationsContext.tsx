@@ -55,7 +55,7 @@ function loadPersistedCadGenerations(): TrackedGeneration[] {
         workflowId: row.workflowId,
         status: 'running' as const,
         progress: 5,
-        generationStep: 'Reconnecting to your 3D ring...',
+        generationStep: 'Reconnecting to your CAD...',
         resultImages: [],
         outputAssetId: null,
         jewelryUrl: '',
@@ -433,7 +433,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
       },
       onStatusData: (statusData) => {
         const pct = Math.round(ringCadProgressFraction(statusData) * 90);
-        const step = isRingCadRepairing(statusData) ? 'Fixing the model...' : 'Building your 3D ring...';
+        const step = isRingCadRepairing(statusData) ? 'Fixing the model...' : 'Building your CAD...';
         setGenerations(prev => prev.map(g =>
           g.workflowId === gen.workflowId
             ? { ...g, progress: Math.max(g.progress, pct), generationStep: step }
@@ -474,7 +474,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
         // A failed run releases the entire credit hold.
         refreshCredits();
         toast({
-          title: 'Your 3D ring could not be generated',
+          title: 'Your CAD could not be generated',
           description: failure.userMessage
             ?? 'The run did not complete. Your credits were not charged.',
           variant: 'destructive',
@@ -497,8 +497,8 @@ export function GenerationsContextProvider({ children }: { children: React.React
       refreshCredits();
 
       toast({
-        title: 'Your 3D ring is ready',
-        description: `${gen.label ?? 'Image to 3D'} · ${duration}s`,
+        title: 'Your CAD is ready',
+        description: `${gen.label ?? 'Image to CAD'} · ${duration}s`,
         action: (
           <ToastAction
             altText="View Result"
@@ -519,7 +519,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
       markGenerationFailed(gen.workflowId, 'CAD poll failed', startTime);
       refreshCredits();
       toast({
-        title: 'Your 3D ring could not be generated',
+        title: 'Your CAD could not be generated',
         description: 'The run did not complete. Your credits were not charged.',
         variant: 'destructive',
       });
@@ -611,7 +611,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
               : g
           ));
           toast({
-            title: parsed ? 'Your 3D ring is ready' : 'Your 3D ring finished',
+            title: parsed ? 'Your CAD is ready' : 'Your CAD finished',
             description: parsed
               ? (gen.label ?? 'Open the completed CAD result')
               : 'The result could not be loaded yet. Open it to retry.',

@@ -29,11 +29,11 @@ const NODE_LABELS: Record<string, string> = {
   validate_against_sketch: "Validating against image",
   build_corrected: "Rendering final",
   success_final: "Generation complete",
-  success_original_glb: "Your 3D design is ready",
+  success_original_glb: "Your CAD is ready",
   failed_final: "Could not complete generation",
   _loading: "Loading model into viewport",
   analyzing: "Analyzing your design",
-  building: "Building your 3D ring",
+  building: "Building your CAD",
   repairing: "Fixing the model",
 };
 

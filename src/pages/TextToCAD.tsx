@@ -466,7 +466,7 @@ export default function TextToCAD() {
   return (
     <>
       <Helmet>
-        <title>Text to 3D | FormaNova</title>
+        <title>Text to CAD | FormaNova</title>
         <meta name="description" content="Describe any jewelry piece in text and get a manufacturable 3D CAD model in minutes. Rings, necklaces, bracelets & more." />
         <link rel="canonical" href="/text-to-cad" />
         <meta name="robots" content="noindex, nofollow" />

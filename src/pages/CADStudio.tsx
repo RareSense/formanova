@@ -10,7 +10,7 @@ import imageTo3dImg from "@/assets/examples/cad-example-3.webp";
 
 const cadFeatures = [
   {
-    title: "Text to 3D",
+    title: "Text to CAD",
     description: "Describe your ring and generate a 3D model from the text.",
     route: "/text-to-cad",
     comingSoon: false,
@@ -18,7 +18,7 @@ const cadFeatures = [
     image: textToCadImg,
   },
   {
-    title: "Image to 3D",
+    title: "Image to CAD",
     description: "Upload up to five reference images and generate a 3D model.",
     route: "/image-to-cad",
     comingSoon: false,

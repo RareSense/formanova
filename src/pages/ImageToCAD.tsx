@@ -250,7 +250,7 @@ export default function ImageToCAD() {
   return (
     <>
       <Helmet>
-        <title>Image to 3D | FormaNova</title>
+        <title>Image to CAD | FormaNova</title>
         <meta name="description" content="Upload a jewelry sketch or reference image and convert it into a 3D CAD model with AI-powered accuracy." />
         <link rel="canonical" href="/image-to-cad" />
         <meta name="robots" content="noindex, nofollow" />
@@ -284,7 +284,7 @@ export default function ImageToCAD() {
                 else canvasRef.current?.removeAllTextures();
               }}
               onReset={workflow.hasModel ? handleReset : undefined}
-              pageTitle="Image to 3D"
+              pageTitle="Image to CAD"
               referenceImagePreviewUrls={referenceImagePreviewUrls}
               onRemoveReferenceImage={removeReferenceImage}
               creditBlock={creditBlockUI}
