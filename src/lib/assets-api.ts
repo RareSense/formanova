@@ -100,11 +100,15 @@ export async function fetchUserAssets(
   category?: string,
   intendedUse?: 'on_model' | 'pdp',
   inputGroupId?: string,
+  /** Case-insensitive substring match on the asset NAME only. Applied
+   * server-side before pagination, so `total` stays correct while searching. */
+  search?: string,
 ): Promise<AssetsPage> {
   const params = new URLSearchParams({ asset_type: type, page: String(page), page_size: String(pageSize) });
   if (category) params.set('category', category);
   if (intendedUse) params.set('intended_use', intendedUse);
   if (inputGroupId) params.set('input_group_id', inputGroupId);
+  if (search) params.set('search', search);
   const response = await fetchWithRetry(`${API_BASE}/assets?${params}`);
   return response.json();
 }

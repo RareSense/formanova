@@ -53,7 +53,7 @@ describe('CadHistoryLibrary', () => {
   it('selecting a prompt card calls onSelectPrompt with its text', () => {
     const onSelectPrompt = vi.fn();
     mockUseCadHistoryLibrary.mockReturnValue(baseState({
-      items: [{ workflowId: 'wf-1', createdAt: '2026-08-15T00:00:00Z', prompt: 'Twisted vine ring', referenceImageUrls: [] }],
+      items: [{ id: 'wf-1', createdAt: '2026-08-15T00:00:00Z', prompt: 'Twisted vine ring', referenceImageUrls: [] }],
     }));
     render(<CadHistoryLibrary variant="prompts" onSelectPrompt={onSelectPrompt} />);
 
@@ -61,24 +61,36 @@ describe('CadHistoryLibrary', () => {
     expect(onSelectPrompt).toHaveBeenCalledWith('Twisted vine ring');
   });
 
-  it('selecting a single-image card calls onSelectImages, and renders no search box for images', () => {
+  it('selecting a single-image card calls onSelectImages with its url', () => {
     const onSelectImages = vi.fn();
     mockUseCadHistoryLibrary.mockReturnValue(baseState({
-      isSearchable: false,
-      items: [{ workflowId: 'wf-2', createdAt: '2026-08-15T00:00:00Z', prompt: null, referenceImageUrls: ['/api/artifacts/abc'] }],
+      items: [{ id: 'wf-2', createdAt: '2026-08-15T00:00:00Z', prompt: null, referenceImageUrls: ['/api/artifacts/abc'] }],
     }));
     render(<CadHistoryLibrary variant="images" onSelectImages={onSelectImages} />);
 
-    // No dead search affordance: real search ships with the backend vault.
-    expect(screen.queryByRole('textbox')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Reuse this reference image' }));
     expect(onSelectImages).toHaveBeenCalledWith(['/api/artifacts/abc']);
   });
 
+  it('gives images a real name search box, wired to the hook', () => {
+    const setSearch = vi.fn();
+    mockUseCadHistoryLibrary.mockReturnValue(baseState({
+      setSearch,
+      items: [{ id: 'wf-2', createdAt: '2026-08-15T00:00:00Z', prompt: null, referenceImageUrls: ['/api/artifacts/abc'] }],
+    }));
+    render(<CadHistoryLibrary variant="images" />);
+
+    // Searches by asset name (server-side), not by prompt text.
+    const box = screen.getByPlaceholderText('Search by name...');
+    expect(box).not.toHaveProperty('disabled', true);
+    fireEvent.change(box, { target: { value: 'signet' } });
+    expect(setSearch).toHaveBeenCalledWith('signet');
+  });
+
   it('renders no "Show all" toggle for images, since CAD has no intended_use to filter by', () => {
     mockUseCadHistoryLibrary.mockReturnValue(baseState({
-      isSearchable: false,
-      items: [{ workflowId: 'wf-2', createdAt: '2026-08-15T00:00:00Z', prompt: null, referenceImageUrls: ['/api/artifacts/abc'] }],
+      isSearchable: true,
+      items: [{ id: 'wf-2', createdAt: '2026-08-15T00:00:00Z', prompt: null, referenceImageUrls: ['/api/artifacts/abc'] }],
     }));
     render(<CadHistoryLibrary variant="images" />);
 
@@ -89,10 +101,10 @@ describe('CadHistoryLibrary', () => {
   it('shows every image from a multi-image upload as its own tile, not just the primary angle', () => {
     const onSelectImages = vi.fn();
     mockUseCadHistoryLibrary.mockReturnValue(baseState({
-      isSearchable: false,
+      isSearchable: true,
       items: [
-        { workflowId: 'wf-multi', createdAt: '2026-08-15T00:00:00Z', prompt: null, referenceImageUrls: ['/api/artifacts/angle-1', '/api/artifacts/angle-2', '/api/artifacts/angle-3'] },
-        { workflowId: 'wf-single', createdAt: '2026-08-14T00:00:00Z', prompt: null, referenceImageUrls: ['/api/artifacts/single'] },
+        { id: 'wf-multi', createdAt: '2026-08-15T00:00:00Z', prompt: null, referenceImageUrls: ['/api/artifacts/angle-1', '/api/artifacts/angle-2', '/api/artifacts/angle-3'] },
+        { id: 'wf-single', createdAt: '2026-08-14T00:00:00Z', prompt: null, referenceImageUrls: ['/api/artifacts/single'] },
       ],
     }));
     render(<CadHistoryLibrary variant="images" onSelectImages={onSelectImages} />);
@@ -106,7 +118,7 @@ describe('CadHistoryLibrary', () => {
 
   it('strips raw markdown emphasis from prompt text before rendering', () => {
     mockUseCadHistoryLibrary.mockReturnValue(baseState({
-      items: [{ workflowId: 'wf-md', createdAt: '2026-08-17T15:27:00Z', prompt: 'Create a **spider-shaped statement ring** with the spider centered symmetrically', referenceImageUrls: [] }],
+      items: [{ id: 'wf-md', createdAt: '2026-08-17T15:27:00Z', prompt: 'Create a **spider-shaped statement ring** with the spider centered symmetrically', referenceImageUrls: [] }],
     }));
     render(<CadHistoryLibrary variant="prompts" />);
 
@@ -123,7 +135,7 @@ describe('CadHistoryLibrary', () => {
   it('renders pagination controls and paging through calls setPage', () => {
     const setPage = vi.fn();
     mockUseCadHistoryLibrary.mockReturnValue(baseState({
-      items: [{ workflowId: 'wf-1', createdAt: '2026-08-15T00:00:00Z', prompt: 'A ring', referenceImageUrls: [] }],
+      items: [{ id: 'wf-1', createdAt: '2026-08-15T00:00:00Z', prompt: 'A ring', referenceImageUrls: [] }],
       totalPages: 3,
       page: 1,
       setPage,

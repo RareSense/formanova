@@ -140,10 +140,10 @@ export default function CadHistoryLibrary({ variant, onSelectPrompt, onSelectIma
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground/50" />
               <input
                 type="text"
-                placeholder="Search prompts..."
+                placeholder={variant === "images" ? "Search by name..." : "Search prompts..."}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                aria-label="Search prompts"
+                aria-label={variant === "images" ? "Search rings by name" : "Search prompts"}
                 className="w-full border border-border/20 bg-muted/20 py-1.5 pl-7 pr-3 font-mono text-[10px] text-foreground placeholder:text-muted-foreground/40 outline-none transition-colors focus:border-border/60"
               />
             </div>
@@ -158,7 +158,7 @@ export default function CadHistoryLibrary({ variant, onSelectPrompt, onSelectIma
           <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
             {items.map((entry) => (
               <PromptCard
-                key={entry.workflowId}
+                key={entry.id}
                 entry={entry}
                 onSelect={() => entry.prompt && onSelectPrompt?.(entry.prompt)}
               />
@@ -174,7 +174,7 @@ export default function CadHistoryLibrary({ variant, onSelectPrompt, onSelectIma
             <div className="columns-3 gap-2">
               {items.flatMap((entry) =>
                   entry.referenceImageUrls.map((url, index) => (
-                  <RingTile key={`${entry.workflowId}-${index}`} url={url} createdAt={entry.createdAt} onSelect={() => onSelectImages?.([url])} />
+                  <RingTile key={`${entry.id}-${index}`} url={url} createdAt={entry.createdAt} onSelect={() => onSelectImages?.([url])} />
                 )),
               )}
             </div>

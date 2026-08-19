@@ -7,8 +7,15 @@ vi.mock('@/lib/generation-history-api', async () => {
   return { ...actual, listMyWorkflows: mockListMyWorkflows };
 });
 
+const mockFetchUserAssets = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/assets-api', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/assets-api')>('@/lib/assets-api');
+  return { ...actual, fetchUserAssets: mockFetchUserAssets };
+});
+
 import { useCadHistoryLibrary } from './useCadHistoryLibrary';
 import type { WorkflowSummary } from '@/lib/generation-history-api';
+import type { UserAsset } from '@/lib/assets-api';
 
 function wf(overrides: Partial<WorkflowSummary>): WorkflowSummary {
   return {
@@ -22,12 +29,28 @@ function wf(overrides: Partial<WorkflowSummary>): WorkflowSummary {
   };
 }
 
+function asset(overrides: Partial<UserAsset> & { id: string }): UserAsset {
+  return {
+    asset_type: 'cad_reference',
+    created_at: '2026-08-10T00:00:00Z',
+    thumbnail_url: `/api/artifacts/${overrides.id}`,
+    name: null,
+    ...overrides,
+  } as UserAsset;
+}
+
+function assetPage(items: UserAsset[], total = items.length) {
+  return { items, total, page: 0, page_size: 10 };
+}
+
 beforeEach(() => {
   mockListMyWorkflows.mockReset();
+  mockFetchUserAssets.mockReset();
+  mockFetchUserAssets.mockResolvedValue(assetPage([]));
 });
 
-describe('useCadHistoryLibrary', () => {
-  it('reports no history when there are zero matching, prompt-bearing text_to_cad runs', async () => {
+describe('useCadHistoryLibrary — prompts (text_to_cad)', () => {
+  it('reports no history when there are zero matching, prompt-bearing runs', async () => {
     mockListMyWorkflows.mockResolvedValue([
       wf({ workflow_id: 'a', source_type: 'text_to_cad', prompt: null }),
       wf({ workflow_id: 'b', source_type: 'image_to_cad', prompt: 'ignored, wrong source type' }),
@@ -40,7 +63,7 @@ describe('useCadHistoryLibrary', () => {
     expect(result.current.items).toEqual([]);
   });
 
-  it('sorts prompt history newest first and filters by search text', async () => {
+  it('sorts newest first and filters in memory by search text', async () => {
     mockListMyWorkflows.mockResolvedValue([
       wf({ workflow_id: 'old', created_at: '2026-08-01T00:00:00Z', prompt: 'Twisted vine ring' }),
       wf({ workflow_id: 'new', created_at: '2026-08-15T00:00:00Z', prompt: 'Halo diamond ring' }),
@@ -49,25 +72,12 @@ describe('useCadHistoryLibrary', () => {
     const { result } = renderHook(() => useCadHistoryLibrary('text_to_cad'));
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
-    expect(result.current.hasHistory).toBe(true);
-    expect(result.current.items.map((i) => i.workflowId)).toEqual(['new', 'old']);
+    expect(result.current.items.map((i) => i.id)).toEqual(['new', 'old']);
 
     act(() => result.current.setSearch('twisted'));
-    expect(result.current.items.map((i) => i.workflowId)).toEqual(['old']);
-  });
-
-  it('is not searchable for image_to_cad and ignores incomplete/imageless runs', async () => {
-    mockListMyWorkflows.mockResolvedValue([
-      wf({ workflow_id: 'running', status: 'running', source_type: 'image_to_cad', reference_image_urls: ['/api/artifacts/a'] }),
-      wf({ workflow_id: 'no-images', status: 'completed', source_type: 'image_to_cad', reference_image_urls: [] }),
-      wf({ workflow_id: 'good', status: 'completed', source_type: 'image_to_cad', reference_image_urls: ['/api/artifacts/b'] }),
-    ]);
-
-    const { result } = renderHook(() => useCadHistoryLibrary('image_to_cad'));
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
-
-    expect(result.current.isSearchable).toBe(false);
-    expect(result.current.items.map((i) => i.workflowId)).toEqual(['good']);
+    expect(result.current.items.map((i) => i.id)).toEqual(['old']);
+    // Prompts never hit the asset vault.
+    expect(mockFetchUserAssets).not.toHaveBeenCalled();
   });
 
   it('paginates in pages of 10', async () => {
@@ -93,6 +103,81 @@ describe('useCadHistoryLibrary', () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     expect(result.current.error).toBe('Failed to list workflows: 500');
+    expect(result.current.hasHistory).toBe(false);
+  });
+});
+
+describe('useCadHistoryLibrary — images (image_to_cad)', () => {
+  it('reads the cad_reference vault, not generation history', async () => {
+    mockFetchUserAssets.mockResolvedValue(assetPage([
+      asset({ id: 'asset-a', name: 'Signet band' }),
+      asset({ id: 'asset-b' }),
+    ]));
+
+    const { result } = renderHook(() => useCadHistoryLibrary('image_to_cad'));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(mockFetchUserAssets).toHaveBeenCalledWith(
+      'cad_reference', 0, 10, undefined, undefined, undefined, undefined,
+    );
+    expect(mockListMyWorkflows).not.toHaveBeenCalled();
+
+    // One entry per asset, carrying the id needed for rename.
+    expect(result.current.items.map((i) => i.id)).toEqual(['asset-a', 'asset-b']);
+    expect(result.current.items[0].assetId).toBe('asset-a');
+    expect(result.current.items[0].name).toBe('Signet band');
+    expect(result.current.items[0].referenceImageUrls).toEqual(['/api/artifacts/asset-a']);
+  });
+
+  it('is searchable, and sends the term to the server rather than filtering locally', async () => {
+    mockFetchUserAssets.mockResolvedValue(assetPage([asset({ id: 'asset-a' })]));
+
+    const { result } = renderHook(() => useCadHistoryLibrary('image_to_cad'));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.isSearchable).toBe(true);
+
+    act(() => result.current.setSearch('signet'));
+
+    await waitFor(() => expect(mockFetchUserAssets).toHaveBeenLastCalledWith(
+      'cad_reference', 0, 10, undefined, undefined, undefined, 'signet',
+    ));
+  });
+
+  it('keeps the panel mounted while a search returns nothing, so the box stays usable', async () => {
+    mockFetchUserAssets.mockResolvedValue(assetPage([]));
+
+    const { result } = renderHook(() => useCadHistoryLibrary('image_to_cad'));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    // No assets and no search term: genuinely empty, caller shows the examples.
+    expect(result.current.hasHistory).toBe(false);
+
+    act(() => result.current.setSearch('nothing matches this'));
+    await waitFor(() => expect(result.current.hasHistory).toBe(true));
+  });
+
+  it('pages on the server, using the reported total rather than the page length', async () => {
+    mockFetchUserAssets.mockResolvedValue(assetPage([asset({ id: 'a' })], 25));
+
+    const { result } = renderHook(() => useCadHistoryLibrary('image_to_cad'));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.totalCount).toBe(25);
+    expect(result.current.totalPages).toBe(3);
+
+    act(() => result.current.setPage(2));
+    await waitFor(() => expect(mockFetchUserAssets).toHaveBeenLastCalledWith(
+      'cad_reference', 2, 10, undefined, undefined, undefined, undefined,
+    ));
+  });
+
+  it('surfaces a vault fetch failure', async () => {
+    mockFetchUserAssets.mockRejectedValue(new Error('HTTP 404'));
+
+    const { result } = renderHook(() => useCadHistoryLibrary('image_to_cad'));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.error).toBe('HTTP 404');
     expect(result.current.hasHistory).toBe(false);
   });
 });
