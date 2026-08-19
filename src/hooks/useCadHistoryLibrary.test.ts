@@ -56,7 +56,7 @@ describe('useCadHistoryLibrary', () => {
     expect(result.current.items.map((i) => i.workflowId)).toEqual(['old']);
   });
 
-  it('exposes the visual search affordance for image_to_cad and ignores incomplete/imageless runs', async () => {
+  it('is not searchable for image_to_cad and ignores incomplete/imageless runs', async () => {
     mockListMyWorkflows.mockResolvedValue([
       wf({ workflow_id: 'running', status: 'running', source_type: 'image_to_cad', reference_image_urls: ['/api/artifacts/a'] }),
       wf({ workflow_id: 'no-images', status: 'completed', source_type: 'image_to_cad', reference_image_urls: [] }),
@@ -66,7 +66,7 @@ describe('useCadHistoryLibrary', () => {
     const { result } = renderHook(() => useCadHistoryLibrary('image_to_cad'));
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
-    expect(result.current.isSearchable).toBe(true);
+    expect(result.current.isSearchable).toBe(false);
     expect(result.current.items.map((i) => i.workflowId)).toEqual(['good']);
   });
 

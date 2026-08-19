@@ -18,9 +18,11 @@ const PAGE_SIZE = 10;
  * from listMyWorkflows(), which already carries reference_image_urls/prompt
  * per run (see docs/CAD_LIBRARY_PANEL_PLAN.md) — no separate endpoint.
  *
- * Image-to-CAD entries have no user-given name to search by (these are past
- * workflow runs, not named vault assets), but the images panel still renders
- * the disabled search affordance for visual parity with Photo Studio.
+ * Search only applies to prompts: image_to_cad entries have no user-given
+ * name to search by (these are past workflow runs, not named vault assets).
+ * Real search arrives with the backend cad_reference vault (GET /assets
+ * ?asset_type=cad_reference&search=), not before — until then the images
+ * panel renders no search box rather than a dead one.
  */
 export function useCadHistoryLibrary(sourceType: Extract<SourceType, 'text_to_cad' | 'image_to_cad'>) {
   const [entries, setEntries] = useState<CadLibraryEntry[] | null>(null);
@@ -72,7 +74,7 @@ export function useCadHistoryLibrary(sourceType: Extract<SourceType, 'text_to_ca
     isLoading: entries === null,
     error,
     hasHistory: (entries?.length ?? 0) > 0,
-    isSearchable: true,
+    isSearchable: sourceType === 'text_to_cad',
     items: pageItems,
     totalCount: filtered.length,
     search,

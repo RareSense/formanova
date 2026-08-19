@@ -11,7 +11,6 @@ import { useEffect } from "react";
 import { useAuthenticatedImage } from "@/hooks/useAuthenticatedImage";
 import { useCadHistoryLibrary, type CadLibraryEntry } from "@/hooks/useCadHistoryLibrary";
 import { Search, ChevronLeft, ChevronRight, Diamond } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
 
 const localDateFmt = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
 
@@ -127,18 +126,11 @@ export default function CadHistoryLibrary({ variant, onSelectPrompt, onSelectIma
   return (
     <div className="flex h-full flex-col">
       <div className="mb-2">
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">{title}</h3>
-            <p className="mt-1.5 text-sm text-muted-foreground">{subtitle}</p>
-          </div>
-          {variant === "images" && (
-            <div className="mt-8 flex shrink-0 items-center gap-2">
-              <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Show all</span>
-              <Switch checked={false} disabled aria-label="Show all rings coming soon" />
-            </div>
-          )}
-        </div>
+        {/* No "Show all" toggle here, unlike Photo Studio: that switch filters
+            between on_model / pdp intended_use, which CAD references have no
+            equivalent of. A disabled copy of it would never become functional. */}
+        <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">{title}</h3>
+        <p className="mt-1.5 text-sm text-muted-foreground">{subtitle}</p>
       </div>
 
       <div className={`flex min-h-0 flex-col border border-border/30 ${variant === "images" ? `flex-none ${panelH ?? ""}` : "flex-1"}`}>
@@ -148,11 +140,10 @@ export default function CadHistoryLibrary({ variant, onSelectPrompt, onSelectIma
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground/50" />
               <input
                 type="text"
-                placeholder={variant === "images" ? "Search coming soon" : "Search prompts..."}
+                placeholder="Search prompts..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                disabled={variant === "images"}
-                aria-label={variant === "images" ? "Search rings coming soon" : "Search prompts"}
+                aria-label="Search prompts"
                 className="w-full border border-border/20 bg-muted/20 py-1.5 pl-7 pr-3 font-mono text-[10px] text-foreground placeholder:text-muted-foreground/40 outline-none transition-colors focus:border-border/60"
               />
             </div>
