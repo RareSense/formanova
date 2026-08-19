@@ -318,26 +318,63 @@ export function extractWorkflowCredits(payload: unknown): number | null {
   }
 
   if (!payload || typeof payload !== 'object') return null;
-  const data = payload as Record<string, any>;
-  const wrappers = [data, data.data, data.result, data.financials].filter(
-    (value): value is Record<string, any> => Boolean(value && typeof value === 'object' && !Array.isArray(value)),
-  );
 
-  for (const record of wrappers) {
-    for (const key of ['actual_user_billed', 'total_charged', 'total_cost', 'total', 'credits_spent']) {
-      const value = numericCredits(record[key]);
-      if (value !== null) return value;
-    }
+  // Search the whole object for the billed figure rather than a fixed list of
+  // wrapper depths. The charge sits on the workflow row and the backend nests
+  // it, so hardcoding `data`, `data.data`, `data.result` and `data.financials`
+  // missed it whenever the shape differed by even one level.
+  const billed = findCreditKey(payload, BILLED_KEYS);
+  if (billed !== null) return billed;
+
+  // Only now fall back to summing the per-step breakdown, and never accept a
+  // total of zero from it. Every toolkit tool prices at 0 per call, so a CAD
+  // audit has 20 line items that all read 0 while the run really cost 60.
+  // Summing those produced the "0 credits used" the user sees; a zero here
+  // means the cost lives elsewhere, not that the run was free.
+  const items = findLineItems(payload);
+  if (items) {
+    const total = extractWorkflowCredits(items);
+    if (total !== null && total > 0) return total;
   }
 
-  for (const record of wrappers) {
-    const items = record.line_items ?? record.items ?? record.audit;
-    if (Array.isArray(items)) {
-      const total = extractWorkflowCredits(items);
-      if (total !== null) return total;
-    }
-  }
+  return null;
+}
 
+const BILLED_KEYS = ['actual_user_billed', 'total_charged', 'total_cost', 'total', 'credits_spent'];
+
+/** Depth-first search for the first of `keys` holding a usable number. */
+function findCreditKey(node: unknown, keys: string[], depth = 0): number | null {
+  if (depth > 6 || !node || typeof node !== 'object') return null;
+  if (Array.isArray(node)) {
+    for (const entry of node) {
+      const found = findCreditKey(entry, keys, depth + 1);
+      if (found !== null) return found;
+    }
+    return null;
+  }
+  const record = node as Record<string, unknown>;
+  for (const key of keys) {
+    const value = numericCredits(record[key]);
+    if (value !== null) return value;
+  }
+  for (const value of Object.values(record)) {
+    const found = findCreditKey(value, keys, depth + 1);
+    if (found !== null) return found;
+  }
+  return null;
+}
+
+/** Finds the per-step breakdown array wherever it is nested. */
+function findLineItems(node: unknown, depth = 0): unknown[] | null {
+  if (depth > 6 || !node || typeof node !== 'object' || Array.isArray(node)) return null;
+  const record = node as Record<string, unknown>;
+  for (const key of ['line_items', 'items', 'audit']) {
+    if (Array.isArray(record[key])) return record[key] as unknown[];
+  }
+  for (const value of Object.values(record)) {
+    const found = findLineItems(value, depth + 1);
+    if (found) return found;
+  }
   return null;
 }
 

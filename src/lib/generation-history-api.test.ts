@@ -400,3 +400,36 @@ describe('credits on the history summary', () => {
     expect(wf.credits_spent).toBe(0);
   });
 });
+
+describe('extractWorkflowCredits on the real CAD audit shape', () => {
+  it('finds the billed figure however deeply it is nested', () => {
+    expect(extractWorkflowCredits({ audit: { summary: { actual_user_billed: 60 } } })).toBe(60);
+    expect(extractWorkflowCredits({ workflow: { billing: { actual_user_billed: '70' } } })).toBe(70);
+  });
+
+  it('prefers the billed figure over an all-zero step breakdown', () => {
+    // The shape backend showed: 60 on the workflow row, 20 steps all at 0
+    // because every toolkit tool prices at 0 per call.
+    const payload = {
+      status: 'completed',
+      actual_user_billed: 60,
+      provider_cost: 0,
+      line_items: Array.from({ length: 20 }, (_, i) => ({ name: `step_${i}`, cost: 0 })),
+    };
+    expect(extractWorkflowCredits(payload)).toBe(60);
+  });
+
+  it('refuses to report zero from a breakdown where every step is zero', () => {
+    // Summing these produced the "0 credits used" bug. A zero here means the
+    // charge lives elsewhere, not that the generation was free.
+    const payload = {
+      status: 'completed',
+      line_items: Array.from({ length: 20 }, () => ({ cost: 0 })),
+    };
+    expect(extractWorkflowCredits(payload)).toBeNull();
+  });
+
+  it('still sums a breakdown that carries real per-step costs', () => {
+    expect(extractWorkflowCredits({ line_items: [{ cost: 8 }, { cost: 2 }] })).toBe(10);
+  });
+});
