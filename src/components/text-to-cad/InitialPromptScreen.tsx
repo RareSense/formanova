@@ -1,6 +1,5 @@
 import { useRef, useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { useEstimatedCost } from "@/hooks/use-estimated-cost";
@@ -117,7 +116,6 @@ export default function InitialPromptScreen({
                         <img src={creditCoinIcon} alt="" className="w-5 h-5" />
                         <span className="font-mono text-sm font-semibold">{costLoading ? '…' : (estimatedCost !== null ? estimatedCost : '—')}</span>
                       </span>
-                      <ArrowRight className="h-4 w-4" />
                     </>
                   )}
                 </Button>
