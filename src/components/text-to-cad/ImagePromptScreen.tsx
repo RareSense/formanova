@@ -229,9 +229,15 @@ export default function ImagePromptScreen({
           </div>
 
           <div>
-            {hasImageHistory ? (
+            {/* My Rings must stay mounted even while hidden: it is what reports
+                whether any history exists, so gating its render on
+                hasImageHistory would deadlock — the flag could never flip
+                because nothing would ever fetch and report back. */}
+            <div className={hasImageHistory ? "" : "hidden"}>
               <CadHistoryLibrary variant="images" panelH={PANEL_H} onSelectImages={handleLibraryImageSelect} onHasHistoryChange={setHasImageHistory} />
-            ) : (
+            </div>
+
+            {!hasImageHistory && (
               <>
                 <div className="mb-2">
                   <span className="marta-label block mb-1 invisible" aria-hidden="true">Step 1</span>
