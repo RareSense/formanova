@@ -15,7 +15,6 @@ import { useImageToCADWorkflow } from "@/hooks/useImageToCADWorkflow";
 import { useCADMeshEditor } from "@/hooks/useCADMeshEditor";
 import { useReferenceImages } from "@/hooks/useReferenceImages";
 import { useNotificationEmail } from "@/hooks/useNotificationEmail";
-import { useAltDeliveryPreference } from "@/hooks/useAltDeliveryPreference";
 import { useCADKeyboardShortcuts } from "@/hooks/use-cad-keyboard-shortcuts";
 
 import ImagePromptScreen from "@/components/text-to-cad/ImagePromptScreen";
@@ -80,7 +79,6 @@ export default function ImageToCAD() {
     userId: user?.id,
     onWorkspaceActivate: activateWorkspace,
   });
-  const altDelivery = useAltDeliveryPreference(workflow.sourceWorkflowId, user?.email, "Image-to-CAD");
 
   useEffect(() => { runMicroBenchmark(); }, []);
 
@@ -448,11 +446,6 @@ export default function ImageToCAD() {
               notificationEmailSaving={notificationEmail.isSaving}
               notificationEmailError={notificationEmail.error}
               onSaveNotificationEmail={notificationEmail.saveNotificationEmail}
-              altDeliveryPreference={altDelivery.preference}
-              altDeliveryRequesting={altDelivery.isRequesting}
-              altDeliveryError={altDelivery.error}
-              altDeliveryRequested={altDelivery.requested}
-              onRequestAltDelivery={altDelivery.requestDelivery}
               onKeepCreating={() => {
                 workflow.handleKeepCreating();
                 setPrompt("");

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -46,6 +46,7 @@ interface SectionState {
 
 export default function Generations() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [error, setError] = useState<string | null>(null);
 
   const [allWorkflows, setAllWorkflows] = useState<WorkflowSummary[]>([]);
@@ -53,6 +54,20 @@ export default function Generations() {
   // Bumped when an inline upscale completes, to re-fetch the list so the new
   // upscaled generation appears as its own entry.
   const [refreshKey, setRefreshKey] = useState(0);
+  /** Fires once per deep link so a later re-render cannot yank the page back. */
+  const scrolledToLinkedRef = useRef(false);
+
+  // Deep link from the result notification email: /generations?workflow=<id>.
+  // Backend links here rather than attaching the file, so the download stays
+  // behind auth. Wait for the list to render, then bring that run into view.
+  useEffect(() => {
+    const linked = searchParams.get('workflow')?.trim();
+    if (!linked || globalLoading || scrolledToLinkedRef.current) return;
+    const node = document.getElementById(`workflow-${linked}`);
+    if (!node) return;   // not on this page, or filtered out
+    scrolledToLinkedRef.current = true;
+    node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [searchParams, globalLoading, allWorkflows]);
 
   const [photoPage, setPhotoPage] = useState(1);
   const [productShotPage, setProductShotPage] = useState(1);

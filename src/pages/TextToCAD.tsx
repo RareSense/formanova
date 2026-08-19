@@ -17,7 +17,6 @@ import { isWeightStlEnabled, isCadUploadEnabled } from "@/lib/feature-flags";
 import { useImageToCADWorkflow } from "@/hooks/useImageToCADWorkflow";
 import { useCADMeshEditor } from "@/hooks/useCADMeshEditor";
 import { useNotificationEmail } from "@/hooks/useNotificationEmail";
-import { useAltDeliveryPreference } from "@/hooks/useAltDeliveryPreference";
 
 import MeshPanel from "@/components/text-to-cad/MeshPanel";
 import CADCanvas from "@/components/text-to-cad/CADCanvas";
@@ -93,7 +92,6 @@ export default function TextToCAD() {
     cadRoute: '/text-to-cad',
     onWorkspaceActivate: activateWorkspace,
   });
-  const altDelivery = useAltDeliveryPreference(workflow.sourceWorkflowId, user?.email, "Text-to-CAD");
 
   // Track browser fullscreen state
   useEffect(() => {
@@ -691,11 +689,6 @@ export default function TextToCAD() {
               notificationEmailSaving={notificationEmail.isSaving}
               notificationEmailError={notificationEmail.error}
               onSaveNotificationEmail={notificationEmail.saveNotificationEmail}
-              altDeliveryPreference={altDelivery.preference}
-              altDeliveryRequesting={altDelivery.isRequesting}
-              altDeliveryError={altDelivery.error}
-              altDeliveryRequested={altDelivery.requested}
-              onRequestAltDelivery={altDelivery.requestDelivery}
               onKeepCreating={() => {
                 workflow.handleKeepCreating();
                 setPrompt("");

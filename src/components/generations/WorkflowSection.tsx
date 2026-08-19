@@ -97,6 +97,10 @@ export function WorkflowSection({
             className={gridClass}
           >
             {workflows.map((w, i) => (
+              // Anchor for the notification email's deep link,
+              // /generations?workflow=<id>. Wrapping rather than putting the id
+              // on the card keeps it stable across both card variants.
+              <div key={w.workflow_id} id={`workflow-${w.workflow_id}`} className="contents">
               <WorkflowCard
                 key={w.workflow_id}
                 workflow={w}
@@ -104,6 +108,7 @@ export function WorkflowSection({
                 onClick={onWorkflowClick}
                 onUpscaled={onUpscaled}
               />
+              </div>
             ))}
           </motion.div>
 
