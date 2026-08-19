@@ -167,7 +167,7 @@ function RingCard({ entry, onSelect, onRename }: {
             ) : (
               <>
                 <span className="truncate font-mono text-[10px] text-foreground" title={entry.name ?? undefined}>
-                  {entry.name || <span className="italic text-muted-foreground/60">Click to name</span>}
+                  {entry.name || "Ring"}
                 </span>
                 <Pencil className="h-3 w-3 flex-shrink-0 text-muted-foreground/40 transition-colors group-hover/rename:text-foreground/60" />
               </>
@@ -281,7 +281,7 @@ export default function CadHistoryLibrary({ variant, onSelectPrompt, onSelectIma
             {/* True masonry: every reference image is its own tile at its
                 natural aspect ratio, packed into 3 columns with small
                 consistent gaps — matches Photo Studio's My Models panel. */}
-            <div className="columns-2 gap-2">
+            <div className="columns-3 gap-2">
               {items.map((entry) => (
                 <RingCard
                   key={entry.id}
