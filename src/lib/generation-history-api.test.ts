@@ -233,7 +233,8 @@ describe('generation-history-api URL shapes', () => {
 
 describe('credit audit parsing', () => {
   it('sums the shipped array response shape', () => {
-    expect(extractWorkflowCredits([{ cost: 40 }, { cost: 30 }])).toBe(70);
+    // Line items are never the answer: they price attempts that were not billed.
+    expect(extractWorkflowCredits([{ cost: 40 }, { cost: 30 }])).toBeNull();
   });
 
   it('reads wrapped actual billing and numeric strings', () => {
@@ -241,7 +242,7 @@ describe('credit audit parsing', () => {
   });
 
   it('preserves a legitimate zero-credit audit', () => {
-    expect(extractWorkflowCredits([{ cost: 0 }])).toBe(0);
+    expect(extractWorkflowCredits([{ cost: 0 }])).toBeNull();
     expect(extractWorkflowCredits({ line_items: [] })).toBeNull();
   });
 });
@@ -402,6 +403,31 @@ describe('extractWorkflowCredits on the real CAD audit payload', () => {
   });
 
   it('still sums a breakdown that carries real per-step costs', () => {
-    expect(extractWorkflowCredits({ line_items: [{ cost: 8 }, { cost: 2 }] })).toBe(10);
+    expect(extractWorkflowCredits({ line_items: [{ cost: 8 }, { cost: 2 }] })).toBeNull();
+  });
+});
+
+describe('extractWorkflowCredits never sums unbilled attempts', () => {
+  // Backend's real cases. Summing the rows overstates the charge, because a
+  // priced row is written for every attempt while the policy only bills the
+  // successful, uncached, unskipped ones.
+  it('reports the billed figure, not the larger line-item total', () => {
+    expect(extractWorkflowCredits({
+      summary: { financials: { actual_user_billed: 20 } },
+      line_items: [{ cost: 20 }, { cost: 8 }, { cost: 8 }],  // 36, two failed retries
+    })).toBe(20);
+  });
+
+  it('reports zero for a fully failed run whose rows still carry prices', () => {
+    // Failures are not charged, so 0 is the truthful answer even though the
+    // rows total 36.
+    expect(extractWorkflowCredits({
+      summary: { status: 'failed', financials: { actual_user_billed: 0 } },
+      line_items: [{ cost: 12 }, { cost: 12 }, { cost: 12 }],
+    })).toBe(0);
+  });
+
+  it('returns null rather than a number invented from the rows', () => {
+    expect(extractWorkflowCredits({ line_items: [{ cost: 8 }, { cost: 2 }] })).toBeNull();
   });
 });

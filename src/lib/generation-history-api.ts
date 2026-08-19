@@ -292,24 +292,29 @@ function numericCredits(value: unknown): number | null {
 }
 
 /** Normalizes every currently shipped credit-audit response shape. */
+/**
+ * Reads the post-policy charge from a credit-audit response.
+ *
+ * Only `actual_user_billed` is correct. Do NOT sum `line_items`: every attempt
+ * writes a priced row whether or not it was billed, and the policy suppresses
+ * several of them. Failed attempts never bill (user_billable = is_success),
+ * and charge_cache_hits, charge_skipped_nodes and charge_duplicate_success are
+ * all false, so each of those also writes a priced row that was never charged.
+ *
+ * Summing therefore overstates the charge. Backend's example: line items total
+ * 36 on a run billed 20, and a fully failed run bills 0 while its items still
+ * total 36. Summing used to look right only on a clean run with no retries,
+ * where the two happen to coincide.
+ *
+ * If the billed figure is absent we return null and the UI says the cost is
+ * unavailable, which is honest, rather than inventing a number from the rows.
+ */
 export function extractWorkflowCredits(payload: unknown): number | null {
-  if (Array.isArray(payload)) {
-    let found = false;
-    const total = payload.reduce((sum, item) => {
-      const record = item && typeof item === 'object' ? item as Record<string, unknown> : {};
-      const value = numericCredits(record.cost ?? record.amount ?? record.credits);
-      if (value === null) return sum;
-      found = true;
-      return sum + value;
-    }, 0);
-    return found ? total : null;
-  }
-
-  if (!payload || typeof payload !== 'object') return null;
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
   const data = payload as Record<string, any>;
-  // The audit response nests the charge at summary.financials.actual_user_billed.
-  // Checking `financials` only at the root missed it by one level, which is why
-  // a 60-credit CAD run fell through to the line items below.
+
+  // The charge is nested at summary.financials.actual_user_billed. The other
+  // wrappers cover shapes shipped by older workflows.
   const wrappers = [
     data,
     data.data,
@@ -322,21 +327,9 @@ export function extractWorkflowCredits(payload: unknown): number | null {
   );
 
   for (const record of wrappers) {
-    for (const key of ['actual_user_billed', 'total_charged', 'total_cost', 'total', 'credits_spent']) {
+    for (const key of ['actual_user_billed', 'total_charged', 'total_cost', 'total']) {
       const value = numericCredits(record[key]);
       if (value !== null) return value;
-    }
-  }
-
-  // Never report a breakdown that sums to zero. Every toolkit tool prices at 0
-  // per call, so a CAD audit carries 20 line items all reading 0 while the
-  // charge sits on the workflow row. A zero here means the cost lives
-  // elsewhere, not that the generation was free.
-  for (const record of wrappers) {
-    const items = record.line_items ?? record.items ?? record.audit;
-    if (Array.isArray(items)) {
-      const total = extractWorkflowCredits(items);
-      if (total !== null && total > 0) return total;
     }
   }
 
