@@ -179,7 +179,9 @@ export default function ImagePromptScreen({
                   onKeyDown={handleKeyDown}
                   placeholder="Add optional description"
                   rows={3}
-                  className="min-h-[96px] max-h-[240px] w-full resize-y overflow-y-auto border border-border/60 bg-background px-5 py-3 pb-7 font-body text-[14px] leading-relaxed text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-foreground/40 focus:ring-1 focus:ring-border"
+                  /* Full-strength border, not a faded one: this is an input and
+                     needs to read as an editable field at a glance. */
+                  className="min-h-[96px] max-h-[240px] w-full resize-y overflow-y-auto border border-border bg-background px-5 py-3 pb-7 font-body text-[14px] leading-relaxed text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-foreground/60 focus:ring-1 focus:ring-border"
                 />
                 {prompt.length > 0 && (
                   <button
