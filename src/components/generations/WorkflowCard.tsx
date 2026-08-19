@@ -198,7 +198,7 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
             <GLBPreviewSlot
               id={workflow.workflow_id}
               glbUrl={workflow.glb_url}
-              className="w-full aspect-[4/3] bg-background/50 border border-border/30"
+              className="w-full aspect-[4/3] min-h-[300px] sm:min-h-[360px] bg-background/50 border border-border/30"
             />
           </div>
         )}

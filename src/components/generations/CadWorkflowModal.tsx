@@ -139,7 +139,7 @@ export function CadWorkflowModal({ workflowId, workflowStatus, onClose }: CadWor
                   <GLBPreviewSlot
                     id={workflowId || 'modal'}
                     glbUrl={glbUrl}
-                    className="w-full aspect-square max-h-[450px] bg-background/50 border border-border/30 rounded-sm mb-4"
+                    className="w-full aspect-square min-h-[340px] max-h-[560px] bg-background/50 border border-border/30 rounded-sm mb-4"
                   />
                 </Suspense>
               )}

@@ -22,7 +22,8 @@ describe('applyHistoryPreviewMaterials', () => {
     const material = mesh.material as THREE.MeshStandardMaterial;
     expect(material.metalness).toBe(1);
     expect(material.roughness).toBeLessThan(0.4);
-    expect(material.color.getHex()).toBe(0xc58b35);
+    // Same gold as CADCanvas gold18k, so history matches the Studio.
+    expect(material.color.getHex()).toBe(0xffd88a);
   });
 
   it('uses the explicit pink semantic for Top_CenterStone_Pink', () => {
@@ -35,7 +36,7 @@ describe('applyHistoryPreviewMaterials', () => {
     const material = mesh.material as THREE.MeshPhysicalMaterial;
     expect(material.metalness).toBe(0);
     expect(material.transmission).toBeGreaterThan(0);
-    expect(material.color.getHex()).toBe(0xb51f5d);
+    expect(material.color.getHex()).toBe(0xf4c6c6);
   });
 
   it('uses a visible blue fallback for a gem without a color semantic', () => {
@@ -46,7 +47,7 @@ describe('applyHistoryPreviewMaterials', () => {
     applyHistoryPreviewMaterials(model);
 
     const material = mesh.material as THREE.MeshPhysicalMaterial;
-    expect(material.color.getHex()).toBe(0x2d78b7);
+    expect(material.color.getHex()).toBe(0x4f7ce0);
     expect(material.transmission).toBeGreaterThan(0);
     expect(material.roughness).toBeLessThan(0.3);
   });

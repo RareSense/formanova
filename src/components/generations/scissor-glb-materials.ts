@@ -20,16 +20,20 @@ interface ParsedGltfMaterialMetadata {
 const GEM_RE = /diamond|gem|stone|crystal|jewel|brill|ruby|emerald|sapphire|topaz|opal|garnet|amethyst|pearl|cz|cubic|solitaire|pave|prong_stone|accent_stone|center_stone|main_stone/i;
 const METAL_RE = /band|ring|shank|prong|setting|mount|bezel|basket|gallery|shoulder|bridge|head|collet|metal|gold|silver|platinum|frame|base/i;
 
+/** Taken from CADCanvas's REFERENCE_MATERIALS so a stone reads as the same
+ * colour in history as it does in the Studio. The previous values were several
+ * shades darker, which made every gem look like a different stone once the
+ * design was opened. */
 const GEM_COLORS: Array<[RegExp, number]> = [
-  [/(?:^|[_\s.-])pink(?:$|[_\s.-])/i, 0xb51f5d],
-  [/(?:^|[_\s.-])red(?:$|[_\s.-])|ruby/i, 0x9d1535],
-  [/(?:^|[_\s.-])green(?:$|[_\s.-])|emerald/i, 0x087f5b],
-  [/(?:^|[_\s.-])blue(?:$|[_\s.-])|sapphire/i, 0x1858a8],
-  [/(?:^|[_\s.-])purple(?:$|[_\s.-])|amethyst/i, 0x6f3aa8],
+  [/(?:^|[_\s.-])pink(?:$|[_\s.-])/i, 0xf4c6c6],
+  [/(?:^|[_\s.-])red(?:$|[_\s.-])|ruby/i, 0xf26a8c],
+  [/(?:^|[_\s.-])green(?:$|[_\s.-])|emerald/i, 0x46c684],
+  [/(?:^|[_\s.-])blue(?:$|[_\s.-])|sapphire/i, 0x4f7ce0],
+  [/(?:^|[_\s.-])purple(?:$|[_\s.-])|amethyst/i, 0xb488e2],
 ];
 
 function fallbackGemColor(name: string): number {
-  return GEM_COLORS.find(([pattern]) => pattern.test(name))?.[1] ?? 0x2d78b7;
+  return GEM_COLORS.find(([pattern]) => pattern.test(name))?.[1] ?? 0x4f7ce0;
 }
 
 /** Record whether each mesh primitive had an explicit material in the GLTF document. */
@@ -51,7 +55,7 @@ export function createHistoryFallbackMaterial(meshName: string): THREE.Material 
     return new THREE.MeshPhysicalMaterial({
       color: fallbackGemColor(meshName),
       metalness: 0,
-      roughness: 0.14,
+      roughness: 0.04,
       transmission: 0.22,
       thickness: 0.35,
       ior: 2.1,
@@ -62,11 +66,14 @@ export function createHistoryFallbackMaterial(meshName: string): THREE.Material 
     });
   }
 
+  // Matches CADCanvas's gold18k reference material (0xffd88a at roughness
+  // 0.08) so a ring looks the same in history as it does once opened in the
+  // Studio. The previous darker, rougher gold read as a different metal.
   return new THREE.MeshStandardMaterial({
-    color: 0xc58b35,
+    color: 0xffd88a,
     metalness: 1,
-    roughness: 0.24,
-    envMapIntensity: 1.15,
+    roughness: 0.08,
+    envMapIntensity: 1.35,
     side: THREE.DoubleSide,
   });
 }
