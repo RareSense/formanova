@@ -209,7 +209,7 @@ export default function ImagePromptScreen({
                 >
                   {isGenerating ? "Generating…" : (
                     <>
-                      Generate 3D Ring
+                      Generate CAD
                       <span className="inline-flex items-center gap-1 opacity-90">
                         <img src={creditCoinIcon} alt="" className="w-5 h-5" />
                         <span className="font-mono text-sm font-semibold">{costLoading ? '…' : (estimatedCost !== null ? estimatedCost : '—')}</span>
