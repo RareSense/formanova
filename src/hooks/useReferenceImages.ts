@@ -1,16 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MAX_RING_CAD_REFERENCE_IMAGES } from "@/lib/ring-cad-nurbs-api";
 import { normalizeImageFiles } from "@/lib/image-normalize";
-import { uploadCadReferenceImages, type CadReferenceItem } from "@/lib/microservices-api";
 
-/** One reference image and everything that belongs to it. Held as a single
- * array rather than parallel arrays so file, preview and uploaded item cannot
- * drift out of alignment when images are added or removed concurrently. */
+/** One reference image and its preview. Held as a single array rather than
+ * parallel arrays so file and preview cannot drift out of alignment when
+ * images are added or removed concurrently. */
 interface ReferenceEntry {
   file: File;
   previewUrl: string;
-  /** Null while the upload is in flight, or if it failed. */
-  item: CadReferenceItem | null;
 }
 
 /**
@@ -18,19 +15,16 @@ interface ReferenceEntry {
  * capped at MAX_RING_CAD_REFERENCE_IMAGES, with object-URL lifetime cleanup on
  * remove/replace/unmount. Index 0 is always the primary image.
  *
- * Images upload as soon as they are attached, not at generate time — matching
- * Photo Studio (useStudioUpload.ts uploads inside handleJewelryUpload). That is
- * what makes an image appear in "My Rings" immediately, and it means uploading
- * can be observed without paying for a generation.
+ * Uploading happens at generate time, not on attach, and deliberately so. The
+ * upload endpoint mints one set_id per call, so uploading per attach made a
+ * "set" mean "whatever was attached in one go": five images added one at a
+ * time became five sets, and My Rings showed five cards for a single run.
+ * Sending the whole set in one call at generate time makes a set mean exactly
+ * one generation, which is how people think about it.
  *
- * Uploads are fire-and-forget: a failure leaves `item` null and generation
- * inlines that file as base64 instead, so an upload problem never blocks the
- * user from generating. That path is now only for real failures, since the
- * endpoint is live in prod as of 2026-08-20.
- *
- * Note each attach is its own /upload/cad-reference call, so each gets its own
- * server-minted set_id rather than one set per generation. That is invisible
- * today because "My Rings" renders a flat image grid and never groups by set.
+ * The cost is that an image reaches the vault only once the user generates.
+ * Populating it earlier needs a way to attach an existing asset to a new set
+ * without re-uploading, which the backend has not built.
  */
 export function useReferenceImages() {
   const [entries, setEntries] = useState<ReferenceEntry[]>([]);
@@ -39,23 +33,6 @@ export function useReferenceImages() {
   // (and revoking live URLs) on every change.
   const entriesRef = useRef<ReferenceEntry[]>([]);
   useEffect(() => { entriesRef.current = entries; }, [entries]);
-
-  /** Uploads in the background and fills each file's slot when it lands.
-   * Matched by file identity, so a concurrent add or remove cannot land an
-   * item on the wrong image. */
-  const uploadInBackground = useCallback(async (files: File[]) => {
-    if (files.length === 0) return;
-    try {
-      const { items } = await uploadCadReferenceImages(files, { category: 'ring' });
-      setEntries(prev => prev.map(entry => {
-        const i = files.indexOf(entry.file);
-        return i !== -1 && items[i] ? { ...entry, item: items[i] } : entry;
-      }));
-    } catch (err) {
-      // Non-fatal: the file stays in the set and generation inlines it instead.
-      console.warn('[cad] reference upload failed; this image will be inlined at generate time', err);
-    }
-  }, []);
 
   const addReferenceImages = useCallback(async (files: File[]) => {
     if (files.length === 0) return;
@@ -74,15 +51,12 @@ export function useReferenceImages() {
     const added = accepted.map((file): ReferenceEntry => ({
       file,
       previewUrl: URL.createObjectURL(file),
-      item: null,
     }));
     // Keep the ref in step immediately: a second add can arrive before React
     // re-renders, and would otherwise recompute `room` against a stale length.
     entriesRef.current = [...entriesRef.current, ...added];
     setEntries(prev => [...prev, ...added]);
-
-    void uploadInBackground(accepted);
-  }, [uploadInBackground]);
+  }, []);
 
   const removeReferenceImage = useCallback((index: number) => {
     setEntries(prev => {
@@ -99,7 +73,6 @@ export function useReferenceImages() {
     const added = normalized.map((file): ReferenceEntry => ({
       file,
       previewUrl: URL.createObjectURL(file),
-      item: null,
     }));
 
     setEntries(prev => {
@@ -107,9 +80,7 @@ export function useReferenceImages() {
       return added;
     });
     entriesRef.current = added;
-
-    void uploadInBackground(normalized);
-  }, [uploadInBackground]);
+  }, []);
 
   const clearReferenceImages = useCallback(() => {
     setEntries(prev => {
@@ -128,14 +99,10 @@ export function useReferenceImages() {
 
   const referenceImages = useMemo(() => entries.map(e => e.file), [entries]);
   const referenceImagePreviewUrls = useMemo(() => entries.map(e => e.previewUrl), [entries]);
-  const uploadedItems = useMemo(() => entries.map(e => e.item), [entries]);
 
   return {
     referenceImages,
     referenceImagePreviewUrls,
-    /** Index-parallel to referenceImages; null where the upload is still in
-     * flight or failed, so the caller can inline that file instead. */
-    uploadedItems,
     addReferenceImages,
     removeReferenceImage,
     replaceReferenceImages,

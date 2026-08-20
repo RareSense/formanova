@@ -15,7 +15,6 @@ import {
   type ArtifactRef,
 } from "@/lib/ring-cad-nurbs-api";
 import { buildReferenceInputs } from "@/lib/cad-reference-upload";
-import type { CadReferenceItem } from "@/lib/microservices-api";
 import { trackPaywallHit, trackCadGenerationCompleted } from "@/lib/posthog-events";
 import { fetchCadResult } from "@/lib/generation-history-api";
 
@@ -25,9 +24,6 @@ interface WorkflowParams {
   prompt: string;
   /** Ordered reference set, 0..5 images. Index 0 is IMAGE 1 and wins every conflict. */
   referenceImages: File[];
-  /** Index-parallel uploaded items from useReferenceImages; null where the
-   * upload is pending or failed, in which case that file is inlined. */
-  uploadedItems?: (CadReferenceItem | null)[];
   /** ring_cad_nurbs_v1 tier; selects both the model and the price. */
   tier?: string;
   /** Which page owns this run, so the header/toast restore link returns here. */
@@ -39,7 +35,6 @@ export function useImageToCADWorkflow({
   model,
   prompt,
   referenceImages,
-  uploadedItems = [],
   tier = RING_CAD_DEFAULT_TIER,
   cadRoute,
   onWorkspaceActivate,
@@ -224,7 +219,7 @@ export function useImageToCADWorkflow({
 
     try {
       const requestBody = buildRingCadStartBody({
-        referenceImages: await buildReferenceInputs(referenceImages, uploadedItems),
+        referenceImages: await buildReferenceInputs(referenceImages),
         userDescription: prompt,
         tier,
       });

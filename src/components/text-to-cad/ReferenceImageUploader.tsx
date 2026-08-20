@@ -217,11 +217,6 @@ export default function ReferenceImageUploader({
         </div>
       )}
 
-      {primaryPreviewUrl && (
-        <p className="mt-2 text-[11px] text-muted-foreground/70 leading-relaxed">
-          Optional. More angles of the same ring give the model a better read on depth and profile.
-        </p>
-      )}
     </div>
   );
 }

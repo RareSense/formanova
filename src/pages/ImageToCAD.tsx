@@ -43,7 +43,6 @@ export default function ImageToCAD() {
   const {
     referenceImages,
     referenceImagePreviewUrls,
-    uploadedItems,
     addReferenceImages,
     removeReferenceImage,
     replaceReferenceImages,
@@ -72,7 +71,6 @@ export default function ImageToCAD() {
     model,
     prompt,
     referenceImages,
-    uploadedItems,
     tier: activeTier,
     cadRoute: '/image-to-cad',
     pushUndo: editor.pushUndo,

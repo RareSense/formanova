@@ -1,4 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mockUpload = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/microservices-api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/microservices-api')>();
+  return { ...actual, uploadCadReferenceImages: mockUpload };
+});
+
 import { buildReferenceInputs } from './cad-reference-upload';
 import type { CadReferenceItem } from './microservices-api';
 
@@ -10,40 +17,49 @@ function item(id: string, position: number): CadReferenceItem {
   return { asset_id: id, uri: `azure://${id}`, sha256: `sha-${id}`, type: 'image/jpeg', bytes: 100, position };
 }
 
+beforeEach(() => {
+  mockUpload.mockReset();
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+});
+
 describe('buildReferenceInputs', () => {
-  it('returns nothing for an empty file list', async () => {
-    expect(await buildReferenceInputs([], [])).toEqual([]);
+  it('sends the whole set in one call, so the run gets a single set_id', async () => {
+    // One call is what makes a set mean one generation. Uploading per file
+    // would mint a set each and split one run across several vault cards.
+    mockUpload.mockResolvedValue({ items: [item('a', 0), item('b', 1)], set_id: 'set-1' });
+
+    await buildReferenceInputs([imageFile('a.jpg'), imageFile('b.jpg')]);
+
+    expect(mockUpload).toHaveBeenCalledTimes(1);
+    expect(mockUpload.mock.calls[0][0]).toHaveLength(2);
+    expect(mockUpload).toHaveBeenCalledWith(expect.any(Array), { category: 'ring' });
   });
 
-  it('passes uploaded items through unmodified, keeping all six keys', async () => {
+  it('passes the items through unmodified, keeping all six keys', async () => {
     const items = [item('a', 0), item('b', 1)];
+    mockUpload.mockResolvedValue({ items, set_id: 'set-1' });
 
-    const result = await buildReferenceInputs([imageFile('a.jpg'), imageFile('b.jpg')], items);
-
-    // Straight through: stripping asset_id/position would break the contract.
-    expect(result).toEqual(items);
+    expect(await buildReferenceInputs([imageFile('a.jpg'), imageFile('b.jpg')])).toEqual(items);
   });
 
-  it('inlines a file as base64 when its upload is missing', async () => {
-    // Pending, failed, or endpoint not deployed all look the same here: null.
-    const result = await buildReferenceInputs([imageFile('a.jpg')], [null]);
+  it('sends no request at all for an empty file list', async () => {
+    expect(await buildReferenceInputs([])).toEqual([]);
+    expect(mockUpload).not.toHaveBeenCalled();
+  });
+
+  it('inlines the files when the upload fails, rather than blocking the run', async () => {
+    mockUpload.mockRejectedValue(new Error('500'));
+
+    const result = await buildReferenceInputs([imageFile('a.jpg')]);
 
     expect(result).toHaveLength(1);
     expect(result[0] as string).toMatch(/^data:/);
   });
 
-  it('mixes uploaded items and inlined files, preserving order', async () => {
-    const result = await buildReferenceInputs(
-      [imageFile('a.jpg'), imageFile('b.jpg'), imageFile('c.jpg')],
-      [item('a', 0), null, item('c', 2)],
-    );
+  it('inlines rather than silently dropping an image the response missed', async () => {
+    // A short list would generate from fewer images than the user chose.
+    mockUpload.mockResolvedValue({ items: [item('a', 0)], set_id: 'set-1' });
 
-    expect(result[0]).toEqual(item('a', 0));
-    expect(result[1] as string).toMatch(/^data:/);
-    expect(result[2]).toEqual(item('c', 2));
-  });
-
-  it('inlines everything when no items are supplied at all', async () => {
     const result = await buildReferenceInputs([imageFile('a.jpg'), imageFile('b.jpg')]);
 
     expect(result).toHaveLength(2);
