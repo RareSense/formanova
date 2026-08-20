@@ -41,15 +41,37 @@ export function isValidNotificationEmail(value: string): boolean {
   return email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-/** Pulls a readable message out of either a plain detail or a FastAPI field-validation list. */
+function sentenceCase(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function nonEmptyStrings(values: unknown[]): string[] {
+  return values.filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+}
+
+/**
+ * Pulls a readable message out of the three detail shapes this route returns.
+ *
+ * Both errors these two fields produce come back keyed by field name:
+ *   {"detail": {"notification_email": "must be a valid email address"}}
+ * A wrong JSON type is rejected by Pydantic before the endpoint's own checks
+ * run and comes back in FastAPI's native list form instead. Other failures on
+ * the route return a plain string. The messages are sentence fragments, so
+ * they are capitalized for display under the field.
+ */
 function detailMessage(detail: unknown): string | null {
-  if (typeof detail === 'string' && detail.trim()) return detail.trim();
+  if (typeof detail === 'string' && detail.trim()) return sentenceCase(detail.trim());
+
   if (Array.isArray(detail)) {
-    const messages = detail
-      .map(entry => (entry && typeof entry === 'object' ? (entry as { msg?: unknown }).msg : null))
-      .filter((msg): msg is string => typeof msg === 'string' && msg.trim().length > 0);
-    if (messages.length) return messages.join(' ');
+    const messages = nonEmptyStrings(
+      detail.map(entry => (entry && typeof entry === 'object' ? (entry as { msg?: unknown }).msg : null)),
+    );
+    if (messages.length) return sentenceCase(messages.join(' '));
+  } else if (detail && typeof detail === 'object') {
+    const messages = nonEmptyStrings(Object.values(detail));
+    if (messages.length) return sentenceCase(messages.join(' '));
   }
+
   return null;
 }
 

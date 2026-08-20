@@ -137,13 +137,27 @@ describe('patchNotificationSettings', () => {
       .rejects.toThrow('Email domain is not allowed.');
   });
 
-  it('surfaces a field-validation 422 rather than a bare status code', async () => {
+  it('surfaces the field-keyed 422 this endpoint actually returns', async () => {
+    // The two errors these fields produce come back as a plain dict keyed by
+    // field name, not FastAPI's native list. Without this the user only ever
+    // saw the generic fallback on the one error they are most likely to hit.
+    mockAuthenticatedFetch.mockResolvedValue(jsonResponse({
+      detail: { notification_email: 'must be a valid email address' },
+    }, 422));
+
+    await expect(patchNotificationSettings({ notificationEmail: 'delivery@example.com' }))
+      .rejects.toThrow('Must be a valid email address');
+  });
+
+  it('still reads the native list shape, which a wrong JSON type returns', async () => {
+    // Pydantic rejects a bad type before the endpoint's own checks run, so
+    // this shape can still arrive from the same route.
     mockAuthenticatedFetch.mockResolvedValue(jsonResponse({
       detail: [{ loc: ['body', 'notification_email'], msg: 'value is not a valid email address' }],
     }, 422));
 
     await expect(patchNotificationSettings({ notificationEmail: 'delivery@example.com' }))
-      .rejects.toThrow('value is not a valid email address');
+      .rejects.toThrow('Value is not a valid email address');
   });
 });
 

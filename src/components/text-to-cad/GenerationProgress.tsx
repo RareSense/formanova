@@ -196,6 +196,12 @@ export default function GenerationProgress({
                 below it reads as a detail of the thing being switched on. */}
             <div className="flex items-center gap-3 text-left">
               <Mail className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              {/* Accurate today: the toggle gates audience == "user", and the
+                  only user-facing mail CAD sends is the result. Failures go to
+                  admins only. The gate is not scoped to results though, so if a
+                  user-facing workflow_failed template is ever added to the spec
+                  the same toggle silences that too, and this label has to become
+                  outcome-agnostic ("Email me about this run") or split in two. */}
               <label htmlFor="cad-notification-toggle" className="min-w-0 flex-1 text-sm text-foreground">
                 Email me when this is ready
               </label>
