@@ -4,9 +4,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, Layers, ImageIcon } from "lucide-react";
 
 import textToCadImg from "@/assets/text-to-cad-thumb.webp";
-// PLACEHOLDER card art. Swap for a dedicated image-to-3d card asset when one
-// exists; keep it .webp, matching the other cards.
-import imageTo3dImg from "@/assets/examples/cad-example-3.webp";
+import imageTo3dImg from "@/assets/image-to-cad-thumb.webp";
 
 const cadFeatures = [
   {
