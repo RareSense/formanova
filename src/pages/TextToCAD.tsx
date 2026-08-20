@@ -34,10 +34,16 @@ import GemToggle from "@/components/text-to-cad/QualityToggle";
 import { runMicroBenchmark } from "@/lib/gpu-detect";
 import type { GemMode } from "@/components/text-to-cad/CADCanvas";
 import { RING_CAD_DEFAULT_TIER, RING_CAD_TIERS } from "@/lib/ring-cad-nurbs-api";
+import { recordStudioVisit } from '@/lib/studio-preference';
 
 const NO_REFERENCE_IMAGES: File[] = [];
 
 export default function TextToCAD() {
+  // Counts towards which studio this user lands in after sign-in. The
+  // workspaces are counted rather than the hub pages so both sides are
+  // measured the same way: where the work happens, not where you browse.
+  useEffect(() => { recordStudioVisit('cad'); }, []);
+
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();

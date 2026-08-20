@@ -14,8 +14,17 @@ import {
   dispatchAuthChange 
 } from '@/lib/auth-api';
 import { getPublicSiteUrl } from '@/lib/public-url';
+import { getPreferredStudioPath } from '@/lib/studio-preference';
 
-const AUTH_SUCCESS_REDIRECT = '/studio';
+/**
+ * Where sign-in lands when nothing more specific was asked for. Reads the
+ * studio someone actually works in, so a regular CAD user stops arriving in
+ * Photo Studio every session. Photo Studio for anyone new.
+ *
+ * Deliberately not applied to an explicit ?redirect=: a link the user followed
+ * always outranks a habit inferred from their history.
+ */
+const AUTH_SUCCESS_REDIRECT = getPreferredStudioPath();
 
 // CRITICAL: Capture hash fragment IMMEDIATELY on module load (before React clears it)
 const INITIAL_HASH = typeof window !== 'undefined' ? window.location.hash : '';
