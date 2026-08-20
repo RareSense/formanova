@@ -4,12 +4,12 @@ import { motion } from "framer-motion";
 import { ArrowRight, Layers, ImageIcon } from "lucide-react";
 
 import textToCadImg from "@/assets/text-to-cad-thumb.webp";
-import imageTo3dImg from "@/assets/image-to-cad-thumb.webp";
+import imageToCadImg from "@/assets/image-to-cad-thumb.webp";
 
 const cadFeatures = [
   {
     title: "Text to CAD",
-    description: "Describe your ring and generate a 3D model from the text.",
+    description: "Describe your ring and generate a CAD model from the text.",
     route: "/text-to-cad",
     comingSoon: false,
     icon: Layers,
@@ -17,11 +17,11 @@ const cadFeatures = [
   },
   {
     title: "Image to CAD",
-    description: "Upload up to five reference images and generate a 3D model.",
+    description: "Upload up to five reference images and generate a CAD model.",
     route: "/image-to-cad",
     comingSoon: false,
     icon: ImageIcon,
-    image: imageTo3dImg,
+    image: imageToCadImg,
   },
 ];
 
