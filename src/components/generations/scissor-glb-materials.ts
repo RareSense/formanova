@@ -61,7 +61,9 @@ export function createHistoryFallbackMaterial(meshName: string): THREE.Material 
       ior: 2.1,
       clearcoat: 1,
       clearcoatRoughness: 0.08,
-      envMapIntensity: 1.35,
+      // CADCanvas REFERENCE_BASE_ENV.gem. Gems take far more environment than
+      // metal, which is most of why a stone looked flat here.
+      envMapIntensity: 2.3,
       side: THREE.DoubleSide,
     });
   }
@@ -73,7 +75,8 @@ export function createHistoryFallbackMaterial(meshName: string): THREE.Material 
     color: 0xffd88a,
     metalness: 1,
     roughness: 0.08,
-    envMapIntensity: 1.35,
+    // CADCanvas REFERENCE_BASE_ENV.metal.
+    envMapIntensity: 1.15,
     side: THREE.DoubleSide,
   });
 }

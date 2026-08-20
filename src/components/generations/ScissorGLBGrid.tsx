@@ -346,7 +346,9 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
       scene.environment = envMapRef.current;
     }
 
-    const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
+    // fov 30 matches the Studio viewport; a wider lens changes the ring's
+    // proportions, so the same model reads differently between the two.
+    const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
     camera.position.set(0, 1.5, 6);
     camera.lookAt(0, 0, 0);
 
