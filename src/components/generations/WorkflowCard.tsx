@@ -285,7 +285,7 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
                     aria-label="Manufacturing deliverable"
                     className="border border-border bg-muted/20 p-2.5"
                   >
-                    <div className="mb-2 flex items-end justify-between gap-3">
+                    <div className="flex items-end justify-between gap-3">
                       <div className="min-w-0">
                         <p className="font-mono text-[8px] font-semibold uppercase tracking-[0.16em] text-foreground">
                           Manufacturing file
@@ -298,19 +298,24 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
                         {threedmFilename}
                       </span>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handleDownloadThreedm}
-                      disabled={isDownloadingThreedm}
-                      className="h-11 w-full gap-1.5 border-foreground/40 bg-transparent px-3 font-mono text-[9px] uppercase tracking-wider text-foreground hover:border-foreground/70 hover:bg-muted/40 hover:text-foreground"
-                      title="Download the machinable .3dm"
-                      aria-label="Download .3dm"
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                      {isDownloadingThreedm ? 'Checking .3dm…' : 'Download .3dm'}
-                    </Button>
                   </section>
+                )}
+                {/* Both actions are siblings of the same container so their
+                    w-full resolves to one width. Nesting the download inside
+                    the padded section above made it narrower than its pair. */}
+                {supportsThreedm && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleDownloadThreedm}
+                    disabled={isDownloadingThreedm}
+                    className="h-11 w-full gap-1.5 border-foreground/40 bg-transparent px-3 font-mono text-[9px] uppercase tracking-wider text-foreground hover:border-foreground/70 hover:bg-muted/40 hover:text-foreground"
+                    title="Download the machinable .3dm"
+                    aria-label="Download .3dm"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    {isDownloadingThreedm ? 'Checking .3dm…' : 'Download .3dm'}
+                  </Button>
                 )}
                   <Button
                     size="sm"
