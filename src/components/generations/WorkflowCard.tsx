@@ -156,7 +156,10 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
       glb: workflow.glb_url,
       workflow_id: workflow.workflow_id,
     });
-    navigate(`/text-to-cad?${params.toString()}`);
+    // One card serves both CAD types, so the workspace has to be chosen by
+    // source rather than assumed. Both routes restore from the id alone.
+    const studioPath = workflow.source_type === 'image_to_cad' ? '/image-to-cad' : '/text-to-cad';
+    navigate(`${studioPath}?${params.toString()}`);
   };
 
   return (

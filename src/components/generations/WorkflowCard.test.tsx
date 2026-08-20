@@ -1,6 +1,6 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WorkflowSummary } from '@/lib/generation-history-api';
 
@@ -48,7 +48,39 @@ const cadWorkflow: WorkflowSummary = {
   ai_model: 'INTERNAL_PROVIDER_SENTINEL',
 };
 
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location">{location.pathname + location.search}</div>;
+}
+
+function openInStudio(workflow: WorkflowSummary) {
+  render(
+    <MemoryRouter>
+      <WorkflowCard workflow={workflow} index={1} onClick={() => {}} />
+      <LocationProbe />
+    </MemoryRouter>,
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Open in Studio' }));
+  return screen.getByTestId('location').textContent ?? '';
+}
+
 describe('CAD generation history card', () => {
+  it('opens an image-to-cad run in the image workspace, not the text one', () => {
+    // One card serves both CAD types, so the destination has to follow the
+    // source. Sending an image run to /text-to-cad drops it in the wrong tool.
+    const location = openInStudio({ ...cadWorkflow, source_type: 'image_to_cad' });
+
+    expect(location.startsWith('/image-to-cad?')).toBe(true);
+    expect(location).toContain('workflow_id=workflow-1');
+  });
+
+  it('opens a text-to-cad run in the text workspace', () => {
+    const location = openInStudio({ ...cadWorkflow, source_type: 'text_to_cad' });
+
+    expect(location.startsWith('/text-to-cad?')).toBe(true);
+    expect(location).toContain('workflow_id=workflow-1');
+  });
+
   it('does not expose internal mode or provider values', () => {
     render(
       <MemoryRouter>
