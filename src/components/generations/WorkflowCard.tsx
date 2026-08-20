@@ -300,7 +300,7 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
                       variant="outline"
                       onClick={handleDownloadThreedm}
                       disabled={isDownloadingThreedm}
-                      className="h-11 w-full gap-1.5 border-[hsl(var(--formanova-hero-accent))] bg-transparent px-3 font-mono text-[9px] uppercase tracking-wider text-[hsl(var(--formanova-hero-accent))] hover:bg-[hsl(var(--formanova-hero-accent))]/10 hover:text-[hsl(var(--formanova-hero-accent))]"
+                      className="h-11 w-full gap-1.5 border-[hsl(var(--formanova-hero-accent))] bg-[hsl(var(--formanova-hero-accent))] px-3 font-mono text-[9px] uppercase tracking-wider text-background hover:bg-[hsl(var(--formanova-hero-accent))]/90 hover:text-background"
                       title="Download the machinable .3dm"
                       aria-label="Download .3dm"
                     >
@@ -313,7 +313,7 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
                     size="sm"
                     variant="outline"
                     onClick={handleLoadInStudio}
-                    className="h-11 w-full gap-1.5 border-border bg-transparent px-3 font-mono text-[9px] uppercase tracking-wider text-foreground hover:bg-muted/40 hover:text-foreground"
+                    className="h-11 w-full gap-1.5 border-foreground/40 bg-transparent px-3 font-mono text-[9px] uppercase tracking-wider text-foreground hover:border-foreground/70 hover:bg-muted/40 hover:text-foreground"
                   >
                     <Layers className="h-3.5 w-3.5 shrink-0" />
                     Open in Studio

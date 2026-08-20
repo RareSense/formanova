@@ -13,7 +13,7 @@ import { InsufficientCreditsInline } from "@/components/InsufficientCreditsInlin
 import InitialPromptScreen from "@/components/text-to-cad/InitialPromptScreen";
 import LeftPanel from "@/components/text-to-cad/LeftPanel";
 import { useAuth } from "@/contexts/AuthContext";
-import { isWeightStlEnabled, isCadUploadEnabled } from "@/lib/feature-flags";
+import { isCadUploadEnabled } from "@/lib/feature-flags";
 import { useImageToCADWorkflow } from "@/hooks/useImageToCADWorkflow";
 import { useCADMeshEditor } from "@/hooks/useCADMeshEditor";
 import { useNotificationEmail } from "@/hooks/useNotificationEmail";
@@ -42,7 +42,6 @@ export default function TextToCAD() {
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const notificationEmail = useNotificationEmail(user?.email);
-  const showWeightStl = isWeightStlEnabled(user?.email);
   const showCadUpload = isCadUploadEnabled(user?.email);
   const requestedTier = searchParams.get('tier') === RING_CAD_TIERS.GPT_5_6_SOL
     ? RING_CAD_TIERS.GPT_5_6_SOL
@@ -65,10 +64,6 @@ export default function TextToCAD() {
     weight_platinum_g: number;
     scale_warning: boolean;
   } | null>(null);
-  const [weightLoading, setWeightLoading] = useState(false);
-  const [stlExporting, setStlExporting] = useState(false);
-  const [stlPresetOpen, setStlPresetOpen] = useState(false);
-  const [stlQuality, setStlQuality] = useState<'draft' | 'standard' | 'high'>('standard');
   const [additionalParts, setAdditionalParts] = useState<string[]>([]);
 
   // Run invisible micro-benchmark on mount (offscreen, ~200ms)
@@ -278,143 +273,7 @@ export default function TextToCAD() {
     }
   }, [workflow.glbUrl]);
 
-  const handleEstimateWeight = useCallback(async () => {
-    if (!workflow.glbArtifact) {
-      toast.error("No model artifact available — generate a model first");
-      return;
-    }
-    setWeightLoading(true);
-    try {
-      const weightPayload = {
-        payload: { glb_artifact: workflow.glbArtifact, timeout_seconds: 60 },
-      };
-      // estimate_weight is intentionally free after a generated/imported GLB exists; no credit preflight.
-      const startRes = await authenticatedFetch('/api/run/state/estimate_weight', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(weightPayload),
-      });
-      const weightStartBody = await startRes.json().catch(() => ({}));
-      if (!startRes.ok) {
-        toast.error(weightStartBody?.error || "Failed to start weight estimation");
-        return;
-      }
-      const { workflow_id } = weightStartBody;
 
-      // Poll until done (2s interval, ~2 min timeout)
-      const pollResult = await pollWorkflow({
-        mode: 'result-direct',
-        fetchResult: () => authenticatedFetch(`/api/result/${encodeURIComponent(workflow_id)}`),
-        parseResult: (d) => d as { success: boolean; error?: string; scale_warning?: boolean; weight_14k_gold_g?: number; weight_platinum_g?: number },
-        intervalMs: 2000,
-        timeoutMs: 120_000,
-      });
-
-      if (pollResult.status === 'cancelled') return; // unreachable: no signal passed
-
-      const result = pollResult.result;
-      if (!result.success) {
-        toast.error(result.error || "Weight estimation failed");
-        return;
-      }
-      if (result.scale_warning) {
-        toast.warning("Weight estimate may be inaccurate — geometry scale looks unusual");
-      }
-      setWeightResult({
-        weight_14k_gold_g: result.weight_14k_gold_g,
-        weight_platinum_g: result.weight_platinum_g,
-        scale_warning: result.scale_warning,
-      });
-    } catch (err) {
-      const isTimeout = err instanceof Error && err.message.includes('timed out');
-      toast.error(isTimeout ? "Weight estimation timed out — try again" : "Weight estimation failed");
-      console.error('[Weight]', err);
-    } finally {
-      setWeightLoading(false);
-    }
-  }, [workflow.glbArtifact]);
-
-  const handleDownloadStl = useCallback(() => {
-    setStlPresetOpen(true);
-  }, []);
-
-  const executeStlDownload = useCallback(async () => {
-    setStlPresetOpen(false);
-    if (!workflow.glbArtifact) {
-      toast.error("No model artifact available — generate a model first");
-      return;
-    }
-    const voxelSizeMm = stlQuality === 'draft' ? 0.1 : stlQuality === 'high' ? 0.03 : 0.05;
-    setStlExporting(true);
-    try {
-      const stlPayload = {
-        payload: {
-          glb_artifact: workflow.glbArtifact,
-          voxel_size_mm: voxelSizeMm,
-          island_min_fraction: 0.005,
-          decimate_ratio: 0.3,
-          timeout_seconds: 300,
-        },
-      };
-      // prepare_stl is intentionally free after a generated/imported GLB exists; no credit preflight.
-      const startRes = await authenticatedFetch('/api/run/state/prepare_stl', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(stlPayload),
-      });
-      const stlStartBody = await startRes.json().catch(() => ({}));
-      if (!startRes.ok) {
-        toast.error(stlStartBody?.error || "Failed to start STL export");
-        return;
-      }
-      const { workflow_id } = stlStartBody;
-
-      // Poll until done (2s interval, ~5 min timeout for high quality)
-      const pollResult = await pollWorkflow({
-        mode: 'result-direct',
-        fetchResult: () => authenticatedFetch(`/api/result/${encodeURIComponent(workflow_id)}`),
-        parseResult: (d) => d as { success: boolean; error_text?: string; stl_artifact?: { uri: string } },
-        intervalMs: 2000,
-        timeoutMs: 300_000,
-      });
-
-      if (pollResult.status === 'cancelled') return; // unreachable: no signal passed
-
-      const result = pollResult.result;
-      if (!result.success || !result.stl_artifact) {
-        toast.error(result.error_text || "STL export failed");
-        return;
-      }
-
-      // stl_artifact.uri is a signed Azure Blob URL ready to use directly
-      const downloadUrl = result.stl_artifact.uri;
-      const timestamp = Date.now();
-
-      try {
-        const fileHandle = await (window as any).showSaveFilePicker({
-          suggestedName: `model-${timestamp}.stl`,
-          types: [{ description: 'STL 3D Print File', accept: { 'model/stl': ['.stl'] } }],
-        });
-        const writable = await fileHandle.createWritable();
-        const stlResponse = await fetch(downloadUrl);
-        await writable.write(await stlResponse.blob());
-        await writable.close();
-      } catch (pickerErr: any) {
-        if (pickerErr?.name !== 'AbortError') {
-          const a = document.createElement('a');
-          a.href = downloadUrl;
-          a.download = `model-${timestamp}.stl`;
-          a.click();
-        }
-      }
-    } catch (err) {
-      const isTimeout = err instanceof Error && err.message.includes('timed out');
-      toast.error(isTimeout ? "STL preparation timed out — try Standard quality or a simpler model" : "STL export failed");
-      console.error('[STL Export]', err);
-    } finally {
-      setStlExporting(false);
-    }
-  }, [stlQuality, workflow.glbArtifact]);
 
   useCADKeyboardShortcuts({
     onUndo: editor.handleUndo,
@@ -704,10 +563,6 @@ export default function TextToCAD() {
               onRedo={editor.handleRedo}
               undoCount={editor.undoStack.length}
               redoCount={editor.redoStack.length}
-              onEstimateWeight={showWeightStl ? handleEstimateWeight : undefined}
-              weightLoading={weightLoading}
-              onDownloadStl={showWeightStl ? handleDownloadStl : undefined}
-              stlExporting={stlExporting}
               onFullscreen={() => {
                 const el = document.querySelector('[data-cad-viewport]') as HTMLElement;
                 if (el) {
@@ -748,85 +603,6 @@ export default function TextToCAD() {
         </ResizablePanel>
       </ResizablePanelGroup>
 
-      {/* Weight result display */}
-      {weightResult && (
-        <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 bg-card/95 backdrop-blur-sm border border-border rounded-sm font-mono text-[11px] text-muted-foreground">
-          <span className="text-foreground">Est. weight:</span>
-          <span>{weightResult.weight_14k_gold_g.toFixed(1)}g (14K gold)</span>
-          <span>·</span>
-          <span>{weightResult.weight_platinum_g.toFixed(1)}g (platinum)</span>
-          {weightResult.scale_warning && (
-            <span title="Geometry scale may be incorrect">⚠</span>
-          )}
-        </div>
-      )}
-
-      {/* STL Quality Preset Modal */}
-      <AnimatePresence>
-        {stlPresetOpen && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 8 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 8 }}
-            transition={{ duration: 0.2 }}
-            className="absolute inset-0 z-[80] flex items-center justify-center pointer-events-none"
-          >
-            <div className="pointer-events-auto bg-card border border-border shadow-2xl w-[340px] px-8 py-7 text-center relative">
-              <button
-                onClick={() => setStlPresetOpen(false)}
-                className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-sm transition-colors"
-                aria-label="Close"
-              >
-                <X className="w-4 h-4" />
-              </button>
-              <div className="font-display text-sm uppercase tracking-[0.15em] text-foreground mb-1.5 pr-6">
-                Download for 3D Printing
-              </div>
-              <p className="font-mono text-[11px] text-muted-foreground leading-relaxed mb-5 text-left">
-                Choose a quality level. Higher quality takes longer to process (30–120 seconds).
-              </p>
-
-              {/* Quality presets */}
-              <div className="flex flex-col gap-2 mb-6">
-                {([
-                  { label: "Draft", sublabel: "Fast · FDM prototyping", value: "draft" as const },
-                  { label: "Standard", sublabel: "Recommended · Resin/wax", value: "standard" as const },
-                  { label: "High Detail", sublabel: "Slow · Milgrain/filigree", value: "high" as const },
-                ] as const).map((preset) => (
-                  <button
-                    key={preset.value}
-                    onClick={() => setStlQuality(preset.value)}
-                    className={`py-3 px-4 text-left border transition-all duration-150 ${
-                      stlQuality === preset.value
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-background text-muted-foreground border-border hover:border-foreground/30"
-                    }`}
-                  >
-                    <div className="text-[11px] font-bold uppercase tracking-[0.12em]">{preset.label}</div>
-                    <div className={`text-[9px] tracking-wide mt-0.5 ${stlQuality === preset.value ? "text-primary-foreground/70" : "text-muted-foreground/60"}`}>{preset.sublabel}</div>
-                  </button>
-                ))}
-              </div>
-
-              {/* Actions */}
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => setStlPresetOpen(false)}
-                  className="py-2.5 w-full text-center text-[10px] font-bold uppercase tracking-[0.15em] bg-background text-muted-foreground border border-border hover:border-foreground/30 transition-all duration-150"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={executeStlDownload}
-                  className="py-2.5 w-full text-center text-[10px] font-bold uppercase tracking-[0.15em] bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
-                >
-                  Download STL
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
     </>
   );

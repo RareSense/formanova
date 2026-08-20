@@ -1,4 +1,4 @@
-import { Undo2, Redo2, Download, Plus, Minus, Maximize2, Maximize, Eye, Keyboard, Printer, Scale, Loader2 } from "lucide-react";
+import { Undo2, Redo2, Download, Plus, Minus, Maximize2, Maximize, Eye, Keyboard, Loader2 } from "lucide-react";
 import { TRANSFORM_MODES, PROGRESS_STEPS } from "./types";
 import type { StatsData } from "./types";
 
@@ -43,12 +43,13 @@ export function ViewportToolbar({
         ))}
       </div>
 
-      {/* Result-level action, pinned to the right edge — deliberately not
-          adjacent to the mode buttons, so it doesn't read as another mode. */}
+      {/* Result-level action, pinned right — deliberately not adjacent to the
+          mode buttons, so it doesn't read as another mode. right-14 clears the
+          panel-collapse button, which occupies the first 40px of that edge. */}
       {onDownload && (
         <button
           onClick={onDownload}
-          className="pointer-events-auto absolute right-8 flex h-[40px] items-center gap-2 border border-primary bg-primary px-4 text-[11px] font-bold uppercase tracking-[0.12em] text-primary-foreground shadow-lg transition-opacity hover:opacity-90 active:scale-[0.98]"
+          className="pointer-events-auto absolute right-14 flex h-[40px] items-center gap-2 border border-primary bg-primary px-4 text-[11px] font-bold uppercase tracking-[0.12em] text-primary-foreground shadow-lg transition-opacity hover:opacity-90 active:scale-[0.98]"
         >
           <Download className="h-3.5 w-3.5" />
           {downloadLabel}
@@ -144,7 +145,7 @@ function SideTooltip({ label }: { label: string }) {
   );
 }
 
-export function ViewportSideTools({ visible, onZoomIn, onZoomOut, onResetView, onUndo, onRedo, undoCount, redoCount, onDownloadStl, onFullscreen, onDisplayMenu, onKeyboardShortcuts, onEstimateWeight, weightLoading, stlExporting }: {
+export function ViewportSideTools({ visible, onZoomIn, onZoomOut, onResetView, onUndo, onRedo, undoCount, redoCount, onFullscreen, onDisplayMenu, onKeyboardShortcuts  }: {
   visible: boolean;
   onZoomIn: () => void;
   onZoomOut: () => void;
@@ -153,13 +154,9 @@ export function ViewportSideTools({ visible, onZoomIn, onZoomOut, onResetView, o
   onRedo: () => void;
   undoCount: number;
   redoCount: number;
-  onDownloadStl?: () => void;
   onFullscreen?: () => void;
   onDisplayMenu?: () => void;
   onKeyboardShortcuts?: () => void;
-  onEstimateWeight?: () => void;
-  weightLoading?: boolean;
-  stlExporting?: boolean;
 }) {
   if (!visible) return null;
 
@@ -217,37 +214,8 @@ export function ViewportSideTools({ visible, onZoomIn, onZoomOut, onResetView, o
         </button>
       )}
 
-      <SideDivider />
-
-      {/* Download 3DM moved to ViewportToolbar (top-right, alongside the mode
-          buttons) — it's a result-level action, not a viewport utility. This
-          strip keeps Estimate Weight and Print (STL), which are utilities. */}
-      {onEstimateWeight && (
-        <button
-          onClick={onEstimateWeight}
-          disabled={weightLoading}
-          className={SIDE_BTN}
-          title="Estimate metal weight"
-        >
-          <SideTooltip label={weightLoading ? "Calculating…" : "Est. Weight"} />
-          {weightLoading
-            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            : <Scale className="w-3.5 h-3.5" />}
-        </button>
-      )}
-      {onDownloadStl && (
-        <button
-          onClick={onDownloadStl}
-          disabled={stlExporting}
-          className={`${SIDE_BTN} text-primary hover:text-primary`}
-          title="Download for 3D printing"
-        >
-          <SideTooltip label={stlExporting ? "Preparing STL…" : "Print (STL)"} />
-          {stlExporting
-            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            : <Printer className="w-3.5 h-3.5" />}
-        </button>
-      )}
+      {/* Download 3DM lives in ViewportToolbar, top-right: it is a
+          result-level action rather than a viewport utility. */}
     </div>
   );
 }
