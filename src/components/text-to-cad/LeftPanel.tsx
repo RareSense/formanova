@@ -54,7 +54,7 @@ export default function LeftPanel({
               animate={{ scale: 1 }}
               exit={{ scale: 0.9 }}
               src={referenceImagePreviewUrls[lightboxIndex]}
-              alt="Reference design"
+              alt="Inspiration image"
               className="max-w-full max-h-full object-contain"
               onClick={(e) => e.stopPropagation()}
             />
@@ -83,7 +83,7 @@ export default function LeftPanel({
         {primaryPreviewUrl && (
           <section>
             <div className="flex items-baseline justify-between mb-2">
-              <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Reference Image</h3>
+              <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Inspiration Image</h3>
               {imageCount > 1 && (
                 <span className="font-mono text-[10px] tracking-[0.15em] text-muted-foreground/60 tabular-nums">
                   {imageCount}/{MAX_RING_CAD_REFERENCE_IMAGES}
@@ -93,7 +93,7 @@ export default function LeftPanel({
             <div className="relative border border-border bg-muted/10 overflow-hidden">
               <img
                 src={primaryPreviewUrl}
-                alt="Reference design"
+                alt="Inspiration image"
                 className="w-full object-contain cursor-pointer"
                 style={{ maxHeight: 180 }}
                 onClick={() => setLightboxIndex(0)}
@@ -123,10 +123,10 @@ export default function LeftPanel({
                       <button
                         type="button"
                         onClick={() => setLightboxIndex(index)}
-                        aria-label={`Expand reference angle ${index}`}
+                        aria-label={`Expand inspiration angle ${index}`}
                         className="block h-full w-full"
                       >
-                        <img src={url} alt={`Reference angle ${index}`} className="h-full w-full object-cover" />
+                        <img src={url} alt={`Inspiration angle ${index}`} className="h-full w-full object-cover" />
                       </button>
                       <span
                         aria-hidden="true"

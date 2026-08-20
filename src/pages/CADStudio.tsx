@@ -17,7 +17,7 @@ const cadFeatures = [
   },
   {
     title: "Image to CAD",
-    description: "Upload up to five reference images and generate a CAD model.",
+    description: "Upload up to five inspiration images and generate a CAD model.",
     route: "/image-to-cad",
     comingSoon: false,
     icon: ImageIcon,

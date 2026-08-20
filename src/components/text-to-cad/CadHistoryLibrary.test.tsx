@@ -69,7 +69,7 @@ describe('CadHistoryLibrary', () => {
     }));
     render(<CadHistoryLibrary variant="images" onSelectImages={onSelectImages} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Reuse this reference image' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reuse this inspiration image' }));
     expect(onSelectImages).toHaveBeenCalledWith(['/api/artifacts/abc']);
   });
 
@@ -111,9 +111,9 @@ describe('CadHistoryLibrary', () => {
     render(<CadHistoryLibrary variant="images" onSelectImages={onSelectImages} />);
 
     // One card per set, not one tile per image.
-    fireEvent.click(screen.getByRole('button', { name: 'Reuse these 3 reference images' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reuse these 3 inspiration images' }));
     expect(onSelectImages).toHaveBeenCalledWith(urls);
-    expect(screen.getByRole('button', { name: 'Reuse this reference image' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Reuse this inspiration image' })).toBeTruthy();
 
     // Every angle is still reachable, via the strip below the cover.
     expect(screen.getAllByRole('button', { name: /^Show angle/ })).toHaveLength(3);

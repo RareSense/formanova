@@ -48,7 +48,7 @@ export default function ReferenceImageUploader({
     const images = Array.from(fileList ?? []).filter(f => f.type.startsWith("image/"));
     if (images.length === 0) return;
     if (remainingSlots <= 0) {
-      toast.error(`You can use up to ${MAX_RING_CAD_REFERENCE_IMAGES} reference images`);
+      toast.error(`You can use up to ${MAX_RING_CAD_REFERENCE_IMAGES} inspiration images`);
       return;
     }
     if (images.length > remainingSlots) {
@@ -176,11 +176,11 @@ export default function ReferenceImageUploader({
               if (url) {
                 return (
                   <div key={index} className="relative h-full min-h-0 min-w-0 overflow-hidden border border-border bg-muted/10">
-                    <img src={url} alt={index === 0 ? "Primary reference ring" : `Reference angle ${index}`} className="h-full w-full object-contain p-1" />
+                    <img src={url} alt={index === 0 ? "Primary inspiration ring" : `Inspiration angle ${index}`} className="h-full w-full object-contain p-1" />
                     <button
                       onClick={() => onRemoveReferenceImage(index)}
                       className="absolute top-1 right-1 w-6 h-6 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
-                      aria-label={index === 0 ? "Remove primary image" : `Remove reference angle ${index}`}
+                      aria-label={index === 0 ? "Remove primary image" : `Remove inspiration angle ${index}`}
                     >
                       <X className="w-3 h-3 text-foreground/70" />
                     </button>
@@ -197,7 +197,7 @@ export default function ReferenceImageUploader({
                   type="button"
                   disabled={!isNextSlot}
                   onClick={() => extraInputRef.current?.click()}
-                  aria-label={`Add reference angle ${index}`}
+                  aria-label={`Add inspiration angle ${index}`}
                   className={`h-full min-h-0 min-w-0 border border-dashed flex flex-col items-center justify-center gap-1 transition-colors duration-200 ${
                     isNextSlot
                       ? "border-foreground/40 hover:border-foreground/60 hover:bg-foreground/5 bg-muted/10"

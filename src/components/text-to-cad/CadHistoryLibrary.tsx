@@ -95,7 +95,7 @@ function RingCard({ entry, onSelect, onRename }: {
       <button
         type="button"
         onClick={() => onSelect(urls)}
-        aria-label={urls.length > 1 ? `Reuse these ${urls.length} reference images` : 'Reuse this reference image'}
+        aria-label={urls.length > 1 ? `Reuse these ${urls.length} inspiration images` : 'Reuse this inspiration image'}
         className="group relative block w-full overflow-hidden border border-border/20 transition-colors hover:border-[hsl(var(--formanova-hero-accent))]/50"
       >
         <RingThumb url={urls[activeIndex] ?? urls[0]} className="block w-full" />
@@ -206,7 +206,7 @@ function EmptyGuide({ variant }: { variant: "prompts" | "images" }) {
       <p className="max-w-[220px] text-[11px] leading-relaxed text-muted-foreground/70">
         {variant === "prompts"
           ? "Design briefs you generate from will show up here to reuse."
-          : "Reference images you upload will show up here to reuse."}
+          : "Inspiration images you upload will show up here to reuse."}
       </p>
     </div>
   );
