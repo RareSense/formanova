@@ -87,10 +87,10 @@ describe('ring_cad_nurbs_v1 start body', () => {
     expect(payload).not.toHaveProperty('llm_model');
   });
 
-  it('defaults to the fixed Opus 5 tier', () => {
+  it('defaults to the fixed Gemini 3.1 Pro tier', () => {
     const { payload } = buildRingCadStartBody({ referenceImages: [IMG(1)] });
     expect(payload.llm_tier).toBe(RING_CAD_DEFAULT_TIER);
-    expect(RING_CAD_DEFAULT_TIER).toBe(RING_CAD_TIERS.OPUS_5);
+    expect(RING_CAD_DEFAULT_TIER).toBe(RING_CAD_TIERS.GEMINI_3_1_PRO);
   });
 
   it('sends the fixed tier, which selects the model rather than the price', () => {

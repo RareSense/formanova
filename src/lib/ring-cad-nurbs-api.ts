@@ -30,6 +30,7 @@ export const RING_CAD_TIERS = {
   FABLE_5: 'claude_fable_5_openrouter',
   OPUS_5: 'claude_opus_5_openrouter',
   GPT_5_6_SOL: 'gpt_5_6_sol_openrouter',
+  GEMINI_3_1_PRO: 'gemini_3_1_pro_openrouter',
 } as const;
 
 export type RingCadTier = (typeof RING_CAD_TIERS)[keyof typeof RING_CAD_TIERS];
@@ -39,7 +40,7 @@ export type RingCadTier = (typeof RING_CAD_TIERS)[keyof typeof RING_CAD_TIERS];
  * consistent with CAD_MODEL_SELECTOR_ENABLED being false. This selects the
  * model, not the price: what it costs is backend's to decide.
  */
-export const RING_CAD_DEFAULT_TIER: RingCadTier = RING_CAD_TIERS.OPUS_5;
+export const RING_CAD_DEFAULT_TIER: RingCadTier = RING_CAD_TIERS.GEMINI_3_1_PRO;
 
 /**
  * Price is not defined here on purpose. It is set by backend per llm_tier and
