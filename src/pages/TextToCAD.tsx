@@ -576,14 +576,19 @@ export default function TextToCAD() {
           </div>
         </ResizablePanel>
 
-        <ResizableHandle withHandle />
+        {/* No handle until there is a model: a divider against an empty
+            panel reads as a region that failed to load. */}
+        {workflow.hasModel && <ResizableHandle withHandle />}
 
         {/* Right panel — always mounted, use imperative collapse/expand */}
         <ResizablePanel
           ref={rightPanelRef}
           id="right-panel"
           order={3}
-          defaultSize={22}
+          // Starts collapsed. With defaultSize 22 the panel rendered empty on
+          // mount until the effect collapsed it, which flashed a blank region
+          // during generation.
+          defaultSize={0}
           minSize={15}
           maxSize={35}
           collapsible

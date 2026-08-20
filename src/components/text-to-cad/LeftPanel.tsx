@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { RotateCcw, X } from "lucide-react";
+import { RotateCcw, X, Maximize2 } from "lucide-react";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { useEstimatedCost } from "@/hooks/use-estimated-cost";
 import { RING_CAD_NURBS_WORKFLOW, MAX_RING_CAD_REFERENCE_IMAGES } from "@/lib/ring-cad-nurbs-api";
@@ -18,7 +18,6 @@ interface LeftPanelProps {
   onReset?: () => void;
   creditBlock?: React.ReactNode;
   referenceImagePreviewUrls?: string[];
-  onRemoveReferenceImage?: (index: number) => void;
   pageTitle?: string;
 }
 
@@ -29,7 +28,6 @@ export default function LeftPanel({
   onReset,
   creditBlock,
   referenceImagePreviewUrls = [],
-  onRemoveReferenceImage,
   pageTitle,
 }: LeftPanelProps) {
   const { cost: generationCost, loading: generationCostLoading } = useEstimatedCost({ workflowName: RING_CAD_NURBS_WORKFLOW, model });
@@ -100,17 +98,16 @@ export default function LeftPanel({
                 style={{ maxHeight: 180 }}
                 onClick={() => setLightboxIndex(0)}
               />
-              {/* No separate expand button: the image itself opens the
-                  lightbox, so a second control just covers the artwork. */}
-              {onRemoveReferenceImage && (
-                <button
-                  onClick={() => onRemoveReferenceImage(0)}
-                  className="absolute top-1.5 right-1.5 w-6 h-6 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
-                  aria-label="Remove image"
-                >
-                  <X className="w-3 h-3 text-foreground/70" />
-                </button>
-              )}
+              {/* Enlarge, not remove. This panel is the workspace, where the
+                  run has already been sent with these images, so removing one
+                  changes nothing about the result. */}
+              <button
+                onClick={() => setLightboxIndex(0)}
+                className="absolute top-1.5 right-1.5 w-6 h-6 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
+                aria-label="Expand image"
+              >
+                <Maximize2 className="w-3 h-3 text-foreground/70" />
+              </button>
             </div>
 
             {/* Additional angles, if any were uploaded */}
@@ -131,15 +128,12 @@ export default function LeftPanel({
                       >
                         <img src={url} alt={`Reference angle ${index}`} className="h-full w-full object-cover" />
                       </button>
-                      {onRemoveReferenceImage && (
-                        <button
-                          onClick={() => onRemoveReferenceImage(index)}
-                          className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center border border-border bg-card/80 opacity-0 transition-opacity hover:bg-accent/60 focus-visible:opacity-100 group-hover:opacity-100"
-                          aria-label={`Remove reference angle ${index}`}
-                        >
-                          <X className="h-2.5 w-2.5 text-foreground/70" />
-                        </button>
-                      )}
+                      <span
+                        aria-hidden="true"
+                        className="pointer-events-none absolute top-1 right-1 flex h-5 w-5 items-center justify-center border border-border bg-card/80 opacity-0 transition-opacity group-hover:opacity-100"
+                      >
+                        <Maximize2 className="h-2.5 w-2.5 text-foreground/70" />
+                      </span>
                     </div>
                   );
                 })}
