@@ -184,3 +184,47 @@ describe('useCadHistoryLibrary — images (image_to_cad)', () => {
     expect(result.current.hasHistory).toBe(false);
   });
 });
+
+describe('useCadHistoryLibrary — no duplicate images', () => {
+  it('shows an asset once even when it belongs to several sets', async () => {
+    // Re-uploading an image already owned adds it to the new set while keeping
+    // the old, so set_ids carries both. Rendering it in each card read as
+    // duplicates in My Rings.
+    mockFetchUserAssets.mockResolvedValue(assetPage([
+      asset({ id: 'shared', set_ids: ['set-1', 'set-2'] }),
+      asset({ id: 'only-2', set_ids: ['set-2'] }),
+    ]));
+
+    const { result } = renderHook(() => useCadHistoryLibrary('image_to_cad'));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    const allIds = result.current.items.flatMap((i) => i.assetIds);
+    expect(allIds).toEqual(['shared', 'only-2']);
+    expect(new Set(allIds).size).toBe(allIds.length);
+  });
+
+  it('drops a repeated row rather than rendering it twice', async () => {
+    mockFetchUserAssets.mockResolvedValue(assetPage([
+      asset({ id: 'dupe', set_ids: ['set-1'] }),
+      asset({ id: 'dupe', set_ids: ['set-1'] }),
+    ]));
+
+    const { result } = renderHook(() => useCadHistoryLibrary('image_to_cad'));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.items.flatMap((i) => i.assetIds)).toEqual(['dupe']);
+  });
+
+  it('still groups a genuine multi-image set into one card', async () => {
+    mockFetchUserAssets.mockResolvedValue(assetPage([
+      asset({ id: 'a', set_ids: ['set-1'] }),
+      asset({ id: 'b', set_ids: ['set-1'] }),
+    ]));
+
+    const { result } = renderHook(() => useCadHistoryLibrary('image_to_cad'));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.items).toHaveLength(1);
+    expect(result.current.items[0].assetIds).toEqual(['a', 'b']);
+  });
+});

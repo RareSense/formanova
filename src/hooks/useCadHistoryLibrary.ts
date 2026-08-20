@@ -20,20 +20,27 @@ export interface CadLibraryEntry {
   name: string | null;
 }
 
-/** Groups vault assets into one entry per set, mirroring Photo Studio's
- * buildVaultCards. An asset can belong to several sets, so it can appear in
- * more than one entry; that is intended, not duplication. Assets with no set
- * stand alone. Order follows first appearance so the grid does not reshuffle,
- * and within a set the earliest-created asset is the cover. */
+/** Groups vault assets into one entry per set, and shows each image exactly
+ * once. Assets with no set stand alone. Order follows first appearance so the
+ * grid does not reshuffle, and within a set the earliest-created asset is the
+ * cover. */
 function groupBySet(assets: UserAsset[]): CadLibraryEntry[] {
   const groups = new Map<string, UserAsset[]>();
   const order: string[] = [];
+  const placed = new Set<string>();
   for (const a of assets) {
-    const keys = a.set_ids?.length ? a.set_ids : [a.input_group_id ?? `single:${a.id}`];
-    for (const key of keys) {
-      if (!groups.has(key)) { groups.set(key, []); order.push(key); }
-      groups.get(key)!.push(a);
-    }
+    // Each image is shown once, in the first set it belongs to.
+    //
+    // An asset can be in several sets: re-uploading one already owned adds it
+    // to the new set while keeping the old. Photo Studio renders it in every
+    // card, which is meaningful there because a card is a product. Here a card
+    // is an upload batch, and since every attach is its own upload, batches are
+    // arbitrary. Repeating the image across them just reads as duplicates.
+    if (placed.has(a.id)) continue;
+    placed.add(a.id);
+    const key = a.set_ids?.[0] ?? a.input_group_id ?? `single:${a.id}`;
+    if (!groups.has(key)) { groups.set(key, []); order.push(key); }
+    groups.get(key)!.push(a);
   }
   return order.map((key) => {
     const members = [...groups.get(key)!].sort((x, y) =>
