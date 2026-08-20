@@ -153,8 +153,13 @@ export default function ImagePromptScreen({
                 <div>
                   <span className="marta-label block mb-1">Image to CAD &middot; Step 1</span>
                   <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">Upload Your Ring Images</h3>
+                  {/* Sets the expectation before the upload, not after the
+                      result. Weight and colour carry the emphasis rather than
+                      a warning colour: this is how the tool works, not a
+                      caution. */}
                   <p className="mt-1.5 text-sm text-muted-foreground">
-                    Upload 1&ndash;5 photos or sketches of the same ring to inspire your CAD design.
+                    Upload 1&ndash;5 reference images. We&rsquo;ll use them as{" "}
+                    <span className="font-medium text-foreground">inspiration, not recreate the design exactly.</span>
                   </p>
                 </div>
               </div>
@@ -236,6 +241,12 @@ export default function ImagePromptScreen({
                   <span className="marta-label block mb-1 invisible" aria-hidden="true">Step 1</span>
                   <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">Try an Example</h3>
                   <p className="mt-1.5 text-sm text-muted-foreground">Choose one to load its image and prompt</p>
+                  {/* First run only: this whole block is gated on having no
+                      history, so it retires itself once someone has generated
+                      once and does not need its own dismissal state. */}
+                  <p className="mt-1 text-xs text-muted-foreground/80">
+                    Examples are for inspiration. Your CAD will be a new interpretation, not an exact copy.
+                  </p>
                 </div>
                 <RingReferenceExamples onSelect={handleExampleClick} />
               </>
