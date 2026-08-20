@@ -25,6 +25,7 @@ export function CadWorkflowModal({ workflowId, workflowStatus, onClose }: CadWor
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [glbUrl, setGlbUrl] = useState<string | null>(null);
+  const [threedmUrl, setThreedmUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!workflowId) return;
@@ -32,6 +33,7 @@ export function CadWorkflowModal({ workflowId, workflowStatus, onClose }: CadWor
     setLoading(true);
     setError(null);
     setGlbUrl(null);
+    setThreedmUrl(null);
 
     (async () => {
       try {
@@ -39,8 +41,9 @@ export function CadWorkflowModal({ workflowId, workflowStatus, onClose }: CadWor
 
         if (cadResult.azure_source === 'failed_final') {
           setError('This generation failed. No model available.');
-        } else if (cadResult.glb_url) {
+        } else if (cadResult.glb_url || cadResult.threedm_url) {
           setGlbUrl(cadResult.glb_url);
+          setThreedmUrl(cadResult.threedm_url);
         } else {
           setError('No GLB model found for this workflow.');
         }
@@ -52,16 +55,24 @@ export function CadWorkflowModal({ workflowId, workflowStatus, onClose }: CadWor
     })();
   }, [workflowId, workflowStatus]);
 
-  const handleDownloadGlb = async () => {
-    if (!glbUrl) return;
-    const fileName = `ring-${workflowId?.slice(0, 8)}.glb`;
+  /**
+   * Downloads the .3dm — the machinable NURBS deliverable — when the run
+   * produced one (ring_cad_nurbs_v1). Falls back to the .glb preview mesh for
+   * older workflow shapes that never had a .3dm, same fallback ImageToCAD
+   * already uses (workflow.threedmArtifact ? handleDownloadThreedm : handleDownloadGlb).
+   */
+  const handleDownload = async () => {
+    const use3dm = !!threedmUrl;
+    const downloadUrl = use3dm ? threedmUrl : glbUrl;
+    if (!downloadUrl) return;
+    const fileName = `ring-${workflowId?.slice(0, 8)}.${use3dm ? '3dm' : 'glb'}`;
     import('@/lib/posthog-events').then((m) =>
-      m.trackDownloadClicked({ file_name: fileName, file_type: 'glb', context: 'generations-cad-modal' })
+      m.trackDownloadClicked({ file_name: fileName, file_type: use3dm ? 'threedm' : 'glb', context: 'generations-cad-modal' })
     );
 
     try {
-      const needsAuth = glbUrl.includes('/artifacts/');
-      const resp = needsAuth ? await authenticatedFetch(glbUrl) : await fetch(glbUrl);
+      const needsAuth = downloadUrl.includes('/artifacts/');
+      const resp = needsAuth ? await authenticatedFetch(downloadUrl) : await fetch(downloadUrl);
       if (!resp.ok) throw new Error(`Download failed: ${resp.status}`);
       const blob = await resp.blob();
       const blobUrl = URL.createObjectURL(blob);
@@ -71,7 +82,7 @@ export function CadWorkflowModal({ workflowId, workflowStatus, onClose }: CadWor
       a.click();
       URL.revokeObjectURL(blobUrl);
     } catch (err) {
-      console.error('[CadWorkflowModal] GLB download error:', err);
+      console.error('[CadWorkflowModal] download error:', err);
     }
   };
 
@@ -115,37 +126,39 @@ export function CadWorkflowModal({ workflowId, workflowStatus, onClose }: CadWor
           )}
 
           {/* Success: 3D GLB preview + download */}
-          {!loading && !error && glbUrl && (
+          {!loading && !error && (glbUrl || threedmUrl) && (
             <>
-              <Suspense
-                fallback={
-                  <div className="w-full aspect-square max-h-[450px] bg-muted/30 flex items-center justify-center rounded-sm">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                  </div>
-                }
-              >
-                <GLBPreviewSlot
-                  id={workflowId || 'modal'}
-                  glbUrl={glbUrl}
-                  className="w-full aspect-square max-h-[450px] bg-background/50 border border-border/30 rounded-sm mb-4"
-                />
-              </Suspense>
+              {glbUrl && (
+                <Suspense
+                  fallback={
+                    <div className="w-full aspect-square max-h-[450px] bg-muted/30 flex items-center justify-center rounded-sm">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  }
+                >
+                  <GLBPreviewSlot
+                    id={workflowId || 'modal'}
+                    glbUrl={glbUrl}
+                    className="w-full aspect-square min-h-[340px] max-h-[560px] bg-background/50 border border-border/30 rounded-sm mb-4"
+                  />
+                </Suspense>
+              )}
 
               <div className="flex flex-wrap gap-3">
                 <Button
-                  onClick={handleDownloadGlb}
+                  onClick={handleDownload}
                   variant="outline"
                   className="font-mono text-[10px] tracking-wider uppercase gap-2"
                 >
                   <Download className="h-3.5 w-3.5" />
-                  Download GLB
+                  {threedmUrl ? "Download 3DM" : "Download GLB"}
                 </Button>
               </div>
             </>
           )}
 
           {/* No data fallback */}
-          {!loading && !error && !glbUrl && (
+          {!loading && !error && !glbUrl && !threedmUrl && (
             <p className="font-mono text-[10px] tracking-wider text-muted-foreground text-center py-8">
               No output artifacts found for this workflow.
             </p>

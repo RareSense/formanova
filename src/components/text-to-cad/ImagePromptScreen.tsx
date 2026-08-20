@@ -1,14 +1,23 @@
 import { useRef, useCallback, useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Diamond, X, Maximize2, ImageIcon } from "lucide-react";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { useEstimatedCost } from "@/hooks/use-estimated-cost";
+import { RING_CAD_NURBS_WORKFLOW } from "@/lib/ring-cad-nurbs-api";
+import { authenticatedFetch } from "@/lib/authenticated-fetch";
+import ReferenceImageUploader from "./ReferenceImageUploader";
+import CadHistoryLibrary from "./CadHistoryLibrary";
 
 import cadExample1 from "@/assets/examples/cad-example-1.webp";
 import cadExample2 from "@/assets/examples/cad-example-2.webp";
 import cadExample3 from "@/assets/examples/cad-example-3.webp";
 import cadExample4 from "@/assets/examples/cad-example-4.webp";
+
+// Shared fixed height for the upload workspace box and the "My Rings" panel,
+// so the two columns frame identically — same top edge (both start right
+// below their own header) and same bottom edge, matching Photo Studio's
+// CANVAS_H technique (StudioVaultUploadStep.tsx).
+const PANEL_H = "h-[500px] md:h-[640px]";
 
 const EXAMPLE_DESIGNS = [
   {
@@ -29,53 +38,66 @@ const EXAMPLE_DESIGNS = [
   },
 ];
 
+function RingReferenceExamples({ onSelect }: { onSelect: (example: typeof EXAMPLE_DESIGNS[0]) => void }) {
+  return (
+    <div className={`grid grid-cols-2 gap-3 overflow-hidden border border-border/30 p-3 ${PANEL_H}`}>
+      {EXAMPLE_DESIGNS.map((example, index) => (
+        <button
+          key={example.image}
+          type="button"
+          onClick={() => onSelect(example)}
+          className="group relative min-h-0 overflow-hidden border border-border/20 bg-muted/10 transition-colors hover:border-foreground/30"
+          aria-label={`Use ring example ${index + 1}`}
+        >
+          <img src={example.image} alt={`Ring example ${index + 1}`} className="h-full w-full object-cover" />
+          <div className="absolute inset-0 flex items-center justify-center bg-background/85 p-4 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
+            <p className="text-center font-mono text-[10px] leading-[1.6] text-foreground/80">{example.prompt}</p>
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 interface ImagePromptScreenProps {
   model: string;
+  tier: string;
   prompt: string;
   setPrompt: (p: string) => void;
   isGenerating: boolean;
   onGenerate: () => void;
   creditBlock?: React.ReactNode;
-  referenceImagePreviewUrl: string | null;
-  onReferenceImageChange: (file: File | null, previewUrl: string | null) => void;
+  /** Ordered previews; index 0 is the primary reference. Length 0..MAX_RING_CAD_REFERENCE_IMAGES. */
+  referenceImagePreviewUrls: string[];
+  /** Appends images, respecting the max. Caller owns File state and object-URL lifetime. */
+  onAddReferenceImages: (files: File[]) => void;
+  onRemoveReferenceImage: (index: number) => void;
+  /** Replaces the whole set (used by the example designs). */
+  onReplaceReferenceImages: (files: File[]) => void;
   onGlbUpload?: (file: File) => void;
 }
 
 export default function ImagePromptScreen({
-  model, prompt, setPrompt,
+  model, tier, prompt, setPrompt,
   isGenerating, onGenerate, creditBlock,
-  referenceImagePreviewUrl, onReferenceImageChange,
+  referenceImagePreviewUrls,
+  onAddReferenceImages, onRemoveReferenceImage, onReplaceReferenceImages,
   onGlbUpload,
 }: ImagePromptScreenProps) {
-  const imageInputRef = useRef<HTMLInputElement>(null);
   const glbInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const dropZoneRef = useRef<HTMLDivElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [hoveredExample, setHoveredExample] = useState<number | null>(null);
-  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [hasImageHistory, setHasImageHistory] = useState(false);
 
-  const activeWorkflow = referenceImagePreviewUrl ? 'sketch_generate_v1' : 'ring_generate_v1';
-  const { cost: estimatedCost, loading: costLoading } = useEstimatedCost({ workflowName: activeWorkflow, model });
+  const primaryPreviewUrl = referenceImagePreviewUrls[0] ?? null;
+  const imageCount = referenceImagePreviewUrls.length;
 
-  const handleImageFile = useCallback((file: File) => {
-    if (!file.type.startsWith("image/")) return;
-    const prevUrl = referenceImagePreviewUrl;
-    const url = URL.createObjectURL(file);
-    if (prevUrl?.startsWith("blob:")) URL.revokeObjectURL(prevUrl);
-    onReferenceImageChange(file, url);
-  }, [referenceImagePreviewUrl, onReferenceImageChange]);
-
-  const handleImageInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) handleImageFile(file);
-    e.target.value = "";
-  }, [handleImageFile]);
-
-  const handleClearImage = useCallback(() => {
-    if (referenceImagePreviewUrl?.startsWith("blob:")) URL.revokeObjectURL(referenceImagePreviewUrl);
-    onReferenceImageChange(null, null);
-  }, [referenceImagePreviewUrl, onReferenceImageChange]);
+  // ring_cad_nurbs_v1 handles every input mode (text-only, one image, 2-5
+  // images) — the workflow name never changes, only the payload shape does.
+  const { cost: estimatedCost, loading: costLoading } = useEstimatedCost({
+    workflowName: RING_CAD_NURBS_WORKFLOW,
+    model,
+    pricingContext: { llm_tier: tier },
+  });
 
   const handleExampleClick = useCallback(async (example: typeof EXAMPLE_DESIGNS[0]) => {
     setPrompt(example.prompt);
@@ -83,31 +105,30 @@ export default function ImagePromptScreen({
       const res = await fetch(example.image);
       const blob = await res.blob();
       const file = new File([blob], "example-ring.webp", { type: "image/webp" });
-      const url = URL.createObjectURL(file);
-      if (referenceImagePreviewUrl?.startsWith("blob:")) URL.revokeObjectURL(referenceImagePreviewUrl);
-      onReferenceImageChange(file, url);
+      onReplaceReferenceImages([file]);
     } catch {
       // image load failed -- just set prompt
     }
-  }, [setPrompt, referenceImagePreviewUrl, onReferenceImageChange]);
+  }, [setPrompt, onReplaceReferenceImages]);
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    if (!dropZoneRef.current?.contains(e.relatedTarget as Node)) {
-      setIsDragging(false);
+  // "My Rings" reuse — urls are same-origin, auth-gated /api/artifacts proxy
+  // URLs (see useCadHistoryLibrary), so these must go through authenticatedFetch,
+  // unlike the bundled example assets above. A multi-angle entry reuses as a
+  // whole set in one call, so all its images land together (respecting the
+  // existing 5-image cap in useReferenceImages).
+  const handleLibraryImageSelect = useCallback(async (urls: string[]) => {
+    try {
+      const files = await Promise.all(urls.map(async (url, index) => {
+        const res = await authenticatedFetch(url);
+        if (!res.ok) throw new Error(`${res.status}`);
+        const blob = await res.blob();
+        return new File([blob], `reused-reference-${index}.webp`, { type: blob.type || "image/webp" });
+      }));
+      onAddReferenceImages(files);
+    } catch {
+      // reuse failed -- silently no-op, same as the example-click failure path
     }
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) handleImageFile(file);
-  }, [handleImageFile]);
+  }, [onAddReferenceImages]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -116,225 +137,122 @@ export default function ImagePromptScreen({
     }
   };
 
-  useEffect(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, 200) + "px";
-  }, [prompt]);
-
-  useEffect(() => {
-    const onPaste = (e: ClipboardEvent) => {
-      const item = Array.from(e.clipboardData?.items ?? []).find(i => i.type.startsWith("image/"));
-      if (!item) return;
-      const file = item.getAsFile();
-      if (file) handleImageFile(file);
-    };
-    window.addEventListener("paste", onPaste);
-    return () => window.removeEventListener("paste", onPaste);
-  }, [handleImageFile]);
-
-  const canGenerate = !!referenceImagePreviewUrl;
+  const canGenerate = imageCount > 0;
 
   return (
-    <div className="flex-1 flex items-center justify-center bg-background overflow-y-auto">
-      {/* Lightbox */}
-      <AnimatePresence>
-        {lightboxOpen && referenceImagePreviewUrl && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
-            onClick={() => setLightboxOpen(false)}
-          >
-            <motion.img
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.9 }}
-              src={referenceImagePreviewUrl}
-              alt="Reference ring full view"
-              className="max-w-full max-h-full object-contain"
-              onClick={(e) => e.stopPropagation()}
-            />
-            <button
-              onClick={() => setLightboxOpen(false)}
-              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
-            >
-              <X className="w-4 h-4 text-foreground/70" />
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
+    <div className="w-full flex items-start justify-center bg-background">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
-        className="w-full max-w-[680px] px-4 sm:px-6 py-6"
+        className="w-full px-3 pb-6 pt-20 sm:px-6 lg:px-3"
       >
-        {/* Title */}
-        <div className="text-center mb-6">
-          <h1 className="font-display text-4xl md:text-5xl tracking-[0.2em] text-foreground uppercase mb-2">
-            Generate 3D Ring
-          </h1>
-          <p className="font-mono text-[11px] text-muted-foreground tracking-[0.15em] uppercase">
-            Upload a photo or sketch of your design
-          </p>
-        </div>
-
-        <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageInputChange} />
-
-        {/* Image drop zone — primary */}
-        <div
-          ref={dropZoneRef}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          onClick={() => !referenceImagePreviewUrl && imageInputRef.current?.click()}
-          className={`relative w-full border flex items-center justify-center transition-all duration-200 mb-3 ${
-            isDragging
-              ? "border-foreground/60 bg-foreground/5"
-              : "border-foreground/40 hover:border-foreground/60 hover:bg-foreground/5 bg-muted/10"
-          } ${!referenceImagePreviewUrl ? "cursor-pointer" : ""}`}
-          style={{ minHeight: 240 }}
-        >
-          {referenceImagePreviewUrl ? (
-            <>
-              <img
-                src={referenceImagePreviewUrl}
-                alt="Reference ring"
-                className="w-full object-contain p-3"
-                style={{ maxHeight: 320 }}
-              />
-              <button
-                onClick={(e) => { e.stopPropagation(); handleClearImage(); }}
-                className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
-                aria-label="Remove image"
-              >
-                <X className="w-3 h-3 text-foreground/70" />
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); setLightboxOpen(true); }}
-                className="absolute top-2 right-10 w-6 h-6 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
-                aria-label="Expand image"
-              >
-                <Maximize2 className="w-3 h-3 text-foreground/70" />
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); imageInputRef.current?.click(); }}
-                className="absolute bottom-2 left-2 font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground/60 hover:text-foreground transition-colors bg-card/70 px-1.5 py-0.5 cursor-pointer"
-              >
-                Change
-              </button>
-            </>
-          ) : (
-            <div className="flex flex-col items-center text-center px-6 py-10">
-<div className="relative mx-auto w-20 h-20 mb-6">
-                <div className="absolute inset-0 rounded-full bg-primary/10 animate-ping" style={{ animationDuration: '2.5s' }} />
-                <div className="absolute inset-0 rounded-full bg-primary/5 border-2 border-primary/20 flex items-center justify-center">
-                  <Diamond className="h-9 w-9 text-primary" />
+        <div className="grid gap-8 lg:gap-10 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+              <div className="mb-2 flex items-start justify-between gap-3">
+                <div>
+                  <span className="marta-label block mb-1">Image to CAD &middot; Step 1</span>
+                  <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">Upload Your Ring Images</h3>
+                  {/* Sets the expectation before the upload, not after the
+                      result. Weight and colour carry the emphasis rather than
+                      a warning colour: this is how the tool works, not a
+                      caution. */}
+                  <p className="mt-1.5 text-sm text-muted-foreground">
+                    Upload 1&ndash;5 reference images. We&rsquo;ll use them as{" "}
+                    <span className="font-medium text-foreground">inspiration, not recreate the design exactly.</span>
+                  </p>
                 </div>
               </div>
-              <p className="font-display text-lg tracking-[0.1em] text-foreground uppercase mb-1.5">
-                Drop your ring image or sketch here
-              </p>
-              <p className="text-sm text-muted-foreground mb-6">
-                Drag &amp; drop · click to browse · paste (Ctrl+V)
-              </p>
-              <Button variant="outline" size="lg" className="gap-2 pointer-events-none">
-                <ImageIcon className="h-4 w-4" />
-                Browse ring files
-              </Button>
+
+            <div className="flex flex-col gap-3">
+              <ReferenceImageUploader
+                referenceImagePreviewUrls={referenceImagePreviewUrls}
+                onAddReferenceImages={onAddReferenceImages}
+                onRemoveReferenceImage={onRemoveReferenceImage}
+                primaryLabel="Drop your ring images or sketches here"
+                canvasClassName={PANEL_H}
+                photoStudioEmptyState
+              />
+
+              {/* Text prompt — secondary */}
+              <div className="relative flex-shrink-0">
+                <textarea
+                  ref={textareaRef}
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Add optional description"
+                  rows={3}
+                  /* Full-strength border, not a faded one: this is an input and
+                     needs to read as an editable field at a glance. */
+                  className="min-h-[96px] max-h-[240px] w-full resize-y overflow-y-auto border border-border bg-background px-5 py-3 pb-7 font-body text-[14px] leading-relaxed text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-foreground/60 focus:ring-1 focus:ring-border"
+                />
+                {prompt.length > 0 && (
+                  <button
+                    onClick={() => { setPrompt(""); textareaRef.current?.focus(); }}
+                    className="absolute bottom-2.5 right-8 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground/60 hover:text-foreground transition-colors duration-150 cursor-pointer z-10"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+
             </div>
-          )}
-        </div>
 
-        {/* Text prompt — secondary */}
-        <div className={`relative mb-3 transition-opacity duration-200 ${referenceImagePreviewUrl ? "opacity-100" : "opacity-40"}`}>
-          <textarea
-            ref={textareaRef}
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Add optional description"
-            rows={2}
-            className={`w-full min-h-[52px] max-h-[200px] px-5 py-2.5 pb-7 text-[14px] text-foreground placeholder:text-muted-foreground/50 resize-none font-body leading-relaxed transition-all duration-200 focus:outline-none bg-muted/20 border overflow-y-auto ${referenceImagePreviewUrl ? "border-border focus:ring-1 focus:ring-border" : "border-border/30 pointer-events-none"}`}
-          />
-          {prompt.length > 0 && (
-            <button
-              onClick={() => { setPrompt(""); textareaRef.current?.focus(); }}
-              className="absolute bottom-2.5 right-8 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground/60 hover:text-foreground transition-colors duration-150 cursor-pointer z-10"
-            >
-              Clear
-            </button>
-          )}
-        </div>
+            {/* Action area — matches Photo Studio's Next button exactly:
+                right-aligned below the canvas, gold gradient, size="lg". */}
+            {creditBlock ? (
+              <div className="mt-3">{creditBlock}</div>
+            ) : (
+              <div className="mt-3 flex items-center justify-end gap-3">
+                <Button
+                  size="lg"
+                  onClick={onGenerate}
+                  disabled={isGenerating || !canGenerate}
+                  className="gap-2.5 border-0 bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] px-10 font-display text-base uppercase tracking-wide text-background transition-opacity hover:opacity-90 disabled:opacity-60"
+                >
+                  {isGenerating ? "Generating…" : (
+                    <>
+                      Generate CAD
+                      <span className="inline-flex items-center gap-1 opacity-90">
+                        <img src={creditCoinIcon} alt="" className="w-5 h-5" />
+                        <span className="font-mono text-sm font-semibold">{costLoading ? '…' : (estimatedCost !== null ? estimatedCost : '—')}</span>
+                      </span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
 
-        {/* Credit block */}
-        {creditBlock && <div className="mb-3">{creditBlock}</div>}
+          </div>
 
-        {/* Generate button */}
-        {!creditBlock && (
-          <button
-            onClick={onGenerate}
-            disabled={isGenerating || !canGenerate}
-            className="w-full py-4 text-[13px] font-bold uppercase tracking-[0.2em] cursor-pointer transition-all duration-200 bg-primary text-primary-foreground disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90 active:scale-[0.99] flex items-center justify-center gap-2"
-          >
-            {isGenerating ? "Generating…" : (
+          <div>
+            {/* My Rings must stay mounted even while hidden: it is what reports
+                whether any history exists, so gating its render on
+                hasImageHistory would deadlock — the flag could never flip
+                because nothing would ever fetch and report back. */}
+            <div className={hasImageHistory ? "" : "hidden"}>
+              <CadHistoryLibrary variant="images" panelH={PANEL_H} onSelectImages={handleLibraryImageSelect} onHasHistoryChange={setHasImageHistory} />
+            </div>
+
+            {!hasImageHistory && (
               <>
-                Generate 3D Ring
-                <span className="inline-flex items-center gap-1 ml-1 opacity-80">
-                  <span className="text-[13px] font-mono font-semibold">≤</span>
-                  <img src={creditCoinIcon} alt="" className="w-5 h-5" />
-                  <span className="text-[13px] font-mono font-semibold">{costLoading ? '…' : (estimatedCost !== null ? estimatedCost : '—')}</span>
-                </span>
+                <div className="mb-2">
+                  <span className="marta-label block mb-1 invisible" aria-hidden="true">Step 1</span>
+                  <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">Try an Example</h3>
+                  <p className="mt-1.5 text-sm text-muted-foreground">Choose one to load its image and prompt</p>
+                  {/* First run only: this whole block is gated on having no
+                      history, so it retires itself once someone has generated
+                      once and does not need its own dismissal state. */}
+                  <p className="mt-1 text-xs text-muted-foreground/80">
+                    Examples are for inspiration. Your CAD will be a new interpretation, not an exact copy.
+                  </p>
+                </div>
+                <RingReferenceExamples onSelect={handleExampleClick} />
               </>
             )}
-          </button>
-        )}
-
-        {/* Example designs */}
-        <div className="mt-6">
-          <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-3">
-            Try an example
-          </h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            {EXAMPLE_DESIGNS.map((ex, i) => (
-              <button
-                key={i}
-                onClick={() => handleExampleClick(ex)}
-                onMouseEnter={() => setHoveredExample(i)}
-                onMouseLeave={() => setHoveredExample(null)}
-                className="relative aspect-square border border-border hover:border-foreground/20 overflow-hidden transition-all duration-150 bg-muted/10"
-              >
-                <img src={ex.image} alt={`Ring example ${i + 1}`} className="w-full h-full object-cover" />
-                <div className={`absolute inset-0 bg-background/85 flex items-center justify-center p-3 transition-opacity duration-200 ${hoveredExample === i ? 'opacity-100' : 'opacity-0'}`}>
-                  <p className="font-mono text-[10px] text-foreground/80 leading-[1.6] text-center">{ex.prompt}</p>
-                </div>
-              </button>
-            ))}
           </div>
         </div>
-
-        {/* Upload GLB — gated */}
-        {onGlbUpload && (
-          <div className="mt-4 text-center">
-            <input
-              ref={glbInputRef}
-              type="file"
-              accept=".glb,.gltf"
-              className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) onGlbUpload(f); e.target.value = ""; }}
-            />
-            <button
-              onClick={() => glbInputRef.current?.click()}
-              className="font-mono text-[11px] uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground transition-colors duration-150 cursor-pointer underline underline-offset-4 decoration-border hover:decoration-foreground"
-            >
-              Or upload a CAD file (.glb)
-            </button>
-          </div>
-        )}
       </motion.div>
     </div>
   );

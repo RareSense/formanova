@@ -5,25 +5,29 @@ import {
   AlertTriangle,
   ArrowLeft,
   ChevronDown,
+  Download,
   ImageOff,
   Loader2,
   MessageSquareWarning,
 } from 'lucide-react';
 
 import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
+import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { azureUriToUrl } from '@/lib/azure-utils';
 import {
   AdminGenerationsApiError,
   getAdminGenerationDetail,
   type AdminGenerationDetail,
 } from '@/lib/admin-generations-api';
-import { resolveSourceType } from '@/lib/generation-history-api';
+import { fetchCadResult, resolveSourceType } from '@/lib/generation-history-api';
+import { parseRingCadResult } from '@/lib/ring-cad-nurbs-api';
 import type { AdminGenerationStep } from '@/lib/admin-generations-api';
 import { ScissorGLBGrid, GLBPreviewSlot } from '@/components/generations/ScissorGLBGrid';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { toast } from 'sonner';
 
 function formatDateTime(value: string | null): string {
   if (!value) return '-';
@@ -142,6 +146,25 @@ function findText(value: unknown, keys: string[]): string | null {
   return null;
 }
 
+function getReferenceImageCount(value: unknown): number | null {
+  if (!value || typeof value !== 'object') return null;
+  const root = value as Record<string, unknown>;
+  const nested = root.payload && typeof root.payload === 'object'
+    ? root.payload as Record<string, unknown>
+    : null;
+
+  for (const candidate of [root, nested]) {
+    if (!candidate) continue;
+    if (typeof candidate.reference_image_count === 'number') {
+      return candidate.reference_image_count;
+    }
+    for (const key of ['reference_images', 'reference_image_urls']) {
+      if (Array.isArray(candidate[key])) return candidate[key].length;
+    }
+  }
+  return null;
+}
+
 function extractGlbFromSteps(steps: AdminGenerationStep[]): string | null {
   function deepFindGlbUri(node: unknown): string | null {
     if (typeof node === 'string' && node.includes('.glb')) {
@@ -157,20 +180,50 @@ function extractGlbFromSteps(steps: AdminGenerationStep[]): string | null {
     return null;
   }
 
+  // ring_cad_nurbs_v1 steps nest the artifact under a `result` (or sink-node)
+  // wrapper and use extensionless content-addressed proxy URLs (/api/artifacts/
+  // <sha256>, no ".glb" suffix), which the string-matching fallback below can
+  // never find. Try the shared, key-based parser first — it already handles
+  // both the nesting and the extensionless URL shape (see ring-cad-nurbs-api.ts).
   for (const step of steps) {
     const out = step.output as Record<string, unknown> | null;
     if (!out) continue;
-    const glbArtUri = (out.glb_artifact as any)?.uri ?? (out.original_glb_artifact as any)?.uri;
-    if (typeof glbArtUri === 'string') return azureUriToUrl(glbArtUri) || glbArtUri;
+    try {
+      const parsed = parseRingCadResult(out);
+      if (parsed.glbArtifact?.url) return parsed.glbArtifact.url;
+    } catch {
+      // Not a ring_cad_nurbs_v1-shaped step — fall through to the checks below.
+    }
+  }
+
+  for (const step of steps) {
+    const out = step.output as Record<string, unknown> | null;
+    if (!out) continue;
+    // Prefer a backend-signed url when present; otherwise resolve the azure://
+    // reference. Never fall back to the raw uri: azure:// cannot be fetched, so
+    // returning it guarantees the viewer fails instead of showing "No 3D output".
+    const glbArt = (out.glb_artifact ?? out.original_glb_artifact) as any;
+    const glbArtUrl = typeof glbArt?.url === 'string' ? glbArt.url : undefined;
+    if (glbArtUrl) return glbArtUrl;
+    if (typeof glbArt?.uri === 'string') {
+      const resolved = azureUriToUrl(glbArt.uri);
+      if (resolved) return resolved;
+    }
     const glbPath = out.glb_path;
     if (glbPath) {
       const p = typeof glbPath === 'string' ? glbPath : (glbPath as any)?.uri;
-      if (typeof p === 'string') return azureUriToUrl(p) || p;
+      if (typeof p === 'string') {
+        const resolved = azureUriToUrl(p);
+        if (resolved) return resolved;
+      }
     }
   }
   for (const step of steps) {
     const uri = deepFindGlbUri(step.output);
-    if (uri) return azureUriToUrl(uri) || uri;
+    if (uri) {
+      const resolved = azureUriToUrl(uri);
+      if (resolved) return resolved;
+    }
   }
   return null;
 }
@@ -333,11 +386,56 @@ function InvalidRequestState({ message }: { message: string }) {
 }
 
 function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
-  const isCadText = resolveSourceType(detail.source_type, detail.workflow_name) === 'cad_text';
-  const textPrompt = isCadText
-    ? findText(detail.input_payload, ['prompt', 'description', 'ring_description', 'text_input', 'input_text', 'text', 'query'])
+  // Both CAD families produce a GLB. Image-to-CAD (including ring_cad_nurbs_v1)
+  // was excluded here, so its runs always rendered
+  // "No 3D output" no matter what the pipeline returned.
+  const referenceImageCount = getReferenceImageCount(detail.input_payload);
+  const cadSourceType = resolveSourceType(detail.source_type, detail.workflow_name, referenceImageCount);
+  const isCadModel = cadSourceType === 'text_to_cad' || cadSourceType === 'image_to_cad';
+  const cadResultQuery = useQuery({
+    queryKey: ['admin-cad-result', detail.workflow_id],
+    queryFn: () => fetchCadResult(detail.workflow_id),
+    enabled: isCadModel && detail.status === 'completed',
+    staleTime: Infinity,
+    retry: 1,
+  });
+  const [downloading3dm, setDownloading3dm] = useState(false);
+  const textPrompt = isCadModel
+    ? findText(detail.input_payload, ['prompt', 'description', 'ring_description', 'text_input', 'input_text', 'text', 'query', 'user_description'])
     : null;
-  const cadGlbUrl = isCadText ? extractGlbFromSteps(detail.steps) : null;
+  const cadGlbUrl = isCadModel
+    ? cadResultQuery.data?.glb_url ?? extractGlbFromSteps(detail.steps)
+    : null;
+  const cadThreedmUrl = isCadModel ? cadResultQuery.data?.threedm_url ?? null : null;
+  const cadSourceLabel = cadSourceType === 'text_to_cad'
+    ? 'Text to CAD'
+    : cadSourceType === 'image_to_cad'
+      ? 'Image to CAD'
+      : null;
+
+  async function handleDownload3dm() {
+    if (!cadThreedmUrl || downloading3dm) return;
+    setDownloading3dm(true);
+    try {
+      const response = await authenticatedFetch(cadThreedmUrl);
+      if (!response.ok) throw new Error(`3DM download failed: ${response.status}`);
+      const blob = await response.blob();
+      if (blob.size === 0) throw new Error('3DM download was empty');
+      const blobUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = blobUrl;
+      anchor.download = `${detail.workflow_id}.3dm`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+    } catch (error) {
+      console.error('[Admin CAD 3DM download]', error);
+      toast.error('Failed to download the 3DM file');
+    } finally {
+      setDownloading3dm(false);
+    }
+  }
 
   const stepOutputImageUrls = detail.steps.flatMap((step) =>
     extractImageUrls(step.output)
@@ -442,6 +540,7 @@ function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
           <MetaItem label="Provider Cost" value={formatCredits(detail.total_provider_cost)} />
           <MetaItem label="Workflow ID" value={detail.workflow_id} />
           <MetaItem label="Status" value={detail.status.replace(/_/g, ' ')} />
+          {cadSourceLabel && <MetaItem label="CAD Source" value={cadSourceLabel} />}
         </CardContent>
       </Card>
 
@@ -457,7 +556,7 @@ function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
             <MetaItem label="Complaint" value={detail.feedback ? 'Yes' : 'No'} />
           </div>
 
-          {isCadText ? (
+          {isCadModel ? (
             <div className="space-y-4">
               {textPrompt && (
                 <div className="space-y-2">
@@ -482,6 +581,10 @@ function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
                       />
                     </ScissorGLBGrid>
                   </div>
+                ) : cadResultQuery.isLoading ? (
+                  <div className="flex w-40 aspect-[4/3] items-center justify-center rounded-md border border-border bg-muted/20">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
                 ) : (
                   <div className="flex w-40 aspect-[4/3] items-center justify-center rounded-md border border-border bg-muted/20">
                     <div className="flex flex-col items-center gap-2 text-muted-foreground/50">
@@ -489,6 +592,18 @@ function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
                       <span className="font-mono text-[10px] uppercase tracking-widest text-center">No 3D output</span>
                     </div>
                   </div>
+                )}
+                {cadThreedmUrl && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleDownload3dm}
+                    disabled={downloading3dm}
+                    className="font-mono text-[10px] uppercase tracking-widest"
+                  >
+                    {downloading3dm ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                    Download 3DM
+                  </Button>
                 )}
               </div>
             </div>

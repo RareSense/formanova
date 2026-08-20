@@ -31,6 +31,7 @@ import { StudioModelStep } from '@/components/studio/StudioModelStep';
 import { StudioHeader } from '@/components/studio/StudioHeader';
 import { StudioUploadStep } from '@/components/studio/StudioUploadStep';
 import { trackFeedbackModalOpened } from '@/lib/posthog-events';
+import { recordStudioVisit } from '@/lib/studio-preference';
 // ExampleGuidePanel removed — guide is inline
 
 const CATEGORY_TYPE_MAP: Record<string, string> = {
@@ -87,6 +88,11 @@ function getStepFromQuery(stepParam: string | null): StudioStep {
 
 
 export default function UnifiedStudio() {
+  // Counts towards which studio this user lands in after sign-in. The
+  // workspaces are counted rather than the hub pages so both sides are
+  // measured the same way: where the work happens, not where you browse.
+  useEffect(() => { recordStudioVisit('photo'); }, []);
+
   const { type } = useParams<{ type: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const jewelryType = type || 'necklace';

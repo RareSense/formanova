@@ -5,11 +5,19 @@
  */
 
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
+import { azureUriToUrl } from '@/lib/azure-utils';
+import { fetchCadResult } from '@/lib/cad-result-api';
 const __DEV__ = import.meta.env.DEV;
+
+// Re-exported so existing imports (WorkflowCard.tsx, useImageToCADWorkflow.ts,
+// CadWorkflowModal.tsx, etc.) keep working — the fetch/parse logic itself now
+// lives in cad-result-api.ts (split out to stay under AI_RULES.md's file-size
+// guideline).
+export { fetchCadResult };
 
 // ─── Types ──────────────────────────────────────────────────────────
 
-export type SourceType = 'photo' | 'product_shot' | 'cad_render' | 'cad_text' | 'cad_sketch' | 'unknown';
+export type SourceType = 'photo' | 'product_shot' | 'cad_render' | 'text_to_cad' | 'image_to_cad' | 'unknown';
 
 export interface WorkflowSummary {
   workflow_id: string;
@@ -20,12 +28,14 @@ export interface WorkflowSummary {
   source_type: SourceType;
   /** Optional thumbnail extracted from workflow details (populated client-side) */
   thumbnail_url?: string;
-  /** All angle screenshots for cad_text workflows (populated client-side) */
+  /** All angle screenshots for Text-to-CAD workflows (populated client-side) */
   screenshots?: { angle: string; url: string }[];
   /** GLB download URL (populated client-side from workflow details) */
   glb_url?: string | null;
   /** GLB file name extracted from the azure URI */
   glb_filename?: string | null;
+  /** Machinable Rhino file returned by ring_cad_nurbs_v1 */
+  threedm_url?: string | null;
   /** AI model tier used (e.g. 'gemini', 'claude-sonnet', 'claude-opus') — populated client-side */
   ai_model?: string | null;
   /** Mode from workflow input (e.g. 'lite', 'standard', 'premium') — available in list response */
@@ -36,6 +46,10 @@ export interface WorkflowSummary {
   output_asset_id?: string | null;
   /** User-friendly name from the vault asset (e.g. "Photoshoot 3") — populated during enrichment */
   output_asset_name?: string | null;
+  /** Text-to-CAD design brief the user typed for this run, if any. Empty/absent for image_to_cad. */
+  prompt?: string | null;
+  /** Reference images the user uploaded for this run, resolved to same-origin artifact-proxy URLs. Empty for text_to_cad. */
+  reference_image_urls?: string[];
 }
 
 export interface WorkflowStep {
@@ -125,11 +139,35 @@ export async function listMyWorkflows(
 
   const mapped = raw.map((w: any) => {
     const name = w.name ?? '';
-    // Prefer the backend source_type; fall back to name parsing only when absent/unknown.
-    const sourceType = resolveSourceType(w.source_type, name);
+    // reference_image_artifacts is the real field name the backend sends
+    // (denormalise_payload output — confirmed against
+    // temporal-agentic-pipeline's tests/unit/test_workflow_helpers.py).
+    // reference_images never matched real data; kept as a defensive fallback
+    // only in case an older/alternate response shape used that name instead.
+    const referenceImageArtifacts: Array<{ uri?: string }> = Array.isArray(w.input?.reference_image_artifacts)
+      ? w.input.reference_image_artifacts
+      : Array.isArray(w.input?.reference_images)
+        ? w.input.reference_images
+        : [];
+    const referenceImageCount = typeof w.input?.reference_image_count === 'number'
+      ? w.input.reference_image_count
+      : referenceImageArtifacts.length || null;
+    // The consolidated ring workflow serves both text and image inputs, so its
+    // actual input count is the only reliable discriminator when the backend
+    // still returns source_type="unknown".
+    const sourceType = resolveSourceType(w.source_type, name, referenceImageCount);
+    const summaryCredits = [w.credits_spent, w.actual_user_billed, w.actual_cost]
+      .map(numericCredits)
+      .find((value): value is number => value !== null);
     if (sourceType === 'unknown' && __DEV__) {
       console.warn('[HistoryAPI] unknown source_type for workflow:', { id: w.workflow_id ?? w.id, name, status: w.status, backend_source_type: w.source_type });
     }
+    const prompt = typeof w.input?.user_description === 'string' && w.input.user_description.trim()
+      ? w.input.user_description.trim()
+      : null;
+    const referenceImageUrls = referenceImageArtifacts
+      .map((artifact) => azureUriToUrl(artifact?.uri))
+      .filter((url): url is string => Boolean(url));
     return {
       workflow_id: w.workflow_id ?? w.id,
       name,
@@ -137,18 +175,23 @@ export async function listMyWorkflows(
       created_at: w.created_at ?? w.started_at ?? '',
       finished_at: w.finished_at ?? null,
       source_type: sourceType,
+      // Prefer the backend's already-computed workflow charge. The separate
+      // audit request remains the fallback when this summary omits billing.
+      credits_spent: summaryCredits,
       mode: w.input?.mode ?? null,
       output_asset_id: extractOutputAssetId(w),
       output_asset_name: extractOutputAssetName(w),
+      prompt,
+      reference_image_urls: referenceImageUrls,
     };
   });
   if (__DEV__) {
     console.log('[HistoryAPI] source_type breakdown:', {
       photo: mapped.filter(w => w.source_type === 'photo').length,
       product_shot: mapped.filter(w => w.source_type === 'product_shot').length,
-      cad_text: mapped.filter(w => w.source_type === 'cad_text').length,
+      text_to_cad: mapped.filter(w => w.source_type === 'text_to_cad').length,
       cad_render: mapped.filter(w => w.source_type === 'cad_render').length,
-      cad_sketch: mapped.filter(w => w.source_type === 'cad_sketch').length,
+      image_to_cad: mapped.filter(w => w.source_type === 'image_to_cad').length,
       unknown: mapped.filter(w => w.source_type === 'unknown').length,
     });
   }
@@ -206,79 +249,6 @@ export async function getWorkflowDetails(
   };
 }
 
-// ─── CAD Result (sink-based fallback) ───────────────────────────────
-
-/**
- * Fetch the final result for a CAD workflow using the /result endpoint.
- * Applies the deterministic sink-based fallback rule:
- *   success_final → glb_artifact (final output, preferred) → original_glb_artifact (intermediate)
- *   success_original_glb → original_glb_artifact
- *   failed_final → null (no fallback)
- */
-export async function fetchCadResult(
-  workflowId: string,
-): Promise<{ glb_url: string | null; azure_source: string | null }> {
-  function extractArtifactUri(results: Record<string, unknown>, nodeKey: string, artifactKey: string): string | null {
-    const node = results[nodeKey];
-    if (!node) return null;
-    const arr = Array.isArray(node) ? node : [node];
-    for (const entry of arr) {
-      const rec = entry as Record<string, unknown> | null;
-      if (!rec) continue;
-      const artifact = rec[artifactKey] as Record<string, unknown> | undefined;
-      if (artifact && typeof artifact.uri === 'string') return artifact.uri;
-    }
-    return null;
-  }
-
-  try {
-    const res = await authenticatedFetch(
-      `/api/result/${workflowId}`,
-    );
-    if (!res.ok) return { glb_url: null, azure_source: null };
-
-    const data = await res.json();
-
-    // 1. success_final: prefer glb_artifact (final output), fallback original_glb_artifact
-    const finalUri = extractArtifactUri(data, 'success_final', 'glb_artifact')
-      || extractArtifactUri(data, 'success_final', 'original_glb_artifact');
-    if (finalUri) {
-      return { glb_url: finalUri, azure_source: 'success_final' };
-    }
-
-    // 2. success_original_glb: use original_glb_artifact only
-    const originalUri = extractArtifactUri(data, 'success_original_glb', 'original_glb_artifact');
-    if (originalUri) {
-      return { glb_url: originalUri, azure_source: 'success_original_glb' };
-    }
-
-    // 3. failed_final: only build_initial is allowed as fallback
-    const failedArr = data['failed_final'];
-    if (Array.isArray(failedArr) && failedArr.length > 0) {
-      const failedInitialUri = extractArtifactUri(data, 'build_initial', 'glb_artifact')
-        || extractArtifactUri(data, 'build_initial', 'original_glb_artifact');
-      if (failedInitialUri) {
-        return { glb_url: failedInitialUri, azure_source: 'build_initial' };
-      }
-      return { glb_url: null, azure_source: 'failed_final' };
-    }
-
-    // 4. ring_edit_v1 currently returns build nodes rather than success sinks.
-    const buildUri = extractArtifactUri(data, 'build_retry', 'glb_artifact')
-      || extractArtifactUri(data, 'build_retry', 'original_glb_artifact')
-      || extractArtifactUri(data, 'build_initial', 'glb_artifact')
-      || extractArtifactUri(data, 'build_initial', 'original_glb_artifact');
-    if (buildUri) {
-      return { glb_url: buildUri, azure_source: 'build_retry' };
-    }
-
-    return { glb_url: null, azure_source: null };
-  } catch (e) {
-    if (__DEV__) console.warn('[HistoryAPI] fetchCadResult error:', workflowId, e);
-    return { glb_url: null, azure_source: null };
-  }
-}
-
 // ─── Credit Audit ───────────────────────────────────────────────────
 
 /**
@@ -301,22 +271,8 @@ export async function fetchWorkflowCreditAudit(
     }
 
     const data = await res.json();
-
-    // 1. Top-level actual_user_billed (final amount deducted from wallet)
-    if (typeof data.actual_user_billed === 'number') return data.actual_user_billed;
-
-    // 2. Nested under financials
-    if (typeof data.financials?.actual_user_billed === 'number') return data.financials.actual_user_billed;
-
-    // 3. Fallback to other common field names
-    const total = data.total_charged ?? data.total_cost ?? data.total ?? data.credits_spent ?? null;
-    if (typeof total === 'number') return total;
-
-    // 4. Sum line_items costs
-    if (Array.isArray(data.line_items)) {
-      const sum = data.line_items.reduce((acc: number, item: any) => acc + (item.cost ?? item.amount ?? item.credits ?? 0), 0);
-      if (sum > 0) return sum;
-    }
+    const credits = extractWorkflowCredits(data);
+    if (credits !== null) return credits;
 
     if (__DEV__) console.warn('[HistoryAPI] credit audit: could not extract cost from response', workflowId, Object.keys(data));
     return null;
@@ -324,6 +280,60 @@ export async function fetchWorkflowCreditAudit(
     if (__DEV__) console.warn('[HistoryAPI] credit audit error:', workflowId, e);
     return null;
   }
+}
+
+function numericCredits(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value) && value >= 0) return value;
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+  }
+  return null;
+}
+
+/** Normalizes every currently shipped credit-audit response shape. */
+/**
+ * Reads the post-policy charge from a credit-audit response.
+ *
+ * Only `actual_user_billed` is correct. Do NOT sum `line_items`: every attempt
+ * writes a priced row whether or not it was billed, and the policy suppresses
+ * several of them. Failed attempts never bill (user_billable = is_success),
+ * and charge_cache_hits, charge_skipped_nodes and charge_duplicate_success are
+ * all false, so each of those also writes a priced row that was never charged.
+ *
+ * Summing therefore overstates the charge. Backend's example: line items total
+ * 36 on a run billed 20, and a fully failed run bills 0 while its items still
+ * total 36. Summing used to look right only on a clean run with no retries,
+ * where the two happen to coincide.
+ *
+ * If the billed figure is absent we return null and the UI says the cost is
+ * unavailable, which is honest, rather than inventing a number from the rows.
+ */
+export function extractWorkflowCredits(payload: unknown): number | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+  const data = payload as Record<string, any>;
+
+  // The charge is nested at summary.financials.actual_user_billed. The other
+  // wrappers cover shapes shipped by older workflows.
+  const wrappers = [
+    data,
+    data.data,
+    data.result,
+    data.financials,
+    data.summary,
+    data.summary?.financials,
+  ].filter(
+    (value): value is Record<string, any> => Boolean(value && typeof value === 'object' && !Array.isArray(value)),
+  );
+
+  for (const record of wrappers) {
+    for (const key of ['actual_user_billed', 'total_charged', 'total_cost', 'total']) {
+      const value = numericCredits(record[key]);
+      if (value !== null) return value;
+    }
+  }
+
+  return null;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -342,10 +352,15 @@ export function inferSourceType(name: string): SourceType {
     (lower.includes('ring') && lower.includes('pipeline')) ||
     (lower.includes('ring') && lower.includes('generate'))
   )
-    return 'cad_text';
+    return 'text_to_cad';
+
+  // Image-to-3D workflows. ring_cad_nurbs_v1 names neither 'sketch' nor 'image'
+  // but does contain 'cad', so it must be matched before the cad_render check
+  // or it lands in the wrong history section.
+  if (lower.includes('ring_cad_nurbs') || lower.includes('ring-cad-nurbs')) return 'image_to_cad';
 
   // Sketch-to-CAD workflows
-  if (lower.includes('sketch')) return 'cad_sketch';
+  if (lower.includes('sketch')) return 'image_to_cad';
 
   // CAD render workflows
   if (lower.includes('cad') || lower.includes('render')) return 'cad_render';
@@ -382,7 +397,7 @@ export function inferSourceType(name: string): SourceType {
 /**
  * Backend `source_type` enum -> the app's coarser SourceType bucket.
  * The backend distinguishes generate vs fix vs upscale within a family; the UI only
- * cares about the family bucket (photo / product_shot / cad_*), so fixes and upscales
+ * cares about the family bucket, so fixes and upscales
  * collapse into their generate family. Unrecognized/future values are intentionally
  * absent here so they fall through to unknown (or the name-parse fallback).
  */
@@ -392,8 +407,12 @@ const BACKEND_SOURCE_TYPE_MAP: Record<string, SourceType> = {
   upscale: 'photo',
   product_shot: 'product_shot',
   product_fix: 'product_shot',
-  cad_text: 'cad_text',
-  cad_sketch: 'cad_sketch',
+  text_to_cad: 'text_to_cad',
+  image_to_cad: 'image_to_cad',
+  // Backward-compatible API aliases. They are normalized at this boundary and
+  // never become the application's canonical source type.
+  cad_text: 'text_to_cad',
+  cad_sketch: 'image_to_cad',
   cad_render: 'cad_render',
 };
 
@@ -405,18 +424,35 @@ const BACKEND_SOURCE_TYPE_MAP: Record<string, SourceType> = {
  * This is strictly >= the old name-only behavior: a good backend value wins, otherwise
  * we do exactly what we did before, so nothing that classified before can regress.
  */
-export function resolveSourceType(rawSourceType: unknown, workflowName: string): SourceType {
+export function resolveSourceType(
+  rawSourceType: unknown,
+  workflowName: string,
+  referenceImageCount: number | null = null,
+): SourceType {
+  const normalizedName = (workflowName ?? '').toLowerCase();
   // High Effort ("higher_tier") runs are classified by their workflow name, which
   // is unambiguous (jewelry_photoshoots_generator_higher_tier -> photo,
   // Product_shot_pipeline_higher_tier -> product_shot, likewise the fixes). Name
   // wins here so these always land in their shot-type section like the normal
   // flows, even if the backend source_type is missing OR mislabeled.
-  if ((workflowName ?? '').toLowerCase().includes('higher_tier')) {
+  if (normalizedName.includes('higher_tier')) {
     return inferSourceType(workflowName);
   }
   if (typeof rawSourceType === 'string') {
     const mapped = BACKEND_SOURCE_TYPE_MAP[rawSourceType];
     if (mapped) return mapped;
+  }
+  // Backend now resolves text_to_cad/image_to_cad server-side for the
+  // consolidated CAD workflow (temporal-agentic-pipeline PR #52, confirmed
+  // deployed) and always wins above when it returns a recognized value.
+  // This only fires for backend's own deliberate "unknown" (payload missing,
+  // >5 images, or 0 images with no description) — picks a sensible bucket
+  // from the count instead of leaving the workflow in an Unknown section.
+  if (
+    (normalizedName.includes('ring_cad_nurbs') || normalizedName.includes('ring-cad-nurbs')) &&
+    referenceImageCount !== null
+  ) {
+    return referenceImageCount === 0 ? 'text_to_cad' : 'image_to_cad';
   }
   return inferSourceType(workflowName);
 }

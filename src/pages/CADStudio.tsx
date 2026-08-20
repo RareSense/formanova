@@ -4,24 +4,24 @@ import { motion } from "framer-motion";
 import { ArrowRight, Layers, ImageIcon } from "lucide-react";
 
 import textToCadImg from "@/assets/text-to-cad-thumb.webp";
-import cadToCatalogImg from "@/assets/cad-studio/cad-to-catalog-card.webp";
+import imageToCadImg from "@/assets/image-to-cad-thumb.webp";
 
 const cadFeatures = [
   {
     title: "Text to CAD",
-    description: "Generate jewelry CAD concepts from text prompts.",
+    description: "Describe your ring and generate a CAD model from the text.",
     route: "/text-to-cad",
     comingSoon: false,
     icon: Layers,
     image: textToCadImg,
   },
   {
-    title: "CAD to Catalog",
-    description: "Turn your 3D CAD models into polished catalog-ready images.",
-    route: "/cad-to-catalog",
-    comingSoon: true,
+    title: "Image to CAD",
+    description: "Upload up to five inspiration images and generate a CAD model.",
+    route: "/image-to-cad",
+    comingSoon: false,
     icon: ImageIcon,
-    image: cadToCatalogImg,
+    image: imageToCadImg,
   },
 ];
 

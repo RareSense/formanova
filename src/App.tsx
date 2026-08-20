@@ -91,6 +91,9 @@ const AIJewelryCAD = lazyWithRetry(() => import("./pages/AIJewelryCAD"));
 const LinkAccount = lazyWithRetry(() => import("./pages/LinkAccount"));
 const RolePicker = lazyWithRetry(() => import("./pages/RolePicker"));
 const OnboardingWelcome = lazyWithRetry(() => import("./pages/OnboardingWelcome"));
+const DevCadGeneration = import.meta.env.DEV
+  ? lazyWithRetry(() => import("./pages/DevCadGeneration"))
+  : null;
 
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-background">
@@ -168,7 +171,7 @@ function VersionBanner() {
 
 const queryClient = new QueryClient();
 
-const App = () => (
+const MainApp = () => (
   <HelmetProvider>
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
@@ -278,5 +281,23 @@ const App = () => (
   </QueryClientProvider>
   </HelmetProvider>
 );
+
+const App = () => {
+  // Keep the no-cost UI demo outside every application provider. This prevents
+  // auth, credit-balance, generation tracking, and analytics network activity.
+  if (import.meta.env.DEV && DevCadGeneration && window.location.pathname === '/dev/cad-generation') {
+    return (
+      <HelmetProvider>
+        <ThemeProvider>
+          <Suspense fallback={<PageLoader />}>
+            <DevCadGeneration />
+          </Suspense>
+        </ThemeProvider>
+      </HelmetProvider>
+    );
+  }
+
+  return <MainApp />;
+};
 
 export default App;

@@ -17,7 +17,7 @@ import { useUpscaleLauncher } from '@/hooks/useUpscaleLauncher';
 import { loadUpscaleIntent, clearUpscaleIntent } from '@/lib/upscale-intent';
 import { inferResolutionTier, resolutionTierLabel, upscaleEtaLabel } from '@/lib/upscale-api';
 import type { Resolution } from '@/components/studio/OutputSettingsPills';
-import { truncateDisplayName, formatLocal, formatLocalDateOnly, itemVariants, CreditsBadge } from './workflow-card-shared';
+import { truncateDisplayName, formatLocal, itemVariants, CreditsBadge } from './workflow-card-shared';
 import { ShopifyPublishButton } from '@/components/shopify/ShopifyPublishButton';
 
 const PHOTO_RENAMES_KEY = 'formanova_photo_renames';
@@ -47,7 +47,6 @@ export function PhotoCard({ workflow, index, onUpscaled }: { workflow: WorkflowS
   }, [workflow.output_asset_name]);
 
   const dateStr = workflow.created_at ? formatLocal(workflow.created_at) : '-';
-  const dateOnlyStr = workflow.created_at ? formatLocalDateOnly(workflow.created_at) : '-';
 
   const handleStartRename = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -313,8 +312,7 @@ export function PhotoCard({ workflow, index, onUpscaled }: { workflow: WorkflowS
           <div className="flex items-center gap-2 flex-shrink-0">
             <span className="hidden sm:inline-flex"><CreditsBadge credits={workflow.credits_spent} /></span>
             <span className="font-mono text-[10px] tracking-wider text-muted-foreground whitespace-nowrap">
-              <span className="sm:hidden">{dateOnlyStr}</span>
-              <span className="hidden sm:inline">{dateStr}</span>
+              {dateStr}
             </span>
           </div>
         </div>

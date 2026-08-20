@@ -3,6 +3,7 @@
  * Used by both the Generations page and the prefetch hook.
  */
 import { azureUriToUrl } from '@/lib/azure-utils';
+import { parseRingCadResult } from '@/lib/ring-cad-nurbs-api';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -146,9 +147,57 @@ export function extractCadTextData(steps: any[]) {
   let screenshots: { angle: string; url: string }[] = [];
   let glb_url: string | null = null;
   let glb_filename: string | null = null;
+  let threedm_url: string | null = null;
 
   // Normalize: backend may use output or output_data
   const getOutput = (s: any) => s?.output_data ?? s?.output ?? {};
+  const unwrapResult = (value: any): any => {
+    let current = value;
+    // History steps from state workflows wrap tool output in one or more
+    // { result: ... } envelopes. Keep this bounded so malformed cyclic data
+    // cannot trap history rendering.
+    for (let i = 0; i < 4; i += 1) {
+      if (!current || typeof current !== 'object' || Array.isArray(current) || !current.result) break;
+      current = current.result;
+    }
+    return current;
+  };
+
+  // ring_cad_nurbs_v1: typed, extensionless artifacts nested under
+  // output.result. Prefer the latest successful CAD export and the dedicated
+  // screenshot tool before entering the legacy filename-based fallbacks.
+  for (const step of [...steps].reverse()) {
+    const out = unwrapResult(getOutput(step));
+
+    if (screenshots.length === 0 && out?.success !== false && Array.isArray(out?.screenshots)) {
+      const typedShots = out.screenshots
+        .map((shot: any, index: number) => {
+          const artifact = shot?.artifact ?? shot?.data_uri ?? shot;
+          const rawUrl = artifact?.url ?? artifact?.uri ?? shot?.url ?? shot?.uri;
+          const url = typeof rawUrl === 'string' ? normalizeImageUrl(rawUrl) : null;
+          return url
+            ? { angle: String(shot?.name ?? shot?.angle ?? `angle_${index + 1}`), url }
+            : null;
+        })
+        .filter((shot: { angle: string; url: string } | null): shot is { angle: string; url: string } => !!shot);
+      if (typedShots.length > 0) screenshots = typedShots;
+    }
+
+    if (!glb_url) {
+      try {
+        const parsed = parseRingCadResult(out);
+        if (parsed.glbUrl) {
+          glb_url = parsed.glbUrl;
+          glb_filename = 'model.glb';
+          threedm_url = parsed.threedmArtifact?.url ?? null;
+        }
+      } catch {
+        // Not a CAD result-bearing step; keep scanning older steps.
+      }
+    }
+
+    if (glb_url && screenshots.length > 0) break;
+  }
 
   const blenderStep = steps.find(
     (s: any) => {
@@ -245,5 +294,5 @@ export function extractCadTextData(steps: any[]) {
   }
 
   const front = screenshots[0];
-  return { thumbnail_url: front?.url ?? '', screenshots, glb_url, glb_filename, ai_model };
+  return { thumbnail_url: front?.url ?? '', screenshots, glb_url, glb_filename, threedm_url, ai_model };
 }

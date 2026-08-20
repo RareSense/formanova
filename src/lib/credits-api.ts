@@ -39,6 +39,10 @@ export const TOOL_COSTS: Record<string, number> = {
   ring_full_pipeline: 85,
   ring_generate_v1: 85,
   ring_edit_v1: 85,
+  // No ring_cad_nurbs_v1 entry on purpose. Backend prices it per llm_tier and
+  // changes it, so any number here goes stale silently. Without a fallback the
+  // estimate simply reports unavailable and the start call enforces the
+  // balance, returning 402 with the shortfall.
   // Model-specific costs for ring_generate_v1
   'ring_generate_v1:gemini': 85,
   'ring_generate_v1:claude-sonnet': 120,

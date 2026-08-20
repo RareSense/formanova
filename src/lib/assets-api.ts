@@ -41,10 +41,17 @@ export interface UserAsset {
   workflow_id?: string | null;
   workflow_run_id?: string | null;
   generation_workflow_id?: string | null;
-  /** UUID of the grouped multi-image jewelry set this asset belongs to. null for
-   * older/ungrouped uploads. Set by POST /upload/bulk with group_jewelry=true.
-   * Group vault items by this value; filter a single set via the input_group_id param. */
+  /** UUID of ONE set this asset belongs to — the earliest, unless the request
+   * filtered by set. Kept for backwards compatibility and unchanged by the
+   * 2026-08-19 grouping consolidation. Prefer set_ids: an asset can now belong
+   * to several sets and this field can only ever report one of them. */
   input_group_id?: string | null;
+  /** Authoritative membership list: every set this asset belongs to. Added by
+   * the 2026-08-19 grouping consolidation, when re-uploading an image already
+   * owned started adding it to the new set instead of leaving it welded to its
+   * first one. Absent on responses predating that change; for assets that
+   * belong to exactly one set it holds the same value as input_group_id. */
+  set_ids?: string[] | null;
   metadata?: {
     category?: string;
     /** Resolution tier of a generated asset (e.g. '1K' | '2K' | '4K'). Populated by
@@ -93,11 +100,15 @@ export async function fetchUserAssets(
   category?: string,
   intendedUse?: 'on_model' | 'pdp',
   inputGroupId?: string,
+  /** Case-insensitive substring match on the asset NAME only. Applied
+   * server-side before pagination, so `total` stays correct while searching. */
+  search?: string,
 ): Promise<AssetsPage> {
   const params = new URLSearchParams({ asset_type: type, page: String(page), page_size: String(pageSize) });
   if (category) params.set('category', category);
   if (intendedUse) params.set('intended_use', intendedUse);
   if (inputGroupId) params.set('input_group_id', inputGroupId);
+  if (search) params.set('search', search);
   const response = await fetchWithRetry(`${API_BASE}/assets?${params}`);
   return response.json();
 }

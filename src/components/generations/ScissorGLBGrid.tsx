@@ -21,89 +21,34 @@ import React, {
   useMemo,
 } from 'react';
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { applyNeutralToneMapping, makeStudioBackdrop, STUDIO_ENVIRONMENT_HDR } from '@/lib/neutral-tone-mapping';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { RGBELoader } from 'three-stdlib';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Box } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
+import {
+  applyHistoryPreviewMaterials,
+  markEmbeddedGltfMaterials,
+} from './scissor-glb-materials';
+import { PendingCardRegistrationQueue } from './scissor-glb-registration';
+import {
+  cacheScene,
+  disposeScene,
+  fetchGlbArrayBuffer,
+  getCachedScene,
+  glbErrors,
+  glbLoading,
+  glbUrlNeedsAuth,
+  resolveGlbUrl,
+} from './scissor-glb-cache';
+
+// Re-exported so existing imports (glb-url.test.ts, ScissorGLBGrid.test.ts)
+// keep working — the cache/fetch logic itself lives in scissor-glb-cache.ts.
+export { fetchGlbArrayBuffer, glbUrlNeedsAuth, resolveGlbUrl };
 
 const __DEV__ = import.meta.env.DEV;
-
-// ── LRU GLB Cache ────────────────────────────────────────────────────
-const MAX_CACHE = 20;
-
-interface CachedModel {
-  scene: THREE.Group;
-  lastUsed: number;
-}
-
-const glbCache = new Map<string, CachedModel>();
-const glbLoading = new Map<string, Promise<THREE.Group>>();
-const glbErrors = new Set<string>();
-
-function getCachedScene(url: string): THREE.Group | null {
-  const entry = glbCache.get(url);
-  if (entry) {
-    entry.lastUsed = Date.now();
-    return entry.scene.clone(true);
-  }
-  return null;
-}
-
-function cacheScene(url: string, scene: THREE.Group) {
-  if (glbCache.size >= MAX_CACHE) {
-    let oldestKey = '';
-    let oldestTime = Infinity;
-    for (const [key, val] of glbCache) {
-      if (val.lastUsed < oldestTime) {
-        oldestTime = val.lastUsed;
-        oldestKey = key;
-      }
-    }
-    if (oldestKey) {
-      const evicted = glbCache.get(oldestKey);
-      if (evicted) disposeScene(evicted.scene);
-      glbCache.delete(oldestKey);
-    }
-  }
-  glbCache.set(url, { scene: scene.clone(true), lastUsed: Date.now() });
-}
-
-// ── GLB fetch with retry ────────────────────────────────────────────
-// 5xx responses (e.g. a transient 503 from blob storage/CDN) are retried with
-// backoff; 4xx responses (404/403 - genuinely missing/forbidden) fail immediately.
-// Without this, one transient blip permanently marks the URL as errored via
-// glbErrors, since that cache has no expiry.
-const GLB_FETCH_MAX_ATTEMPTS = 3;
-const GLB_FETCH_RETRY_DELAY_MS = 400;
-
-export async function fetchGlbArrayBuffer(
-  url: string,
-  fetchFn: (url: string) => Promise<Response>,
-  attempt = 0,
-): Promise<ArrayBuffer> {
-  const resp = await fetchFn(url);
-  if (!resp.ok) {
-    const isTransient = resp.status >= 500 && resp.status < 600;
-    if (isTransient && attempt < GLB_FETCH_MAX_ATTEMPTS - 1) {
-      await new Promise((r) => setTimeout(r, GLB_FETCH_RETRY_DELAY_MS * (attempt + 1)));
-      return fetchGlbArrayBuffer(url, fetchFn, attempt + 1);
-    }
-    throw new Error(`Failed to fetch GLB: ${resp.status}`);
-  }
-  return resp.arrayBuffer();
-}
-
-function disposeScene(obj: THREE.Object3D) {
-  obj.traverse((child) => {
-    if ((child as THREE.Mesh).isMesh) {
-      const mesh = child as THREE.Mesh;
-      mesh.geometry?.dispose();
-      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      mats.forEach((m) => m?.dispose());
-    }
-  });
-}
 
 // ── Card registration ────────────────────────────────────────────────
 
@@ -145,25 +90,6 @@ interface ScissorGLBGridProps {
   children: React.ReactNode;
 }
 
-/** Read the current --background HSL token from :root and convert to a THREE.Color */
-function getThemeBgColor(): THREE.Color {
-  try {
-    const style = getComputedStyle(document.documentElement);
-    const raw = style.getPropertyValue('--background').trim(); // e.g. "0 0% 0%"
-    if (raw) {
-      const parts = raw.split(/\s+/);
-      if (parts.length >= 3) {
-        const h = parseFloat(parts[0]) / 360;
-        const s = parseFloat(parts[1]) / 100;
-        const l = parseFloat(parts[2]) / 100;
-        return new THREE.Color().setHSL(h, s, l);
-      }
-    }
-  } catch { /* fallback */ }
-  return new THREE.Color(0x0a0a0a);
-}
-
-
 export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -172,7 +98,12 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
   const listenersRef = useRef<Map<string, Set<CardStateListener>>>(new Map());
   const rafRef = useRef<number>(0);
   const envMapRef = useRef<THREE.Texture | null>(null);
+  /** One backdrop shared by every card, built lazily so it is not created
+   * during SSR or before a scene needs it. */
+  const backdropRef = useRef<THREE.Texture | null>(null);
   const gltfLoaderRef = useRef(new GLTFLoader());
+  const pendingRegistrationsRef = useRef(new PendingCardRegistrationQueue<HTMLDivElement>());
+  const [rendererReady, setRendererReady] = useState(false);
 
   /** Notify all listeners for a given card id */
   const notifyListeners = useCallback((id: string) => {
@@ -188,6 +119,7 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    const pendingRegistrations = pendingRegistrationsRef.current;
 
     const renderer = new THREE.WebGLRenderer({
       canvas,
@@ -195,15 +127,26 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
       alpha: true,
     });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.8;
+    // Same neutral curve and exposure as the Studio viewport. ACESFilmic at
+    // 0.65 rendered these previews darker than the design the user opens, and
+    // pulled saturation out of gold and coloured stones on the way.
+    applyNeutralToneMapping(renderer);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.setClearColor(0x000000, 0);
     rendererRef.current = renderer;
+    setRendererReady(true);
+
+    // Neutral studio box as the immediate environment, replaced by the HDRI
+    // once it arrives. Studio does the same, and without it a preview rendered
+    // before the download finished would be lit by the directional alone.
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const roomTarget = pmrem.fromScene(new RoomEnvironment(), 0.04);
+    envMapRef.current = roomTarget.texture;
+    pmrem.dispose();
 
     // Preload HDRI environment
     const rgbeLoader = new RGBELoader();
-    rgbeLoader.load('/hdri/jewelry-studio-v2.hdr', (texture) => {
+    rgbeLoader.load(STUDIO_ENVIRONMENT_HDR, (texture) => {
       texture.mapping = THREE.EquirectangularReflectionMapping;
       envMapRef.current = texture;
       for (const card of cardsRef.current.values()) {
@@ -211,21 +154,13 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
       }
     });
 
-    // Watch for theme changes on <html> (class or data-theme attribute)
-    const observer = new MutationObserver(() => {
-      const bg = getThemeBgColor();
-      for (const card of cardsRef.current.values()) {
-        card.scene.background = bg;
-      }
-    });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] });
 
     return () => {
       cancelAnimationFrame(rafRef.current);
       renderer.dispose();
       envMapRef.current?.dispose();
       rendererRef.current = null;
-      observer.disconnect();
+      pendingRegistrations.clear();
     };
   }, []);
 
@@ -319,15 +254,19 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
     let promise = glbLoading.get(card.glbUrl);
     if (!promise) {
       promise = (async () => {
-        const needsAuth = card.glbUrl.includes('/artifacts/');
-        const fetchFn = needsAuth ? authenticatedFetch : fetch;
-        const arrayBuffer = await fetchGlbArrayBuffer(card.glbUrl, fetchFn);
+        const fetchUrl = resolveGlbUrl(card.glbUrl);
+        if (!fetchUrl) {
+          throw new Error(`Unresolvable GLB reference: ${card.glbUrl}`);
+        }
+        const fetchFn = glbUrlNeedsAuth(fetchUrl) ? authenticatedFetch : fetch;
+        const arrayBuffer = await fetchGlbArrayBuffer(fetchUrl, fetchFn);
 
         return new Promise<THREE.Group>((resolve, reject) => {
           gltfLoaderRef.current.parse(
             arrayBuffer,
             '',
             (gltf) => {
+              markEmbeddedGltfMaterials(gltf);
               cacheScene(card.glbUrl, gltf.scene);
               resolve(gltf.scene.clone(true));
             },
@@ -361,29 +300,7 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
     model.position.set(-center.x * scale, -center.y * scale, -center.z * scale);
     model.scale.setScalar(scale);
 
-    const gemRe = /diamond|gem|stone|crystal|jewel|brill|ruby|emerald|sapphire|topaz|opal|garnet|amethyst|pearl|cz|cubic|solitaire|pave|prong_stone|accent_stone|center_stone|main_stone/i;
-    const metalRe = /band|ring|shank|prong|setting|mount|bezel|basket|gallery|shoulder|bridge|head|collet|metal|gold|silver|platinum|frame|base/i;
-
-    model.traverse((child) => {
-      if ((child as THREE.Mesh).isMesh) {
-        const mesh = child as THREE.Mesh;
-        const lower = mesh.name.toLowerCase();
-        const origMat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
-        const phys = origMat as THREE.MeshPhysicalMaterial;
-        let isGem = gemRe.test(lower);
-        if (metalRe.test(lower)) isGem = false;
-        if (!gemRe.test(lower) && !metalRe.test(lower)) {
-          if (phys?.transmission > 0.5 || phys?.ior > 2.0) isGem = true;
-        }
-        mesh.material = new THREE.MeshStandardMaterial({
-          color: isGem ? 0x1a3a6b : 0x77dd77,
-          metalness: 0,
-          roughness: isGem ? 0.6 : 0.8,
-          flatShading: true,
-          side: THREE.DoubleSide,
-        });
-      }
-    });
+    applyHistoryPreviewMaterials(model);
 
     card.scene.add(model);
 
@@ -400,22 +317,34 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
     if (cardsRef.current.has(id)) return;
 
     const renderer = rendererRef.current;
-    if (!renderer) return;
+    if (!renderer) {
+      pendingRegistrationsRef.current.upsert({ id, glbUrl, element: div });
+      return;
+    }
+
+    pendingRegistrationsRef.current.delete(id);
 
     const scene = new THREE.Scene();
-    scene.background = getThemeBgColor();
+    // The Studio's fixed backdrop, not the theme colour: the ring should sit
+    // on the same neutral sweep it will sit on once opened.
+    if (!backdropRef.current) backdropRef.current = makeStudioBackdrop();
+    scene.background = backdropRef.current;
 
-    const ambient = new THREE.AmbientLight(0xffffff, 0.4);
-    scene.add(ambient);
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    dirLight.position.set(5, 5, 5);
+    // Matches the Studio rig: one directional light at the same intensity and
+    // angle, with the environment doing the rest. The ambient light that used
+    // to sit here flattened the metal by filling the shadows that give it its
+    // shape.
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.55);
+    dirLight.position.set(1.5, 8, 2);
     scene.add(dirLight);
 
     if (envMapRef.current) {
       scene.environment = envMapRef.current;
     }
 
-    const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
+    // fov 30 matches the Studio viewport; a wider lens changes the ring's
+    // proportions, so the same model reads differently between the two.
+    const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
     camera.position.set(0, 1.5, 6);
     camera.lookAt(0, 0, 0);
 
@@ -445,7 +374,15 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
     loadGlb(entry);
   }, [loadGlb]);
 
+  useEffect(() => {
+    if (!rendererReady || !rendererRef.current) return;
+    pendingRegistrationsRef.current.drain(({ id, glbUrl, element }) => {
+      registerCard(id, glbUrl, element);
+    });
+  }, [rendererReady, registerCard]);
+
   const unregisterCard = useCallback((id: string) => {
+    pendingRegistrationsRef.current.delete(id);
     const card = cardsRef.current.get(id);
     if (card) {
       card.controls.dispose();
@@ -547,7 +484,7 @@ export function GLBPreviewSlot({ id, glbUrl, className = '' }: GLBPreviewSlotPro
     >
       {/* Loading state */}
       {!state.loaded && !state.error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-muted rounded-sm">
+        <div className="absolute inset-0 flex items-center justify-center bg-muted rounded-sm" role="status" aria-live="polite">
           <div className="flex flex-col items-center gap-2">
             <div className="w-5 h-5 border-2 border-foreground/20 border-t-foreground/60 rounded-full animate-spin" />
             <span className="font-mono text-[8px] tracking-[0.2em] text-muted-foreground uppercase">
@@ -558,10 +495,10 @@ export function GLBPreviewSlot({ id, glbUrl, className = '' }: GLBPreviewSlotPro
       )}
       {/* Error fallback */}
       {state.error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-muted rounded-sm">
+        <div className="absolute inset-0 flex items-center justify-center bg-muted rounded-sm" role="status" aria-live="polite">
           <div className="flex flex-col items-center gap-1.5">
             <Box className="h-5 w-5 text-muted-foreground/40" />
-            <span className="font-mono text-[8px] tracking-[0.2em] text-muted-foreground/60 uppercase">
+            <span className="font-mono text-[8px] tracking-[0.2em] text-muted-foreground uppercase">
               Preview unavailable
             </span>
           </div>

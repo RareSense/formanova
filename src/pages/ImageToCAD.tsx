@@ -9,9 +9,12 @@ import type { ImperativePanelHandle } from "react-resizable-panels";
 import { InsufficientCreditsInline } from "@/components/InsufficientCreditsInline";
 import { useAuth } from "@/contexts/AuthContext";
 import { isCadUploadEnabled } from "@/lib/feature-flags";
+import { authenticatedFetch, AuthExpiredError } from "@/lib/authenticated-fetch";
 import { runMicroBenchmark } from "@/lib/gpu-detect";
 import { useImageToCADWorkflow } from "@/hooks/useImageToCADWorkflow";
 import { useCADMeshEditor } from "@/hooks/useCADMeshEditor";
+import { useReferenceImages } from "@/hooks/useReferenceImages";
+import { useNotificationEmail } from "@/hooks/useNotificationEmail";
 import { useCADKeyboardShortcuts } from "@/hooks/use-cad-keyboard-shortcuts";
 
 import ImagePromptScreen from "@/components/text-to-cad/ImagePromptScreen";
@@ -26,16 +29,31 @@ import GenerationProgress from "@/components/text-to-cad/GenerationProgress";
 import { ViewportToolbar, ViewportSideTools } from "@/components/text-to-cad/ViewportOverlays";
 import GemToggle from "@/components/text-to-cad/QualityToggle";
 import type { GemMode } from "@/components/text-to-cad/CADCanvas";
+import { RING_CAD_DEFAULT_TIER } from "@/lib/ring-cad-nurbs-api";
+import { recordStudioVisit } from '@/lib/studio-preference';
 
 export default function ImageToCAD() {
+  // Counts towards which studio this user lands in after sign-in. The
+  // workspaces are counted rather than the hub pages so both sides are
+  // measured the same way: where the work happens, not where you browse.
+  useEffect(() => { recordStudioVisit('cad'); }, []);
+
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
+  const notificationEmail = useNotificationEmail(user?.email);
   const showCadUpload = isCadUploadEnabled(user?.email);
 
   const [model] = useState("gemini");
-  const [referenceImage, setReferenceImage] = useState<File | null>(null);
-  const [referenceImagePreviewUrl, setReferenceImagePreviewUrl] = useState<string | null>(null);
+  const activeTier = RING_CAD_DEFAULT_TIER;
+  const {
+    referenceImages,
+    referenceImagePreviewUrls,
+    addReferenceImages,
+    removeReferenceImage,
+    replaceReferenceImages,
+    clearReferenceImages,
+  } = useReferenceImages();
   const [transformMode, setTransformMode] = useState("orbit");
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(true);
@@ -55,10 +73,19 @@ export default function ImageToCAD() {
 
   const activateWorkspace = useCallback(() => setWorkspaceActive(true), []);
 
+  const [isRestoringFromUrl] = useState(
+    () => Boolean(searchParams.get('workflow_id')?.trim() || searchParams.get('glb')),
+  );
+
   const workflow = useImageToCADWorkflow({
     model,
     prompt,
-    referenceImage,
+    referenceImages,
+    tier: activeTier,
+    cadRoute: '/image-to-cad',
+    // Read once, at first render, so arriving from the result email
+    // paints the loading state instead of an empty workspace.
+    restoringFromUrl: isRestoringFromUrl,
     pushUndo: editor.pushUndo,
     userId: user?.id,
     onWorkspaceActivate: activateWorkspace,
@@ -79,34 +106,58 @@ export default function ImageToCAD() {
 
   useEffect(() => {
     const glbParam = searchParams.get('glb');
-    if (!glbParam) return;
     const workflowIdParam = searchParams.get('workflow_id');
-    setWorkspaceActive(true);
-    workflow.setHasModel(true);
-    workflow.setIsModelLoading(true);
-    workflow.setProgressStep("_loading");
-    workflow.setGlbUrl(glbParam);
-    workflow.setSourceWorkflowId(workflowIdParam?.trim() || null);
-    workflow.setGlbArtifact({ uri: glbParam, type: 'model/gltf-binary', bytes: 0, sha256: '' });
+    const workflowId = workflowIdParam?.trim() || null;
+    if (!glbParam && !workflowId) return;
+    void workflow.restoreCompletedWorkflow(workflowId, glbParam).then((restored) => {
+      if (!restored) toast.error('Could not load this CAD result');
+    });
     navigate('/image-to-cad', { replace: true });
   // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount; workflow/navigate/searchParams excluded so re-navigation doesn't re-seed state
   }, []);
 
-  const handleReferenceImageChange = useCallback((file: File | null, previewUrl: string | null) => {
-    setReferenceImage(file);
-    setReferenceImagePreviewUrl(previewUrl);
-  }, []);
-
+  // Depend only on the stable setter this uses, not the whole `workflow`
+  // object (a fresh literal every render) — see TextToCAD.tsx's handleModelReady
+  // for why a `[workflow]` dependency here causes CADCanvas to re-fire this
+  // callback (and reprocess the mesh, causing flicker) on unrelated re-renders.
   const handleModelReady = useCallback(() => {
     workflow.setIsModelLoading(false);
     toast.success("Ring generated successfully");
-  }, [workflow]);
+  }, [workflow.setIsModelLoading]);
 
   const handleReset = useCallback(() => {
-    workflow.setEditPrompt("");
     workflow.resetWorkflow();
     editor.resetMeshEditor();
   }, [workflow, editor]);
+
+  /**
+   * Downloads the NURBS .3dm, which is the machinable deliverable. It is built
+   * server-side, so it is the pristine generated ring and cannot reflect any
+   * viewport mesh edits - the GLB export below covers that case.
+   */
+  const handleDownloadThreedm = useCallback(async () => {
+    // .url, never .uri: the raw reference is azure:// and is not fetchable.
+    const uri = workflow.threedmArtifact?.url;
+    if (!uri) { toast.error("No CAD file available for this model"); return; }
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
+    const fileName = `ring-${timestamp}.3dm`;
+    import('@/lib/posthog-events').then(m => m.trackDownloadClicked({ file_name: fileName, file_type: '3dm', context: 'image-to-cad' }));
+    try {
+      const response = await authenticatedFetch(uri);
+      if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
+      const blob = await response.blob();
+      if (!blob || blob.size === 0) throw new Error("Empty file");
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = fileName;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch (err) {
+      if (err instanceof AuthExpiredError) return;
+      console.error('[Download 3dm]', err);
+      toast.error("Failed to download the CAD file");
+    }
+  }, [workflow.threedmArtifact]);
 
   const handleDownloadGlb = useCallback(async () => {
     const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
@@ -178,15 +229,18 @@ export default function ImageToCAD() {
   // ── Phase 1: Initial prompt screen ──
   if (!workspaceActive) {
     return (
-      <div className="h-[calc(100vh-5rem)] flex bg-background" tabIndex={0}>
+      <div className="min-h-[calc(100vh-5rem)] flex bg-background" tabIndex={0}>
         <ImagePromptScreen
           model={model}
+          tier={activeTier}
           prompt={prompt}
           setPrompt={setPrompt}
           isGenerating={workflow.isGenerating}
           onGenerate={workflow.simulateGeneration}
-          referenceImagePreviewUrl={referenceImagePreviewUrl}
-          onReferenceImageChange={handleReferenceImageChange}
+          referenceImagePreviewUrls={referenceImagePreviewUrls}
+          onAddReferenceImages={addReferenceImages}
+          onRemoveReferenceImage={removeReferenceImage}
+          onReplaceReferenceImages={replaceReferenceImages}
           onGlbUpload={showCadUpload ? (file) => {
             setWorkspaceActive(true);
             workflow.setHasModel(true);
@@ -229,22 +283,18 @@ export default function ImageToCAD() {
             <LeftPanel
               model={model} setModel={() => {}}
               prompt={prompt} setPrompt={setPrompt}
-              editPrompt={workflow.editPrompt} setEditPrompt={workflow.setEditPrompt}
-              isGenerating={workflow.isGenerating} isEditing={workflow.isEditing}
+              isGenerating={workflow.isGenerating}
               hasModel={workflow.hasModel}
               onGenerate={workflow.simulateGeneration}
-              onEdit={workflow.simulateEdit}
               magicTexturing={magicTexturing}
               onMagicTexturingChange={(on) => {
                 setMagicTexturing(on);
                 if (on) canvasRef.current?.applyMagicTextures();
                 else canvasRef.current?.removeAllTextures();
               }}
-              onGlbUpload={() => {}}
               onReset={workflow.hasModel ? handleReset : undefined}
               pageTitle="Image to CAD"
-              referenceImagePreviewUrl={referenceImagePreviewUrl}
-              onClearReferenceImage={() => handleReferenceImageChange(null, null)}
+              referenceImagePreviewUrls={referenceImagePreviewUrls}
               creditBlock={creditBlockUI}
             />
           )}
@@ -343,6 +393,12 @@ export default function ImageToCAD() {
                 transformData={editor.selectedTransform}
                 onTransformChange={editor.handleNumericTransformChange}
                 onResetTransform={() => editor.handleSceneAction("reset-transform")}
+                // Same visibility rule the download action had in ViewportSideTools
+                // before the move — hidden mid-regeneration, not just mid-initial-generation.
+                onDownload={!workflow.isGenerating && !workflow.isModelLoading
+                  ? (workflow.threedmArtifact ? handleDownloadThreedm : handleDownloadGlb)
+                  : undefined}
+                downloadLabel={workflow.threedmArtifact ? "Download 3DM" : "Export GLB"}
               />
             )}
 
@@ -393,8 +449,22 @@ export default function ImageToCAD() {
             <GenerationProgress
               visible={workflow.isGenerating || workflow.isModelLoading}
               currentStep={workflow.progressStep}
-              retryAttempt={workflow.retryAttempt}
               onRetry={() => workflow.simulateGeneration()}
+              failureMessage={workflow.failureMessage}
+              notificationEmail={notificationEmail.notificationEmail}
+              storedNotificationEmail={notificationEmail.storedNotificationEmail}
+              emailEnabled={notificationEmail.emailEnabled}
+              onToggleEmailEnabled={notificationEmail.setEmailEnabled}
+              notificationEmailLoading={notificationEmail.isLoading}
+              notificationEmailSaving={notificationEmail.isSaving}
+              notificationEmailError={notificationEmail.error}
+              onSaveNotificationEmail={notificationEmail.saveNotificationEmail}
+              onKeepCreating={() => {
+                workflow.handleKeepCreating();
+                setPrompt("");
+                clearReferenceImages();
+                setWorkspaceActive(false);
+              }}
             />
             <ViewportSideTools
               visible={workflow.hasModel && !workflow.isGenerating && !workflow.isModelLoading}
@@ -405,7 +475,6 @@ export default function ImageToCAD() {
               onRedo={editor.handleRedo}
               undoCount={editor.undoStack.length}
               redoCount={editor.redoStack.length}
-              onDownload={handleDownloadGlb}
               onFullscreen={() => {
                 const el = document.querySelector('[data-cad-viewport]') as HTMLElement;
                 if (el) { document.fullscreenElement ? document.exitFullscreen() : el.requestFullscreen(); }
@@ -416,13 +485,18 @@ export default function ImageToCAD() {
           </div>
         </ResizablePanel>
 
-        <ResizableHandle withHandle />
+        {/* No handle until there is a model: a divider against an empty
+            panel reads as a region that failed to load. */}
+        {workflow.hasModel && <ResizableHandle withHandle />}
 
         <ResizablePanel
           ref={rightPanelRef}
           id="right-panel"
           order={3}
-          defaultSize={22}
+          // Starts collapsed. With defaultSize 22 the panel rendered empty on
+          // mount until the effect collapsed it, which flashed a blank region
+          // during generation.
+          defaultSize={0}
           minSize={15}
           maxSize={35}
           collapsible

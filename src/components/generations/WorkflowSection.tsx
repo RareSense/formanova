@@ -45,14 +45,17 @@ export function WorkflowSection({
 }: WorkflowSectionProps) {
   const gridClass =
     columns === 5
-      ? 'grid gap-2 grid-cols-3 sm:grid-cols-4 lg:grid-cols-5'
+      ? 'grid grid-cols-1 gap-2 min-[360px]:grid-cols-2 md:grid-cols-4 lg:grid-cols-5'
       : columns === 4
       ? 'grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'
       : columns === 3
-      ? 'grid gap-3 sm:grid-cols-2 lg:grid-cols-3'
+      ? 'grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3'
       : 'grid gap-3 md:grid-cols-2';
+
+  if (!loading && workflows.length === 0) return null;
+
   return (
-    <section className="mb-14">
+    <section className="mb-14" aria-busy={loading}>
       {/* Section Header */}
       <div className="flex items-center gap-3 mb-6">
         <div className="w-8 h-8 flex items-center justify-center bg-primary/10 text-primary border border-border">
@@ -84,18 +87,6 @@ export function WorkflowSection({
         </div>
       )}
 
-      {/* Empty state */}
-      {!loading && workflows.length === 0 && (
-        <div className="marta-frame p-12 flex flex-col items-center justify-center text-center">
-          <div className="w-12 h-12 flex items-center justify-center bg-muted mb-4">
-            {icon}
-          </div>
-          <p className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground uppercase">
-            No generation history yet
-          </p>
-        </div>
-      )}
-
       {/* Workflow cards */}
       {!loading && workflows.length > 0 && (
         <>
@@ -106,6 +97,10 @@ export function WorkflowSection({
             className={gridClass}
           >
             {workflows.map((w, i) => (
+              // Anchor for the notification email's deep link,
+              // /generations?workflow=<id>. Wrapping rather than putting the id
+              // on the card keeps it stable across both card variants.
+              <div key={w.workflow_id} id={`workflow-${w.workflow_id}`} className="contents">
               <WorkflowCard
                 key={w.workflow_id}
                 workflow={w}
@@ -113,6 +108,7 @@ export function WorkflowSection({
                 onClick={onWorkflowClick}
                 onUpscaled={onUpscaled}
               />
+              </div>
             ))}
           </motion.div>
 
@@ -132,6 +128,6 @@ export const SectionIcons = {
   photo: <PeopleIcon className="h-4 w-4" />,
   productShot: <RingIcon className="h-4 w-4" />,
   cadRender: <Box className="h-4 w-4" />,
-  cadText: <RingIcon className="h-4 w-4" />,
-  cadSketch: <ImageIcon className="h-4 w-4" />,
+  textToCad: <RingIcon className="h-4 w-4" />,
+  imageToCad: <ImageIcon className="h-4 w-4" />,
 };

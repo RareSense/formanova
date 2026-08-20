@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -20,20 +20,20 @@ import {
   saveCache,
   preloadImage,
   withTimeout,
+  retryNullable,
+  isVisibleGeneration,
   getAssetWorkflowId,
   getArtifactKey,
   getAssetArtifactKeys,
-  buildOrderedCadAssetNameMap,
   type CachePayload,
 } from '@/lib/generation-history-utils';
 import { WorkflowSection, SectionIcons } from '@/components/generations/WorkflowSection';
-import { isImageToCadEnabled } from '@/lib/feature-flags';
 import { ScissorGLBGrid } from '@/components/generations/ScissorGLBGrid';
 import CADRuntimeErrorBoundary from '@/components/cad/CADRuntimeErrorBoundary';
 
 const PER_PAGE = 5;
 
-type SourceType = 'photo' | 'product_shot' | 'cad_render' | 'cad_text' | 'cad_sketch';
+type SourceType = 'photo' | 'product_shot' | 'cad_render' | 'text_to_cad' | 'image_to_cad';
 
 interface SectionState {
   workflows: WorkflowSummary[];
@@ -46,6 +46,7 @@ interface SectionState {
 
 export default function Generations() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [error, setError] = useState<string | null>(null);
 
   const [allWorkflows, setAllWorkflows] = useState<WorkflowSummary[]>([]);
@@ -53,12 +54,25 @@ export default function Generations() {
   // Bumped when an inline upscale completes, to re-fetch the list so the new
   // upscaled generation appears as its own entry.
   const [refreshKey, setRefreshKey] = useState(0);
+  /** Fires once per deep link so a later re-render cannot yank the page back. */
+  const scrolledToLinkedRef = useRef(false);
+
+  // Deep link from the result notification email: /generations?workflow=<id>.
+  // Backend links here rather than attaching the file, so the download stays
+  // behind auth. Wait for the list to render, then bring that run into view.
+  useEffect(() => {
+    const linked = searchParams.get('workflow')?.trim();
+    if (!linked || globalLoading || scrolledToLinkedRef.current) return;
+    const node = document.getElementById(`workflow-${linked}`);
+    if (!node) return;   // not on this page, or filtered out
+    scrolledToLinkedRef.current = true;
+    node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [searchParams, globalLoading, allWorkflows]);
 
   const [photoPage, setPhotoPage] = useState(1);
   const [productShotPage, setProductShotPage] = useState(1);
-  const [cadRenderPage, setCadRenderPage] = useState(1);
-  const [cadTextPage, setCadTextPage] = useState(1);
-  const [cadSketchPage, setCadSketchPage] = useState(1);
+  const [textCadPage, setTextCadPage] = useState(1);
+  const [imageCadPage, setImageCadPage] = useState(1);
 
   // Track enriched IDs + their data for sessionStorage persistence
   const enrichedRef = useRef<Record<string, Partial<WorkflowSummary>>>({});
@@ -66,8 +80,7 @@ export default function Generations() {
     byAssetId: Record<string, string>;
     byWorkflowId: Record<string, string>;
     byArtifactKey: Record<string, string>;
-    byOrderedCadWorkflowId: Record<string, string>;
-  }>({ byAssetId: {}, byWorkflowId: {}, byArtifactKey: {}, byOrderedCadWorkflowId: {} });
+  }>({ byAssetId: {}, byWorkflowId: {}, byArtifactKey: {} });
 
   const resolveGeneratedAssetName = useCallback((workflow: WorkflowSummary): string | null => {
     const maps = generatedAssetNamesRef.current;
@@ -77,7 +90,6 @@ export default function Generations() {
       (workflow.output_asset_id ? maps.byAssetId[workflow.output_asset_id] : undefined) ||
       maps.byWorkflowId[workflow.workflow_id] ||
       (artifactKey ? maps.byArtifactKey[artifactKey] : undefined) ||
-      maps.byOrderedCadWorkflowId[workflow.workflow_id] ||
       null
     );
   }, []);
@@ -89,14 +101,20 @@ export default function Generations() {
     // Try cache first for instant render
     const cached = loadCache();
     if (cached) {
+      const visibleCachedWorkflows = cached.workflows.filter(isVisibleGeneration);
       const normalizedEnriched = Object.fromEntries(
         Object.entries(cached.enriched).filter(([workflowId, data]) => {
-          const workflow = cached.workflows.find((w) => w.workflow_id === workflowId);
-          return !(workflow?.source_type === 'product_shot' && data.thumbnail_url === '');
+          const workflow = visibleCachedWorkflows.find((w) => w.workflow_id === workflowId);
+          if (!workflow) return false;
+          if (Object.keys(data).length === 0) return false;
+          if (workflow?.source_type === 'product_shot' && data.thumbnail_url === '') return false;
+          const isCad = workflow?.source_type === 'text_to_cad' || workflow?.source_type === 'image_to_cad';
+          if (isCad && data.screenshots !== undefined && !data.glb_url) return false;
+          return true;
         }),
       );
       // Apply cached enrichment data on top of workflow list
-      const hydrated = cached.workflows.map(w => {
+      const hydrated = visibleCachedWorkflows.map(w => {
         const e = normalizedEnriched[w.workflow_id];
         return e ? { ...w, ...e } : w;
       });
@@ -123,7 +141,7 @@ export default function Generations() {
       try {
         if (!cached) setGlobalLoading(true);
         const rawWorkflows = await listMyWorkflows(100, 0);
-        const workflows = rawWorkflows.filter(w => w.source_type !== 'unknown');
+        const workflows = rawWorkflows.filter(w => w.source_type !== 'unknown' && isVisibleGeneration(w));
         if (import.meta.env.DEV) console.log('[Generations] fetched:', rawWorkflows.length, '→ valid:', workflows.length);
 
         // Build generated asset name maps. Some older workflow rows do not expose
@@ -131,13 +149,11 @@ export default function Generations() {
         const assetNameMap: Record<string, string> = {};
         const workflowAssetNameMap: Record<string, string> = {};
         const artifactAssetNameMap: Record<string, string> = {};
-        let orderedCadWorkflowNameMap: Record<string, string> = {};
         try {
           const [photos, cads] = await Promise.all([
             fetchUserAssets('generated_photo', 0, 100),
             fetchUserAssets('generated_cad', 0, 100),
           ]);
-          orderedCadWorkflowNameMap = buildOrderedCadAssetNameMap(workflows, cads.items);
           [...photos.items, ...cads.items].forEach(a => {
             const name = getAssetDisplayName(a);
             if (!name) return;
@@ -154,7 +170,6 @@ export default function Generations() {
           byAssetId: assetNameMap,
           byWorkflowId: workflowAssetNameMap,
           byArtifactKey: artifactAssetNameMap,
-          byOrderedCadWorkflowId: orderedCadWorkflowNameMap,
         };
 
         // Re-apply enriched data + asset names
@@ -183,15 +198,12 @@ export default function Generations() {
   // ── Pagination helper ─────────────────────────────────────────────
     const getSection = useCallback(
     (source: SourceType, page: number, requireImage = false): SectionState => {
-      const isCadSource = source === 'cad_text' || source === 'cad_sketch';
-      const statusOk = isCadSource
-        ? (w: WorkflowSummary) => w.status === 'completed' || w.status === 'failed'
-        : (w: WorkflowSummary) => w.status === 'completed';
+      const isCadSource = source === 'text_to_cad' || source === 'image_to_cad';
       const filtered = allWorkflows.filter((w) => {
-        if (w.source_type !== source || !statusOk(w)) return false;
+        if (w.source_type !== source || !isVisibleGeneration(w)) return false;
         // Skip photo/product_shot/cad_render cards that enriched but have no thumbnail
         if (requireImage && w.thumbnail_url === '') return false;
-        // Skip cad_text/cad_sketch cards that finished enriching but have no GLB
+        // Successful CAD runs without an artifact are not actionable.
         if (isCadSource && w.screenshots !== undefined && !w.glb_url) return false;
         return true;
       });
@@ -213,7 +225,7 @@ export default function Generations() {
 
     const allUnenriched = allWorkflows.filter(
       w => w.thumbnail_url === undefined && !enrichedRef.current[w.workflow_id] &&
-           (w.status === 'completed' || (w.source_type === 'cad_text' && w.status === 'failed'))
+           isVisibleGeneration(w)
     );
 
     if (allUnenriched.length === 0) return;
@@ -244,27 +256,56 @@ export default function Generations() {
         const batch = allUnenriched.slice(i, i + 3);
         await Promise.allSettled(
           batch.map(async (wf) => {
-            if (wf.source_type === 'cad_text' || wf.source_type === 'cad_sketch') {
-              const details = await getWorkflowDetails(wf.workflow_id);
+            if (wf.source_type === 'text_to_cad' || wf.source_type === 'image_to_cad') {
+              const details = await retryNullable(
+                () => withTimeout(getWorkflowDetails(wf.workflow_id), 5000),
+                2,
+              );
+              if (!details) {
+                if (!cancelled) applyEnrichment(wf.workflow_id, {
+                  thumbnail_url: '',
+                  screenshots: [],
+                  glb_url: null,
+                });
+                return;
+              }
               const stepData = extractCadTextData(details.steps ?? []);
               if (!cancelled) applyEnrichment(wf.workflow_id, stepData);
 
               if (!stepData.glb_url) {
                 const cadResult = await withTimeout(fetchCadResult(wf.workflow_id), 5000);
-                if (!cancelled && cadResult?.glb_url) {
-                  applyEnrichment(wf.workflow_id, { ...stepData, glb_url: cadResult.glb_url });
+                if (!cancelled && cadResult && (cadResult.glb_url || cadResult.threedm_url)) {
+                  applyEnrichment(wf.workflow_id, {
+                    ...stepData,
+                    glb_url: cadResult.glb_url,
+                    threedm_url: cadResult.threedm_url,
+                  });
                 }
               }
               return;
             }
             if (wf.source_type === 'product_shot') {
-              const details = await getWorkflowDetails(wf.workflow_id);
+              const details = await retryNullable(
+                () => withTimeout(getWorkflowDetails(wf.workflow_id), 5000),
+                2,
+              );
+              if (!details) {
+                if (!cancelled) applyEnrichment(wf.workflow_id, { thumbnail_url: '' });
+                return;
+              }
               const thumbnail_url = extractProductShotThumbnail(details.steps ?? []);
               if (thumbnail_url) preloadImage(thumbnail_url);
               if (!cancelled) applyEnrichment(wf.workflow_id, { thumbnail_url: thumbnail_url ?? '' });
               return;
             }
-            const details = await getWorkflowDetails(wf.workflow_id);
+            const details = await retryNullable(
+              () => withTimeout(getWorkflowDetails(wf.workflow_id), 5000),
+              2,
+            );
+            if (!details) {
+              if (!cancelled) applyEnrichment(wf.workflow_id, { thumbnail_url: '' });
+              return;
+            }
             const thumbnail_url = extractPhotoThumbnail(details.steps ?? []);
             if (thumbnail_url) preloadImage(thumbnail_url);
             if (!cancelled) applyEnrichment(wf.workflow_id, { thumbnail_url: thumbnail_url ?? '' });
@@ -293,7 +334,7 @@ export default function Generations() {
     const needsAudit = allWorkflows.filter(
       w => w.credits_spent === undefined &&
            !auditFetchedRef.current.has(w.workflow_id) &&
-           (w.status === 'completed' || w.status === 'failed')
+           isVisibleGeneration(w)
     );
 
     if (needsAudit.length === 0) return;
@@ -309,7 +350,10 @@ export default function Generations() {
         const batch = needsAudit.slice(i, i + 3);
         const results = await Promise.allSettled(
           batch.map(async wf => {
-            const credits = await fetchWorkflowCreditAudit(wf.workflow_id);
+            const credits = await retryNullable(
+              () => withTimeout(fetchWorkflowCreditAudit(wf.workflow_id), 5000),
+              3,
+            );
             return { id: wf.workflow_id, credits_spent: credits };
           })
         );
@@ -342,10 +386,8 @@ export default function Generations() {
 
   const photoSection = getSection('photo', photoPage, true);
   const productShotSection = getSection('product_shot', productShotPage, true);
-  const cadRenderSection = getSection('cad_render', cadRenderPage, true);
-  const cadTextSection = getSection('cad_text', cadTextPage);
-  const imageToCadEnabled = isImageToCadEnabled(user?.email);
-  const cadSketchSection = imageToCadEnabled ? getSection('cad_sketch', cadSketchPage) : null;
+  const textCadSection = getSection('text_to_cad', textCadPage);
+  const imageCadSection = getSection('image_to_cad', imageCadPage);
 
   return (
     <>
@@ -361,9 +403,9 @@ export default function Generations() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="mb-8 flex items-end justify-between"
+          className="mb-10"
         >
-          <div>
+          <div className="max-w-2xl">
             <Link
               to="/dashboard"
               className="inline-flex items-center gap-1.5 font-mono text-[9px] tracking-[0.3em] text-muted-foreground uppercase hover:text-foreground transition-colors mb-2"
@@ -371,6 +413,12 @@ export default function Generations() {
               <ArrowLeft className="h-3 w-3" />
               Dashboard
             </Link>
+            <h1 className="font-display text-4xl uppercase tracking-wide text-foreground md:text-5xl">
+              Generations
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Review, rename, download, and reopen your generated jewelry assets.
+            </p>
           </div>
         </motion.div>
 
@@ -427,34 +475,34 @@ export default function Generations() {
             <CADRuntimeErrorBoundary
               title="CAD Previews Unavailable"
               description="The 3D preview grid hit a rendering problem. Your generation history is still available."
-              resetKeys={[cadTextPage, cadSketchPage]}
+              resetKeys={[textCadPage, imageCadPage]}
             >
               <ScissorGLBGrid>
                 <WorkflowSection
                   title="Text to CAD"
-                  subtitle="AI-generated 3D models from text"
-                  icon={SectionIcons.cadText}
-                  workflows={cadTextSection.workflows}
-                  loading={cadTextSection.loading}
-                  currentPage={cadTextSection.page}
-                  totalPages={cadTextSection.totalPages}
+                  subtitle="CAD models generated from text"
+                  icon={SectionIcons.textToCad}
+                  workflows={textCadSection.workflows}
+                  loading={textCadSection.loading}
+                  currentPage={textCadSection.page}
+                  totalPages={textCadSection.totalPages}
                   columns={3}
-                  indexOffset={(cadTextPage - 1) * PER_PAGE}
-                  onPageChange={setCadTextPage}
+                  indexOffset={(textCadPage - 1) * PER_PAGE}
+                  onPageChange={setTextCadPage}
                   onWorkflowClick={() => {}}
                 />
-                {cadSketchSection && (
+                {imageCadSection && (
                   <WorkflowSection
                     title="Image to CAD"
-                    subtitle="3D models generated from photos and sketches"
-                    icon={SectionIcons.cadSketch}
-                    workflows={cadSketchSection.workflows}
-                    loading={cadSketchSection.loading}
-                    currentPage={cadSketchSection.page}
-                    totalPages={cadSketchSection.totalPages}
+                    subtitle="CAD models generated from reference images"
+                    icon={SectionIcons.imageToCad}
+                    workflows={imageCadSection.workflows}
+                    loading={imageCadSection.loading}
+                    currentPage={imageCadSection.page}
+                    totalPages={imageCadSection.totalPages}
                     columns={3}
-                    indexOffset={(cadSketchPage - 1) * PER_PAGE}
-                    onPageChange={setCadSketchPage}
+                    indexOffset={(imageCadPage - 1) * PER_PAGE}
+                    onPageChange={setImageCadPage}
                     onWorkflowClick={() => {}}
                   />
                 )}

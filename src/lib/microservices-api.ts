@@ -105,6 +105,88 @@ export async function bulkUploadJewelry(
   return response.json();
 }
 
+// ========== CAD Reference Upload (ring_cad_nurbs_v1 reference images) ==========
+const CAD_REFERENCE_UPLOAD_URL = `${import.meta.env.VITE_PIPELINE_API_URL}/upload/cad-reference`;
+
+/** Matches MAX_RING_CAD_REFERENCE_IMAGES; the backend 422s above this. */
+const MAX_CAD_REFERENCE_FILES = 5;
+
+/**
+ * One uploaded reference image. Pass this object through to
+ * reference_image_artifacts UNMODIFIED — all six keys, not just `uri`.
+ * Backend confirmed (2026-08-19) that nothing between their API boundary and
+ * the tool call strips or schema-validates these elements, so `asset_id` and
+ * `position` ride along harmlessly.
+ *
+ * Deliberately has no `url` field, unlike ArtifactRef: that one is our
+ * browser-side display concern, not part of the wire shape.
+ */
+export interface CadReferenceItem {
+  asset_id: string;
+  uri: string;      // azure:// form
+  sha256: string;
+  type: string;     // mime type
+  bytes: number;
+  /** Zero-based index within the set. Authoritative ordering — index 0 is
+   * IMAGE 1, which wins every conflict in the workflow. Do not re-derive
+   * order from created_at: a reused image keeps its original timestamp. */
+  position: number;
+}
+
+export interface CadReferenceUploadResponse {
+  items: CadReferenceItem[];   // upload order preserved; first file is position 0
+  set_id: string;              // server-minted; read-only, never sent on upload
+}
+
+/** Carries the HTTP status so callers can branch on it without parsing the
+ * message — specifically to tell "endpoint not deployed here yet" (404) apart
+ * from a real upload failure. */
+export class CadReferenceUploadError extends Error {
+  constructor(public readonly status: number, message: string) {
+    super(message);
+    this.name = 'CadReferenceUploadError';
+  }
+}
+
+/**
+ * POST /upload/cad-reference — upload 1-5 reference photos of the SAME ring as
+ * one set (multipart). Replaces inlining base64 into the generation-start call.
+ *
+ * Reusing an image the user already owns is done by re-uploading its bytes:
+ * dedup is keyed on content hash, so it collapses to the same underlying asset
+ * and joins this set as well as its previous ones (backend confirmed this is
+ * correct, not incidental). A bytes-free "attach existing asset_id" path does
+ * not exist yet.
+ *
+ * Errors: 0 files 400, >5 files 422, unsupported type 400, missing auth 401.
+ */
+export async function uploadCadReferenceImages(
+  files: File[],
+  meta?: { category?: string },
+): Promise<CadReferenceUploadResponse> {
+  if (files.length < 1 || files.length > MAX_CAD_REFERENCE_FILES) {
+    throw new Error(`uploadCadReferenceImages accepts 1-${MAX_CAD_REFERENCE_FILES} files.`);
+  }
+  const form = new FormData();
+  files.forEach((f) => form.append('files', f));
+  // Truthy guard keeps empty strings off the wire so the backend's Form(None)
+  // default applies, matching bulkUploadJewelry.
+  if (meta?.category) form.append('category', meta.category);
+
+  // No explicit Content-Type: the browser sets the multipart boundary;
+  // authenticatedFetch still attaches the Bearer token.
+  const response = await authenticatedFetch(CAD_REFERENCE_UPLOAD_URL, { method: 'POST', body: form });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new CadReferenceUploadError(
+      response.status,
+      `CAD reference upload failed: ${response.status} - ${error.substring(0, 200)}`,
+    );
+  }
+  return response.json();
+}
+
 // ========== Polling Utility ==========
 export interface PollOptions {
   maxAttempts?: number;
