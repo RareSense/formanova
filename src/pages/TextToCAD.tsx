@@ -79,12 +79,19 @@ export default function TextToCAD() {
 
   const editor = useCADMeshEditor({ canvasRef, transformMode, setTransformMode });
 
+  const [isRestoringFromUrl] = useState(
+    () => Boolean(searchParams.get('workflow_id')?.trim() || searchParams.get('glb')),
+  );
+
   const workflow = useImageToCADWorkflow({
     model,
     prompt,
     referenceImages: NO_REFERENCE_IMAGES,
     tier: activeTier,
     cadRoute: '/text-to-cad',
+    // Read once, at first render, so arriving from the result email
+    // paints the loading state instead of an empty workspace.
+    restoringFromUrl: isRestoringFromUrl,
     onWorkspaceActivate: activateWorkspace,
   });
 

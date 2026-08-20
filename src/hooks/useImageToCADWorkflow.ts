@@ -28,6 +28,14 @@ interface WorkflowParams {
   tier?: string;
   /** Which page owns this run, so the header/toast restore link returns here. */
   cadRoute: '/text-to-cad' | '/image-to-cad';
+  /**
+   * True when the URL carries a workflow_id or glb to restore, so the very
+   * first paint is already the loading state. The restore itself runs in a
+   * mount effect and then awaits the result, which is long enough to flash
+   * the empty "Workspace Ready" panel at anyone arriving from the result
+   * email.
+   */
+  restoringFromUrl?: boolean;
   onWorkspaceActivate: () => void;
 }
 
@@ -37,14 +45,15 @@ export function useImageToCADWorkflow({
   referenceImages,
   tier = RING_CAD_DEFAULT_TIER,
   cadRoute,
+  restoringFromUrl = false,
   onWorkspaceActivate,
 }: WorkflowParams) {
   const { generations, trackCadGeneration } = useGenerations();
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [hasModel, setHasModel] = useState(false);
-  const [isModelLoading, setIsModelLoading] = useState(false);
-  const [progressStep, setProgressStep] = useState("");
+  const [isModelLoading, setIsModelLoading] = useState(restoringFromUrl);
+  const [progressStep, setProgressStep] = useState(restoringFromUrl ? "_loading" : "");
   const [retryAttempt, setRetryAttempt] = useState(0);
   const [creditBlock, setCreditBlock] = useState<PreflightResult | null>(null);
   const [generationFailed, setGenerationFailed] = useState(false);
@@ -135,6 +144,8 @@ export function useImageToCADWorkflow({
     setFailureMessage(null);
     setSourceWorkflowId(workflowId);
     setThreedmArtifact(null);
+    setIsModelLoading(true);
+    setProgressStep('_loading');
 
     const seedGlb = (url: string) => {
       setHasModel(true);
