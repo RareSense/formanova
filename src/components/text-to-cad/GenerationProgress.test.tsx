@@ -28,6 +28,74 @@ describe('GenerationProgress', () => {
     expect(onKeepCreating).toHaveBeenCalledOnce();
   });
 
+  it('toggles result email off and hides the destination with it', () => {
+    const onToggle = vi.fn();
+    const { rerender } = render(
+      <GenerationProgress
+        visible
+        currentStep="building"
+        notificationEmail="cad@example.com"
+        emailEnabled
+        onToggleEmailEnabled={onToggle}
+        onSaveNotificationEmail={vi.fn()}
+      />,
+    );
+
+    const toggle = screen.getByRole('switch', { name: 'Email me when this is ready' });
+    expect(toggle.getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(toggle);
+    expect(onToggle).toHaveBeenCalledWith(false);
+
+    rerender(
+      <GenerationProgress
+        visible
+        currentStep="building"
+        notificationEmail="cad@example.com"
+        emailEnabled={false}
+        onToggleEmailEnabled={onToggle}
+        onSaveNotificationEmail={vi.fn()}
+      />,
+    );
+
+    // No destination is shown for mail that is not going to be sent.
+    expect(screen.queryByText(/Send to/)).toBeNull();
+    expect(screen.queryByText('cad@example.com')).toBeNull();
+    expect(screen.getByRole('switch', { name: 'Email me when this is ready' })).toBeTruthy();
+  });
+
+  it('opens the input empty when no override is stored, not on the account email', () => {
+    // Pre-filling with the account address would make the user clear it
+    // before they could type their own.
+    render(
+      <GenerationProgress
+        visible
+        currentStep="building"
+        notificationEmail="account@example.com"
+        storedNotificationEmail={null}
+        onSaveNotificationEmail={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/Send to/).parentElement?.textContent).toContain('account@example.com');
+    fireEvent.click(screen.getByRole('button', { name: /^Change/ }));
+    expect((screen.getByRole('textbox', { name: 'Send to' }) as HTMLInputElement).value).toBe('');
+  });
+
+  it('opens the input on the stored override when there is one', () => {
+    render(
+      <GenerationProgress
+        visible
+        currentStep="building"
+        notificationEmail="work@example.com"
+        storedNotificationEmail="work@example.com"
+        onSaveNotificationEmail={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /^Change/ }));
+    expect((screen.getByRole('textbox', { name: 'Send to' }) as HTMLInputElement).value).toBe('work@example.com');
+  });
+
   it('validates the email and saves a valid replacement', async () => {
     const onSave = vi.fn().mockResolvedValue(true);
     render(

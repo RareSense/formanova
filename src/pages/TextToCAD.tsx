@@ -544,6 +544,9 @@ export default function TextToCAD() {
               onRetry={() => workflow.simulateGeneration()}
               failureMessage={workflow.failureMessage}
               notificationEmail={notificationEmail.notificationEmail}
+              storedNotificationEmail={notificationEmail.storedNotificationEmail}
+              emailEnabled={notificationEmail.emailEnabled}
+              onToggleEmailEnabled={notificationEmail.setEmailEnabled}
               notificationEmailLoading={notificationEmail.isLoading}
               notificationEmailSaving={notificationEmail.isSaving}
               notificationEmailError={notificationEmail.error}

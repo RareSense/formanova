@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, Diamond, Mail, Pencil } from "lucide-react";
 import { isValidNotificationEmail } from "@/lib/notification-email-api";
+import { Switch } from "@/components/ui/switch";
 
 const NODE_LABELS: Record<string, string> = {
   generate_initial: "Generating design",
@@ -28,6 +29,10 @@ interface GenerationProgressProps {
   estimateText?: string;
   failureMessage?: string | null;
   notificationEmail?: string | null;
+  /** The raw saved override. Null means unset, so the input opens empty. */
+  storedNotificationEmail?: string | null;
+  emailEnabled?: boolean;
+  onToggleEmailEnabled?: (enabled: boolean) => void;
   notificationEmailLoading?: boolean;
   notificationEmailSaving?: boolean;
   notificationEmailError?: string | null;
@@ -42,6 +47,9 @@ export default function GenerationProgress({
   estimateText = "up to 1 hour",
   failureMessage,
   notificationEmail,
+  storedNotificationEmail,
+  emailEnabled = true,
+  onToggleEmailEnabled,
   notificationEmailLoading = false,
   notificationEmailSaving = false,
   notificationEmailError,
@@ -49,15 +57,15 @@ export default function GenerationProgress({
   onKeepCreating,
 }: GenerationProgressProps) {
   const [isEditingEmail, setIsEditingEmail] = useState(false);
-  const [emailDraft, setEmailDraft] = useState(notificationEmail ?? "");
+  const [emailDraft, setEmailDraft] = useState(storedNotificationEmail ?? "");
   const [validationError, setValidationError] = useState<string | null>(null);
   const sectionRef = useRef<HTMLElement>(null);
   const changeEmailButtonRef = useRef<HTMLButtonElement>(null);
   const wasEditingEmailRef = useRef(false);
 
   useEffect(() => {
-    if (!isEditingEmail) setEmailDraft(notificationEmail ?? "");
-  }, [isEditingEmail, notificationEmail]);
+    if (!isEditingEmail) setEmailDraft(storedNotificationEmail ?? "");
+  }, [isEditingEmail, storedNotificationEmail]);
 
   // Move focus into the overlay when it appears, and back to the "Use a
   // different email" trigger when its form closes, so keyboard/screen-reader
@@ -83,13 +91,13 @@ export default function GenerationProgress({
   const emailError = validationError ?? notificationEmailError;
 
   const beginEmailEdit = () => {
-    setEmailDraft(notificationEmail ?? "");
+    setEmailDraft(storedNotificationEmail ?? "");
     setValidationError(null);
     setIsEditingEmail(true);
   };
 
   const cancelEmailEdit = () => {
-    setEmailDraft(notificationEmail ?? "");
+    setEmailDraft(storedNotificationEmail ?? "");
     setValidationError(null);
     setIsEditingEmail(false);
   };
@@ -184,9 +192,33 @@ export default function GenerationProgress({
             {/* One row, edit in place: the label and value stay put and only
                 the value becomes editable, so the layout does not jump. */}
             <div className="mx-auto max-w-[470px] border-y border-border/40 py-3">
+            {/* The switch owns the icon and the whole row, so the address
+                below it reads as a detail of the thing being switched on. */}
+            <div className="flex items-center gap-3 text-left">
+              <Mail className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <label htmlFor="cad-notification-toggle" className="min-w-0 flex-1 text-sm text-foreground">
+                Email me when this is ready
+              </label>
+              {onToggleEmailEnabled && (
+                <Switch
+                  id="cad-notification-toggle"
+                  checked={emailEnabled}
+                  onCheckedChange={onToggleEmailEnabled}
+                  disabled={notificationEmailLoading}
+                  className="shrink-0"
+                />
+              )}
+            </div>
+
+            {/* Hidden rather than dimmed when off: there is no destination to
+                show for mail that is not going to be sent. The pl-7 matches
+                the icon plus gap above, so the address lines up with the
+                label. Only from sm up: on a narrow phone the edit form needs
+                every pixel for the input, Save and Cancel. */}
+            {emailEnabled && (
+            <div className="mt-3 sm:pl-7">
             {!isEditingEmail ? (
               <div className="flex items-center gap-3 text-left">
-                <Mail className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
                   <p className="text-[11px] leading-4 text-muted-foreground">Send to</p>
                   <p className="truncate text-sm text-foreground">
@@ -207,7 +239,6 @@ export default function GenerationProgress({
               </div>
             ) : (
               <form className="flex items-center gap-3 text-left" onSubmit={submitEmail} noValidate>
-                <Mail className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                 <label htmlFor="cad-notification-email" className="shrink-0 text-[11px] text-muted-foreground">
                   Send to
                 </label>
@@ -247,6 +278,8 @@ export default function GenerationProgress({
               <p id="cad-notification-email-error" role="alert" className="mt-2 text-left text-xs text-destructive">
                 {emailError}
               </p>
+            )}
+            </div>
             )}
             </div>
           </div>
