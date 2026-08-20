@@ -22,7 +22,7 @@ import React, {
 } from 'react';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { applyNeutralToneMapping, STUDIO_ENVIRONMENT_HDR } from '@/lib/neutral-tone-mapping';
+import { applyNeutralToneMapping, makeStudioBackdrop, STUDIO_ENVIRONMENT_HDR } from '@/lib/neutral-tone-mapping';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { RGBELoader } from 'three-stdlib';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -33,7 +33,6 @@ import {
   markEmbeddedGltfMaterials,
 } from './scissor-glb-materials';
 import { PendingCardRegistrationQueue } from './scissor-glb-registration';
-import { getThemeBgColor } from './scissor-glb-theme';
 import {
   cacheScene,
   disposeScene,
@@ -99,6 +98,9 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
   const listenersRef = useRef<Map<string, Set<CardStateListener>>>(new Map());
   const rafRef = useRef<number>(0);
   const envMapRef = useRef<THREE.Texture | null>(null);
+  /** One backdrop shared by every card, built lazily so it is not created
+   * during SSR or before a scene needs it. */
+  const backdropRef = useRef<THREE.Texture | null>(null);
   const gltfLoaderRef = useRef(new GLTFLoader());
   const pendingRegistrationsRef = useRef(new PendingCardRegistrationQueue<HTMLDivElement>());
   const [rendererReady, setRendererReady] = useState(false);
@@ -152,14 +154,6 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
       }
     });
 
-    // Watch for theme changes on <html> (class or data-theme attribute)
-    const observer = new MutationObserver(() => {
-      const bg = getThemeBgColor();
-      for (const card of cardsRef.current.values()) {
-        card.scene.background = bg;
-      }
-    });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] });
 
     return () => {
       cancelAnimationFrame(rafRef.current);
@@ -167,7 +161,6 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
       envMapRef.current?.dispose();
       rendererRef.current = null;
       pendingRegistrations.clear();
-      observer.disconnect();
     };
   }, []);
 
@@ -332,7 +325,10 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
     pendingRegistrationsRef.current.delete(id);
 
     const scene = new THREE.Scene();
-    scene.background = getThemeBgColor();
+    // The Studio's fixed backdrop, not the theme colour: the ring should sit
+    // on the same neutral sweep it will sit on once opened.
+    if (!backdropRef.current) backdropRef.current = makeStudioBackdrop();
+    scene.background = backdropRef.current;
 
     // Matches the Studio rig: one directional light at the same intensity and
     // angle, with the environment doing the rest. The ambient light that used

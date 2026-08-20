@@ -68,3 +68,31 @@ export function applyNeutralToneMapping(renderer: THREE.WebGLRenderer): void {
  */
 export const STUDIO_ENVIRONMENT_HDR =
   'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/brown_photostudio_02_1k.hdr';
+
+/**
+ * The Studio viewport's backdrop: a vertical white to light grey gradient,
+ * mirroring CADCanvas's makeReferenceBackground.
+ *
+ * Deliberately fixed rather than themed. It is a photographic sweep, the same
+ * idea as the paper behind a product shot, so the ring is judged against a
+ * neutral ground in every theme. History previews used the theme background
+ * instead, which is near-black in dark mode and made the same model read
+ * completely differently.
+ *
+ * CADCanvas is protected and cannot import this, so the two must stay in step.
+ */
+export function makeStudioBackdrop(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 2;
+  canvas.height = 512;
+  const context = canvas.getContext('2d');
+  if (!context) return new THREE.CanvasTexture(canvas);
+  const gradient = context.createLinearGradient(0, 0, 0, 512);
+  gradient.addColorStop(0, '#ffffff');
+  gradient.addColorStop(1, '#c9cdd4');
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, 2, 512);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}

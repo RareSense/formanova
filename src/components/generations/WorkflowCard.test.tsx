@@ -174,13 +174,17 @@ describe('CAD generation history card', () => {
     expect(downloadCadArtifact).toHaveBeenNthCalledWith(1, '/fresh/manufacturing-3dm', 'ring.3dm', '3dm');
   });
 
-  it('shows credits used explicitly, including zero', () => {
+  it('shows the figure alone, and still announces it in full', () => {
     render(
       <MemoryRouter>
         <WorkflowCard workflow={{ ...cadWorkflow, credits_spent: 0 }} index={1} onClick={() => {}} />
       </MemoryRouter>,
     );
 
-    expect(screen.getByText('0 credits used')).toBeTruthy();
+    // Coin and number only, matching the photo cards. Zero is shown rather
+    // than hidden, since a free run and an unknown one are different things.
+    expect(screen.getByText('0')).toBeTruthy();
+    expect(screen.queryByText('0 credits used')).toBeNull();
+    expect(screen.getByLabelText('0 credits used')).toBeTruthy();
   });
 });

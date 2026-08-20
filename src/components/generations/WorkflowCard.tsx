@@ -175,8 +175,10 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
           <div className="flex flex-wrap items-center justify-end gap-2 flex-shrink-0">
             <span
               /* Same plain badge the photo cards use (CreditsBadge): coin and
-                 figure, muted, no box. The states below are kept, since a CAD
-                 run can be mid-audit and silence would read as free. */
+                 figure, nothing else. The two non-numeric states stay as marks
+                 rather than words, since a CAD run can be mid-audit and an
+                 empty pill would read as free. The full wording lives in the
+                 aria-label so it is still announced. */
               className="inline-flex items-center gap-1 font-mono text-[10px] tracking-wider text-muted-foreground"
               aria-label={workflow.credits_spent == null ? 'Credits used unavailable' : `${workflow.credits_spent} credits used`}
               role="status"
@@ -184,10 +186,10 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
             >
               <img src={creditCoinIcon} alt="" className="h-3.5 w-3.5" />
               {workflow.credits_spent === undefined
-                ? 'Calculating credits…'
+                ? '…'
                 : workflow.credits_spent === null
-                  ? 'Credits unavailable'
-                  : `${workflow.credits_spent} credits used`}
+                  ? '—'
+                  : workflow.credits_spent}
             </span>
             <span className="font-mono text-[10px] tracking-wider text-muted-foreground whitespace-nowrap">
               {dateStr}
