@@ -57,3 +57,14 @@ export function applyNeutralToneMapping(renderer: THREE.WebGLRenderer): void {
   renderer.toneMapping = THREE.CustomToneMapping;
   renderer.toneMappingExposure = NEUTRAL_TONE_MAPPING_EXPOSURE;
 }
+
+/**
+ * The environment CADCanvas lights with by default (its `photostudio` key).
+ *
+ * On polished metal the environment IS the appearance: every highlight and
+ * reflection is the room, not the lights. The history preview used to load a
+ * different HDRI, so matching the tone mapping and the light rig still left it
+ * looking like a different piece once opened in the Studio.
+ */
+export const STUDIO_ENVIRONMENT_HDR =
+  'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/brown_photostudio_02_1k.hdr';

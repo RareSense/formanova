@@ -174,12 +174,15 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2 flex-shrink-0">
             <span
-              className="inline-flex min-h-8 items-center gap-1.5 border border-border/70 bg-muted/25 px-2.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-foreground"
+              /* Same plain badge the photo cards use (CreditsBadge): coin and
+                 figure, muted, no box. The states below are kept, since a CAD
+                 run can be mid-audit and silence would read as free. */
+              className="inline-flex items-center gap-1 font-mono text-[10px] tracking-wider text-muted-foreground"
               aria-label={workflow.credits_spent == null ? 'Credits used unavailable' : `${workflow.credits_spent} credits used`}
               role="status"
               aria-live="polite"
             >
-              <img src={creditCoinIcon} alt="" className="h-4 w-4" />
+              <img src={creditCoinIcon} alt="" className="h-3.5 w-3.5" />
               {workflow.credits_spent === undefined
                 ? 'Calculating credits…'
                 : workflow.credits_spent === null
@@ -280,11 +283,11 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
                 {supportsThreedm && (
                   <section
                     aria-label="Manufacturing deliverable"
-                    className="border border-[hsl(var(--formanova-hero-accent))]/45 bg-[hsl(var(--formanova-hero-accent))]/[0.04] p-2.5"
+                    className="border border-border bg-muted/20 p-2.5"
                   >
                     <div className="mb-2 flex items-end justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="font-mono text-[8px] font-semibold uppercase tracking-[0.16em] text-[hsl(var(--formanova-hero-accent))]">
+                        <p className="font-mono text-[8px] font-semibold uppercase tracking-[0.16em] text-foreground">
                           Manufacturing file
                         </p>
                         <p className="mt-0.5 text-[10px] leading-4 text-muted-foreground">
@@ -300,7 +303,7 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
                       variant="outline"
                       onClick={handleDownloadThreedm}
                       disabled={isDownloadingThreedm}
-                      className="h-11 w-full gap-1.5 border-[hsl(var(--formanova-hero-accent))] bg-[hsl(var(--formanova-hero-accent))] px-3 font-mono text-[9px] uppercase tracking-wider text-background hover:bg-[hsl(var(--formanova-hero-accent))]/90 hover:text-background"
+                      className="h-11 w-full gap-1.5 border-foreground/40 bg-transparent px-3 font-mono text-[9px] uppercase tracking-wider text-foreground hover:border-foreground/70 hover:bg-muted/40 hover:text-foreground"
                       title="Download the machinable .3dm"
                       aria-label="Download .3dm"
                     >

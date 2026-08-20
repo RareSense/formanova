@@ -22,7 +22,7 @@ import React, {
 } from 'react';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { applyNeutralToneMapping } from '@/lib/neutral-tone-mapping';
+import { applyNeutralToneMapping, STUDIO_ENVIRONMENT_HDR } from '@/lib/neutral-tone-mapping';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { RGBELoader } from 'three-stdlib';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -144,7 +144,7 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
 
     // Preload HDRI environment
     const rgbeLoader = new RGBELoader();
-    rgbeLoader.load('/hdri/jewelry-studio-v2.hdr', (texture) => {
+    rgbeLoader.load(STUDIO_ENVIRONMENT_HDR, (texture) => {
       texture.mapping = THREE.EquirectangularReflectionMapping;
       envMapRef.current = texture;
       for (const card of cardsRef.current.values()) {
