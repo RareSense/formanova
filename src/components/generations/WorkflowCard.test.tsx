@@ -80,17 +80,18 @@ describe('CAD generation history card', () => {
     expect(studio.className).toContain('h-11');
     expect(threedm.className).toContain('w-full');
     expect(studio.className).toContain('w-full');
-    // Both carry the same treatment as the upscale button, which reads from
-    // the theme tokens rather than fixed colours.
-    expect(studio.className).toContain('formanova-hero-accent');
-    expect(threedm.className).toContain('formanova-hero-accent');
-    expect(studio.className).toContain('text-background');
-    expect(screen.getByRole('region', { name: 'Manufacturing deliverable' })).toBeTruthy();
-    expect(screen.getByText('Native Rhino 3DM')).toBeTruthy();
+    // Outlined, not filled: these sit under the preview, and two solid blocks
+    // of accent there compete with the ring for attention.
+    for (const action of [threedm, studio]) {
+      expect(action.className).toContain('border-border');
+      expect(action.className).toContain('bg-transparent');
+      expect(action.className).toContain('text-foreground');
+      expect(action.className).not.toContain('formanova-hero-accent');
+    }
     expect(screen.queryByRole('button', { name: 'Export GLB' })).toBeNull();
   });
 
-  it('uses an extension-free design name for the 3DM filename', () => {
+  it('uses an extension-free design name for the 3DM filename', async () => {
     render(
       <MemoryRouter>
         <WorkflowCard workflow={cadWorkflow} index={1} onClick={() => {}} />
@@ -98,25 +99,17 @@ describe('CAD generation history card', () => {
     );
 
     expect(screen.getByText('Design name')).toBeTruthy();
-    expect(screen.getByText('ring.3dm')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Rename design' }));
     expect((screen.getByRole('textbox') as HTMLInputElement).value).toBe('ring');
     expect(screen.queryByText('.glb')).toBeNull();
-  });
 
-  it('renames the 3DM file locally without an output asset id', () => {
-    render(
-      <MemoryRouter>
-        <WorkflowCard workflow={{ ...cadWorkflow, output_asset_id: null }} index={1} onClick={() => {}} />
-      </MemoryRouter>,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Rename design' }));
-    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Customer Ring' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save design name' }));
-
-    expect(screen.getByText('Customer Ring.3dm')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Download .3dm' }));
+    await waitFor(() => expect(downloadCadArtifact).toHaveBeenCalledWith(
+      expect.any(String),
+      'ring.3dm',
+      '3dm',
+    ));
   });
 
   it('downloads the refreshed 3DM URL with the renamed 3DM filename and type', async () => {

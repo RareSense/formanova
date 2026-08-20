@@ -282,26 +282,6 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
 
             {workflow.glb_url ? (
               <div className="flex w-full flex-col gap-2">
-                {supportsThreedm && (
-                  <section
-                    aria-label="Manufacturing deliverable"
-                    className="border border-border bg-muted/20 p-2.5"
-                  >
-                    <div className="flex items-end justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="font-mono text-[8px] font-semibold uppercase tracking-[0.16em] text-foreground">
-                          Manufacturing file
-                        </p>
-                        <p className="mt-0.5 text-[10px] leading-4 text-muted-foreground">
-                          Native Rhino 3DM
-                        </p>
-                      </div>
-                      <span className="min-w-0 truncate font-mono text-[8px] uppercase tracking-[0.12em] text-muted-foreground" title={threedmFilename}>
-                        {threedmFilename}
-                      </span>
-                    </div>
-                  </section>
-                )}
                 {/* Both actions are siblings of the same container so their
                     w-full resolves to one width. Nesting the download inside
                     the padded section above made it narrower than its pair. */}
@@ -311,7 +291,7 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
                     variant="outline"
                     onClick={handleDownloadThreedm}
                     disabled={isDownloadingThreedm}
-                    className="h-11 w-full gap-1.5 border-0 bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] px-3 font-mono text-[9px] uppercase tracking-wider text-background transition-opacity hover:opacity-90"
+                    className="h-11 w-full gap-1.5 border-border bg-transparent px-3 font-mono text-[9px] uppercase tracking-wider text-foreground transition-colors hover:border-foreground/60 hover:bg-muted/40"
                     title="Download the machinable .3dm"
                     aria-label="Download .3dm"
                   >
@@ -319,15 +299,15 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
                     {isDownloadingThreedm ? 'Checking .3dm…' : 'Download .3dm'}
                   </Button>
                 )}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleLoadInStudio}
-                    className="h-11 w-full gap-1.5 border-0 bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] px-3 font-mono text-[9px] uppercase tracking-wider text-background transition-opacity hover:opacity-90"
-                  >
-                    <Layers className="h-3.5 w-3.5 shrink-0" />
-                    Open in Studio
-                  </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleLoadInStudio}
+                  className="h-11 w-full gap-1.5 border-border bg-transparent px-3 font-mono text-[9px] uppercase tracking-wider text-foreground transition-colors hover:border-foreground/60 hover:bg-muted/40"
+                >
+                  <Layers className="h-3.5 w-3.5 shrink-0" />
+                  Open in Studio
+                </Button>
               </div>
             ) : (
               <span className="font-mono text-[9px] tracking-wider text-muted-foreground uppercase">
