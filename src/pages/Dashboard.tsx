@@ -9,8 +9,11 @@ import { usePrefetchGenerations } from '@/hooks/use-prefetch-generations';
 import { useShopifyStatus } from '@/hooks/useShopify';
 
 // Reuse the same hero imagery
-import heroNecklace from '@/assets/jewelry/hero-necklace-diamond.jpg';
-import textToCadThumb from '@/assets/cad-studio-thumb.webp';
+// Both are 4:3, matching the cards, so object-cover has nothing to crop and
+// each subject stays centred the way CAD Studio's cards already look. The
+// square wireframe thumb this replaced lost a quarter of its height.
+import heroNecklace from '@/assets/jewelry/hero-necklace-diamond.webp';
+import cadStudioThumb from '@/assets/image-to-cad-thumb.webp';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -117,7 +120,7 @@ export default function Dashboard() {
           className="group relative aspect-[4/3] marta-frame overflow-hidden text-left cursor-pointer transition-all duration-300 hover:border-formanova-hero-accent hover:shadow-[0_0_30px_-5px_hsl(var(--formanova-hero-accent)/0.4)]"
         >
           <OptimizedImage
-            src={textToCadThumb}
+            src={cadStudioThumb}
             alt="From CAD designs"
             className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
