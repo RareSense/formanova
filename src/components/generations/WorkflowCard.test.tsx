@@ -80,8 +80,11 @@ describe('CAD generation history card', () => {
     expect(studio.className).toContain('h-11');
     expect(threedm.className).toContain('w-full');
     expect(studio.className).toContain('w-full');
-    // Secondary, but still legible: not washed out to muted.
-    expect(studio.className).toContain('text-foreground');
+    // Both carry the same treatment as the upscale button, which reads from
+    // the theme tokens rather than fixed colours.
+    expect(studio.className).toContain('formanova-hero-accent');
+    expect(threedm.className).toContain('formanova-hero-accent');
+    expect(studio.className).toContain('text-background');
     expect(screen.getByRole('region', { name: 'Manufacturing deliverable' })).toBeTruthy();
     expect(screen.getByText('Native Rhino 3DM')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Export GLB' })).toBeNull();
