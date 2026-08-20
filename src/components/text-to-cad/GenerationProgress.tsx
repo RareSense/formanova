@@ -74,6 +74,13 @@ export default function GenerationProgress({
     if (visible) sectionRef.current?.focus();
   }, [visible]);
 
+  // Switching the toggle off unmounts the edit form. Without this the
+  // component stays in editing state with no form on screen, and Keep
+  // Creating, which is gated on not editing, disappears with no way back.
+  useEffect(() => {
+    if (!emailEnabled) setIsEditingEmail(false);
+  }, [emailEnabled]);
+
   useEffect(() => {
     if (wasEditingEmailRef.current && !isEditingEmail) changeEmailButtonRef.current?.focus();
     wasEditingEmailRef.current = isEditingEmail;
@@ -167,7 +174,7 @@ export default function GenerationProgress({
                     <span className="font-semibold text-[hsl(var(--formanova-hero-accent))]">{estimateText}</span>
                   </p>
                   <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                    You can leave this page. We&rsquo;ll send your CAD when it&rsquo;s ready.
+                    You can leave this page. We&rsquo;ll email you when your CAD is ready.
                   </p>
                 </>
               )}
@@ -189,9 +196,9 @@ export default function GenerationProgress({
 
         {isActiveGeneration && (
           <div className="mt-5">
-            {/* One row, edit in place: the label and value stay put and only
-                the value becomes editable, so the layout does not jump. */}
-            <div className="mx-auto max-w-[470px] border-y border-border/40 py-3">
+            {/* One bordered group: the switch and the address it governs read
+                as a single setting rather than two stacked hairline rows. */}
+            <div className="mx-auto max-w-[470px] border border-border/60 px-4 py-5 sm:px-6">
             {/* The switch owns the icon and the whole row, so the address
                 below it reads as a detail of the thing being switched on. */}
             <div className="flex items-center gap-3 text-left">
@@ -217,20 +224,20 @@ export default function GenerationProgress({
             </div>
 
             {/* Hidden rather than dimmed when off: there is no destination to
-                show for mail that is not going to be sent. The pl-7 matches
-                the icon plus gap above, so the address lines up with the
-                label. Only from sm up: on a narrow phone the edit form needs
-                every pixel for the input, Save and Cancel. */}
+                show for mail that is not going to be sent.
+
+                The pl-7 matches the icon plus gap above, so the address lines
+                up with the label rather than the icon, and the rule sits back
+                at the icon's edge to tie the two rows together. Both only from
+                sm up: on a narrow phone the edit row needs every pixel for the
+                input, Save and Cancel. */}
             {emailEnabled && (
-            <div className="mt-3 sm:pl-7">
+            <div className="mt-4 sm:border-l sm:border-border/60 sm:pl-7">
             {!isEditingEmail ? (
               <div className="flex items-center gap-3 text-left">
-                <div className="min-w-0 flex-1">
-                  <p className="text-[11px] leading-4 text-muted-foreground">Send to</p>
-                  <p className="truncate text-sm text-foreground">
-                    {notificationEmailLoading && !notificationEmail ? "your account email" : notificationEmail ?? "your account email"}
-                  </p>
-                </div>
+                <p className="min-w-0 truncate text-sm text-foreground">
+                  {notificationEmailLoading && !notificationEmail ? "your account email" : notificationEmail ?? "your account email"}
+                </p>
                 {onSaveNotificationEmail && (
                   <button
                     ref={changeEmailButtonRef}
@@ -245,8 +252,8 @@ export default function GenerationProgress({
               </div>
             ) : (
               <form className="flex items-center gap-3 text-left" onSubmit={submitEmail} noValidate>
-                <label htmlFor="cad-notification-email" className="shrink-0 text-[11px] text-muted-foreground">
-                  Send to
+                <label htmlFor="cad-notification-email" className="sr-only">
+                  Notification email
                 </label>
                 <input
                   id="cad-notification-email"
@@ -303,6 +310,8 @@ export default function GenerationProgress({
         )}
 
         {isActiveGeneration && onKeepCreating && !isEditingEmail && (
+          <>
+          <div className="mx-auto mt-6 h-px w-full max-w-[470px] bg-border/40" aria-hidden="true" />
           <button
             type="button"
             onClick={onKeepCreating}
@@ -311,6 +320,7 @@ export default function GenerationProgress({
             Keep Creating
             <ArrowRight className="h-4 w-4 shrink-0" />
           </button>
+          </>
         )}
       </motion.section>
     </div>

@@ -17,7 +17,7 @@ describe('GenerationProgress', () => {
 
     expect(screen.getByRole('heading', { name: 'Your CAD is generating' })).toBeTruthy();
     expect(screen.getByText('up to 1 hour')).toBeTruthy();
-    expect(screen.getByText(/Send to/).parentElement?.textContent).toContain('cad@example.com');
+    expect(screen.getByText('cad@example.com')).toBeTruthy();
     expect(screen.getByText(/You can leave this page/i)).toBeTruthy();
     expect(screen.queryByText(/generation history/i)).toBeNull();
     expect(screen.queryByText(/elapsed/i)).toBeNull();
@@ -58,9 +58,29 @@ describe('GenerationProgress', () => {
     );
 
     // No destination is shown for mail that is not going to be sent.
-    expect(screen.queryByText(/Send to/)).toBeNull();
     expect(screen.queryByText('cad@example.com')).toBeNull();
     expect(screen.getByRole('switch', { name: 'Email me when this is ready' })).toBeTruthy();
+  });
+
+  it('leaves edit mode when the toggle is switched off mid-edit', () => {
+    // Switching off unmounts the form. Staying in editing state would also
+    // hide Keep Creating, which is gated on not editing, with no way back.
+    const props = {
+      visible: true,
+      currentStep: 'building',
+      notificationEmail: 'cad@example.com',
+      onSaveNotificationEmail: vi.fn(),
+      onToggleEmailEnabled: vi.fn(),
+      onKeepCreating: vi.fn(),
+    } as const;
+    const { rerender } = render(<GenerationProgress {...props} emailEnabled />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^Change/ }));
+    expect(screen.queryByRole('button', { name: 'Keep Creating' })).toBeNull();
+
+    rerender(<GenerationProgress {...props} emailEnabled={false} />);
+
+    expect(screen.getByRole('button', { name: 'Keep Creating' })).toBeTruthy();
   });
 
   it('opens the input empty when no override is stored, not on the account email', () => {
@@ -76,9 +96,9 @@ describe('GenerationProgress', () => {
       />,
     );
 
-    expect(screen.getByText(/Send to/).parentElement?.textContent).toContain('account@example.com');
+    expect(screen.getByText('account@example.com')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /^Change/ }));
-    expect((screen.getByRole('textbox', { name: 'Send to' }) as HTMLInputElement).value).toBe('');
+    expect((screen.getByRole('textbox', { name: 'Notification email' }) as HTMLInputElement).value).toBe('');
   });
 
   it('opens the input on the stored override when there is one', () => {
@@ -93,7 +113,7 @@ describe('GenerationProgress', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: /^Change/ }));
-    expect((screen.getByRole('textbox', { name: 'Send to' }) as HTMLInputElement).value).toBe('work@example.com');
+    expect((screen.getByRole('textbox', { name: 'Notification email' }) as HTMLInputElement).value).toBe('work@example.com');
   });
 
   it('validates the email and saves a valid replacement', async () => {
@@ -108,7 +128,7 @@ describe('GenerationProgress', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: /^Change/ }));
-    const input = screen.getByRole('textbox', { name: 'Send to' });
+    const input = screen.getByRole('textbox', { name: 'Notification email' });
     fireEvent.change(input, { target: { value: 'invalid' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(screen.getByRole('alert').textContent).toContain('Enter a valid email address.');
@@ -117,7 +137,7 @@ describe('GenerationProgress', () => {
     fireEvent.change(input, { target: { value: 'new@example.com' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(onSave).toHaveBeenCalledWith('new@example.com'));
-    await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Send to' })).toBeNull());
+    await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Notification email' })).toBeNull());
   });
 
   it('supports cancel and exposes pending and server-error states', () => {
@@ -145,7 +165,7 @@ describe('GenerationProgress', () => {
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(screen.queryByRole('textbox', { name: 'Send to' })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Notification email' })).toBeNull();
   });
 
   it('keeps loading and failure states accessible without nesting retry in the live region', async () => {
