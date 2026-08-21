@@ -15,7 +15,19 @@ import {
   type ArtifactRef,
 } from "@/lib/ring-cad-nurbs-api";
 import { buildReferenceInputs } from "@/lib/cad-reference-upload";
-import { trackPaywallHit, trackCadGenerationCompleted } from "@/lib/posthog-events";
+import {
+  trackPaywallHit,
+  trackCadGenerationCompleted,
+  trackCadGenerationStarted,
+  trackCadGenerationFailed,
+  trackCadResultRestored,
+} from "@/lib/posthog-events";
+import {
+  resolveCadSource,
+  resolveRestoreEntry,
+  consumeFirstCadGeneration,
+  buildCadGenerationProps,
+} from "@/lib/cad-analytics";
 import { fetchCadResult } from "@/lib/generation-history-api";
 
 
@@ -69,6 +81,10 @@ export function useImageToCADWorkflow({
 
   const pollAbortRef = useRef<AbortController | null>(null);
   const generationStartRef = useRef<number>(0);
+  /** What cad_generation_started reported for is_first_ever, so the completed
+   *  event reports the same value instead of re-consuming a flag that has
+   *  already flipped. */
+  const startedFirstEverRef = useRef(false);
   /**
    * Set by handleKeepCreating. While true the on-page overlay stops following
    * the run, so results land via the toast instead of yanking the user back
@@ -77,6 +93,11 @@ export function useImageToCADWorkflow({
   const hasNavigatedAway = useRef(false);
 
   useEffect(() => () => { pollAbortRef.current?.abort(); }, []);
+
+  /** Which CAD tool this hook instance is serving. Both pages share this hook,
+   *  so every analytics event carries this rather than being duplicated per
+   *  page. */
+  const cadSource = resolveCadSource(cadRoute);
 
   const trackedRun = generations.find(g => g.workflowId === sourceWorkflowId && g.kind === 'cad');
 
@@ -93,6 +114,16 @@ export function useImageToCADWorkflow({
       setProgressStep('failed_final');
       setIsGenerating(false);
       setGenerationFailed(true);
+      // Stage 'run': backend accepted the job and then failed. Kept distinct
+      // from a 'start' failure because the causes share nothing.
+      trackCadGenerationFailed({
+        source: cadSource,
+        failure_stage: 'run',
+        duration_ms: Date.now() - (generationStartRef.current || Date.now()),
+        // has_failure_message is deliberately omitted: TrackedGeneration
+        // carries no failure text, so sending false here would assert
+        // something this layer cannot actually observe.
+      });
       return;
     }
 
@@ -110,15 +141,18 @@ export function useImageToCADWorkflow({
         setThreedmArtifact({ uri: trackedRun.threedmUrl, url: trackedRun.threedmUrl, type: 'model/3dm', bytes: 0, sha256: '' });
       }
       trackCadGenerationCompleted({
-        category: 'ring',
-        prompt_length: prompt.trim().length,
+        ...buildCadGenerationProps({ cadRoute, prompt, referenceImageCount: referenceImages.length, tier }),
         duration_ms: Date.now() - (generationStartRef.current || Date.now()),
+        // Read, not consumed: startedFirstEverRef holds what the matching
+        // cad_generation_started already reported, so the two ends of the
+        // funnel agree instead of this one always seeing false.
+        is_first_ever: startedFirstEverRef.current,
       });
       setProgressStep('_loading');
       setIsModelLoading(true);
       setHasModel(true);
     }
-  }, [trackedRun?.status, trackedRun?.glbUrl, trackedRun?.threedmUrl, trackedRun?.generationStep]); // eslint-disable-line react-hooks/exhaustive-deps -- prompt/trackedRun object excluded: only the run's own transitions should re-drive the overlay, and including the object would re-fire on every progress tick
+  }, [trackedRun?.status, trackedRun?.glbUrl, trackedRun?.threedmUrl, trackedRun?.generationStep]); // eslint-disable-line react-hooks/exhaustive-deps -- prompt/referenceImages/tier/cadRoute/cadSource and the trackedRun object are excluded: only the run's own transitions should re-drive the overlay, and including the object would re-fire on every progress tick. The analytics values are read from the closure of the render in which status changed, which is the correct moment for them. Regression to watch: if a future edit fires an event here on something other than a status transition, those values could be stale.
 
   /** Leaves the run running in the background and returns to the upload screen. */
   const handleKeepCreating = useCallback(() => {
@@ -137,6 +171,12 @@ export function useImageToCADWorkflow({
     workflowId: string | null,
     fallbackGlbUrl?: string | null,
   ): Promise<boolean> => {
+    // Captured synchronously, before the await below. Both pages strip the
+    // query string once this resolves (navigate(..., { replace: true })), so
+    // reading the marker afterwards would always see an unmarked URL and
+    // report every internal restore as external.
+    const entry = resolveRestoreEntry(window.location.search);
+
     hasNavigatedAway.current = false;
     onWorkspaceActivate();
     setIsGenerating(false);
@@ -164,6 +204,7 @@ export function useImageToCADWorkflow({
       setProgressStep('');
       setGenerationFailed(true);
       setFailureMessage('The completed CAD result could not be loaded.');
+      trackCadResultRestored({ source: cadSource, entry, restore_ok: false });
       return false;
     }
 
@@ -177,8 +218,9 @@ export function useImageToCADWorkflow({
         sha256: '',
       });
     }
+    trackCadResultRestored({ source: cadSource, entry, restore_ok: true });
     return true;
-  }, [onWorkspaceActivate]);
+  }, [onWorkspaceActivate, cadSource]);
 
   const simulateGeneration = useCallback(async () => {
     if (isGenerating) return;
@@ -203,7 +245,7 @@ export function useImageToCADWorkflow({
       const cost = result.estimatedCredits;
       if (cost > 0 && balance < cost) {
         setCreditBlock({ approved: false, estimatedCredits: cost, currentBalance: balance });
-        trackPaywallHit({ category: 'ring', steps_completed: 1 });
+        trackPaywallHit({ category: 'ring', steps_completed: 1, source: cadSource });
         return;
       }
       setCreditBlock(null);
@@ -252,6 +294,15 @@ export function useImageToCADWorkflow({
       if (!workflow_id) throw new Error("No workflow_id returned");
       setSourceWorkflowId(workflow_id);
 
+      // Fired only once a workflow_id exists, so a start that never reached
+      // the backend counts as a failure rather than inflating the top of the
+      // funnel and depressing the conversion rate.
+      startedFirstEverRef.current = consumeFirstCadGeneration();
+      trackCadGenerationStarted({
+        ...buildCadGenerationProps({ cadRoute, prompt, referenceImageCount: referenceImages.length, tier }),
+        is_first_ever: startedFirstEverRef.current,
+      });
+
       // Hand the run to GenerationsContext, which polls above the routes. That
       // is what lets the user press Keep Creating and leave: this hook's own
       // poll below only drives the on-page overlay while they stay.
@@ -268,6 +319,15 @@ export function useImageToCADWorkflow({
 
     } catch (err) {
       console.error("ImageToCAD generation failed:", err);
+      // Stage 'start': the run never got a workflow_id, so nothing was charged
+      // and nothing is polling. Usually a bad payload or the workflow not
+      // being active on this environment.
+      trackCadGenerationFailed({
+        source: cadSource,
+        failure_stage: 'start',
+        duration_ms: Date.now() - cadGenStartTime,
+        has_failure_message: err instanceof Error && !!err.message,
+      });
       // Surface the real reason. A start failure (bad payload, workflow not
       // active on this environment) is actionable, and hiding it behind the
       // generic message means the user only sees it with DevTools open.
@@ -276,7 +336,7 @@ export function useImageToCADWorkflow({
       setProgressStep("failed_final");
       setGenerationFailed(true);
     }
-  }, [prompt, referenceImages, tier, cadRoute, isGenerating, onWorkspaceActivate, trackCadGeneration]);
+  }, [prompt, referenceImages, tier, cadRoute, cadSource, isGenerating, onWorkspaceActivate, trackCadGeneration]);
 
   const resetWorkflow = useCallback(() => {
     hasNavigatedAway.current = false;

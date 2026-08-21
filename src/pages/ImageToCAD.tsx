@@ -15,6 +15,7 @@ import { useImageToCADWorkflow } from "@/hooks/useImageToCADWorkflow";
 import { useCADMeshEditor } from "@/hooks/useCADMeshEditor";
 import { useReferenceImages } from "@/hooks/useReferenceImages";
 import { useNotificationEmail } from "@/hooks/useNotificationEmail";
+import { trackCadStudioOpen, trackCadReferenceUploaded } from "@/lib/posthog-events";
 import { useCADKeyboardShortcuts } from "@/hooks/use-cad-keyboard-shortcuts";
 
 import ImagePromptScreen from "@/components/text-to-cad/ImagePromptScreen";
@@ -49,11 +50,24 @@ export default function ImageToCAD() {
   const {
     referenceImages,
     referenceImagePreviewUrls,
-    addReferenceImages,
+    addReferenceImages: addReferenceImagesRaw,
     removeReferenceImage,
     replaceReferenceImages,
     clearReferenceImages,
   } = useReferenceImages();
+  /** Wraps the shared uploader so the analytics live at this page's boundary
+   *  rather than inside useReferenceImages, which knows nothing about CAD. */
+  const addReferenceImages = useCallback((files: File[]) => {
+    if (files.length) {
+      trackCadReferenceUploaded({
+        source: 'image-to-cad',
+        image_count: files.length,
+        total_after_add: referenceImages.length + files.length,
+      });
+    }
+    addReferenceImagesRaw(files);
+  }, [addReferenceImagesRaw, referenceImages.length]);
+
   const [transformMode, setTransformMode] = useState("orbit");
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(true);
@@ -114,6 +128,13 @@ export default function ImageToCAD() {
     });
     navigate('/image-to-cad', { replace: true });
   // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount; workflow/navigate/searchParams excluded so re-navigation doesn't re-seed state
+  }, []);
+
+  // Top of the CAD funnel. Fires once per page entry so drop-off between
+  // landing here and pressing Generate is measurable, matching studio_open in
+  // the photoshoot flow.
+  useEffect(() => {
+    trackCadStudioOpen({ source: 'image-to-cad' });
   }, []);
 
   // Depend only on the stable setter this uses, not the whole `workflow`

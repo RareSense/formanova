@@ -15,6 +15,11 @@ import {
   trackModelSelected,
   trackPaywallHit,
   trackCadGenerationCompleted,
+  trackCadStudioOpen,
+  trackCadReferenceUploaded,
+  trackCadGenerationStarted,
+  trackCadGenerationFailed,
+  trackCadResultRestored,
   trackGenerationComplete,
   trackDownloadClicked,
   trackAIFixSubmitted,
@@ -218,6 +223,168 @@ describe('trackCadGenerationCompleted', () => {
       category: 'ring',
       prompt_length: 42,
       duration_ms: 5000,
+    })
+  })
+})
+
+// ── CAD funnel events ────────────────────────────────
+
+describe('trackCadStudioOpen', () => {
+  it('captures cad_studio_open for text-to-cad', () => {
+    trackCadStudioOpen({ source: 'text-to-cad' })
+    expect(posthog.capture).toHaveBeenCalledWith('cad_studio_open', { source: 'text-to-cad' })
+  })
+
+  it('captures cad_studio_open for image-to-cad', () => {
+    trackCadStudioOpen({ source: 'image-to-cad' })
+    expect(posthog.capture).toHaveBeenCalledWith('cad_studio_open', { source: 'image-to-cad' })
+  })
+})
+
+describe('trackCadReferenceUploaded', () => {
+  it('captures cad_reference_uploaded with the added and running counts', () => {
+    trackCadReferenceUploaded({ source: 'image-to-cad', image_count: 2, total_after_add: 3 })
+    expect(posthog.capture).toHaveBeenCalledWith('cad_reference_uploaded', {
+      source: 'image-to-cad',
+      image_count: 2,
+      total_after_add: 3,
+    })
+  })
+})
+
+describe('trackCadGenerationStarted', () => {
+  it('captures cad_generation_started with the full shared property bundle', () => {
+    trackCadGenerationStarted({
+      source: 'image-to-cad',
+      category: 'ring',
+      prompt_length: 12,
+      reference_image_count: 2,
+      llm_tier: 'claude_opus_5_openrouter',
+      is_first_ever: true,
+    })
+    expect(posthog.capture).toHaveBeenCalledWith('cad_generation_started', {
+      source: 'image-to-cad',
+      category: 'ring',
+      prompt_length: 12,
+      reference_image_count: 2,
+      llm_tier: 'claude_opus_5_openrouter',
+      is_first_ever: true,
+    })
+  })
+})
+
+describe('trackCadGenerationFailed', () => {
+  it('captures a failure at start', () => {
+    trackCadGenerationFailed({
+      source: 'text-to-cad',
+      failure_stage: 'start',
+      duration_ms: 800,
+      has_failure_message: true,
+    })
+    expect(posthog.capture).toHaveBeenCalledWith('cad_generation_failed', {
+      source: 'text-to-cad',
+      failure_stage: 'start',
+      duration_ms: 800,
+      has_failure_message: true,
+    })
+  })
+
+  it('omits has_failure_message for a run failure, which this layer cannot see', () => {
+    trackCadGenerationFailed({
+      source: 'image-to-cad',
+      failure_stage: 'run',
+      duration_ms: 61000,
+    })
+    expect(posthog.capture).toHaveBeenCalledWith('cad_generation_failed', {
+      source: 'image-to-cad',
+      failure_stage: 'run',
+      duration_ms: 61000,
+    })
+  })
+})
+
+describe('trackCadResultRestored', () => {
+  it('captures an external restore, which is how email arrivals are counted', () => {
+    trackCadResultRestored({ source: 'text-to-cad', entry: 'external', restore_ok: true })
+    expect(posthog.capture).toHaveBeenCalledWith('cad_result_restored', {
+      source: 'text-to-cad',
+      entry: 'external',
+      restore_ok: true,
+    })
+  })
+
+  it('captures an internal restore from history', () => {
+    trackCadResultRestored({ source: 'image-to-cad', entry: 'history', restore_ok: true })
+    expect(posthog.capture).toHaveBeenCalledWith('cad_result_restored', {
+      source: 'image-to-cad',
+      entry: 'history',
+      restore_ok: true,
+    })
+  })
+
+  it('records a restore that failed to load', () => {
+    trackCadResultRestored({ source: 'text-to-cad', entry: 'toast', restore_ok: false })
+    expect(posthog.capture).toHaveBeenCalledWith('cad_result_restored', {
+      source: 'text-to-cad',
+      entry: 'toast',
+      restore_ok: false,
+    })
+  })
+})
+
+describe('CAD amendments to existing events', () => {
+  it('cad_generation_completed carries the new CAD properties', () => {
+    trackCadGenerationCompleted({
+      category: 'ring',
+      prompt_length: 42,
+      duration_ms: 5000,
+      source: 'image-to-cad',
+      reference_image_count: 1,
+      llm_tier: 'claude_opus_5_openrouter',
+      is_first_ever: false,
+    })
+    expect(posthog.capture).toHaveBeenCalledWith('cad_generation_completed', {
+      category: 'ring',
+      prompt_length: 42,
+      duration_ms: 5000,
+      source: 'image-to-cad',
+      reference_image_count: 1,
+      llm_tier: 'claude_opus_5_openrouter',
+      is_first_ever: false,
+    })
+  })
+
+  it('paywall_hit carries source for CAD', () => {
+    trackPaywallHit({ category: 'ring', steps_completed: 1, source: 'text-to-cad' })
+    expect(posthog.capture).toHaveBeenCalledWith('paywall_hit', {
+      category: 'ring',
+      steps_completed: 1,
+      source: 'text-to-cad',
+    })
+  })
+
+  it('paywall_hit from the photoshoot flow is unchanged and omits source', () => {
+    // Guards the existing photoshoot dashboards: the amended signature must not
+    // start emitting an extra key for callers that never pass one.
+    trackPaywallHit({ category: 'ring', steps_completed: 3 })
+    expect(posthog.capture).toHaveBeenCalledWith('paywall_hit', {
+      category: 'ring',
+      steps_completed: 3,
+    })
+  })
+
+  it('download_clicked carries source for CAD downloads from history', () => {
+    trackDownloadClicked({
+      file_name: 'ring-abc.3dm',
+      file_type: '3dm',
+      context: 'generations',
+      source: 'image-to-cad',
+    })
+    expect(posthog.capture).toHaveBeenCalledWith('download_clicked', {
+      file_name: 'ring-abc.3dm',
+      file_type: '3dm',
+      context: 'generations',
+      source: 'image-to-cad',
     })
   })
 })

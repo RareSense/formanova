@@ -17,6 +17,7 @@ import { isCadUploadEnabled } from "@/lib/feature-flags";
 import { useImageToCADWorkflow } from "@/hooks/useImageToCADWorkflow";
 import { useCADMeshEditor } from "@/hooks/useCADMeshEditor";
 import { useNotificationEmail } from "@/hooks/useNotificationEmail";
+import { trackCadStudioOpen } from "@/lib/posthog-events";
 
 import MeshPanel from "@/components/text-to-cad/MeshPanel";
 import CADCanvas from "@/components/text-to-cad/CADCanvas";
@@ -43,6 +44,11 @@ export default function TextToCAD() {
   // workspaces are counted rather than the hub pages so both sides are
   // measured the same way: where the work happens, not where you browse.
   useEffect(() => { recordStudioVisit('cad'); }, []);
+
+  // Top of the CAD funnel. Fires once per page entry so drop-off between
+  // landing here and pressing Generate is measurable, matching studio_open in
+  // the photoshoot flow.
+  useEffect(() => { trackCadStudioOpen({ source: 'text-to-cad' }); }, []);
 
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();

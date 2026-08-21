@@ -71,7 +71,7 @@ function GenerationIndicator() {
       const cadRoute = mostRecent.cadRoute ?? '/image-to-cad';
       navigate(
         mostRecent.status === 'completed'
-          ? buildCadRestorePath(mostRecent.workflowId, mostRecent.glbUrl ?? null, cadRoute)
+          ? buildCadRestorePath(mostRecent.workflowId, mostRecent.glbUrl ?? null, cadRoute, 'header')
           : cadRoute,
       );
       return;

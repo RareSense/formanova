@@ -19,6 +19,8 @@ import {
 } from './workflow-card-shared';
 import { PhotoCard } from './PhotoCard';
 import { withTimeout } from '@/lib/generation-history-utils';
+import { buildCadRestorePath } from '@/contexts/GenerationsContext';
+import { cadSourceFromSourceType, cadRouteFromSource } from '@/lib/cad-analytics';
 import {
   downloadCadArtifact,
   selectCadArtifactUrl,
@@ -140,6 +142,10 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
         file_name: threedmFilename,
         file_type: '3dm',
         context: 'generations',
+        // Without this every download made from history is unattributable:
+        // one card serves both CAD tools, so 'generations' alone cannot say
+        // which of them produced the model.
+        source: cadSourceFromSourceType(workflow.source_type),
       }));
     } catch (err) {
       console.error('[WorkflowCard] 3DM download error:', err);
@@ -152,14 +158,13 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
   const handleLoadInStudio = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!workflow.glb_url) return;
-    const params = new URLSearchParams({
-      glb: workflow.glb_url,
-      workflow_id: workflow.workflow_id,
-    });
     // One card serves both CAD types, so the workspace has to be chosen by
     // source rather than assumed. Both routes restore from the id alone.
-    const studioPath = workflow.source_type === 'image_to_cad' ? '/image-to-cad' : '/text-to-cad';
-    navigate(`${studioPath}?${params.toString()}`);
+    // Built by the shared helper rather than by hand so this link carries the
+    // 'history' marker: an unmarked restore is counted as an external (email)
+    // arrival, and a hand-rolled URL here would land in that bucket instead.
+    const source = cadSourceFromSourceType(workflow.source_type);
+    navigate(buildCadRestorePath(workflow.workflow_id, workflow.glb_url, cadRouteFromSource(source), 'history'));
   };
 
   return (

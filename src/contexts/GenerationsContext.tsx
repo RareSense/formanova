@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCredits } from '@/contexts/CreditsContext';
 import { useToast } from '@/hooks/use-toast';
 import { ToastAction } from '@/components/ui/toast';
+import { CAD_RESTORE_SRC_PARAM, type CadRestoreEntry } from '@/lib/cad-analytics';
 import { pollWorkflow } from '@/lib/poll-workflow';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { markGenerationCompleted, markGenerationFailed } from '@/lib/generation-lifecycle';
@@ -81,14 +82,27 @@ function loadPersistedCadGenerations(): TrackedGeneration[] {
  * Deep link that restores a finished CAD run into the workspace it was
  * started from. Both TextToCAD and ImageToCAD read ?glb= and ?workflow_id=
  * on mount and seed the viewport; cadRoute picks which page to land on.
+ *
+ * `entry` stamps the link with where it came from, and it is REQUIRED on
+ * purpose. The completion email links to this exact same URL shape, so the two
+ * were previously indistinguishable. Rather than depend on backend tagging the
+ * email, we tag every link we generate ourselves and treat an unmarked arrival
+ * as external -- see CAD_RESTORE_SRC_PARAM in @/lib/cad-analytics.
+ *
+ * That inference only holds while every internal navigation is marked. Making
+ * the argument required means a new CAD restore link that forgets it fails to
+ * compile, instead of quietly inflating the external (email) count. If you are
+ * adding one, call this builder rather than assembling params by hand.
  */
 export function buildCadRestorePath(
   workflowId: string,
   glbUrl: string | null,
   cadRoute: '/text-to-cad' | '/image-to-cad' = '/image-to-cad',
+  entry: Exclude<CadRestoreEntry, 'external'> = 'toast',
 ): string {
   const params = new URLSearchParams({ workflow_id: workflowId });
   if (glbUrl) params.set('glb', glbUrl);
+  params.set(CAD_RESTORE_SRC_PARAM, entry);
   return `${cadRoute}?${params.toString()}`;
 }
 
@@ -502,7 +516,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
         action: (
           <ToastAction
             altText="View Result"
-            onClick={() => navigate(buildCadRestorePath(gen.workflowId, parsed.glbUrl, gen.cadRoute))}
+            onClick={() => navigate(buildCadRestorePath(gen.workflowId, parsed.glbUrl, gen.cadRoute, 'toast'))}
           >
             View Result
           </ToastAction>
@@ -618,7 +632,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
             action: (
               <ToastAction
                 altText="View Result"
-                onClick={() => navigate(buildCadRestorePath(gen.workflowId, parsed?.glbUrl ?? null, gen.cadRoute))}
+                onClick={() => navigate(buildCadRestorePath(gen.workflowId, parsed?.glbUrl ?? null, gen.cadRoute, 'toast'))}
               >
                 View Result
               </ToastAction>

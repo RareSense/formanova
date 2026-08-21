@@ -2,7 +2,8 @@ import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
-import { GenerationsContextProvider, GenerationsContext, useGenerations, type TrackedGeneration } from './GenerationsContext';
+import { GenerationsContextProvider, GenerationsContext, useGenerations, buildCadRestorePath, type TrackedGeneration } from './GenerationsContext';
+import { resolveRestoreEntry } from '@/lib/cad-analytics';
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
 vi.mock('@/lib/poll-workflow', () => ({ pollWorkflow: vi.fn() }));
@@ -45,6 +46,44 @@ function jsonResponse(body: unknown, status = 200): Response {
 function wrapper({ children }: { children: React.ReactNode }) {
   return <MemoryRouter><GenerationsContextProvider>{children}</GenerationsContextProvider></MemoryRouter>;
 }
+
+describe('buildCadRestorePath', () => {
+  // Attribution for CAD restores works by inversion: we mark every link we
+  // generate, so an unmarked arrival is external (overwhelmingly the completion
+  // email). These tests are the guard on that inference -- if the marker ever
+  // stops being written, email arrivals silently vanish into the internal
+  // buckets and nobody notices until the funnel is queried.
+  const paramsOf = (path: string) => new URLSearchParams(path.split('?')[1]);
+
+  it('writes the src marker for every internal entry point', () => {
+    for (const src of ['history', 'toast', 'header'] as const) {
+      expect(paramsOf(buildCadRestorePath('wf-1', null, '/text-to-cad', src)).get('src')).toBe(src);
+    }
+  });
+
+  it('keeps the existing workflow_id and glb parameters intact', () => {
+    const params = paramsOf(buildCadRestorePath('wf-1', 'https://blob/x.glb', '/image-to-cad', 'history'));
+    expect(params.get('workflow_id')).toBe('wf-1');
+    expect(params.get('glb')).toBe('https://blob/x.glb');
+  });
+
+  it('omits glb when there is none, and still marks the link', () => {
+    const params = paramsOf(buildCadRestorePath('wf-1', null, '/image-to-cad', 'toast'));
+    expect(params.has('glb')).toBe(false);
+    expect(params.get('src')).toBe('toast');
+  });
+
+  it('routes to the page the run was started from', () => {
+    expect(buildCadRestorePath('wf-1', null, '/text-to-cad', 'header')).toContain('/text-to-cad?');
+    expect(buildCadRestorePath('wf-1', null, '/image-to-cad', 'header')).toContain('/image-to-cad?');
+  });
+
+  it('produces a path resolveRestoreEntry reads back as the same entry', () => {
+    // The two halves are written in different files; this asserts they agree.
+    const path = buildCadRestorePath('wf-1', null, '/text-to-cad', 'history');
+    expect(resolveRestoreEntry(paramsOf(path))).toBe('history');
+  });
+});
 
 describe('GenerationsContext', () => {
   beforeEach(() => {

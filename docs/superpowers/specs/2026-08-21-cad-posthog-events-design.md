@@ -1,7 +1,7 @@
 # CAD PostHog Events - Design
 
 Date: 2026-08-21
-Status: Approved. No backend dependency.
+Status: Implemented on feat/cad-posthog-events. No backend dependency.
 
 ## Problem
 
@@ -54,7 +54,7 @@ from the hook's existing `cadRoute` parameter.
 | `cad_studio_open` | Either CAD page mounts | `source` |
 | `cad_reference_uploaded` | Reference images added (Image-to-CAD only) | `source`, `image_count`, `total_after_add` |
 | `cad_generation_started` | `simulateGeneration`, after credit preflight passes and the start call returns a `workflow_id` | `source`, `prompt_length`, `reference_image_count`, `llm_tier`, `is_first_ever` |
-| `cad_generation_failed` | Hook reaches `failed_final` | `source`, `failure_stage: 'start' \| 'run'`, `duration_ms`, `has_failure_message` |
+| `cad_generation_failed` | Hook reaches `failed_final` | `source`, `failure_stage: 'start' \| 'run'`, `duration_ms`, `has_failure_message` (start only) |
 | `cad_result_restored` | Mount restore effect resolves | `source`, `entry: 'history' \| 'toast' \| 'header' \| 'external'`, `restore_ok` |
 
 ### Amended events
@@ -250,3 +250,34 @@ and preserves the existing `workflow_id` and `glb` parameters unchanged.
 Low-signal UI interactions: Keep Creating, the gem render toggle, the
 notification email save, and opening the history library. They can be added
 later if a specific question needs them.
+
+## Implementation notes
+
+Three things surfaced during the build that the design did not anticipate.
+
+**`has_failure_message` only exists for start failures.** A run-stage failure is
+reported through `GenerationsContext`, and `TrackedGeneration` carries no failure
+text. Sending `false` there would have asserted "backend never explains run
+failures" when the truth is that this layer cannot see it. The property is
+optional and omitted for `failure_stage: 'run'`.
+
+**`is_first_ever` is consumed once and remembered, not read twice.**
+`consumeFirstCadGeneration` flips permanently on first call. If both the started
+and completed events called it, completed would always report `false` and the two
+ends of the funnel would disagree on the same run. Started consumes it into
+`startedFirstEverRef`; completed reads that ref.
+
+**`cadSourceFromSourceType` was added to bridge two vocabularies.** The history
+API speaks `image_to_cad` while the analytics dimension is `image-to-cad`.
+Converting in one tested place stops that mapping being re-derived, and subtly
+differently, at each call site.
+
+## Verification
+
+- `npx vitest run`: 683 passed, 72 files, 0 failed
+- `npx tsc --noEmit`: clean
+- `npm run build`: built in 47s
+- ESLint on touched files: no new errors. Baseline for the CAD pages was 9
+  pre-existing errors (`no-explicit-any`, `no-unused-expressions`) and it is
+  still 9. The one new warning this work introduced (a missing `cadSource`
+  dependency) was fixed by adding the dependency rather than suppressing it.

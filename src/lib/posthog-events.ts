@@ -1,5 +1,6 @@
 import posthog from 'posthog-js';
 import type { UserType } from '@/lib/onboarding-api';
+import type { CadSource, CadRestoreEntry } from '@/lib/cad-analytics';
 
 /** Safe wrapper — only fires when PostHog is loaded */
 function capture(event: string, properties?: Record<string, unknown>) {
@@ -52,12 +53,22 @@ export interface ModelSelectedProps {
 export interface PaywallHitProps {
   category: string;
   steps_completed: number;
+  /** Set only by the CAD tools, so CAD paywall hits are separable from
+   *  photoshoot ones. Photoshoot callers omit it and their payload is
+   *  byte-identical to before. */
+  source?: CadSource;
 }
 
 export interface CadGenerationCompletedProps {
   category: string;
   prompt_length: number;
   duration_ms: number;
+  /** Which CAD tool produced this. Optional so the pre-existing payload shape
+   *  stays valid; every live caller now passes it. */
+  source?: CadSource;
+  reference_image_count?: number;
+  llm_tier?: string;
+  is_first_ever?: boolean;
 }
 
 export interface GenerationCompleteProps {
@@ -252,6 +263,82 @@ export function trackCadGenerationCompleted(props: CadGenerationCompletedProps) 
   capture('cad_generation_completed', { ...props });
 }
 
+// ═══════ CAD funnel ════════════════════════════════════════════
+//
+// Text-to-CAD and Image-to-CAD are one event set with a `source` property, not
+// two parallel sets of event names. They share a single hook
+// (useImageToCADWorkflow) and differ only by input, so they are the same user
+// action along one dimension. The property assembly lives in
+// `@/lib/cad-analytics`; this file only owns the names and payload shapes.
+
+export interface CadStudioOpenProps {
+  source: CadSource;
+}
+
+export interface CadReferenceUploadedProps {
+  source: CadSource;
+  /** How many images this one action added. */
+  image_count: number;
+  /** Running total afterwards, so drop-off can be read against set size. */
+  total_after_add: number;
+}
+
+export interface CadGenerationStartedProps {
+  source: CadSource;
+  category: 'ring';
+  prompt_length: number;
+  reference_image_count: number;
+  llm_tier: string;
+  is_first_ever: boolean;
+}
+
+export interface CadGenerationFailedProps {
+  source: CadSource;
+  /** `start` means the run never got a workflow_id; `run` means the backend
+   *  accepted it and then failed. They have completely different causes, so
+   *  collapsing them would make the failure rate unactionable. */
+  failure_stage: 'start' | 'run';
+  duration_ms: number;
+  /** Whether backend gave us copy to show. False means the user saw the
+   *  generic message, which is a support burden worth counting.
+   *
+   *  Only ever set for `failure_stage: 'start'`. A run-stage failure is
+   *  surfaced through GenerationsContext, whose TrackedGeneration carries no
+   *  failure text, so there is nothing to report. Omitted rather than sent as
+   *  a constant false, which would read as "backend never explains run
+   *  failures" when the truth is that this layer cannot see it. */
+  has_failure_message?: boolean;
+}
+
+export interface CadResultRestoredProps {
+  source: CadSource;
+  entry: CadRestoreEntry;
+  restore_ok: boolean;
+}
+
+export function trackCadStudioOpen(props: CadStudioOpenProps) {
+  capture('cad_studio_open', { ...props });
+}
+
+export function trackCadReferenceUploaded(props: CadReferenceUploadedProps) {
+  capture('cad_reference_uploaded', { ...props });
+}
+
+export function trackCadGenerationStarted(props: CadGenerationStartedProps) {
+  capture('cad_generation_started', { ...props });
+}
+
+export function trackCadGenerationFailed(props: CadGenerationFailedProps) {
+  capture('cad_generation_failed', { ...props });
+}
+
+/** Fired when a finished run is reopened from a deep link. `entry` says where
+ *  the link came from; see CAD_RESTORE_SRC_PARAM in cad-analytics for why
+ *  `external` is the email proxy. */
+export function trackCadResultRestored(props: CadResultRestoredProps) {
+  capture('cad_result_restored', { ...props });
+}
+
 // ═══════ Conversion / Checkout ══════════════════════════════════════
 
 export function trackCheckoutStart(plan?: string) {
@@ -354,6 +441,10 @@ export function trackDownloadClicked(props?: {
   file_type?: string;
   context?: string;
   category?: string;
+  /** Which CAD tool produced the downloaded model. The generations history
+   *  serves both tools from one card, so without this every download made
+   *  outside the studio pages is unattributable. */
+  source?: CadSource;
 }) {
   capture('download_clicked', props ?? {});
 }
