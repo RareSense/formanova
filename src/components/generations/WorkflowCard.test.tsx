@@ -13,14 +13,14 @@ vi.mock('@/lib/generation-history-api', async () => {
   const actual = await vi.importActual<typeof import('@/lib/generation-history-api')>('@/lib/generation-history-api');
   return { ...actual, fetchCadResult: vi.fn() };
 });
-vi.mock('./cad-artifact-download', async () => {
-  const actual = await vi.importActual<typeof import('./cad-artifact-download')>('./cad-artifact-download');
+vi.mock('@/lib/cad-artifact-download', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/cad-artifact-download')>('@/lib/cad-artifact-download');
   return { ...actual, downloadCadArtifact: vi.fn() };
 });
 
 import { WorkflowCard } from './WorkflowCard';
 import { fetchCadResult } from '@/lib/generation-history-api';
-import { downloadCadArtifact } from './cad-artifact-download';
+import { downloadCadArtifact } from '@/lib/cad-artifact-download';
 
 beforeEach(() => {
   localStorage.clear();
@@ -100,11 +100,11 @@ describe('CAD generation history card', () => {
     );
 
     expect(screen.getAllByRole('button').map((button) => button.textContent?.trim()).filter(Boolean)).toEqual([
-      'Download .3dm',
+      'Download 3DM',
       'Open in Studio',
     ]);
 
-    const threedm = screen.getByRole('button', { name: 'Download .3dm' });
+    const threedm = screen.getByRole('button', { name: 'Download 3DM' });
     const studio = screen.getByRole('button', { name: 'Open in Studio' });
     // Sibling actions match in height and width rather than one sitting
     // shorter than the other.
@@ -112,14 +112,18 @@ describe('CAD generation history card', () => {
     expect(studio.className).toContain('h-11');
     expect(threedm.className).toContain('w-full');
     expect(studio.className).toContain('w-full');
-    // Outlined, not filled: these sit under the preview, and two solid blocks
-    // of accent there compete with the ring for attention.
-    for (const action of [threedm, studio]) {
-      expect(action.className).toContain('border-border');
-      expect(action.className).toContain('bg-transparent');
-      expect(action.className).toContain('text-foreground');
-      expect(action.className).not.toContain('formanova-hero-accent');
-    }
+    // One filled action, not two. The original rule here was that two solid
+    // blocks under the preview compete with the ring for attention, which
+    // still holds, but leaving both outlined made the download invisible in
+    // dark mode: a 20%-lightness border on a 5%-lightness card. Promoting
+    // only the download gives one clear primary action and keeps the pair
+    // from competing.
+    expect(threedm.className).toContain('bg-primary');
+    expect(threedm.className).toContain('text-primary-foreground');
+    expect(studio.className).toContain('border-border');
+    expect(studio.className).toContain('bg-transparent');
+    expect(studio.className).toContain('text-foreground');
+    expect(studio.className).not.toContain('formanova-hero-accent');
     expect(screen.queryByRole('button', { name: 'Export GLB' })).toBeNull();
   });
 
@@ -136,7 +140,7 @@ describe('CAD generation history card', () => {
     expect((screen.getByRole('textbox') as HTMLInputElement).value).toBe('ring');
     expect(screen.queryByText('.glb')).toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Download .3dm' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Download 3DM' }));
     await waitFor(() => expect(downloadCadArtifact).toHaveBeenCalledWith(
       expect.any(String),
       'ring.3dm',
@@ -154,7 +158,7 @@ describe('CAD generation history card', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Rename design' }));
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Customer Ring' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save design name' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Download .3dm' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Download 3DM' }));
 
     await waitFor(() => expect(downloadCadArtifact).toHaveBeenCalledWith(
       '/fresh/manufacturing-3dm',
@@ -173,7 +177,7 @@ describe('CAD generation history card', () => {
         </MemoryRouter>,
       );
 
-      fireEvent.click(screen.getByRole('button', { name: 'Download .3dm' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Download 3DM' }));
       await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
 
       expect(downloadCadArtifact).toHaveBeenCalledWith('/api/artifacts/3dm', 'ring.3dm', '3dm');
@@ -193,7 +197,7 @@ describe('CAD generation history card', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Download .3dm' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Download 3DM' }));
 
     await waitFor(() => expect(downloadCadArtifact).toHaveBeenCalledWith('/api/artifacts/3dm', 'ring.3dm', '3dm'));
     expect(downloadCadArtifact).toHaveBeenNthCalledWith(1, '/fresh/manufacturing-3dm', 'ring.3dm', '3dm');

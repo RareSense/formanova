@@ -6,7 +6,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import { PanelLeftClose, PanelRightClose, PanelLeft, PanelRight, X } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import type { ImperativePanelHandle } from "react-resizable-panels";
-import { authenticatedFetch, AuthExpiredError } from "@/lib/authenticated-fetch";
 import { pollWorkflow } from "@/lib/poll-workflow";
 import { InsufficientCreditsInline } from "@/components/InsufficientCreditsInline";
 
@@ -17,6 +16,8 @@ import { isCadUploadEnabled } from "@/lib/feature-flags";
 import { useImageToCADWorkflow } from "@/hooks/useImageToCADWorkflow";
 import { useCADMeshEditor } from "@/hooks/useCADMeshEditor";
 import { useNotificationEmail } from "@/hooks/useNotificationEmail";
+import { useCadArtifactDownloads } from "@/hooks/useCadArtifactDownloads";
+import { CadDownloadMenu } from "@/components/downloads/CadDownloadMenu";
 import { trackCadStudioOpen } from "@/lib/posthog-events";
 
 import MeshPanel from "@/components/text-to-cad/MeshPanel";
@@ -196,101 +197,22 @@ export default function TextToCAD() {
   }, [workflow, editor, additionalParts]);
 
   /**
-   * Downloads the NURBS .3dm, which is the machinable deliverable. It is built
-   * server-side, so it is the pristine generated ring and cannot reflect any
-   * viewport mesh edits - the GLB export below covers that case.
+   * Downloads hand back exactly what the backend produced. The GLB used to be
+   * a GLTFExporter re-encode of the live scene, which rewrites materials and
+   * renders differently from both the viewport and the backend's own file;
+   * scene export now happens only through exportEdited, which the menu offers
+   * only once the user has actually edited something.
    */
-  const handleDownloadThreedm = useCallback(async () => {
-    // .url, never .uri: the raw reference is azure:// and is not fetchable.
-    const uri = workflow.threedmArtifact?.url;
-    if (!uri) { toast.error("No CAD file available for this model"); return; }
-    const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
-    const fileName = `ring-${timestamp}.3dm`;
-    import('@/lib/posthog-events').then(m => m.trackDownloadClicked({ file_name: fileName, file_type: '3dm', context: 'text-to-cad' }));
-    try {
-      const response = await authenticatedFetch(uri);
-      if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
-      const blob = await response.blob();
-      if (!blob || blob.size === 0) throw new Error("Empty file");
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = fileName;
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-    } catch (err) {
-      if (err instanceof AuthExpiredError) return;
-      console.error('[Download 3dm]', err);
-      toast.error("Failed to download the CAD file");
-    }
-  }, [workflow.threedmArtifact]);
+  const downloads = useCadArtifactDownloads({
+    threedmUrl: workflow.threedmArtifact?.url,
+    glbUrl: workflow.glbUrl,
+    exportEditedBlob: () => canvasRef.current?.exportSceneBlob() ?? Promise.resolve(undefined),
+    source: '' + source + '',
+  });
 
-  const handleDownloadGlb = useCallback(async () => {
-    const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
-    const defaultName = `model-${timestamp}.glb`;
-    import('@/lib/posthog-events').then(m => m.trackDownloadClicked({ file_name: defaultName, file_type: 'glb', context: 'text-to-cad' }));
-
-    // Helper: trigger download via anchor element (universal fallback)
-    const anchorDownload = (blob: Blob) => {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = defaultName;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      // Revoke after a short delay so the download can start
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-    };
-
-    try {
-      // Download is always user-initiated, so React state is guaranteed to be
-      // committed by the time the click handler fires — no need to defer.
-      let blob: Blob;
-      if (canvasRef.current) {
-        blob = await canvasRef.current.exportSceneBlob();
-      } else if (workflow.glbUrl) {
-        // Fallback: download original if canvas not available
-        const response = await fetch(workflow.glbUrl);
-        if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
-        blob = await response.blob();
-      } else {
-        toast.error("No model to download");
-        return;
-      }
-
-      if (!blob || blob.size === 0) {
-        toast.error("Export produced an empty file");
-        return;
-      }
-
-      // Try native Save-As dialog, fall back to anchor download on any failure
-      if ('showSaveFilePicker' in window) {
-        try {
-          const handle = await (window as any).showSaveFilePicker({
-            suggestedName: defaultName,
-            types: [{
-              description: 'GLB 3D Model',
-              accept: { 'model/gltf-binary': ['.glb'] },
-            }],
-          });
-          const writable = await handle.createWritable();
-          await writable.write(blob);
-          await writable.close();
-        } catch (e: any) {
-          // User cancelled — not an error
-          if (e?.name === 'AbortError') return;
-          // Any other File System Access error → fall back to anchor download
-          console.warn('[Download] showSaveFilePicker failed, using fallback:', e);
-          anchorDownload(blob);
-        }
-      } else {
-        anchorDownload(blob);
-      }
-    } catch (err) {
-      console.error('[Download] Failed to export/download model:', err);
-      toast.error("Failed to download model");
-    }
-  }, [workflow.glbUrl]);
+  /** An edit exists only once something has been pushed onto the undo stack,
+   *  so an unedited model never offers an export identical to the plain GLB. */
+  const hasEdits = editor.undoStack.length > 0;
 
 
 
@@ -493,10 +415,14 @@ export default function TextToCAD() {
                 onResetTransform={() => editor.handleSceneAction("reset-transform")}
                 // Same visibility rule the download action had in ViewportSideTools
                 // before the move — hidden mid-regeneration, not just mid-initial-generation.
-                onDownload={!workflow.isGenerating && !workflow.isModelLoading
-                  ? (workflow.threedmArtifact ? handleDownloadThreedm : handleDownloadGlb)
-                  : undefined}
-                downloadLabel={workflow.threedmArtifact ? "Download 3DM" : "Export GLB"}
+                downloadSlot={!workflow.isGenerating && !workflow.isModelLoading ? (
+                  <CadDownloadMenu
+                    isBusy={downloads.isBusy}
+                    onDownloadThreedm={workflow.threedmArtifact ? downloads.downloadThreedm : undefined}
+                    onDownloadGlb={workflow.glbUrl ? downloads.downloadGlb : undefined}
+                    onExportEdited={hasEdits ? downloads.exportEdited : undefined}
+                  />
+                ) : undefined}
               />
             )}
 

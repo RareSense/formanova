@@ -9,12 +9,13 @@ import type { ImperativePanelHandle } from "react-resizable-panels";
 import { InsufficientCreditsInline } from "@/components/InsufficientCreditsInline";
 import { useAuth } from "@/contexts/AuthContext";
 import { isCadUploadEnabled } from "@/lib/feature-flags";
-import { authenticatedFetch, AuthExpiredError } from "@/lib/authenticated-fetch";
 import { runMicroBenchmark } from "@/lib/gpu-detect";
 import { useImageToCADWorkflow } from "@/hooks/useImageToCADWorkflow";
 import { useCADMeshEditor } from "@/hooks/useCADMeshEditor";
 import { useReferenceImages } from "@/hooks/useReferenceImages";
 import { useNotificationEmail } from "@/hooks/useNotificationEmail";
+import { useCadArtifactDownloads } from "@/hooks/useCadArtifactDownloads";
+import { CadDownloadMenu } from "@/components/downloads/CadDownloadMenu";
 import { trackCadStudioOpen, trackCadReferenceUploaded } from "@/lib/posthog-events";
 import { useCADKeyboardShortcuts } from "@/hooks/use-cad-keyboard-shortcuts";
 
@@ -152,75 +153,22 @@ export default function ImageToCAD() {
   }, [workflow, editor]);
 
   /**
-   * Downloads the NURBS .3dm, which is the machinable deliverable. It is built
-   * server-side, so it is the pristine generated ring and cannot reflect any
-   * viewport mesh edits - the GLB export below covers that case.
+   * Downloads hand back exactly what the backend produced. The GLB used to be
+   * a GLTFExporter re-encode of the live scene, which rewrites materials and
+   * renders differently from both the viewport and the backend's own file;
+   * scene export now happens only through exportEdited, which the menu offers
+   * only once the user has actually edited something.
    */
-  const handleDownloadThreedm = useCallback(async () => {
-    // .url, never .uri: the raw reference is azure:// and is not fetchable.
-    const uri = workflow.threedmArtifact?.url;
-    if (!uri) { toast.error("No CAD file available for this model"); return; }
-    const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
-    const fileName = `ring-${timestamp}.3dm`;
-    import('@/lib/posthog-events').then(m => m.trackDownloadClicked({ file_name: fileName, file_type: '3dm', context: 'image-to-cad' }));
-    try {
-      const response = await authenticatedFetch(uri);
-      if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
-      const blob = await response.blob();
-      if (!blob || blob.size === 0) throw new Error("Empty file");
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = fileName;
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-    } catch (err) {
-      if (err instanceof AuthExpiredError) return;
-      console.error('[Download 3dm]', err);
-      toast.error("Failed to download the CAD file");
-    }
-  }, [workflow.threedmArtifact]);
+  const downloads = useCadArtifactDownloads({
+    threedmUrl: workflow.threedmArtifact?.url,
+    glbUrl: workflow.glbUrl,
+    exportEditedBlob: () => canvasRef.current?.exportSceneBlob() ?? Promise.resolve(undefined),
+    source: '' + source + '',
+  });
 
-  const handleDownloadGlb = useCallback(async () => {
-    const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
-    const defaultName = `model-${timestamp}.glb`;
-    import('@/lib/posthog-events').then(m => m.trackDownloadClicked({ file_name: defaultName, file_type: 'glb', context: 'image-to-cad' }));
-    const anchorDownload = (blob: Blob) => {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = defaultName;
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-    };
-    try {
-      let blob: Blob;
-      if (canvasRef.current) {
-        blob = await canvasRef.current.exportSceneBlob();
-      } else if (workflow.glbUrl) {
-        // glbUrl may be a blob: URL (user upload) or a backend-returned asset URL — both are allowed raw fetches
-        const response = await fetch(workflow.glbUrl);
-        if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
-        blob = await response.blob();
-      } else { toast.error("No model to download"); return; }
-      if (!blob || blob.size === 0) { toast.error("Export produced an empty file"); return; }
-      if ('showSaveFilePicker' in window) {
-        try {
-          const handle = await (window as any).showSaveFilePicker({
-            suggestedName: defaultName,
-            types: [{ description: 'GLB 3D Model', accept: { 'model/gltf-binary': ['.glb'] } }],
-          });
-          const writable = await handle.createWritable();
-          await writable.write(blob);
-          await writable.close();
-        } catch (e: any) {
-          if (e?.name === 'AbortError') return;
-          anchorDownload(blob);
-        }
-      } else { anchorDownload(blob); }
-    } catch (err) {
-      console.error('[Download]', err);
-      toast.error("Failed to download model");
-    }
-  }, [workflow.glbUrl]);
+  /** An edit exists only once something has been pushed onto the undo stack,
+   *  so an unedited model never offers an export identical to the plain GLB. */
+  const hasEdits = editor.undoStack.length > 0;
 
   useCADKeyboardShortcuts({
     onUndo: editor.handleUndo,
@@ -416,10 +364,14 @@ export default function ImageToCAD() {
                 onResetTransform={() => editor.handleSceneAction("reset-transform")}
                 // Same visibility rule the download action had in ViewportSideTools
                 // before the move — hidden mid-regeneration, not just mid-initial-generation.
-                onDownload={!workflow.isGenerating && !workflow.isModelLoading
-                  ? (workflow.threedmArtifact ? handleDownloadThreedm : handleDownloadGlb)
-                  : undefined}
-                downloadLabel={workflow.threedmArtifact ? "Download 3DM" : "Export GLB"}
+                downloadSlot={!workflow.isGenerating && !workflow.isModelLoading ? (
+                  <CadDownloadMenu
+                    isBusy={downloads.isBusy}
+                    onDownloadThreedm={workflow.threedmArtifact ? downloads.downloadThreedm : undefined}
+                    onDownloadGlb={workflow.glbUrl ? downloads.downloadGlb : undefined}
+                    onExportEdited={hasEdits ? downloads.exportEdited : undefined}
+                  />
+                ) : undefined}
               />
             )}
 

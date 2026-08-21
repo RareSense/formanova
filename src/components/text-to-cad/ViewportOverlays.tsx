@@ -1,4 +1,4 @@
-import { Undo2, Redo2, Download, Plus, Minus, Maximize2, Maximize, Eye, Keyboard, Loader2 } from "lucide-react";
+import { Undo2, Redo2, Plus, Minus, Maximize2, Maximize, Eye, Keyboard, Loader2 } from "lucide-react";
 import { TRANSFORM_MODES, PROGRESS_STEPS } from "./types";
 import type { StatsData } from "./types";
 
@@ -11,8 +11,7 @@ const VT_BTN_ACTIVE = `${VT_BTN} text-primary-foreground bg-primary`;
 export function ViewportToolbar({
   mode,
   setMode,
-  onDownload,
-  downloadLabel = "Download 3DM",
+  downloadSlot,
 }: {
   mode: string;
   setMode: (m: string) => void;
@@ -22,9 +21,13 @@ export function ViewportToolbar({
   /** Result-level action ("what I do with the finished object"), deliberately
    * separated from the mode toolbar ("how I interact with the object") and
    * from the viewport-utility strip in ViewportSideTools — see the design
-   * rationale in git history for this component. Omit to hide the button. */
-  onDownload?: () => void;
-  downloadLabel?: string;
+   * rationale in git history for this component.
+   *
+   * A slot rather than an onDownload/label pair: the control is now a split
+   * button whose contents depend on which artifacts exist and whether the user
+   * has edited the model, and that is the page's knowledge, not the toolbar's.
+   * Omit to hide it. */
+  downloadSlot?: React.ReactNode;
 }) {
   const isTransformActive = mode !== "orbit"; // kept for potential future use
 
@@ -46,14 +49,8 @@ export function ViewportToolbar({
       {/* Result-level action, pinned right — deliberately not adjacent to the
           mode buttons, so it doesn't read as another mode. right-14 clears the
           panel-collapse button, which occupies the first 40px of that edge. */}
-      {onDownload && (
-        <button
-          onClick={onDownload}
-          className="pointer-events-auto absolute right-14 flex h-[40px] items-center gap-2 border border-primary bg-primary px-4 text-[11px] font-bold uppercase tracking-[0.12em] text-primary-foreground shadow-lg transition-opacity hover:opacity-90 active:scale-[0.98]"
-        >
-          <Download className="h-3.5 w-3.5" />
-          {downloadLabel}
-        </button>
+      {downloadSlot && (
+        <div className="pointer-events-auto absolute right-14">{downloadSlot}</div>
       )}
     </div>
   );

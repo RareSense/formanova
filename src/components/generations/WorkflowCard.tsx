@@ -24,7 +24,9 @@ import { cadSourceFromSourceType, cadRouteFromSource } from '@/lib/cad-analytics
 import {
   downloadCadArtifact,
   selectCadArtifactUrl,
-} from './cad-artifact-download';
+  type CadArtifactKind,
+} from '@/lib/cad-artifact-download';
+import { CadDownloadMenu } from '@/components/downloads/CadDownloadMenu';
 
 const CAD_RENAMES_KEY = 'formanova_cad_renames';
 
@@ -62,7 +64,7 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
     () => getStoredRename(loadStoredRenames(), workflow.workflow_id) ?? workflow.output_asset_name ?? null
   );
   const [renameValue, setRenameValue] = useState('');
-  const [isDownloadingThreedm, setIsDownloadingThreedm] = useState(false);
+  const [isDownloading, setIsDownloading] = useState<CadArtifactKind | null>(null);
   const renameButtonRef = useRef<HTMLButtonElement>(null);
   const wasRenamingRef = useRef(false);
 
@@ -88,6 +90,7 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
   const rawFilename = workflow.glb_filename || 'model.glb';
   const shownBaseName = getCadArtifactBaseName(displayName, rawFilename);
   const threedmFilename = buildCadArtifactFilename(displayName, rawFilename, '3dm');
+  const glbFilename = buildCadArtifactFilename(displayName, rawFilename, 'glb');
   const visibleBaseName = truncateDisplayName(shownBaseName);
   const supportsThreedm = Boolean(workflow.threedm_url) || /ring[_-]cad[_-]nurbs/i.test(workflow.name);
   const renameInputId = `cad-design-name-${workflow.workflow_id}`;
@@ -119,28 +122,33 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
     setIsRenaming(false);
   };
 
-  const handleDownloadThreedm = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (isDownloadingThreedm) return;
+  /**
+   * Fetches whichever artifact was asked for and saves it exactly as the
+   * backend returned it. Both kinds go through the same path so the .3dm and
+   * the .glb cannot drift into being fetched, validated or named differently.
+   */
+  const downloadArtifact = async (kind: CadArtifactKind) => {
+    if (isDownloading) return;
+    const filename = kind === '3dm' ? threedmFilename : glbFilename;
 
-    setIsDownloadingThreedm(true);
+    setIsDownloading(kind);
     try {
       // Refresh the typed result at click time. History cache data may be old,
       // but GLB and 3DM must never be selected positionally or by extension.
       const fresh = await withTimeout(fetchCadResult(workflow.workflow_id), 5000);
-      const url = selectCadArtifactUrl('3dm', fresh, workflow);
-      if (!url) throw new Error('3DM is not available for this design.');
+      const url = selectCadArtifactUrl(kind, fresh, workflow);
+      if (!url) throw new Error(`${kind.toUpperCase()} is not available for this design.`);
 
       try {
-        await downloadCadArtifact(url, threedmFilename, '3dm');
+        await downloadCadArtifact(url, filename, kind);
       } catch (freshError) {
-        const cachedUrl = selectCadArtifactUrl('3dm', null, workflow);
+        const cachedUrl = selectCadArtifactUrl(kind, null, workflow);
         if (!cachedUrl || cachedUrl === url) throw freshError;
-        await downloadCadArtifact(cachedUrl, threedmFilename, '3dm');
+        await downloadCadArtifact(cachedUrl, filename, kind);
       }
       import('@/lib/posthog-events').then(m => m.trackDownloadClicked({
-        file_name: threedmFilename,
-        file_type: '3dm',
+        file_name: filename,
+        file_type: kind,
         context: 'generations',
         // Without this every download made from history is unattributable:
         // one card serves both CAD tools, so 'generations' alone cannot say
@@ -148,10 +156,10 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
         source: cadSourceFromSourceType(workflow.source_type),
       }));
     } catch (err) {
-      console.error('[WorkflowCard] 3DM download error:', err);
-      toast.error(err instanceof Error ? err.message : 'Could not download the 3DM file.');
+      console.error(`[WorkflowCard] ${kind} download error:`, err);
+      toast.error(err instanceof Error ? err.message : `Could not download the ${kind.toUpperCase()} file.`);
     } finally {
-      setIsDownloadingThreedm(false);
+      setIsDownloading(null);
     }
   };
 
@@ -293,20 +301,12 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
                 {/* Both actions are siblings of the same container so their
                     w-full resolves to one width. Nesting the download inside
                     the padded section above made it narrower than its pair. */}
-                {supportsThreedm && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleDownloadThreedm}
-                    disabled={isDownloadingThreedm}
-                    className="h-11 w-full gap-1.5 border-border bg-transparent px-3 font-mono text-[9px] uppercase tracking-wider text-foreground transition-colors hover:border-foreground/60 hover:bg-muted/40"
-                    title="Download the machinable .3dm"
-                    aria-label="Download .3dm"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    {isDownloadingThreedm ? 'Checking .3dm…' : 'Download .3dm'}
-                  </Button>
-                )}
+                <CadDownloadMenu
+                  variant="card"
+                  isBusy={isDownloading !== null}
+                  onDownloadThreedm={supportsThreedm ? () => downloadArtifact('3dm') : undefined}
+                  onDownloadGlb={workflow.glb_url ? () => downloadArtifact('glb') : undefined}
+                />
                 <Button
                   size="sm"
                   variant="outline"

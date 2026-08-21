@@ -5,7 +5,7 @@ vi.mock('@/lib/authenticated-fetch', () => ({
   authenticatedFetch: mockAuthenticatedFetch,
 }));
 
-import { downloadCadArtifact, isExpectedCadArtifact, selectCadArtifactUrl } from './cad-artifact-download';
+import { downloadCadArtifact, isExpectedCadArtifact, selectCadArtifactUrl, expectedSha256FromUrl } from './cad-artifact-download';
 
 function bytes(...values: number[]): Blob {
   return new Blob([new Uint8Array(values)]);
@@ -132,5 +132,37 @@ describe('downloadCadArtifact auth routing', () => {
     mockAuthenticatedFetch.mockResolvedValue({ ok: false, status: 404 } as unknown as Response);
     await expect(downloadCadArtifact('/api/artifacts/missing', 'ring.glb', 'glb'))
       .rejects.toThrow('Download failed (404)');
+  });
+});
+
+describe('artifact hash from the URL', () => {
+  // The backend serves artifacts at /api/artifacts/<sha256>, and the response
+  // shape confirms the path segment is the same value as the artifact's
+  // sha256 field. That gives a free integrity check with no extra plumbing:
+  // .3dm has no internal length field, so a truncated one is otherwise
+  // indistinguishable from a good one.
+  const sha = 'a'.repeat(64);
+
+  it('reads the hash out of an artifact URL', () => {
+    expect(expectedSha256FromUrl(`https://staging.formanova.ai/api/artifacts/${sha}`)).toBe(sha);
+    expect(expectedSha256FromUrl(`/api/artifacts/${sha}`)).toBe(sha);
+  });
+
+  it('ignores a query string or trailing slash', () => {
+    expect(expectedSha256FromUrl(`/api/artifacts/${sha}?download=1`)).toBe(sha);
+    expect(expectedSha256FromUrl(`/api/artifacts/${sha}/`)).toBe(sha);
+  });
+
+  it('returns null when the URL is not hash addressed', () => {
+    // Signed blob URLs and legacy paths must not be treated as verifiable, or
+    // every download from them would fail an impossible check.
+    expect(expectedSha256FromUrl('/api/result/model.3dm')).toBeNull();
+    expect(expectedSha256FromUrl('https://blob.core.windows.net/x/model.glb?sig=abc')).toBeNull();
+    expect(expectedSha256FromUrl(`/api/artifacts/${'a'.repeat(63)}`)).toBeNull();
+    expect(expectedSha256FromUrl(`/api/artifacts/${'g'.repeat(64)}`)).toBeNull();
+  });
+
+  it('accepts an uppercase hash and normalises it', () => {
+    expect(expectedSha256FromUrl(`/api/artifacts/${'A'.repeat(64)}`)).toBe('a'.repeat(64));
   });
 });

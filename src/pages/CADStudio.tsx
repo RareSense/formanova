@@ -42,10 +42,26 @@ export default function CADStudio() {
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        className="font-display text-5xl md:text-6xl lg:text-[10rem] uppercase tracking-wide text-center pt-4 md:pt-8 lg:pt-6 text-foreground leading-none mb-6 md:mb-8"
+        className="font-display text-5xl md:text-6xl lg:text-[10rem] uppercase tracking-wide text-center pt-4 md:pt-8 lg:pt-6 text-foreground leading-none mb-3 md:mb-4"
       >
         CAD <span className="hero-accent-text">Studio</span>
       </motion.h1>
+
+      {/* Positioned on NURBS rather than on manufacturability. Every other AI
+          3D tool outputs meshes; native .3dm NURBS is the real differentiator
+          and the thing a jeweler's CAD person actually checks for. It is also
+          the claim that stays true on every run: the pipeline reports
+          not_all_solid on some geometry, so a blanket "manufacturable" promise
+          here would be contradicted at the caster. Solidity is surfaced
+          per-result in the workspace instead. */}
+      <motion.p
+        initial={{ opacity: 0, y: -6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.05 }}
+        className="max-w-[36ch] sm:max-w-none text-center font-mono text-[9px] sm:text-[10px] md:text-[11px] uppercase tracking-[0.15em] leading-relaxed text-muted-foreground mb-6 md:mb-8"
+      >
+        True NURBS ring CAD. Native Rhino .3dm.
+      </motion.p>
 
       {/* Feature Cards */}
       <motion.div
