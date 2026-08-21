@@ -57,7 +57,12 @@ const TRIGGER_BASE =
   'disabled:pointer-events-none disabled:opacity-60';
 
 const VARIANTS = {
-  viewport: 'h-[40px] px-4 text-[11px] tracking-[0.12em]',
+  // 42px, not 40, so this lines up with the mode group in the same toolbar.
+  // Those buttons are h-[40px] inside a container that adds its own 1px border
+  // top and bottom, making the group 42px outside. This control carries its
+  // border on the button itself, and box-sizing is border-box, so h-[40px]
+  // would render 40px total and sit 2px short at the bottom.
+  viewport: 'h-[42px] px-4 text-[11px] tracking-[0.12em]',
   // flex-1, not w-full: the chevron is a sibling inside the same row, so a
   // full-width primary would push it out of the card.
   card: 'h-11 w-full flex-1 justify-center px-3 font-mono text-[9px] tracking-wider',
@@ -114,7 +119,7 @@ export function CadDownloadMenu({
               className={cn(
                 TRIGGER_BASE,
                 'justify-center px-2',
-                variant === 'viewport' ? 'h-[40px]' : 'h-11',
+                variant === 'viewport' ? 'h-[42px]' : 'h-11',
                 // A hairline keeps the two halves readable as one control
                 // without letting the divider read as a gap between siblings.
                 'border-l border-l-primary-foreground/25',
