@@ -178,7 +178,7 @@ export function Header() {
     {
       path: '/studio-cad',
       label: 'CAD Studio',
-      activePaths: ['/studio-cad', '/text-to-cad', '/cad-to-catalog'],
+      activePaths: ['/studio-cad', '/text-to-cad', '/image-to-cad'],
     },
     // { path: '/tutorial', label: 'Tutorial' }, // hidden for now
   ];

@@ -651,7 +651,16 @@ function MotionAdaptiveProvider({
     previousCameraPosition.current.copy(camera.position);
     previousCameraTarget.current.copy(controls.target);
 
-    const wantsMotion = _isTransformDragging || performance.now() - lastMotionAtRef.current < 110;
+    // Auto-rotate is exempt. The motion profile trades resolution for input
+    // latency, which is the right call for a drag: the user's hand is waiting,
+    // it lasts about a second, and the grain hides the drop. Auto-rotate has no
+    // input to protect, runs for minutes, and exists so the user can look
+    // closely at the piece - so the same trade costs everything and buys
+    // nothing. controls.autoRotate is the live flag set by useCadAutoRotate;
+    // manual orbiting clears it (OrbitControls fires 'start'), so a drag during
+    // auto-rotation still gets the normal motion profile.
+    const wantsMotion = _isTransformDragging
+      || (!controls.autoRotate && performance.now() - lastMotionAtRef.current < 110);
     if (wantsMotion) {
       enterMotion();
       if (grainRef.current) {

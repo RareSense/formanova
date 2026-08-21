@@ -65,7 +65,6 @@ const UnifiedStudio = lazyWithRetry(() => import("./pages/UnifiedStudio"));
 // PRESERVED: Batch upload studio - uncomment to restore batch workflow
 // const CategoryUploadStudio = lazyWithRetry(() => import("@/components/bulk").then(m => ({ default: m.CategoryUploadStudio })));
 const CADStudio = lazyWithRetry(() => import("./pages/CADStudio"));
-const CADToCatalog = lazyWithRetry(() => import("./pages/CADToCatalog"));
 const TextToCAD = lazyWithRetry(() => import("./pages/TextToCAD"));
 const ImageToCAD = lazyWithRetry(() => import("./pages/ImageToCAD"));
 const Generations = lazyWithRetry(() => import("./pages/Generations"));
@@ -244,7 +243,6 @@ const MainApp = () => (
                   {/* PRESERVED: Batch upload route - uncomment to restore batch workflow */}
                   {/* <Route path="/studio/:type" element={<ProtectedRoute><CategoryUploadStudio /></ProtectedRoute>} /> */}
                   <Route path="/studio-cad" element={<ProtectedRoute><CADGate><CADStudio /></CADGate></ProtectedRoute>} />
-                  <Route path="/cad-to-catalog" element={<ProtectedRoute><CADGate><CADToCatalog /></CADGate></ProtectedRoute>} />
                   <Route path="/text-to-cad" element={<ProtectedRoute><CADGate><TextToCAD /></CADGate></ProtectedRoute>} />
                   <Route path="/image-to-cad" element={<ProtectedRoute><CADGate><ImageToCAD /></CADGate></ProtectedRoute>} />
                   
