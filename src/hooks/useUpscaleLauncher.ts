@@ -44,7 +44,12 @@ export interface UseUpscaleLauncherReturn {
 
 export function useUpscaleLauncher(): UseUpscaleLauncherReturn {
   const { generations, trackGeneration, clearGeneration } = useGenerations();
-  const { checkCredits, showInsufficientModal, dismissModal, preflightResult } = useCreditPreflight();
+  // Opted out of the door-in redirect on purpose: this launcher is used by
+  // PhotoCard, a card inside the generations list rather than a full-page
+  // flow, and it renders CreditPreflightModal in place. Every other paid
+  // workflow takes the shared redirect.
+  const { checkCredits, showInsufficientModal, dismissModal, preflightResult } =
+    useCreditPreflight({ redirectOnInsufficient: false });
 
   const [status, setStatus] = useState<UpscaleRunStatus>('idle');
   const [error, setError] = useState<string | null>(null);

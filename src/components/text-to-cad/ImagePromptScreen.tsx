@@ -66,7 +66,6 @@ interface ImagePromptScreenProps {
   setPrompt: (p: string) => void;
   isGenerating: boolean;
   onGenerate: () => void;
-  creditBlock?: React.ReactNode;
   /** Ordered previews; index 0 is the primary reference. Length 0..MAX_RING_CAD_REFERENCE_IMAGES. */
   referenceImagePreviewUrls: string[];
   /** Appends images, respecting the max. Caller owns File state and object-URL lifetime. */
@@ -79,7 +78,7 @@ interface ImagePromptScreenProps {
 
 export default function ImagePromptScreen({
   model, tier, prompt, setPrompt,
-  isGenerating, onGenerate, creditBlock,
+  isGenerating, onGenerate,
   referenceImagePreviewUrls,
   onAddReferenceImages, onRemoveReferenceImage, onReplaceReferenceImages,
   onGlbUpload,
@@ -201,9 +200,7 @@ export default function ImagePromptScreen({
 
             {/* Action area — matches Photo Studio's Next button exactly:
                 right-aligned below the canvas, gold gradient, size="lg". */}
-            {creditBlock ? (
-              <div className="mt-3">{creditBlock}</div>
-            ) : (
+            {(
               <div className="mt-3 flex items-center justify-end gap-3">
                 <Button
                   size="lg"

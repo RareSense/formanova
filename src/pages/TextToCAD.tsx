@@ -7,7 +7,6 @@ import { PanelLeftClose, PanelRightClose, PanelLeft, PanelRight, X } from "lucid
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import type { ImperativePanelHandle } from "react-resizable-panels";
 import { pollWorkflow } from "@/lib/poll-workflow";
-import { InsufficientCreditsInline } from "@/components/InsufficientCreditsInline";
 
 import InitialPromptScreen from "@/components/text-to-cad/InitialPromptScreen";
 import LeftPanel from "@/components/text-to-cad/LeftPanel";
@@ -234,14 +233,6 @@ export default function TextToCAD() {
     enabled: workspaceActive,
   });
 
-  const creditBlockUI = workflow.creditBlock ? (
-    <InsufficientCreditsInline
-      currentBalance={workflow.creditBlock.currentBalance}
-      requiredCredits={workflow.creditBlock.estimatedCredits}
-      onDismiss={() => workflow.setCreditBlock(null)}
-    />
-  ) : undefined;
-
   // ── Phase 1: Initial prompt screen ──
   if (!workspaceActive) {
     return (
@@ -255,7 +246,6 @@ export default function TextToCAD() {
           isGenerating={workflow.isGenerating}
           onGenerate={workflow.simulateGeneration}
           onGlbUpload={showCadUpload ? handleGlbUpload : undefined}
-          creditBlock={creditBlockUI}
         />
       </div>
     );
@@ -306,7 +296,6 @@ export default function TextToCAD() {
                 }
               }}
               onReset={workflow.hasModel ? handleReset : undefined}
-              creditBlock={creditBlockUI}
             />
           )}
         </ResizablePanel>

@@ -23,12 +23,11 @@ interface InitialPromptScreenProps {
   isGenerating: boolean;
   onGenerate: () => void;
   onGlbUpload?: (file: File) => void;
-  creditBlock?: React.ReactNode;
 }
 
 export default function InitialPromptScreen({
   model, tier, setModel, prompt, setPrompt,
-  isGenerating, onGenerate, onGlbUpload, creditBlock,
+  isGenerating, onGenerate, onGlbUpload,
 }: InitialPromptScreenProps) {
   const glbInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -96,12 +95,9 @@ export default function InitialPromptScreen({
               )}
             </div>
 
-            {/* Credit block */}
-            {creditBlock && <div className="mb-3 max-w-[680px] mx-auto">{creditBlock}</div>}
-
             {/* Generate — matches Photo Studio's Next button: right-aligned,
                 gold gradient, size="lg". */}
-            {!creditBlock && (
+            {(
               <div className="mx-auto flex max-w-[680px] items-center justify-end gap-3">
                 <Button
                   size="lg"

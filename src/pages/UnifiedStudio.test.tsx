@@ -54,8 +54,10 @@ const preflightMock = vi.hoisted(() => ({
     preflightResult: null as null | { estimatedCredits: number; currentBalance: number },
     checking: false,
   },
+  options: 'not-called' as unknown,
 }));
 function resetPreflightMock() {
+  preflightMock.options = 'not-called';
   preflightMock.state = {
     checkCredits: vi.fn(),
     showInsufficientModal: false,
@@ -65,7 +67,10 @@ function resetPreflightMock() {
   };
 }
 vi.mock('@/hooks/use-credit-preflight', () => ({
-  useCreditPreflight: () => preflightMock.state,
+  useCreditPreflight: (options?: { redirectOnInsufficient?: boolean }) => {
+    preflightMock.options = options;
+    return preflightMock.state;
+  },
 }));
 
 vi.mock('@/hooks/useAuthenticatedImage', () => ({
@@ -259,18 +264,18 @@ describe('UnifiedStudio smoke tests', () => {
     expect(c.textContent).toContain('Upload Your Jewelry');
   });
 
-  it('redirects to /credits with the shortfall when credits are insufficient (door-in)', () => {
-    preflightMock.state = {
-      checkCredits: vi.fn(),
-      showInsufficientModal: true,
-      dismissModal: vi.fn(),
-      preflightResult: { estimatedCredits: 50, currentBalance: 0 },
-      checking: false,
-    };
-    const c = renderStudio('/studio/necklace');
-    // Navigated away from the studio to the credits page (popup replaced by redirect)
-    expect(c.textContent).toContain('CREDITS PAGE MARKER');
-    // Return path persisted so the post-purchase redirect can bring them back
-    expect(sessionStorage.getItem('formanova_post_purchase_return')).toContain('/studio/necklace');
+  it('takes the shared door-in redirect rather than opting out of it', () => {
+    // The redirect itself (navigate to /credits with the shortfall, and saving
+    // the return path) moved into useCreditPreflight, where it is tested once
+    // and applies to every paid workflow. It used to be an effect in this file,
+    // which is precisely why CAD could not reuse it and grew a second,
+    // divergent insufficient-credit flow.
+    //
+    // What still belongs to this page is the choice not to opt out. Passing
+    // redirectOnInsufficient: false here would silently dead-end a blocked
+    // user, and nothing else would catch it.
+    renderStudio('/studio/necklace');
+    expect(preflightMock.options).not.toBe('not-called');
+    expect(preflightMock.options?.redirectOnInsufficient).not.toBe(false);
   });
 });

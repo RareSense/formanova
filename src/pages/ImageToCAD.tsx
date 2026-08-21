@@ -6,7 +6,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import { PanelLeftClose, PanelRightClose, PanelLeft, PanelRight } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import type { ImperativePanelHandle } from "react-resizable-panels";
-import { InsufficientCreditsInline } from "@/components/InsufficientCreditsInline";
 import { useAuth } from "@/contexts/AuthContext";
 import { isCadUploadEnabled } from "@/lib/feature-flags";
 import { runMicroBenchmark } from "@/lib/gpu-detect";
@@ -188,14 +187,6 @@ export default function ImageToCAD() {
     enabled: workspaceActive,
   });
 
-  const creditBlockUI = workflow.creditBlock ? (
-    <InsufficientCreditsInline
-      currentBalance={workflow.creditBlock.currentBalance}
-      requiredCredits={workflow.creditBlock.estimatedCredits}
-      onDismiss={() => workflow.setCreditBlock(null)}
-    />
-  ) : undefined;
-
   // ── Phase 1: Initial prompt screen ──
   if (!workspaceActive) {
     return (
@@ -219,7 +210,6 @@ export default function ImageToCAD() {
             const url = URL.createObjectURL(file);
             workflow.setGlbUrl(url);
           } : undefined}
-          creditBlock={creditBlockUI}
         />
       </div>
     );
@@ -265,7 +255,6 @@ export default function ImageToCAD() {
               onReset={workflow.hasModel ? handleReset : undefined}
               pageTitle="Image to CAD"
               referenceImagePreviewUrls={referenceImagePreviewUrls}
-              creditBlock={creditBlockUI}
             />
           )}
         </ResizablePanel>

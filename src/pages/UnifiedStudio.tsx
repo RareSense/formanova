@@ -6,7 +6,6 @@ import { useToast } from '@/hooks/use-toast';
 import { fetchPresetModels, fetchPresetInspirations, type PresetModel, type PresetModelsResponse, type PresetInspirationsResponse } from '@/lib/models-api';
 import { useQuery } from '@tanstack/react-query';
 import { useCreditPreflight } from '@/hooks/use-credit-preflight';
-import { savePostPurchaseReturn } from '@/lib/post-purchase-return';
 import { useAuth } from '@/contexts/AuthContext';
 import { azureUriToUrl } from '@/lib/azure-utils';
 import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
@@ -99,7 +98,9 @@ export default function UnifiedStudio() {
   const [overrideJewelryType, setOverrideJewelryType] = useState<string | null>(null);
   const effectiveJewelryType = overrideJewelryType ?? jewelryType;
   const { toast } = useToast();
-  const { checkCredits, showInsufficientModal, dismissModal, preflightResult, checking: preflightChecking } = useCreditPreflight();
+  // Door-in redirect on insufficient credits is the hook's default; see
+  // use-credit-preflight.ts. Nothing to render or wire up here.
+  const { checkCredits, checking: preflightChecking } = useCreditPreflight();
   const { user, initializing } = useAuth();
   const navigate = useNavigate();
 
@@ -558,18 +559,6 @@ export default function UnifiedStudio() {
       workflow_id: workflowId,
     });
   }, [humanFixPricingContext, checkCredits, setFeedbackOpen, effectiveJewelryType, workflowId]);
-
-  // Door-in: a generation blocked by insufficient credits sends the user to the
-  // credits/starter-pack page (with the shortfall) instead of showing a popup.
-  // The studio session is already persisted as they work, so after they buy they
-  // return here and resume. The return path is stored for the post-purchase redirect.
-  useEffect(() => {
-    if (showInsufficientModal && preflightResult) {
-      savePostPurchaseReturn(`${location.pathname}${location.search}`);
-      dismissModal();
-      navigate('/credits', { state: { requiredCredits: preflightResult.estimatedCredits } });
-    }
-  }, [showInsufficientModal, preflightResult, location.pathname, location.search, navigate, dismissModal]);
 
   // Paste handler — supports jewelry upload (step 1) AND model upload (step 2 empty state)
   useEffect(() => {

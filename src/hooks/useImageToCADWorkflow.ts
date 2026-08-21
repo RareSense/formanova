@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useGenerations } from "@/contexts/GenerationsContext";
 import { toast } from "sonner";
-import { performCreditPreflight, type PreflightResult } from "@/lib/credit-preflight";
+import { useCreditPreflight } from "@/hooks/use-credit-preflight";
 import { AuthExpiredError, authenticatedFetch } from "@/lib/authenticated-fetch";
 import {
   RING_CAD_NURBS_WORKFLOW,
@@ -67,7 +67,6 @@ export function useImageToCADWorkflow({
   const [isModelLoading, setIsModelLoading] = useState(restoringFromUrl);
   const [progressStep, setProgressStep] = useState(restoringFromUrl ? "_loading" : "");
   const [retryAttempt, setRetryAttempt] = useState(0);
-  const [creditBlock, setCreditBlock] = useState<PreflightResult | null>(null);
   const [generationFailed, setGenerationFailed] = useState(false);
   const [glbUrl, setGlbUrl] = useState<string | undefined>(undefined);
   const [glbArtifact, setGlbArtifact] = useState<{ uri: string; type: string; bytes: number; sha256: string } | null>(null);
@@ -98,6 +97,10 @@ export function useImageToCADWorkflow({
    *  so every analytics event carries this rather than being duplicated per
    *  page. */
   const cadSource = resolveCadSource(cadRoute);
+
+  /** Shared credit gate. Blocking behaviour (save return path, redirect to
+   *  /credits with the shortfall) belongs to the hook, not to this workflow. */
+  const { checkCredits } = useCreditPreflight();
 
   const trackedRun = generations.find(g => g.workflowId === sourceWorkflowId && g.kind === 'cad');
 
@@ -235,28 +238,17 @@ export function useImageToCADWorkflow({
       return;
     }
 
-    try {
-      const result = await performCreditPreflight(RING_CAD_NURBS_WORKFLOW, 1, {
-        pricingContext: { llm_tier: tier },
-      });
-      const balance = result.currentBalance;
-      // No local fallback price. The tier price is backend's to set and it
-      // changes (70 to 60 during their token-usage test), so a number written
-      // here would quote a stale figure the moment it moves. When the estimate
-      // is unavailable we skip this gate and let the start call decide: it
-      // rejects with 402 and a message naming the shortfall, which is surfaced
-      // below. Backend is the authority on price either way.
-      const cost = result.estimatedCredits;
-      if (cost > 0 && balance < cost) {
-        setCreditBlock({ approved: false, estimatedCredits: cost, currentBalance: balance });
-        trackPaywallHit({ category: 'ring', steps_completed: 1, source: cadSource });
-        return;
-      }
-      setCreditBlock(null);
-    } catch (err) {
-      if (err instanceof AuthExpiredError) return;
-      console.error('[ImageToCAD Preflight] failed, skipping block:', err);
-      setCreditBlock(null);
+    // Same gate every paid workflow uses. checkCredits owns the comparison, the
+    // saved return path and the redirect to /credits, so CAD does not restate
+    // any of it. The tier price is backend's to set and it moves, so no
+    // fallback figure is written here; when the estimate is unavailable the
+    // start call below is the authority and rejects with 402.
+    const approved = await checkCredits(RING_CAD_NURBS_WORKFLOW, 1, {
+      pricingContext: { llm_tier: tier },
+    });
+    if (!approved) {
+      trackPaywallHit({ category: 'ring', steps_completed: 1, source: cadSource });
+      return;
     }
 
     const cadGenStartTime = Date.now();
@@ -343,7 +335,7 @@ export function useImageToCADWorkflow({
       setProgressStep("failed_final");
       setGenerationFailed(true);
     }
-  }, [prompt, referenceImages, tier, cadRoute, cadSource, isGenerating, onWorkspaceActivate, trackCadGeneration]);
+  }, [prompt, referenceImages, tier, cadRoute, cadSource, isGenerating, onWorkspaceActivate, trackCadGeneration, checkCredits]);
 
   const resetWorkflow = useCallback(() => {
     hasNavigatedAway.current = false;
@@ -359,7 +351,7 @@ export function useImageToCADWorkflow({
     isGenerating, hasModel, setHasModel,
     isModelLoading, setIsModelLoading,
     progressStep, setProgressStep,
-    retryAttempt, creditBlock, setCreditBlock,
+    retryAttempt,
     generationFailed, setGenerationFailed,
     glbUrl, setGlbUrl, glbArtifact, setGlbArtifact,
     sourceWorkflowId, setSourceWorkflowId,

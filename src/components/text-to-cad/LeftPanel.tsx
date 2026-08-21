@@ -16,7 +16,6 @@ interface LeftPanelProps {
   magicTexturing: boolean;
   onMagicTexturingChange: (on: boolean) => void;
   onReset?: () => void;
-  creditBlock?: React.ReactNode;
   referenceImagePreviewUrls?: string[];
   pageTitle?: string;
 }
@@ -26,7 +25,6 @@ export default function LeftPanel({
   isGenerating, hasModel,
   onGenerate, magicTexturing, onMagicTexturingChange,
   onReset,
-  creditBlock,
   referenceImagePreviewUrls = [],
   pageTitle,
 }: LeftPanelProps) {
@@ -184,11 +182,8 @@ export default function LeftPanel({
             className="w-full min-h-[96px] max-h-[240px] resize-y overflow-y-auto border border-border bg-muted/30 px-4 py-3 font-body text-[13px] leading-relaxed text-foreground transition-all duration-200 placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
           />
 
-          {/* Insufficient credits inline block */}
-          {creditBlock && <div className="mt-4">{creditBlock}</div>}
-
           {/* Generate button */}
-          {!creditBlock && (
+          {(
             <button
               onClick={onGenerate}
               disabled={isGenerating || (!prompt.trim() && !primaryPreviewUrl)}
