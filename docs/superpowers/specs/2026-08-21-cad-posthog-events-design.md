@@ -1,7 +1,7 @@
 # CAD PostHog Events - Design
 
 Date: 2026-08-21
-Status: Approved pending backend answer on the email link marker
+Status: Approved. No backend dependency.
 
 ## Problem
 
@@ -55,7 +55,7 @@ from the hook's existing `cadRoute` parameter.
 | `cad_reference_uploaded` | Reference images added (Image-to-CAD only) | `source`, `image_count`, `total_after_add` |
 | `cad_generation_started` | `simulateGeneration`, after credit preflight passes and the start call returns a `workflow_id` | `source`, `prompt_length`, `reference_image_count`, `llm_tier`, `is_first_ever` |
 | `cad_generation_failed` | Hook reaches `failed_final` | `source`, `failure_stage: 'start' \| 'run'`, `duration_ms`, `has_failure_message` |
-| `cad_result_restored` | Mount restore effect resolves | `source`, `entry: 'email' \| 'internal'`, `restore_ok` |
+| `cad_result_restored` | Mount restore effect resolves | `source`, `entry: 'history' \| 'toast' \| 'header' \| 'external'`, `restore_ok` |
 
 ### Amended events
 
@@ -90,25 +90,71 @@ would flip the shared flag, and their first photoshoot would then report
 CAD gets its own: `consumeFirstCadGeneration()` on key
 `ph_first_cad_generation_done`, same consume-once semantics.
 
-## Email completion notification
+## Email completion notification: mark our own links, not theirs
 
 The completion email is sent by the backend, so the frontend cannot fire an
 "email sent" event. What it can measure is whether the email brings the user
-back.
+back. Both pages already restore from `?workflow_id=` on mount
+(`TextToCAD.tsx:121`, `ImageToCAD.tsx:108`) and fire nothing today.
 
-Both pages already restore from `?workflow_id=` on mount (`TextToCAD.tsx:121`,
-`ImageToCAD.tsx:108`) and fire nothing. The email links to `/text-to-cad?...` or
-`/image-to-cad?...`, so the source is free from the route.
+The obvious approach was to ask backend to add `src=email` to the email link.
+Rejected: it blocks us on another team, and it is the harder half of the
+problem.
 
-Open item: a restore from the email and a restore from history's Load in Studio
-(`WorkflowCard.tsx:161`) produce the same URL shape and are indistinguishable
-without a marker on the email link.
+### The inversion
 
-Resolution: ship `cad_result_restored` now. `entry` reads `'email'` when the URL
-carries `src=email` and `'internal'` otherwise. Until backend adds that marker
-every restore reports `'internal'`, which is honest rather than wrong, and the
-property starts populating with no further frontend change. The backend ask is
-tracked in `artifacts/cad-email-tracking-backend-question.txt`.
+History's Load in Studio navigates to the same URL shape the email uses, which
+is why the two were indistinguishable. But those internal navigations are ours.
+If we mark every link we generate ourselves, then a `workflow_id` URL arriving
+with no marker came from outside the app. Absence is the signal, and it needs no
+backend change.
+
+This is only sound if every internal path is marked. An unmarked internal
+navigation would silently inflate the external count. There are four:
+
+| Path | Site | Already shared? |
+|---|---|---|
+| Toast action on a completed CAD run | `GenerationsContext.tsx:505` | yes |
+| Generations panel action | `GenerationsContext.tsx:621` | yes |
+| Header running/ready indicator | `Header.tsx:71` | yes |
+| History Load in Studio | `WorkflowCard.tsx:161` | no, hand-rolls the params |
+
+Three of the four already call the shared `buildCadRestorePath` helper
+(`GenerationsContext.tsx:88`). So:
+
+1. `buildCadRestorePath` gains a required `src` argument and writes it into the
+   query string. One edit covers three call sites.
+2. `WorkflowCard.tsx:161` switches from its hand-rolled `URLSearchParams` to the
+   shared builder, which also removes the duplication that let it drift in the
+   first place.
+
+Making `src` required rather than optional is deliberate: it makes a future
+internal navigation that forgets the marker a TypeScript error rather than a
+quiet data leak into the external bucket.
+
+`workflow-classifier.ts` also exposes a `loadRoute`, but it is referenced only
+by its own tests and is not a live navigation path.
+
+### The `entry` property
+
+`cad_result_restored` carries `entry: 'history' | 'toast' | 'header' |
+'external'`.
+
+`external` is not renamed to `email` because it is not only email. A bookmark, a
+pasted URL or a link shared between colleagues all land there too. Those are
+expected to be a small minority, so `external` is a good email proxy, but the
+property name should not claim a precision the data does not have.
+
+Both pages strip the query string after restoring
+(`TextToCAD.tsx:129`, `ImageToCAD.tsx:115`, both `replace: true`), so the event
+must fire from the restore effect before that strip runs, and a browser Back
+cannot resurrect a marked URL and double count it.
+
+### Remaining backend ask
+
+Only one, and it no longer blocks anything: confirm the completion email names
+the right tool (Text-to-CAD vs Image-to-CAD) in its subject and body. Attribution
+itself is now fully frontend-owned.
 
 ## Where the code lands
 
@@ -136,7 +182,7 @@ Pure, no React, no PostHog import.
 |---|---|
 | `CadSource` | `'text-to-cad' \| 'image-to-cad'` |
 | `resolveCadSource(cadRoute)` | `'/text-to-cad'` to `'text-to-cad'` |
-| `resolveRestoreEntry(search)` | `URLSearchParams` to `'email' \| 'internal'`, reading `src=email` |
+| `resolveRestoreEntry(search)` | `URLSearchParams` to `CadRestoreEntry`, reading our own `src` marker and defaulting to `'external'` |
 | `consumeFirstCadGeneration()` | Consume-once on key `ph_first_cad_generation_done` |
 | `buildCadGenerationProps(input)` | Workflow state to the shared started/completed payload |
 
@@ -150,10 +196,14 @@ Because `buildCadGenerationProps` owns the property bundle, `started` and
 | `src/lib/posthog-events.ts` | 6 thin track functions plus props interfaces, roughly +65 lines to about 490. No existing export touched. |
 | `src/hooks/useImageToCADWorkflow.ts` | One line per call site: started, failed, completed, restored, and `source` on the paywall call |
 | `src/pages/TextToCAD.tsx`, `src/pages/ImageToCAD.tsx` | `cad_studio_open` on mount; `cad_reference_uploaded` on the Image-to-CAD add handler |
-| `src/components/generations/WorkflowCard.tsx` | One added property on the existing `trackDownloadClicked` call |
+| `src/components/generations/WorkflowCard.tsx` | `source` on the existing `trackDownloadClicked` call, plus swapping the hand-rolled restore URL for the shared builder |
+| `src/contexts/GenerationsContext.tsx` | `buildCadRestorePath` gains a required `src` argument; its two call sites pass `'toast'` |
+| `src/components/layout/Header.tsx` | Passes `'header'` to `buildCadRestorePath` |
 
-No config changes, no moved code, no re-exports. Every existing import of
-`posthog-events` keeps working unchanged.
+No config changes and no moved code. Every existing import of `posthog-events`
+keeps working unchanged. `buildCadRestorePath` is the one existing signature
+that changes, and making the new argument required means the compiler finds
+every call site rather than leaving one silently unmarked.
 
 `CadWorkflowModal.tsx` also downloads CAD artifacts but is rendered nowhere. It
 is dead code and is deliberately left uninstrumented.
@@ -172,14 +222,21 @@ CLAUDE.md the Vitest test is written before the implementation.
 The pure module is tested directly, no mocks required:
 
 - `resolveCadSource` maps both routes correctly
-- `resolveRestoreEntry` returns `'email'` only for `src=email`, and `'internal'`
-  for a missing param, an empty param and any other value
+- `resolveRestoreEntry` returns the marked value for each of `history`, `toast`
+  and `header`, and falls back to `'external'` for a missing param, an empty
+  param and any unrecognised value, so a malformed marker never reads as
+  internal
 - `consumeFirstCadGeneration` returns true once then false forever
 - `consumeFirstCadGeneration` and `consumeFirstGeneration` do not interfere:
   consuming either one leaves the other still returning true. This is the
   regression the separate key exists to prevent.
 - `buildCadGenerationProps` produces `reference_image_count: 0` for text-to-cad,
   the real count for image-to-cad, and a trimmed `prompt_length`
+
+Marker coverage is also asserted in
+`src/contexts/GenerationsContext.test.tsx` if one exists, or a new focused test
+otherwise: `buildCadRestorePath` writes the `src` marker for every entry value,
+and preserves the existing `workflow_id` and `glb` parameters unchanged.
 
 ### Added to `src/lib/posthog-events.test.ts`
 
