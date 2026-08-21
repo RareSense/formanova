@@ -1,4 +1,4 @@
-import { Undo2, Redo2, Plus, Minus, Maximize2, Maximize, Eye, Keyboard, Loader2 } from "lucide-react";
+import { Undo2, Redo2, Plus, Minus, Maximize, Eye, Keyboard, Loader2, Orbit, RotateCcw } from "lucide-react";
 import { TRANSFORM_MODES, PROGRESS_STEPS } from "./types";
 import type { StatsData } from "./types";
 
@@ -135,7 +135,16 @@ export function StatsBar({ visible, stats }: { visible: boolean; stats: StatsDat
 }
 
 // ── Viewport Side Tools (unified vertical strip) ──
-const SIDE_BTN = "w-9 h-9 flex items-center justify-center text-muted-foreground/80 hover:text-foreground hover:bg-accent/50 transition-all duration-150 cursor-pointer active:scale-95 disabled:opacity-25 disabled:cursor-not-allowed relative group";
+/** Geometry and interaction, shared by both states so they cannot drift. */
+const SIDE_BTN_BASE = "w-9 h-9 flex items-center justify-center hover:bg-accent/50 transition-all duration-150 cursor-pointer active:scale-95 disabled:opacity-25 disabled:cursor-not-allowed relative group";
+
+const SIDE_BTN = `${SIDE_BTN_BASE} text-muted-foreground/80 hover:text-foreground`;
+
+/** Running state for a toggleable side tool: same button, accent colour.
+ *  Composed from the base rather than by rewriting SIDE_BTN, because Tailwind
+ *  resolves conflicts by stylesheet order, not class order, so appending or
+ *  substituting a colour would be silently unreliable. */
+const SIDE_BTN_ACTIVE = `${SIDE_BTN_BASE} text-[hsl(var(--formanova-hero-accent))] bg-accent/40`;
 
 function SideDivider() {
   return <div className="mx-2 h-px bg-border/30" />;
@@ -149,7 +158,7 @@ function SideTooltip({ label }: { label: string }) {
   );
 }
 
-export function ViewportSideTools({ visible, onZoomIn, onZoomOut, onResetView, onUndo, onRedo, undoCount, redoCount, onFullscreen, onDisplayMenu, onKeyboardShortcuts  }: {
+export function ViewportSideTools({ visible, onZoomIn, onZoomOut, onResetView, onUndo, onRedo, undoCount, redoCount, onFullscreen, onDisplayMenu, onKeyboardShortcuts, onAutoRotate, autoRotateActive = false  }: {
   visible: boolean;
   onZoomIn: () => void;
   onZoomOut: () => void;
@@ -161,6 +170,9 @@ export function ViewportSideTools({ visible, onZoomIn, onZoomOut, onResetView, o
   onFullscreen?: () => void;
   onDisplayMenu?: () => void;
   onKeyboardShortcuts?: () => void;
+  /** Omit to hide the control, matching how the other optional tools behave. */
+  onAutoRotate?: () => void;
+  autoRotateActive?: boolean;
 }) {
   if (!visible) return null;
 
@@ -193,8 +205,19 @@ export function ViewportSideTools({ visible, onZoomIn, onZoomOut, onResetView, o
       {/* View */}
       <button onClick={onResetView} className={SIDE_BTN} title="Reset view">
         <SideTooltip label="Reset View" />
-        <Maximize2 className="w-3.5 h-3.5" />
+        <RotateCcw className="w-3.5 h-3.5" />
       </button>
+      {onAutoRotate && (
+        <button
+          onClick={onAutoRotate}
+          className={autoRotateActive ? SIDE_BTN_ACTIVE : SIDE_BTN}
+          title="Auto rotate"
+          aria-pressed={autoRotateActive}
+        >
+          <SideTooltip label="Auto Rotate" />
+          <Orbit className="w-3.5 h-3.5" />
+        </button>
+      )}
       {onFullscreen && (
         <button onClick={onFullscreen} className={SIDE_BTN} title="Fullscreen">
           <SideTooltip label="Fullscreen" />

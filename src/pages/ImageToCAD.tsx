@@ -14,6 +14,7 @@ import { useCADMeshEditor } from "@/hooks/useCADMeshEditor";
 import { useReferenceImages } from "@/hooks/useReferenceImages";
 import { useNotificationEmail } from "@/hooks/useNotificationEmail";
 import { useCadArtifactDownloads } from "@/hooks/useCadArtifactDownloads";
+import { useCadAutoRotate } from "@/hooks/useCadAutoRotate";
 import { CadDownloadMenu } from "@/components/downloads/CadDownloadMenu";
 import { CadSolidityNotice } from "@/components/downloads/CadSolidityNotice";
 import { trackCadStudioOpen, trackCadReferenceUploaded } from "@/lib/posthog-events";
@@ -85,6 +86,9 @@ export default function ImageToCAD() {
   const rightPanelRef = useRef<ImperativePanelHandle>(null);
 
   const editor = useCADMeshEditor({ canvasRef, transformMode, setTransformMode });
+
+  /** Presentation-only camera orbit; see useCadAutoRotate. */
+  const autoRotate = useCadAutoRotate();
 
   const activateWorkspace = useCallback(() => setWorkspaceActive(true), []);
 
@@ -437,7 +441,15 @@ export default function ImageToCAD() {
               visible={workflow.hasModel && !workflow.isGenerating && !workflow.isModelLoading}
               onZoomIn={() => canvasRef.current?.zoomIn()}
               onZoomOut={() => canvasRef.current?.zoomOut()}
-              onResetView={() => canvasRef.current?.resetCamera()}
+              onResetView={() => {
+                // Reset View re-frames the camera, so leaving auto-rotate
+                // running would immediately drift away from the framing the
+                // user just asked for.
+                autoRotate.stopAutoRotate();
+                canvasRef.current?.resetCamera();
+              }}
+              onAutoRotate={autoRotate.toggleAutoRotate}
+              autoRotateActive={autoRotate.isAutoRotating}
               onUndo={editor.handleUndo}
               onRedo={editor.handleRedo}
               undoCount={editor.undoStack.length}
