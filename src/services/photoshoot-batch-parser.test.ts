@@ -31,7 +31,7 @@ describe('photoshoot-batch-parser', () => {
   it('derives workflow state and progress from status payloads', () => {
     expect(resolvePhotoshootWorkflowState({ runtime: { state: 'completed' } })).toBe('completed');
     expect(derivePhotoshootProgress({
-      progress: { total_nodes: 4, completed_nodes: 2, visited: ['start_node', 'render_stage'] },
+      progress: { state: 'running' as const, total_nodes: 4, completed_nodes: 2, visited: ['start_node', 'render_stage'] },
     })).toEqual({ progress: 65, step: 'render stage' });
   });
 });

@@ -19,6 +19,15 @@ export const RESULT_ENDPOINT_TEMPLATE = RESULT_ENDPOINT;
 export const POLL_INTERVAL_MS = 3_000;
 export const POLL_TIMEOUT_MS = 12 * 60 * 1_000;
 export const TERMINAL_STATES = new Set<PhotoshootWorkflowState>(['completed', 'failed', 'budget_exhausted']);
+
+/** Set.has() does not narrow, so callers had no way to prove a state is
+ *  terminal and were passing 'running' | 'unknown' into a field that excludes
+ *  them. A predicate narrows it at the guard instead of casting at the use. */
+export function isTerminalPhotoshootState(
+  state: PhotoshootWorkflowState,
+): state is Exclude<PhotoshootWorkflowState, 'running' | 'unknown'> {
+  return TERMINAL_STATES.has(state);
+}
 export const TRANSIENT_404_POLICY = 'retry';
 export const MAX_CONSECUTIVE_ERRORS = 5;
 
@@ -102,7 +111,7 @@ export async function pollPhotoshootWorkflows({
 
           errorCounts.set(workflowId, 0);
           const workflowState = resolvePhotoshootWorkflowState(status);
-          if (!TERMINAL_STATES.has(workflowState)) {
+          if (!isTerminalPhotoshootState(workflowState)) {
             onProgress({ workflowId, ...derivePhotoshootProgress(status) });
             return;
           }

@@ -10,7 +10,10 @@ interface GltfPrimitiveAssociation {
 interface ParsedGltfMaterialMetadata {
   scene: THREE.Object3D;
   parser: {
-    associations: Map<THREE.Object3D, GltfPrimitiveAssociation>;
+    // three.js keys this by Texture | Material | Object3D, not Object3D
+    // alone. get() is only ever called with a mesh, so a wider key type is
+    // both accurate and safe.
+    associations: Map<object, GltfPrimitiveAssociation>;
     json: {
       meshes?: Array<{ primitives?: Array<{ material?: number }> }>;
     };

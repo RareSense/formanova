@@ -243,7 +243,13 @@ export default function GenerationProgress({
                     ref={changeEmailButtonRef}
                     type="button"
                     onClick={beginEmailEdit}
-                    className="inline-flex shrink-0 items-center gap-1.5 text-xs font-medium text-[hsl(var(--formanova-hero-accent))] transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    /* leading-5 matches the address's text-sm line box (20px).
+                       text-xs alone is a 16px line box, and items-center centres
+                       the boxes rather than the baselines, so the shorter box
+                       lifts this text and the pencil above the address. Equal
+                       line boxes put them on one baseline without nudging
+                       anything with margins or transforms. */
+                    className="inline-flex shrink-0 items-center gap-1.5 text-xs leading-5 font-medium text-[hsl(var(--formanova-hero-accent))] transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     Change
                     <Pencil className="h-3 w-3" aria-hidden="true" />

@@ -6,7 +6,17 @@ import {
   type PhotoshootStartResponse,
   type PhotoshootStatusResponse,
 } from '@/lib/photoshoot-api';
-import type { AssetModelAssignment } from '@/components/studio/StudioPairingStep';
+/**
+ * Declared here because StudioPairingStep, which used to export it, no longer
+ * exists. The shape below is exactly what this file reads from an assignment.
+ */
+export interface AssetModelAssignment {
+  url: string;
+  /** Display name for the chosen model. Carried by callers, not sent upstream. */
+  label?: string;
+  modelAssetId?: string | null;
+  presetModelId?: string | null;
+}
 
 export interface PhotoshootBatchAsset {
   thumbnailUrl: string;

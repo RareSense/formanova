@@ -23,7 +23,7 @@ async function fetchWithRetry(
 
 const API_BASE = import.meta.env.VITE_PIPELINE_API_URL ?? '';
 
-export type AssetType = 'jewelry_photo' | 'model_photo' | 'inspiration_photo' | 'generated_photo' | 'generated_cad';
+export type AssetType = 'jewelry_photo' | 'model_photo' | 'inspiration_photo' | 'generated_photo' | 'generated_cad' | 'cad_reference';
 
 export interface UserAsset {
   id: string;

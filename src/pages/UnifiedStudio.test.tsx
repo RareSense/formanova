@@ -54,7 +54,7 @@ const preflightMock = vi.hoisted(() => ({
     preflightResult: null as null | { estimatedCredits: number; currentBalance: number },
     checking: false,
   },
-  options: 'not-called' as unknown,
+  options: 'not-called' as { redirectOnInsufficient?: boolean } | 'not-called' | undefined,
 }));
 function resetPreflightMock() {
   preflightMock.options = 'not-called';
@@ -276,6 +276,7 @@ describe('UnifiedStudio smoke tests', () => {
     // user, and nothing else would catch it.
     renderStudio('/studio/necklace');
     expect(preflightMock.options).not.toBe('not-called');
-    expect(preflightMock.options?.redirectOnInsufficient).not.toBe(false);
+    const options = preflightMock.options as { redirectOnInsufficient?: boolean } | undefined;
+    expect(options?.redirectOnInsufficient).not.toBe(false);
   });
 });

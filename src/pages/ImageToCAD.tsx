@@ -101,8 +101,6 @@ export default function ImageToCAD() {
     // Read once, at first render, so arriving from the result email
     // paints the loading state instead of an empty workspace.
     restoringFromUrl: isRestoringFromUrl,
-    pushUndo: editor.pushUndo,
-    userId: user?.id,
     onWorkspaceActivate: activateWorkspace,
   });
 

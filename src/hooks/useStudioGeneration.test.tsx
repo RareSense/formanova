@@ -189,7 +189,7 @@ describe('useStudioGeneration', () => {
     await act(async () => { await result.current.handleGenerate(); });
 
     expect(mockBulkUploadJewelry).toHaveBeenCalledTimes(1);
-    const startArg = mockStartPhotoshoot.mock.calls[0][0] as Record<string, unknown>;
+    const startArg = mockStartPhotoshoot.mock.calls[0][0] as unknown as Record<string, unknown>;
     expect(startArg.jewelry_image_urls).toEqual(['azure://a', 'azure://b']);
     expect(startArg.input_jewelry_asset_ids).toEqual(['id-a', 'id-b']);
   });
@@ -219,7 +219,7 @@ describe('useStudioGeneration', () => {
     await act(async () => { await result.current.handleGenerate(); });
 
     expect(mockBulkUploadJewelry).not.toHaveBeenCalled();
-    const startArg = mockStartPhotoshoot.mock.calls[0][0] as Record<string, unknown>;
+    const startArg = mockStartPhotoshoot.mock.calls[0][0] as unknown as Record<string, unknown>;
     expect(startArg.jewelry_image_urls).toEqual(['azure://cover', 'azure://m2', 'azure://m3']);
     expect(startArg.input_jewelry_asset_ids).toEqual(['id-cover', 'id-m2', 'id-m3']);
   });
@@ -251,7 +251,7 @@ describe('useStudioGeneration', () => {
     await act(async () => { await result.current.handleGenerate(); });
 
     expect(mockBulkUploadJewelry).toHaveBeenCalledTimes(1);
-    const startArg = mockStartPhotoshoot.mock.calls[0][0] as Record<string, unknown>;
+    const startArg = mockStartPhotoshoot.mock.calls[0][0] as unknown as Record<string, unknown>;
     expect(startArg.jewelry_image_urls).toEqual(['azure://cover', 'azure://fresh']);
     expect(startArg.input_jewelry_asset_ids).toEqual(['id-cover', 'id-fresh']);
   });

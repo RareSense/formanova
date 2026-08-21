@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockGetStoredToken = vi.hoisted(() => vi.fn<[], string | null>());
+const mockGetStoredToken = vi.hoisted(() => vi.fn<() => string | null>());
 const mockRemoveStoredToken = vi.hoisted(() => vi.fn());
 const mockRemoveStoredUser = vi.hoisted(() => vi.fn());
 const mockDispatchAuthChange = vi.hoisted(() => vi.fn());
