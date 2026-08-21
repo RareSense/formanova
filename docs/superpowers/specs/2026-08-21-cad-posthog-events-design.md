@@ -112,29 +112,80 @@ tracked in `artifacts/cad-email-tracking-backend-question.txt`.
 
 ## Where the code lands
 
-Nearly all of it goes in `useImageToCADWorkflow.ts`, which already holds
-`cadRoute`, `tier`, `prompt`, `referenceImages` and `generationStartRef`. The
-hook serves both pages, so instrumenting it once covers both tools.
+Two rules pull in opposite directions here. CLAUDE.md mandates a single-file
+event API in `posthog-events.ts`, enforced by the ESLint rule at
+`eslint.config.js:35` that bans `posthog-js` imports elsewhere. AI_RULES section
+8 sets a 500-line ceiling and forbids mixing concerns, and
+`posthog-events.ts` is already 424 lines.
 
-- `src/lib/posthog-events.ts` - new typed functions, new props interfaces, new
-  `consumeFirstCadGeneration()`
-- `src/hooks/useImageToCADWorkflow.ts` - started, failed, completed, restored,
-  paywall source
-- `src/pages/TextToCAD.tsx`, `src/pages/ImageToCAD.tsx` - `cad_studio_open` on
-  mount; `cad_reference_uploaded` on the Image-to-CAD add handler
-- `src/components/generations/WorkflowCard.tsx` - one added property
+The split is by concern, not by file:
+
+- The event vocabulary, meaning names and typed payloads, stays in
+  `posthog-events.ts`. That is the contract ESLint enforces.
+- The CAD domain logic is not event plumbing. Deriving `source` from the route,
+  deriving `entry` from the URL, owning the first-CAD-generation key and
+  assembling the repeated property bundle are all pure functions. They go in a
+  new module, which keeps them out of both the hook and the event file and makes
+  them testable with no PostHog mocking at all.
+
+### New: `src/lib/cad-analytics.ts`
+
+Pure, no React, no PostHog import.
+
+| Export | Responsibility |
+|---|---|
+| `CadSource` | `'text-to-cad' \| 'image-to-cad'` |
+| `resolveCadSource(cadRoute)` | `'/text-to-cad'` to `'text-to-cad'` |
+| `resolveRestoreEntry(search)` | `URLSearchParams` to `'email' \| 'internal'`, reading `src=email` |
+| `consumeFirstCadGeneration()` | Consume-once on key `ph_first_cad_generation_done` |
+| `buildCadGenerationProps(input)` | Workflow state to the shared started/completed payload |
+
+Because `buildCadGenerationProps` owns the property bundle, `started` and
+`completed` cannot drift apart, which is the usual way a funnel silently breaks.
+
+### Edited
+
+| File | Change |
+|---|---|
+| `src/lib/posthog-events.ts` | 6 thin track functions plus props interfaces, roughly +65 lines to about 490. No existing export touched. |
+| `src/hooks/useImageToCADWorkflow.ts` | One line per call site: started, failed, completed, restored, and `source` on the paywall call |
+| `src/pages/TextToCAD.tsx`, `src/pages/ImageToCAD.tsx` | `cad_studio_open` on mount; `cad_reference_uploaded` on the Image-to-CAD add handler |
+| `src/components/generations/WorkflowCard.tsx` | One added property on the existing `trackDownloadClicked` call |
+
+No config changes, no moved code, no re-exports. Every existing import of
+`posthog-events` keeps working unchanged.
 
 `CadWorkflowModal.tsx` also downloads CAD artifacts but is rendered nowhere. It
 is dead code and is deliberately left uninstrumented.
 
+Note for whoever comes next: `posthog-events.ts` lands at about 490 lines, just
+under the ceiling. The next feature to add events must split it into a barrel
+(`src/lib/posthog/*` re-exported from `posthog-events.ts`) rather than appending.
+
 ## Testing
 
-Per AI_RULES section 10, tests ship with this change, not in a later PR.
+Per AI_RULES section 10 tests ship with this change, not in a later PR, and per
+CLAUDE.md the Vitest test is written before the implementation.
 
-- New Vitest cases in `src/lib/posthog-events.test.ts` for each new function and
-  each amended payload, written before the implementation
-- A case asserting `consumeFirstCadGeneration()` and `consumeFirstGeneration()`
-  do not interfere with each other
+### New: `src/lib/cad-analytics.test.ts`
+
+The pure module is tested directly, no mocks required:
+
+- `resolveCadSource` maps both routes correctly
+- `resolveRestoreEntry` returns `'email'` only for `src=email`, and `'internal'`
+  for a missing param, an empty param and any other value
+- `consumeFirstCadGeneration` returns true once then false forever
+- `consumeFirstCadGeneration` and `consumeFirstGeneration` do not interfere:
+  consuming either one leaves the other still returning true. This is the
+  regression the separate key exists to prevent.
+- `buildCadGenerationProps` produces `reference_image_count: 0` for text-to-cad,
+  the real count for image-to-cad, and a trimmed `prompt_length`
+
+### Added to `src/lib/posthog-events.test.ts`
+
+- One case per new track function asserting the event name and full payload
+- One case per amended event asserting the new property is present and the
+  existing properties are unchanged, so existing dashboards are provably safe
 - The existing 20 tests stay green and are not weakened
 
 ## Out of scope
