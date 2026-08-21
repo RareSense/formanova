@@ -80,20 +80,12 @@ export function CadDownloadMenu({
 
   // Everything not already the default action. A menu holding a single entry
   // is a dead affordance, so the chevron only appears when it has contents.
-  const menuItems: { label: string; hint: string; onSelect: () => void }[] = [];
+  const menuItems: { label: string; onSelect: () => void }[] = [];
   if (onDownloadThreedm && onDownloadGlb) {
-    menuItems.push({
-      label: 'Download GLB',
-      hint: '3D preview, as generated',
-      onSelect: onDownloadGlb,
-    });
+    menuItems.push({ label: 'Download GLB', onSelect: onDownloadGlb });
   }
   if (onExportEdited) {
-    menuItems.push({
-      label: 'Export GLB with my edits',
-      hint: 'reflects your changes',
-      onSelect: onExportEdited,
-    });
+    menuItems.push({ label: 'Export GLB with my edits', onSelect: onExportEdited });
   }
 
   return (
@@ -131,15 +123,14 @@ export function CadDownloadMenu({
               <ChevronDown className="h-3.5 w-3.5" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-[15rem]">
+          <DropdownMenuContent align="end" className="min-w-[13rem]">
             {menuItems.map(item => (
               <DropdownMenuItem
                 key={item.label}
                 onSelect={item.onSelect}
-                className="flex flex-col items-start gap-0.5 py-2"
+                className="font-mono text-[10px] uppercase tracking-wider py-2"
               >
-                <span className="font-mono text-[10px] uppercase tracking-wider">{item.label}</span>
-                <span className="text-[10px] text-muted-foreground">{item.hint}</span>
+                {item.label}
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>

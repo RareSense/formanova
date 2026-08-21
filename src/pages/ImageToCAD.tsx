@@ -163,7 +163,7 @@ export default function ImageToCAD() {
     threedmUrl: workflow.threedmArtifact?.url,
     glbUrl: workflow.glbUrl,
     exportEditedBlob: () => canvasRef.current?.exportSceneBlob() ?? Promise.resolve(undefined),
-    source: '' + source + '',
+    source: 'image-to-cad',
   });
 
   /** An edit exists only once something has been pushed onto the undo stack,

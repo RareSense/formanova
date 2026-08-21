@@ -164,6 +164,7 @@ describe('generation-history-api URL shapes', () => {
       glb_url: 'gs://bucket/edit.glb',
       threedm_url: null,
       azure_source: 'build_retry',
+      not_all_solid: false,
     });
   });
 
@@ -178,6 +179,7 @@ describe('generation-history-api URL shapes', () => {
       glb_url: 'gs://bucket/initial.glb',
       threedm_url: null,
       azure_source: 'build_initial',
+      not_all_solid: false,
     });
   });
 
@@ -192,6 +194,7 @@ describe('generation-history-api URL shapes', () => {
       glb_url: 'gs://bucket/final.glb',
       threedm_url: null,
       azure_source: 'success_final',
+      not_all_solid: false,
     });
   });
 
@@ -207,6 +210,7 @@ describe('generation-history-api URL shapes', () => {
       glb_url: `/api/artifacts/${glbSha}`,
       threedm_url: `/api/artifacts/${threedmSha}`,
       azure_source: 'threedm_artifact',
+      not_all_solid: false,
     });
   });
 
@@ -219,6 +223,7 @@ describe('generation-history-api URL shapes', () => {
       glb_url: 'gs://bucket/legacy.glb',
       threedm_url: null,
       azure_source: 'success_final',
+      not_all_solid: false,
     });
   });
 
