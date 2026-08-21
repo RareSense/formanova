@@ -47,10 +47,17 @@ export function ViewportToolbar({
       </div>
 
       {/* Result-level action, pinned right — deliberately not adjacent to the
-          mode buttons, so it doesn't read as another mode. right-14 clears the
-          panel-collapse button, which occupies the first 40px of that edge. */}
+          mode buttons, so it doesn't read as another mode: those manipulate the
+          object, this completes the task. right-14 clears the panel-collapse
+          button, which occupies the first 40px of that edge.
+
+          top-2 is not decoration. This element is absolutely positioned, so it
+          ignores the parent's pt-2 and would otherwise sit at its static
+          position, a few pixels off the centered group. Stating the same inset
+          explicitly is what makes the two read as one toolbar rather than two
+          things that happen to be near the top. */}
       {downloadSlot && (
-        <div className="pointer-events-auto absolute right-14">{downloadSlot}</div>
+        <div className="pointer-events-auto absolute top-2 right-14">{downloadSlot}</div>
       )}
     </div>
   );

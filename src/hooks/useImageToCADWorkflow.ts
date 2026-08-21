@@ -135,6 +135,9 @@ export function useImageToCADWorkflow({
         setProgressStep('');
         return;
       }
+      // An unsealed part cannot be cast or printed, so this has to be shown
+      // next to the download rather than only logged.
+      setNotAllSolid(trackedRun.notAllSolid === true);
       setGlbUrl(trackedRun.glbUrl);
       setGlbArtifact({ uri: trackedRun.glbUrl, type: 'model/gltf-binary', bytes: 0, sha256: '' });
       if (trackedRun.threedmUrl) {
@@ -198,6 +201,7 @@ export function useImageToCADWorkflow({
     if (fallbackGlbUrl) seedGlb(fallbackGlbUrl);
 
     const result = workflowId ? await fetchCadResult(workflowId) : null;
+    setNotAllSolid(result?.not_all_solid === true);
     const resolvedGlbUrl = result?.glb_url ?? fallbackGlbUrl ?? null;
     if (!resolvedGlbUrl) {
       setIsModelLoading(false);
@@ -268,6 +272,9 @@ export function useImageToCADWorkflow({
     setHasModel(false);
     setSourceWorkflowId(null);
     setThreedmArtifact(null);
+    // Clear the previous ring's solidity result: a stale warning on a new run
+    // is worse than none, because it trains people to ignore it.
+    setNotAllSolid(false);
     setProgressStep("analyzing");
 
     try {

@@ -155,6 +155,15 @@ export interface TrackedGeneration {
   threedmUrl?: string | null;
   /** CAD only: label for the completion toast. */
   label?: string;
+  /**
+   * CAD only: true when the run produced parts that are not closed solids.
+   *
+   * An unsealed surface cannot be cast or 3D printed, so this has to reach the
+   * workspace. Carried on the run rather than refetched because the workspace
+   * mirrors this object and would otherwise have to hit /result again just to
+   * learn something the completion poll already read.
+   */
+  notAllSolid?: boolean;
   /** CAD only: which page started this run, so restore paths return to the right one. */
   cadRoute?: '/text-to-cad' | '/image-to-cad';
 }
@@ -504,6 +513,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
               progress: 100,
               glbUrl: parsed.glbUrl,
               threedmUrl: parsed.threedmArtifact?.url ?? null,
+              notAllSolid: parsed.notAllSolid,
             }
           : g
       ));
@@ -621,6 +631,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
                   generationStep: parsed ? 'Completed' : 'Completed — result unavailable',
                   glbUrl: parsed?.glbUrl ?? null,
                   threedmUrl: parsed?.threedmArtifact?.url ?? null,
+                  notAllSolid: parsed?.notAllSolid ?? false,
                 }
               : g
           ));

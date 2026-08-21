@@ -18,6 +18,7 @@ import { useCADMeshEditor } from "@/hooks/useCADMeshEditor";
 import { useNotificationEmail } from "@/hooks/useNotificationEmail";
 import { useCadArtifactDownloads } from "@/hooks/useCadArtifactDownloads";
 import { CadDownloadMenu } from "@/components/downloads/CadDownloadMenu";
+import { CadSolidityNotice } from "@/components/downloads/CadSolidityNotice";
 import { trackCadStudioOpen } from "@/lib/posthog-events";
 
 import MeshPanel from "@/components/text-to-cad/MeshPanel";
@@ -416,12 +417,18 @@ export default function TextToCAD() {
                 // Same visibility rule the download action had in ViewportSideTools
                 // before the move — hidden mid-regeneration, not just mid-initial-generation.
                 downloadSlot={!workflow.isGenerating && !workflow.isModelLoading ? (
-                  <CadDownloadMenu
-                    isBusy={downloads.isBusy}
-                    onDownloadThreedm={workflow.threedmArtifact ? downloads.downloadThreedm : undefined}
-                    onDownloadGlb={workflow.glbUrl ? downloads.downloadGlb : undefined}
-                    onExportEdited={hasEdits ? downloads.exportEdited : undefined}
-                  />
+                  <div className="flex flex-col items-end gap-1.5">
+                    <CadDownloadMenu
+                      isBusy={downloads.isBusy}
+                      onDownloadThreedm={workflow.threedmArtifact ? downloads.downloadThreedm : undefined}
+                      onDownloadGlb={workflow.glbUrl ? downloads.downloadGlb : undefined}
+                      onExportEdited={hasEdits ? downloads.exportEdited : undefined}
+                    />
+                    {/* Directly under the download, because the moment that
+                        matters is the one where the file is about to leave the
+                        app and go to someone who will try to make it. */}
+                    <CadSolidityNotice notAllSolid={workflow.notAllSolid} />
+                  </div>
                 ) : undefined}
               />
             )}
