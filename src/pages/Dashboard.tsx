@@ -33,8 +33,6 @@ type Workflow = {
   usesEffortIntro?: boolean;
   /** PostHog value, identical to what the Photo Studio page sent. */
   studioType?: 'model-shot' | 'product-shot';
-  /** Illustrated marks need more room inside the chip than a silhouette. */
-  illustratedIcon?: boolean;
 };
 
 const photographyWorkflows: Workflow[] = [
@@ -64,7 +62,6 @@ const cadWorkflows: Workflow[] = [
     description: 'Describe your jewelry and generate a CAD model.',
     route: '/text-to-cad',
     icon: TextToCadIcon,
-    illustratedIcon: true,
     image: textToCadImg,
   },
   {
@@ -72,7 +69,6 @@ const cadWorkflows: Workflow[] = [
     description: 'Turn inspiration images into a CAD model.',
     route: '/image-to-cad',
     icon: ImageToCadIcon,
-    illustratedIcon: true,
     image: imageToCadImg,
   },
 ];
@@ -119,7 +115,7 @@ function CategoryDivider({
   tag?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-3 md:gap-4 mb-2.5 md:mb-3">
+    <div className="flex items-center gap-3 md:gap-4 mb-2.5 md:mb-3 [@media(max-height:820px)]:mb-2">
       <span aria-hidden="true" className="h-px flex-1 bg-border" />
       <div className="flex items-center gap-2.5 md:gap-3 shrink-0">
         <h2
@@ -149,7 +145,6 @@ function WorkflowCard({
   onSelect: (workflow: Workflow) => void;
 }) {
   const Icon = workflow.icon;
-  const iconSize = workflow.illustratedIcon ? 'w-9 h-9' : 'w-5 h-5 md:w-6 md:h-6';
 
   return (
     <motion.div
@@ -173,7 +168,7 @@ function WorkflowCard({
       {/* Content */}
       <div className="relative z-10 flex flex-col items-center flex-1 px-4 py-4 md:py-5 bg-card">
         <div className="w-12 h-12 flex items-center justify-center border border-border bg-background -mt-11 mb-2 relative z-10">
-          <Icon className={`${iconSize} text-formanova-hero-accent`} />
+          <Icon className="w-5 h-5 md:w-6 md:h-6 text-formanova-hero-accent" />
         </div>
         <h3 className="font-display text-xl md:text-2xl uppercase tracking-wide text-foreground leading-none mb-1.5">
           {workflow.title}
@@ -211,7 +206,6 @@ function WideWorkflowCard({
   onSelect: (workflow: Workflow) => void;
 }) {
   const Icon = workflow.icon;
-  const iconSize = workflow.illustratedIcon ? 'w-9 h-9' : 'w-5 h-5 md:w-6 md:h-6';
 
   return (
     <motion.div
@@ -233,24 +227,23 @@ function WideWorkflowCard({
       </div>
 
       {/* Content */}
-      <div className="relative z-10 flex flex-col flex-1 px-4 py-4 bg-card">
-        <div className="flex items-center gap-2 mb-1.5">
-          <span className="w-11 h-11 shrink-0 flex items-center justify-center border border-border bg-background">
-            <Icon className={`${iconSize} text-formanova-hero-accent`} />
-          </span>
-          <h3 className="font-display text-lg md:text-xl uppercase tracking-wide text-foreground leading-none">
-            {workflow.title}
-          </h3>
-        </div>
-        <p className="font-mono text-[11px] md:text-xs tracking-[0.15em] text-foreground/80 uppercase">
+      {/* Content. Centred on one axis with even steps between icon, title,
+          copy and action, so the text half reads as a composition rather than
+          as a column pushed against the image. */}
+      <div className="relative z-10 flex flex-col items-center justify-center flex-1 px-5 py-5 [@media(max-height:820px)]:py-3 text-center bg-card">
+        <span className="w-11 h-11 [@media(max-height:820px)]:w-9 [@media(max-height:820px)]:h-9 shrink-0 flex items-center justify-center border border-border bg-background mb-3 [@media(max-height:820px)]:mb-2">
+          <Icon className="w-5 h-5 md:w-6 md:h-6 text-formanova-hero-accent" />
+        </span>
+        <h3 className="font-display text-lg md:text-xl uppercase tracking-wide text-foreground leading-none mb-2">
+          {workflow.title}
+        </h3>
+        <p className="font-mono text-[11px] md:text-xs tracking-[0.15em] text-foreground/80 uppercase max-w-[240px]">
           {workflow.description}
         </p>
-        <div className="mt-auto pt-3">
-          <button className={CONTINUE_BUTTON}>
-            Continue
-            <ArrowRight className="w-3 h-3 shrink-0" />
-          </button>
-        </div>
+        <button className={`${CONTINUE_BUTTON} mt-4 [@media(max-height:820px)]:mt-3`}>
+          Continue
+          <ArrowRight className="w-3 h-3 shrink-0" />
+        </button>
       </div>
     </motion.div>
   );
@@ -273,7 +266,6 @@ function PanelWorkflowCard({
   onSelect: (workflow: Workflow) => void;
 }) {
   const Icon = workflow.icon;
-  const iconSize = workflow.illustratedIcon ? 'w-9 h-9' : 'w-5 h-5 md:w-6 md:h-6';
 
   return (
     <motion.div
@@ -295,23 +287,21 @@ function PanelWorkflowCard({
       </div>
 
       {/* Content */}
-      <div className="flex flex-col flex-1 px-5 py-3 md:px-6 md:py-3.5">
-        <span className="w-11 h-11 shrink-0 flex items-center justify-center border border-border rounded-md mb-2">
-          <Icon className={`${iconSize} text-formanova-hero-accent`} />
+      {/* Content. Same centred composition as the other cards. */}
+      <div className="flex flex-col items-center justify-center flex-1 px-5 py-4 md:px-6 md:py-5 [@media(max-height:820px)]:py-3 text-center">
+        <span className="w-11 h-11 [@media(max-height:820px)]:w-9 [@media(max-height:820px)]:h-9 shrink-0 flex items-center justify-center border border-border rounded-md mb-2.5 [@media(max-height:820px)]:mb-2">
+          <Icon className="w-5 h-5 md:w-6 md:h-6 text-formanova-hero-accent" />
         </span>
-        <h3 className="font-display text-xl md:text-2xl uppercase tracking-wide text-foreground leading-none">
+        <h3 className="font-display text-xl md:text-2xl uppercase tracking-wide text-foreground leading-none mb-2">
           {workflow.title}
         </h3>
-        <span aria-hidden="true" className="block w-8 h-px bg-formanova-hero-accent my-1.5" />
-        <p className="font-mono text-[11px] md:text-xs tracking-[0.12em] text-foreground/80 uppercase leading-snug">
+        <p className="font-mono text-[11px] md:text-xs tracking-[0.12em] text-foreground/80 uppercase leading-snug max-w-[240px]">
           {workflow.description}
         </p>
-        <div className="mt-auto pt-2.5">
-          <button className={CONTINUE_BUTTON}>
-            Continue
-            <ArrowRight className="w-3 h-3 shrink-0" />
-          </button>
-        </div>
+        <button className={`${CONTINUE_BUTTON} mt-4 [@media(max-height:820px)]:mt-3`}>
+          Continue
+          <ArrowRight className="w-3 h-3 shrink-0" />
+        </button>
       </div>
     </motion.div>
   );
@@ -427,22 +417,22 @@ export default function Dashboard() {
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
 
-      <div className="min-h-[calc(100dvh-5rem)] bg-background flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 lg:px-10 overflow-x-hidden py-3 md:py-4">
+      <div className="min-h-[calc(100dvh-5rem)] bg-background flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 lg:px-10 overflow-x-hidden py-3 md:py-4 [@media(max-height:820px)]:py-2">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="text-center mb-3 md:mb-4 max-w-[720px]"
+          className="text-center mb-3 md:mb-4 [@media(max-height:820px)]:mb-2 max-w-[720px]"
         >
-          <p className="font-mono text-[10px] md:text-xs tracking-[0.3em] uppercase text-formanova-hero-accent mb-1.5 font-medium">
+          <p className="font-mono text-[10px] md:text-xs tracking-[0.3em] uppercase text-formanova-hero-accent mb-1.5 font-medium [@media(max-height:780px)]:hidden">
             {userName ? `Welcome, ${userName}` : 'Welcome'}
           </p>
-          <h1 className="font-display text-3xl sm:text-4xl md:text-5xl uppercase tracking-wide text-foreground leading-none mb-1.5">
+          <h1 className="font-display text-3xl sm:text-4xl md:text-5xl [@media(max-height:820px)]:md:text-4xl uppercase tracking-wide text-foreground leading-none mb-1.5">
             What do you want to create?
           </h1>
-          <p className="font-mono text-[11px] md:text-xs tracking-[0.12em] text-foreground/70 uppercase font-medium">
-            Choose a studio workflow to get started
+          <p className="font-mono text-[11px] md:text-xs tracking-[0.12em] text-foreground/70 uppercase font-medium [@media(max-height:780px)]:hidden">
+            Pick a workflow to begin
           </p>
           {/* TEMPORARY: layout A/B preview. */}
           <LayoutToggle layout={layout} onChange={chooseLayout} />
@@ -486,7 +476,7 @@ export default function Dashboard() {
             className={
               isStacked
                 ? 'w-full max-w-[1100px] grid gap-y-5 pb-4'
-                : 'w-full max-w-[1400px] grid xl:grid-cols-2 gap-x-8 gap-y-6 pb-4'
+                : 'w-full max-w-[1400px] grid lg:grid-cols-2 gap-x-6 xl:gap-x-8 gap-y-6 pb-4'
             }
           >
             <section aria-labelledby="dashboard-photography" className="flex flex-col">
