@@ -92,7 +92,7 @@ const itemVariants = {
  */
 function RhinoTag() {
   return (
-    <span className="inline-flex items-center gap-1.5 border border-formanova-hero-accent px-2 py-1 font-mono text-[9px] md:text-[10px] tracking-[0.15em] uppercase text-foreground/80 font-medium whitespace-nowrap">
+    <span className="inline-flex items-center gap-1.5 border border-formanova-hero-accent px-2 py-1 font-mono text-[9px] md:text-[10px] tracking-[0.15em] uppercase text-foreground font-bold whitespace-nowrap">
       <RhinoIcon className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0" />
       Rhino compatible
     </span>
@@ -168,7 +168,7 @@ function WorkflowCard({
       {/* Content */}
       <div className="relative z-10 flex flex-col items-center flex-1 px-4 py-4 md:py-5 bg-card">
         <div className="w-12 h-12 flex items-center justify-center border border-border bg-background -mt-11 mb-2 relative z-10">
-          <Icon className="w-5 h-5 md:w-6 md:h-6 text-formanova-hero-accent" />
+          <Icon className="w-6 h-6 md:w-7 md:h-7 text-formanova-hero-accent" />
         </div>
         <h3 className="font-display text-xl md:text-2xl uppercase tracking-wide text-foreground leading-none mb-1.5">
           {workflow.title}
@@ -189,13 +189,78 @@ function WorkflowCard({
   );
 }
 
+/**
+ * Split card for the Grid layout: image beside the copy rather than above it.
+ *
+ * This is the shape that fits four cards on one screen. Two rows of
+ * image-on-top cards run roughly twice the height of a laptop viewport, so
+ * turning the card on its side is what buys the second row.
+ *
+ * Softer frame than the other layouts (rounded corners and a shadow rather
+ * than a hairline) so the wider card still reads as one object.
+ *
+ * Image on top below sm, where a side-by-side split leaves the copy about
+ * 180px wide.
+ */
+function PanelWorkflowCard({
+  workflow,
+  onSelect,
+}: {
+  workflow: Workflow;
+  onSelect: (workflow: Workflow) => void;
+}) {
+  const Icon = workflow.icon;
+
+  return (
+    <motion.div
+      variants={itemVariants}
+      whileHover={{ scale: 1.01 }}
+      whileTap={{ scale: 0.99 }}
+      onClick={() => onSelect(workflow)}
+      className="group relative flex flex-col sm:flex-row h-full overflow-hidden rounded-lg border border-border bg-card shadow-sm transition-all duration-300 hover:border-formanova-hero-accent hover:shadow-[0_0_30px_-8px_hsl(var(--formanova-hero-accent)/0.45)] cursor-pointer"
+    >
+      {/* Image */}
+      <div className="relative w-full sm:w-[42%] shrink-0 aspect-[4/3] sm:aspect-auto overflow-hidden">
+        <img
+          src={workflow.image}
+          alt={workflow.title}
+          loading="lazy"
+          decoding="async"
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+        />
+      </div>
+
+      {/* Content. Same centred composition as the other cards. */}
+      <div className="flex flex-col items-center justify-center flex-1 px-5 py-5 md:px-6 md:py-6 [@media(max-height:820px)]:py-4 text-center">
+        <span className="w-11 h-11 [@media(max-height:820px)]:w-9 [@media(max-height:820px)]:h-9 shrink-0 flex items-center justify-center border border-border rounded-md mb-3 [@media(max-height:820px)]:mb-2">
+          <Icon className="w-6 h-6 md:w-7 md:h-7 text-formanova-hero-accent" />
+        </span>
+        <h3 className="font-display text-xl md:text-2xl uppercase tracking-wide text-foreground leading-none mb-2">
+          {workflow.title}
+        </h3>
+        <p className="font-mono text-[11px] md:text-xs tracking-[0.12em] text-foreground/80 uppercase leading-snug max-w-[240px]">
+          {workflow.description}
+        </p>
+        <button
+          type="button"
+          aria-label={`Continue to ${workflow.title}`}
+          className={`${CONTINUE_BUTTON} mt-4 [@media(max-height:820px)]:mt-3`}
+        >
+          Continue
+          <ArrowRight className="w-3 h-3 shrink-0" />
+        </button>
+      </div>
+    </motion.div>
+  );
+}
+
 // ── TEMPORARY: layout A/B preview ──────────────────────────────────────────
 // Scaffolding so the arrangements can be judged against each other in the
 // running app. Once one is chosen, delete this block, the toggle in the
 // header, and whichever card components are not kept.
-type DashboardLayout = 'columns' | 'stacked';
+type DashboardLayout = 'columns' | 'stacked' | 'grid';
 const LAYOUT_KEY = 'formanova_dashboard_layout_preview';
-const LAYOUTS: DashboardLayout[] = ['columns', 'stacked'];
+const LAYOUTS: DashboardLayout[] = ['columns', 'stacked', 'grid'];
 
 function readStoredLayout(): DashboardLayout {
   try {
@@ -216,10 +281,11 @@ function LayoutToggle({
   const options: { value: DashboardLayout; label: string }[] = [
     { value: 'columns', label: 'Side by side' },
     { value: 'stacked', label: 'Stacked' },
+    { value: 'grid', label: 'Grid' },
   ];
 
   return (
-    <div className="flex items-center justify-center gap-px mt-2.5 border border-border w-fit mx-auto">
+    <div className="fixed bottom-4 left-4 z-50 flex items-center gap-px border border-border bg-background/95 backdrop-blur-sm shadow-lg">
       {options.map((option) => (
         <button
           key={option.value}
@@ -263,6 +329,8 @@ export default function Dashboard() {
     }
   };
   const isStacked = layout === 'stacked';
+  const isGrid = layout === 'grid';
+  const Card = isGrid ? PanelWorkflowCard : WorkflowCard;
 
   // Prefetch generation history in background so it's instant when user opens Generations
   usePrefetchGenerations();
@@ -313,8 +381,6 @@ export default function Dashboard() {
           <p className="font-mono text-[11px] md:text-xs tracking-[0.12em] text-foreground/70 uppercase font-medium [@media(max-height:780px)]:hidden">
             Pick a workflow to begin
           </p>
-          {/* TEMPORARY: layout A/B preview. */}
-          <LayoutToggle layout={layout} onChange={chooseLayout} />
         </motion.div>
 
         {/* Workflow sections. Side by side puts the two groups in adjacent
@@ -328,28 +394,33 @@ export default function Dashboard() {
             className={
               isStacked
                 ? 'w-full max-w-[1100px] grid gap-y-5 pb-4'
-                : 'w-full max-w-[1400px] grid lg:grid-cols-2 gap-x-6 xl:gap-x-8 gap-y-6 pb-4'
+                : isGrid
+                  ? 'w-full max-w-[1180px] grid gap-y-4 md:gap-y-5 pb-2'
+                  : 'w-full max-w-[1400px] grid lg:grid-cols-2 gap-x-6 xl:gap-x-8 gap-y-6 pb-4'
             }
           >
             <section aria-labelledby="dashboard-photography" className="flex flex-col">
               <CategoryDivider id="dashboard-photography" label="Photography" />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5 flex-1">
+              <div className={`grid grid-cols-1 ${isGrid ? "md:grid-cols-2" : "sm:grid-cols-2"} gap-4 md:gap-5 flex-1`}>
                 {photographyWorkflows.map((workflow) => (
-                  <WorkflowCard key={workflow.title} workflow={workflow} onSelect={handleSelect} />
+                  <Card key={workflow.title} workflow={workflow} onSelect={handleSelect} />
                 ))}
               </div>
             </section>
 
             <section aria-labelledby="dashboard-cad" className="flex flex-col">
               <CategoryDivider id="dashboard-cad" label="CAD" tag={<RhinoTag />} />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5 flex-1">
+              <div className={`grid grid-cols-1 ${isGrid ? "md:grid-cols-2" : "sm:grid-cols-2"} gap-4 md:gap-5 flex-1`}>
                 {cadWorkflows.map((workflow) => (
-                  <WorkflowCard key={workflow.title} workflow={workflow} onSelect={handleSelect} />
+                  <Card key={workflow.title} workflow={workflow} onSelect={handleSelect} />
                 ))}
               </div>
             </section>
           </motion.div>
       </div>
+
+      {/* TEMPORARY: layout A/B preview. */}
+      <LayoutToggle layout={layout} onChange={chooseLayout} />
 
       <EffortIntroModal
         open={pendingRoute !== null}
