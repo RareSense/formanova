@@ -8,8 +8,7 @@ interface ImageToCadIconProps {
  * Image to CAD: a reference picture beside a ring.
  *
  * Same construction as [[TextToCadIcon]] and the same shared ring, so the two
- * CAD marks read as a pair. Plain strokes in a single `currentColor` to match
- * PeopleIcon and RingIcon.
+ * CAD marks read as a pair, at RingIcon's stroke weight.
  */
 export const ImageToCadIcon: React.FC<ImageToCadIconProps> = ({ className = 'h-5 w-5' }) => (
   <svg
@@ -17,7 +16,7 @@ export const ImageToCadIcon: React.FC<ImageToCadIconProps> = ({ className = 'h-5
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
-    strokeWidth="1.5"
+    strokeWidth="1"
     strokeLinecap="round"
     strokeLinejoin="round"
     className={className}

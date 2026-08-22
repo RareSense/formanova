@@ -7,10 +7,12 @@ interface TextToCadIconProps {
 /**
  * Text to CAD: written lines beside a ring.
  *
- * Drawn as plain strokes in a single `currentColor`, matching PeopleIcon and
- * RingIcon. The illustrated version this replaced carried three colour tiers
- * and about a hundred paths, which read as a blob at chip size and did not
- * belong beside the other two marks.
+ * Drawn as plain strokes in a single `currentColor` at the same visual weight
+ * as RingIcon, whose band works out near a 1-unit stroke on this 24 viewBox.
+ *
+ * The illustrated version this replaced carried three colour tiers and about a
+ * hundred paths, which read as a blob at chip size and did not belong beside
+ * the other two marks.
  *
  * Shares its ring with [[ImageToCadIcon]] so the CAD pair reads as a family.
  */
@@ -20,7 +22,7 @@ export const TextToCadIcon: React.FC<TextToCadIconProps> = ({ className = 'h-5 w
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
-    strokeWidth="1.5"
+    strokeWidth="1"
     strokeLinecap="round"
     strokeLinejoin="round"
     className={className}

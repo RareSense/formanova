@@ -92,9 +92,9 @@ const itemVariants = {
  */
 function RhinoTag() {
   return (
-    <span className="inline-flex items-center gap-1.5 border border-border px-2 py-1 font-mono text-[9px] md:text-[10px] tracking-[0.15em] uppercase text-foreground/80 font-medium whitespace-nowrap">
+    <span className="inline-flex items-center gap-1.5 border border-formanova-hero-accent px-2 py-1 font-mono text-[9px] md:text-[10px] tracking-[0.15em] uppercase text-foreground/80 font-medium whitespace-nowrap">
       <RhinoIcon className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0" />
-      Rhino compatible · .3DM
+      Rhino compatible
     </span>
   );
 }
@@ -135,7 +135,7 @@ const CARD_FRAME =
   'group relative marta-frame overflow-hidden h-full transition-all duration-300 hover:border-formanova-hero-accent hover:shadow-[0_0_30px_-5px_hsl(var(--formanova-hero-accent)/0.4)] cursor-pointer';
 
 const CONTINUE_BUTTON =
-  'px-6 py-2 bg-formanova-hero-accent text-primary-foreground font-mono text-[10px] md:text-xs tracking-[0.2em] uppercase inline-flex items-center justify-center gap-2 whitespace-nowrap transition-all duration-300 hover:opacity-90';
+  'px-6 py-3 sm:py-2 bg-formanova-hero-accent text-primary-foreground font-mono text-[10px] md:text-xs tracking-[0.2em] uppercase inline-flex items-center justify-center gap-2 whitespace-nowrap transition-all duration-300 hover:opacity-90';
 
 function WorkflowCard({
   workflow,
@@ -179,7 +179,7 @@ function WorkflowCard({
         {/* mt-auto on the wrapper, not the button, so the Continue buttons line
             up across a row without inflating the button's own padding. */}
         <div className="mt-auto pt-3 md:pt-4">
-          <button className={CONTINUE_BUTTON}>
+          <button type="button" aria-label={`Continue to ${workflow.title}`} className={CONTINUE_BUTTON}>
             Continue
             <ArrowRight className="w-3 h-3 shrink-0" />
           </button>
@@ -189,131 +189,13 @@ function WorkflowCard({
   );
 }
 
-/**
- * Wide card for the stacked layout: image beside the copy rather than above
- * it. Two stacked rows of tall image-on-top cards cannot fit an 800px screen
- * without shrinking the images to letterbox strips, so the stacked option
- * turns the card on its side instead of squashing it.
- *
- * Still image-on-top below sm, where a side-by-side split leaves the copy
- * about 180px wide.
- */
-function WideWorkflowCard({
-  workflow,
-  onSelect,
-}: {
-  workflow: Workflow;
-  onSelect: (workflow: Workflow) => void;
-}) {
-  const Icon = workflow.icon;
-
-  return (
-    <motion.div
-      variants={itemVariants}
-      whileHover={{ scale: 1.01 }}
-      whileTap={{ scale: 0.99 }}
-      onClick={() => onSelect(workflow)}
-      className={`${CARD_FRAME} flex flex-col sm:flex-row`}
-    >
-      {/* Image */}
-      <div className="relative w-full sm:w-[38%] shrink-0 aspect-[4/3] sm:aspect-auto overflow-hidden">
-        <img
-          src={workflow.image}
-          alt={workflow.title}
-          loading="lazy"
-          decoding="async"
-          className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-        />
-      </div>
-
-      {/* Content */}
-      {/* Content. Centred on one axis with even steps between icon, title,
-          copy and action, so the text half reads as a composition rather than
-          as a column pushed against the image. */}
-      <div className="relative z-10 flex flex-col items-center justify-center flex-1 px-5 py-5 [@media(max-height:820px)]:py-3 text-center bg-card">
-        <span className="w-11 h-11 [@media(max-height:820px)]:w-9 [@media(max-height:820px)]:h-9 shrink-0 flex items-center justify-center border border-border bg-background mb-3 [@media(max-height:820px)]:mb-2">
-          <Icon className="w-5 h-5 md:w-6 md:h-6 text-formanova-hero-accent" />
-        </span>
-        <h3 className="font-display text-lg md:text-xl uppercase tracking-wide text-foreground leading-none mb-2">
-          {workflow.title}
-        </h3>
-        <p className="font-mono text-[11px] md:text-xs tracking-[0.15em] text-foreground/80 uppercase max-w-[240px]">
-          {workflow.description}
-        </p>
-        <button className={`${CONTINUE_BUTTON} mt-4 [@media(max-height:820px)]:mt-3`}>
-          Continue
-          <ArrowRight className="w-3 h-3 shrink-0" />
-        </button>
-      </div>
-    </motion.div>
-  );
-}
-
-/**
- * Grid variant: four wide cards in a 2x2, no section headings. The grouping
- * is carried by the order and by the icons rather than by labels, so the copy
- * is the only thing competing for attention.
- *
- * Softer frame than the other two (rounded corners, a shadow instead of a
- * hairline) because without the section rules the page needs the cards
- * themselves to define the structure.
- */
-function PanelWorkflowCard({
-  workflow,
-  onSelect,
-}: {
-  workflow: Workflow;
-  onSelect: (workflow: Workflow) => void;
-}) {
-  const Icon = workflow.icon;
-
-  return (
-    <motion.div
-      variants={itemVariants}
-      whileHover={{ scale: 1.01 }}
-      whileTap={{ scale: 0.99 }}
-      onClick={() => onSelect(workflow)}
-      className="group relative flex flex-col sm:flex-row h-full overflow-hidden rounded-lg border border-border bg-card shadow-sm transition-all duration-300 hover:border-formanova-hero-accent hover:shadow-[0_0_30px_-8px_hsl(var(--formanova-hero-accent)/0.45)] cursor-pointer"
-    >
-      {/* Image */}
-      <div className="relative w-full sm:w-[40%] xl:w-[45%] shrink-0 aspect-[4/3] sm:aspect-auto overflow-hidden">
-        <img
-          src={workflow.image}
-          alt={workflow.title}
-          loading="lazy"
-          decoding="async"
-          className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-        />
-      </div>
-
-      {/* Content */}
-      {/* Content. Same centred composition as the other cards. */}
-      <div className="flex flex-col items-center justify-center flex-1 px-5 py-4 md:px-6 md:py-5 [@media(max-height:820px)]:py-3 text-center">
-        <span className="w-11 h-11 [@media(max-height:820px)]:w-9 [@media(max-height:820px)]:h-9 shrink-0 flex items-center justify-center border border-border rounded-md mb-2.5 [@media(max-height:820px)]:mb-2">
-          <Icon className="w-5 h-5 md:w-6 md:h-6 text-formanova-hero-accent" />
-        </span>
-        <h3 className="font-display text-xl md:text-2xl uppercase tracking-wide text-foreground leading-none mb-2">
-          {workflow.title}
-        </h3>
-        <p className="font-mono text-[11px] md:text-xs tracking-[0.12em] text-foreground/80 uppercase leading-snug max-w-[240px]">
-          {workflow.description}
-        </p>
-        <button className={`${CONTINUE_BUTTON} mt-4 [@media(max-height:820px)]:mt-3`}>
-          Continue
-          <ArrowRight className="w-3 h-3 shrink-0" />
-        </button>
-      </div>
-    </motion.div>
-  );
-}
-
 // ── TEMPORARY: layout A/B preview ──────────────────────────────────────────
 // Scaffolding so the arrangements can be judged against each other in the
 // running app. Once one is chosen, delete this block, the toggle in the
 // header, and whichever card components are not kept.
-type DashboardLayout = 'columns' | 'stacked' | 'grid';
+type DashboardLayout = 'columns' | 'stacked';
 const LAYOUT_KEY = 'formanova_dashboard_layout_preview';
-const LAYOUTS: DashboardLayout[] = ['columns', 'stacked', 'grid'];
+const LAYOUTS: DashboardLayout[] = ['columns', 'stacked'];
 
 function readStoredLayout(): DashboardLayout {
   try {
@@ -334,7 +216,6 @@ function LayoutToggle({
   const options: { value: DashboardLayout; label: string }[] = [
     { value: 'columns', label: 'Side by side' },
     { value: 'stacked', label: 'Stacked' },
-    { value: 'grid', label: 'Grid' },
   ];
 
   return (
@@ -382,8 +263,6 @@ export default function Dashboard() {
     }
   };
   const isStacked = layout === 'stacked';
-  const isGrid = layout === 'grid';
-  const Card = isStacked ? WideWorkflowCard : WorkflowCard;
 
   // Prefetch generation history in background so it's instant when user opens Generations
   usePrefetchGenerations();
@@ -439,35 +318,8 @@ export default function Dashboard() {
         </motion.div>
 
         {/* Workflow sections. Side by side puts the two groups in adjacent
-            columns from xl up; stacked keeps Photography over CAD and turns
-            the cards on their side so both rows still fit one screen. */}
-        {isGrid ? (
-          <motion.div
-            key={layout}
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-            className="w-full max-w-[1200px] grid gap-y-3 md:gap-y-4 pb-2"
-          >
-            <section aria-labelledby="grid-photography">
-              <CategoryDivider id="grid-photography" label="Photography" />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
-                {photographyWorkflows.map((workflow) => (
-                  <PanelWorkflowCard key={workflow.title} workflow={workflow} onSelect={handleSelect} />
-                ))}
-              </div>
-            </section>
-
-            <section aria-labelledby="grid-cad">
-              <CategoryDivider id="grid-cad" label="CAD" tag={<RhinoTag />} />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
-                {cadWorkflows.map((workflow) => (
-                  <PanelWorkflowCard key={workflow.title} workflow={workflow} onSelect={handleSelect} />
-                ))}
-              </div>
-            </section>
-          </motion.div>
-        ) : (
+            columns; stacked keeps Photography over CAD. Same card either way. */}
+        
           <motion.div
             key={layout}
             variants={containerVariants}
@@ -483,7 +335,7 @@ export default function Dashboard() {
               <CategoryDivider id="dashboard-photography" label="Photography" />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5 flex-1">
                 {photographyWorkflows.map((workflow) => (
-                  <Card key={workflow.title} workflow={workflow} onSelect={handleSelect} />
+                  <WorkflowCard key={workflow.title} workflow={workflow} onSelect={handleSelect} />
                 ))}
               </div>
             </section>
@@ -492,12 +344,11 @@ export default function Dashboard() {
               <CategoryDivider id="dashboard-cad" label="CAD" tag={<RhinoTag />} />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5 flex-1">
                 {cadWorkflows.map((workflow) => (
-                  <Card key={workflow.title} workflow={workflow} onSelect={handleSelect} />
+                  <WorkflowCard key={workflow.title} workflow={workflow} onSelect={handleSelect} />
                 ))}
               </div>
             </section>
           </motion.div>
-        )}
       </div>
 
       <EffortIntroModal
