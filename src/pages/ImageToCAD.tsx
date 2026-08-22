@@ -34,6 +34,7 @@ import GemToggle from "@/components/text-to-cad/QualityToggle";
 import type { GemMode } from "@/components/text-to-cad/CADCanvas";
 import { RING_CAD_DEFAULT_TIER } from "@/lib/ring-cad-nurbs-api";
 import { recordStudioVisit } from '@/lib/studio-preference';
+import { useCadRestoreFromUrl } from "@/hooks/useCadRestoreFromUrl";
 
 export default function ImageToCAD() {
   // Counts towards which studio this user lands in after sign-in. The
@@ -121,17 +122,14 @@ export default function ImageToCAD() {
     else rightPanelRef.current?.collapse();
   }, [workflow.hasModel]);
 
-  useEffect(() => {
-    const glbParam = searchParams.get('glb');
-    const workflowIdParam = searchParams.get('workflow_id');
-    const workflowId = workflowIdParam?.trim() || null;
-    if (!glbParam && !workflowId) return;
-    void workflow.restoreCompletedWorkflow(workflowId, glbParam).then((restored) => {
-      if (!restored) toast.error('Could not load this CAD result');
-    });
-    navigate('/image-to-cad', { replace: true });
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount; workflow/navigate/searchParams excluded so re-navigation doesn't re-seed state
-  }, []);
+  // Boot directly into the workspace from a stable workflow result link. The
+  // optional GLB param renders eagerly; the workflow id restores the full
+  // result, including the machinable 3DM, after refresh/new session.
+  useCadRestoreFromUrl({
+    cadRoute: '/image-to-cad',
+    restoreCompletedWorkflow: workflow.restoreCompletedWorkflow,
+    onFailure: () => toast.error('Could not load this CAD result'),
+  });
 
   // Top of the CAD funnel. Fires once per page entry so drop-off between
   // landing here and pressing Generate is measurable, matching studio_open in
