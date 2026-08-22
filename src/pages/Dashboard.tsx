@@ -11,7 +11,7 @@ import { trackStudioTypeSelected } from '@/lib/posthog-events';
 
 import { PeopleIcon } from '@/components/icons/PeopleIcon';
 import { RingIcon } from '@/components/icons/RingIcon';
-import { WireframeCubeIcon } from '@/components/icons/WireframeCubeIcon';
+import { RhinoIcon } from '@/components/icons/RhinoIcon';
 import { EffortIntroModal } from '@/components/studio/EffortIntroModal';
 import type { EffortLevel } from '@/components/studio/EffortToggle';
 
@@ -87,10 +87,12 @@ const itemVariants = {
 
 function SectionHeading({ id, label }: { id: string; label: string }) {
   return (
-    <div className="flex items-center gap-3 md:gap-4 mb-4 md:mb-5">
+    <div className="flex items-center gap-3 md:gap-4 mb-3">
+      {/* Display face at a size above the card titles, so the two groups read
+          as sections rather than as another line of card copy. */}
       <h2
         id={id}
-        className="font-mono text-[10px] md:text-xs tracking-[0.3em] uppercase text-formanova-hero-accent font-medium whitespace-nowrap"
+        className="font-display text-2xl md:text-3xl uppercase tracking-wide text-formanova-hero-accent leading-none whitespace-nowrap"
       >
         {label}
       </h2>
@@ -117,7 +119,7 @@ function WorkflowCard({
       className="group relative marta-frame overflow-hidden flex flex-col h-full transition-all duration-300 hover:border-formanova-hero-accent hover:shadow-[0_0_30px_-5px_hsl(var(--formanova-hero-accent)/0.4)] cursor-pointer"
     >
       {/* Image */}
-      <div className="relative aspect-[3/2] overflow-hidden">
+      <div className="relative aspect-[4/3] overflow-hidden">
         <img
           src={workflow.image}
           alt={workflow.title}
@@ -128,26 +130,26 @@ function WorkflowCard({
       </div>
 
       {/* Content */}
-      <div className="relative z-10 flex flex-col items-center flex-1 px-4 py-5 md:py-6 bg-card">
-        <div className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center border border-border bg-background -mt-10 md:-mt-11 mb-3 relative z-10">
+      <div className="relative z-10 flex flex-col items-center flex-1 px-4 py-4 md:py-5 bg-card">
+        <div className="w-10 h-10 flex items-center justify-center border border-border bg-background -mt-9 mb-2.5 relative z-10">
           <Icon className="w-4 h-4 md:w-5 md:h-5 text-formanova-hero-accent" />
         </div>
-        <h3 className="font-display text-xl md:text-2xl uppercase tracking-wide text-foreground leading-none mb-2">
+        <h3 className="font-display text-xl md:text-2xl uppercase tracking-wide text-foreground leading-none mb-1.5">
           {workflow.title}
         </h3>
         <p className="font-mono text-[11px] md:text-xs tracking-[0.15em] text-foreground/80 uppercase text-center max-w-[240px]">
           {workflow.description}
         </p>
         {workflow.meta && (
-          <p className="mt-2.5 flex items-center justify-center gap-1.5 font-mono text-[9px] md:text-[10px] tracking-[0.15em] text-muted-foreground uppercase text-center">
-            <WireframeCubeIcon className="w-3 h-3 md:w-3.5 md:h-3.5 shrink-0 opacity-70" />
+          <p className="mt-2 flex items-center justify-center gap-1.5 font-mono text-[10px] md:text-[11px] tracking-[0.15em] text-foreground/75 uppercase text-center">
+            <RhinoIcon className="w-4 h-4 shrink-0" />
             {workflow.meta}
           </p>
         )}
         {/* mt-auto on the wrapper, not the button, so the Continue buttons line
             up across a row without inflating the button's own padding. */}
-        <div className="mt-auto pt-4 md:pt-5">
-          <button className="px-6 py-2.5 bg-formanova-hero-accent text-primary-foreground font-mono text-[10px] md:text-xs tracking-[0.2em] uppercase inline-flex items-center justify-center gap-2 whitespace-nowrap transition-all duration-300 hover:opacity-90">
+        <div className="mt-auto pt-3 md:pt-4">
+          <button className="px-6 py-2 bg-formanova-hero-accent text-primary-foreground font-mono text-[10px] md:text-xs tracking-[0.2em] uppercase inline-flex items-center justify-center gap-2 whitespace-nowrap transition-all duration-300 hover:opacity-90">
             Continue
             <ArrowRight className="w-3 h-3 shrink-0" />
           </button>
@@ -201,44 +203,46 @@ export default function Dashboard() {
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
 
-      <div className="min-h-[calc(100dvh-5rem)] bg-background flex flex-col items-center px-4 sm:px-6 md:px-8 lg:px-10 overflow-x-hidden py-8 md:py-10">
+      <div className="min-h-[calc(100dvh-5rem)] bg-background flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 lg:px-10 overflow-x-hidden py-5 md:py-6">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="text-center mb-8 md:mb-10 max-w-[720px]"
+          className="text-center mb-5 md:mb-6 max-w-[720px]"
         >
-          <p className="font-mono text-[10px] md:text-xs tracking-[0.3em] uppercase text-formanova-hero-accent mb-3 font-medium">
+          <p className="font-mono text-[10px] md:text-xs tracking-[0.3em] uppercase text-formanova-hero-accent mb-2 font-medium">
             {userName ? `Welcome, ${userName}` : 'Welcome'}
           </p>
-          <h1 className="font-display text-3xl sm:text-4xl md:text-5xl lg:text-6xl uppercase tracking-wide text-foreground leading-none mb-3">
+          <h1 className="font-display text-3xl sm:text-4xl md:text-5xl uppercase tracking-wide text-foreground leading-none mb-2">
             What do you want to create?
           </h1>
-          <p className="font-mono text-[11px] md:text-sm tracking-[0.12em] text-foreground/70 uppercase font-medium">
+          <p className="font-mono text-[11px] md:text-xs tracking-[0.12em] text-foreground/70 uppercase font-medium">
             Choose a studio workflow to get started
           </p>
         </motion.div>
 
-        {/* Workflow sections */}
+        {/* Workflow sections.
+            Side by side from xl up, which is what keeps all four cards on one
+            screen: stacked, the second section always fell below the fold. */}
         <motion.div
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="w-full max-w-[1200px] flex flex-col gap-8 md:gap-10 pb-6 md:pb-10"
+          className="w-full max-w-[1400px] grid xl:grid-cols-2 gap-x-8 gap-y-6 pb-4"
         >
-          <section aria-labelledby="dashboard-photography">
+          <section aria-labelledby="dashboard-photography" className="flex flex-col">
             <SectionHeading id="dashboard-photography" label="Photography" />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5 lg:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5 flex-1">
               {photographyWorkflows.map((workflow) => (
                 <WorkflowCard key={workflow.title} workflow={workflow} onSelect={handleSelect} />
               ))}
             </div>
           </section>
 
-          <section aria-labelledby="dashboard-cad">
+          <section aria-labelledby="dashboard-cad" className="flex flex-col">
             <SectionHeading id="dashboard-cad" label="CAD" />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5 lg:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5 flex-1">
               {cadWorkflows.map((workflow) => (
                 <WorkflowCard key={workflow.title} workflow={workflow} onSelect={handleSelect} />
               ))}
