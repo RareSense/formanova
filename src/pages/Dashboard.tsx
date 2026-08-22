@@ -134,7 +134,7 @@ function CategoryDivider({
   tag?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-2 sm:gap-3 md:gap-4 mb-2 sm:mb-2.5 md:mb-3 [@media(max-height:820px)]:mb-2">
+    <div className="flex items-center gap-2 sm:gap-3 md:gap-4 mb-1.5 sm:mb-2.5 md:mb-3 [@media(max-height:820px)]:mb-2">
       <span aria-hidden="true" className="h-px flex-1 bg-border" />
       <div className="flex items-center gap-2.5 md:gap-3 shrink-0">
         <h2
@@ -154,7 +154,7 @@ const CARD_FRAME =
   'group relative marta-frame overflow-hidden h-full transition-all duration-300 hover:border-formanova-hero-accent hover:shadow-[0_0_30px_-5px_hsl(var(--formanova-hero-accent)/0.4)] cursor-pointer';
 
 const CONTINUE_BUTTON =
-  'px-6 py-3 sm:py-2 bg-formanova-hero-accent text-primary-foreground font-mono text-[10px] md:text-xs tracking-[0.2em] uppercase inline-flex items-center justify-center gap-2 whitespace-nowrap transition-all duration-300 hover:opacity-90';
+  'px-4 py-2.5 sm:px-6 sm:py-2 bg-formanova-hero-accent text-primary-foreground font-mono text-[10px] md:text-xs tracking-[0.2em] uppercase inline-flex items-center justify-center gap-2 whitespace-nowrap transition-all duration-300 hover:opacity-90';
 
 function WorkflowCard({
   workflow,
@@ -185,25 +185,25 @@ function WorkflowCard({
       </div>
 
       {/* Content */}
-      <div className="relative z-10 flex flex-col items-center flex-1 px-3 py-2.5 sm:px-4 sm:py-4 md:py-5 bg-card">
-        <div className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center border border-border bg-background -mt-9 sm:-mt-11 mb-1.5 sm:mb-2 relative z-10">
+      <div className="relative z-10 flex flex-col items-center flex-1 px-2.5 py-2 sm:px-4 sm:py-4 md:py-5 bg-card">
+        <div className="w-9 h-9 sm:w-12 sm:h-12 flex items-center justify-center border border-border bg-background -mt-[26px] sm:-mt-11 mb-1 sm:mb-2 relative z-10">
           <Icon
             className={`text-formanova-hero-accent ${
               workflow.wideIcon
-                ? 'h-5 sm:h-6 md:h-7 w-auto'
-                : 'w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7'
+                ? 'h-4 sm:h-6 md:h-7 w-auto'
+                : 'w-4 h-4 sm:w-6 sm:h-6 md:w-7 md:h-7'
             }`}
           />
         </div>
         <h3 className="font-display text-lg sm:text-xl md:text-2xl uppercase tracking-wide text-foreground leading-none mb-1 sm:mb-1.5">
           {workflow.title}
         </h3>
-        <p className="font-mono text-[10px] sm:text-[11px] md:text-xs tracking-[0.12em] sm:tracking-[0.15em] text-foreground/80 uppercase text-center max-w-[240px]">
+        <p className="font-mono text-[9px] sm:text-[11px] md:text-xs tracking-[0.1em] sm:tracking-[0.15em] text-foreground/80 uppercase text-center max-w-[240px]">
           {workflow.description}
         </p>
         {/* mt-auto on the wrapper, not the button, so the Continue buttons line
             up across a row without inflating the button's own padding. */}
-        <div className="mt-auto pt-2.5 sm:pt-3 md:pt-4">
+        <div className="mt-auto pt-2 sm:pt-3 md:pt-4">
           <button
             type="button"
             aria-label={`Continue to ${workflow.title}`}
@@ -263,18 +263,18 @@ export default function Dashboard() {
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
 
-      <div className="min-h-[calc(100dvh-5rem)] bg-background flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 lg:px-10 overflow-x-hidden py-2 sm:py-3 md:py-4 [@media(max-height:820px)]:py-2">
+      <div className="min-h-[calc(100svh-5rem)] bg-background flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 lg:px-10 overflow-x-hidden py-2 sm:py-3 md:py-4 [@media(max-height:820px)]:py-2">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="text-center mb-2 sm:mb-3 md:mb-4 [@media(max-height:820px)]:mb-2 max-w-[720px]"
+          className="text-center mb-1.5 sm:mb-3 md:mb-4 [@media(max-height:820px)]:mb-2 max-w-[720px]"
         >
           <p className="font-mono text-[10px] md:text-xs tracking-[0.3em] uppercase text-formanova-hero-accent mb-1.5 font-medium hidden sm:block [@media(max-height:780px)]:hidden">
             {userName ? `Welcome, ${userName}` : 'Welcome'}
           </p>
-          <h1 className="font-display text-2xl sm:text-4xl md:text-5xl [@media(max-height:820px)]:md:text-4xl uppercase tracking-wide text-foreground leading-none mb-1.5">
+          <h1 className="font-display text-xl sm:text-4xl md:text-5xl [@media(max-height:820px)]:md:text-4xl uppercase tracking-wide text-foreground leading-none mb-1 sm:mb-1.5">
             What do you want to create?
           </h1>
           <p className="font-mono text-[11px] md:text-xs tracking-[0.12em] text-foreground/70 uppercase font-medium hidden sm:block [@media(max-height:780px)]:hidden">
@@ -289,11 +289,11 @@ export default function Dashboard() {
               variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className="w-full max-w-[1400px] grid md:grid-cols-2 gap-x-4 lg:gap-x-6 xl:gap-x-8 gap-y-2.5 sm:gap-y-6 pb-1 sm:pb-4"
+            className="w-full max-w-[1400px] grid md:grid-cols-2 gap-x-4 lg:gap-x-6 xl:gap-x-8 gap-y-2 sm:gap-y-6 pb-0 sm:pb-4"
           >
             <section aria-labelledby="dashboard-photography" className="flex flex-col">
               <CategoryDivider id="dashboard-photography" label="Photography" />
-              <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:gap-5 flex-1">
+              <div className="grid grid-cols-2 gap-2 sm:gap-4 md:gap-5 flex-1">
                 {photographyWorkflows.map((workflow) => (
                   <WorkflowCard key={workflow.title} workflow={workflow} onSelect={handleSelect} />
                 ))}
@@ -302,7 +302,7 @@ export default function Dashboard() {
 
             <section aria-labelledby="dashboard-cad" className="flex flex-col">
               <CategoryDivider id="dashboard-cad" label="CAD" tag={<RhinoTag />} />
-              <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:gap-5 flex-1">
+              <div className="grid grid-cols-2 gap-2 sm:gap-4 md:gap-5 flex-1">
                 {cadWorkflows.map((workflow) => (
                   <WorkflowCard key={workflow.title} workflow={workflow} onSelect={handleSelect} />
                 ))}
