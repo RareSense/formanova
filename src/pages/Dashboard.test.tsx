@@ -29,16 +29,41 @@ vi.mock('@/hooks/use-prefetch-generations', () => ({
   usePrefetchGenerations: vi.fn(),
 }));
 
-vi.mock('@/components/ui/optimized-image', () => ({
-  OptimizedImage: ({ alt, className }: { alt: string; className?: string }) => (
-    <div role="img" aria-label={alt} className={className} />
-  ),
+vi.mock('@/lib/posthog-events', () => ({
+  trackStudioTypeSelected: vi.fn(),
+}));
+
+vi.mock('@/components/studio/EffortIntroModal', () => ({
+  EffortIntroModal: () => null,
 }));
 
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+
+function renderDashboard() {
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+
+  // Dashboard calls useShopifyStatus (react-query), so it needs a client.
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+  act(() => {
+    root?.render(
+      <QueryClientProvider client={queryClient}>
+        <HelmetProvider>
+          <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+            <Dashboard />
+          </MemoryRouter>
+        </HelmetProvider>
+      </QueryClientProvider>,
+    );
+  });
+
+  return container as HTMLDivElement;
+}
 
 afterEach(() => {
   if (root) {
@@ -49,28 +74,43 @@ afterEach(() => {
   container = null;
 });
 
-describe('Dashboard CAD entry copy', () => {
-  it('presents the dashboard as a studio choice and describes the CAD hub', () => {
-    container = document.createElement('div');
-    document.body.appendChild(container);
-    root = createRoot(container);
+describe('Dashboard as the merged studio hub', () => {
+  it('asks what to create and groups all four workflows under Photography and CAD', () => {
+    const el = renderDashboard();
 
-    // Dashboard calls useShopifyStatus (react-query), so it needs a client.
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    expect(el.textContent).toContain('What do you want to create?');
+    expect(el.textContent).toContain('Photography');
+    expect(el.textContent).toContain('CAD');
 
-    act(() => {
-      root?.render(
-        <QueryClientProvider client={queryClient}>
-          <HelmetProvider>
-            <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-              <Dashboard />
-            </MemoryRouter>
-          </HelmetProvider>
-        </QueryClientProvider>,
-      );
+    expect(el.textContent).toContain('Model Shot');
+    expect(el.textContent).toContain('Product Shot');
+    expect(el.textContent).toContain('Text to CAD');
+    expect(el.textContent).toContain('Image to CAD');
+  });
+
+  it('uses the agreed CAD copy with a non-interactive format note', () => {
+    const el = renderDashboard();
+
+    expect(el.textContent).toContain('Describe your jewelry and generate a CAD model.');
+    expect(el.textContent).toContain('Turn inspiration images into a CAD model.');
+
+    const metaNodes = Array.from(el.querySelectorAll('p')).filter((node) =>
+      node.textContent?.includes('Rhino compatible'),
+    );
+    expect(metaNodes).toHaveLength(2);
+    // The note is plain text, never a button/link/pill.
+    metaNodes.forEach((node) => {
+      expect(node.closest('a')).toBeNull();
+      expect(node.querySelector('button')).toBeNull();
     });
+  });
 
-    expect(container.textContent).toContain('Choose your studio');
-    expect(container.textContent).toContain('Generate text-to-CAD models and catalog visuals');
+  it('gives every card a Continue action', () => {
+    const el = renderDashboard();
+
+    const continueButtons = Array.from(el.querySelectorAll('button')).filter((node) =>
+      node.textContent?.includes('Continue'),
+    );
+    expect(continueButtons).toHaveLength(4);
   });
 });

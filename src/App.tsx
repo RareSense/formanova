@@ -58,13 +58,11 @@ const Tutorial = lazyWithRetry(() => import("./pages/Tutorial"));
 const FeedbackRedirect = lazyWithRetry(() => import("./pages/FeedbackRedirect"));
 const PhotographyStudioCategories = lazyWithRetry(() => import("./pages/PhotographyStudioCategories"));
 const ProductShotCategories = lazyWithRetry(() => import("./pages/ProductShotCategories"));
-const StudioTypeSelection = lazyWithRetry(() => import("./pages/StudioTypeSelection"));
 const UnifiedStudio = lazyWithRetry(() => import("./pages/UnifiedStudio"));
 // PRESERVED: Old single-upload studio - uncomment to restore
 // const JewelryStudio = lazyWithRetry(() => import("./pages/JewelryStudio"));
 // PRESERVED: Batch upload studio - uncomment to restore batch workflow
 // const CategoryUploadStudio = lazyWithRetry(() => import("@/components/bulk").then(m => ({ default: m.CategoryUploadStudio })));
-const CADStudio = lazyWithRetry(() => import("./pages/CADStudio"));
 const TextToCAD = lazyWithRetry(() => import("./pages/TextToCAD"));
 const ImageToCAD = lazyWithRetry(() => import("./pages/ImageToCAD"));
 const Generations = lazyWithRetry(() => import("./pages/Generations"));
@@ -154,11 +152,6 @@ function OnboardingRedirectHandler() {
 /* GlobalOnboardingGate removed — guide is now handled inside UnifiedStudio */
 
 
-/** Routes /studio to the pre-selection screen. */
-function StudioGate() {
-  return <StudioTypeSelection />;
-}
-
 /** Version-aware update banner — rendered via portal so Radix Dialog inert does not block it */
 function VersionBanner() {
   const { updateAvailable, refresh, dismiss } = useVersionPolling();
@@ -234,7 +227,9 @@ const MainApp = () => (
                   <Route path="/payment-success" element={<ProtectedRoute><PaymentSuccess /></ProtectedRoute>} />
                   <Route path="/success" element={<ProtectedRoute><PaymentSuccess /></ProtectedRoute>} />
                   <Route path="/cancel" element={<ProtectedRoute><PaymentCancel /></ProtectedRoute>} />
-                  <Route path="/studio" element={<ProtectedRoute><StudioGate /></ProtectedRoute>} />
+                  {/* Photo Studio and CAD Studio merged into the dashboard; the old entry
+                      paths still resolve so saved links and post-payment returns keep working. */}
+                  <Route path="/studio" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/studio/categories" element={<ProtectedRoute><PhotographyStudioCategories /></ProtectedRoute>} />
                   <Route path="/studio/product-shot/categories" element={<ProtectedRoute><ProductShotCategories /></ProtectedRoute>} />
                   <Route path="/studio/:type" element={<ProtectedRoute><UnifiedStudio /></ProtectedRoute>} />
@@ -242,7 +237,7 @@ const MainApp = () => (
                   {/* <Route path="/studio/:type" element={<ProtectedRoute><JewelryStudio /></ProtectedRoute>} /> */}
                   {/* PRESERVED: Batch upload route - uncomment to restore batch workflow */}
                   {/* <Route path="/studio/:type" element={<ProtectedRoute><CategoryUploadStudio /></ProtectedRoute>} /> */}
-                  <Route path="/studio-cad" element={<ProtectedRoute><CADGate><CADStudio /></CADGate></ProtectedRoute>} />
+                  <Route path="/studio-cad" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/text-to-cad" element={<ProtectedRoute><CADGate><TextToCAD /></CADGate></ProtectedRoute>} />
                   <Route path="/image-to-cad" element={<ProtectedRoute><CADGate><ImageToCAD /></CADGate></ProtectedRoute>} />
                   
