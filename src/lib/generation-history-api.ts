@@ -10,7 +10,7 @@ import { fetchCadResult } from '@/lib/cad-result-api';
 const __DEV__ = import.meta.env.DEV;
 
 // Re-exported so existing imports (WorkflowCard.tsx, useImageToCADWorkflow.ts,
-// CadWorkflowModal.tsx, etc.) keep working — the fetch/parse logic itself now
+// etc.) keep working — the fetch/parse logic itself now
 // lives in cad-result-api.ts (split out to stay under AI_RULES.md's file-size
 // guideline).
 export { fetchCadResult };

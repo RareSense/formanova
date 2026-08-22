@@ -29,16 +29,41 @@ vi.mock('@/hooks/use-prefetch-generations', () => ({
   usePrefetchGenerations: vi.fn(),
 }));
 
-vi.mock('@/components/ui/optimized-image', () => ({
-  OptimizedImage: ({ alt, className }: { alt: string; className?: string }) => (
-    <div role="img" aria-label={alt} className={className} />
-  ),
+vi.mock('@/lib/posthog-events', () => ({
+  trackStudioTypeSelected: vi.fn(),
+}));
+
+vi.mock('@/components/studio/EffortIntroModal', () => ({
+  EffortIntroModal: () => null,
 }));
 
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+
+function renderDashboard() {
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+
+  // Dashboard calls useShopifyStatus (react-query), so it needs a client.
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+  act(() => {
+    root?.render(
+      <QueryClientProvider client={queryClient}>
+        <HelmetProvider>
+          <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+            <Dashboard />
+          </MemoryRouter>
+        </HelmetProvider>
+      </QueryClientProvider>,
+    );
+  });
+
+  return container as HTMLDivElement;
+}
 
 afterEach(() => {
   if (root) {
@@ -49,28 +74,56 @@ afterEach(() => {
   container = null;
 });
 
-describe('Dashboard CAD entry copy', () => {
-  it('presents the dashboard as a studio choice and describes the CAD hub', () => {
-    container = document.createElement('div');
-    document.body.appendChild(container);
-    root = createRoot(container);
+describe('Dashboard as the merged studio hub', () => {
+  it('asks what to create and groups all four workflows under Photography and CAD', () => {
+    const el = renderDashboard();
 
-    // Dashboard calls useShopifyStatus (react-query), so it needs a client.
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    expect(el.textContent).toContain('What do you want to create?');
+    expect(el.textContent).toContain('Photography');
+    expect(el.textContent).toContain('CAD');
 
-    act(() => {
-      root?.render(
-        <QueryClientProvider client={queryClient}>
-          <HelmetProvider>
-            <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-              <Dashboard />
-            </MemoryRouter>
-          </HelmetProvider>
-        </QueryClientProvider>,
-      );
-    });
+    expect(el.textContent).toContain('Model Shot');
+    expect(el.textContent).toContain('Product Shot');
+    expect(el.textContent).toContain('Text to CAD');
+    expect(el.textContent).toContain('Image to CAD');
+  });
 
-    expect(container.textContent).toContain('Choose your studio');
-    expect(container.textContent).toContain('Generate text-to-CAD models and catalog visuals');
+  it('uses the agreed CAD copy', () => {
+    const el = renderDashboard();
+
+    expect(el.textContent).toContain('Describe your jewelry and generate a CAD model.');
+    expect(el.textContent).toContain('Turn inspiration images into a CAD model.');
+  });
+
+  // The note describes both CAD workflows, so it belongs to the category
+  // divider. On the cards it was repeated twice and said nothing card-specific.
+  it('carries the format note once, on the CAD divider, as plain metadata', () => {
+    const el = renderDashboard();
+
+    // The outermost span only: the note nests spans to keep the brackets out
+    // of the accessible name, and every level reads the same textContent.
+    const metaNodes = Array.from(el.querySelectorAll('span')).filter(
+      (node) => node.textContent?.trim() === '[Rhino compatible]' && node.querySelector('svg'),
+    );
+    expect(metaNodes).toHaveLength(1);
+
+    const [note] = metaNodes;
+    // Never a button, link, or anything else that invites a click.
+    expect(note.closest('a')).toBeNull();
+    expect(note.closest('button')).toBeNull();
+    expect(note.querySelector('button')).toBeNull();
+
+    // It sits with the CAD heading rather than inside a workflow card.
+    const divider = note.closest('div');
+    expect(divider?.querySelector('h2')?.textContent).toBe('CAD');
+  });
+
+  it('gives every card a Continue action', () => {
+    const el = renderDashboard();
+
+    const continueButtons = Array.from(el.querySelectorAll('button')).filter((node) =>
+      node.textContent?.includes('Continue'),
+    );
+    expect(continueButtons).toHaveLength(4);
   });
 });

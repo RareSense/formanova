@@ -38,6 +38,7 @@ import { runMicroBenchmark } from "@/lib/gpu-detect";
 import type { GemMode } from "@/components/text-to-cad/CADCanvas";
 import { RING_CAD_DEFAULT_TIER, RING_CAD_TIERS } from "@/lib/ring-cad-nurbs-api";
 import { recordStudioVisit } from '@/lib/studio-preference';
+import { useCadRestoreFromUrl } from "@/hooks/useCadRestoreFromUrl";
 
 const NO_REFERENCE_IMAGES: File[] = [];
 
@@ -128,18 +129,11 @@ export default function TextToCAD() {
   // Boot directly into the workspace from a stable workflow result link. The
   // optional GLB param renders eagerly; the workflow id restores the full
   // result, including the machinable 3DM, after refresh/new session.
-  useEffect(() => {
-    const glbParam = searchParams.get('glb');
-    const workflowIdParam = searchParams.get('workflow_id');
-    const workflowId = workflowIdParam?.trim() || null;
-    if (!glbParam && !workflowId) return;
-    void workflow.restoreCompletedWorkflow(workflowId, glbParam).then((restored) => {
-      if (!restored) toast.error('Could not load this CAD result');
-    });
-    // Clean the param from the URL without triggering a re-render loop
-    navigate('/text-to-cad', { replace: true });
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount; workflow/navigate/searchParams excluded so re-navigation doesn't re-seed state
-  }, []);
+  useCadRestoreFromUrl({
+    cadRoute: '/text-to-cad',
+    restoreCompletedWorkflow: workflow.restoreCompletedWorkflow,
+    onFailure: () => toast.error('Could not load this CAD result'),
+  });
 
   // Called when CADCanvas has fully parsed, textured, and rendered the model.
   // Depend only on the stable setter this uses (React guarantees setState
