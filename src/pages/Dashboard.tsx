@@ -92,7 +92,7 @@ const itemVariants = {
  */
 function RhinoTag() {
   return (
-    <span className="inline-flex items-center gap-1.5 border border-formanova-hero-accent px-2 py-1 font-mono text-[9px] md:text-[10px] tracking-[0.15em] uppercase text-foreground font-bold whitespace-nowrap">
+    <span className="inline-flex items-center gap-1.5 border border-formanova-hero-accent px-2 py-1 font-mono text-[9px] md:text-[10px] tracking-[0.15em] uppercase text-foreground font-medium whitespace-nowrap">
       <RhinoIcon className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0" />
       Rhino compatible
     </span>
