@@ -33,6 +33,9 @@ type Workflow = {
   usesEffortIntro?: boolean;
   /** PostHog value, identical to what the Photo Studio page sent. */
   studioType?: 'model-shot' | 'product-shot';
+  /** Wide marks (200x128) size by height so their ring matches the square
+   *  marks. Square marks size both axes. */
+  wideIcon?: boolean;
 };
 
 const photographyWorkflows: Workflow[] = [
@@ -62,6 +65,7 @@ const cadWorkflows: Workflow[] = [
     description: 'Describe your jewelry and generate a CAD model.',
     route: '/text-to-cad',
     icon: TextToCadIcon,
+    wideIcon: true,
     image: textToCadImg,
   },
   {
@@ -69,6 +73,7 @@ const cadWorkflows: Workflow[] = [
     description: 'Turn inspiration images into a CAD model.',
     route: '/image-to-cad',
     icon: ImageToCadIcon,
+    wideIcon: true,
     image: imageToCadImg,
   },
 ];
@@ -120,7 +125,7 @@ function CategoryDivider({
       <div className="flex items-center gap-2.5 md:gap-3 shrink-0">
         <h2
           id={id}
-          className="font-display text-2xl md:text-3xl uppercase tracking-wide text-formanova-hero-accent leading-none whitespace-nowrap"
+          className="font-display text-2xl md:text-3xl [@media(max-height:860px)]:text-xl uppercase tracking-wide text-formanova-hero-accent leading-none whitespace-nowrap"
         >
           {label}
         </h2>
@@ -140,9 +145,14 @@ const CONTINUE_BUTTON =
 function WorkflowCard({
   workflow,
   onSelect,
+  compact = false,
 }: {
   workflow: Workflow;
   onSelect: (workflow: Workflow) => void;
+  /** Stacked runs two rows of these, so every vertical unit it spends is
+   *  doubled. The content block is what stops the card shrinking, not the
+   *  image, so compact trims the chip, type and button rather than the art. */
+  compact?: boolean;
 }) {
   const Icon = workflow.icon;
 
@@ -166,20 +176,50 @@ function WorkflowCard({
       </div>
 
       {/* Content */}
-      <div className="relative z-10 flex flex-col items-center flex-1 px-4 py-4 md:py-5 bg-card">
-        <div className="w-12 h-12 flex items-center justify-center border border-border bg-background -mt-11 mb-2 relative z-10">
-          <Icon className="w-6 h-6 md:w-7 md:h-7 text-formanova-hero-accent" />
+      <div
+        className={`relative z-10 flex flex-col items-center flex-1 bg-card ${
+          compact ? 'px-3 py-2.5' : 'px-4 py-4 md:py-5'
+        }`}
+      >
+        <div
+          className={`flex items-center justify-center border border-border bg-background relative z-10 ${
+            compact ? 'w-9 h-9 -mt-[26px] mb-1.5' : 'w-12 h-12 -mt-11 mb-2'
+          }`}
+        >
+          <Icon
+            className={`text-formanova-hero-accent ${
+              workflow.wideIcon
+                ? compact ? 'h-5 w-auto' : 'h-6 md:h-7 w-auto'
+                : compact ? 'w-5 h-5' : 'w-6 h-6 md:w-7 md:h-7'
+            }`}
+          />
         </div>
-        <h3 className="font-display text-xl md:text-2xl uppercase tracking-wide text-foreground leading-none mb-1.5">
+        <h3
+          className={`font-display uppercase tracking-wide text-foreground leading-none ${
+            compact ? 'text-base mb-1' : 'text-xl md:text-2xl mb-1.5'
+          }`}
+        >
           {workflow.title}
         </h3>
-        <p className="font-mono text-[11px] md:text-xs tracking-[0.15em] text-foreground/80 uppercase text-center max-w-[240px]">
+        <p
+          className={`font-mono tracking-[0.12em] text-foreground/80 uppercase text-center ${
+            compact ? 'text-[9px] leading-snug max-w-[200px]' : 'text-[11px] md:text-xs tracking-[0.15em] max-w-[240px]'
+          }`}
+        >
           {workflow.description}
         </p>
         {/* mt-auto on the wrapper, not the button, so the Continue buttons line
             up across a row without inflating the button's own padding. */}
-        <div className="mt-auto pt-3 md:pt-4">
-          <button type="button" aria-label={`Continue to ${workflow.title}`} className={CONTINUE_BUTTON}>
+        <div className={`mt-auto ${compact ? 'pt-2' : 'pt-3 md:pt-4'}`}>
+          <button
+            type="button"
+            aria-label={`Continue to ${workflow.title}`}
+            className={
+              compact
+                ? 'px-4 py-1.5 bg-formanova-hero-accent text-primary-foreground font-mono text-[9px] tracking-[0.2em] uppercase inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-all duration-300 hover:opacity-90'
+                : CONTINUE_BUTTON
+            }
+          >
             Continue
             <ArrowRight className="w-3 h-3 shrink-0" />
           </button>
@@ -208,6 +248,9 @@ function PanelWorkflowCard({
 }: {
   workflow: Workflow;
   onSelect: (workflow: Workflow) => void;
+  /** Accepted so this can share the Card slot with WorkflowCard. Grid has the
+   *  room the stacked rows do not, so it ignores the flag. */
+  compact?: boolean;
 }) {
   const Icon = workflow.icon;
 
@@ -233,7 +276,11 @@ function PanelWorkflowCard({
       {/* Content. Same centred composition as the other cards. */}
       <div className="flex flex-col items-center justify-center flex-1 px-5 py-5 md:px-6 md:py-6 [@media(max-height:820px)]:py-4 text-center">
         <span className="w-11 h-11 [@media(max-height:820px)]:w-9 [@media(max-height:820px)]:h-9 shrink-0 flex items-center justify-center border border-border rounded-md mb-3 [@media(max-height:820px)]:mb-2">
-          <Icon className="w-6 h-6 md:w-7 md:h-7 text-formanova-hero-accent" />
+          <Icon
+            className={`text-formanova-hero-accent ${
+              workflow.wideIcon ? 'h-6 md:h-7 w-auto' : 'w-6 h-6 md:w-7 md:h-7'
+            }`}
+          />
         </span>
         <h3 className="font-display text-xl md:text-2xl uppercase tracking-wide text-foreground leading-none mb-2">
           {workflow.title}
@@ -372,13 +419,13 @@ export default function Dashboard() {
           transition={{ duration: 0.3 }}
           className="text-center mb-3 md:mb-4 [@media(max-height:820px)]:mb-2 max-w-[720px]"
         >
-          <p className="font-mono text-[10px] md:text-xs tracking-[0.3em] uppercase text-formanova-hero-accent mb-1.5 font-medium [@media(max-height:780px)]:hidden">
+          <p className={`font-mono text-[10px] md:text-xs tracking-[0.3em] uppercase text-formanova-hero-accent mb-1.5 font-medium [@media(max-height:780px)]:hidden${isStacked ? ' hidden' : ''}`}>
             {userName ? `Welcome, ${userName}` : 'Welcome'}
           </p>
           <h1 className="font-display text-3xl sm:text-4xl md:text-5xl [@media(max-height:820px)]:md:text-4xl uppercase tracking-wide text-foreground leading-none mb-1.5">
             What do you want to create?
           </h1>
-          <p className="font-mono text-[11px] md:text-xs tracking-[0.12em] text-foreground/70 uppercase font-medium [@media(max-height:780px)]:hidden">
+          <p className={`font-mono text-[11px] md:text-xs tracking-[0.12em] text-foreground/70 uppercase font-medium [@media(max-height:780px)]:hidden${isStacked ? ' hidden' : ''}`}>
             Pick a workflow to begin
           </p>
         </motion.div>
@@ -393,7 +440,7 @@ export default function Dashboard() {
             animate="visible"
             className={
               isStacked
-                ? 'w-full max-w-[1100px] grid gap-y-5 pb-4'
+                ? 'w-full max-w-[470px] [@media(max-height:860px)]:max-w-[290px] grid gap-y-4 [@media(max-height:860px)]:gap-y-2 pb-1 [@media(max-height:860px)]:pb-0'
                 : isGrid
                   ? 'w-full max-w-[1180px] grid gap-y-4 md:gap-y-5 pb-2'
                   : 'w-full max-w-[1400px] grid lg:grid-cols-2 gap-x-6 xl:gap-x-8 gap-y-6 pb-4'
@@ -403,7 +450,7 @@ export default function Dashboard() {
               <CategoryDivider id="dashboard-photography" label="Photography" />
               <div className={`grid grid-cols-1 ${isGrid ? "md:grid-cols-2" : "sm:grid-cols-2"} gap-4 md:gap-5 flex-1`}>
                 {photographyWorkflows.map((workflow) => (
-                  <Card key={workflow.title} workflow={workflow} onSelect={handleSelect} />
+                  <Card key={workflow.title} workflow={workflow} onSelect={handleSelect} compact={isStacked} />
                 ))}
               </div>
             </section>
@@ -412,7 +459,7 @@ export default function Dashboard() {
               <CategoryDivider id="dashboard-cad" label="CAD" tag={<RhinoTag />} />
               <div className={`grid grid-cols-1 ${isGrid ? "md:grid-cols-2" : "sm:grid-cols-2"} gap-4 md:gap-5 flex-1`}>
                 {cadWorkflows.map((workflow) => (
-                  <Card key={workflow.title} workflow={workflow} onSelect={handleSelect} />
+                  <Card key={workflow.title} workflow={workflow} onSelect={handleSelect} compact={isStacked} />
                 ))}
               </div>
             </section>
