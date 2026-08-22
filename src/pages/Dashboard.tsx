@@ -275,7 +275,7 @@ function PanelWorkflowCard({
 
       {/* Content. Same centred composition as the other cards. */}
       <div className="flex flex-col items-center justify-center flex-1 px-5 py-5 md:px-6 md:py-6 [@media(max-height:820px)]:py-4 text-center">
-        <span className="w-11 h-11 [@media(max-height:820px)]:w-9 [@media(max-height:820px)]:h-9 shrink-0 flex items-center justify-center border border-border rounded-md mb-3 [@media(max-height:820px)]:mb-2">
+        <span className="w-11 h-11 [@media(max-height:820px)]:w-9 [@media(max-height:820px)]:h-9 shrink-0 flex items-center justify-center border border-border bg-background rounded-md mb-3 [@media(max-height:820px)]:mb-2">
           <Icon
             className={`text-formanova-hero-accent ${
               workflow.wideIcon ? 'h-6 md:h-7 w-auto' : 'w-6 h-6 md:w-7 md:h-7'
