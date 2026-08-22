@@ -99,18 +99,21 @@ const itemVariants = {
  * conventional way to write a machine-readable fact, and nothing about it
  * invites a click: no border, no fill, no hover, default cursor.
  *
+ * Mark and words sit inside the brackets together and share one colour. Split
+ * across the bracket, or coloured differently from each other, they read as
+ * two separate things rather than one label. Foreground rather than accent
+ * keeps it out of competition with the CAD label beside it.
+ *
  * The brackets are aria-hidden so this is announced as "Rhino compatible"
  * rather than with the punctuation read out.
  */
 function RhinoTag() {
   return (
-    <span className="inline-flex items-center gap-1.5 cursor-default font-mono text-[9px] md:text-[10px] tracking-[0.15em] uppercase text-foreground/70 whitespace-nowrap">
-      <RhinoIcon className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0 text-formanova-hero-accent" />
-      <span>
-        <span aria-hidden="true">[</span>
-        Rhino compatible
-        <span aria-hidden="true">]</span>
-      </span>
+    <span className="inline-flex items-center gap-1 cursor-default font-mono text-[9px] md:text-[10px] tracking-[0.15em] uppercase text-foreground font-bold whitespace-nowrap">
+      <span aria-hidden="true">[</span>
+      <RhinoIcon className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0" />
+      <span>Rhino compatible</span>
+      <span aria-hidden="true">]</span>
     </span>
   );
 }
