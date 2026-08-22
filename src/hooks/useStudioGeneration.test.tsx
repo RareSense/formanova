@@ -17,10 +17,14 @@ vi.mock('@/lib/photoshoot-api', () => ({
   fixWorkflowFor: (isProductShot: boolean) =>
     isProductShot ? 'fix_product_shot' : 'fix_model_shot',
   // Effort-aware generate resolver: low → unsuffixed; high → higher-tier names
-  // (on-model splits 4K, PDP is one name across tiers). Mirrors photoshoot-api.
+  // (both families split 4K onto a _4k upscale-node workflow). Mirrors photoshoot-api.
   workflowFor: (isProductShot: boolean, resolution: string, effort: string = 'low') => {
     if (effort === 'high') {
-      if (isProductShot) return 'Product_shot_pipeline_higher_tier';
+      if (isProductShot) {
+        return resolution === '4K'
+          ? 'Product_shot_pipeline_higher_tier_4k'
+          : 'Product_shot_pipeline_higher_tier';
+      }
       return resolution === '4K'
         ? 'jewelry_photoshoots_generator_higher_tier_4k'
         : 'jewelry_photoshoots_generator_higher_tier';
