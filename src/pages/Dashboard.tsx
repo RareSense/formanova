@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
-import { ArrowRight, ImageIcon, Layers } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { usePrefetchGenerations } from '@/hooks/use-prefetch-generations';
@@ -12,6 +12,8 @@ import { trackStudioTypeSelected } from '@/lib/posthog-events';
 import { PeopleIcon } from '@/components/icons/PeopleIcon';
 import { RingIcon } from '@/components/icons/RingIcon';
 import { RhinoIcon } from '@/components/icons/RhinoIcon';
+import { TextToCadIcon } from '@/components/icons/TextToCadIcon';
+import { ImageToCadIcon } from '@/components/icons/ImageToCadIcon';
 import { EffortIntroModal } from '@/components/studio/EffortIntroModal';
 import type { EffortLevel } from '@/components/studio/EffortToggle';
 
@@ -27,12 +29,12 @@ type Workflow = {
   route: string;
   icon: React.ComponentType<{ className?: string }>;
   image: string;
-  /** Quiet format note under the description. CAD workflows only. */
-  meta?: string;
   /** Photography still passes through the first-run effort chooser. */
   usesEffortIntro?: boolean;
   /** PostHog value, identical to what the Photo Studio page sent. */
   studioType?: 'model-shot' | 'product-shot';
+  /** Illustrated marks need more room inside the chip than a silhouette. */
+  illustratedIcon?: boolean;
 };
 
 const photographyWorkflows: Workflow[] = [
@@ -61,17 +63,17 @@ const cadWorkflows: Workflow[] = [
     title: 'Text to CAD',
     description: 'Describe your jewelry and generate a CAD model.',
     route: '/text-to-cad',
-    icon: Layers,
+    icon: TextToCadIcon,
+    illustratedIcon: true,
     image: textToCadImg,
-    meta: 'Rhino compatible · .3DM',
   },
   {
     title: 'Image to CAD',
     description: 'Turn inspiration images into a CAD model.',
     route: '/image-to-cad',
-    icon: ImageIcon,
+    icon: ImageToCadIcon,
+    illustratedIcon: true,
     image: imageToCadImg,
-    meta: 'Rhino compatible · .3DM',
   },
 ];
 
@@ -85,21 +87,59 @@ const itemVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
 };
 
-function SectionHeading({ id, label }: { id: string; label: string }) {
+/**
+ * Compatibility note for the CAD category.
+ *
+ * Sits on the divider rather than on each card because it describes both CAD
+ * workflows, not either one of them. Outlined and quiet on purpose: filled or
+ * accented it reads as a button, and this is metadata, not an action.
+ */
+function RhinoTag() {
   return (
-    <div className="flex items-center gap-3 md:gap-4 mb-3">
-      {/* Display face at a size above the card titles, so the two groups read
-          as sections rather than as another line of card copy. */}
-      <h2
-        id={id}
-        className="font-display text-2xl md:text-3xl uppercase tracking-wide text-formanova-hero-accent leading-none whitespace-nowrap"
-      >
-        {label}
-      </h2>
+    <span className="inline-flex items-center gap-1.5 border border-border px-2 py-1 font-mono text-[9px] md:text-[10px] tracking-[0.15em] uppercase text-foreground/80 font-medium whitespace-nowrap">
+      <RhinoIcon className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0" />
+      Rhino compatible · .3DM
+    </span>
+  );
+}
+
+/**
+ * Category divider: a centred cluster with a rule running out to each edge.
+ *
+ * Both rules are flex-1, so they are always exactly the same length and the
+ * cluster stays centred whatever it contains, tag or no tag.
+ */
+function CategoryDivider({
+  id,
+  label,
+  tag,
+}: {
+  id: string;
+  label: string;
+  tag?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-3 md:gap-4 mb-2.5 md:mb-3">
+      <span aria-hidden="true" className="h-px flex-1 bg-border" />
+      <div className="flex items-center gap-2.5 md:gap-3 shrink-0">
+        <h2
+          id={id}
+          className="font-display text-2xl md:text-3xl uppercase tracking-wide text-formanova-hero-accent leading-none whitespace-nowrap"
+        >
+          {label}
+        </h2>
+        {tag}
+      </div>
       <span aria-hidden="true" className="h-px flex-1 bg-border" />
     </div>
   );
 }
+
+const CARD_FRAME =
+  'group relative marta-frame overflow-hidden h-full transition-all duration-300 hover:border-formanova-hero-accent hover:shadow-[0_0_30px_-5px_hsl(var(--formanova-hero-accent)/0.4)] cursor-pointer';
+
+const CONTINUE_BUTTON =
+  'px-6 py-2 bg-formanova-hero-accent text-primary-foreground font-mono text-[10px] md:text-xs tracking-[0.2em] uppercase inline-flex items-center justify-center gap-2 whitespace-nowrap transition-all duration-300 hover:opacity-90';
 
 function WorkflowCard({
   workflow,
@@ -109,6 +149,7 @@ function WorkflowCard({
   onSelect: (workflow: Workflow) => void;
 }) {
   const Icon = workflow.icon;
+  const iconSize = workflow.illustratedIcon ? 'w-9 h-9' : 'w-5 h-5 md:w-6 md:h-6';
 
   return (
     <motion.div
@@ -116,7 +157,7 @@ function WorkflowCard({
       whileHover={{ scale: 1.01 }}
       whileTap={{ scale: 0.99 }}
       onClick={() => onSelect(workflow)}
-      className="group relative marta-frame overflow-hidden flex flex-col h-full transition-all duration-300 hover:border-formanova-hero-accent hover:shadow-[0_0_30px_-5px_hsl(var(--formanova-hero-accent)/0.4)] cursor-pointer"
+      className={`${CARD_FRAME} flex flex-col`}
     >
       {/* Image */}
       <div className="relative aspect-[4/3] overflow-hidden">
@@ -131,8 +172,8 @@ function WorkflowCard({
 
       {/* Content */}
       <div className="relative z-10 flex flex-col items-center flex-1 px-4 py-4 md:py-5 bg-card">
-        <div className="w-10 h-10 flex items-center justify-center border border-border bg-background -mt-9 mb-2.5 relative z-10">
-          <Icon className="w-4 h-4 md:w-5 md:h-5 text-formanova-hero-accent" />
+        <div className="w-12 h-12 flex items-center justify-center border border-border bg-background -mt-11 mb-2 relative z-10">
+          <Icon className={`${iconSize} text-formanova-hero-accent`} />
         </div>
         <h3 className="font-display text-xl md:text-2xl uppercase tracking-wide text-foreground leading-none mb-1.5">
           {workflow.title}
@@ -140,16 +181,10 @@ function WorkflowCard({
         <p className="font-mono text-[11px] md:text-xs tracking-[0.15em] text-foreground/80 uppercase text-center max-w-[240px]">
           {workflow.description}
         </p>
-        {workflow.meta && (
-          <p className="mt-2 flex items-center justify-center gap-1.5 font-mono text-[10px] md:text-[11px] tracking-[0.15em] text-foreground/75 uppercase text-center">
-            <RhinoIcon className="w-4 h-4 shrink-0" />
-            {workflow.meta}
-          </p>
-        )}
         {/* mt-auto on the wrapper, not the button, so the Continue buttons line
             up across a row without inflating the button's own padding. */}
         <div className="mt-auto pt-3 md:pt-4">
-          <button className="px-6 py-2 bg-formanova-hero-accent text-primary-foreground font-mono text-[10px] md:text-xs tracking-[0.2em] uppercase inline-flex items-center justify-center gap-2 whitespace-nowrap transition-all duration-300 hover:opacity-90">
+          <button className={CONTINUE_BUTTON}>
             Continue
             <ArrowRight className="w-3 h-3 shrink-0" />
           </button>
@@ -158,6 +193,181 @@ function WorkflowCard({
     </motion.div>
   );
 }
+
+/**
+ * Wide card for the stacked layout: image beside the copy rather than above
+ * it. Two stacked rows of tall image-on-top cards cannot fit an 800px screen
+ * without shrinking the images to letterbox strips, so the stacked option
+ * turns the card on its side instead of squashing it.
+ *
+ * Still image-on-top below sm, where a side-by-side split leaves the copy
+ * about 180px wide.
+ */
+function WideWorkflowCard({
+  workflow,
+  onSelect,
+}: {
+  workflow: Workflow;
+  onSelect: (workflow: Workflow) => void;
+}) {
+  const Icon = workflow.icon;
+  const iconSize = workflow.illustratedIcon ? 'w-9 h-9' : 'w-5 h-5 md:w-6 md:h-6';
+
+  return (
+    <motion.div
+      variants={itemVariants}
+      whileHover={{ scale: 1.01 }}
+      whileTap={{ scale: 0.99 }}
+      onClick={() => onSelect(workflow)}
+      className={`${CARD_FRAME} flex flex-col sm:flex-row`}
+    >
+      {/* Image */}
+      <div className="relative w-full sm:w-[38%] shrink-0 aspect-[4/3] sm:aspect-auto overflow-hidden">
+        <img
+          src={workflow.image}
+          alt={workflow.title}
+          loading="lazy"
+          decoding="async"
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+        />
+      </div>
+
+      {/* Content */}
+      <div className="relative z-10 flex flex-col flex-1 px-4 py-4 bg-card">
+        <div className="flex items-center gap-2 mb-1.5">
+          <span className="w-11 h-11 shrink-0 flex items-center justify-center border border-border bg-background">
+            <Icon className={`${iconSize} text-formanova-hero-accent`} />
+          </span>
+          <h3 className="font-display text-lg md:text-xl uppercase tracking-wide text-foreground leading-none">
+            {workflow.title}
+          </h3>
+        </div>
+        <p className="font-mono text-[11px] md:text-xs tracking-[0.15em] text-foreground/80 uppercase">
+          {workflow.description}
+        </p>
+        <div className="mt-auto pt-3">
+          <button className={CONTINUE_BUTTON}>
+            Continue
+            <ArrowRight className="w-3 h-3 shrink-0" />
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+/**
+ * Grid variant: four wide cards in a 2x2, no section headings. The grouping
+ * is carried by the order and by the icons rather than by labels, so the copy
+ * is the only thing competing for attention.
+ *
+ * Softer frame than the other two (rounded corners, a shadow instead of a
+ * hairline) because without the section rules the page needs the cards
+ * themselves to define the structure.
+ */
+function PanelWorkflowCard({
+  workflow,
+  onSelect,
+}: {
+  workflow: Workflow;
+  onSelect: (workflow: Workflow) => void;
+}) {
+  const Icon = workflow.icon;
+  const iconSize = workflow.illustratedIcon ? 'w-9 h-9' : 'w-5 h-5 md:w-6 md:h-6';
+
+  return (
+    <motion.div
+      variants={itemVariants}
+      whileHover={{ scale: 1.01 }}
+      whileTap={{ scale: 0.99 }}
+      onClick={() => onSelect(workflow)}
+      className="group relative flex flex-col sm:flex-row h-full overflow-hidden rounded-lg border border-border bg-card shadow-sm transition-all duration-300 hover:border-formanova-hero-accent hover:shadow-[0_0_30px_-8px_hsl(var(--formanova-hero-accent)/0.45)] cursor-pointer"
+    >
+      {/* Image */}
+      <div className="relative w-full sm:w-[40%] xl:w-[45%] shrink-0 aspect-[4/3] sm:aspect-auto overflow-hidden">
+        <img
+          src={workflow.image}
+          alt={workflow.title}
+          loading="lazy"
+          decoding="async"
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+        />
+      </div>
+
+      {/* Content */}
+      <div className="flex flex-col flex-1 px-5 py-3 md:px-6 md:py-3.5">
+        <span className="w-11 h-11 shrink-0 flex items-center justify-center border border-border rounded-md mb-2">
+          <Icon className={`${iconSize} text-formanova-hero-accent`} />
+        </span>
+        <h3 className="font-display text-xl md:text-2xl uppercase tracking-wide text-foreground leading-none">
+          {workflow.title}
+        </h3>
+        <span aria-hidden="true" className="block w-8 h-px bg-formanova-hero-accent my-1.5" />
+        <p className="font-mono text-[11px] md:text-xs tracking-[0.12em] text-foreground/80 uppercase leading-snug">
+          {workflow.description}
+        </p>
+        <div className="mt-auto pt-2.5">
+          <button className={CONTINUE_BUTTON}>
+            Continue
+            <ArrowRight className="w-3 h-3 shrink-0" />
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// ── TEMPORARY: layout A/B preview ──────────────────────────────────────────
+// Scaffolding so the arrangements can be judged against each other in the
+// running app. Once one is chosen, delete this block, the toggle in the
+// header, and whichever card components are not kept.
+type DashboardLayout = 'columns' | 'stacked' | 'grid';
+const LAYOUT_KEY = 'formanova_dashboard_layout_preview';
+const LAYOUTS: DashboardLayout[] = ['columns', 'stacked', 'grid'];
+
+function readStoredLayout(): DashboardLayout {
+  try {
+    const stored = localStorage.getItem(LAYOUT_KEY) as DashboardLayout | null;
+    return stored && LAYOUTS.includes(stored) ? stored : 'columns';
+  } catch {
+    return 'columns';
+  }
+}
+
+function LayoutToggle({
+  layout,
+  onChange,
+}: {
+  layout: DashboardLayout;
+  onChange: (next: DashboardLayout) => void;
+}) {
+  const options: { value: DashboardLayout; label: string }[] = [
+    { value: 'columns', label: 'Side by side' },
+    { value: 'stacked', label: 'Stacked' },
+    { value: 'grid', label: 'Grid' },
+  ];
+
+  return (
+    <div className="flex items-center justify-center gap-px mt-2.5 border border-border w-fit mx-auto">
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          onClick={() => onChange(option.value)}
+          aria-pressed={layout === option.value}
+          className={`px-3 py-1.5 font-mono text-[9px] md:text-[10px] tracking-[0.2em] uppercase transition-colors duration-200 ${
+            layout === option.value
+              ? 'bg-formanova-hero-accent text-primary-foreground'
+              : 'bg-background text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+// ── end TEMPORARY ──────────────────────────────────────────────────────────
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -170,6 +380,20 @@ export default function Dashboard() {
   const [pendingRoute, setPendingRoute] = useState<string | null>(null);
   const defaultEffort: EffortLevel =
     localStorage.getItem('formanova_studio_effort') === 'high' ? 'high' : 'low';
+
+  // TEMPORARY: see the layout A/B preview block above.
+  const [layout, setLayout] = useState<DashboardLayout>(readStoredLayout);
+  const chooseLayout = (next: DashboardLayout) => {
+    setLayout(next);
+    try {
+      localStorage.setItem(LAYOUT_KEY, next);
+    } catch {
+      // Private mode. Losing the preview choice on reload costs one click.
+    }
+  };
+  const isStacked = layout === 'stacked';
+  const isGrid = layout === 'grid';
+  const Card = isStacked ? WideWorkflowCard : WorkflowCard;
 
   // Prefetch generation history in background so it's instant when user opens Generations
   usePrefetchGenerations();
@@ -203,52 +427,87 @@ export default function Dashboard() {
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
 
-      <div className="min-h-[calc(100dvh-5rem)] bg-background flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 lg:px-10 overflow-x-hidden py-5 md:py-6">
+      <div className="min-h-[calc(100dvh-5rem)] bg-background flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 lg:px-10 overflow-x-hidden py-3 md:py-4">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="text-center mb-5 md:mb-6 max-w-[720px]"
+          className="text-center mb-3 md:mb-4 max-w-[720px]"
         >
-          <p className="font-mono text-[10px] md:text-xs tracking-[0.3em] uppercase text-formanova-hero-accent mb-2 font-medium">
+          <p className="font-mono text-[10px] md:text-xs tracking-[0.3em] uppercase text-formanova-hero-accent mb-1.5 font-medium">
             {userName ? `Welcome, ${userName}` : 'Welcome'}
           </p>
-          <h1 className="font-display text-3xl sm:text-4xl md:text-5xl uppercase tracking-wide text-foreground leading-none mb-2">
+          <h1 className="font-display text-3xl sm:text-4xl md:text-5xl uppercase tracking-wide text-foreground leading-none mb-1.5">
             What do you want to create?
           </h1>
           <p className="font-mono text-[11px] md:text-xs tracking-[0.12em] text-foreground/70 uppercase font-medium">
             Choose a studio workflow to get started
           </p>
+          {/* TEMPORARY: layout A/B preview. */}
+          <LayoutToggle layout={layout} onChange={chooseLayout} />
         </motion.div>
 
-        {/* Workflow sections.
-            Side by side from xl up, which is what keeps all four cards on one
-            screen: stacked, the second section always fell below the fold. */}
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="w-full max-w-[1400px] grid xl:grid-cols-2 gap-x-8 gap-y-6 pb-4"
-        >
-          <section aria-labelledby="dashboard-photography" className="flex flex-col">
-            <SectionHeading id="dashboard-photography" label="Photography" />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5 flex-1">
-              {photographyWorkflows.map((workflow) => (
-                <WorkflowCard key={workflow.title} workflow={workflow} onSelect={handleSelect} />
-              ))}
-            </div>
-          </section>
+        {/* Workflow sections. Side by side puts the two groups in adjacent
+            columns from xl up; stacked keeps Photography over CAD and turns
+            the cards on their side so both rows still fit one screen. */}
+        {isGrid ? (
+          <motion.div
+            key={layout}
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            className="w-full max-w-[1200px] grid gap-y-3 md:gap-y-4 pb-2"
+          >
+            <section aria-labelledby="grid-photography">
+              <CategoryDivider id="grid-photography" label="Photography" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
+                {photographyWorkflows.map((workflow) => (
+                  <PanelWorkflowCard key={workflow.title} workflow={workflow} onSelect={handleSelect} />
+                ))}
+              </div>
+            </section>
 
-          <section aria-labelledby="dashboard-cad" className="flex flex-col">
-            <SectionHeading id="dashboard-cad" label="CAD" />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5 flex-1">
-              {cadWorkflows.map((workflow) => (
-                <WorkflowCard key={workflow.title} workflow={workflow} onSelect={handleSelect} />
-              ))}
-            </div>
-          </section>
-        </motion.div>
+            <section aria-labelledby="grid-cad">
+              <CategoryDivider id="grid-cad" label="CAD" tag={<RhinoTag />} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
+                {cadWorkflows.map((workflow) => (
+                  <PanelWorkflowCard key={workflow.title} workflow={workflow} onSelect={handleSelect} />
+                ))}
+              </div>
+            </section>
+          </motion.div>
+        ) : (
+          <motion.div
+            key={layout}
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            className={
+              isStacked
+                ? 'w-full max-w-[1100px] grid gap-y-5 pb-4'
+                : 'w-full max-w-[1400px] grid xl:grid-cols-2 gap-x-8 gap-y-6 pb-4'
+            }
+          >
+            <section aria-labelledby="dashboard-photography" className="flex flex-col">
+              <CategoryDivider id="dashboard-photography" label="Photography" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5 flex-1">
+                {photographyWorkflows.map((workflow) => (
+                  <Card key={workflow.title} workflow={workflow} onSelect={handleSelect} />
+                ))}
+              </div>
+            </section>
+
+            <section aria-labelledby="dashboard-cad" className="flex flex-col">
+              <CategoryDivider id="dashboard-cad" label="CAD" tag={<RhinoTag />} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5 flex-1">
+                {cadWorkflows.map((workflow) => (
+                  <Card key={workflow.title} workflow={workflow} onSelect={handleSelect} />
+                ))}
+              </div>
+            </section>
+          </motion.div>
+        )}
       </div>
 
       <EffortIntroModal

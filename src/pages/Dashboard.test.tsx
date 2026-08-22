@@ -88,21 +88,32 @@ describe('Dashboard as the merged studio hub', () => {
     expect(el.textContent).toContain('Image to CAD');
   });
 
-  it('uses the agreed CAD copy with a non-interactive format note', () => {
+  it('uses the agreed CAD copy', () => {
     const el = renderDashboard();
 
     expect(el.textContent).toContain('Describe your jewelry and generate a CAD model.');
     expect(el.textContent).toContain('Turn inspiration images into a CAD model.');
+  });
 
-    const metaNodes = Array.from(el.querySelectorAll('p')).filter((node) =>
-      node.textContent?.includes('Rhino compatible'),
+  // The note describes both CAD workflows, so it belongs to the category
+  // divider. On the cards it was repeated twice and said nothing card-specific.
+  it('carries the format note once, on the CAD divider, as plain metadata', () => {
+    const el = renderDashboard();
+
+    const metaNodes = Array.from(el.querySelectorAll('span')).filter(
+      (node) => node.textContent?.trim().startsWith('Rhino compatible'),
     );
-    expect(metaNodes).toHaveLength(2);
-    // The note is plain text, never a button/link/pill.
-    metaNodes.forEach((node) => {
-      expect(node.closest('a')).toBeNull();
-      expect(node.querySelector('button')).toBeNull();
-    });
+    expect(metaNodes).toHaveLength(1);
+
+    const [note] = metaNodes;
+    // Never a button, link, or anything else that invites a click.
+    expect(note.closest('a')).toBeNull();
+    expect(note.closest('button')).toBeNull();
+    expect(note.querySelector('button')).toBeNull();
+
+    // It sits with the CAD heading rather than inside a workflow card.
+    const divider = note.closest('div');
+    expect(divider?.querySelector('h2')?.textContent).toBe('CAD');
   });
 
   it('gives every card a Continue action', () => {
