@@ -100,8 +100,10 @@ describe('Dashboard as the merged studio hub', () => {
   it('carries the format note once, on the CAD divider, as plain metadata', () => {
     const el = renderDashboard();
 
+    // The outermost span only: the note nests spans to keep the brackets out
+    // of the accessible name, and every level reads the same textContent.
     const metaNodes = Array.from(el.querySelectorAll('span')).filter(
-      (node) => node.textContent?.trim().startsWith('Rhino compatible'),
+      (node) => node.textContent?.trim() === '[Rhino compatible]' && node.querySelector('svg'),
     );
     expect(metaNodes).toHaveLength(1);
 
