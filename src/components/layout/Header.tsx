@@ -174,11 +174,12 @@ export function Header() {
 
   const navLinks: NavLink[] = [
     { path: '/', label: 'Home' },
-    { path: '/studio', label: 'Photo Studio' },
     {
-      path: '/studio-cad',
-      label: 'CAD Studio',
-      activePaths: ['/studio-cad', '/text-to-cad', '/image-to-cad'],
+      // Photo Studio and CAD Studio are one page now, so the studio entry
+      // paths stay active links rather than getting their own nav items.
+      path: '/dashboard',
+      label: 'Dashboard',
+      activePaths: ['/dashboard', '/studio', '/studio-cad', '/text-to-cad', '/image-to-cad'],
     },
     // { path: '/tutorial', label: 'Tutorial' }, // hidden for now
   ];
