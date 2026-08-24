@@ -58,13 +58,21 @@ export function fixWorkflowFor(isProductShot: boolean, effort: EffortTier = 'low
 
 // High-effort ("higher tier") generate workflow names. Effort is chosen purely by
 // which workflow_name we POST — the payload shape is identical to low effort
-// (resolution still travels as `image_size`). On-model splits 1K/2K vs 4K because the
-// polish step caps at 2K, so 4K needs an extra upscale node; PDP's generate service
-// natively covers all three tiers, so PDP is a single name. Up to 3 jewelry images are
-// accepted on the high path. See Pricing Restructure handoff (2026-07-06).
+// (resolution still travels as `image_size`). BOTH families split 1K/2K vs 4K, because
+// gpt-image-2 generation caps at 2048px, so true 4K needs an extra upscale node.
+//
+// PDP used to be a single name on the belief that "PDP's generate service natively
+// covers all three tiers". It does not: generate_jewelry_image_pdp caps its gpt request
+// at 2048 (_gpt_max_edge: 1K -> 1024, everything else -> 2048), and on the Gemini client
+// it returned ~1024 for every tier. So picking 4K on a product shot was billed as 4K and
+// delivered ~1024px. Measured 2026-08-22: a 4K request returns 1456x2048.
+//
+// Up to 3 jewelry images are accepted on the high path. See Pricing Restructure handoff
+// (2026-07-06).
 const MODEL_SHOT_GENERATE_HIGH = 'jewelry_photoshoots_generator_higher_tier';
 const MODEL_SHOT_GENERATE_HIGH_4K = 'jewelry_photoshoots_generator_higher_tier_4k';
 const PRODUCT_SHOT_GENERATE_HIGH = 'Product_shot_pipeline_higher_tier';
+const PRODUCT_SHOT_GENERATE_HIGH_4K = 'Product_shot_pipeline_higher_tier_4k';
 
 /**
  * Canonical generate workflow-name resolver. Single source of truth referenced by
@@ -80,7 +88,7 @@ export function workflowFor(
 ): string {
   const res = resolution || '1K';
   if (effort === 'high') {
-    if (isProductShot) return PRODUCT_SHOT_GENERATE_HIGH;
+    if (isProductShot) return res === '4K' ? PRODUCT_SHOT_GENERATE_HIGH_4K : PRODUCT_SHOT_GENERATE_HIGH;
     return res === '4K' ? MODEL_SHOT_GENERATE_HIGH_4K : MODEL_SHOT_GENERATE_HIGH;
   }
   return isProductShot ? WORKFLOW_NAMES.productShot : WORKFLOW_NAMES.modelShot;

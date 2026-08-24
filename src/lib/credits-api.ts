@@ -24,7 +24,8 @@ export const TOOL_COSTS: Record<string, number> = {
   // PDP high 1K/2K/4K = 12/18/24.
   jewelry_photoshoots_generator_higher_tier: 32,     // model-shot high 1K/2K (max = 2K)
   jewelry_photoshoots_generator_higher_tier_4k: 44,  // model-shot high 4K
-  Product_shot_pipeline_higher_tier: 24,             // product-shot high, all tiers (max = 4K)
+  Product_shot_pipeline_higher_tier: 18,             // product-shot high 1K/2K (max = 2K)
+  Product_shot_pipeline_higher_tier_4k: 24,          // product-shot high 4K
   // Upscale — real cost depends on tier + factor (sent via pricing_context to the
   // estimate endpoint). This flat key is only a last-resort gate fallback when the
   // estimate call fails; set mid-grid so it neither blocks cheap nor approves the

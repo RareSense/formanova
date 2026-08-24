@@ -356,10 +356,12 @@ describe('workflowFor', () => {
     expect(workflowFor(false, '1K', 'high')).toBe('jewelry_photoshoots_generator_higher_tier');
     expect(workflowFor(false, '2K', 'high')).toBe('jewelry_photoshoots_generator_higher_tier');
     expect(workflowFor(false, '4K', 'high')).toBe('jewelry_photoshoots_generator_higher_tier_4k');
-    // PDP high: one name across all three tiers.
+    // PDP high: same split as on-model. generate_jewelry_image_pdp caps its gpt request
+    // at 2048px (_gpt_max_edge), so 4K needs the extra upscale-node workflow. Before
+    // 2026-08-22 all three tiers shared one name, which billed 4K and delivered ~1024px.
     expect(workflowFor(true, '1K', 'high')).toBe('Product_shot_pipeline_higher_tier');
     expect(workflowFor(true, '2K', 'high')).toBe('Product_shot_pipeline_higher_tier');
-    expect(workflowFor(true, '4K', 'high')).toBe('Product_shot_pipeline_higher_tier');
+    expect(workflowFor(true, '4K', 'high')).toBe('Product_shot_pipeline_higher_tier_4k');
   });
 
   it('defaults to standard when effort is omitted', () => {

@@ -292,6 +292,9 @@ describe('inferSourceType', () => {
     expect(inferSourceType('jewelry_photoshoots_generator_higher_tier_4k')).toBe('photo');
     // Product generate high -> product_shot
     expect(inferSourceType('Product_shot_pipeline_higher_tier')).toBe('product_shot');
+    // PDP gained a _4k variant on 2026-08-22 (gpt generation caps at 2048, so 4K needs
+    // the upscale node) — it must land in the same section as its base name.
+    expect(inferSourceType('Product_shot_pipeline_higher_tier_4k')).toBe('product_shot');
     // Model fix high -> photo (has no photo/jewelry keyword; matched via model_shot)
     expect(inferSourceType('fix_model_shot_higher_tier')).toBe('photo');
     expect(inferSourceType('fix_model_shot_higher_tier_4k')).toBe('photo');
