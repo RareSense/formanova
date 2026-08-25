@@ -652,7 +652,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
           continue;
         }
 
-        if (['failed', 'cancelled', 'canceled', 'timed_out'].includes(state)) {
+        if (['failed', 'cancelled', 'canceled', 'timed_out', 'budget_exhausted'].includes(state)) {
           settledCadIds.current.add(gen.workflowId);
           controllers.current.get(gen.workflowId)?.abort();
           controllers.current.delete(gen.workflowId);

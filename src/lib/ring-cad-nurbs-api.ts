@@ -4,11 +4,17 @@ import type { CadReferenceItem } from '@/lib/microservices-api';
 /**
  * ring-cad-nurbs-api.ts
  *
- * Request/response contract for the ring_cad_nurbs_v1 workflow (spec rev 6).
+ * Request/response contract for the ring_cad_nurbs_v1 workflow (spec rev 13).
  *
- *   POST /api/run/state/ring_cad_nurbs_v1  -> 202 { workflow_id, ... }
+ *   POST /api/run/state/ring_cad_nurbs_v1  -> 202 { workflow_id, status_url, result_url, ... }
  *   GET  /api/status/{workflow_id}         -> poll until runtime.state is terminal
  *   GET  /api/result/{workflow_id}         -> BLOCKS; fetch once, after status is terminal
+ *
+ * status_url/result_url in the 202 body are always /status/{id} and
+ * /result/{id} - rev 13's "GET /runtime/state/{workflow_id}" heading in the
+ * spec documents what that SAME /status/{id} response body now contains
+ * (runtime.total_visits, node_visits, pending_human_tasks), not a new route.
+ * Do not rename the endpoint on the strength of that heading alone.
  *
  * Auth: the browser sends only its JWT via authenticatedFetch. The tenant
  * X-API-Key and X-On-Behalf-Of headers named in the spec are attached by the
@@ -60,8 +66,21 @@ export const MAX_RING_CAD_REFERENCE_IMAGES = 5;
 
 /** Hard ceiling from the spec. Typical run is 10-45 minutes. */
 export const RING_CAD_POLL_TIMEOUT_MS = 90 * 60 * 1000;
-/** Total nodes in the workflow, used to turn node_visit_seq into a percentage. */
-export const RING_CAD_TOTAL_NODES = 46;
+
+/**
+ * Total node-visit budget for the progress bar denominator. Rev 13 raised
+ * staging's ceiling to 64 while production (an older revision) stays at 48 -
+ * hard-coding either stops the bar short on the other environment. There is
+ * no reliable client-side signal for which backend environment is live (the
+ * frontend's own hostname doesn't track it, and VITE_PIPELINE_API_URL is not
+ * guaranteed to contain a "staging" substring), so this is an explicit,
+ * per-deployment env var instead of a guess - see .env.example. Defaults to
+ * 64, rev 13's own ceiling, since that is the revision this file targets.
+ */
+export const RING_CAD_TOTAL_NODES = (() => {
+  const raw = Number(import.meta.env.VITE_RING_CAD_TOTAL_NODES);
+  return Number.isFinite(raw) && raw > 0 ? raw : 64;
+})();
 
 // -- Request ---------------------------------------------------------------
 
@@ -100,6 +119,30 @@ export interface RingCadStartParams {
   tier?: string | null;
 }
 
+/**
+ * The screenshot step always captures 12 views and the workflow compares its
+ * result against this number. Sending anything else - or sending it as a
+ * string - diverts the run to an internal failure branch that surfaces as an
+ * empty result, not an error. Fixed on purpose; never make this configurable.
+ */
+const RING_CAD_VALIDATION_SCREENSHOT_COUNT = 12;
+
+/** Required so the corrected build actually exports a file (spec section 3). */
+const RING_CAD_RUN_MODE = 'execute_and_export';
+
+/**
+ * Literal string, not a real credential: tells the backend to run on its own
+ * server-side .env key rather than requiring a caller-supplied one. Confirmed
+ * live against staging 2026-08-26 - omitting these two fields fails an
+ * otherwise-correct payload with error_category "missing_api_key" on the
+ * image_generator sub-step (message: "No API key supplied. Send your own
+ * provider key, or the literal 'managed' to run on the server's key at the
+ * managed rate."). This directly contradicts an earlier, stale copy of the
+ * spec that said to omit these fields - trust the live behavior over that
+ * doc.
+ */
+const RING_CAD_MANAGED_KEY = 'managed';
+
 export interface RingCadStartBody {
   payload: Record<string, unknown>;
 }
@@ -132,6 +175,10 @@ export function buildRingCadStartBody({
 
   const payload: Record<string, unknown> = {
     reference_image_count: images.length,
+    validation_screenshot_count: RING_CAD_VALIDATION_SCREENSHOT_COUNT,
+    cad_run_mode: RING_CAD_RUN_MODE,
+    llm_api_key: RING_CAD_MANAGED_KEY,
+    variant_api_key: RING_CAD_MANAGED_KEY,
   };
 
   // Text is optional whenever an image is supplied, mandatory when none is.
@@ -396,11 +443,35 @@ export function parseRingCadFailure(data: unknown): RingCadFailure {
 }
 
 /**
- * Progress fraction (0..1) from node_visit_seq. Repeat visits are not extra
- * progress, so distinct nodes entered is the measure.
+ * Progress fraction (0..1) against RING_CAD_TOTAL_NODES.
+ *
+ * Rev 13's /status body carries `runtime.total_visits`, a running count of
+ * steps taken - preferred when present. Older/alternate shapes are read as
+ * fallbacks, same defensive ladder as readStagedArtifact: `node_visits`
+ * (rev 13's per-node visit-record map, one entry per distinct node entered)
+ * and finally the pre-rev-13 flat `node_visit_seq` map. Repeat visits are not
+ * extra progress under the two node-keyed shapes, so distinct nodes entered
+ * is the measure there.
  */
 export function ringCadProgressFraction(statusData: unknown): number {
-  const d = (statusData ?? {}) as { node_visit_seq?: Record<string, number> };
+  const d = (statusData ?? {}) as {
+    runtime?: { total_visits?: number };
+    node_visits?: Record<string, unknown[]>;
+    node_visit_seq?: Record<string, number>;
+  };
+
+  const totalVisits = d.runtime?.total_visits;
+  if (typeof totalVisits === 'number' && totalVisits >= 0) {
+    return Math.min(totalVisits / RING_CAD_TOTAL_NODES, 1);
+  }
+
+  const nodeVisitsEntered = d.node_visits && typeof d.node_visits === 'object'
+    ? Object.keys(d.node_visits).length
+    : 0;
+  if (nodeVisitsEntered > 0) {
+    return Math.min(nodeVisitsEntered / RING_CAD_TOTAL_NODES, 1);
+  }
+
   const entered = Object.keys(d.node_visit_seq ?? {}).length;
   if (entered <= 0) return 0;
   return Math.min(entered / RING_CAD_TOTAL_NODES, 1);
@@ -408,6 +479,13 @@ export function ringCadProgressFraction(statusData: unknown): number {
 
 /** A second visit to run_cad means a repair is underway - worth saying so. */
 export function isRingCadRepairing(statusData: unknown): boolean {
-  const d = (statusData ?? {}) as { node_visit_seq?: Record<string, number> };
+  const d = (statusData ?? {}) as {
+    node_visits?: Record<string, unknown[]>;
+    node_visit_seq?: Record<string, number>;
+  };
+  if (d.node_visits && typeof d.node_visits === 'object') {
+    const visits = d.node_visits.run_cad;
+    if (Array.isArray(visits)) return visits.length > 1;
+  }
   return (d.node_visit_seq?.run_cad ?? 0) > 1;
 }
