@@ -117,6 +117,17 @@ describe('ring_cad_nurbs_v1 start body', () => {
     expect(payload.reference_image_artifacts).toEqual([IMG(1)]);
     expect(payload.reference_image_count).toBe(1);
   });
+
+  it('always sends validation_screenshot_count 12 and cad_run_mode execute_and_export (rev 13)', () => {
+    for (const imgs of [[], [IMG(1)], [IMG(1), IMG(2)]] as const) {
+      const { payload } = buildRingCadStartBody({
+        referenceImages: [...imgs],
+        userDescription: imgs.length === 0 ? 'plain band' : undefined,
+      });
+      expect(payload.validation_screenshot_count).toBe(12);
+      expect(payload.cad_run_mode).toBe('execute_and_export');
+    }
+  });
 });
 
 // No pricing tests here on purpose. Price is backend's, read from
@@ -334,19 +345,50 @@ describe('ring_cad_nurbs_v1 failure parsing', () => {
 });
 
 describe('ring_cad_nurbs_v1 progress', () => {
-  it('measures distinct nodes entered against the total', () => {
+  it('measures distinct nodes entered against the total (pre-rev-13 node_visit_seq shape)', () => {
     expect(ringCadProgressFraction({ node_visit_seq: {} })).toBe(0);
     expect(ringCadProgressFraction({ node_visit_seq: { a: 1, b: 1 } })).toBeCloseTo(2 / RING_CAD_TOTAL_NODES);
   });
 
   it('does not count repeat visits as extra progress, and never exceeds 1', () => {
-    const many = Object.fromEntries(Array.from({ length: 60 }, (_, i) => [`n${i}`, 3]));
+    const many = Object.fromEntries(
+      Array.from({ length: RING_CAD_TOTAL_NODES + 10 }, (_, i) => [`n${i}`, 3]),
+    );
     expect(ringCadProgressFraction({ node_visit_seq: many })).toBe(1);
   });
 
-  it('detects a repair from a second run_cad visit', () => {
+  it('detects a repair from a second run_cad visit (pre-rev-13 node_visit_seq shape)', () => {
     expect(isRingCadRepairing({ node_visit_seq: { run_cad: 1 } })).toBe(false);
     expect(isRingCadRepairing({ node_visit_seq: { run_cad: 2 } })).toBe(true);
     expect(isRingCadRepairing({})).toBe(false);
+  });
+
+  it('rev 13: prefers runtime.total_visits when present', () => {
+    expect(ringCadProgressFraction({ runtime: { state: 'running', total_visits: 0 } })).toBe(0);
+    expect(ringCadProgressFraction({ runtime: { state: 'running', total_visits: 14 } }))
+      .toBeCloseTo(14 / RING_CAD_TOTAL_NODES);
+    expect(ringCadProgressFraction({ runtime: { state: 'running', total_visits: 999 } })).toBe(1);
+  });
+
+  it('rev 13: falls back to node_visits (per-node visit-record map) when runtime.total_visits is absent', () => {
+    expect(ringCadProgressFraction({
+      node_visits: { geometry_analysis_llm: [{ visit_seq: 1, status: 'completed' }] },
+    })).toBeCloseTo(1 / RING_CAD_TOTAL_NODES);
+    expect(ringCadProgressFraction({
+      node_visits: {
+        geometry_analysis_llm: [{ visit_seq: 1, status: 'completed' }],
+        run_cad: [{ visit_seq: 1, status: 'completed' }],
+      },
+    })).toBeCloseTo(2 / RING_CAD_TOTAL_NODES);
+  });
+
+  it('rev 13: detects a repair from a second run_cad entry in node_visits', () => {
+    expect(isRingCadRepairing({ node_visits: { run_cad: [{ visit_seq: 1, status: 'completed' }] } })).toBe(false);
+    expect(isRingCadRepairing({
+      node_visits: {
+        run_cad: [{ visit_seq: 1, status: 'completed' }, { visit_seq: 2, status: 'completed' }],
+      },
+    })).toBe(true);
+    expect(isRingCadRepairing({ node_visits: {} })).toBe(false);
   });
 });
