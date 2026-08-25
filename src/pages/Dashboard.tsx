@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { usePrefetchGenerations } from '@/hooks/use-prefetch-generations';
 import { useShopifyStatus } from '@/hooks/useShopify';
 import { trackStudioTypeSelected } from '@/lib/posthog-events';
+import { CAD_USER_FACING_HIDDEN } from '@/lib/feature-flags';
 
 import { PeopleIcon } from '@/components/icons/PeopleIcon';
 import { RingIcon } from '@/components/icons/RingIcon';
@@ -289,7 +290,11 @@ export default function Dashboard() {
               variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className="w-full max-w-[1400px] grid md:grid-cols-2 gap-x-4 lg:gap-x-6 xl:gap-x-8 gap-y-2 sm:gap-y-6 pb-0 sm:pb-4"
+            className={
+              CAD_USER_FACING_HIDDEN
+                ? 'w-full max-w-[680px] grid gap-y-2 sm:gap-y-6 pb-0 sm:pb-4'
+                : 'w-full max-w-[1400px] grid md:grid-cols-2 gap-x-4 lg:gap-x-6 xl:gap-x-8 gap-y-2 sm:gap-y-6 pb-0 sm:pb-4'
+            }
           >
             <section aria-labelledby="dashboard-photography" className="flex flex-col">
               <CategoryDivider id="dashboard-photography" label="Photography" />
@@ -300,14 +305,17 @@ export default function Dashboard() {
               </div>
             </section>
 
-            <section aria-labelledby="dashboard-cad" className="flex flex-col">
-              <CategoryDivider id="dashboard-cad" label="CAD" tag={<RhinoTag />} />
-              <div className="grid grid-cols-2 gap-2 sm:gap-4 md:gap-5 flex-1">
-                {cadWorkflows.map((workflow) => (
-                  <WorkflowCard key={workflow.title} workflow={workflow} onSelect={handleSelect} />
-                ))}
-              </div>
-            </section>
+            {/* CAD section hidden while CAD_USER_FACING_HIDDEN is true - see feature-flags.ts */}
+            {!CAD_USER_FACING_HIDDEN && (
+              <section aria-labelledby="dashboard-cad" className="flex flex-col">
+                <CategoryDivider id="dashboard-cad" label="CAD" tag={<RhinoTag />} />
+                <div className="grid grid-cols-2 gap-2 sm:gap-4 md:gap-5 flex-1">
+                  {cadWorkflows.map((workflow) => (
+                    <WorkflowCard key={workflow.title} workflow={workflow} onSelect={handleSelect} />
+                  ))}
+                </div>
+              </section>
+            )}
           </motion.div>
       </div>
 

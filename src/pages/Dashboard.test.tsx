@@ -37,6 +37,11 @@ vi.mock('@/components/studio/EffortIntroModal', () => ({
   EffortIntroModal: () => null,
 }));
 
+// These tests describe the normal (CAD visible) dashboard. The temporary
+// production-update hide (CAD_USER_FACING_HIDDEN) is covered separately below
+// via a dynamic re-import, since Dashboard reads the flag at module load.
+vi.mock('@/lib/feature-flags', () => ({ CAD_USER_FACING_HIDDEN: false }));
+
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
 
@@ -125,5 +130,62 @@ describe('Dashboard as the merged studio hub', () => {
       node.textContent?.includes('Continue'),
     );
     expect(continueButtons).toHaveLength(4);
+  });
+});
+
+describe('Dashboard while CAD_USER_FACING_HIDDEN is true (temporary production-update hide)', () => {
+  it('hides the CAD section and its two workflow cards, keeping Photography intact', async () => {
+    // resetModules gives Dashboard a fresh copy of feature-flags with the
+    // flag flipped, but every module it (transitively) shares React Context
+    // through must be re-imported from that SAME fresh graph too, or the
+    // provider below won't match the context Dashboard's copy reads from.
+    vi.resetModules();
+    vi.doMock('@/lib/feature-flags', () => ({ CAD_USER_FACING_HIDDEN: true }));
+
+    const [
+      { default: HiddenDashboard },
+      { HelmetProvider: FreshHelmetProvider },
+      { MemoryRouter: FreshMemoryRouter },
+      { QueryClient: FreshQueryClient, QueryClientProvider: FreshQueryClientProvider },
+      { createRoot: freshCreateRoot },
+    ] = await Promise.all([
+      import('./Dashboard'),
+      import('react-helmet-async'),
+      import('react-router-dom'),
+      import('@tanstack/react-query'),
+      import('react-dom/client'),
+    ]);
+
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = freshCreateRoot(container);
+    const queryClient = new FreshQueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    act(() => {
+      root?.render(
+        <FreshQueryClientProvider client={queryClient}>
+          <FreshHelmetProvider>
+            <FreshMemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+              <HiddenDashboard />
+            </FreshMemoryRouter>
+          </FreshHelmetProvider>
+        </FreshQueryClientProvider>,
+      );
+    });
+
+    expect(container.textContent).toContain('Photography');
+    expect(container.textContent).toContain('Model Shot');
+    expect(container.textContent).toContain('Product Shot');
+    expect(container.textContent).not.toContain('CAD');
+    expect(container.textContent).not.toContain('Text to CAD');
+    expect(container.textContent).not.toContain('Image to CAD');
+
+    const continueButtons = Array.from(container.querySelectorAll('button')).filter((node) =>
+      node.textContent?.includes('Continue'),
+    );
+    expect(continueButtons).toHaveLength(2);
+
+    vi.doUnmock('@/lib/feature-flags');
+    vi.resetModules();
   });
 });
