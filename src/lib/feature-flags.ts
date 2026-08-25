@@ -3,22 +3,6 @@
  * This is a UI-only gate - not a security boundary.
  */
 
-/**
- * TEMPORARY: hides every user-facing CAD entry point (header nav link,
- * dashboard tile, and the /studio-cad, /text-to-cad, /image-to-cad routes
- * themselves - CADGate redirects those to /dashboard while this is true).
- *
- * Owner: uswa. Reason: production CAD backend is being updated and may be
- * unstable for a while; hiding the entry points avoids sending users into a
- * broken flow mid-update. Nothing else changes - no CAD code, route, or
- * component is modified or deleted, so re-enabling is exact.
- *
- * Removal condition: flip back to `false` (or delete this flag and its call
- * sites in Header.tsx, Dashboard.tsx, and CADGate.tsx) when told to restore
- * CAD - grep `CAD_USER_FACING_HIDDEN` for every call site.
- */
-export const CAD_USER_FACING_HIDDEN = true;
-
 function getAllowlist(envKey: string): string[] {
   const rawValue = import.meta.env[envKey];
   if (!rawValue || typeof rawValue !== 'string') return [];
