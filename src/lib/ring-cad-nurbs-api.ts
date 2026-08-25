@@ -130,6 +130,19 @@ const RING_CAD_VALIDATION_SCREENSHOT_COUNT = 12;
 /** Required so the corrected build actually exports a file (spec section 3). */
 const RING_CAD_RUN_MODE = 'execute_and_export';
 
+/**
+ * Literal string, not a real credential: tells the backend to run on its own
+ * server-side .env key rather than requiring a caller-supplied one. Confirmed
+ * live against staging 2026-08-26 - omitting these two fields fails an
+ * otherwise-correct payload with error_category "missing_api_key" on the
+ * image_generator sub-step (message: "No API key supplied. Send your own
+ * provider key, or the literal 'managed' to run on the server's key at the
+ * managed rate."). This directly contradicts an earlier, stale copy of the
+ * spec that said to omit these fields - trust the live behavior over that
+ * doc.
+ */
+const RING_CAD_MANAGED_KEY = 'managed';
+
 export interface RingCadStartBody {
   payload: Record<string, unknown>;
 }
@@ -164,6 +177,8 @@ export function buildRingCadStartBody({
     reference_image_count: images.length,
     validation_screenshot_count: RING_CAD_VALIDATION_SCREENSHOT_COUNT,
     cad_run_mode: RING_CAD_RUN_MODE,
+    llm_api_key: RING_CAD_MANAGED_KEY,
+    variant_api_key: RING_CAD_MANAGED_KEY,
   };
 
   // Text is optional whenever an image is supplied, mandatory when none is.

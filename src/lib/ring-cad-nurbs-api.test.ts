@@ -98,10 +98,14 @@ describe('ring_cad_nurbs_v1 start body', () => {
     expect(payload.llm_tier).toBe(RING_CAD_DEFAULT_TIER);
   });
 
-  it('never sends credentials in the payload, which is persisted and readable', () => {
+  it('sends the literal "managed" for llm_api_key/variant_api_key, never a real credential', () => {
+    // Confirmed live against staging 2026-08-26: omitting these two fields
+    // fails with error_category "missing_api_key" on the image_generator
+    // sub-step. "managed" is not a secret - it tells the backend to use its
+    // own server-side key, so this is safe to persist/read, unlike a real key.
     const { payload } = buildRingCadStartBody({ referenceImages: [IMG(1)] });
-    expect(payload).not.toHaveProperty('llm_api_key');
-    expect(payload).not.toHaveProperty('variant_api_key');
+    expect(payload.llm_api_key).toBe('managed');
+    expect(payload.variant_api_key).toBe('managed');
   });
 
   it('does not send return_nodes, which this workflow does not accept', () => {
@@ -118,7 +122,7 @@ describe('ring_cad_nurbs_v1 start body', () => {
     expect(payload.reference_image_count).toBe(1);
   });
 
-  it('always sends validation_screenshot_count 12 and cad_run_mode execute_and_export (rev 13)', () => {
+  it('always sends validation_screenshot_count 12, cad_run_mode execute_and_export, and managed keys (rev 13)', () => {
     for (const imgs of [[], [IMG(1)], [IMG(1), IMG(2)]] as const) {
       const { payload } = buildRingCadStartBody({
         referenceImages: [...imgs],
@@ -126,6 +130,8 @@ describe('ring_cad_nurbs_v1 start body', () => {
       });
       expect(payload.validation_screenshot_count).toBe(12);
       expect(payload.cad_run_mode).toBe('execute_and_export');
+      expect(payload.llm_api_key).toBe('managed');
+      expect(payload.variant_api_key).toBe('managed');
     }
   });
 });
