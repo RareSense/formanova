@@ -24,6 +24,61 @@
         }, true);
       })();
     </script>
+    <!--
+      Signup attribution. Writes one first-party cookie (fn_attr) recording where the
+      visitor came from; fastapi-auth-service reads it once at account creation
+      (UserManager.on_after_register) and copies it onto the user row.
+
+      Lives here, not in main.tsx, because main.tsx:68-81 can location.replace() away
+      on a host redirect before React mounts — which would both skip this and make us
+      our own referrer. Must run on the very first landing, before any redirect.
+
+      Contract is fixed by deployed backend code (attribution.py:37-43): name fn_attr,
+      keys s/m/c/r/l, caps 100/100/100/400/200. Do not rename either.
+      formanova-marketing ships this same body with <script is:inline>; keep them
+      byte-identical. See attribution-decisions.md §4.
+    -->
+    <script>
+    (function () {
+      try {
+        var NAME  = 'fn_attr';
+        var ATTRS = ';domain=.formanova.ai;path=/;max-age=2592000;SameSite=Lax;Secure';
+
+        var m = document.cookie.match(/(?:^|;\s*)fn_attr=([^;]*)/);
+        var existing = m ? m[1] : '';
+
+        // First touch wins. If a value already exists, re-stamp its expiry and stop.
+        // Safari caps script-set cookies at 7 days regardless of max-age, so a visitor
+        // returning inside that window keeps their original attribution indefinitely.
+        // The VALUE is rewritten byte-for-byte; only the clock moves.
+        if (existing) { document.cookie = NAME + '=' + existing + ATTRS; return; }
+
+        var p = new URLSearchParams(location.search);
+        var payload = {
+          s: (p.get('utm_source')   || '').slice(0, 100),
+          m: (p.get('utm_medium')   || '').slice(0, 100),
+          c: (p.get('utm_campaign') || '').slice(0, 100),
+          r: (document.referrer     || '').slice(0, 400),
+          l: (location.pathname     || '').slice(0, 200)
+        };
+
+        // Skip self-referrals so internal navigation cannot overwrite a real source.
+        // Hostname equality, not substring and not slice() — substring discards
+        // 'someblog.com/formanova.ai-review'; a mis-counted slice silently matches
+        // nothing at all.
+        if (payload.r) {
+          try {
+            var h = new URL(payload.r).hostname.toLowerCase();
+            if (h === 'formanova.ai' || h.endsWith('.formanova.ai')) payload.r = '';
+          } catch (e) { payload.r = ''; }
+        }
+
+        // No guard. A direct visit is a fact worth recording: it stores landing_path
+        // only, which is what distinguishes it from a capture failure. See §1.
+        document.cookie = NAME + '=' + encodeURIComponent(JSON.stringify(payload)) + ATTRS;
+      } catch (e) { /* attribution is best-effort; never surface an error */ }
+    })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     
     <title>FormaNova | AI Jewelry Photoshoot Studio & CAD Generator</title>
