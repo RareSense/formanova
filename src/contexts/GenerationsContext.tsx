@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useCredits } from '@/contexts/CreditsContext';
 import { useToast } from '@/hooks/use-toast';
 import { ToastAction } from '@/components/ui/toast';
-import { CAD_RESTORE_SRC_PARAM, type CadRestoreEntry } from '@/lib/cad-analytics';
+import { CAD_RESTORE_SRC_PARAM, type CadRestoreEntry, type CadSource } from '@/lib/cad-analytics';
+import { trackCadGenerationCompleted } from '@/lib/posthog-events';
 import { pollWorkflow } from '@/lib/poll-workflow';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { markGenerationCompleted, markGenerationFailed } from '@/lib/generation-lifecycle';
@@ -35,6 +36,9 @@ interface PersistedCadGeneration {
   startedAt: number;
   cadRoute: '/text-to-cad' | '/image-to-cad';
   timeoutMs: number;
+  /** Carried across a refresh so the completion event keeps its properties.
+   *  Only scalars -- the prompt's length, never the prompt itself. */
+  cadAnalytics?: CadGenerationAnalytics;
 }
 
 function loadPersistedCadGenerations(): TrackedGeneration[] {
@@ -71,6 +75,7 @@ function loadPersistedCadGenerations(): TrackedGeneration[] {
         threedmUrl: null,
         cadRoute: row.cadRoute ?? '/image-to-cad',
         timeoutMs: row.timeoutMs ?? RING_CAD_POLL_TIMEOUT_MS,
+        ...(row.cadAnalytics ? { cadAnalytics: row.cadAnalytics } : {}),
       }));
   } catch {
     try { localStorage.removeItem(CAD_TRACKING_STORAGE_KEY); } catch { /* unavailable storage */ }
@@ -149,6 +154,12 @@ export interface TrackedGeneration {
    * existing row and call site keeps its current meaning.
    */
   kind?: GenerationKind;
+  /**
+   * CAD-only. The completion event's properties, captured at submission.
+   * Absent on photoshoot runs and on CAD rows persisted before this field
+   * existed; the emit degrades to what it can honestly state in that case.
+   */
+  cadAnalytics?: CadGenerationAnalytics;
   /** CAD only: GLB preview url, used to restore the viewport. */
   glbUrl?: string | null;
   /** CAD only: the machinable NURBS .3dm deliverable. */
@@ -192,6 +203,28 @@ export interface TrackGenerationParams {
  * images, so it shares only the queue, the header indicator and the completion
  * toast with photoshoots - never their result shape.
  */
+/**
+ * Everything `cad_generation_completed` needs, captured when the run starts.
+ *
+ * The completion event used to be emitted from the CAD page effect, which read
+ * these off component state. That effect does not run when the page is
+ * unmounted, so every run finishing after the user navigated away, pressed
+ * Keep Creating or closed the tab was never counted at all. This context owns
+ * the poll and outlives the page, so the emit belongs here -- but the page is
+ * the only place that knows the prompt and tier. Carrying the bundle on the
+ * run fixes both halves: the event always fires, and its properties describe
+ * the run as it was submitted rather than whatever state the page happens to
+ * be in when the backend answers.
+ */
+export interface CadGenerationAnalytics {
+  source: CadSource;
+  category: 'ring';
+  prompt_length: number;
+  reference_image_count: number;
+  llm_tier: string;
+  is_first_ever: boolean;
+}
+
 export interface TrackCadGenerationParams {
   workflowId: string;
   /** Shown in the completion toast so a user with several runs can tell them apart. */
@@ -200,6 +233,8 @@ export interface TrackCadGenerationParams {
   timeoutMs?: number;
   /** Which page started this run, so restore paths return to the right one. */
   cadRoute?: '/text-to-cad' | '/image-to-cad';
+  /** Completion-event properties, captured now and emitted when the run settles. */
+  analytics?: CadGenerationAnalytics;
 }
 
 export interface GenerationsContextValue {
@@ -409,8 +444,34 @@ export function GenerationsContextProvider({ children }: { children: React.React
         ...(params.label ? { label: params.label } : {}),
         cadRoute: params.cadRoute ?? '/image-to-cad',
         timeoutMs: params.timeoutMs ?? RING_CAD_POLL_TIMEOUT_MS,
+        ...(params.analytics ? { cadAnalytics: params.analytics } : {}),
       };
       return [...prev.filter(g => g.workflowId !== params.workflowId), next];
+    });
+  }, []);
+
+  /**
+   * Emits `cad_generation_completed` for a settled CAD run.
+   *
+   * Lives here rather than in useImageToCADWorkflow because that hook's effect
+   * bails out on `hasNavigatedAway` and does not run at all once the page
+   * unmounts, so completions arriving after the user moved on were silently
+   * dropped. Properties come from the bundle captured at submission; a run
+   * persisted before that field existed still reports its source, derived from
+   * the route it was started on, and omits what it cannot honestly state.
+   */
+  const emitCadCompleted = useCallback((gen: TrackedGeneration) => {
+    const a = gen.cadAnalytics;
+    trackCadGenerationCompleted({
+      category: a?.category ?? 'ring',
+      duration_ms: Date.now() - gen.startedAt,
+      source: a?.source ?? (gen.cadRoute === '/image-to-cad' ? 'image-to-cad' : 'text-to-cad'),
+      ...(a ? {
+        prompt_length: a.prompt_length,
+        reference_image_count: a.reference_image_count,
+        llm_tier: a.llm_tier,
+        is_first_ever: a.is_first_ever,
+      } : {}),
     });
   }, []);
 
@@ -518,6 +579,10 @@ export function GenerationsContextProvider({ children }: { children: React.React
           : g
       ));
       markGenerationCompleted(gen.workflowId, startTime);
+      // Fires here, not from the CAD page, because the page may be unmounted:
+      // the run outlives it. Guarded upstream by settledCadIds, so a run that
+      // settles through either terminal path is counted exactly once.
+      emitCadCompleted(gen);
       refreshCredits();
 
       toast({
@@ -548,7 +613,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
         variant: 'destructive',
       });
     });
-  }, [navigate, refreshCredits, toast]);
+  }, [navigate, refreshCredits, toast, emitCadCompleted]);
 
   const runningKey = generations
     .filter(g => g.status === 'running')
@@ -565,6 +630,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
         startedAt: g.startedAt,
         cadRoute: g.cadRoute ?? '/image-to-cad',
         timeoutMs: g.timeoutMs ?? RING_CAD_POLL_TIMEOUT_MS,
+        ...(g.cadAnalytics ? { cadAnalytics: g.cadAnalytics } : {}),
       })),
   );
 
@@ -606,6 +672,10 @@ export function GenerationsContextProvider({ children }: { children: React.React
               : g
           ));
           markGenerationCompleted(gen.workflowId, gen.startedAt);
+          // Fires here, not from the CAD page, because the page may be unmounted:
+          // the run outlives it. Guarded upstream by settledCadIds, so a run that
+          // settles through either terminal path is counted exactly once.
+          emitCadCompleted(gen);
           refreshCredits();
 
           let parsed: ReturnType<typeof parseRingCadResult> | null = null;
@@ -668,7 +738,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
         reconcilingCadIds.current.delete(gen.workflowId);
       }
     }
-  }, [navigate, refreshCredits, toast]);
+  }, [navigate, refreshCredits, toast, emitCadCompleted]);
 
   useEffect(() => {
     const reconcileOnReturn = () => {

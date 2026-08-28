@@ -17,7 +17,6 @@ import {
 import { buildReferenceInputs } from "@/lib/cad-reference-upload";
 import {
   trackPaywallHit,
-  trackCadGenerationCompleted,
   trackCadGenerationStarted,
   trackCadGenerationFailed,
   trackCadResultRestored,
@@ -146,14 +145,10 @@ export function useImageToCADWorkflow({
       if (trackedRun.threedmUrl) {
         setThreedmArtifact({ uri: trackedRun.threedmUrl, url: trackedRun.threedmUrl, type: 'model/3dm', bytes: 0, sha256: '' });
       }
-      trackCadGenerationCompleted({
-        ...buildCadGenerationProps({ cadRoute, prompt, referenceImageCount: referenceImages.length, tier }),
-        duration_ms: Date.now() - (generationStartRef.current || Date.now()),
-        // Read, not consumed: startedFirstEverRef holds what the matching
-        // cad_generation_started already reported, so the two ends of the
-        // funnel agree instead of this one always seeing false.
-        is_first_ever: startedFirstEverRef.current,
-      });
+      // cad_generation_completed is NOT emitted here. This effect does not run
+      // once the page unmounts and bails out early on hasNavigatedAway, so
+      // every run finishing after the user left was never counted.
+      // GenerationsContext owns the poll, outlives the page and emits it there.
       setProgressStep('_loading');
       setIsModelLoading(true);
       setHasModel(true);
@@ -297,10 +292,11 @@ export function useImageToCADWorkflow({
       // the backend counts as a failure rather than inflating the top of the
       // funnel and depressing the conversion rate.
       startedFirstEverRef.current = consumeFirstCadGeneration();
-      trackCadGenerationStarted({
+      const cadAnalytics = {
         ...buildCadGenerationProps({ cadRoute, prompt, referenceImageCount: referenceImages.length, tier }),
         is_first_ever: startedFirstEverRef.current,
-      });
+      };
+      trackCadGenerationStarted(cadAnalytics);
 
       // Hand the run to GenerationsContext, which polls above the routes. That
       // is what lets the user press Keep Creating and leave: this hook's own
@@ -309,6 +305,11 @@ export function useImageToCADWorkflow({
         workflowId: workflow_id,
         label: prompt.trim() ? prompt.trim().slice(0, 40) : 'Image to CAD',
         cadRoute,
+        // The same bundle the started event just reported, handed over so the
+        // completion event can be emitted by the context when the run settles.
+        // The two ends of the funnel therefore describe the run identically,
+        // and completion no longer depends on this page still being mounted.
+        analytics: cadAnalytics,
       });
 
       // Polling is now GenerationsContext's job. The effect below mirrors that

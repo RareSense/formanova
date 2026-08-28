@@ -171,8 +171,12 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
     // Built by the shared helper rather than by hand so this link carries the
     // 'history' marker: an unmarked restore is counted as an external (email)
     // arrival, and a hand-rolled URL here would land in that bucket instead.
+    // Routing still needs a concrete page, so an unrecognised source_type
+    // lands on Text-to-CAD as it always has. Only the analytics property is
+    // allowed to be undefined -- a wrong route breaks the user, a guessed
+    // source only breaks the data.
     const source = cadSourceFromSourceType(workflow.source_type);
-    navigate(buildCadRestorePath(workflow.workflow_id, workflow.glb_url, cadRouteFromSource(source), 'history'));
+    navigate(buildCadRestorePath(workflow.workflow_id, workflow.glb_url, cadRouteFromSource(source ?? 'text-to-cad'), 'history'));
   };
 
   return (
@@ -333,6 +337,7 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
           initialIndex={previewIndex}
           glbUrl={workflow.glb_url}
           glbFilename={workflow.glb_filename}
+          source={cadSourceFromSourceType(workflow.source_type)}
           onClose={() => setPreviewIndex(null)}
         />
       )}

@@ -130,8 +130,14 @@ export function buildCadGenerationProps(input: CadGenerationPropsInput): CadGene
  * dimension. Converting in one place stops the mapping being re-derived, and
  * subtly differently, at each call site.
  */
-export function cadSourceFromSourceType(sourceType: string): CadSource {
-  return sourceType === 'image_to_cad' ? 'image-to-cad' : 'text-to-cad';
+export function cadSourceFromSourceType(sourceType: string): CadSource | undefined {
+  if (sourceType === 'image_to_cad') return 'image-to-cad';
+  if (sourceType === 'text_to_cad') return 'text-to-cad';
+  // Deliberately not defaulting to text-to-cad. This used to, which meant an
+  // empty, legacy or renamed source_type was reported as a genuine Text-to-CAD
+  // run and quietly inflated that bucket in every history-sourced event. An
+  // unknown source is now omitted from the payload, so it reads as unknown.
+  return undefined;
 }
 
 /** The page that owns a given tool, for building restore links. */

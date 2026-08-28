@@ -16,6 +16,7 @@ vi.mock('@/lib/generation-lifecycle', () => ({
 }));
 vi.mock('@/lib/azure-utils', () => ({ azureUriToUrl: (v: string) => v.replace('azure://', 'https://cdn.example.com/') }));
 vi.mock('@/lib/generation-history-api', () => ({ getWorkflowDetails: vi.fn() }));
+vi.mock('@/lib/posthog-events', () => ({ trackCadGenerationCompleted: vi.fn() }));
 vi.mock('@/lib/generation-enrichment', () => ({
   extractPhotoThumbnail: vi.fn(),
   extractProductShotThumbnail: vi.fn(),
@@ -26,7 +27,9 @@ import { markGenerationCompleted, markGenerationFailed } from '@/lib/generation-
 import { getWorkflowDetails } from '@/lib/generation-history-api';
 import { extractPhotoThumbnail, extractProductShotThumbnail } from '@/lib/generation-enrichment';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
+import { trackCadGenerationCompleted } from '@/lib/posthog-events';
 
+const mockTrackCadCompleted = vi.mocked(trackCadGenerationCompleted);
 const mockPollWorkflow = vi.mocked(pollWorkflow);
 const mockMarkCompleted = vi.mocked(markGenerationCompleted);
 const mockMarkFailed = vi.mocked(markGenerationFailed);
@@ -470,6 +473,87 @@ describe('GenerationsContext - Image to 3D runs', () => {
     expect(result.current.generations[0].glbUrl).toBe('https://s/r.glb');
     expect(result.current.generations[0].threedmUrl).toBe('https://s/r.3dm');
     expect(mockMarkCompleted).toHaveBeenCalledWith('cad-1', expect.any(Number));
+  });
+
+  // ── cad_generation_completed lives here, not on the CAD page ─────────────
+  //
+  // It used to be emitted from useImageToCADWorkflow's effect, which bails out
+  // on hasNavigatedAway and does not run at all once the page unmounts. Any run
+  // finishing after the user pressed Keep Creating, navigated away or closed
+  // the tab was therefore never counted. These tests are the guard on the fix:
+  // if the emit ever moves back to a page, they fail.
+
+  const CAD_ANALYTICS = {
+    source: 'image-to-cad' as const,
+    category: 'ring' as const,
+    prompt_length: 42,
+    reference_image_count: 3,
+    llm_tier: 'fable-5',
+    is_first_ever: true,
+  };
+
+  it('emits cad_generation_completed when the run settles with no CAD page mounted', async () => {
+    mockPollWorkflow.mockResolvedValue({ status: 'completed', result: CAD_RESULT } as never);
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    act(() => {
+      result.current.trackCadGeneration({ workflowId: 'cad-1', cadRoute: '/image-to-cad', analytics: CAD_ANALYTICS });
+    });
+
+    await waitFor(() => expect(mockTrackCadCompleted).toHaveBeenCalledTimes(1));
+    expect(mockTrackCadCompleted).toHaveBeenCalledWith(expect.objectContaining({
+      source: 'image-to-cad',
+      category: 'ring',
+      prompt_length: 42,
+      reference_image_count: 3,
+      llm_tier: 'fable-5',
+      is_first_ever: true,
+      duration_ms: expect.any(Number),
+    }));
+  });
+
+  it('emits the completion exactly once when a stale tab reconciles', async () => {
+    mockAuthenticatedFetch
+      .mockResolvedValueOnce(jsonResponse({ runtime: { state: 'completed' } }))
+      .mockResolvedValueOnce(jsonResponse(CAD_RESULT));
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    act(() => {
+      result.current.trackCadGeneration({ workflowId: 'cad-stale-1', cadRoute: '/text-to-cad', analytics: CAD_ANALYTICS });
+    });
+    act(() => { window.dispatchEvent(new Event('focus')); });
+
+    await waitFor(() => expect(mockTrackCadCompleted).toHaveBeenCalledTimes(1));
+  });
+
+  it('still reports a source for a run persisted before the analytics bundle existed', async () => {
+    // A row written by the previous build carries cadRoute but no analytics.
+    // The route is enough to name the tool, so the event keeps its most
+    // important property instead of being dropped or guessed at.
+    localStorage.setItem('formanova_running_cad_v1', JSON.stringify([
+      { workflowId: 'cad-legacy', startedAt: Date.now(), cadRoute: '/text-to-cad', timeoutMs: 60_000 },
+    ]));
+    mockPollWorkflow.mockResolvedValue({ status: 'completed', result: CAD_RESULT } as never);
+    renderHook(() => useGenerations(), { wrapper });
+
+    await waitFor(() => expect(mockTrackCadCompleted).toHaveBeenCalledTimes(1));
+    const props = mockTrackCadCompleted.mock.calls[0][0];
+    expect(props.source).toBe('text-to-cad');
+    // Never asserted as 0: this layer cannot see the prompt of a run it did
+    // not start, and a fabricated 0 would read as a real empty prompt.
+    expect(props.prompt_length).toBeUndefined();
+  });
+
+  it('carries the analytics bundle across a refresh so completion keeps its properties', async () => {
+    const first = renderHook(() => useGenerations(), { wrapper });
+    act(() => {
+      first.result.current.trackCadGeneration({ workflowId: 'cad-refresh', cadRoute: '/image-to-cad', analytics: CAD_ANALYTICS });
+    });
+    await waitFor(() => {
+      expect(localStorage.getItem('formanova_running_cad_v1')).toContain('cad-refresh');
+    });
+    first.unmount();
+
+    const second = renderHook(() => useGenerations(), { wrapper });
+    expect(second.result.current.generations[0].cadAnalytics).toEqual(CAD_ANALYTICS);
   });
 
   it('persists a running CAD id and restores it after provider remount', async () => {

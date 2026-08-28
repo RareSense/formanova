@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { OptimizedImage } from '@/components/ui/optimized-image';
 import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
+import type { CadSource } from '@/lib/cad-analytics';
 
 function SnapshotThumb({ url, angle }: { url: string; angle: string }) {
   const resolved = useAuthenticatedImage(url);
@@ -28,6 +29,14 @@ interface SnapshotPreviewModalProps {
   initialIndex: number;
   glbUrl?: string | null;
   glbFilename?: string | null;
+  /**
+   * Which CAD tool produced the run these snapshots belong to. Both downloads
+   * below are CAD artifacts, so without this they fired `download_clicked` with
+   * a context and no source and were unattributable. Undefined when the
+   * history row's source_type is unrecognised, in which case the property is
+   * omitted rather than guessed.
+   */
+  source?: CadSource;
   onClose: () => void;
 }
 
@@ -36,6 +45,7 @@ export function SnapshotPreviewModal({
   initialIndex,
   glbUrl,
   glbFilename,
+  source,
   onClose,
 }: SnapshotPreviewModalProps) {
   const [index, setIndex] = useState(Math.min(initialIndex, screenshots.length - 1));
@@ -49,7 +59,7 @@ export function SnapshotPreviewModal({
   const handleDownloadImage = async () => {
     if (!shot) return;
     const fileName = `ring-${shot.angle}.png`;
-    import('@/lib/posthog-events').then(m => m.trackDownloadClicked({ file_name: fileName, file_type: 'png', context: 'generations-snapshot' }));
+    import('@/lib/posthog-events').then(m => m.trackDownloadClicked({ file_name: fileName, file_type: 'png', context: 'generations-snapshot', source }));
     const res = await authenticatedFetch(shot.url);
     const blob = await res.blob();
     const objectUrl = URL.createObjectURL(blob);
@@ -63,7 +73,7 @@ export function SnapshotPreviewModal({
   const handleDownloadGlb = async () => {
     if (!glbUrl) return;
     const fileName = glbFilename || 'model.glb';
-    import('@/lib/posthog-events').then(m => m.trackDownloadClicked({ file_name: fileName, file_type: 'glb', context: 'generations-snapshot' }));
+    import('@/lib/posthog-events').then(m => m.trackDownloadClicked({ file_name: fileName, file_type: 'glb', context: 'generations-snapshot', source }));
     try {
       const resp = await authenticatedFetch(glbUrl);
       if (!resp.ok) throw new Error(`Download failed: ${resp.status}`);

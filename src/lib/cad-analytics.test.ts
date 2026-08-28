@@ -146,12 +146,14 @@ describe('cadSourceFromSourceType', () => {
     expect(cadSourceFromSourceType('text_to_cad')).toBe('text-to-cad')
   })
 
-  it('falls back to text-to-cad for anything else', () => {
-    // The history API can still emit 'unknown' for older rows. Text-to-CAD is
-    // the safer default: it is the original tool, so a misfiled legacy row is
-    // far more likely to be one of those than an image run.
-    expect(cadSourceFromSourceType('unknown')).toBe('text-to-cad')
-    expect(cadSourceFromSourceType('')).toBe('text-to-cad')
+  it('returns undefined for anything it does not recognise', () => {
+    // Defaulting an unrecognised value to text-to-cad silently inflated that
+    // bucket: every legacy row, every renamed source_type and every empty
+    // value was reported as a real Text-to-CAD run. An unknown source has to
+    // read as unknown, so the property is omitted instead of guessed.
+    expect(cadSourceFromSourceType('unknown')).toBeUndefined()
+    expect(cadSourceFromSourceType('')).toBeUndefined()
+    expect(cadSourceFromSourceType('imageToCad')).toBeUndefined()
   })
 })
 
