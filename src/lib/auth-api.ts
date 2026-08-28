@@ -105,6 +105,15 @@ class AuthApi {
     const params = new URLSearchParams({ code });
     if (state) params.append('state', state);
 
+    // Signup attribution depends on this call sending cookies. AUTH_URL is relative
+    // ('/auth'), so this is same-origin, and fetch's default credentials mode
+    // ('same-origin') sends the fn_attr cookie set in index.html. The backend reads it
+    // here — this is the request that reaches UserManager.on_after_register.
+    //
+    // Do NOT add credentials:'omit', and do NOT route this through authenticatedFetch
+    // (which is for Bearer-token calls, not this pre-token exchange). Either change
+    // silently stops attribution being recorded: sign-in still works, no error is
+    // raised, no test fails, and every utm_* column just stays NULL.
     const response = await fetch(
       `${AUTH_URL}/auth/google/callback?${params.toString()}`,
       { method: 'GET' }
