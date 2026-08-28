@@ -261,6 +261,7 @@ describe('trackCadGenerationStarted', () => {
       reference_image_count: 2,
       llm_tier: 'claude_opus_5_openrouter',
       is_first_ever: true,
+      workflow_id: 'state-abc123',
     })
     expect(posthog.capture).toHaveBeenCalledWith('cad_generation_started', {
       source: 'image-to-cad',
@@ -269,6 +270,7 @@ describe('trackCadGenerationStarted', () => {
       reference_image_count: 2,
       llm_tier: 'claude_opus_5_openrouter',
       is_first_ever: true,
+      workflow_id: 'state-abc123',
     })
   })
 })
@@ -294,12 +296,30 @@ describe('trackCadGenerationFailed', () => {
       source: 'image-to-cad',
       failure_stage: 'run',
       duration_ms: 61000,
+      workflow_id: 'state-abc123',
     })
     expect(posthog.capture).toHaveBeenCalledWith('cad_generation_failed', {
       source: 'image-to-cad',
       failure_stage: 'run',
       duration_ms: 61000,
+      workflow_id: 'state-abc123',
     })
+  })
+
+  it('carries no workflow_id for a start failure, because the run never got one', () => {
+    // Not an oversight: a start-stage failure means the backend never returned
+    // a workflow id, so there is nothing to join on. Sending a placeholder
+    // would create a run that does not exist.
+    trackCadGenerationFailed({
+      source: 'text-to-cad',
+      failure_stage: 'start',
+      duration_ms: 400,
+      has_failure_message: false,
+    })
+    expect(posthog.capture).toHaveBeenCalledWith(
+      'cad_generation_failed',
+      expect.not.objectContaining({ workflow_id: expect.anything() }),
+    )
   })
 })
 

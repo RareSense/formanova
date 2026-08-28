@@ -508,6 +508,9 @@ describe('GenerationsContext - Image to 3D runs', () => {
       llm_tier: 'fable-5',
       is_first_ever: true,
       duration_ms: expect.any(Number),
+      // The join key. Without it a completion can only be matched to its start
+      // by person and timing, which is guesswork across sessions.
+      workflow_id: 'cad-1',
     }));
   });
 

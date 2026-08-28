@@ -63,6 +63,11 @@ export interface CadGenerationCompletedProps {
   category: string;
   prompt_length: number;
   duration_ms: number;
+  /** The Temporal workflow id this run was given at submission. Present on
+   *  every generation event so a run's start, completion and failure can be
+   *  joined exactly, rather than inferred from person identity and timing.
+   *  Absent only on a `start` stage failure, where the run never got one. */
+  workflow_id?: string;
   /** Which CAD tool produced this. Optional so the pre-existing payload shape
    *  stays valid; every live caller now passes it. */
   source?: CadSource;
@@ -285,6 +290,11 @@ export interface CadReferenceUploadedProps {
 
 export interface CadGenerationStartedProps {
   source: CadSource;
+  /** The Temporal workflow id this run was given at submission. Present on
+   *  every generation event so a run's start, completion and failure can be
+   *  joined exactly, rather than inferred from person identity and timing.
+   *  Absent only on a `start` stage failure, where the run never got one. */
+  workflow_id?: string;
   category: 'ring';
   prompt_length: number;
   reference_image_count: number;
@@ -294,6 +304,11 @@ export interface CadGenerationStartedProps {
 
 export interface CadGenerationFailedProps {
   source: CadSource;
+  /** The Temporal workflow id this run was given at submission. Present on
+   *  every generation event so a run's start, completion and failure can be
+   *  joined exactly, rather than inferred from person identity and timing.
+   *  Absent only on a `start` stage failure, where the run never got one. */
+  workflow_id?: string;
   /** `start` means the run never got a workflow_id; `run` means the backend
    *  accepted it and then failed. They have completely different causes, so
    *  collapsing them would make the failure rate unactionable. */

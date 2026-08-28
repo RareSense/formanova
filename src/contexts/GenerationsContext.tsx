@@ -464,6 +464,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
     const a = gen.cadAnalytics;
     trackCadGenerationCompleted({
       category: a?.category ?? 'ring',
+      workflow_id: gen.workflowId,
       duration_ms: Date.now() - gen.startedAt,
       source: a?.source ?? (gen.cadRoute === '/image-to-cad' ? 'image-to-cad' : 'text-to-cad'),
       ...(a ? {

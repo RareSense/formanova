@@ -120,6 +120,7 @@ export function useImageToCADWorkflow({
       // from a 'start' failure because the causes share nothing.
       trackCadGenerationFailed({
         source: cadSource,
+        workflow_id: trackedRun.workflowId,
         failure_stage: 'run',
         duration_ms: Date.now() - (generationStartRef.current || Date.now()),
         // has_failure_message is deliberately omitted: TrackedGeneration
@@ -296,7 +297,7 @@ export function useImageToCADWorkflow({
         ...buildCadGenerationProps({ cadRoute, prompt, referenceImageCount: referenceImages.length, tier }),
         is_first_ever: startedFirstEverRef.current,
       };
-      trackCadGenerationStarted(cadAnalytics);
+      trackCadGenerationStarted({ ...cadAnalytics, workflow_id });
 
       // Hand the run to GenerationsContext, which polls above the routes. That
       // is what lets the user press Keep Creating and leave: this hook's own
