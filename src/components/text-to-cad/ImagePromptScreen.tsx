@@ -157,7 +157,7 @@ export default function ImagePromptScreen({
                       a warning colour: this is how the tool works, not a
                       caution. */}
                   <p className="mt-1.5 text-sm text-muted-foreground">
-                    Rings only. Upload 1&ndash;5 reference images. We&rsquo;ll use them as{" "}
+                    Upload 1&ndash;5 reference images. We&rsquo;ll use them as{" "}
                     <span className="font-medium text-foreground">inspiration, not recreate the design exactly.</span>
                   </p>
                 </div>
