@@ -62,7 +62,7 @@ const photographyWorkflows: Workflow[] = [
 const cadWorkflows: Workflow[] = [
   {
     title: 'Text to CAD',
-    description: 'Describe your jewelry and generate a CAD model.',
+    description: 'Describe your ring and generate a CAD model.',
     route: '/text-to-cad',
     icon: TextToCadIcon,
     wideIcon: true,
@@ -70,7 +70,7 @@ const cadWorkflows: Workflow[] = [
   },
   {
     title: 'Image to CAD',
-    description: 'Turn inspiration images into a CAD model.',
+    description: 'Turn ring inspiration images into a CAD model.',
     route: '/image-to-cad',
     icon: ImageToCadIcon,
     wideIcon: true,

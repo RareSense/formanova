@@ -77,7 +77,7 @@ export default function InitialPromptScreen({
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Describe your ring — e.g. A rose ring with three blooming roses, twisted vine band with thorns, and diamond accents"
+                placeholder="Describe your ring, e.g. A rose ring with three blooming roses, twisted vine band with thorns, and diamond accents"
                 rows={6}
                 className="w-full min-h-[220px] max-h-[60vh] px-5 py-4 pb-9 text-[15px] text-foreground placeholder:text-muted-foreground/40 resize-y font-body leading-relaxed transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-ring bg-muted/20 border border-border overflow-y-auto"
               />
