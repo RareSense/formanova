@@ -16,7 +16,6 @@ import { useNotificationEmail } from "@/hooks/useNotificationEmail";
 import { useCadArtifactDownloads } from "@/hooks/useCadArtifactDownloads";
 import { useCadAutoRotate } from "@/hooks/useCadAutoRotate";
 import { CadDownloadMenu } from "@/components/downloads/CadDownloadMenu";
-import { CadSolidityNotice } from "@/components/downloads/CadSolidityNotice";
 import { trackCadStudioOpen, trackCadReferenceUploaded } from "@/lib/posthog-events";
 import { useCADKeyboardShortcuts } from "@/hooks/use-cad-keyboard-shortcuts";
 
@@ -355,18 +354,12 @@ export default function ImageToCAD() {
                 // Same visibility rule the download action had in ViewportSideTools
                 // before the move — hidden mid-regeneration, not just mid-initial-generation.
                 downloadSlot={!workflow.isGenerating && !workflow.isModelLoading ? (
-                  <div className="flex flex-col items-end gap-1.5">
-                    <CadDownloadMenu
-                      isBusy={downloads.isBusy}
-                      onDownloadThreedm={workflow.threedmArtifact ? downloads.downloadThreedm : undefined}
-                      onDownloadGlb={workflow.glbUrl ? downloads.downloadGlb : undefined}
-                      onExportEdited={hasEdits ? downloads.exportEdited : undefined}
-                    />
-                    {/* Directly under the download, because the moment that
-                        matters is the one where the file is about to leave the
-                        app and go to someone who will try to make it. */}
-                    <CadSolidityNotice notAllSolid={workflow.notAllSolid} />
-                  </div>
+                  <CadDownloadMenu
+                    isBusy={downloads.isBusy}
+                    onDownloadThreedm={workflow.threedmArtifact ? downloads.downloadThreedm : undefined}
+                    onDownloadGlb={workflow.glbUrl ? downloads.downloadGlb : undefined}
+                    onExportEdited={hasEdits ? downloads.exportEdited : undefined}
+                  />
                 ) : undefined}
               />
             )}
