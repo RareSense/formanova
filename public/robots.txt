@@ -1,8 +1,50 @@
+# Public marketing pages (/, /ai-jewelry-cad, /ai-jewelry-photoshoot, /blog/*,
+# /about, /glossary, /press/*, /terms, /privacy, /whitepaper) stay fully
+# crawlable. The Disallow list below is the React web app: auth-gated routes
+# that only ever render a loading shell to bots — no indexable content, and
+# they were showing up in Bing Webmaster as duplicate-title / thin-content
+# pages. Blocking crawl does not affect real visitors, redirects, or OAuth.
+# Rules are prefix matches; none collide with a marketing page path.
+
 User-agent: Googlebot
 Allow: /
+Disallow: /login
+Disallow: /oauth-callback
+Disallow: /dashboard
+Disallow: /generations
+Disallow: /credits
+Disallow: /studio
+Disallow: /studio-cad
+Disallow: /text-to-cad
+Disallow: /image-to-cad
+Disallow: /onboarding
+Disallow: /my-shopify-store
+Disallow: /brand-details
+Disallow: /payment-success
+Disallow: /success
+Disallow: /cancel
+Disallow: /link
+Disallow: /admin
 
 User-agent: Bingbot
 Allow: /
+Disallow: /login
+Disallow: /oauth-callback
+Disallow: /dashboard
+Disallow: /generations
+Disallow: /credits
+Disallow: /studio
+Disallow: /studio-cad
+Disallow: /text-to-cad
+Disallow: /image-to-cad
+Disallow: /onboarding
+Disallow: /my-shopify-store
+Disallow: /brand-details
+Disallow: /payment-success
+Disallow: /success
+Disallow: /cancel
+Disallow: /link
+Disallow: /admin
 
 User-agent: GPTBot
 Allow: /
@@ -27,5 +69,22 @@ Allow: /
 
 User-agent: *
 Allow: /
+Disallow: /login
+Disallow: /oauth-callback
+Disallow: /dashboard
+Disallow: /generations
+Disallow: /credits
+Disallow: /studio
+Disallow: /studio-cad
+Disallow: /text-to-cad
+Disallow: /image-to-cad
+Disallow: /onboarding
+Disallow: /my-shopify-store
+Disallow: /brand-details
+Disallow: /payment-success
+Disallow: /success
+Disallow: /cancel
+Disallow: /link
+Disallow: /admin
 
 Sitemap: https://formanova.ai/sitemap.xml
