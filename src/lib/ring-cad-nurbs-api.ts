@@ -38,6 +38,7 @@ export const RING_CAD_TIERS = {
   GPT_5_6_SOL: 'gpt_5_6_sol_openrouter',
   GEMINI_3_1_PRO: 'gemini_3_1_pro_openrouter',
   GPT_5_6_LUNA: 'gpt_5_6_luna_openrouter',
+  GPT_6_ASTRA_PRO: 'gpt_6_astra_pro_openrouter',
 } as const;
 
 export type RingCadTier = (typeof RING_CAD_TIERS)[keyof typeof RING_CAD_TIERS];
@@ -46,8 +47,11 @@ export type RingCadTier = (typeof RING_CAD_TIERS)[keyof typeof RING_CAD_TIERS];
  * Fixed tier for both Text-to-CAD and Image-to-CAD. No picker is exposed,
  * consistent with CAD_MODEL_SELECTOR_ENABLED being false. This selects the
  * model, not the price: what it costs is backend's to decide.
+ *
+ * astra-test branch: pointed at GPT_6_ASTRA_PRO instead of OPUS_5 so ring CAD
+ * runs exercise gpt-6-astra-pro end to end. Revert to OPUS_5 before merging.
  */
-export const RING_CAD_DEFAULT_TIER: RingCadTier = RING_CAD_TIERS.OPUS_5;
+export const RING_CAD_DEFAULT_TIER: RingCadTier = RING_CAD_TIERS.GPT_6_ASTRA_PRO;
 
 /**
  * Price is not defined here on purpose. It is set by backend per llm_tier and

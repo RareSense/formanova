@@ -47,7 +47,7 @@ export default function ImageToCAD() {
   const notificationEmail = useNotificationEmail(user?.email);
   const showCadUpload = isCadUploadEnabled(user?.email);
 
-  const [model] = useState("gemini");
+  const [model] = useState("gpt-6-astra-pro");
   const activeTier = RING_CAD_DEFAULT_TIER;
   const {
     referenceImages,
