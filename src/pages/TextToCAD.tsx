@@ -62,7 +62,7 @@ export default function TextToCAD() {
     : undefined;
   const activeTier = requestedTier ?? RING_CAD_DEFAULT_TIER;
 
-  const [model] = useState("gpt-6-astra-pro");
+  const [model] = useState("gpt-6-astra");
   const [prompt, setPrompt] = useState("");
   const [transformMode, setTransformMode] = useState("orbit");
   const wasManualUploadRef = useRef(false);

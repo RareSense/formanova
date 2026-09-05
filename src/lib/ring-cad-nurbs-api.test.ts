@@ -87,10 +87,10 @@ describe('ring_cad_nurbs_v1 start body', () => {
     expect(payload).not.toHaveProperty('llm_model');
   });
 
-  it('defaults to the fixed GPT-6 Astra Pro tier', () => {
+  it('defaults to the fixed GPT-6 Astra tier', () => {
     const { payload } = buildRingCadStartBody({ referenceImages: [IMG(1)] });
     expect(payload.llm_tier).toBe(RING_CAD_DEFAULT_TIER);
-    expect(RING_CAD_DEFAULT_TIER).toBe(RING_CAD_TIERS.GPT_6_ASTRA_PRO);
+    expect(RING_CAD_DEFAULT_TIER).toBe(RING_CAD_TIERS.GPT_6_ASTRA);
   });
 
   it('sends the fixed tier, which selects the model rather than the price', () => {

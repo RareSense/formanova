@@ -7,7 +7,7 @@ export const AI_MODELS = [
   { id: "gemini", label: "Lite", tier: "", comingSoon: false, hidden: false },
   { id: "claude-sonnet", label: "Standard", tier: "Mid-tier", comingSoon: false, hidden: true },
   { id: "claude-opus", label: "Premium", tier: "", comingSoon: false, hidden: false },
-  { id: "gpt-6-astra-pro", label: "Astra Pro", tier: "", comingSoon: false, hidden: false },
+  { id: "gpt-6-astra", label: "Astra", tier: "", comingSoon: false, hidden: false },
 ] as const;
 
 export const QUICK_EDITS = [
