@@ -38,7 +38,7 @@ export const RING_CAD_TIERS = {
   GPT_5_6_SOL: 'gpt_5_6_sol_openrouter',
   GEMINI_3_1_PRO: 'gemini_3_1_pro_openrouter',
   GPT_5_6_LUNA: 'gpt_5_6_luna_openrouter',
-  GPT_6_ASTRA: 'gpt_6_astra_openai',
+  GPT_6_ASTRA: 'gpt_6_astra_openrouter',
 } as const;
 
 export type RingCadTier = (typeof RING_CAD_TIERS)[keyof typeof RING_CAD_TIERS];
@@ -50,13 +50,10 @@ export type RingCadTier = (typeof RING_CAD_TIERS)[keyof typeof RING_CAD_TIERS];
  *
  * astra-test branch: pointed at GPT_6_ASTRA instead of OPUS_5 so ring CAD runs
  * exercise gpt-6-astra end to end. Slug from the toolkit QC runbook (PR #5,
- * feat/gpt-6-astra-routes). This is the OpenAI-direct route, not the
- * gpt_6_astra_openrouter twin: it is the path that has never run live, which is
- * the point of the test. Two consequences. The server's 'managed' key for this
- * tier must be an OpenAI key - an OpenRouter key fails as bad auth. And Astra
- * rejects sampling params, so the toolkit refuses temperature on this tier
- * (openrouter accepts it); buildRingCadStartBody sends none, so that is moot
- * unless someone adds one. Revert to OPUS_5 before merging.
+ * feat/gpt-6-astra-routes). This is the OpenRouter route, matching every other
+ * tier here; the openai-direct twin is gpt_6_astra_openai. The server's
+ * 'managed' key for this tier must be an OpenRouter key - an OpenAI key fails
+ * as bad auth. Revert to OPUS_5 before merging.
  */
 export const RING_CAD_DEFAULT_TIER: RingCadTier = RING_CAD_TIERS.GPT_6_ASTRA;
 
