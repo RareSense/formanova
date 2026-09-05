@@ -8,7 +8,6 @@ import {
   isRingCadRepairing,
   MAX_RING_CAD_REFERENCE_IMAGES,
   RING_CAD_DEFAULT_TIER,
-  RING_CAD_EXPLICIT_MODEL,
   RING_CAD_TIERS,
   RING_CAD_TOTAL_NODES,
 } from './ring-cad-nurbs-api';
@@ -79,17 +78,24 @@ describe('ring_cad_nurbs_v1 start body', () => {
     expect(() => buildRingCadStartBody({ referenceImages: imgs })).toThrow(/at most 5/i);
   });
 
-  it('names gpt-6-astra-pro outright, since no tier routes to it', () => {
+  it('sends llm_tier and never llm_model, which would bypass tier routing', () => {
     const { payload } = buildRingCadStartBody({
       referenceImages: [IMG(1)],
       tier: RING_CAD_TIERS.FABLE_5,
     });
-    expect(payload.llm_model).toBe(RING_CAD_EXPLICIT_MODEL);
-    expect(payload).not.toHaveProperty('llm_tier');
+    expect(payload.llm_tier).toBe(RING_CAD_TIERS.FABLE_5);
+    expect(payload).not.toHaveProperty('llm_model');
   });
 
-  it('uses the slash-prefixed form, which routes to OpenRouter', () => {
-    expect(RING_CAD_EXPLICIT_MODEL).toBe('openai/gpt-6-astra-pro');
+  it('defaults to the fixed GPT-6 Astra Pro tier', () => {
+    const { payload } = buildRingCadStartBody({ referenceImages: [IMG(1)] });
+    expect(payload.llm_tier).toBe(RING_CAD_DEFAULT_TIER);
+    expect(RING_CAD_DEFAULT_TIER).toBe(RING_CAD_TIERS.GPT_6_ASTRA_PRO);
+  });
+
+  it('sends the fixed tier, which selects the model rather than the price', () => {
+    const { payload } = buildRingCadStartBody({ referenceImages: [IMG(1)] });
+    expect(payload.llm_tier).toBe(RING_CAD_DEFAULT_TIER);
   });
 
   it('sends the literal "managed" for llm_api_key/variant_api_key, never a real credential', () => {

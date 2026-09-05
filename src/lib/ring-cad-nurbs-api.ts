@@ -31,8 +31,6 @@ import type { CadReferenceItem } from '@/lib/microservices-api';
  * Tier ids carry provider, model, token ceiling and reasoning budget as one
  * matched set. Never send llm_model alongside llm_tier: an explicit model
  * bypasses tier routing, silently dropping the token cap and reasoning config.
- *
- * astra-test branch is the one deliberate exception - see RING_CAD_EXPLICIT_MODEL.
  */
 export const RING_CAD_TIERS = {
   FABLE_5: 'claude_fable_5_openrouter',
@@ -40,7 +38,7 @@ export const RING_CAD_TIERS = {
   GPT_5_6_SOL: 'gpt_5_6_sol_openrouter',
   GEMINI_3_1_PRO: 'gemini_3_1_pro_openrouter',
   GPT_5_6_LUNA: 'gpt_5_6_luna_openrouter',
-  GPT_6_ASTRA: 'gpt_6_astra_openrouter',
+  GPT_6_ASTRA_PRO: 'gpt_6_astra_pro_openrouter',
 } as const;
 
 export type RingCadTier = (typeof RING_CAD_TIERS)[keyof typeof RING_CAD_TIERS];
@@ -50,28 +48,16 @@ export type RingCadTier = (typeof RING_CAD_TIERS)[keyof typeof RING_CAD_TIERS];
  * consistent with CAD_MODEL_SELECTOR_ENABLED being false. This selects the
  * model, not the price: what it costs is backend's to decide.
  *
- * Unused on the astra-test branch, which sends RING_CAD_EXPLICIT_MODEL instead.
- * Kept as the value to restore before merging.
- */
-export const RING_CAD_DEFAULT_TIER: RingCadTier = RING_CAD_TIERS.OPUS_5;
-
-/**
- * astra-test branch only. gpt-6-astra-PRO has no tier in the
- * nova3d_code_generation profile - only plain gpt-6-astra does (PR #5,
- * feat/gpt-6-astra-routes). Pro is still reachable, but only by naming the
- * model outright, which is why this branch breaks the never-send-llm_model
- * rule above on purpose.
+ * astra-test branch: pointed at GPT_6_ASTRA_PRO instead of OPUS_5 so ring CAD
+ * runs exercise gpt-6-astra-pro end to end, through tier routing rather than an
+ * explicit llm_model, so the token ceiling and reasoning budget still apply.
  *
- * The slash prefix picks the transport: _infer_provider_from_model sends a bare
- * gpt-* to OpenAI direct, and falls through to OpenRouter for the prefixed
- * form. This is the OpenRouter one.
- *
- * The cost of going around tier routing is real: no token ceiling (the tiers
- * set 128000) and no reasoning budget (the tiers set high). Long CAD scripts
- * are the likeliest thing to break. Delete this and restore llm_tier before
- * merging.
+ * The QC runbook for PR #5 (feat/gpt-6-astra-routes) lists only gpt_6_astra_openai
+ * and gpt_6_astra_openrouter - no Pro tier. If backend has not added this one
+ * since, the start call fails outright rather than falling back. Revert to
+ * OPUS_5 before merging.
  */
-export const RING_CAD_EXPLICIT_MODEL = 'openai/gpt-6-astra-pro';
+export const RING_CAD_DEFAULT_TIER: RingCadTier = RING_CAD_TIERS.GPT_6_ASTRA_PRO;
 
 /**
  * Price is not defined here on purpose. It is set by backend per llm_tier and
@@ -219,10 +205,7 @@ export function buildRingCadStartBody({
     payload.reference_image_artifacts = images;
   }
 
-  // astra-test: explicit model instead of the tier, the only way to reach Pro.
-  // Sending both would be wrong - llm_model already wins.
-  void tier;
-  payload.llm_model = RING_CAD_EXPLICIT_MODEL;
+  if (tier) payload.llm_tier = tier;
 
   return { payload };
 }
