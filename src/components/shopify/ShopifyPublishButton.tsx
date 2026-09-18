@@ -101,7 +101,10 @@ export function ShopifyPublishButton({
           color: SHOPIFY_BUTTON_ACCENT,
         }}
         className={cn(
-          'gap-2 border bg-background hover:bg-background hover:text-[#6E9735]',
+          // min-w-0 and a centred, full-width box let the label shrink inside
+          // the button. Without it the text keeps its full width and spills
+          // past the border on a narrow card, which is what it did.
+          'w-full min-w-0 justify-center gap-2 border bg-background hover:bg-background hover:text-[#6E9735]',
           className
         )}
       >
@@ -110,11 +113,14 @@ export function ShopifyPublishButton({
           : <ShopifyIcon />}
         {shortLabel ? (
           <>
-            <span className="hidden whitespace-nowrap sm:inline">{label}</span>
-            <span className="whitespace-nowrap sm:hidden">{shortLabel}</span>
+            {/* Truncation rather than wrapping: the button keeps one line and
+                its height, and an ellipsis reads as a shortened label while a
+                second line would push it into whatever sits below. */}
+            <span className="hidden min-w-0 truncate sm:inline">{label}</span>
+            <span className="min-w-0 truncate sm:hidden">{shortLabel}</span>
           </>
         ) : (
-          <span className="whitespace-nowrap">{label}</span>
+          <span className="min-w-0 truncate">{label}</span>
         )}
       </Button>
 
