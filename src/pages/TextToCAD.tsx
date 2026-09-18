@@ -17,7 +17,7 @@ import { useCADMeshEditor } from "@/hooks/useCADMeshEditor";
 import { useNotificationEmail } from "@/hooks/useNotificationEmail";
 import { useCadArtifactDownloads } from "@/hooks/useCadArtifactDownloads";
 import { useCadAutoRotate } from "@/hooks/useCadAutoRotate";
-import { CadDownloadMenu } from "@/components/downloads/CadDownloadMenu";
+import CadResultActions from "@/components/text-to-cad/CadResultActions";
 import { trackCadStudioOpen } from "@/lib/posthog-events";
 
 import MeshPanel from "@/components/text-to-cad/MeshPanel";
@@ -400,16 +400,18 @@ export default function TextToCAD() {
                 transformData={editor.selectedTransform}
                 onTransformChange={editor.handleNumericTransformChange}
                 onResetTransform={() => editor.handleSceneAction("reset-transform")}
-                // Same visibility rule the download action had in ViewportSideTools
-                // before the move — hidden mid-regeneration, not just mid-initial-generation.
-                downloadSlot={!workflow.isGenerating && !workflow.isModelLoading ? (
-                  <CadDownloadMenu
-                    isBusy={downloads.isBusy}
-                    onDownloadThreedm={workflow.threedmArtifact ? downloads.downloadThreedm : undefined}
-                    onDownloadGlb={workflow.glbUrl ? downloads.downloadGlb : undefined}
-                    onExportEdited={hasEdits ? downloads.exportEdited : undefined}
-                  />
-                ) : undefined}
+              />
+            )}
+
+            {/* Result actions, bottom center. Same visibility rule the download
+                carried in the toolbar before the move: hidden mid-regeneration,
+                not just mid-initial-generation. */}
+            {workflow.hasModel && !workflow.isGenerating && !workflow.isModelLoading && (
+              <CadResultActions
+                isBusy={downloads.isBusy}
+                onDownloadThreedm={workflow.threedmArtifact ? downloads.downloadThreedm : undefined}
+                onDownloadGlb={workflow.glbUrl ? downloads.downloadGlb : undefined}
+                onExportEdited={hasEdits ? downloads.exportEdited : undefined}
               />
             )}
 

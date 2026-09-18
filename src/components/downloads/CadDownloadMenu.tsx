@@ -38,7 +38,8 @@ export interface CadDownloadMenuProps {
   isBusy?: boolean;
   /**
    * `viewport` is the overlay button in the 3D workspace; `card` is the
-   * full-width variant used in the history list.
+   * full-width variant used in the history list; `result` is the large one in
+   * the result action bar at the bottom of the CAD viewport.
    *
    * Both are solid. The history card previously used an outline style so two
    * filled blocks would not compete with the ring preview above them, which
@@ -47,7 +48,7 @@ export interface CadDownloadMenuProps {
    * is promoted; Open in Studio stays outlined, so there is one clear primary
    * action rather than the two the original note was guarding against.
    */
-  variant?: 'viewport' | 'card';
+  variant?: 'viewport' | 'card' | 'result';
   className?: string;
 }
 
@@ -55,6 +56,17 @@ const TRIGGER_BASE =
   'flex items-center gap-2 border border-primary bg-primary text-primary-foreground ' +
   'font-bold uppercase shadow-lg transition-opacity hover:opacity-90 active:scale-[0.98] ' +
   'disabled:pointer-events-none disabled:opacity-60';
+
+/**
+ * The size every control in the result action bar shares.
+ *
+ * Exported rather than duplicated: the bar's other control (Improve from the
+ * latest version) is a sibling of this one, and CLAUDE.md requires siblings to
+ * be the same size. Two hand-kept copies of the same measurements drift the
+ * first time one of them is adjusted, so both read it from here.
+ */
+export const CAD_RESULT_ACTION_SIZE =
+  'h-[52px] min-w-[220px] justify-center px-8 text-[12px] tracking-[0.12em]';
 
 const VARIANTS = {
   // 42px, not 40, so this lines up with the mode group in the same toolbar.
@@ -66,6 +78,12 @@ const VARIANTS = {
   // flex-1, not w-full: the chevron is a sibling inside the same row, so a
   // full-width primary would push it out of the card.
   card: 'h-11 w-full flex-1 justify-center px-3 font-mono text-[9px] tracking-wider',
+  // The finished-result action at the bottom of the viewport. Larger than
+  // `viewport` because it is no longer one control among the tools: it is the
+  // end of the job, shown once the object is there to download.
+  // flex-1 so the button fills the bar's full-width stacked layout on a narrow
+  // panel, the same reason the card variant carries it.
+  result: `${CAD_RESULT_ACTION_SIZE} flex-1`,
 } as const;
 
 export function CadDownloadMenu({
@@ -119,7 +137,7 @@ export function CadDownloadMenu({
               className={cn(
                 TRIGGER_BASE,
                 'justify-center px-2',
-                variant === 'viewport' ? 'h-[42px]' : 'h-11',
+                variant === 'viewport' ? 'h-[42px]' : variant === 'result' ? 'h-[52px]' : 'h-11',
                 // A hairline keeps the two halves readable as one control
                 // without letting the divider read as a gap between siblings.
                 'border-l border-l-primary-foreground/25',
