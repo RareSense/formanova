@@ -67,7 +67,21 @@ export const RING_CAD_DEFAULT_TIER: RingCadTier = RING_CAD_TIERS.GPT_6_ASTRA;
 
 // -- Workflow identity and limits ------------------------------------------
 
-export const RING_CAD_NURBS_WORKFLOW = 'ring_cad_nurbs_v1';
+/**
+ * The workflow that builds a ring's first version.
+ *
+ * `ring_cad_generate` replaces `ring_cad_nurbs_v1`: same request fields, same
+ * three input modes, and it saves its result as version 1 of a ring, which is
+ * what the vault and the Improve button read. Runs started under the old name
+ * have no versions at all, so nothing can be improved from them.
+ *
+ * The old export name is kept as an alias so the call sites that import it do
+ * not all have to change in the same commit as the switch.
+ */
+export const RING_CAD_WORKFLOW = 'ring_cad_generate';
+
+/** @deprecated Use RING_CAD_WORKFLOW; kept so existing imports keep working. */
+export const RING_CAD_NURBS_WORKFLOW = RING_CAD_WORKFLOW;
 
 /** Beyond 5 the backend ignores the extras, so the UI must cap before sending. */
 export const MAX_RING_CAD_REFERENCE_IMAGES = 5;

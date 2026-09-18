@@ -338,9 +338,30 @@ export function extractWorkflowCredits(payload: unknown): number | null {
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
+/**
+ * The one ring CAD workflow, under each of the names it has been served by.
+ *
+ * All three serve text-only, one-image and multi-image runs alike, so the name
+ * alone never says which section a run belongs in - the reference count does.
+ *
+ * This must be consulted BEFORE the text-to-CAD rules below: `ring_cad_generate`
+ * contains both "ring" and "generate", so it would otherwise match the generic
+ * text-to-CAD rule and file every photo run in the wrong section.
+ */
+export function isRingCadWorkflow(name: string): boolean {
+  const lower = name.toLowerCase().replace(/-/g, '_');
+  return (
+    lower.includes('ring_cad_nurbs') ||
+    lower.includes('ring_cad_generate') ||
+    lower.includes('ring_cad_improve')
+  );
+}
+
 /** Infer the source type from the workflow name */
 export function inferSourceType(name: string): SourceType {
   const lower = name.toLowerCase();
+
+  if (isRingCadWorkflow(name)) return 'image_to_cad';
 
   // Text-to-CAD workflows (ring_full_pipeline, ring_generate, text_to_cad, etc.)
   if (
@@ -353,11 +374,6 @@ export function inferSourceType(name: string): SourceType {
     (lower.includes('ring') && lower.includes('generate'))
   )
     return 'text_to_cad';
-
-  // Image-to-3D workflows. ring_cad_nurbs_v1 names neither 'sketch' nor 'image'
-  // but does contain 'cad', so it must be matched before the cad_render check
-  // or it lands in the wrong history section.
-  if (lower.includes('ring_cad_nurbs') || lower.includes('ring-cad-nurbs')) return 'image_to_cad';
 
   // Sketch-to-CAD workflows
   if (lower.includes('sketch')) return 'image_to_cad';
@@ -448,10 +464,7 @@ export function resolveSourceType(
   // This only fires for backend's own deliberate "unknown" (payload missing,
   // >5 images, or 0 images with no description) — picks a sensible bucket
   // from the count instead of leaving the workflow in an Unknown section.
-  if (
-    (normalizedName.includes('ring_cad_nurbs') || normalizedName.includes('ring-cad-nurbs')) &&
-    referenceImageCount !== null
-  ) {
+  if (isRingCadWorkflow(normalizedName) && referenceImageCount !== null) {
     return referenceImageCount === 0 ? 'text_to_cad' : 'image_to_cad';
   }
   return inferSourceType(workflowName);
