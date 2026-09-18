@@ -20,6 +20,7 @@ import {
 import { PhotoCard } from './PhotoCard';
 import { withTimeout, type RingVersionRef } from '@/lib/generation-history-utils';
 import { cn } from '@/lib/utils';
+import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
 import { buildCadRestorePath } from '@/contexts/GenerationsContext';
 import { cadSourceFromSourceType, cadRouteFromSource } from '@/lib/cad-analytics';
 import {
@@ -53,6 +54,15 @@ interface WorkflowCardProps {
   onClick: (id: string) => void;
   /** Called after an inline upscale completes, so the page can refresh the list. */
   onUpscaled?: () => void;
+}
+
+/** A version's preview, fetched with the caller's token like every other
+ *  artifact image; the link is auth-gated, so a plain <img> renders broken. */
+function RingVersionThumb({ version }: { version: RingVersionRef }) {
+  const src = useAuthenticatedImage(version.thumbnailUrl);
+  return src
+    ? <img src={src} alt="" loading="lazy" className="h-full w-full object-contain p-0.5" />
+    : <span className="font-mono text-[9px] text-muted-foreground">{`V${version.position + 1}`}</span>;
 }
 
 // ─── Text-to-CAD card ──────────────────────────────────────────────────────
@@ -368,9 +378,7 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
                     isNewest ? 'border-foreground' : 'border-border hover:border-foreground/50',
                   )}
                 >
-                  {version.thumbnailUrl
-                    ? <img src={version.thumbnailUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
-                    : <span className="font-mono text-[9px] text-muted-foreground">{`V${version.position + 1}`}</span>}
+                  <RingVersionThumb version={version} />
                   <span className="absolute bottom-0 right-0 bg-background/85 px-1 font-mono text-[8px] leading-tight">
                     {`V${version.position + 1}`}
                   </span>

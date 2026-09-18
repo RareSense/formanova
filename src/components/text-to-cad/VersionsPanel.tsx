@@ -11,6 +11,7 @@
  * saves none, and an empty section would read as something being broken.
  */
 
+import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
 import { cn } from '@/lib/utils';
 
 export interface VersionCard {
@@ -35,6 +36,28 @@ function savedAt(value?: string | null): string {
   return Number.isNaN(when.getTime())
     ? ''
     : when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+/**
+ * One card, so the thumbnail can be fetched with the caller's token.
+ *
+ * The vault's links are auth-gated: /api/artifacts/<sha> answers 401 without a
+ * token, and an <img> sends none, which is why every preview rendered broken.
+ * The shared hook fetches the bytes and hands back a blob URL, exactly as the
+ * rest of the app does for artifact images.
+ */
+function VersionCardImage({ version }: { version: VersionCard }) {
+  const src = useAuthenticatedImage(version.thumbnail_url);
+  if (!src) {
+    // No screenshot, or it has not arrived yet: the version is still a real
+    // ring the user can open, so it keeps its place and shows its name.
+    return (
+      <span className="font-mono text-[11px] font-bold tracking-wider text-muted-foreground">
+        {`V${version.position + 1}`}
+      </span>
+    );
+  }
+  return <img src={src} alt="" loading="lazy" className="h-full w-full object-contain" />;
 }
 
 export function VersionsPanel({ versions, selectedAssetId, onSelect }: VersionsPanelProps) {
@@ -81,18 +104,7 @@ export function VersionsPanel({ versions, selectedAssetId, onSelect }: VersionsP
                   different rings. The padding keeps the silhouette off the
                   border so the card does not read as cramped. */}
               <div className="flex aspect-square items-center justify-center bg-muted/10 p-1.5">
-                {version.thumbnail_url ? (
-                  <img
-                    src={version.thumbnail_url}
-                    alt={`Version ${version.position + 1}`}
-                    loading="lazy"
-                    className="h-full w-full object-contain"
-                  />
-                ) : (
-                  // A version whose screenshot could not be made still belongs
-                  // in the list; it is a real ring the user can open.
-                  <span className="font-mono text-[10px] text-muted-foreground">No preview</span>
-                )}
+                <VersionCardImage version={version} />
               </div>
               <div className="flex items-baseline justify-between border-t border-border px-1.5 py-1">
                 <span className="font-mono text-[10px] font-bold tracking-wider">{`V${version.position + 1}`}</span>
