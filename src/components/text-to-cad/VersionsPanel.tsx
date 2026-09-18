@@ -43,13 +43,19 @@ export function VersionsPanel({ versions, selectedAssetId, onSelect }: VersionsP
   const newest = versions.reduce((a, b) => ((b.position ?? 0) >= (a.position ?? 0) ? b : a));
 
   return (
-    <section className="mt-8">
-      <header className="mb-3 flex items-baseline justify-between">
-        <h2 className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Versions</h2>
-        <span className="font-mono text-[11px] text-muted-foreground">{versions.length}</span>
-      </header>
+    <section>
+      {/* Header matches the panel's other sections: small caps label on the
+          left, the count on the right, same type scale as REFERENCE IMAGES. */}
+      <div className="mb-2 flex items-baseline justify-between">
+        <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Versions</h3>
+        <span className="font-mono text-[10px] tracking-[0.15em] text-muted-foreground/60 tabular-nums">
+          {versions.length}
+        </span>
+      </div>
 
-      <div className="flex flex-wrap gap-3">
+      {/* Three to a row, matching the reference thumbnails above, so the two
+          strips line up instead of each choosing its own width. */}
+      <div className="grid grid-cols-3 gap-2">
         {versions.map((version) => {
           const isSelected = version.asset_id === selectedAssetId;
           const isNewest = version.asset_id === newest.asset_id;
@@ -61,22 +67,22 @@ export function VersionsPanel({ versions, selectedAssetId, onSelect }: VersionsP
               aria-current={isSelected}
               title={version.label?.text ?? undefined}
               className={cn(
-                'relative w-[104px] overflow-hidden rounded-lg border bg-card text-left transition-colors',
-                isSelected ? 'border-foreground' : 'border-border hover:border-foreground/40',
+                'group relative overflow-hidden border bg-card text-left transition-colors',
+                isSelected ? 'border-foreground' : 'border-border hover:border-foreground/50',
               )}
             >
               {isNewest && (
-                <span className="absolute right-1.5 top-1.5 rounded bg-primary px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider text-primary-foreground">
+                <span className="absolute right-1 top-1 z-10 bg-primary px-1.5 py-0.5 font-mono text-[8px] font-bold uppercase tracking-wider text-primary-foreground">
                   Latest
                 </span>
               )}
-              <div className="flex h-[88px] items-center justify-center bg-muted/40">
+              <div className="flex aspect-square items-center justify-center bg-muted/10">
                 {version.thumbnail_url ? (
                   <img
                     src={version.thumbnail_url}
                     alt={`Version ${version.position + 1}`}
                     loading="lazy"
-                    className="h-full w-full object-contain"
+                    className="h-full w-full object-cover"
                   />
                 ) : (
                   // A version whose screenshot could not be made still belongs
@@ -84,9 +90,9 @@ export function VersionsPanel({ versions, selectedAssetId, onSelect }: VersionsP
                   <span className="font-mono text-[10px] text-muted-foreground">No preview</span>
                 )}
               </div>
-              <div className="flex items-baseline justify-between px-2 py-1.5">
-                <span className="font-mono text-[11px] font-bold">{`V${version.position + 1}`}</span>
-                <span className="font-mono text-[10px] text-muted-foreground">{savedAt(version.created_at)}</span>
+              <div className="flex items-baseline justify-between border-t border-border px-1.5 py-1">
+                <span className="font-mono text-[10px] font-bold tracking-wider">{`V${version.position + 1}`}</span>
+                <span className="font-mono text-[9px] text-muted-foreground tabular-nums">{savedAt(version.created_at)}</span>
               </div>
             </button>
           );

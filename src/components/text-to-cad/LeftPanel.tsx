@@ -180,8 +180,12 @@ export default function LeftPanel({
         */}
 
         {/* Prompt */}
-        {/* In image mode before model loads: show prompt as static text (if any), no textarea */}
-        {!(isImageMode && !hasModel) && (
+        {/* In image mode before model loads: show prompt as static text (if any), no textarea.
+            A ring that has saved versions hides this section entirely: the brief
+            that made it is already spent, the action on a saved ring is Improve,
+            and a live Generate button beside its versions invites starting a
+            second ring over the top of the one on screen. */}
+        {!(isImageMode && !hasModel) && versions.length === 0 && (
         <section>
           <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-3">Prompt</h3>
           <textarea

@@ -19,6 +19,7 @@
  *    start is refused.
  */
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
+import { azureUriToUrl } from '@/lib/azure-utils';
 
 /** How the backend labels an improve outcome, e.g. "Looks better". */
 export interface CadVersionLabel {
@@ -113,7 +114,29 @@ export async function fetchCadRings(page = 0, pageSize = MAX_PAGE_SIZE): Promise
   }
   const body = await response.json();
   const items = Array.isArray(body) ? body : body?.items;
-  return Array.isArray(items) ? (items as CadRing[]) : [];
+  return Array.isArray(items) ? (items as CadRing[]).map(withSameOriginFiles) : [];
+}
+
+/**
+ * Rewrites a version's file links to this app's own artifact proxy.
+ *
+ * The vault returns absolute links on the API host, and those are auth-gated:
+ * an <img> cannot send the caller's token, so every thumbnail rendered as a
+ * broken image. Each link is content-addressed, so the shared resolver finds
+ * the digest and returns the same-origin `/api/artifacts/<sha>` form that the
+ * rest of the app already uses for exactly this reason.
+ */
+function withSameOriginFiles(ring: CadRing): CadRing {
+  const proxied = (url?: string | null) => (url ? azureUriToUrl(url) || url : url ?? null);
+  return {
+    ...ring,
+    versions: (ring.versions ?? []).map((version) => ({
+      ...version,
+      thumbnail_url: proxied(version.thumbnail_url),
+      glb_url: proxied(version.glb_url),
+      threedm_url: proxied(version.threedm_url),
+    })),
+  };
 }
 
 /** The newest version of a ring, which is the one an Improve press starts from. */

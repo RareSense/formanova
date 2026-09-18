@@ -55,6 +55,25 @@ describe('versionLabel', () => {
 });
 
 describe('fetchCadRings', () => {
+  it("rewrites the vault's auth-gated links to the app's own proxy", async () => {
+    const sha = 'b'.repeat(64);
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, {
+      items: [{
+        set_id: 's',
+        versions: [{
+          asset_id: 'a1', position: 0,
+          thumbnail_url: `https://api.example.com/artifacts/${sha}`,
+          glb_url: `https://api.example.com/artifacts/${sha}.glb`,
+        }],
+      }],
+    }));
+    const [ring] = await fetchCadRings();
+    // An <img> cannot send the caller's token, so an absolute API link renders
+    // as a broken image; the same-origin proxy is what the rest of the app uses.
+    expect(ring.versions[0].thumbnail_url).toBe(`/api/artifacts/${sha}`);
+    expect(ring.versions[0].glb_url).toBe(`/api/artifacts/${sha}`);
+  });
+
   it('asks for page 0: paging starts there, so page 1 would skip the newest', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { items: [RING] }));
     await fetchCadRings();
