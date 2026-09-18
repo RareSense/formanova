@@ -38,6 +38,8 @@ export const RING_CAD_TIERS = {
   GPT_5_6_SOL: 'gpt_5_6_sol_openrouter',
   GEMINI_3_1_PRO: 'gemini_3_1_pro_openrouter',
   GPT_5_6_LUNA: 'gpt_5_6_luna_openrouter',
+  GPT_6_ASTRA: 'gpt_6_astra_openrouter',
+  GPT_6_ASTRA_PRO: 'gpt_6_astra_pro_openrouter',
 } as const;
 
 export type RingCadTier = (typeof RING_CAD_TIERS)[keyof typeof RING_CAD_TIERS];
@@ -46,8 +48,14 @@ export type RingCadTier = (typeof RING_CAD_TIERS)[keyof typeof RING_CAD_TIERS];
  * Fixed tier for both Text-to-CAD and Image-to-CAD. No picker is exposed,
  * consistent with CAD_MODEL_SELECTOR_ENABLED being false. This selects the
  * model, not the price: what it costs is backend's to decide.
+ *
+ * Astra, matching what ring_cad_generate and ring_cad_improve use when no tier
+ * is sent: the toolkit's own default for CAD code, repairs and the likeness
+ * review is gpt_6_astra_openrouter. Sending the same value keeps a run on one
+ * model whichever workflow it lands on. GPT_6_ASTRA_PRO is the heavier
+ * sibling, and a one-line switch if the quality is worth the cost.
  */
-export const RING_CAD_DEFAULT_TIER: RingCadTier = RING_CAD_TIERS.OPUS_5;
+export const RING_CAD_DEFAULT_TIER: RingCadTier = RING_CAD_TIERS.GPT_6_ASTRA;
 
 /**
  * Price is not defined here on purpose. It is set by backend per llm_tier and
@@ -147,6 +155,40 @@ export interface RingCadStartBody {
   payload: Record<string, unknown>;
 }
 
+/** One evidence record per supplied image, in slot order. */
+export interface RingCadImageEvidence {
+  /** Must start with a letter; the workflow refers to the image by this id. */
+  stable_id: string;
+  provenance: 'original_customer_photo' | 'customer_supplied_diagram';
+  role: string;
+  sha256?: string;
+}
+
+/**
+ * ring_cad_generate's reference bundle sets require_provenance, so every
+ * supplied image must arrive with an evidence record or the run stops at
+ * 422 missing_image_provenance. Provenance is also what keeps a customer's
+ * photograph apart from a view the workflow generated itself: only the
+ * photographs are treated as evidence of the real ring, and cameras are
+ * fitted to them.
+ *
+ * `ring_cad_nurbs_v1` maps neither field, so sending them changes nothing
+ * there - a root key no node reads is ignored.
+ */
+export function referenceEvidence(image: ImageInput, index: number): RingCadImageEvidence {
+  const sha256 = typeof image === 'string' ? undefined : image.sha256;
+  return {
+    stable_id: `ref_${String(index + 1).padStart(2, '0')}`,
+    // What the user uploads IS the reference for the ring they want, so it is
+    // authority. The alternative, caller_supplied_unknown, is excluded from
+    // camera pairing and from repair authority, which would leave the likeness
+    // review with no references at all.
+    provenance: 'original_customer_photo',
+    role: index === 0 ? 'primary_reference' : `additional_reference_${index + 1}`,
+    ...(sha256 ? { sha256 } : {}),
+  };
+}
+
 /**
  * Builds the start body for the three input modes. reference_image_count must
  * always match the number of images actually supplied - it is what selects the
@@ -190,9 +232,11 @@ export function buildRingCadStartBody({
     // ordered list the prompts read.
     payload.image_artifact = images[0];
     payload.reference_image_artifacts = [images[0]];
+    payload.single_reference_evidence_by_slot = { image_1: referenceEvidence(images[0], 0) };
   } else if (images.length > 1) {
     // Multi-image mode generates no variants, so image_artifact is not sent.
     payload.reference_image_artifacts = images;
+    payload.reference_evidence_by_slot = { image_1: images.map(referenceEvidence) };
   }
 
   if (tier) payload.llm_tier = tier;

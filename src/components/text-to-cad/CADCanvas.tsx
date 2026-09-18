@@ -569,11 +569,15 @@ function MotionAdaptiveProvider({
   const enterMotion = useCallback(() => {
     if (inMotionRef.current) return;
     inMotionRef.current = true;
+    // Dragging used to drop to a quarter of the render scale under heavy grain,
+    // which is what made orbiting look coarse next to the local ring viewer.
+    // Half (heavy) and three quarters (normal) still buy most of the frame
+    // budget while the ring stays legible while it moves.
     const motionDpr = heavyScene
-      ? Math.max(0.22, baseDpr * 0.24)
-      : Math.max(0.3, baseDpr * 0.33);
+      ? Math.max(0.5, baseDpr * 0.5)
+      : Math.max(0.75, baseDpr * 0.75);
     setRenderScale(motionDpr);
-    if (grainRef.current) grainRef.current.style.opacity = heavyScene ? ".72" : ".6";
+    if (grainRef.current) grainRef.current.style.opacity = heavyScene ? ".5" : ".35";
     inv();
   }, [baseDpr, heavyScene, inv, setRenderScale]);
 
@@ -2789,7 +2793,10 @@ const CADCanvas = forwardRef<CADCanvasHandle, CADCanvasProps>(
               enablePan={true}
               enableZoom={true}
               enableDamping
-              dampingFactor={0.03}
+              // 0.03 leaves the camera coasting well after the pointer stops,
+              // which reads as lag rather than weight. 0.08 is what the local
+              // ring viewer uses, and it follows the pointer closely.
+              dampingFactor={0.08}
               minDistance={0.5}
               maxDistance={20}
               minPolarAngle={0}
