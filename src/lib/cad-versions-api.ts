@@ -174,6 +174,18 @@ export async function startImproveFromVersion(assetId: string): Promise<CadImpro
  * reason}`. Everything else keeps a plain string detail, so the two are told
  * apart by the shape of the body rather than by the status alone.
  */
+export async function fetchImproveOutcome(workflowId: string): Promise<CadImproveError | null> {
+  try {
+    const response = await authenticatedFetch(`/api/result/${workflowId}`);
+    if (response.ok) return null;
+    return readImproveResultFailure(response.status, await response.json().catch(() => null));
+  } catch {
+    // A press whose outcome cannot be read is reported as an ordinary failure
+    // by the caller, which is the safer of the two stories to tell.
+    return null;
+  }
+}
+
 export function readImproveResultFailure(status: number, body: unknown): CadImproveError | null {
   if (status !== 404) return null;
   const detail = (body as { detail?: unknown } | null)?.detail;

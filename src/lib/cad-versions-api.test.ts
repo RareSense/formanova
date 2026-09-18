@@ -5,6 +5,7 @@ vi.mock('@/lib/authenticated-fetch', () => ({ authenticatedFetch: vi.fn() }));
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import {
   CadImproveError,
+  fetchImproveOutcome,
   findRingForWorkflow,
   latestVersion,
   readImproveResultFailure,
@@ -84,6 +85,28 @@ describe('startImproveFromVersion', () => {
   it('reports too few credits as its own case', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(402, { detail: 'Not enough credits' }));
     await expect(startImproveFromVersion('a2')).rejects.toBeInstanceOf(CadImproveError);
+  });
+});
+
+describe('fetchImproveOutcome', () => {
+  it('reports the refunded press so the UI can say so plainly', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(404, { detail: { message: 'Nothing needed fixing.', reason_code: 'nothing_to_fix' } }),
+    );
+    expect((await fetchImproveOutcome('wf_2'))?.failure).toBe('no_new_version');
+  });
+
+  it('is null for a run that succeeded, and for an ordinary failure', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { glb_artifact: {} }));
+    expect(await fetchImproveOutcome('wf_2')).toBeNull();
+
+    fetchMock.mockResolvedValueOnce(jsonResponse(500, { detail: 'boom' }));
+    expect(await fetchImproveOutcome('wf_2')).toBeNull();
+  });
+
+  it('is null when the call itself fails, so the generic message still shows', async () => {
+    fetchMock.mockRejectedValueOnce(new Error('offline'));
+    expect(await fetchImproveOutcome('wf_2')).toBeNull();
   });
 });
 

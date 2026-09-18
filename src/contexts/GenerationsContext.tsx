@@ -12,6 +12,7 @@ import { azureUriToUrl } from '@/lib/azure-utils';
 import type { PhotoshootResultResponse } from '@/lib/photoshoot-api';
 import type { Resolution } from '@/components/studio/OutputSettingsPills';
 import { getWorkflowDetails } from '@/lib/generation-history-api';
+import { fetchImproveOutcome } from '@/lib/cad-versions-api';
 import {
   RING_CAD_POLL_TIMEOUT_MS,
   isRingCadRepairing,
@@ -598,7 +599,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
           </ToastAction>
         ),
       });
-    }).catch(err => {
+    }).catch(async err => {
       clearInterval(ticker);
       controllers.current.delete(gen.workflowId);
       if (ctrl.signal.aborted) return;
@@ -608,6 +609,21 @@ export function GenerationsContextProvider({ children }: { children: React.React
       ));
       markGenerationFailed(gen.workflowId, 'CAD poll failed', startTime);
       refreshCredits();
+
+      // An Improve press that found nothing to fix ends as a failed run on
+      // purpose, and the credits are already back. /result says so in a body
+      // written for the user, so ask once before calling this an error:
+      // "your CAD could not be generated" is the wrong thing to tell someone
+      // whose ring simply needed no changes.
+      const outcome = await fetchImproveOutcome(gen.workflowId);
+      if (outcome) {
+        toast({
+          title: 'No changes this time',
+          description: `${outcome.message} Your credits were not charged.`,
+        });
+        return;
+      }
+
       toast({
         title: 'Your CAD could not be generated',
         description: 'The run did not complete. Your credits were not charged.',
