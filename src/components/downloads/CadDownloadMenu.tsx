@@ -53,9 +53,24 @@ export interface CadDownloadMenuProps {
 }
 
 const TRIGGER_BASE =
-  'flex items-center gap-2 border border-primary bg-primary text-primary-foreground ' +
-  'font-bold uppercase shadow-lg transition-opacity hover:opacity-90 active:scale-[0.98] ' +
-  'disabled:pointer-events-none disabled:opacity-60';
+  'flex items-center gap-2 border font-bold uppercase shadow-lg ' +
+  'active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60';
+
+/**
+ * Filled everywhere the download is the only action on offer. In the result
+ * bar it stands beside Improve, which is the one the eye should land on, so
+ * there it is the quiet one: same size, lighter weight.
+ */
+const TRIGGER_TONES = {
+  filled: 'border-primary bg-primary text-primary-foreground transition-opacity hover:opacity-90',
+  quiet: 'border-border bg-card text-foreground transition-colors hover:bg-accent',
+} as const;
+
+/** Keeps the chevron readable as part of the same control in either tone. */
+const DIVIDER_TONES = {
+  filled: 'border-l-primary-foreground/25',
+  quiet: 'border-l-border',
+} as const;
 
 /**
  * The size every control in the result action bar shares.
@@ -100,6 +115,7 @@ export function CadDownloadMenu({
   if (!primaryAction) return null;
 
   const primaryLabel = onDownloadThreedm ? 'Download 3DM' : 'Download GLB';
+  const tone = variant === 'result' ? 'quiet' : 'filled';
 
   // Everything not already the default action. A menu holding a single entry
   // is a dead affordance, so the chevron only appears when it has contents.
@@ -119,6 +135,7 @@ export function CadDownloadMenu({
         disabled={isBusy}
         className={cn(
           TRIGGER_BASE,
+          TRIGGER_TONES[tone],
           VARIANTS[variant],
           menuItems.length > 0 && 'border-r-0',
         )}
@@ -136,11 +153,13 @@ export function CadDownloadMenu({
               disabled={isBusy}
               className={cn(
                 TRIGGER_BASE,
+                TRIGGER_TONES[tone],
                 'justify-center px-2',
                 variant === 'viewport' ? 'h-[42px]' : variant === 'result' ? 'h-[52px]' : 'h-11',
                 // A hairline keeps the two halves readable as one control
                 // without letting the divider read as a gap between siblings.
-                'border-l border-l-primary-foreground/25',
+                'border-l',
+                DIVIDER_TONES[tone],
               )}
             >
               <ChevronDown className="h-3.5 w-3.5" />

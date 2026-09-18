@@ -38,9 +38,12 @@ export interface CadResultActionsProps {
   onImproveFromVersion?: () => void;
 }
 
+// Improve is where the eye should land, so it carries the filled treatment and
+// the download beside it goes quiet. Both keep the same size, which is what
+// stops the bar shifting on the day versions start arriving.
 const IMPROVE_BASE =
-  'flex items-center gap-2 border border-border bg-card text-foreground ' +
-  'font-bold uppercase shadow-lg transition-colors hover:bg-accent active:scale-[0.98] ' +
+  'flex items-center gap-2 border border-primary bg-primary text-primary-foreground ' +
+  'font-bold uppercase shadow-lg transition-opacity hover:opacity-90 active:scale-[0.98] ' +
   'disabled:pointer-events-none disabled:opacity-60';
 
 export function CadResultActions({
