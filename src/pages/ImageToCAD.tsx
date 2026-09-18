@@ -116,6 +116,19 @@ export default function ImageToCAD() {
     return () => document.removeEventListener('fullscreenchange', handler);
   }, []);
 
+  // A ring opened from history shows the description it was made from. A run
+  // that used none leaves this null, and the panel shows no prompt at all
+  // rather than an empty box implying the user forgot to type something.
+  useEffect(() => {
+    if (workflow.restoredPrompt && !prompt) setPrompt(workflow.restoredPrompt);
+  }, [workflow.restoredPrompt]); // eslint-disable-line react-hooks/exhaustive-deps -- runs when a restore resolves, and must not fight the user's own typing afterwards
+
+  // What the left panel shows: this session's uploads, or, for a ring opened
+  // from history, the photos that run was actually made from.
+  const panelReferenceUrls = referenceImagePreviewUrls.length > 0
+    ? referenceImagePreviewUrls
+    : workflow.restoredReferenceUrls;
+
   useEffect(() => {
     if (workflow.hasModel) rightPanelRef.current?.expand(22);
     else rightPanelRef.current?.collapse();
@@ -197,7 +210,7 @@ export default function ImageToCAD() {
           setPrompt={setPrompt}
           isGenerating={workflow.isGenerating}
           onGenerate={workflow.simulateGeneration}
-          referenceImagePreviewUrls={referenceImagePreviewUrls}
+          referenceImagePreviewUrls={panelReferenceUrls}
           onAddReferenceImages={addReferenceImages}
           onRemoveReferenceImage={removeReferenceImage}
           onReplaceReferenceImages={replaceReferenceImages}
@@ -253,7 +266,7 @@ export default function ImageToCAD() {
               }}
               onReset={workflow.hasModel ? handleReset : undefined}
               pageTitle="Image to CAD"
-              referenceImagePreviewUrls={referenceImagePreviewUrls}
+              referenceImagePreviewUrls={panelReferenceUrls}
             />
           )}
         </ResizablePanel>

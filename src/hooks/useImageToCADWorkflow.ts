@@ -28,6 +28,7 @@ import {
   buildCadGenerationProps,
 } from "@/lib/cad-analytics";
 import { fetchCadResult } from "@/lib/generation-history-api";
+import { fetchCadRunInputs } from "@/lib/cad-result-api";
 import {
   CadImproveError,
   findRingForWorkflow,
@@ -97,6 +98,16 @@ export function useImageToCADWorkflow({
   const [ring, setRing] = useState<CadRing | null>(null);
   /** Why the last Improve press could not start, in the user's own terms. */
   const [improveMessage, setImproveMessage] = useState<string | null>(null);
+  /**
+   * The photos and text a restored run was made from.
+   *
+   * A ring opened from history rebuilt the model but not the brief behind it,
+   * so the panel came up blank. Empty for a run with no photos, and the prompt
+   * stays null when none was typed, so nothing invents a brief that never
+   * existed.
+   */
+  const [restoredReferenceUrls, setRestoredReferenceUrls] = useState<string[]>([]);
+  const [restoredPrompt, setRestoredPrompt] = useState<string | null>(null);
 
   const pollAbortRef = useRef<AbortController | null>(null);
   const generationStartRef = useRef<number>(0);
@@ -329,6 +340,14 @@ export function useImageToCADWorkflow({
       });
     }
     trackCadResultRestored({ source: cadSource, entry, restore_ok: true });
+    if (workflowId) {
+      // After the model, never before it: the ring is what the user came for,
+      // and this is only the brief beside it.
+      void fetchCadRunInputs(workflowId).then(({ referenceImageUrls, prompt }) => {
+        setRestoredReferenceUrls(referenceImageUrls);
+        setRestoredPrompt(prompt);
+      });
+    }
     return true;
   }, [onWorkspaceActivate, cadSource]);
 
@@ -374,6 +393,8 @@ export function useImageToCADWorkflow({
     // would start a press on a ring the user is no longer looking at.
     setRing(null);
     setImproveMessage(null);
+    setRestoredReferenceUrls([]);
+    setRestoredPrompt(null);
     setProgressStep("analyzing");
 
     try {
@@ -458,6 +479,8 @@ export function useImageToCADWorkflow({
     setSourceWorkflowId(null);
     setRing(null);
     setImproveMessage(null);
+    setRestoredReferenceUrls([]);
+    setRestoredPrompt(null);
     if (glbUrl) URL.revokeObjectURL(glbUrl);
     setGlbUrl(undefined);
   }, [glbUrl]);
@@ -484,6 +507,8 @@ export function useImageToCADWorkflow({
         : undefined,
     improveFromLatestVersion,
     improveMessage,
+    restoredReferenceUrls,
+    restoredPrompt,
     simulateGeneration,
     restoreCompletedWorkflow,
     handleKeepCreating,

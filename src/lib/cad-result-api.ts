@@ -130,3 +130,32 @@ export async function fetchCadResult(
     return { glb_url: null, threedm_url: null, azure_source: null, not_all_solid: false };
   }
 }
+
+
+/**
+ * The inputs a finished run was made from: its reference photos and its text.
+ *
+ * Restoring a run rebuilds the model but not the brief that produced it, so a
+ * ring opened from history showed an empty left panel — no photos, no
+ * description, nothing to say what it was made from. The history list carries
+ * both, so this reads them back by workflow id rather than asking the user to
+ * remember.
+ *
+ * Returns empty values rather than throwing: the panel is worth showing even
+ * when the lookup fails, and the model is already on screen by then.
+ */
+export async function fetchCadRunInputs(
+  workflowId: string,
+): Promise<{ referenceImageUrls: string[]; prompt: string | null }> {
+  const { listMyWorkflows } = await import('@/lib/generation-history-api');
+  try {
+    const rows = await listMyWorkflows(100, 0);
+    const row = rows.find((w) => w.workflow_id === workflowId);
+    return {
+      referenceImageUrls: row?.reference_image_urls ?? [],
+      prompt: row?.prompt ?? null,
+    };
+  } catch {
+    return { referenceImageUrls: [], prompt: null };
+  }
+}
