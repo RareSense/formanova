@@ -111,6 +111,16 @@ export function useImageToCADWorkflow({
   /** Which version the panel is showing; the newest until the user picks another. */
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
 
+  /**
+   * True only while a run this page started is still on its way to the screen.
+   *
+   * "Ring generated successfully" fires when a model finishes loading, and a
+   * model finishes loading when a ring is opened from history or a version is
+   * clicked too, which announced a generation that never happened. The flag is
+   * set when this page starts a run and consumed by the first model that
+   * arrives afterwards.
+   */
+  const awaitingGeneratedToastRef = useRef(false);
   const pollAbortRef = useRef<AbortController | null>(null);
   const generationStartRef = useRef<number>(0);
   /** What cad_generation_started reported for is_first_ever, so the completed
@@ -241,6 +251,7 @@ export function useImageToCADWorkflow({
   const selectVersion = useCallback((assetId: string) => {
     const version = (ring?.versions ?? []).find((v) => v.asset_id === assetId);
     if (!version?.glb_url) return;
+    awaitingGeneratedToastRef.current = false;
     setSelectedVersionId(assetId);
     setGlbUrl(version.glb_url);
     setGlbArtifact({ uri: version.glb_url, type: 'model/gltf-binary', bytes: 0, sha256: '' });
@@ -272,6 +283,7 @@ export function useImageToCADWorkflow({
     try {
       const started = await startImproveFromVersion(activeVersion.asset_id);
       hasNavigatedAway.current = false;
+      awaitingGeneratedToastRef.current = true;
       onWorkspaceActivate();
       setIsGenerating(true);
       setGenerationFailed(false);
@@ -346,6 +358,8 @@ export function useImageToCADWorkflow({
       setGlbArtifact({ uri: url, type: 'model/gltf-binary', bytes: 0, sha256: '' });
     };
 
+    // Restoring shows a ring that already existed; nothing was generated here.
+    awaitingGeneratedToastRef.current = false;
     if (fallbackGlbUrl) seedGlb(fallbackGlbUrl);
 
     const result = workflowId ? await fetchCadResult(workflowId) : null;
@@ -409,6 +423,7 @@ export function useImageToCADWorkflow({
     // permanently block this hook's trackedRun mirror effect from ever
     // syncing this new run's progress/completion into the on-page viewport.
     hasNavigatedAway.current = false;
+    awaitingGeneratedToastRef.current = true;
     onWorkspaceActivate();
     setIsGenerating(true);
     setGenerationFailed(false);
@@ -546,6 +561,12 @@ export function useImageToCADWorkflow({
     improveMessage,
     restoredReferenceUrls,
     restoredPrompt,
+    /** True once, for the model that a run started here has just produced. */
+    consumeGeneratedToast: () => {
+      const owed = awaitingGeneratedToastRef.current;
+      awaitingGeneratedToastRef.current = false;
+      return owed;
+    },
     simulateGeneration,
     restoreCompletedWorkflow,
     handleKeepCreating,

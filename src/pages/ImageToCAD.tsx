@@ -156,8 +156,11 @@ export default function ImageToCAD() {
   // callback (and reprocess the mesh, causing flicker) on unrelated re-renders.
   const handleModelReady = useCallback(() => {
     workflow.setIsModelLoading(false);
-    toast.success("Ring generated successfully");
-  }, [workflow.setIsModelLoading]);
+    // Only for a ring this page just made: opening one from history or
+    // clicking another version also lands here, and announcing a generation
+    // that did not happen is worse than saying nothing.
+    if (workflow.consumeGeneratedToast()) toast.success("Ring generated successfully");
+  }, [workflow.setIsModelLoading, workflow.consumeGeneratedToast]);
 
   const handleReset = useCallback(() => {
     workflow.resetWorkflow();
