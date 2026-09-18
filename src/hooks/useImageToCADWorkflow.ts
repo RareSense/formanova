@@ -28,6 +28,13 @@ import {
   buildCadGenerationProps,
 } from "@/lib/cad-analytics";
 import { fetchCadResult } from "@/lib/generation-history-api";
+import {
+  CadImproveError,
+  findRingForWorkflow,
+  latestVersion,
+  startImproveFromVersion,
+  type CadRing,
+} from "@/lib/cad-versions-api";
 
 
 interface WorkflowParams {
@@ -76,6 +83,16 @@ export function useImageToCADWorkflow({
   const [failureMessage, setFailureMessage] = useState<string | null>(null);
   /** Exports fine but some part is not a closed solid - flag before manufacture. */
   const [notAllSolid, setNotAllSolid] = useState(false);
+  /**
+   * The saved ring this run produced, once the vault has it.
+   *
+   * Null for a run under an older workflow, which saved no versions at all,
+   * and for a run whose version row has not been written yet. Either way the
+   * Improve button stays hidden rather than pointing at nothing.
+   */
+  const [ring, setRing] = useState<CadRing | null>(null);
+  /** Why the last Improve press could not start, in the user's own terms. */
+  const [improveMessage, setImproveMessage] = useState<string | null>(null);
 
   const pollAbortRef = useRef<AbortController | null>(null);
   const generationStartRef = useRef<number>(0);
@@ -155,6 +172,76 @@ export function useImageToCADWorkflow({
       setHasModel(true);
     }
   }, [trackedRun?.status, trackedRun?.glbUrl, trackedRun?.threedmUrl, trackedRun?.generationStep]); // eslint-disable-line react-hooks/exhaustive-deps -- prompt/referenceImages/tier/cadRoute/cadSource and the trackedRun object are excluded: only the run's own transitions should re-drive the overlay, and including the object would re-fire on every progress tick. The analytics values are read from the closure of the render in which status changed, which is the correct moment for them. Regression to watch: if a future edit fires an event here on something other than a status transition, those values could be stale.
+
+  /**
+   * Looks up the ring this run saved, which is what the Improve button needs.
+   *
+   * Runs once a model is on screen, which is after /result has returned, so
+   * the version row is already written and the first attempt normally hits.
+   * The lookup retries internally for the case where the caller arrived from
+   * /status alone, where the write can still be a moment away.
+   *
+   * A run under an older workflow saves no ring, so this settles on null and
+   * the bar keeps holding the download by itself.
+   */
+  useEffect(() => {
+    if (!hasModel || !sourceWorkflowId) return;
+    let cancelled = false;
+    findRingForWorkflow(sourceWorkflowId)
+      .then((found) => {
+        if (!cancelled) setRing(found);
+      })
+      .catch(() => {
+        if (!cancelled) setRing(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [hasModel, sourceWorkflowId]);
+
+  const latestRingVersion = ring ? latestVersion(ring) : null;
+
+  /**
+   * One repair pass on the newest version, saved as the next one.
+   *
+   * The backend starts the run: the one-improve-per-ring rule lives on its
+   * endpoint, and it holds the credits itself, so there is no preflight here.
+   * The started run is handed to GenerationsContext exactly as a generation
+   * is, so the existing poll, overlay and toast carry it without knowing it
+   * came from a different button.
+   */
+  const improveFromLatestVersion = useCallback(async () => {
+    if (!latestRingVersion || ring?.improve_running) return;
+    setImproveMessage(null);
+    try {
+      const started = await startImproveFromVersion(latestRingVersion.asset_id);
+      hasNavigatedAway.current = false;
+      onWorkspaceActivate();
+      setIsGenerating(true);
+      setGenerationFailed(false);
+      setFailureMessage(null);
+      setNotAllSolid(false);
+      setHasModel(false);
+      // The ring is stale the moment a press starts: its next version does not
+      // exist yet, and the button must not offer a second press meanwhile.
+      setRing(null);
+      setProgressStep('building');
+      generationStartRef.current = Date.now();
+      setSourceWorkflowId(started.workflow_id);
+      trackCadGeneration({
+        workflowId: started.workflow_id,
+        label: latestRingVersion.label ? `Improve ${latestRingVersion.label}` : 'Improve ring',
+        cadRoute,
+      });
+    } catch (error) {
+      const message =
+        error instanceof CadImproveError
+          ? error.message
+          : 'Could not start the improvement. Please try again.';
+      setImproveMessage(message);
+      toast.error(message);
+    }
+  }, [cadRoute, latestRingVersion, onWorkspaceActivate, ring?.improve_running, trackCadGeneration]);
 
   /** Leaves the run running in the background and returns to the upload screen. */
   const handleKeepCreating = useCallback(() => {
@@ -263,6 +350,10 @@ export function useImageToCADWorkflow({
     // Clear the previous ring's solidity result: a stale warning on a new run
     // is worse than none, because it trains people to ignore it.
     setNotAllSolid(false);
+    // Likewise the previous ring: improving from it while a new one builds
+    // would start a press on a ring the user is no longer looking at.
+    setRing(null);
+    setImproveMessage(null);
     setProgressStep("analyzing");
 
     try {
@@ -345,6 +436,8 @@ export function useImageToCADWorkflow({
     setRetryAttempt(0);
     setProgressStep("");
     setSourceWorkflowId(null);
+    setRing(null);
+    setImproveMessage(null);
     if (glbUrl) URL.revokeObjectURL(glbUrl);
     setGlbUrl(undefined);
   }, [glbUrl]);
@@ -359,6 +452,10 @@ export function useImageToCADWorkflow({
     sourceWorkflowId, setSourceWorkflowId,
     threedmArtifact, setThreedmArtifact,
     failureMessage, notAllSolid,
+    /** The newest saved version's label, e.g. "V2"; absent until one exists. */
+    latestVersionLabel: latestRingVersion?.improvable === false ? undefined : latestRingVersion?.label ?? undefined,
+    improveFromLatestVersion,
+    improveMessage,
     simulateGeneration,
     restoreCompletedWorkflow,
     handleKeepCreating,

@@ -412,6 +412,8 @@ export default function TextToCAD() {
                 onDownloadThreedm={workflow.threedmArtifact ? downloads.downloadThreedm : undefined}
                 onDownloadGlb={workflow.glbUrl ? downloads.downloadGlb : undefined}
                 onExportEdited={hasEdits ? downloads.exportEdited : undefined}
+                latestVersionLabel={workflow.latestVersionLabel}
+                onImproveFromVersion={workflow.improveFromLatestVersion}
               />
             )}
 
