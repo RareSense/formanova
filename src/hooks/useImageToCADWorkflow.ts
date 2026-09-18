@@ -209,8 +209,20 @@ export function useImageToCADWorkflow({
     if (!ready || !sourceWorkflowId) return;
     let cancelled = false;
     findRingForWorkflow(sourceWorkflowId)
-      .then((found) => {
-        if (!cancelled) setRing(found);
+      .then(async (found) => {
+        if (cancelled) return;
+        setRing(found);
+        // The photos and brief belong to the ring, not to the press: an
+        // improve run's own inputs are the saved files it was handed, so
+        // opening V3 from history showed no reference images at all. They come
+        // from the run that made version 0, whichever version is on screen.
+        const root = (found?.versions ?? []).find((v) => (v.position ?? 0) === 0);
+        if (root?.source_workflow_id && root.source_workflow_id !== sourceWorkflowId) {
+          const inputs = await fetchCadRunInputs(root.source_workflow_id);
+          if (cancelled) return;
+          if (inputs.referenceImageUrls.length) setRestoredReferenceUrls(inputs.referenceImageUrls);
+          if (inputs.prompt) setRestoredPrompt(inputs.prompt);
+        }
       })
       .catch(() => {
         if (!cancelled) setRing(null);

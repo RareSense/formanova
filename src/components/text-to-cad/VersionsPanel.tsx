@@ -76,13 +76,17 @@ export function VersionsPanel({ versions, selectedAssetId, onSelect }: VersionsP
                   Latest
                 </span>
               )}
-              <div className="flex aspect-square items-center justify-center bg-muted/10">
+              {/* Contain, not cover: a screenshot cropped to a square cuts the
+                  shank off and two versions of the same ring then look like
+                  different rings. The padding keeps the silhouette off the
+                  border so the card does not read as cramped. */}
+              <div className="flex aspect-square items-center justify-center bg-muted/10 p-1.5">
                 {version.thumbnail_url ? (
                   <img
                     src={version.thumbnail_url}
                     alt={`Version ${version.position + 1}`}
                     loading="lazy"
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-contain"
                   />
                 ) : (
                   // A version whose screenshot could not be made still belongs
