@@ -37,6 +37,19 @@ const Q = getQualitySettings();
 // mutation boundary forbids changing its public API, UI consumers, or adding
 // sibling engine modules. Existing workflow/API concerns are not expanded.
 
+/**
+ * Mesh-name hints used wherever meshes are classified without a material name.
+ *
+ * The CAD pipeline names accent stones `pave_main_left_rows`, `pave_center_stone`
+ * and so on, and side stones `accent_*` or `melee_*`; those have to read as
+ * gems, or a ring's small stones come out as metal.
+ */
+const GEM_KEYWORDS = ["gem", "diamond", "stone", "ruby", "sapphire", "emerald", "crystal", "halo_gem",
+  "center_gem", "pave", "accent", "melee", "side_stone", "halo", "cz", "brilliant", "round_cut",
+  "cushion", "oval", "marquise", "princess", "baguette", "asscher", "trillion", "pear", "facet"];
+/** Settings and holders: metal that often sits inside a stone's own name. */
+const SETTING_KEYWORDS = ["prong", "claw", "bead", "milgrain", "setting", "basket", "collet"];
+
 type ReferenceMaterialKind = "metal" | "gem" | "pearl";
 
 interface ReferenceMaterialSpec {
@@ -1174,8 +1187,8 @@ const LoadedModel = forwardRef<
       console.log(`[MagicTex] Recognised ${recognisedCount}/${list.length} materials from GLB — skipping heuristics`);
     } else {
       // ── Standard heuristic texturing for fresh/pipeline GLBs ──
-      const gemKeywords = ["gem", "diamond", "stone", "ruby", "sapphire", "emerald", "crystal", "halo_gem", "center_gem", "pave", "brilliant", "round_cut", "cushion", "oval", "marquise", "princess", "facet"];
-      const platinumKeywords = ["prong", "claw", "bead", "milgrain", "setting", "basket", "collet"];
+      const gemKeywords = GEM_KEYWORDS;
+      const platinumKeywords = SETTING_KEYWORDS;
       const diamondMatDef = findMaterial("diamond")!;
       const platinumMatDef = findMaterial("platinum")!;
       const goldMatDef = findMaterial("yellow-gold")!;
@@ -1698,13 +1711,21 @@ const LoadedModel = forwardRef<
       const useRecognised = recognisedCount > 0 && recognisedCount >= list.length * 0.5;
 
       if (useRecognised) {
+        // A mesh the GLB never named is not automatically metal: accent stones
+        // arrive as pave_*/accent_* with no material name of their own, and
+        // blanket gold turned every one of them into part of the band.
         const fallbackGold = findMaterial("yellow-gold")!;
+        const fallbackDiamond = findMaterial("diamond")!;
         list.forEach((md) => {
-          if (!newMaterials[md.name]) newMaterials[md.name] = fallbackGold;
+          if (newMaterials[md.name]) return;
+          const lower = md.name.toLowerCase();
+          const isGem = GEM_KEYWORDS.some((kw) => lower.includes(kw))
+            && !SETTING_KEYWORDS.some((kw) => lower.includes(kw));
+          newMaterials[md.name] = isGem ? fallbackDiamond : fallbackGold;
         });
       } else {
-        const gemKeywords = ["gem", "diamond", "stone", "ruby", "sapphire", "emerald", "crystal", "halo_gem", "center_gem", "pave", "brilliant", "round_cut", "cushion", "oval", "marquise", "princess", "facet"];
-        const platinumKeywords = ["prong", "claw", "bead", "milgrain", "setting", "basket", "collet"];
+        const gemKeywords = GEM_KEYWORDS;
+        const platinumKeywords = SETTING_KEYWORDS;
         const diamondMatDef = findMaterial("diamond")!;
         const platinumMatDef = findMaterial("platinum")!;
         const goldMatDef = findMaterial("yellow-gold")!;

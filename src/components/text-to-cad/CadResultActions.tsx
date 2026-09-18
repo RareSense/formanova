@@ -43,7 +43,7 @@ export interface CadResultActionsProps {
 // stops the bar shifting on the day versions start arriving.
 const IMPROVE_BASE =
   'flex items-center gap-2 border border-primary bg-primary text-primary-foreground ' +
-  'font-bold uppercase shadow-lg transition-opacity hover:opacity-90 active:scale-[0.98] ' +
+  'font-bold shadow-lg transition-opacity hover:opacity-90 active:scale-[0.98] ' +
   'disabled:pointer-events-none disabled:opacity-60';
 
 export function CadResultActions({
@@ -67,7 +67,7 @@ export function CadResultActions({
           onClick={onImproveFromVersion}
           className={cn('pointer-events-auto w-full sm:w-auto', IMPROVE_BASE, CAD_RESULT_ACTION_SIZE)}
         >
-          <Sparkles className="h-3.5 w-3.5 shrink-0" />
+          <Sparkles className="h-[18px] w-[18px] shrink-0" />
           {`Improve from ${latestVersionLabel}`}
         </button>
       )}

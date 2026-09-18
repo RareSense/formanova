@@ -53,7 +53,7 @@ export interface CadDownloadMenuProps {
 }
 
 const TRIGGER_BASE =
-  'flex items-center gap-2 border font-bold uppercase shadow-lg ' +
+  'flex items-center gap-2 border font-bold shadow-lg ' +
   'active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60';
 
 /**
@@ -81,7 +81,7 @@ const DIVIDER_TONES = {
  * first time one of them is adjusted, so both read it from here.
  */
 export const CAD_RESULT_ACTION_SIZE =
-  'h-[52px] min-w-[220px] justify-center px-8 text-[12px] tracking-[0.12em]';
+  'h-[56px] min-w-[240px] justify-center gap-3 rounded-lg px-9 text-[15px] tracking-normal';
 
 const VARIANTS = {
   // 42px, not 40, so this lines up with the mode group in the same toolbar.
@@ -89,10 +89,10 @@ const VARIANTS = {
   // top and bottom, making the group 42px outside. This control carries its
   // border on the button itself, and box-sizing is border-box, so h-[40px]
   // would render 40px total and sit 2px short at the bottom.
-  viewport: 'h-[42px] px-4 text-[11px] tracking-[0.12em]',
+  viewport: 'h-[42px] px-4 text-[11px] uppercase tracking-[0.12em]',
   // flex-1, not w-full: the chevron is a sibling inside the same row, so a
   // full-width primary would push it out of the card.
-  card: 'h-11 w-full flex-1 justify-center px-3 font-mono text-[9px] tracking-wider',
+  card: 'h-11 w-full flex-1 justify-center px-3 font-mono text-[9px] uppercase tracking-wider',
   // The finished-result action at the bottom of the viewport. Larger than
   // `viewport` because it is no longer one control among the tools: it is the
   // end of the job, shown once the object is there to download.
@@ -140,7 +140,7 @@ export function CadDownloadMenu({
           menuItems.length > 0 && 'border-r-0',
         )}
       >
-        <Download className="h-3.5 w-3.5 shrink-0" />
+        <Download className={cn('shrink-0', variant === 'result' ? 'h-[18px] w-[18px]' : 'h-3.5 w-3.5')} />
         {isBusy ? 'Preparing...' : primaryLabel}
       </button>
 
@@ -155,7 +155,7 @@ export function CadDownloadMenu({
                 TRIGGER_BASE,
                 TRIGGER_TONES[tone],
                 'justify-center px-2',
-                variant === 'viewport' ? 'h-[42px]' : variant === 'result' ? 'h-[52px]' : 'h-11',
+                variant === 'viewport' ? 'h-[42px]' : variant === 'result' ? 'h-[56px]' : 'h-11',
                 // A hairline keeps the two halves readable as one control
                 // without letting the divider read as a gap between siblings.
                 'border-l',
