@@ -38,6 +38,9 @@ import {
 } from "@/lib/cad-versions-api";
 
 
+/** What an Improve press runs, so its price is quoted under the right name. */
+const IMPROVE_WORKFLOW = 'ring_cad_improve';
+
 interface WorkflowParams {
   model: string;
   prompt: string;
@@ -218,6 +221,12 @@ export function useImageToCADWorkflow({
   const improveFromLatestVersion = useCallback(async () => {
     if (!latestRingVersion || ring?.improve_running) return;
     setImproveMessage(null);
+    // The same gate every paid run uses: it saves this page as the return
+    // path, shows the balance against the price, and sends the user to
+    // /credits. Reaching the endpoint's own 402 instead would swap that
+    // shared flow for a toast that says less and leads nowhere.
+    const approved = await checkCredits(IMPROVE_WORKFLOW, 1);
+    if (!approved) return;
     try {
       const started = await startImproveFromVersion(latestRingVersion.asset_id);
       hasNavigatedAway.current = false;
@@ -239,6 +248,12 @@ export function useImageToCADWorkflow({
         cadRoute,
       });
     } catch (error) {
+      if (error instanceof CadImproveError && error.failure === 'insufficient_credits') {
+        // The balance moved between the gate above and the start call, so hand
+        // it back to the same shared flow rather than explaining it here.
+        await checkCredits(IMPROVE_WORKFLOW, 1);
+        return;
+      }
       const message =
         error instanceof CadImproveError
           ? error.message
@@ -246,7 +261,7 @@ export function useImageToCADWorkflow({
       setImproveMessage(message);
       toast.error(message);
     }
-  }, [cadRoute, latestRingVersion, onWorkspaceActivate, ring?.improve_running, trackCadGeneration]);
+  }, [cadRoute, checkCredits, latestRingVersion, onWorkspaceActivate, ring?.improve_running, trackCadGeneration]);
 
   /** Leaves the run running in the background and returns to the upload screen. */
   const handleKeepCreating = useCallback(() => {
