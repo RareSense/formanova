@@ -4,6 +4,7 @@ import { RotateCcw, X, Maximize2 } from "lucide-react";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { useEstimatedCost } from "@/hooks/use-estimated-cost";
 import { RING_CAD_NURBS_WORKFLOW, MAX_RING_CAD_REFERENCE_IMAGES } from "@/lib/ring-cad-nurbs-api";
+import VersionsPanel, { type VersionCard } from '@/components/text-to-cad/VersionsPanel';
 
 interface LeftPanelProps {
   model: string;
@@ -18,6 +19,10 @@ interface LeftPanelProps {
   onReset?: () => void;
   referenceImagePreviewUrls?: string[];
   pageTitle?: string;
+  /** Saved versions of this ring, oldest first; empty until one is saved. */
+  versions?: VersionCard[];
+  selectedVersionId?: string | null;
+  onSelectVersion?: (assetId: string) => void;
 }
 
 export default function LeftPanel({
@@ -27,6 +32,9 @@ export default function LeftPanel({
   onReset,
   referenceImagePreviewUrls = [],
   pageTitle,
+  versions = [],
+  selectedVersionId,
+  onSelectVersion,
 }: LeftPanelProps) {
   const { cost: generationCost, loading: generationCostLoading } = useEstimatedCost({ workflowName: RING_CAD_NURBS_WORKFLOW, model });
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -139,6 +147,11 @@ export default function LeftPanel({
             )}
           </section>
         )}
+
+        {/* The ring's own history, directly under what it was made from.
+            Renders nothing until a version exists, so a run from an older
+            workflow shows no empty section. */}
+        <VersionsPanel versions={versions} selectedAssetId={selectedVersionId} onSelect={onSelectVersion} />
 
         {/* AI Model - hidden until model selection is ready to ship.
         <section>

@@ -108,6 +108,8 @@ export function useImageToCADWorkflow({
    */
   const [restoredReferenceUrls, setRestoredReferenceUrls] = useState<string[]>([]);
   const [restoredPrompt, setRestoredPrompt] = useState<string | null>(null);
+  /** Which version the panel is showing; the newest until the user picks another. */
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
 
   const pollAbortRef = useRef<AbortController | null>(null);
   const generationStartRef = useRef<number>(0);
@@ -218,7 +220,24 @@ export function useImageToCADWorkflow({
     };
   }, [hasModel, trackedRun?.status, sourceWorkflowId]);
 
+  const versions = ring?.versions ? [...ring.versions].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)) : [];
   const latestRingVersion = ring ? latestVersion(ring) : null;
+  /** What Improve acts on: the version on screen, which is the newest until picked. */
+  const activeVersion = versions.find((v) => v.asset_id === selectedVersionId) ?? latestRingVersion;
+
+  /** Opens an earlier version in the viewer. Its files are already published. */
+  const selectVersion = useCallback((assetId: string) => {
+    const version = (ring?.versions ?? []).find((v) => v.asset_id === assetId);
+    if (!version?.glb_url) return;
+    setSelectedVersionId(assetId);
+    setGlbUrl(version.glb_url);
+    setGlbArtifact({ uri: version.glb_url, type: 'model/gltf-binary', bytes: 0, sha256: '' });
+    setThreedmArtifact(version.threedm_url
+      ? { uri: version.threedm_url, url: version.threedm_url, type: 'model/3dm', bytes: 0, sha256: '' }
+      : null);
+    setIsModelLoading(true);
+    setHasModel(true);
+  }, [ring]);
 
   /**
    * One repair pass on the newest version, saved as the next one.
@@ -230,7 +249,7 @@ export function useImageToCADWorkflow({
    * came from a different button.
    */
   const improveFromLatestVersion = useCallback(async () => {
-    if (!latestRingVersion || ring?.improve_running) return;
+    if (!activeVersion || activeVersion.improvable === false || ring?.improve_running) return;
     setImproveMessage(null);
     // The same gate every paid run uses: it saves this page as the return
     // path, shows the balance against the price, and sends the user to
@@ -239,7 +258,7 @@ export function useImageToCADWorkflow({
     const approved = await checkCredits(IMPROVE_WORKFLOW, 1);
     if (!approved) return;
     try {
-      const started = await startImproveFromVersion(latestRingVersion.asset_id);
+      const started = await startImproveFromVersion(activeVersion.asset_id);
       hasNavigatedAway.current = false;
       onWorkspaceActivate();
       setIsGenerating(true);
@@ -255,7 +274,7 @@ export function useImageToCADWorkflow({
       setSourceWorkflowId(started.workflow_id);
       trackCadGeneration({
         workflowId: started.workflow_id,
-        label: `Improve ${versionLabel(latestRingVersion)}`,
+        label: `Improve ${versionLabel(activeVersion)}`,
         cadRoute,
       });
     } catch (error) {
@@ -272,7 +291,7 @@ export function useImageToCADWorkflow({
       setImproveMessage(message);
       toast.error(message);
     }
-  }, [cadRoute, checkCredits, latestRingVersion, onWorkspaceActivate, ring?.improve_running, trackCadGeneration]);
+  }, [activeVersion, cadRoute, checkCredits, onWorkspaceActivate, ring?.improve_running, trackCadGeneration]);
 
   /** Leaves the run running in the background and returns to the upload screen. */
   const handleKeepCreating = useCallback(() => {
@@ -395,6 +414,7 @@ export function useImageToCADWorkflow({
     setImproveMessage(null);
     setRestoredReferenceUrls([]);
     setRestoredPrompt(null);
+    setSelectedVersionId(null);
     setProgressStep("analyzing");
 
     try {
@@ -481,6 +501,7 @@ export function useImageToCADWorkflow({
     setImproveMessage(null);
     setRestoredReferenceUrls([]);
     setRestoredPrompt(null);
+    setSelectedVersionId(null);
     if (glbUrl) URL.revokeObjectURL(glbUrl);
     setGlbUrl(undefined);
   }, [glbUrl]);
@@ -502,9 +523,13 @@ export function useImageToCADWorkflow({
      * list, not on the button.
      */
     latestVersionLabel:
-      latestRingVersion && latestRingVersion.improvable !== false
-        ? versionLabel(latestRingVersion)
+      activeVersion && activeVersion.improvable !== false
+        ? versionLabel(activeVersion)
         : undefined,
+    /** Every saved version of this ring, oldest first, for the side panel. */
+    versions,
+    selectedVersionId: activeVersion?.asset_id ?? null,
+    selectVersion,
     improveFromLatestVersion,
     improveMessage,
     restoredReferenceUrls,

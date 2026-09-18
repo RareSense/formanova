@@ -267,6 +267,9 @@ export default function ImageToCAD() {
               onReset={workflow.hasModel ? handleReset : undefined}
               pageTitle="Image to CAD"
               referenceImagePreviewUrls={panelReferenceUrls}
+              versions={workflow.versions}
+              selectedVersionId={workflow.selectedVersionId}
+              onSelectVersion={workflow.selectVersion}
             />
           )}
         </ResizablePanel>

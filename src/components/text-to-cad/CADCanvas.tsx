@@ -1239,7 +1239,12 @@ const LoadedModel = forwardRef<
     } else {
       // ── Flat mesh classification (default when magic texturing is off) ──
       // gem → blue (#4a90d9), metal → green (#77dd77), flat shading, no maps
-      const gemRe = /diamond|gem|stone|crystal|jewel|brill|ruby|emerald|sapphire|topaz|opal|garnet|amethyst|pearl|cz|cubic|solitaire|pave|prong_stone|accent_stone|center_stone|main_stone/i;
+      // Built from the shared list so the flat preview and the real materials
+      // agree on what a gem is: `wing_accent_right` is a stone here too, and
+      // only `accent_stone` used to match.
+      const gemRe = new RegExp(
+        [...GEM_KEYWORDS, "jewel", "brill", "topaz", "opal", "garnet", "amethyst", "pearl", "cubic",
+          "solitaire", "prong_stone", "center_stone", "main_stone"].join("|"), "i");
       const metalRe = /band|ring|shank|prong|setting|mount|bezel|basket|gallery|shoulder|bridge|head|collet|metal|gold|silver|platinum|frame|base/i;
 
       list.forEach((md) => {
