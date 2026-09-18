@@ -241,10 +241,15 @@ export default function LeftPanel({
         </section>
         )}
 
-        {/* Image mode — show prompt text before model loads (read-only, no header).
+        {/* The brief this ring was made from, read-only, with no header.
+            Shown while an image-mode run is still building, and on a saved ring
+            whose original run had a description - that text is part of what the
+            ring is, so it stays visible beside its versions. A run made from
+            photos alone had no description, and then nothing is shown rather
+            than an empty box.
             Bounded and scrollable: a long brief would otherwise run for hundreds
             of pixels and push everything below it out of the panel. */}
-        {isImageMode && !hasModel && prompt.trim() && (
+        {((isImageMode && !hasModel) || versions.length > 0) && prompt.trim() && (
           <section>
             <div className="max-h-[140px] overflow-y-auto overscroll-contain border border-border/40 bg-muted/20 px-3 py-2.5">
               <p className="font-body text-[13px] leading-relaxed text-foreground/70 [overflow-wrap:anywhere]">{prompt}</p>
