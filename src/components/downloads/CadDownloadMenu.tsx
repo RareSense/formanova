@@ -81,7 +81,17 @@ const DIVIDER_TONES = {
  * first time one of them is adjusted, so both read it from here.
  */
 export const CAD_RESULT_ACTION_SIZE =
-  'h-[56px] min-w-[240px] justify-center gap-3 rounded-lg px-9 text-[15px] tracking-normal';
+  'h-[56px] justify-center gap-3 rounded-lg px-6 text-[15px] tracking-normal';
+
+/**
+ * The width both controls in the result bar take.
+ *
+ * Set here rather than left to each label, because the download is a split
+ * button: its chevron is a sibling INSIDE its own width, so matching only the
+ * primary halves would still leave the pair looking mismatched by the width of
+ * the chevron. Full width when the bar stacks on a narrow panel.
+ */
+export const CAD_RESULT_ACTION_WIDTH = 'w-full sm:w-[264px]';
 
 const VARIANTS = {
   // 42px, not 40, so this lines up with the mode group in the same toolbar.

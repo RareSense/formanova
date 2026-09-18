@@ -186,7 +186,11 @@ export function useImageToCADWorkflow({
    * the bar keeps holding the download by itself.
    */
   useEffect(() => {
-    if (!hasModel || !sourceWorkflowId) return;
+    // Starts as soon as the run has a result, not once the GLB has finished
+    // loading: parsing a heavy ring takes seconds, and waiting for it left the
+    // button missing on a ring that was already saved and improvable.
+    const ready = hasModel || trackedRun?.status === 'completed';
+    if (!ready || !sourceWorkflowId) return;
     let cancelled = false;
     findRingForWorkflow(sourceWorkflowId)
       .then((found) => {
@@ -198,7 +202,7 @@ export function useImageToCADWorkflow({
     return () => {
       cancelled = true;
     };
-  }, [hasModel, sourceWorkflowId]);
+  }, [hasModel, trackedRun?.status, sourceWorkflowId]);
 
   const latestRingVersion = ring ? latestVersion(ring) : null;
 

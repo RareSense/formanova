@@ -14,7 +14,7 @@
 
 import { Sparkles } from 'lucide-react';
 
-import { CadDownloadMenu, CAD_RESULT_ACTION_SIZE } from '@/components/downloads/CadDownloadMenu';
+import { CadDownloadMenu, CAD_RESULT_ACTION_SIZE, CAD_RESULT_ACTION_WIDTH } from '@/components/downloads/CadDownloadMenu';
 import { cn } from '@/lib/utils';
 
 export interface CadResultActionsProps {
@@ -65,7 +65,7 @@ export function CadResultActions({
         <button
           type="button"
           onClick={onImproveFromVersion}
-          className={cn('pointer-events-auto w-full sm:w-auto', IMPROVE_BASE, CAD_RESULT_ACTION_SIZE)}
+          className={cn('pointer-events-auto', CAD_RESULT_ACTION_WIDTH, IMPROVE_BASE, CAD_RESULT_ACTION_SIZE)}
         >
           <Sparkles className="h-[18px] w-[18px] shrink-0" />
           {`Improve from ${latestVersionLabel}`}
@@ -73,7 +73,7 @@ export function CadResultActions({
       )}
       <CadDownloadMenu
         variant="result"
-        className="pointer-events-auto w-full sm:w-auto"
+        className={cn('pointer-events-auto', CAD_RESULT_ACTION_WIDTH)}
         isBusy={isBusy}
         onDownloadThreedm={onDownloadThreedm}
         onDownloadGlb={onDownloadGlb}
