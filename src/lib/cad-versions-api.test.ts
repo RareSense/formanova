@@ -6,10 +6,12 @@ import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import {
   CadImproveError,
   fetchImproveOutcome,
+  fetchCadRings,
   findRingForWorkflow,
   latestVersion,
   readImproveResultFailure,
   startImproveFromVersion,
+  versionLabel,
 } from './cad-versions-api';
 
 const fetchMock = vi.mocked(authenticatedFetch);
@@ -18,12 +20,14 @@ function jsonResponse(status: number, body: unknown) {
   return { ok: status >= 200 && status < 300, status, json: async () => body } as unknown as Response;
 }
 
+// Shaped as GET /cad/rings really answers: source_workflow_id and position
+// live on the VERSION, and `label` is the improve verdict, not "V2".
 const RING = {
   set_id: 'set_1',
-  source_workflow_id: 'wf_1',
   versions: [
-    { asset_id: 'a1', label: 'V1', improvable: true },
-    { asset_id: 'a2', label: 'V2', improvable: true },
+    { asset_id: 'a1', position: 0, source_workflow_id: 'wf_1', improvable: true },
+    { asset_id: 'a2', position: 1, source_workflow_id: 'wf_2', improvable: true,
+      label: { code: 'looks_better', text: 'Looks better' } },
   ],
 };
 
@@ -32,8 +36,10 @@ beforeEach(() => {
 });
 
 describe('latestVersion', () => {
-  it('is the last entry, which is what an Improve press starts from', () => {
-    expect(latestVersion(RING)?.label).toBe('V2');
+  it('is the highest position, whatever order the list arrives in', () => {
+    expect(latestVersion(RING)?.asset_id).toBe('a2');
+    const reversed = { ...RING, versions: [...RING.versions].reverse() };
+    expect(latestVersion(reversed)?.asset_id).toBe('a2');
   });
 
   it('is null for a ring with no versions, so no button is offered', () => {
@@ -41,11 +47,32 @@ describe('latestVersion', () => {
   });
 });
 
-describe('findRingForWorkflow', () => {
-  it('matches on source_workflow_id', async () => {
+describe('versionLabel', () => {
+  it('counts from one: position 0 is the ring the user first made', () => {
+    expect(versionLabel({ asset_id: 'a1', position: 0 })).toBe('V1');
+    expect(versionLabel({ asset_id: 'a2', position: 2 })).toBe('V3');
+  });
+});
+
+describe('fetchCadRings', () => {
+  it('asks for page 0: paging starts there, so page 1 would skip the newest', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { items: [RING] }));
-    const ring = await findRingForWorkflow('wf_1', { attempts: 1 });
-    expect(ring?.set_id).toBe('set_1');
+    await fetchCadRings();
+    expect(String(fetchMock.mock.calls[0][0])).toContain('page=0');
+  });
+});
+
+describe('findRingForWorkflow', () => {
+  it('matches the run against the VERSION it produced, not the ring', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { items: [RING] }));
+    expect((await findRingForWorkflow('wf_2', { attempts: 1 }))?.set_id).toBe('set_1');
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { items: [RING] }));
+    expect((await findRingForWorkflow('wf_1', { attempts: 1 }))?.set_id).toBe('set_1');
+  });
+
+  it('does not claim a ring for an unrelated run', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { items: [RING] }));
+    expect(await findRingForWorkflow('wf_other', { attempts: 1 })).toBeNull();
   });
 
   it('retries: the version row is written after /status turns terminal', async () => {

@@ -33,6 +33,7 @@ import {
   findRingForWorkflow,
   latestVersion,
   startImproveFromVersion,
+  versionLabel,
   type CadRing,
 } from "@/lib/cad-versions-api";
 
@@ -230,7 +231,7 @@ export function useImageToCADWorkflow({
       setSourceWorkflowId(started.workflow_id);
       trackCadGeneration({
         workflowId: started.workflow_id,
-        label: latestRingVersion.label ? `Improve ${latestRingVersion.label}` : 'Improve ring',
+        label: `Improve ${versionLabel(latestRingVersion)}`,
         cadRoute,
       });
     } catch (error) {
@@ -452,8 +453,16 @@ export function useImageToCADWorkflow({
     sourceWorkflowId, setSourceWorkflowId,
     threedmArtifact, setThreedmArtifact,
     failureMessage, notAllSolid,
-    /** The newest saved version's label, e.g. "V2"; absent until one exists. */
-    latestVersionLabel: latestRingVersion?.improvable === false ? undefined : latestRingVersion?.label ?? undefined,
+    /**
+     * What the Improve button is named after, e.g. "V2". Built from the
+     * version's position: the backend's own `label` is the improve verdict
+     * ("Looks better"), which is a different thing and belongs on the version
+     * list, not on the button.
+     */
+    latestVersionLabel:
+      latestRingVersion && latestRingVersion.improvable !== false
+        ? versionLabel(latestRingVersion)
+        : undefined,
     improveFromLatestVersion,
     improveMessage,
     simulateGeneration,

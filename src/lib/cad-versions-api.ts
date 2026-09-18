@@ -20,10 +20,21 @@
  */
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 
+/** How the backend labels an improve outcome, e.g. "Looks better". */
+export interface CadVersionLabel {
+  code: string;
+  text: string;
+}
+
 export interface CadRingVersion {
   asset_id: string;
-  /** Shown as the version's name, e.g. "V3". Absent until one is assigned. */
-  label?: string | null;
+  /** 0 is the original from generate; the button reads "Improve from V{position+1}". */
+  position: number;
+  name?: string | null;
+  /** The run that produced THIS version. It lives on the version, not the ring. */
+  source_workflow_id?: string | null;
+  /** The before-and-after verdict of an improve press; absent on version 0. */
+  label?: CadVersionLabel | null;
   /** The version this one was improved from; absent on the first version. */
   improved_from_asset_id?: string | null;
   glb_url?: string | null;
@@ -36,11 +47,11 @@ export interface CadRingVersion {
 
 export interface CadRing {
   set_id: string;
+  name?: string | null;
   /** Ordered by position; the last entry is the newest version. */
   versions: CadRingVersion[];
   improve_running?: boolean;
   running_improve_workflow_id?: string | null;
-  source_workflow_id?: string | null;
 }
 
 /**
@@ -91,7 +102,8 @@ export interface CadImproveStarted {
 /** Page size the vault endpoint accepts; larger values are rejected. */
 const MAX_PAGE_SIZE = 50;
 
-export async function fetchCadRings(page = 1, pageSize = MAX_PAGE_SIZE): Promise<CadRing[]> {
+/** Paging starts at 0 there, so asking for page 1 skips the newest rings. */
+export async function fetchCadRings(page = 0, pageSize = MAX_PAGE_SIZE): Promise<CadRing[]> {
   const size = Math.min(pageSize, MAX_PAGE_SIZE);
   const response = await authenticatedFetch(`/api/cad/rings?page=${page}&page_size=${size}`);
   if (!response.ok) {
@@ -106,7 +118,15 @@ export async function fetchCadRings(page = 1, pageSize = MAX_PAGE_SIZE): Promise
 
 /** The newest version of a ring, which is the one an Improve press starts from. */
 export function latestVersion(ring: CadRing): CadRingVersion | null {
-  return ring.versions?.length ? ring.versions[ring.versions.length - 1] : null;
+  if (!ring.versions?.length) return null;
+  // Highest position wins rather than array order: the button must never offer
+  // to improve from anything but the newest version.
+  return ring.versions.reduce((newest, v) => ((v.position ?? 0) >= (newest.position ?? 0) ? v : newest));
+}
+
+/** What the button says: version 0 is V1, so a press reads "Improve from V1". */
+export function versionLabel(version: CadRingVersion): string {
+  return `V${(version.position ?? 0) + 1}`;
 }
 
 /**
@@ -128,7 +148,9 @@ export async function findRingForWorkflow(
     } catch {
       continue; // A transient failure should not end the search early.
     }
-    const match = rings.find((ring) => ring.source_workflow_id === workflowId);
+    // source_workflow_id belongs to the VERSION a run produced, not to the ring.
+    const match = rings.find((ring) =>
+      (ring.versions ?? []).some((version) => version.source_workflow_id === workflowId));
     if (match) return match;
   }
   return null;
