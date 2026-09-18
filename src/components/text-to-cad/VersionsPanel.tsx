@@ -11,12 +11,14 @@
  * saves none, and an empty section would read as something being broken.
  */
 
-import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
+import { ScissorGLBGrid, GLBPreviewSlot } from '@/components/generations/ScissorGLBGrid';
 import { cn } from '@/lib/utils';
 
 export interface VersionCard {
   asset_id: string;
   position: number;
+  /** The version's model, which the card renders as its picture. */
+  glb_url?: string | null;
   thumbnail_url?: string | null;
   created_at?: string | null;
   /** The improve verdict, e.g. "Looks better"; absent on the first version. */
@@ -39,25 +41,26 @@ function savedAt(value?: string | null): string {
 }
 
 /**
- * One card, so the thumbnail can be fetched with the caller's token.
+ * The card's picture: the version's own model, rendered still.
  *
- * The vault's links are auth-gated: /api/artifacts/<sha> answers 401 without a
- * token, and an <img> sends none, which is why every preview rendered broken.
- * The shared hook fetches the bytes and hands back a blob URL, exactly as the
- * rest of the app does for artifact images.
+ * The saved screenshots are the ones the likeness review works from, shot in
+ * flat grey clay so metal and sparkle cannot flatter the shape, which made
+ * every card look grey. Rendering the GLB instead shows the ring as it is.
+ *
+ * All the cards share one canvas (that is what ScissorGLBGrid exists for), and
+ * the click lands on the button above this, so a card reads as a picture
+ * rather than as a second thing to drag around.
  */
-function VersionCardImage({ version }: { version: VersionCard }) {
-  const src = useAuthenticatedImage(version.thumbnail_url);
-  if (!src) {
-    // No screenshot, or it has not arrived yet: the version is still a real
-    // ring the user can open, so it keeps its place and shows its name.
+function VersionCardModel({ version }: { version: VersionCard }) {
+  if (!version.glb_url) {
+    // Nothing to render yet: the version is still real and still openable.
     return (
       <span className="font-mono text-[11px] font-bold tracking-wider text-muted-foreground">
         {`V${version.position + 1}`}
       </span>
     );
   }
-  return <img src={src} alt="" loading="lazy" className="h-full w-full object-contain" />;
+  return <GLBPreviewSlot id={version.asset_id} glbUrl={version.glb_url} className="h-full w-full" />;
 }
 
 export function VersionsPanel({ versions, selectedAssetId, onSelect }: VersionsPanelProps) {
@@ -78,6 +81,7 @@ export function VersionsPanel({ versions, selectedAssetId, onSelect }: VersionsP
 
       {/* Three to a row, matching the reference thumbnails above, so the two
           strips line up instead of each choosing its own width. */}
+      <ScissorGLBGrid>
       <div className="grid grid-cols-3 gap-2">
         {versions.map((version) => {
           const isSelected = version.asset_id === selectedAssetId;
@@ -103,8 +107,8 @@ export function VersionsPanel({ versions, selectedAssetId, onSelect }: VersionsP
                   shank off and two versions of the same ring then look like
                   different rings. The padding keeps the silhouette off the
                   border so the card does not read as cramped. */}
-              <div className="flex aspect-square items-center justify-center bg-muted/10 p-1.5">
-                <VersionCardImage version={version} />
+              <div className="pointer-events-none relative flex aspect-square items-center justify-center bg-muted/10">
+                <VersionCardModel version={version} />
               </div>
               <div className="flex items-baseline justify-between border-t border-border px-1.5 py-1">
                 <span className="font-mono text-[10px] font-bold tracking-wider">{`V${version.position + 1}`}</span>
@@ -114,6 +118,7 @@ export function VersionsPanel({ versions, selectedAssetId, onSelect }: VersionsP
           );
         })}
       </div>
+      </ScissorGLBGrid>
     </section>
   );
 }
