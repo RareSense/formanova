@@ -22,11 +22,13 @@ import {
   withTimeout,
   retryNullable,
   isVisibleGeneration,
+  groupRingVersions,
   getAssetWorkflowId,
   getArtifactKey,
   getAssetArtifactKeys,
   type CachePayload,
 } from '@/lib/generation-history-utils';
+import { fetchCadRings } from '@/lib/cad-versions-api';
 import { WorkflowSection, SectionIcons } from '@/components/generations/WorkflowSection';
 import { ScissorGLBGrid } from '@/components/generations/ScissorGLBGrid';
 import CADRuntimeErrorBoundary from '@/components/cad/CADRuntimeErrorBoundary';
@@ -141,7 +143,13 @@ export default function Generations() {
       try {
         if (!cached) setGlobalLoading(true);
         const rawWorkflows = await listMyWorkflows(100, 0);
-        const workflows = rawWorkflows.filter(w => w.source_type !== 'unknown' && isVisibleGeneration(w));
+        const visible = rawWorkflows.filter(w => w.source_type !== 'unknown' && isVisibleGeneration(w));
+        // A ring and its improvements are separate runs, so they filled a row
+        // each while all showing the same ring. The vault knows which belong
+        // together; anything it does not know passes through untouched, and a
+        // vault that cannot be reached leaves the list exactly as it was.
+        const rings = await fetchCadRings().catch(() => []);
+        const workflows = groupRingVersions(visible, rings);
         if (import.meta.env.DEV) console.log('[Generations] fetched:', rawWorkflows.length, '→ valid:', workflows.length);
 
         // Build generated asset name maps. Some older workflow rows do not expose

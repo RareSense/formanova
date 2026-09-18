@@ -18,7 +18,8 @@ import {
   truncateDisplayName,
 } from './workflow-card-shared';
 import { PhotoCard } from './PhotoCard';
-import { withTimeout } from '@/lib/generation-history-utils';
+import { withTimeout, type RingVersionRef } from '@/lib/generation-history-utils';
+import { cn } from '@/lib/utils';
 import { buildCadRestorePath } from '@/contexts/GenerationsContext';
 import { cadSourceFromSourceType, cadRouteFromSource } from '@/lib/cad-analytics';
 import {
@@ -179,6 +180,22 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
     navigate(buildCadRestorePath(workflow.workflow_id, workflow.glb_url, cadRouteFromSource(source ?? 'text-to-cad'), 'history'));
   };
 
+  /**
+   * Opens one earlier version of this ring.
+   *
+   * Each version was its own run, so it restores exactly the way the card's
+   * own Open in Studio does; the strip below just names which run.
+   */
+  const openVersion = (e: React.MouseEvent, versionWorkflowId: string | null) => {
+    e.stopPropagation();
+    if (!versionWorkflowId) return;
+    const source = cadSourceFromSourceType(workflow.source_type);
+    navigate(buildCadRestorePath(versionWorkflowId, null, cadRouteFromSource(source ?? 'text-to-cad'), 'history'));
+  };
+
+  // Only a ring that has actually been improved carries a strip.
+  const ringVersions = (workflow as WorkflowSummary & { ring_versions?: RingVersionRef[] }).ring_versions ?? [];
+
   return (
     <>
       <motion.div
@@ -326,6 +343,40 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
                 Loading…
               </span>
             )}
+          </div>
+        )}
+
+        {ringVersions.length > 1 && (
+          // The card shows the newest ring; its earlier versions sit under it
+          // as thumbnails, oldest first, each opening that version in the
+          // studio. Without this a ring improved twice filled three rows that
+          // all looked the same.
+          <div className="flex flex-wrap items-center gap-2 px-4 pb-4">
+            <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">Versions</span>
+            {ringVersions.map((version) => {
+              const isNewest = version.workflowId === workflow.workflow_id;
+              return (
+                <button
+                  key={version.assetId}
+                  type="button"
+                  onClick={(e) => openVersion(e, version.workflowId)}
+                  disabled={!version.workflowId}
+                  aria-label={`Open version ${version.position + 1}`}
+                  aria-current={isNewest}
+                  className={cn(
+                    'relative h-12 w-12 overflow-hidden rounded border bg-muted/30 transition-colors disabled:opacity-50',
+                    isNewest ? 'border-foreground' : 'border-border hover:border-foreground/50',
+                  )}
+                >
+                  {version.thumbnailUrl
+                    ? <img src={version.thumbnailUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
+                    : <span className="font-mono text-[9px] text-muted-foreground">{`V${version.position + 1}`}</span>}
+                  <span className="absolute bottom-0 right-0 bg-background/85 px-1 font-mono text-[8px] leading-tight">
+                    {`V${version.position + 1}`}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
       </motion.div>

@@ -119,3 +119,57 @@ export function getAssetArtifactKeys(asset: UserAsset): string[] {
     getArtifactKey(asset.metadata?.url),
   ].filter((v): v is string => Boolean(v));
 }
+
+/** One version of a ring, as the history card shows it. */
+export interface RingVersionRef {
+  assetId: string;
+  position: number;
+  workflowId: string | null;
+  thumbnailUrl: string | null;
+}
+
+/**
+ * Collapses a ring's runs into one row: the newest version, carrying the rest.
+ *
+ * Generate and every Improve press are separate workflow runs, so a ring that
+ * has been improved twice fills three rows of history that all show the same
+ * ring. The vault knows they belong together, so the runs it accounts for are
+ * folded into the newest one and the older rows are dropped from the list.
+ *
+ * A run the vault does not know - anything made before versions existed -
+ * passes through untouched, which is why this is safe to apply to the whole
+ * list.
+ */
+export function groupRingVersions<T extends { workflow_id: string }>(
+  workflows: T[],
+  rings: Array<{ versions?: Array<{ asset_id: string; position?: number; source_workflow_id?: string | null; thumbnail_url?: string | null }> }>,
+): Array<T & { ring_versions?: RingVersionRef[] }> {
+  const newestOf = new Map<string, RingVersionRef[]>();   // workflow id of the newest -> all versions
+  const supersededIds = new Set<string>();
+
+  for (const ring of rings) {
+    const versions = [...(ring.versions ?? [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+    const withRuns = versions.filter((v) => v.source_workflow_id);
+    if (withRuns.length < 1) continue;
+    const newest = withRuns[withRuns.length - 1];
+    for (const version of withRuns) {
+      if (version.source_workflow_id !== newest.source_workflow_id) {
+        supersededIds.add(String(version.source_workflow_id));
+      }
+    }
+    newestOf.set(String(newest.source_workflow_id), versions.map((v) => ({
+      assetId: v.asset_id,
+      position: v.position ?? 0,
+      workflowId: v.source_workflow_id ?? null,
+      thumbnailUrl: v.thumbnail_url ?? null,
+    })));
+  }
+
+  return workflows
+    .filter((w) => !supersededIds.has(w.workflow_id))
+    .map((w) => {
+      const versions = newestOf.get(w.workflow_id);
+      // One version is just a ring nobody has improved yet: no strip to show.
+      return versions && versions.length > 1 ? { ...w, ring_versions: versions } : w;
+    });
+}
