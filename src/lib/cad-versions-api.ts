@@ -55,6 +55,14 @@ export interface CadRing {
   running_improve_workflow_id?: string | null;
 }
 
+/** Data Generation History already has and can paint before Studio refetches it. */
+export interface CadRestoreSeed {
+  ring: CadRing;
+  selectedVersionId?: string | null;
+  referenceImageUrls?: string[];
+  prompt?: string | null;
+}
+
 /**
  * Why a press produced no new version, or could not start.
  *

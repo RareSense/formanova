@@ -36,6 +36,7 @@ import {
   startImproveFromVersion,
   versionLabel,
   type CadRing,
+  type CadRestoreSeed,
 } from "@/lib/cad-versions-api";
 import { cadStatusNotice, type CadStatusNotice } from '@/lib/cad-status-copy';
 
@@ -341,6 +342,7 @@ export function useImageToCADWorkflow({
   const restoreCompletedWorkflow = useCallback(async (
     workflowId: string | null,
     fallbackGlbUrl?: string | null,
+    seed?: CadRestoreSeed,
   ): Promise<boolean> => {
     // Captured synchronously, before the await below. Both pages strip the
     // query string once this resolves (navigate(..., { replace: true })), so
@@ -355,6 +357,10 @@ export function useImageToCADWorkflow({
     setFailureMessage(null);
     setStatusNotice(null);
     setSourceWorkflowId(workflowId);
+    setRing(seed?.ring ?? null);
+    setSelectedVersionId(seed?.selectedVersionId ?? null);
+    setRestoredReferenceUrls(seed?.referenceImageUrls ?? []);
+    setRestoredPrompt(seed?.prompt ?? null);
     setThreedmArtifact(null);
     setIsModelLoading(true);
     setProgressStep('_loading');

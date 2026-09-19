@@ -29,6 +29,7 @@ import {
   type CadArtifactKind,
 } from '@/lib/cad-artifact-download';
 import { CadDownloadMenu } from '@/components/downloads/CadDownloadMenu';
+import type { CadRestoreSeed } from '@/lib/cad-versions-api';
 
 const CAD_RENAMES_KEY = 'formanova_cad_renames';
 
@@ -88,7 +89,11 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
   const [isDownloading, setIsDownloading] = useState<CadArtifactKind | null>(null);
   const renameButtonRef = useRef<HTMLButtonElement>(null);
   const wasRenamingRef = useRef(false);
-  const ringVersions = (workflow as WorkflowSummary & { ring_versions?: RingVersionRef[] }).ring_versions ?? [];
+  const groupedWorkflow = workflow as WorkflowSummary & {
+    ring_versions?: RingVersionRef[];
+    cad_restore_seed?: CadRestoreSeed;
+  };
+  const ringVersions = groupedWorkflow.ring_versions ?? [];
   const newestVersion = ringVersions.reduce<RingVersionRef | null>(
     (latest, version) => (!latest || version.position > latest.position ? version : latest),
     null,
@@ -215,7 +220,13 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
     // allowed to be undefined -- a wrong route breaks the user, a guessed
     // source only breaks the data.
     const source = cadSourceFromSourceType(workflow.source_type);
-    navigate(buildCadRestorePath(selectedWorkflowId, previewGlbUrl, cadRouteFromSource(source ?? 'text-to-cad'), 'history'));
+    const seed = groupedWorkflow.cad_restore_seed
+      ? { ...groupedWorkflow.cad_restore_seed, selectedVersionId: selectedVersion?.assetId ?? null }
+      : undefined;
+    navigate(
+      buildCadRestorePath(selectedWorkflowId, previewGlbUrl, cadRouteFromSource(source ?? 'text-to-cad'), 'history'),
+      { state: seed ? { cadRestoreSeed: seed } : undefined },
+    );
   };
 
   /** Changes the card preview only. Studio navigation stays on its own button. */
@@ -269,7 +280,7 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
             <GLBPreviewSlot
               id={`${workflow.workflow_id}-${selectedVersionId ?? 'latest'}`}
               glbUrl={previewGlbUrl}
-              className="w-full aspect-[4/3] min-h-[300px] sm:min-h-[360px] bg-background/50 border border-border/30"
+              className="w-full aspect-[4/3] min-h-[300px] sm:min-h-[360px] bg-muted/20 border border-border/30"
               forceJewelryPalette
             />
           </div>
@@ -392,7 +403,7 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
                   aria-label={`Preview version ${version.position + 1}`}
                   aria-current={isSelected}
                   className={cn(
-                    'relative h-12 w-12 overflow-hidden rounded border bg-muted/30 transition-colors disabled:opacity-50',
+                    'relative h-16 w-16 overflow-hidden border bg-muted/10 transition-colors disabled:opacity-50',
                     isSelected ? 'border-foreground' : 'border-border hover:border-foreground/50',
                   )}
                 >

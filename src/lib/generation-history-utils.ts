@@ -1,5 +1,6 @@
 import { type WorkflowSummary } from '@/lib/generation-history-api';
 import { type UserAsset } from '@/lib/assets-api';
+import type { CadRestoreSeed, CadRing } from '@/lib/cad-versions-api';
 
 const CACHE_KEY = 'formanova_gen_cache_v5';
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -143,9 +144,10 @@ export interface RingVersionRef {
  */
 export function groupRingVersions<T extends { workflow_id: string }>(
   workflows: T[],
-  rings: Array<{ versions?: Array<{ asset_id: string; position?: number; source_workflow_id?: string | null; thumbnail_url?: string | null; glb_url?: string | null }> }>,
-): Array<T & { ring_versions?: RingVersionRef[] }> {
-  const newestOf = new Map<string, RingVersionRef[]>();   // workflow id of the newest -> all versions
+  rings: CadRing[],
+): Array<T & { ring_versions?: RingVersionRef[]; cad_restore_seed?: CadRestoreSeed }> {
+  const workflowById = new Map(workflows.map((workflow) => [workflow.workflow_id, workflow]));
+  const newestOf = new Map<string, { versions: RingVersionRef[]; seed: CadRestoreSeed }>();
   const supersededIds = new Set<string>();
 
   for (const ring of rings) {
@@ -158,20 +160,35 @@ export function groupRingVersions<T extends { workflow_id: string }>(
         supersededIds.add(String(version.source_workflow_id));
       }
     }
-    newestOf.set(String(newest.source_workflow_id), versions.map((v) => ({
+    const versionRefs = versions.map((v) => ({
       assetId: v.asset_id,
       position: v.position ?? 0,
       workflowId: v.source_workflow_id ?? null,
       thumbnailUrl: v.thumbnail_url ?? null,
       glbUrl: v.glb_url ?? null,
-    })));
+    }));
+    const rootWorkflowId = versions[0]?.source_workflow_id;
+    const rootWorkflow = rootWorkflowId ? workflowById.get(String(rootWorkflowId)) : undefined;
+    const rootInputs = rootWorkflow as (T & { reference_image_urls?: string[]; prompt?: string | null }) | undefined;
+    newestOf.set(String(newest.source_workflow_id), {
+      versions: versionRefs,
+      seed: {
+        ring,
+        selectedVersionId: newest.asset_id,
+        referenceImageUrls: rootInputs?.reference_image_urls ?? [],
+        prompt: rootInputs?.prompt ?? null,
+      },
+    });
   }
 
   return workflows
     .filter((w) => !supersededIds.has(w.workflow_id))
     .map((w) => {
-      const versions = newestOf.get(w.workflow_id);
+      const grouped = newestOf.get(w.workflow_id);
+      if (!grouped) return w;
       // One version is just a ring nobody has improved yet: no strip to show.
-      return versions && versions.length > 1 ? { ...w, ring_versions: versions } : w;
+      return grouped.versions.length > 1
+        ? { ...w, ring_versions: grouped.versions, cad_restore_seed: grouped.seed }
+        : { ...w, cad_restore_seed: grouped.seed };
     });
 }
