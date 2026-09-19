@@ -19,6 +19,7 @@ import {
   trackPaywallHit,
   trackCadGenerationStarted,
   trackCadGenerationFailed,
+  trackCadImproveRequested,
   trackCadResultRestored,
 } from "@/lib/posthog-events";
 import {
@@ -291,6 +292,12 @@ export function useImageToCADWorkflow({
     if (!approved) return;
     try {
       const started = await startImproveFromVersion(activeVersion.asset_id);
+      const fromVersion = (activeVersion.position ?? 0) + 1;
+      trackCadImproveRequested({
+        workflow_id: started.workflow_id,
+        source: cadSource,
+        from_version: fromVersion,
+      });
       hasNavigatedAway.current = false;
       // The current ring stays mounted while Improve runs. Marking a success
       // toast as owed here makes that already-loaded model announce itself as
@@ -312,6 +319,14 @@ export function useImageToCADWorkflow({
         workflowId: started.workflow_id,
         label: `Improve ${versionLabel(activeVersion)}`,
         cadRoute,
+        analytics: {
+          ...buildCadGenerationProps({ cadRoute, prompt, referenceImageCount: referenceImages.length, tier }),
+          is_first_ever: false,
+          operation: 'improve',
+          from_version: fromVersion,
+          ...(started.projected_cost !== undefined ? { projected_cost: started.projected_cost } : {}),
+          ...(started.authorized_budget !== undefined ? { authorized_budget: started.authorized_budget } : {}),
+        },
       });
     } catch (error) {
       if (error instanceof CadImproveError && error.failure === 'insufficient_credits') {
@@ -327,7 +342,7 @@ export function useImageToCADWorkflow({
       setImproveMessage(message);
       toast.error(message);
     }
-  }, [activeVersion, cadRoute, checkCredits, onWorkspaceActivate, ring?.improve_running, trackCadGeneration]);
+  }, [activeVersion, cadRoute, cadSource, checkCredits, onWorkspaceActivate, prompt, referenceImages.length, ring?.improve_running, tier, trackCadGeneration]);
 
   /** Leaves the run running in the background and returns to the upload screen. */
   const handleKeepCreating = useCallback(() => {
@@ -494,6 +509,7 @@ export function useImageToCADWorkflow({
       const cadAnalytics = {
         ...buildCadGenerationProps({ cadRoute, prompt, referenceImageCount: referenceImages.length, tier }),
         is_first_ever: startedFirstEverRef.current,
+        operation: 'generate' as const,
       };
       trackCadGenerationStarted({ ...cadAnalytics, workflow_id });
 

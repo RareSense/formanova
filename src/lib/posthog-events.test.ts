@@ -2,7 +2,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Mock posthog-js BEFORE importing posthog-events
 vi.mock('posthog-js', () => ({
-  default: { capture: vi.fn(), setPersonProperties: vi.fn(), reset: vi.fn(), identify: vi.fn(), onFeatureFlags: vi.fn(), getFeatureFlag: vi.fn(), _isIdentified: vi.fn(), __loaded: true },
+  default: {
+    capture: vi.fn(),
+    people: { set: vi.fn(), increment: vi.fn() },
+    setPersonProperties: vi.fn(),
+    reset: vi.fn(),
+    identify: vi.fn(),
+    onFeatureFlags: vi.fn(),
+    getFeatureFlag: vi.fn(),
+    _isIdentified: vi.fn(),
+    __loaded: true,
+  },
 }))
 
 import posthog from 'posthog-js'
@@ -19,6 +29,7 @@ import {
   trackCadReferenceUploaded,
   trackCadGenerationStarted,
   trackCadGenerationFailed,
+  trackCadImproveFinished,
   trackCadResultRestored,
   trackGenerationComplete,
   trackDownloadClicked,
@@ -223,6 +234,57 @@ describe('trackCadGenerationCompleted', () => {
       category: 'ring',
       prompt_length: 42,
       duration_ms: 5000,
+    })
+  })
+})
+
+describe('trackCadImproveFinished', () => {
+  it('captures the event and updates the identified person once', () => {
+    const props = {
+      workflow_id: 'state-improve-1',
+      source: 'image-to-cad' as const,
+      from_version: 1,
+      to_version: 2,
+      new_version_created: true,
+      outcome: 'improved' as const,
+      changed: true,
+      improved_issue_count: 1,
+      new_issue_count: 0,
+      open_issue_count: 0,
+      duration_ms: 5000,
+    }
+
+    trackCadImproveFinished(props)
+
+    expect(posthog.capture).toHaveBeenCalledWith('cad_improve_finished', props)
+    expect(posthog.people.set).toHaveBeenCalledWith({
+      last_improve_at: expect.any(String),
+      last_improve_outcome: 'improved',
+    })
+    expect(posthog.people.increment).toHaveBeenCalledWith({
+      improve_count: 1,
+      improve_versions_created: 1,
+    })
+    expect(posthog.identify).not.toHaveBeenCalled()
+  })
+
+  it('increments improve_versions_created by zero when no version was created', () => {
+    trackCadImproveFinished({
+      workflow_id: 'state-improve-2',
+      source: 'text-to-cad',
+      from_version: 2,
+      new_version_created: false,
+      outcome: 'no_safe_fix',
+      changed: false,
+      improved_issue_count: 0,
+      new_issue_count: 0,
+      open_issue_count: 1,
+      duration_ms: 3000,
+    })
+
+    expect(posthog.people.increment).toHaveBeenCalledWith({
+      improve_count: 1,
+      improve_versions_created: 0,
     })
   })
 })

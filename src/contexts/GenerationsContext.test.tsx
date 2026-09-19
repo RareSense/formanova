@@ -495,6 +495,7 @@ describe('GenerationsContext - Image to 3D runs', () => {
     reference_image_count: 3,
     llm_tier: 'fable-5',
     is_first_ever: true,
+    operation: 'generate' as const,
   };
 
   it('emits cad_generation_completed when the run settles with no CAD page mounted', async () => {
