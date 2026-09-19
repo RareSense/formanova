@@ -5,11 +5,13 @@ import { MemoryRouter } from 'react-router-dom';
 import { GenerationsContextProvider, GenerationsContext, useGenerations, buildCadRestorePath, type TrackedGeneration } from './GenerationsContext';
 import { resolveRestoreEntry } from '@/lib/cad-analytics';
 
+const { mockToast } = vi.hoisted(() => ({ mockToast: vi.fn() }));
+
 // ── Mocks ──────────────────────────────────────────────────────────────────
 vi.mock('@/lib/poll-workflow', () => ({ pollWorkflow: vi.fn() }));
 vi.mock('@/lib/authenticated-fetch', () => ({ authenticatedFetch: vi.fn() }));
 vi.mock('@/contexts/CreditsContext', () => ({ useCredits: () => ({ refreshCredits: vi.fn() }) }));
-vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: vi.fn() }) }));
+vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: mockToast }) }));
 vi.mock('@/lib/generation-lifecycle', () => ({
   markGenerationCompleted: vi.fn(),
   markGenerationFailed: vi.fn(),
@@ -601,6 +603,29 @@ describe('GenerationsContext - Image to 3D runs', () => {
 
     await waitFor(() => expect(result.current.generations[0].status).toBe('failed'));
     expect(mockMarkFailed).toHaveBeenCalled();
+  });
+
+  it('shows the refunded no-change message when Improve is forced to nothing_to_fix', async () => {
+    mockPollWorkflow.mockRejectedValueOnce(new Error('workflow ended at fail_nothing_to_fix'));
+    mockAuthenticatedFetch.mockResolvedValue(jsonResponse({
+      detail: {
+        message: 'Nothing needed fixing.',
+        reason_code: 'nothing_to_fix',
+        reason: 'nothing to fix on this version',
+      },
+    }, 404));
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+
+    act(() => {
+      result.current.trackCadGeneration({ workflowId: 'cad-nothing-to-fix', label: 'Improve V1' });
+    });
+
+    await waitFor(() => expect(mockToast).toHaveBeenCalledWith({
+      title: 'No changes this time',
+      description: 'Nothing needed fixing. Your credits were not charged.',
+    }));
+    expect(mockAuthenticatedFetch).toHaveBeenCalledWith('/api/result/cad-nothing-to-fix');
+    expect(result.current.generations[0].status).toBe('failed');
   });
 
   it('runs cad and photoshoot generations side by side', async () => {
