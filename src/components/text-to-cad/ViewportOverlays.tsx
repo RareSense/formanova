@@ -11,23 +11,12 @@ const VT_BTN_ACTIVE = `${VT_BTN} text-primary-foreground bg-primary`;
 export function ViewportToolbar({
   mode,
   setMode,
-  downloadSlot,
 }: {
   mode: string;
   setMode: (m: string) => void;
   transformData?: unknown;
   onTransformChange?: unknown;
   onResetTransform?: unknown;
-  /** Result-level action ("what I do with the finished object"), deliberately
-   * separated from the mode toolbar ("how I interact with the object") and
-   * from the viewport-utility strip in ViewportSideTools — see the design
-   * rationale in git history for this component.
-   *
-   * A slot rather than an onDownload/label pair: the control is now a split
-   * button whose contents depend on which artifacts exist and whether the user
-   * has edited the model, and that is the page's knowledge, not the toolbar's.
-   * Omit to hide it. */
-  downloadSlot?: React.ReactNode;
 }) {
   const isTransformActive = mode !== "orbit"; // kept for potential future use
 
@@ -46,19 +35,6 @@ export function ViewportToolbar({
         ))}
       </div>
 
-      {/* Result-level action, pinned right — deliberately not adjacent to the
-          mode buttons, so it doesn't read as another mode: those manipulate the
-          object, this completes the task. right-14 clears the panel-collapse
-          button, which occupies the first 40px of that edge.
-
-          top-2 is not decoration. This element is absolutely positioned, so it
-          ignores the parent's pt-2 and would otherwise sit at its static
-          position, a few pixels off the centered group. Stating the same inset
-          explicitly is what makes the two read as one toolbar rather than two
-          things that happen to be near the top. */}
-      {downloadSlot && (
-        <div className="pointer-events-auto absolute top-2 right-14">{downloadSlot}</div>
-      )}
     </div>
   );
 }

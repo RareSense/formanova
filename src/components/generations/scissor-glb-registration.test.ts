@@ -18,6 +18,21 @@ describe('PendingCardRegistrationQueue', () => {
     expect(register).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the requested material palette while registration is deferred', () => {
+    const queue = new PendingCardRegistrationQueue<object>();
+    const register = vi.fn();
+    queue.upsert({
+      id: 'version-1',
+      glbUrl: '/api/artifacts/version-one',
+      element: {},
+      forceJewelryPalette: true,
+    });
+
+    queue.drain(register);
+
+    expect(register).toHaveBeenCalledWith(expect.objectContaining({ forceJewelryPalette: true }));
+  });
+
   it('removes a deferred registration when its slot unmounts', () => {
     const queue = new PendingCardRegistrationQueue<object>();
     const register = vi.fn();

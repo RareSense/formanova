@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 
 import type { CadRoute } from '@/lib/cad-analytics';
+import type { CadRestoreSeed } from '@/lib/cad-versions-api';
 
 interface Options {
   /** The page that owns this restore, and where the stripped URL lands. */
@@ -10,6 +11,7 @@ interface Options {
   restoreCompletedWorkflow: (
     workflowId: string | null,
     fallbackGlbUrl?: string | null,
+    seed?: CadRestoreSeed,
   ) => Promise<boolean>;
   /** Called when the result could not be loaded. */
   onFailure: () => void;
@@ -34,6 +36,7 @@ interface Options {
  */
 export function useCadRestoreFromUrl({ cadRoute, restoreCompletedWorkflow, onFailure }: Options) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
@@ -42,12 +45,13 @@ export function useCadRestoreFromUrl({ cadRoute, restoreCompletedWorkflow, onFai
     const workflowId = workflowIdParam?.trim() || null;
     if (!glbParam && !workflowId) return;
 
-    void restoreCompletedWorkflow(workflowId, glbParam).then((restored) => {
+    const seed = (location.state as { cadRestoreSeed?: CadRestoreSeed } | null)?.cadRestoreSeed;
+    void restoreCompletedWorkflow(workflowId, glbParam, seed).then((restored) => {
       if (!restored) onFailure();
     });
 
     // Clean the params from the URL. This re-runs the effect with an empty
     // query string, which is the early return above.
     navigate(cadRoute, { replace: true });
-  }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps -- cadRoute is a per-page constant; navigate is router-stable; restoreCompletedWorkflow and onFailure are excluded because they are fresh identities every render and including them would re-fire the restore on unrelated re-renders. Regression to watch: if either ever needs to change behaviour mid-restore, this list has to be revisited.
+  }, [searchParams, location.key]); // eslint-disable-line react-hooks/exhaustive-deps -- cadRoute is a per-page constant; navigate is router-stable; restoreCompletedWorkflow and onFailure are excluded because they are fresh identities every render and including them would re-fire the restore on unrelated re-renders. Regression to watch: if either ever needs to change behaviour mid-restore, this list has to be revisited.
 }

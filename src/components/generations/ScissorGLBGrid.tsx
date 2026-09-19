@@ -62,13 +62,14 @@ interface CardEntry {
   loaded: boolean;
   loading: boolean;
   error: boolean;
+  forceJewelryPalette: boolean;
 }
 
 /** Listeners that slots register to be notified when their card state changes */
 type CardStateListener = (loaded: boolean, error: boolean) => void;
 
 interface GridContextValue {
-  registerCard: (id: string, glbUrl: string, div: HTMLDivElement) => void;
+  registerCard: (id: string, glbUrl: string, div: HTMLDivElement, forceJewelryPalette?: boolean) => void;
   unregisterCard: (id: string) => void;
   /** Subscribe to state changes for a specific card id. Returns unsubscribe fn. */
   subscribe: (id: string, listener: CardStateListener) => () => void;
@@ -88,9 +89,11 @@ export function useScissorGrid() {
 
 interface ScissorGLBGridProps {
   children: React.ReactNode;
+  /** Static grids render only when their contents or layout change. */
+  continuous?: boolean;
 }
 
-export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
+export function ScissorGLBGrid({ children, continuous = true }: ScissorGLBGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -103,6 +106,7 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
   const backdropRef = useRef<THREE.Texture | null>(null);
   const gltfLoaderRef = useRef(new GLTFLoader());
   const pendingRegistrationsRef = useRef(new PendingCardRegistrationQueue<HTMLDivElement>());
+  const requestRenderRef = useRef<() => void>(() => undefined);
   const [rendererReady, setRendererReady] = useState(false);
 
   /** Notify all listeners for a given card id */
@@ -152,6 +156,7 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
       for (const card of cardsRef.current.values()) {
         card.scene.environment = texture;
       }
+      requestRenderRef.current();
     });
 
 
@@ -170,10 +175,11 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
     if (!renderer) return;
 
     let running = true;
+    let scheduled = false;
 
     function render() {
       if (!running || !renderer) return;
-      rafRef.current = requestAnimationFrame(render);
+      scheduled = false;
 
       const container = containerRef.current;
       if (!container) return;
@@ -226,12 +232,32 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
       }
 
       renderer.setScissorTest(false);
+      if (continuous) requestRender();
     }
 
-    render();
+    function requestRender() {
+      if (!running || scheduled) return;
+      scheduled = true;
+      rafRef.current = requestAnimationFrame(render);
+    }
 
-    return () => { running = false; };
-  }, []);
+    requestRenderRef.current = requestRender;
+    requestRender();
+
+    const resizeObserver = new ResizeObserver(requestRender);
+    if (containerRef.current) resizeObserver.observe(containerRef.current);
+    window.addEventListener('resize', requestRender);
+    window.addEventListener('scroll', requestRender, true);
+
+    return () => {
+      running = false;
+      cancelAnimationFrame(rafRef.current);
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', requestRender);
+      window.removeEventListener('scroll', requestRender, true);
+      requestRenderRef.current = () => undefined;
+    };
+  }, [continuous, rendererReady]);
 
   // Load a GLB for a card
   const loadGlb = useCallback((card: CardEntry) => {
@@ -300,7 +326,7 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
     model.position.set(-center.x * scale, -center.y * scale, -center.z * scale);
     model.scale.setScalar(scale);
 
-    applyHistoryPreviewMaterials(model);
+    applyHistoryPreviewMaterials(model, card.forceJewelryPalette);
 
     card.scene.add(model);
 
@@ -311,14 +337,15 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
     card.loaded = true;
     card.loading = false;
     notifyListeners(card.id);
+    requestRenderRef.current();
   }, [notifyListeners]);
 
-  const registerCard = useCallback((id: string, glbUrl: string, div: HTMLDivElement) => {
+  const registerCard = useCallback((id: string, glbUrl: string, div: HTMLDivElement, forceJewelryPalette = false) => {
     if (cardsRef.current.has(id)) return;
 
     const renderer = rendererRef.current;
     if (!renderer) {
-      pendingRegistrationsRef.current.upsert({ id, glbUrl, element: div });
+      pendingRegistrationsRef.current.upsert({ id, glbUrl, element: div, forceJewelryPalette });
       return;
     }
 
@@ -355,7 +382,7 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
     controls.enableZoom = true;
     controls.minDistance = 2;
     controls.maxDistance = 15;
-    controls.autoRotate = true;
+    controls.autoRotate = continuous;
     controls.autoRotateSpeed = 1.5;
 
     const entry: CardEntry = {
@@ -368,16 +395,17 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
       loaded: false,
       loading: false,
       error: false,
+      forceJewelryPalette,
     };
 
     cardsRef.current.set(id, entry);
     loadGlb(entry);
-  }, [loadGlb]);
+  }, [continuous, loadGlb]);
 
   useEffect(() => {
     if (!rendererReady || !rendererRef.current) return;
-    pendingRegistrationsRef.current.drain(({ id, glbUrl, element }) => {
-      registerCard(id, glbUrl, element);
+    pendingRegistrationsRef.current.drain(({ id, glbUrl, element, forceJewelryPalette }) => {
+      registerCard(id, glbUrl, element, forceJewelryPalette);
     });
   }, [rendererReady, registerCard]);
 
@@ -388,6 +416,7 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
       card.controls.dispose();
       disposeScene(card.scene);
       cardsRef.current.delete(id);
+      requestRenderRef.current();
     }
     listenersRef.current.delete(id);
   }, []);
@@ -445,9 +474,10 @@ interface GLBPreviewSlotProps {
   id: string;
   glbUrl: string;
   className?: string;
+  forceJewelryPalette?: boolean;
 }
 
-export function GLBPreviewSlot({ id, glbUrl, className = '' }: GLBPreviewSlotProps) {
+export function GLBPreviewSlot({ id, glbUrl, className = '', forceJewelryPalette = false }: GLBPreviewSlotProps) {
   const divRef = useRef<HTMLDivElement>(null);
   const { registerCard, unregisterCard, subscribe, getCardState } = useScissorGrid();
   const [state, setState] = useState<{ loaded: boolean; error: boolean }>({ loaded: false, error: false });
@@ -456,7 +486,7 @@ export function GLBPreviewSlot({ id, glbUrl, className = '' }: GLBPreviewSlotPro
     const div = divRef.current;
     if (!div || !glbUrl) return;
 
-    registerCard(id, glbUrl, div);
+    registerCard(id, glbUrl, div, forceJewelryPalette);
 
     // Subscribe to state changes — this is the reliable notification path
     const unsub = subscribe(id, (loaded, error) => {
@@ -474,7 +504,7 @@ export function GLBPreviewSlot({ id, glbUrl, className = '' }: GLBPreviewSlotPro
       unregisterCard(id);
       setState({ loaded: false, error: false });
     };
-  }, [id, glbUrl, registerCard, unregisterCard, subscribe, getCardState]);
+  }, [id, glbUrl, forceJewelryPalette, registerCard, unregisterCard, subscribe, getCardState]);
 
   return (
     <div

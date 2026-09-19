@@ -1,5 +1,6 @@
 import { type WorkflowSummary } from '@/lib/generation-history-api';
 import { type UserAsset } from '@/lib/assets-api';
+import type { CadRestoreSeed, CadRing } from '@/lib/cad-versions-api';
 
 const CACHE_KEY = 'formanova_gen_cache_v5';
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -118,4 +119,76 @@ export function getAssetArtifactKeys(asset: UserAsset): string[] {
     getArtifactKey(asset.metadata?.artifact_url),
     getArtifactKey(asset.metadata?.url),
   ].filter((v): v is string => Boolean(v));
+}
+
+/** One version of a ring, as the history card shows it. */
+export interface RingVersionRef {
+  assetId: string;
+  position: number;
+  workflowId: string | null;
+  thumbnailUrl: string | null;
+  glbUrl: string | null;
+}
+
+/**
+ * Collapses a ring's runs into one row: the newest version, carrying the rest.
+ *
+ * Generate and every Improve press are separate workflow runs, so a ring that
+ * has been improved twice fills three rows of history that all show the same
+ * ring. The vault knows they belong together, so the runs it accounts for are
+ * folded into the newest one and the older rows are dropped from the list.
+ *
+ * A run the vault does not know - anything made before versions existed -
+ * passes through untouched, which is why this is safe to apply to the whole
+ * list.
+ */
+export function groupRingVersions<T extends { workflow_id: string }>(
+  workflows: T[],
+  rings: CadRing[],
+): Array<T & { ring_versions?: RingVersionRef[]; cad_restore_seed?: CadRestoreSeed }> {
+  const workflowById = new Map(workflows.map((workflow) => [workflow.workflow_id, workflow]));
+  const newestOf = new Map<string, { versions: RingVersionRef[]; seed: CadRestoreSeed }>();
+  const supersededIds = new Set<string>();
+
+  for (const ring of rings) {
+    const versions = [...(ring.versions ?? [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+    const withRuns = versions.filter((v) => v.source_workflow_id);
+    if (withRuns.length < 1) continue;
+    const newest = withRuns[withRuns.length - 1];
+    for (const version of withRuns) {
+      if (version.source_workflow_id !== newest.source_workflow_id) {
+        supersededIds.add(String(version.source_workflow_id));
+      }
+    }
+    const versionRefs = versions.map((v) => ({
+      assetId: v.asset_id,
+      position: v.position ?? 0,
+      workflowId: v.source_workflow_id ?? null,
+      thumbnailUrl: v.thumbnail_url ?? null,
+      glbUrl: v.glb_url ?? null,
+    }));
+    const rootWorkflowId = versions[0]?.source_workflow_id;
+    const rootWorkflow = rootWorkflowId ? workflowById.get(String(rootWorkflowId)) : undefined;
+    const rootInputs = rootWorkflow as (T & { reference_image_urls?: string[]; prompt?: string | null }) | undefined;
+    newestOf.set(String(newest.source_workflow_id), {
+      versions: versionRefs,
+      seed: {
+        ring,
+        selectedVersionId: newest.asset_id,
+        referenceImageUrls: rootInputs?.reference_image_urls ?? [],
+        prompt: rootInputs?.prompt ?? null,
+      },
+    });
+  }
+
+  return workflows
+    .filter((w) => !supersededIds.has(w.workflow_id))
+    .map((w) => {
+      const grouped = newestOf.get(w.workflow_id);
+      if (!grouped) return w;
+      // One version is just a ring nobody has improved yet: no strip to show.
+      return grouped.versions.length > 1
+        ? { ...w, ring_versions: grouped.versions, cad_restore_seed: grouped.seed }
+        : { ...w, cad_restore_seed: grouped.seed };
+    });
 }

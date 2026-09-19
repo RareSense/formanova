@@ -38,7 +38,8 @@ export interface CadDownloadMenuProps {
   isBusy?: boolean;
   /**
    * `viewport` is the overlay button in the 3D workspace; `card` is the
-   * full-width variant used in the history list.
+   * full-width variant used in the history list; `result` is the large one in
+   * the result action bar at the bottom of the CAD viewport.
    *
    * Both are solid. The history card previously used an outline style so two
    * filled blocks would not compete with the ring preview above them, which
@@ -47,14 +48,48 @@ export interface CadDownloadMenuProps {
    * is promoted; Open in Studio stays outlined, so there is one clear primary
    * action rather than the two the original note was guarding against.
    */
-  variant?: 'viewport' | 'card';
+  variant?: 'viewport' | 'card' | 'result';
   className?: string;
 }
 
 const TRIGGER_BASE =
-  'flex items-center gap-2 border border-primary bg-primary text-primary-foreground ' +
-  'font-bold uppercase shadow-lg transition-opacity hover:opacity-90 active:scale-[0.98] ' +
-  'disabled:pointer-events-none disabled:opacity-60';
+  'flex items-center gap-2 border font-bold shadow-lg ' +
+  'active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60';
+
+/**
+ * The result download stays light independently of the application theme.
+ */
+const TRIGGER_TONES = {
+  filled: 'border-primary bg-primary text-primary-foreground transition-opacity hover:opacity-90',
+  quiet: 'border-zinc-300 bg-white text-zinc-950 transition-colors hover:bg-zinc-100',
+} as const;
+
+/** Keeps the chevron readable as part of the same control in either tone. */
+const DIVIDER_TONES = {
+  filled: 'border-l-primary-foreground/25',
+  quiet: 'border-l-zinc-300',
+} as const;
+
+/**
+ * The size every control in the result action bar shares.
+ *
+ * Exported rather than duplicated: the bar's other control (Improve from the
+ * latest version) is a sibling of this one, and CLAUDE.md requires siblings to
+ * be the same size. Two hand-kept copies of the same measurements drift the
+ * first time one of them is adjusted, so both read it from here.
+ */
+export const CAD_RESULT_ACTION_SIZE =
+  'h-[56px] justify-center gap-3 rounded-lg px-6 text-[15px] tracking-normal';
+
+/**
+ * The width both controls in the result bar take.
+ *
+ * Set here rather than left to each label, because the download is a split
+ * button: its chevron is a sibling INSIDE its own width, so matching only the
+ * primary halves would still leave the pair looking mismatched by the width of
+ * the chevron. Full width when the bar stacks on a narrow panel.
+ */
+export const CAD_RESULT_ACTION_WIDTH = 'w-full sm:w-[264px]';
 
 const VARIANTS = {
   // 42px, not 40, so this lines up with the mode group in the same toolbar.
@@ -62,10 +97,16 @@ const VARIANTS = {
   // top and bottom, making the group 42px outside. This control carries its
   // border on the button itself, and box-sizing is border-box, so h-[40px]
   // would render 40px total and sit 2px short at the bottom.
-  viewport: 'h-[42px] px-4 text-[11px] tracking-[0.12em]',
+  viewport: 'h-[42px] px-4 text-[11px] uppercase tracking-[0.12em]',
   // flex-1, not w-full: the chevron is a sibling inside the same row, so a
   // full-width primary would push it out of the card.
-  card: 'h-11 w-full flex-1 justify-center px-3 font-mono text-[9px] tracking-wider',
+  card: 'h-11 w-full flex-1 justify-center px-3 font-mono text-[9px] uppercase tracking-wider',
+  // The finished-result action at the bottom of the viewport. Larger than
+  // `viewport` because it is no longer one control among the tools: it is the
+  // end of the job, shown once the object is there to download.
+  // flex-1 so the button fills the bar's full-width stacked layout on a narrow
+  // panel, the same reason the card variant carries it.
+  result: `${CAD_RESULT_ACTION_SIZE} flex-1`,
 } as const;
 
 export function CadDownloadMenu({
@@ -82,6 +123,8 @@ export function CadDownloadMenu({
   if (!primaryAction) return null;
 
   const primaryLabel = onDownloadThreedm ? 'Download 3DM' : 'Download GLB';
+  // Fixed light download beside fixed dark Improve, in every theme.
+  const tone = variant === 'result' ? 'quiet' : 'filled';
 
   // Everything not already the default action. A menu holding a single entry
   // is a dead affordance, so the chevron only appears when it has contents.
@@ -101,11 +144,12 @@ export function CadDownloadMenu({
         disabled={isBusy}
         className={cn(
           TRIGGER_BASE,
+          TRIGGER_TONES[tone],
           VARIANTS[variant],
           menuItems.length > 0 && 'border-r-0',
         )}
       >
-        <Download className="h-3.5 w-3.5 shrink-0" />
+        <Download className={cn('shrink-0', variant === 'result' ? 'h-[18px] w-[18px]' : 'h-3.5 w-3.5')} />
         {isBusy ? 'Preparing...' : primaryLabel}
       </button>
 
@@ -118,11 +162,13 @@ export function CadDownloadMenu({
               disabled={isBusy}
               className={cn(
                 TRIGGER_BASE,
+                TRIGGER_TONES[tone],
                 'justify-center px-2',
-                variant === 'viewport' ? 'h-[42px]' : 'h-11',
+                variant === 'viewport' ? 'h-[42px]' : variant === 'result' ? 'h-[56px]' : 'h-11',
                 // A hairline keeps the two halves readable as one control
                 // without letting the divider read as a gap between siblings.
-                'border-l border-l-primary-foreground/25',
+                'border-l',
+                DIVIDER_TONES[tone],
               )}
             >
               <ChevronDown className="h-3.5 w-3.5" />

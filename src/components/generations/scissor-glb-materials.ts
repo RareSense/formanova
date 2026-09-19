@@ -85,12 +85,12 @@ export function createHistoryFallbackMaterial(meshName: string): THREE.Material 
 }
 
 /** Preserve authored materials; add display-only fallbacks to materialless GLTF primitives. */
-export function applyHistoryPreviewMaterials(model: THREE.Object3D): void {
+export function applyHistoryPreviewMaterials(model: THREE.Object3D, forceJewelryPalette = false): void {
   model.traverse((child) => {
     if (!(child as THREE.Mesh).isMesh) return;
 
     const mesh = child as THREE.Mesh;
-    if (mesh.userData[HAS_EMBEDDED_GLTF_MATERIAL] === true) {
+    if (!forceJewelryPalette && mesh.userData[HAS_EMBEDDED_GLTF_MATERIAL] === true) {
       mesh.material = Array.isArray(mesh.material)
         ? mesh.material.map((material) => material.clone())
         : mesh.material.clone();

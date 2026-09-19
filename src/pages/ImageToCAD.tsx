@@ -15,7 +15,8 @@ import { useReferenceImages } from "@/hooks/useReferenceImages";
 import { useNotificationEmail } from "@/hooks/useNotificationEmail";
 import { useCadArtifactDownloads } from "@/hooks/useCadArtifactDownloads";
 import { useCadAutoRotate } from "@/hooks/useCadAutoRotate";
-import { CadDownloadMenu } from "@/components/downloads/CadDownloadMenu";
+import CadResultActions from "@/components/text-to-cad/CadResultActions";
+import CadStatusDialog from '@/components/text-to-cad/CadStatusDialog';
 import { trackCadStudioOpen, trackCadReferenceUploaded } from "@/lib/posthog-events";
 import { useCADKeyboardShortcuts } from "@/hooks/use-cad-keyboard-shortcuts";
 
@@ -116,6 +117,19 @@ export default function ImageToCAD() {
     return () => document.removeEventListener('fullscreenchange', handler);
   }, []);
 
+  // A ring opened from history shows the description it was made from. A run
+  // that used none leaves this null, and the panel shows no prompt at all
+  // rather than an empty box implying the user forgot to type something.
+  useEffect(() => {
+    if (workflow.restoredPrompt && !prompt) setPrompt(workflow.restoredPrompt);
+  }, [workflow.restoredPrompt]); // eslint-disable-line react-hooks/exhaustive-deps -- runs when a restore resolves, and must not fight the user's own typing afterwards
+
+  // What the left panel shows: this session's uploads, or, for a ring opened
+  // from history, the photos that run was actually made from.
+  const panelReferenceUrls = referenceImagePreviewUrls.length > 0
+    ? referenceImagePreviewUrls
+    : workflow.restoredReferenceUrls;
+
   useEffect(() => {
     if (workflow.hasModel) rightPanelRef.current?.expand(22);
     else rightPanelRef.current?.collapse();
@@ -143,8 +157,11 @@ export default function ImageToCAD() {
   // callback (and reprocess the mesh, causing flicker) on unrelated re-renders.
   const handleModelReady = useCallback(() => {
     workflow.setIsModelLoading(false);
-    toast.success("Ring generated successfully");
-  }, [workflow.setIsModelLoading]);
+    // Only for a ring this page just made: opening one from history or
+    // clicking another version also lands here, and announcing a generation
+    // that did not happen is worse than saying nothing.
+    if (workflow.consumeGeneratedToast()) toast.success("Ring generated successfully");
+  }, [workflow.setIsModelLoading, workflow.consumeGeneratedToast]);
 
   const handleReset = useCallback(() => {
     workflow.resetWorkflow();
@@ -197,7 +214,7 @@ export default function ImageToCAD() {
           setPrompt={setPrompt}
           isGenerating={workflow.isGenerating}
           onGenerate={workflow.simulateGeneration}
-          referenceImagePreviewUrls={referenceImagePreviewUrls}
+          referenceImagePreviewUrls={panelReferenceUrls}
           onAddReferenceImages={addReferenceImages}
           onRemoveReferenceImage={removeReferenceImage}
           onReplaceReferenceImages={replaceReferenceImages}
@@ -224,6 +241,7 @@ export default function ImageToCAD() {
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
     <div className="flex h-[calc(100vh-5rem)] overflow-hidden bg-background" tabIndex={-1}>
+      <CadStatusDialog notice={workflow.statusNotice} onClose={workflow.dismissStatusNotice} />
       <ResizablePanelGroup direction="horizontal" className="h-full">
         <ResizablePanel
           ref={leftPanelRef}
@@ -253,7 +271,10 @@ export default function ImageToCAD() {
               }}
               onReset={workflow.hasModel ? handleReset : undefined}
               pageTitle="Image to CAD"
-              referenceImagePreviewUrls={referenceImagePreviewUrls}
+              referenceImagePreviewUrls={panelReferenceUrls}
+              versions={workflow.versions}
+              selectedVersionId={workflow.selectedVersionId}
+              onSelectVersion={workflow.selectVersion}
             />
           )}
         </ResizablePanel>
@@ -304,33 +325,6 @@ export default function ImageToCAD() {
               />
             </CADRuntimeErrorBoundary>
 
-            <AnimatePresence>
-              {workflow.generationFailed && !workflow.isGenerating && !workflow.hasModel && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.96 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.96 }}
-                  transition={{ duration: 0.25 }}
-                  className="absolute inset-0 z-[20] flex items-center justify-center"
-                >
-                  <div className="bg-card border border-border shadow-2xl px-10 py-8 max-w-sm text-center">
-                    <div className="font-display text-lg uppercase tracking-[0.15em] text-foreground mb-3">
-                      Generation Unavailable
-                    </div>
-                    <p className="font-mono text-[11px] text-muted-foreground leading-[1.8] tracking-wide mb-6">
-                      We're really sorry. Something went wrong while generating your design. Our AI generation service may be temporarily unavailable. Please try again in a few minutes.
-                    </p>
-                    <button
-                      onClick={() => workflow.setGenerationFailed(false)}
-                      className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground/60 hover:text-foreground transition-colors"
-                    >
-                      Dismiss
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
             {!workflow.hasModel && !workflow.isGenerating && !workflow.isModelLoading && !workflow.generationFailed && (
               <div className="absolute inset-0 z-[10] flex items-center justify-center pointer-events-none">
                 <div className="text-center">
@@ -351,16 +345,20 @@ export default function ImageToCAD() {
                 transformData={editor.selectedTransform}
                 onTransformChange={editor.handleNumericTransformChange}
                 onResetTransform={() => editor.handleSceneAction("reset-transform")}
-                // Same visibility rule the download action had in ViewportSideTools
-                // before the move — hidden mid-regeneration, not just mid-initial-generation.
-                downloadSlot={!workflow.isGenerating && !workflow.isModelLoading ? (
-                  <CadDownloadMenu
-                    isBusy={downloads.isBusy}
-                    onDownloadThreedm={workflow.threedmArtifact ? downloads.downloadThreedm : undefined}
-                    onDownloadGlb={workflow.glbUrl ? downloads.downloadGlb : undefined}
-                    onExportEdited={hasEdits ? downloads.exportEdited : undefined}
-                  />
-                ) : undefined}
+              />
+            )}
+
+            {/* Result actions, bottom center. Same visibility rule the download
+                carried in the toolbar before the move: hidden mid-regeneration,
+                not just mid-initial-generation. */}
+            {workflow.hasModel && !workflow.isGenerating && !workflow.isModelLoading && (
+              <CadResultActions
+                isBusy={downloads.isBusy}
+                onDownloadThreedm={workflow.threedmArtifact ? downloads.downloadThreedm : undefined}
+                onDownloadGlb={workflow.glbUrl ? downloads.downloadGlb : undefined}
+                onExportEdited={hasEdits ? downloads.exportEdited : undefined}
+                latestVersionLabel={workflow.latestVersionLabel}
+                onImproveFromVersion={workflow.improveFromLatestVersion}
               />
             )}
 

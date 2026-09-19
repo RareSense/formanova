@@ -19,6 +19,7 @@ import {
   trackPaywallHit,
   trackCadGenerationStarted,
   trackCadGenerationFailed,
+  trackCadImproveRequested,
   trackCadResultRestored,
 } from "@/lib/posthog-events";
 import {
@@ -28,7 +29,21 @@ import {
   buildCadGenerationProps,
 } from "@/lib/cad-analytics";
 import { fetchCadResult } from "@/lib/generation-history-api";
+import { fetchCadRunInputs } from "@/lib/cad-result-api";
+import {
+  CadImproveError,
+  findRingForWorkflow,
+  latestVersion,
+  startImproveFromVersion,
+  versionLabel,
+  type CadRing,
+  type CadRestoreSeed,
+} from "@/lib/cad-versions-api";
+import { cadStatusNotice, type CadStatusNotice } from '@/lib/cad-status-copy';
 
+
+/** What an Improve press runs, so its price is quoted under the right name. */
+const IMPROVE_WORKFLOW = 'ring_cad_improve';
 
 interface WorkflowParams {
   model: string;
@@ -76,7 +91,40 @@ export function useImageToCADWorkflow({
   const [failureMessage, setFailureMessage] = useState<string | null>(null);
   /** Exports fine but some part is not a closed solid - flag before manufacture. */
   const [notAllSolid, setNotAllSolid] = useState(false);
+  /**
+   * The saved ring this run produced, once the vault has it.
+   *
+   * Null for a run under an older workflow, which saved no versions at all,
+   * and for a run whose version row has not been written yet. Either way the
+   * Improve button stays hidden rather than pointing at nothing.
+   */
+  const [ring, setRing] = useState<CadRing | null>(null);
+  /** Why the last Improve press could not start, in the user's own terms. */
+  const [improveMessage, setImproveMessage] = useState<string | null>(null);
+  const [statusNotice, setStatusNotice] = useState<CadStatusNotice | null>(null);
+  /**
+   * The photos and text a restored run was made from.
+   *
+   * A ring opened from history rebuilt the model but not the brief behind it,
+   * so the panel came up blank. Empty for a run with no photos, and the prompt
+   * stays null when none was typed, so nothing invents a brief that never
+   * existed.
+   */
+  const [restoredReferenceUrls, setRestoredReferenceUrls] = useState<string[]>([]);
+  const [restoredPrompt, setRestoredPrompt] = useState<string | null>(null);
+  /** Which version the panel is showing; the newest until the user picks another. */
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
 
+  /**
+   * True only while a run this page started is still on its way to the screen.
+   *
+   * "Ring generated successfully" fires when a model finishes loading, and a
+   * model finishes loading when a ring is opened from history or a version is
+   * clicked too, which announced a generation that never happened. The flag is
+   * set when this page starts a run and consumed by the first model that
+   * arrives afterwards.
+   */
+  const awaitingGeneratedToastRef = useRef(false);
   const pollAbortRef = useRef<AbortController | null>(null);
   const generationStartRef = useRef<number>(0);
   /** What cad_generation_started reported for is_first_ever, so the completed
@@ -116,6 +164,7 @@ export function useImageToCADWorkflow({
       setProgressStep('failed_final');
       setIsGenerating(false);
       setGenerationFailed(true);
+      setStatusNotice(cadStatusNotice(trackedRun.cadFailureReasonCode));
       // Stage 'run': backend accepted the job and then failed. Kept distinct
       // from a 'start' failure because the causes share nothing.
       trackCadGenerationFailed({
@@ -154,7 +203,146 @@ export function useImageToCADWorkflow({
       setIsModelLoading(true);
       setHasModel(true);
     }
-  }, [trackedRun?.status, trackedRun?.glbUrl, trackedRun?.threedmUrl, trackedRun?.generationStep]); // eslint-disable-line react-hooks/exhaustive-deps -- prompt/referenceImages/tier/cadRoute/cadSource and the trackedRun object are excluded: only the run's own transitions should re-drive the overlay, and including the object would re-fire on every progress tick. The analytics values are read from the closure of the render in which status changed, which is the correct moment for them. Regression to watch: if a future edit fires an event here on something other than a status transition, those values could be stale.
+  }, [trackedRun?.status, trackedRun?.glbUrl, trackedRun?.threedmUrl, trackedRun?.generationStep, trackedRun?.cadFailureReasonCode]); // eslint-disable-line react-hooks/exhaustive-deps -- prompt/referenceImages/tier/cadRoute/cadSource and the trackedRun object are excluded: only the run's own transitions should re-drive the overlay, and including the object would re-fire on every progress tick. The analytics values are read from the closure of the render in which status changed, which is the correct moment for them. Regression to watch: if a future edit fires an event here on something other than a status transition, those values could be stale.
+
+  /**
+   * Looks up the ring this run saved, which is what the Improve button needs.
+   *
+   * Runs once a model is on screen, which is after /result has returned, so
+   * the version row is already written and the first attempt normally hits.
+   * The lookup retries internally for the case where the caller arrived from
+   * /status alone, where the write can still be a moment away.
+   *
+   * A run under an older workflow saves no ring, so this settles on null and
+   * the bar keeps holding the download by itself.
+   */
+  useEffect(() => {
+    // Starts as soon as the run has a result, not once the GLB has finished
+    // loading: parsing a heavy ring takes seconds, and waiting for it left the
+    // button missing on a ring that was already saved and improvable.
+    const ready = trackedRun ? trackedRun.status === 'completed' : hasModel;
+    if (!ready || !sourceWorkflowId) return;
+    let cancelled = false;
+    findRingForWorkflow(sourceWorkflowId)
+      .then(async (found) => {
+        if (cancelled) return;
+        setRing(found);
+        const producedVersion = (found?.versions ?? []).find(
+          (version) => version.source_workflow_id === sourceWorkflowId,
+        );
+        if (producedVersion) setSelectedVersionId(producedVersion.asset_id);
+        // The photos and brief belong to the ring, not to the press: an
+        // improve run's own inputs are the saved files it was handed, so
+        // opening V3 from history showed no reference images at all. They come
+        // from the run that made version 0, whichever version is on screen.
+        const root = (found?.versions ?? []).find((v) => (v.position ?? 0) === 0);
+        if (root?.source_workflow_id && root.source_workflow_id !== sourceWorkflowId) {
+          const inputs = await fetchCadRunInputs(root.source_workflow_id);
+          if (cancelled) return;
+          if (inputs.referenceImageUrls.length) setRestoredReferenceUrls(inputs.referenceImageUrls);
+          if (inputs.prompt) setRestoredPrompt(inputs.prompt);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setRing(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [hasModel, trackedRun?.status, sourceWorkflowId]);
+
+  const versions = ring?.versions ? [...ring.versions].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)) : [];
+  const latestRingVersion = ring ? latestVersion(ring) : null;
+  /** What Improve acts on: the version on screen, which is the newest until picked. */
+  const activeVersion = versions.find((v) => v.asset_id === selectedVersionId) ?? latestRingVersion;
+
+  /** Opens an earlier version in the viewer. Its files are already published. */
+  const selectVersion = useCallback((assetId: string) => {
+    const version = (ring?.versions ?? []).find((v) => v.asset_id === assetId);
+    if (!version?.glb_url) return;
+    awaitingGeneratedToastRef.current = false;
+    setStatusNotice(null);
+    setSelectedVersionId(assetId);
+    setGlbUrl(version.glb_url);
+    setGlbArtifact({ uri: version.glb_url, type: 'model/gltf-binary', bytes: 0, sha256: '' });
+    setThreedmArtifact(version.threedm_url
+      ? { uri: version.threedm_url, url: version.threedm_url, type: 'model/3dm', bytes: 0, sha256: '' }
+      : null);
+    setIsModelLoading(true);
+    setHasModel(true);
+  }, [ring]);
+
+  /**
+   * One repair pass on the newest version, saved as the next one.
+   *
+   * The backend starts the run: the one-improve-per-ring rule lives on its
+   * endpoint, and it holds the credits itself, so there is no preflight here.
+   * The started run is handed to GenerationsContext exactly as a generation
+   * is, so the existing poll, overlay and toast carry it without knowing it
+   * came from a different button.
+   */
+  const improveFromLatestVersion = useCallback(async () => {
+    if (!activeVersion || activeVersion.improvable === false || ring?.improve_running) return;
+    setImproveMessage(null);
+    // The same gate every paid run uses: it saves this page as the return
+    // path, shows the balance against the price, and sends the user to
+    // /credits. Reaching the endpoint's own 402 instead would swap that
+    // shared flow for a toast that says less and leads nowhere.
+    const approved = await checkCredits(IMPROVE_WORKFLOW, 1);
+    if (!approved) return;
+    try {
+      const started = await startImproveFromVersion(activeVersion.asset_id);
+      const fromVersion = (activeVersion.position ?? 0) + 1;
+      trackCadImproveRequested({
+        workflow_id: started.workflow_id,
+        source: cadSource,
+        from_version: fromVersion,
+      });
+      hasNavigatedAway.current = false;
+      // The current ring stays mounted while Improve runs. Marking a success
+      // toast as owed here makes that already-loaded model announce itself as
+      // newly generated before the improve workflow has produced anything.
+      awaitingGeneratedToastRef.current = false;
+      onWorkspaceActivate();
+      setIsGenerating(true);
+      setGenerationFailed(false);
+      setFailureMessage(null);
+      setStatusNotice(null);
+      setNotAllSolid(false);
+      // Keep the inspected version, its references and the version strip on
+      // screen while Improve runs. A no-change/error result creates no new
+      // model, so clearing these would leave an empty workspace afterward.
+      setProgressStep('building');
+      generationStartRef.current = Date.now();
+      setSourceWorkflowId(started.workflow_id);
+      trackCadGeneration({
+        workflowId: started.workflow_id,
+        label: `Improve ${versionLabel(activeVersion)}`,
+        cadRoute,
+        analytics: {
+          ...buildCadGenerationProps({ cadRoute, prompt, referenceImageCount: referenceImages.length, tier }),
+          is_first_ever: false,
+          operation: 'improve',
+          from_version: fromVersion,
+          ...(started.projected_cost !== undefined ? { projected_cost: started.projected_cost } : {}),
+          ...(started.authorized_budget !== undefined ? { authorized_budget: started.authorized_budget } : {}),
+        },
+      });
+    } catch (error) {
+      if (error instanceof CadImproveError && error.failure === 'insufficient_credits') {
+        // The balance moved between the gate above and the start call, so hand
+        // it back to the same shared flow rather than explaining it here.
+        await checkCredits(IMPROVE_WORKFLOW, 1);
+        return;
+      }
+      const message =
+        error instanceof CadImproveError
+          ? error.message
+          : 'Could not start the improvement. Please try again.';
+      setImproveMessage(message);
+      toast.error(message);
+    }
+  }, [activeVersion, cadRoute, cadSource, checkCredits, onWorkspaceActivate, prompt, referenceImages.length, ring?.improve_running, tier, trackCadGeneration]);
 
   /** Leaves the run running in the background and returns to the upload screen. */
   const handleKeepCreating = useCallback(() => {
@@ -172,6 +360,7 @@ export function useImageToCADWorkflow({
   const restoreCompletedWorkflow = useCallback(async (
     workflowId: string | null,
     fallbackGlbUrl?: string | null,
+    seed?: CadRestoreSeed,
   ): Promise<boolean> => {
     // Captured synchronously, before the await below. Both pages strip the
     // query string once this resolves (navigate(..., { replace: true })), so
@@ -184,7 +373,12 @@ export function useImageToCADWorkflow({
     setIsGenerating(false);
     setGenerationFailed(false);
     setFailureMessage(null);
+    setStatusNotice(null);
     setSourceWorkflowId(workflowId);
+    setRing(seed?.ring ?? null);
+    setSelectedVersionId(seed?.selectedVersionId ?? null);
+    setRestoredReferenceUrls(seed?.referenceImageUrls ?? []);
+    setRestoredPrompt(seed?.prompt ?? null);
     setThreedmArtifact(null);
     setIsModelLoading(true);
     setProgressStep('_loading');
@@ -197,6 +391,8 @@ export function useImageToCADWorkflow({
       setGlbArtifact({ uri: url, type: 'model/gltf-binary', bytes: 0, sha256: '' });
     };
 
+    // Restoring shows a ring that already existed; nothing was generated here.
+    awaitingGeneratedToastRef.current = false;
     if (fallbackGlbUrl) seedGlb(fallbackGlbUrl);
 
     const result = workflowId ? await fetchCadResult(workflowId) : null;
@@ -222,6 +418,14 @@ export function useImageToCADWorkflow({
       });
     }
     trackCadResultRestored({ source: cadSource, entry, restore_ok: true });
+    if (workflowId) {
+      // After the model, never before it: the ring is what the user came for,
+      // and this is only the brief beside it.
+      void fetchCadRunInputs(workflowId).then(({ referenceImageUrls, prompt }) => {
+        setRestoredReferenceUrls(referenceImageUrls);
+        setRestoredPrompt(prompt);
+      });
+    }
     return true;
   }, [onWorkspaceActivate, cadSource]);
 
@@ -252,6 +456,7 @@ export function useImageToCADWorkflow({
     // permanently block this hook's trackedRun mirror effect from ever
     // syncing this new run's progress/completion into the on-page viewport.
     hasNavigatedAway.current = false;
+    awaitingGeneratedToastRef.current = true;
     onWorkspaceActivate();
     setIsGenerating(true);
     setGenerationFailed(false);
@@ -263,6 +468,14 @@ export function useImageToCADWorkflow({
     // Clear the previous ring's solidity result: a stale warning on a new run
     // is worse than none, because it trains people to ignore it.
     setNotAllSolid(false);
+    // Likewise the previous ring: improving from it while a new one builds
+    // would start a press on a ring the user is no longer looking at.
+    setRing(null);
+    setImproveMessage(null);
+    setStatusNotice(null);
+    setRestoredReferenceUrls([]);
+    setRestoredPrompt(null);
+    setSelectedVersionId(null);
     setProgressStep("analyzing");
 
     try {
@@ -296,6 +509,7 @@ export function useImageToCADWorkflow({
       const cadAnalytics = {
         ...buildCadGenerationProps({ cadRoute, prompt, referenceImageCount: referenceImages.length, tier }),
         is_first_ever: startedFirstEverRef.current,
+        operation: 'generate' as const,
       };
       trackCadGenerationStarted({ ...cadAnalytics, workflow_id });
 
@@ -345,9 +559,30 @@ export function useImageToCADWorkflow({
     setRetryAttempt(0);
     setProgressStep("");
     setSourceWorkflowId(null);
+    setRing(null);
+    setImproveMessage(null);
+    setRestoredReferenceUrls([]);
+    setRestoredPrompt(null);
+    setSelectedVersionId(null);
     if (glbUrl) URL.revokeObjectURL(glbUrl);
     setGlbUrl(undefined);
   }, [glbUrl]);
+
+  /**
+   * Stable callback for CADCanvas' onModelReady handler.
+   *
+   * Returning this as a new inline function on every render changes
+   * ImageToCAD's handleModelReady identity. CADCanvas treats that callback as
+   * part of its model-ready effect, so the identity churn re-runs the effect,
+   * updates state again and can continuously restart viewport work. Besides
+   * React's maximum-update-depth warning, that presents as a fluttering model
+   * and repeatedly interrupts camera motion.
+   */
+  const consumeGeneratedToast = useCallback(() => {
+    const owed = awaitingGeneratedToastRef.current;
+    awaitingGeneratedToastRef.current = false;
+    return owed;
+  }, []);
 
   return {
     isGenerating, hasModel, setHasModel,
@@ -359,6 +594,32 @@ export function useImageToCADWorkflow({
     sourceWorkflowId, setSourceWorkflowId,
     threedmArtifact, setThreedmArtifact,
     failureMessage, notAllSolid,
+    statusNotice,
+    dismissStatusNotice: () => {
+      setStatusNotice(null);
+      setGenerationFailed(false);
+      setProgressStep('');
+    },
+    /**
+     * What the Improve button is named after, e.g. "V2". Built from the
+     * version's position: the backend's own `label` is the improve verdict
+     * ("Looks better"), which is a different thing and belongs on the version
+     * list, not on the button.
+     */
+    latestVersionLabel:
+      activeVersion && activeVersion.improvable !== false
+        ? versionLabel(activeVersion)
+        : undefined,
+    /** Every saved version of this ring, oldest first, for the side panel. */
+    versions,
+    selectedVersionId: activeVersion?.asset_id ?? null,
+    selectVersion,
+    improveFromLatestVersion,
+    improveMessage,
+    restoredReferenceUrls,
+    restoredPrompt,
+    /** True once, for the model that a run started here has just produced. */
+    consumeGeneratedToast,
     simulateGeneration,
     restoreCompletedWorkflow,
     handleKeepCreating,

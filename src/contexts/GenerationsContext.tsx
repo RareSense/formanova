@@ -4,7 +4,12 @@ import { useCredits } from '@/contexts/CreditsContext';
 import { useToast } from '@/hooks/use-toast';
 import { ToastAction } from '@/components/ui/toast';
 import { CAD_RESTORE_SRC_PARAM, type CadRestoreEntry, type CadSource } from '@/lib/cad-analytics';
-import { trackCadGenerationCompleted } from '@/lib/posthog-events';
+import {
+  trackCadGenerationCompleted,
+  trackCadImproveFinished,
+  type CadImproveOutcome,
+  type CadOperation,
+} from '@/lib/posthog-events';
 import { pollWorkflow } from '@/lib/poll-workflow';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { markGenerationCompleted, markGenerationFailed } from '@/lib/generation-lifecycle';
@@ -12,6 +17,8 @@ import { azureUriToUrl } from '@/lib/azure-utils';
 import type { PhotoshootResultResponse } from '@/lib/photoshoot-api';
 import type { Resolution } from '@/components/studio/OutputSettingsPills';
 import { getWorkflowDetails } from '@/lib/generation-history-api';
+import { fetchImproveOutcome } from '@/lib/cad-versions-api';
+import { cadStatusNotice } from '@/lib/cad-status-copy';
 import {
   RING_CAD_POLL_TIMEOUT_MS,
   isRingCadRepairing,
@@ -166,6 +173,10 @@ export interface TrackedGeneration {
   threedmUrl?: string | null;
   /** CAD only: label for the completion toast. */
   label?: string;
+  /** CAD only: structured fail-step code, used for clear workspace copy. */
+  cadFailureReasonCode?: string;
+  /** CAD only: backend message retained for diagnostics, never shown raw. */
+  cadFailureMessage?: string;
   /**
    * CAD only: true when the run produced parts that are not closed solids.
    *
@@ -223,6 +234,10 @@ export interface CadGenerationAnalytics {
   reference_image_count: number;
   llm_tier: string;
   is_first_ever: boolean;
+  operation: CadOperation;
+  from_version?: number;
+  projected_cost?: number;
+  authorized_budget?: number;
 }
 
 export interface TrackCadGenerationParams {
@@ -472,7 +487,74 @@ export function GenerationsContextProvider({ children }: { children: React.React
         reference_image_count: a.reference_image_count,
         llm_tier: a.llm_tier,
         is_first_ever: a.is_first_ever,
+        operation: a.operation,
+        ...(a.from_version !== undefined ? { from_version: a.from_version } : {}),
       } : {}),
+    });
+  }, []);
+
+  const emitCadImproveFinished = useCallback((
+    gen: TrackedGeneration,
+    rawResult: unknown,
+    failureReason?: string,
+  ) => {
+    const analytics = gen.cadAnalytics;
+    if (analytics?.operation !== 'improve' || analytics.from_version === undefined) return;
+
+    const find = (node: unknown, key: string, depth = 0): unknown => {
+      if (depth > 6 || !node || typeof node !== 'object') return undefined;
+      if (!Array.isArray(node) && key in node) return (node as Record<string, unknown>)[key];
+      for (const value of Array.isArray(node) ? node : Object.values(node)) {
+        const found = find(value, key, depth + 1);
+        if (found !== undefined) return found;
+      }
+      return undefined;
+    };
+    const stringValue = (key: string) => {
+      const value = find(rawResult, key);
+      return typeof value === 'string' && value ? value : undefined;
+    };
+    const count = (key: string) => {
+      const value = find(rawResult, key);
+      return Array.isArray(value) ? value.length : 0;
+    };
+    const rawChanged = find(rawResult, 'changed');
+    const changed = rawChanged === true;
+    const label = find(rawResult, 'version_label');
+    const versionLabelCode = label && typeof label === 'object'
+      ? (label as Record<string, unknown>).code
+      : undefined;
+    const newVersionCreated = changed || typeof versionLabelCode === 'string';
+    const reason = failureReason ?? stringValue('stop_reason');
+    const allowedOutcomes = new Set<CadImproveOutcome>([
+      'nothing_to_fix',
+      'no_safe_fix',
+      'requirement_conflict',
+      'not_improvable',
+    ]);
+    const outcome: CadImproveOutcome = newVersionCreated
+      ? 'improved'
+      : allowedOutcomes.has(reason as CadImproveOutcome)
+        ? reason as CadImproveOutcome
+        : 'failed';
+
+    trackCadImproveFinished({
+      workflow_id: gen.workflowId,
+      source: analytics.source,
+      from_version: analytics.from_version,
+      ...(newVersionCreated ? { to_version: analytics.from_version + 1 } : {}),
+      new_version_created: newVersionCreated,
+      outcome,
+      ...(typeof versionLabelCode === 'string' ? { version_label_code: versionLabelCode } : {}),
+      ...(stringValue('stop_reason') ? { stop_reason: stringValue('stop_reason') } : {}),
+      ...(stringValue('likeness_status') ? { likeness_status: stringValue('likeness_status') } : {}),
+      changed,
+      improved_issue_count: count('improved_issue_ids'),
+      new_issue_count: count('new_issue_ids'),
+      open_issue_count: count('open_issue_ids'),
+      duration_ms: Date.now() - gen.startedAt,
+      ...(analytics.projected_cost !== undefined ? { projected_cost: analytics.projected_cost } : {}),
+      ...(analytics.authorized_budget !== undefined ? { authorized_budget: analytics.authorized_budget } : {}),
     });
   }, []);
 
@@ -584,6 +666,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
       // the run outlives it. Guarded upstream by settledCadIds, so a run that
       // settles through either terminal path is counted exactly once.
       emitCadCompleted(gen);
+      emitCadImproveFinished(gen, raw);
       refreshCredits();
 
       toast({
@@ -598,23 +681,39 @@ export function GenerationsContextProvider({ children }: { children: React.React
           </ToastAction>
         ),
       });
-    }).catch(err => {
+    }).catch(async err => {
       clearInterval(ticker);
       controllers.current.delete(gen.workflowId);
       if (ctrl.signal.aborted) return;
       console.error('[GenerationsContext] CAD poll failed:', err);
+      const outcome = await fetchImproveOutcome(gen.workflowId);
+      emitCadImproveFinished(gen, null, outcome?.reasonCode);
       setGenerations(prev => prev.map(g =>
-        g.workflowId === gen.workflowId ? { ...g, status: 'failed', progress: 100 } : g
+        g.workflowId === gen.workflowId
+          ? {
+              ...g,
+              status: 'failed',
+              progress: 100,
+              cadFailureReasonCode: outcome?.reasonCode,
+              cadFailureMessage: outcome?.message,
+            }
+          : g
       ));
       markGenerationFailed(gen.workflowId, 'CAD poll failed', startTime);
       refreshCredits();
-      toast({
-        title: 'Your CAD could not be generated',
-        description: 'The run did not complete. Your credits were not charged.',
-        variant: 'destructive',
-      });
+
+      // The active CAD page reads the structured failure above and opens its
+      // centered dialog. A user who navigated away still needs a toast.
+      if (window.location.pathname !== gen.cadRoute) {
+        const notice = cadStatusNotice(outcome?.reasonCode);
+        toast({
+          title: notice.title,
+          description: notice.message,
+          ...(notice.tone === 'error' ? { variant: 'destructive' as const } : {}),
+        });
+      }
     });
-  }, [navigate, refreshCredits, toast, emitCadCompleted]);
+  }, [navigate, refreshCredits, toast, emitCadCompleted, emitCadImproveFinished]);
 
   const runningKey = generations
     .filter(g => g.status === 'running')
@@ -680,18 +779,23 @@ export function GenerationsContextProvider({ children }: { children: React.React
           refreshCredits();
 
           let parsed: ReturnType<typeof parseRingCadResult> | null = null;
+          let rawResult: unknown = null;
           const resultController = new AbortController();
           const resultTimeout = window.setTimeout(() => resultController.abort(), 15_000);
           try {
             const resultResponse = await authenticatedFetch(`/api/result/${gen.workflowId}`, {
               signal: resultController.signal,
             });
-            if (resultResponse.ok) parsed = parseRingCadResult(await resultResponse.json());
+            if (resultResponse.ok) {
+              rawResult = await resultResponse.json();
+              parsed = parseRingCadResult(rawResult);
+            }
           } catch {
             // Completion is still terminal. The restore link will retry result loading.
           } finally {
             window.clearTimeout(resultTimeout);
           }
+          emitCadImproveFinished(gen, rawResult);
 
           setGenerations(prev => prev.map(g =>
             g.workflowId === gen.workflowId
@@ -739,7 +843,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
         reconcilingCadIds.current.delete(gen.workflowId);
       }
     }
-  }, [navigate, refreshCredits, toast, emitCadCompleted]);
+  }, [navigate, refreshCredits, toast, emitCadCompleted, emitCadImproveFinished]);
 
   useEffect(() => {
     const reconcileOnReturn = () => {

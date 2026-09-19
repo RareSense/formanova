@@ -37,6 +37,19 @@ const Q = getQualitySettings();
 // mutation boundary forbids changing its public API, UI consumers, or adding
 // sibling engine modules. Existing workflow/API concerns are not expanded.
 
+/**
+ * Mesh-name hints used wherever meshes are classified without a material name.
+ *
+ * The CAD pipeline names accent stones `pave_main_left_rows`, `pave_center_stone`
+ * and so on, and side stones `accent_*` or `melee_*`; those have to read as
+ * gems, or a ring's small stones come out as metal.
+ */
+const GEM_KEYWORDS = ["gem", "diamond", "stone", "ruby", "sapphire", "emerald", "crystal", "halo_gem",
+  "center_gem", "pave", "accent", "melee", "side_stone", "halo", "cz", "brilliant", "round_cut",
+  "cushion", "oval", "marquise", "princess", "baguette", "asscher", "trillion", "pear", "facet"];
+/** Settings and holders: metal that often sits inside a stone's own name. */
+const SETTING_KEYWORDS = ["prong", "claw", "bead", "milgrain", "setting", "basket", "collet"];
+
 type ReferenceMaterialKind = "metal" | "gem" | "pearl";
 
 interface ReferenceMaterialSpec {
@@ -569,11 +582,15 @@ function MotionAdaptiveProvider({
   const enterMotion = useCallback(() => {
     if (inMotionRef.current) return;
     inMotionRef.current = true;
+    // Dragging used to drop to a quarter of the render scale under heavy grain,
+    // which is what made orbiting look coarse next to the local ring viewer.
+    // Half (heavy) and three quarters (normal) still buy most of the frame
+    // budget while the ring stays legible while it moves.
     const motionDpr = heavyScene
-      ? Math.max(0.22, baseDpr * 0.24)
-      : Math.max(0.3, baseDpr * 0.33);
+      ? Math.max(0.5, baseDpr * 0.5)
+      : Math.max(0.75, baseDpr * 0.75);
     setRenderScale(motionDpr);
-    if (grainRef.current) grainRef.current.style.opacity = heavyScene ? ".72" : ".6";
+    if (grainRef.current) grainRef.current.style.opacity = heavyScene ? ".5" : ".35";
     inv();
   }, [baseDpr, heavyScene, inv, setRenderScale]);
 
@@ -1170,8 +1187,8 @@ const LoadedModel = forwardRef<
       console.log(`[MagicTex] Recognised ${recognisedCount}/${list.length} materials from GLB — skipping heuristics`);
     } else {
       // ── Standard heuristic texturing for fresh/pipeline GLBs ──
-      const gemKeywords = ["gem", "diamond", "stone", "ruby", "sapphire", "emerald", "crystal", "halo_gem", "center_gem", "pave", "brilliant", "round_cut", "cushion", "oval", "marquise", "princess", "facet"];
-      const platinumKeywords = ["prong", "claw", "bead", "milgrain", "setting", "basket", "collet"];
+      const gemKeywords = GEM_KEYWORDS;
+      const platinumKeywords = SETTING_KEYWORDS;
       const diamondMatDef = findMaterial("diamond")!;
       const platinumMatDef = findMaterial("platinum")!;
       const goldMatDef = findMaterial("yellow-gold")!;
@@ -1222,7 +1239,12 @@ const LoadedModel = forwardRef<
     } else {
       // ── Flat mesh classification (default when magic texturing is off) ──
       // gem → blue (#4a90d9), metal → green (#77dd77), flat shading, no maps
-      const gemRe = /diamond|gem|stone|crystal|jewel|brill|ruby|emerald|sapphire|topaz|opal|garnet|amethyst|pearl|cz|cubic|solitaire|pave|prong_stone|accent_stone|center_stone|main_stone/i;
+      // Built from the shared list so the flat preview and the real materials
+      // agree on what a gem is: `wing_accent_right` is a stone here too, and
+      // only `accent_stone` used to match.
+      const gemRe = new RegExp(
+        [...GEM_KEYWORDS, "jewel", "brill", "topaz", "opal", "garnet", "amethyst", "pearl", "cubic",
+          "solitaire", "prong_stone", "center_stone", "main_stone"].join("|"), "i");
       const metalRe = /band|ring|shank|prong|setting|mount|bezel|basket|gallery|shoulder|bridge|head|collet|metal|gold|silver|platinum|frame|base/i;
 
       list.forEach((md) => {
@@ -1694,13 +1716,21 @@ const LoadedModel = forwardRef<
       const useRecognised = recognisedCount > 0 && recognisedCount >= list.length * 0.5;
 
       if (useRecognised) {
+        // A mesh the GLB never named is not automatically metal: accent stones
+        // arrive as pave_*/accent_* with no material name of their own, and
+        // blanket gold turned every one of them into part of the band.
         const fallbackGold = findMaterial("yellow-gold")!;
+        const fallbackDiamond = findMaterial("diamond")!;
         list.forEach((md) => {
-          if (!newMaterials[md.name]) newMaterials[md.name] = fallbackGold;
+          if (newMaterials[md.name]) return;
+          const lower = md.name.toLowerCase();
+          const isGem = GEM_KEYWORDS.some((kw) => lower.includes(kw))
+            && !SETTING_KEYWORDS.some((kw) => lower.includes(kw));
+          newMaterials[md.name] = isGem ? fallbackDiamond : fallbackGold;
         });
       } else {
-        const gemKeywords = ["gem", "diamond", "stone", "ruby", "sapphire", "emerald", "crystal", "halo_gem", "center_gem", "pave", "brilliant", "round_cut", "cushion", "oval", "marquise", "princess", "facet"];
-        const platinumKeywords = ["prong", "claw", "bead", "milgrain", "setting", "basket", "collet"];
+        const gemKeywords = GEM_KEYWORDS;
+        const platinumKeywords = SETTING_KEYWORDS;
         const diamondMatDef = findMaterial("diamond")!;
         const platinumMatDef = findMaterial("platinum")!;
         const goldMatDef = findMaterial("yellow-gold")!;
@@ -2789,7 +2819,10 @@ const CADCanvas = forwardRef<CADCanvasHandle, CADCanvasProps>(
               enablePan={true}
               enableZoom={true}
               enableDamping
-              dampingFactor={0.03}
+              // 0.03 leaves the camera coasting well after the pointer stops,
+              // which reads as lag rather than weight. 0.08 is what the local
+              // ring viewer uses, and it follows the pointer closely.
+              dampingFactor={0.08}
               minDistance={0.5}
               maxDistance={20}
               minPolarAngle={0}

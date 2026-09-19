@@ -4,6 +4,8 @@ import { RotateCcw, X, Maximize2 } from "lucide-react";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { useEstimatedCost } from "@/hooks/use-estimated-cost";
 import { RING_CAD_NURBS_WORKFLOW, MAX_RING_CAD_REFERENCE_IMAGES } from "@/lib/ring-cad-nurbs-api";
+import VersionsPanel, { type VersionCard } from '@/components/text-to-cad/VersionsPanel';
+import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
 
 interface LeftPanelProps {
   model: string;
@@ -18,6 +20,25 @@ interface LeftPanelProps {
   onReset?: () => void;
   referenceImagePreviewUrls?: string[];
   pageTitle?: string;
+  /** Saved versions of this ring, oldest first; empty until one is saved. */
+  versions?: VersionCard[];
+  selectedVersionId?: string | null;
+  onSelectVersion?: (assetId: string) => void;
+}
+
+/**
+ * A reference photo, whatever its source.
+ *
+ * A photo uploaded in this session is a blob: URL and renders directly. One
+ * restored from a finished run is an artifact link, and those are auth-gated:
+ * /api/artifacts/<sha> answers 401 without a token, and an <img> sends none,
+ * so a restored ring showed empty boxes. The shared hook passes a blob: URL
+ * straight through and fetches the artifact ones.
+ */
+function ReferenceImage({ url, alt, className }: { url: string; alt: string; className?: string }) {
+  const src = useAuthenticatedImage(url);
+  if (!src) return null;
+  return <img src={src} alt={alt} className={className} />;
 }
 
 export default function LeftPanel({
@@ -27,6 +48,9 @@ export default function LeftPanel({
   onReset,
   referenceImagePreviewUrls = [],
   pageTitle,
+  versions = [],
+  selectedVersionId,
+  onSelectVersion,
 }: LeftPanelProps) {
   const { cost: generationCost, loading: generationCostLoading } = useEstimatedCost({ workflowName: RING_CAD_NURBS_WORKFLOW, model });
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -77,68 +101,50 @@ export default function LeftPanel({
       <div className="flex-1 overflow-y-auto px-4 lg:px-6 py-6 space-y-6 scrollbar-thin min-w-0"
         style={{ scrollbarWidth: "thin" }}
       >
-        {/* Reference image(s) — image-to-cad mode */}
+        {/* Reference images — every photo this ring was made from.
+            One row of equal squares, the same size as the version cards below,
+            so the two strips read as one column rather than each choosing its
+            own scale. Beyond four they wrap onto the next row. */}
         {primaryPreviewUrl && (
           <section>
             <div className="flex items-baseline justify-between mb-2">
-              <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Inspiration Image</h3>
-              {imageCount > 1 && (
-                <span className="font-mono text-[10px] tracking-[0.15em] text-muted-foreground/60 tabular-nums">
-                  {imageCount}/{MAX_RING_CAD_REFERENCE_IMAGES}
-                </span>
-              )}
+              <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Reference Images</h3>
+              <span className="font-mono text-[10px] tracking-[0.15em] text-muted-foreground/60 tabular-nums">
+                {imageCount}/{MAX_RING_CAD_REFERENCE_IMAGES}
+              </span>
             </div>
-            <div className="relative border border-border bg-muted/10 overflow-hidden">
-              <img
-                src={primaryPreviewUrl}
-                alt="Inspiration image"
-                className="w-full object-contain cursor-pointer"
-                style={{ maxHeight: 180 }}
-                onClick={() => setLightboxIndex(0)}
-              />
-              {/* Enlarge, not remove. This panel is the workspace, where the
-                  run has already been sent with these images, so removing one
-                  changes nothing about the result. */}
-              <button
-                onClick={() => setLightboxIndex(0)}
-                className="absolute top-1.5 right-1.5 w-6 h-6 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
-                aria-label="Expand image"
-              >
-                <Maximize2 className="w-3 h-3 text-foreground/70" />
-              </button>
+            <div className="grid grid-cols-4 gap-2">
+              {referenceImagePreviewUrls.map((url, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => setLightboxIndex(index)}
+                  aria-label={`Expand reference image ${index + 1}`}
+                  /* Enlarge, not remove. This panel is the workspace, where the
+                     run has already been sent with these images, so removing
+                     one changes nothing about the result. */
+                  className="group relative aspect-square overflow-hidden border border-border bg-muted/10 transition-colors hover:border-foreground/50"
+                >
+                  {/* Contain, not cover: these are the customer's own photos
+                      and a square crop cuts the ring's shoulders off, which is
+                      the one thing the reference is there to show. */}
+                  <ReferenceImage url={url} alt={`Reference image ${index + 1}`} className="h-full w-full object-contain p-1" />
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute right-1 top-1 flex h-5 w-5 items-center justify-center border border-border bg-card/80 opacity-0 transition-opacity group-hover:opacity-100"
+                  >
+                    <Maximize2 className="h-2.5 w-2.5 text-foreground/70" />
+                  </span>
+                </button>
+              ))}
             </div>
-
-            {/* Additional angles, if any were uploaded */}
-            {imageCount > 1 && (
-              <div className="grid grid-cols-4 gap-2 mt-2">
-                {referenceImagePreviewUrls.slice(1).map((url, i) => {
-                  const index = i + 1;
-                  return (
-                    <div key={index} className="group relative aspect-square border border-border bg-muted/10 overflow-hidden">
-                      {/* The tile is the expand control, matching the primary
-                          image above. On a thumbnail this size a second button
-                          would cover most of the ring. */}
-                      <button
-                        type="button"
-                        onClick={() => setLightboxIndex(index)}
-                        aria-label={`Expand inspiration angle ${index}`}
-                        className="block h-full w-full"
-                      >
-                        <img src={url} alt={`Inspiration angle ${index}`} className="h-full w-full object-cover" />
-                      </button>
-                      <span
-                        aria-hidden="true"
-                        className="pointer-events-none absolute top-1 right-1 flex h-5 w-5 items-center justify-center border border-border bg-card/80 opacity-0 transition-opacity group-hover:opacity-100"
-                      >
-                        <Maximize2 className="h-2.5 w-2.5 text-foreground/70" />
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
           </section>
         )}
+
+        {/* The ring's own history, directly under what it was made from.
+            Renders nothing until a version exists, so a run from an older
+            workflow shows no empty section. */}
+        <VersionsPanel versions={versions} selectedAssetId={selectedVersionId} onSelect={onSelectVersion} />
 
         {/* AI Model - hidden until model selection is ready to ship.
         <section>
@@ -167,8 +173,12 @@ export default function LeftPanel({
         */}
 
         {/* Prompt */}
-        {/* In image mode before model loads: show prompt as static text (if any), no textarea */}
-        {!(isImageMode && !hasModel) && (
+        {/* In image mode before model loads: show prompt as static text (if any), no textarea.
+            A ring that has saved versions hides this section entirely: the brief
+            that made it is already spent, the action on a saved ring is Improve,
+            and a live Generate button beside its versions invites starting a
+            second ring over the top of the one on screen. */}
+        {!(isImageMode && !hasModel) && versions.length === 0 && (
         <section>
           <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-3">Prompt</h3>
           <textarea
@@ -224,10 +234,15 @@ export default function LeftPanel({
         </section>
         )}
 
-        {/* Image mode — show prompt text before model loads (read-only, no header).
+        {/* The brief this ring was made from, read-only, with no header.
+            Shown while an image-mode run is still building, and on a saved ring
+            whose original run had a description - that text is part of what the
+            ring is, so it stays visible beside its versions. A run made from
+            photos alone had no description, and then nothing is shown rather
+            than an empty box.
             Bounded and scrollable: a long brief would otherwise run for hundreds
             of pixels and push everything below it out of the panel. */}
-        {isImageMode && !hasModel && prompt.trim() && (
+        {((isImageMode && !hasModel) || versions.length > 0) && prompt.trim() && (
           <section>
             <div className="max-h-[140px] overflow-y-auto overscroll-contain border border-border/40 bg-muted/20 px-3 py-2.5">
               <p className="font-body text-[13px] leading-relaxed text-foreground/70 [overflow-wrap:anywhere]">{prompt}</p>

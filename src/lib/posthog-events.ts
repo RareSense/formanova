@@ -2,6 +2,8 @@ import posthog from 'posthog-js';
 import type { UserType } from '@/lib/onboarding-api';
 import type { CadSource, CadRestoreEntry } from '@/lib/cad-analytics';
 
+export type CadOperation = 'generate' | 'improve';
+
 /** Safe wrapper — only fires when PostHog is loaded */
 function capture(event: string, properties?: Record<string, unknown>) {
   // posthog.__loaded is always true after eager init in main.tsx.
@@ -74,6 +76,8 @@ export interface CadGenerationCompletedProps {
   reference_image_count?: number;
   llm_tier?: string;
   is_first_ever?: boolean;
+  operation?: CadOperation;
+  from_version?: number;
 }
 
 export interface GenerationCompleteProps {
@@ -300,6 +304,41 @@ export interface CadGenerationStartedProps {
   reference_image_count: number;
   llm_tier: string;
   is_first_ever: boolean;
+  operation: CadOperation;
+  from_version?: number;
+}
+
+export interface CadImproveRequestedProps {
+  workflow_id: string;
+  source: CadSource;
+  from_version: number;
+}
+
+export type CadImproveOutcome =
+  | 'improved'
+  | 'nothing_to_fix'
+  | 'no_safe_fix'
+  | 'requirement_conflict'
+  | 'not_improvable'
+  | 'failed';
+
+export interface CadImproveFinishedProps {
+  workflow_id: string;
+  source: CadSource;
+  from_version: number;
+  to_version?: number;
+  new_version_created: boolean;
+  outcome: CadImproveOutcome;
+  version_label_code?: string;
+  stop_reason?: string;
+  likeness_status?: string;
+  changed: boolean;
+  improved_issue_count: number;
+  new_issue_count: number;
+  open_issue_count: number;
+  duration_ms: number;
+  projected_cost?: number;
+  authorized_budget?: number;
 }
 
 export interface CadGenerationFailedProps {
@@ -345,6 +384,24 @@ export function trackCadGenerationStarted(props: CadGenerationStartedProps) {
 
 export function trackCadGenerationFailed(props: CadGenerationFailedProps) {
   capture('cad_generation_failed', { ...props });
+}
+
+export function trackCadImproveRequested(props: CadImproveRequestedProps) {
+  capture('cad_improve_requested', { ...props });
+}
+
+export function trackCadImproveFinished(props: CadImproveFinishedProps) {
+  capture('cad_improve_finished', { ...props });
+  if (posthog.__loaded) {
+    posthog.people.set({
+      last_improve_at: new Date().toISOString(),
+      last_improve_outcome: props.outcome,
+    });
+    posthog.people.increment({
+      improve_count: 1,
+      improve_versions_created: props.new_version_created ? 1 : 0,
+    });
+  }
 }
 
 /** Fired when a finished run is reopened from a deep link. `entry` says where

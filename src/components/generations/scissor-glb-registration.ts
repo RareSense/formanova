@@ -2,6 +2,7 @@ export interface PendingCardRegistration<TElement> {
   id: string;
   glbUrl: string;
   element: TElement;
+  forceJewelryPalette?: boolean;
 }
 
 /** Keeps the latest pre-renderer registration for each card and supports cleanup before flush. */

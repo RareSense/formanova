@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 
 import { useCadRestoreFromUrl } from './useCadRestoreFromUrl';
+import type { CadRestoreSeed } from '@/lib/cad-versions-api';
 
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
@@ -17,7 +18,7 @@ function Harness({
   onFailure,
   goTo,
 }: {
-  restore: (id: string | null, glb?: string | null) => Promise<boolean>;
+  restore: (id: string | null, glb?: string | null, seed?: CadRestoreSeed) => Promise<boolean>;
   onFailure: () => void;
   goTo?: string;
 }) {
@@ -34,14 +35,16 @@ function Harness({
   );
 }
 
-function render(initialPath: string, props: Omit<React.ComponentProps<typeof Harness>, never>) {
+function render(initialPath: string, props: Omit<React.ComponentProps<typeof Harness>, never>, initialState?: unknown) {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
   act(() => {
     root?.render(
       <MemoryRouter
-        initialEntries={[initialPath]}
+        initialEntries={[initialState
+          ? { pathname: initialPath.split('?')[0], search: initialPath.includes('?') ? `?${initialPath.split('?')[1]}` : '', state: initialState }
+          : initialPath]}
         future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
       >
         <Routes>
@@ -85,19 +88,19 @@ describe('useCadRestoreFromUrl', () => {
     render('/text-to-cad?workflow_id=wf-1&src=external', { restore, onFailure });
     await flush();
     expect(restore).toHaveBeenCalledTimes(1);
-    expect(restore).toHaveBeenCalledWith('wf-1', null);
+    expect(restore).toHaveBeenCalledWith('wf-1', null, undefined);
   });
 
   it('passes the glb hint through as the fallback', async () => {
     render('/text-to-cad?workflow_id=wf-1&glb=https://blob/x.glb', { restore, onFailure });
     await flush();
-    expect(restore).toHaveBeenCalledWith('wf-1', 'https://blob/x.glb');
+    expect(restore).toHaveBeenCalledWith('wf-1', 'https://blob/x.glb', undefined);
   });
 
   it('restores from a bare glb link with no workflow id', async () => {
     render('/text-to-cad?glb=https://blob/x.glb', { restore, onFailure });
     await flush();
-    expect(restore).toHaveBeenCalledWith(null, 'https://blob/x.glb');
+    expect(restore).toHaveBeenCalledWith(null, 'https://blob/x.glb', undefined);
   });
 
   it('treats a blank workflow_id as absent', async () => {
@@ -127,7 +130,23 @@ describe('useCadRestoreFromUrl', () => {
     await flush();
 
     expect(restore).toHaveBeenCalledTimes(1);
-    expect(restore).toHaveBeenCalledWith('wf-2', null);
+    expect(restore).toHaveBeenCalledWith('wf-2', null, undefined);
+  });
+
+  it('passes cached History inputs and versions into Studio immediately', async () => {
+    const seed: CadRestoreSeed = {
+      ring: { set_id: 'set-1', versions: [] },
+      referenceImageUrls: ['/reference.jpg'],
+      prompt: 'engraved gold ring',
+    };
+    render(
+      '/text-to-cad?workflow_id=wf-1&glb=/ring.glb',
+      { restore, onFailure },
+      { cadRestoreSeed: seed },
+    );
+    await flush();
+
+    expect(restore).toHaveBeenCalledWith('wf-1', '/ring.glb', seed);
   });
 
   it('reports failure when the result cannot be loaded', async () => {

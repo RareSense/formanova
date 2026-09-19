@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WorkflowSummary } from '@/lib/generation-history-api';
 
 vi.mock('./ScissorGLBGrid', () => ({
-  GLBPreviewSlot: () => <div data-testid="glb-preview" />,
+  GLBPreviewSlot: ({ glbUrl }: { glbUrl: string }) => <div data-testid="glb-preview" data-url={glbUrl} />,
 }));
 vi.mock('./SnapshotPreviewModal', () => ({ SnapshotPreviewModal: () => null }));
 vi.mock('./PhotoCard', () => ({ PhotoCard: () => null }));
@@ -51,7 +51,12 @@ const cadWorkflow: WorkflowSummary = {
 
 function LocationProbe() {
   const location = useLocation();
-  return <div data-testid="location">{location.pathname + location.search}</div>;
+  return (
+    <>
+      <div data-testid="location">{location.pathname + location.search}</div>
+      <div data-testid="location-state">{JSON.stringify(location.state)}</div>
+    </>
+  );
 }
 
 function openInStudio(workflow: WorkflowSummary) {
@@ -80,6 +85,40 @@ describe('CAD generation history card', () => {
 
     expect(location.startsWith('/text-to-cad?')).toBe(true);
     expect(location).toContain('workflow_id=workflow-1');
+  });
+
+  it('previews a selected ring version without opening the Studio', () => {
+    render(
+      <MemoryRouter>
+        <WorkflowCard
+          workflow={{
+            ...cadWorkflow,
+            ring_versions: [
+              { assetId: 'asset-v1', position: 0, workflowId: 'workflow-v1', thumbnailUrl: null, glbUrl: '/v1.glb' },
+              { assetId: 'asset-v2', position: 1, workflowId: 'workflow-v2', thumbnailUrl: null, glbUrl: '/v2.glb' },
+            ],
+            cad_restore_seed: {
+              ring: { set_id: 'set-1', versions: [] },
+              referenceImageUrls: ['/reference.jpg'],
+              prompt: 'gold ring',
+            },
+          } as WorkflowSummary}
+          index={1}
+          onClick={() => {}}
+        />
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getAllByTestId('glb-preview')[0].getAttribute('data-url')).toBe('/v2.glb');
+    fireEvent.click(screen.getByRole('button', { name: 'Preview version 1' }));
+
+    expect(screen.getAllByTestId('glb-preview')[0].getAttribute('data-url')).toBe('/v1.glb');
+    expect(screen.getByTestId('location').textContent).toBe('/');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open in Studio' }));
+    expect(screen.getByTestId('location-state').textContent).toContain('asset-v1');
+    expect(screen.getByTestId('location-state').textContent).toContain('/reference.jpg');
   });
 
   it('does not expose internal mode or provider values', () => {

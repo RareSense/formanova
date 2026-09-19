@@ -9,9 +9,14 @@ import { useCadAutoRotate, AUTO_ROTATE_SPEED } from './useCadAutoRotate';
 /** Minimal stand-in for the OrbitControls instance CADCanvas publishes. */
 function mountCanvasWithControls() {
   const listeners: Record<string, Array<() => void>> = {};
+  let azimuth = 0;
   const controls = {
+    enabled: true,
+    enableDamping: true,
     autoRotate: false,
     autoRotateSpeed: 0,
+    getAzimuthalAngle: vi.fn(() => azimuth),
+    setAzimuthalAngle: vi.fn((value: number) => { azimuth = value; }),
     addEventListener: (type: string, fn: () => void) => {
       (listeners[type] ??= []).push(fn);
     },
@@ -22,8 +27,20 @@ function mountCanvasWithControls() {
   const canvas = document.createElement('canvas');
   // Same channel CADCanvas itself uses to reach the live controls.
   (canvas as unknown as { __orbitControls: unknown }).__orbitControls = controls;
-  document.body.appendChild(canvas);
+  const viewport = document.createElement('div');
+  viewport.dataset.cadViewport = '';
+  viewport.appendChild(canvas);
+  document.body.appendChild(viewport);
   return { controls, canvas, fire: (type: string) => (listeners[type] ?? []).forEach(l => l()), listeners };
+}
+
+function mountCanvasWithoutControls() {
+  const canvas = document.createElement('canvas');
+  const viewport = document.createElement('div');
+  viewport.dataset.cadViewport = '';
+  viewport.appendChild(canvas);
+  document.body.appendChild(viewport);
+  return canvas;
 }
 
 beforeEach(() => {
@@ -53,6 +70,35 @@ describe('useCadAutoRotate', () => {
     expect(result.current.isAutoRotating).toBe(true);
     expect(controls.autoRotate).toBe(true);
     expect(controls.autoRotateSpeed).toBe(AUTO_ROTATE_SPEED);
+    expect(controls.enabled).toBe(false);
+  });
+
+  it('waits for controls that attach just after the canvas mounts', () => {
+    const canvas = mountCanvasWithoutControls();
+    const { result } = renderHook(() => useCadAutoRotate());
+
+    act(() => { result.current.toggleAutoRotate(); });
+    expect(result.current.isAutoRotating).toBe(true);
+
+    const controls = mountCanvasWithControls().controls;
+    (canvas as unknown as { __orbitControls: unknown }).__orbitControls = controls;
+    act(() => { vi.advanceTimersByTime(20); });
+
+    expect(controls.autoRotate).toBe(true);
+  });
+
+  it('ignores the version-thumbnail canvas that appears before the workspace', () => {
+    const thumbnail = document.createElement('canvas');
+    const thumbnailControls = { autoRotate: false, autoRotateSpeed: 0 };
+    (thumbnail as unknown as { __orbitControls: unknown }).__orbitControls = thumbnailControls;
+    document.body.appendChild(thumbnail);
+    const { controls } = mountCanvasWithControls();
+    const { result } = renderHook(() => useCadAutoRotate());
+
+    act(() => { result.current.toggleAutoRotate(); });
+
+    expect(controls.autoRotate).toBe(true);
+    expect(thumbnailControls.autoRotate).toBe(false);
   });
 
   it('stops when toggled a second time', () => {
@@ -69,7 +115,7 @@ describe('useCadAutoRotate', () => {
   it('pumps frames while running, because the canvas is frameloop=demand', () => {
     // Without this the native autoRotate advances nothing: R3F only renders on
     // demand, and OrbitControls only rotates inside a rendered frame.
-    mountCanvasWithControls();
+    const { controls } = mountCanvasWithControls();
     const { result } = renderHook(() => useCadAutoRotate());
 
     act(() => { result.current.toggleAutoRotate(); });
@@ -77,6 +123,8 @@ describe('useCadAutoRotate', () => {
     act(() => { vi.advanceTimersByTime(100); });
 
     expect(mockInvalidate.mock.calls.length).toBeGreaterThan(before);
+    expect(controls.setAzimuthalAngle).toHaveBeenCalled();
+    expect(controls.getAzimuthalAngle()).toBeLessThan(0);
   });
 
   it('stops pumping frames once switched off', () => {
@@ -101,6 +149,19 @@ describe('useCadAutoRotate', () => {
 
     expect(result.current.isAutoRotating).toBe(false);
     expect(controls.autoRotate).toBe(false);
+    expect(controls.enabled).toBe(true);
+  });
+
+  it('lets the first pointer gesture take over from auto-rotate', () => {
+    const { controls, canvas } = mountCanvasWithControls();
+    const { result } = renderHook(() => useCadAutoRotate());
+
+    act(() => { result.current.toggleAutoRotate(); });
+    act(() => { canvas.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })); });
+
+    expect(result.current.isAutoRotating).toBe(false);
+    expect(controls.autoRotate).toBe(false);
+    expect(controls.enabled).toBe(true);
   });
 
   it('can be stopped explicitly, which is what Reset View needs', () => {

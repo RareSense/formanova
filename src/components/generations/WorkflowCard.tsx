@@ -18,7 +18,9 @@ import {
   truncateDisplayName,
 } from './workflow-card-shared';
 import { PhotoCard } from './PhotoCard';
-import { withTimeout } from '@/lib/generation-history-utils';
+import { withTimeout, type RingVersionRef } from '@/lib/generation-history-utils';
+import { cn } from '@/lib/utils';
+import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
 import { buildCadRestorePath } from '@/contexts/GenerationsContext';
 import { cadSourceFromSourceType, cadRouteFromSource } from '@/lib/cad-analytics';
 import {
@@ -27,6 +29,7 @@ import {
   type CadArtifactKind,
 } from '@/lib/cad-artifact-download';
 import { CadDownloadMenu } from '@/components/downloads/CadDownloadMenu';
+import type { CadRestoreSeed } from '@/lib/cad-versions-api';
 
 const CAD_RENAMES_KEY = 'formanova_cad_renames';
 
@@ -54,6 +57,25 @@ interface WorkflowCardProps {
   onUpscaled?: () => void;
 }
 
+/** A version's preview, fetched with the caller's token like every other
+ *  artifact image; the link is auth-gated, so a plain <img> renders broken. */
+function RingVersionThumb({ version }: { version: RingVersionRef }) {
+  const src = useAuthenticatedImage(version.thumbnailUrl);
+  if (version.glbUrl) {
+    return (
+      <GLBPreviewSlot
+        id={`ring-version-${version.assetId}`}
+        glbUrl={version.glbUrl}
+        className="h-full w-full"
+        forceJewelryPalette
+      />
+    );
+  }
+  return src
+    ? <img src={src} alt="" loading="lazy" className="h-full w-full object-contain p-0.5" />
+    : <span className="font-mono text-[9px] text-muted-foreground">{`V${version.position + 1}`}</span>;
+}
+
 // ─── Text-to-CAD card ──────────────────────────────────────────────────────
 
 function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: number }) {
@@ -67,6 +89,25 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
   const [isDownloading, setIsDownloading] = useState<CadArtifactKind | null>(null);
   const renameButtonRef = useRef<HTMLButtonElement>(null);
   const wasRenamingRef = useRef(false);
+  const groupedWorkflow = workflow as WorkflowSummary & {
+    ring_versions?: RingVersionRef[];
+    cad_restore_seed?: CadRestoreSeed;
+  };
+  const ringVersions = groupedWorkflow.ring_versions ?? [];
+  const newestVersion = ringVersions.reduce<RingVersionRef | null>(
+    (latest, version) => (!latest || version.position > latest.position ? version : latest),
+    null,
+  );
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(newestVersion?.assetId ?? null);
+  const selectedVersion = ringVersions.find((version) => version.assetId === selectedVersionId) ?? newestVersion;
+  const selectedWorkflowId = selectedVersion?.workflowId ?? workflow.workflow_id;
+  const previewGlbUrl = selectedVersion?.glbUrl ?? workflow.glb_url;
+
+  useEffect(() => {
+    if (newestVersion && !ringVersions.some((version) => version.assetId === selectedVersionId)) {
+      setSelectedVersionId(newestVersion.assetId);
+    }
+  }, [newestVersion?.assetId, ringVersions, selectedVersionId]);
 
   useEffect(() => {
     if (workflow.output_asset_name && !getStoredRename(loadStoredRenames(), workflow.workflow_id)) {
@@ -135,14 +176,17 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
     try {
       // Refresh the typed result at click time. History cache data may be old,
       // but GLB and 3DM must never be selected positionally or by extension.
-      const fresh = await withTimeout(fetchCadResult(workflow.workflow_id), 5000);
-      const url = selectCadArtifactUrl(kind, fresh, workflow);
+      const fresh = await withTimeout(fetchCadResult(selectedWorkflowId), 5000);
+      const selectedFallback = selectedVersion && selectedWorkflowId !== workflow.workflow_id
+        ? { ...workflow, glb_url: selectedVersion.glbUrl, threedm_url: null }
+        : workflow;
+      const url = selectCadArtifactUrl(kind, fresh, selectedFallback);
       if (!url) throw new Error(`${kind.toUpperCase()} is not available for this design.`);
 
       try {
         await downloadCadArtifact(url, filename, kind);
       } catch (freshError) {
-        const cachedUrl = selectCadArtifactUrl(kind, null, workflow);
+        const cachedUrl = selectCadArtifactUrl(kind, null, selectedFallback);
         if (!cachedUrl || cachedUrl === url) throw freshError;
         await downloadCadArtifact(cachedUrl, filename, kind);
       }
@@ -165,7 +209,7 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
 
   const handleLoadInStudio = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!workflow.glb_url) return;
+    if (!previewGlbUrl) return;
     // One card serves both CAD types, so the workspace has to be chosen by
     // source rather than assumed. Both routes restore from the id alone.
     // Built by the shared helper rather than by hand so this link carries the
@@ -176,7 +220,20 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
     // allowed to be undefined -- a wrong route breaks the user, a guessed
     // source only breaks the data.
     const source = cadSourceFromSourceType(workflow.source_type);
-    navigate(buildCadRestorePath(workflow.workflow_id, workflow.glb_url, cadRouteFromSource(source ?? 'text-to-cad'), 'history'));
+    const seed = groupedWorkflow.cad_restore_seed
+      ? { ...groupedWorkflow.cad_restore_seed, selectedVersionId: selectedVersion?.assetId ?? null }
+      : undefined;
+    navigate(
+      buildCadRestorePath(selectedWorkflowId, previewGlbUrl, cadRouteFromSource(source ?? 'text-to-cad'), 'history'),
+      { state: seed ? { cadRestoreSeed: seed } : undefined },
+    );
+  };
+
+  /** Changes the card preview only. Studio navigation stays on its own button. */
+  const selectVersion = (e: React.MouseEvent, version: RingVersionRef) => {
+    e.stopPropagation();
+    if (!version.glbUrl) return;
+    setSelectedVersionId(version.assetId);
   };
 
   return (
@@ -218,16 +275,17 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
         </div>
 
         {/* ── Interactive 3D GLB Preview ── */}
-        {workflow.glb_url && (
+        {previewGlbUrl && (
           <div className="mx-3 mb-2 relative">
             <GLBPreviewSlot
-              id={workflow.workflow_id}
-              glbUrl={workflow.glb_url}
-              className="w-full aspect-[4/3] min-h-[300px] sm:min-h-[360px] bg-background/50 border border-border/30"
+              id={`${workflow.workflow_id}-${selectedVersionId ?? 'latest'}`}
+              glbUrl={previewGlbUrl}
+              className="w-full aspect-[4/3] min-h-[300px] sm:min-h-[360px] bg-muted/20 border border-border/30"
+              forceJewelryPalette
             />
           </div>
         )}
-        {!workflow.glb_url && isEnriching && (
+        {!previewGlbUrl && isEnriching && (
           <div
             className="mx-4 mb-3 flex w-[calc(100%-2rem)] aspect-[4/3] items-center justify-center border border-border/30 bg-muted"
             role="status"
@@ -239,7 +297,7 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
 
 
         {/* ── File box — only shown when GLB is available or still loading ── */}
-        {(workflow.glb_url || isEnriching) && (
+        {(previewGlbUrl || isEnriching) && (
           <div className="mx-3 mb-4 flex flex-col gap-3 rounded-sm border border-border/50 bg-muted/20 px-3 py-3 sm:mx-4">
             {/* Shared design name: both artifact extensions are derived below. */}
             <div className="flex min-w-0 flex-1 items-start gap-1.5">
@@ -300,7 +358,7 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
               </div>
             </div>
 
-            {workflow.glb_url ? (
+            {previewGlbUrl ? (
               <div className="flex w-full flex-col gap-2">
                 {/* Both actions are siblings of the same container so their
                     w-full resolves to one width. Nesting the download inside
@@ -309,7 +367,7 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
                   variant="card"
                   isBusy={isDownloading !== null}
                   onDownloadThreedm={supportsThreedm ? () => downloadArtifact('3dm') : undefined}
-                  onDownloadGlb={workflow.glb_url ? () => downloadArtifact('glb') : undefined}
+                  onDownloadGlb={previewGlbUrl ? () => downloadArtifact('glb') : undefined}
                 />
                 <Button
                   size="sm"
@@ -326,6 +384,36 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
                 Loading…
               </span>
             )}
+          </div>
+        )}
+
+        {ringVersions.length > 1 && (
+          // Selecting a version swaps the large preview in this card. Opening
+          // the Studio remains an explicit action on the button above.
+          <div className="flex flex-wrap items-center gap-2 px-4 pb-4">
+            <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">Versions</span>
+            {ringVersions.map((version) => {
+              const isSelected = version.assetId === selectedVersion?.assetId;
+              return (
+                <button
+                  key={version.assetId}
+                  type="button"
+                  onClick={(e) => selectVersion(e, version)}
+                  disabled={!version.glbUrl}
+                  aria-label={`Preview version ${version.position + 1}`}
+                  aria-current={isSelected}
+                  className={cn(
+                    'relative h-20 w-20 overflow-hidden border bg-muted/10 transition-colors disabled:opacity-50',
+                    isSelected ? 'border-foreground' : 'border-border hover:border-foreground/50',
+                  )}
+                >
+                  <RingVersionThumb version={version} />
+                  <span className="absolute bottom-0 right-0 bg-background/85 px-1 font-mono text-[8px] leading-tight">
+                    {`V${version.position + 1}`}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
       </motion.div>
