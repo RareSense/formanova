@@ -67,13 +67,6 @@ function VersionCardModel({ version }: { version: VersionCard }) {
   }
   return (
     <div className="relative h-full w-full">
-      {thumbnail && (
-        <img
-          src={thumbnail}
-          alt=""
-          className="absolute inset-0 h-full w-full object-contain p-1"
-        />
-      )}
       <GLBPreviewSlot
         id={version.asset_id}
         glbUrl={version.glb_url}
@@ -115,7 +108,7 @@ export function VersionsPanel({ versions, selectedAssetId, onSelect }: VersionsP
               aria-current={isSelected}
               title={version.label?.text ?? undefined}
               className={cn(
-                'group relative overflow-hidden border bg-card text-left transition-colors',
+                'group relative overflow-hidden border text-left transition-colors',
                 isSelected ? 'border-foreground' : 'border-border hover:border-foreground/50',
               )}
             >
@@ -128,10 +121,10 @@ export function VersionsPanel({ versions, selectedAssetId, onSelect }: VersionsP
                   shank off and two versions of the same ring then look like
                   different rings. The padding keeps the silhouette off the
                   border so the card does not read as cramped. */}
-              <div className="pointer-events-none relative flex aspect-square items-center justify-center bg-muted/10">
+              <div className="pointer-events-none relative flex aspect-square items-center justify-center">
                 <VersionCardModel version={version} />
               </div>
-              <div className="flex items-baseline justify-between border-t border-border px-1.5 py-1">
+              <div className="flex items-baseline justify-between border-t border-border bg-card px-1.5 py-1">
                 <span className="font-mono text-[10px] font-bold tracking-wider">{`V${version.position + 1}`}</span>
                 <span className="font-mono text-[9px] text-muted-foreground tabular-nums">{savedAt(version.created_at)}</span>
               </div>
