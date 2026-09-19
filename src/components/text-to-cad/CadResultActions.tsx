@@ -42,7 +42,7 @@ export interface CadResultActionsProps {
 // the download beside it goes quiet. Both keep the same size, which is what
 // stops the bar shifting on the day versions start arriving.
 const IMPROVE_BASE =
-  'flex items-center gap-2 border border-primary bg-primary text-primary-foreground ' +
+  'flex items-center gap-2 border border-zinc-700 bg-zinc-950 text-white ' +
   'font-bold shadow-lg transition-opacity hover:opacity-90 active:scale-[0.98] ' +
   'disabled:pointer-events-none disabled:opacity-60';
 

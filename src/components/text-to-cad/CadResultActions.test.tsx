@@ -53,7 +53,7 @@ describe('CadResultActions', () => {
     }
   });
 
-  it('gives Download and Improve the same theme-aware color treatment', () => {
+  it('keeps Download light and Improve dark independently of theme', () => {
     render(
       <CadResultActions
         onDownloadThreedm={vi.fn()}
@@ -63,10 +63,10 @@ describe('CadResultActions', () => {
     );
     const improve = screen.getByRole('button', { name: /improve from v2/i });
     const download = screen.getByRole('button', { name: /download 3dm/i });
-    expect(improve.className).toContain('bg-primary');
-    expect(download.className).toContain('bg-primary');
-    expect(improve.className).toContain('text-primary-foreground');
-    expect(download.className).toContain('text-primary-foreground');
+    expect(improve.className).toContain('bg-zinc-950');
+    expect(download.className).toContain('bg-white');
+    expect(improve.className).toContain('text-white');
+    expect(download.className).toContain('text-zinc-950');
   });
 
   it('renders nothing when the run produced no downloadable artifact', () => {
