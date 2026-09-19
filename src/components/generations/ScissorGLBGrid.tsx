@@ -89,9 +89,11 @@ export function useScissorGrid() {
 
 interface ScissorGLBGridProps {
   children: React.ReactNode;
+  /** Static grids render only when their contents or layout change. */
+  continuous?: boolean;
 }
 
-export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
+export function ScissorGLBGrid({ children, continuous = true }: ScissorGLBGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -104,6 +106,7 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
   const backdropRef = useRef<THREE.Texture | null>(null);
   const gltfLoaderRef = useRef(new GLTFLoader());
   const pendingRegistrationsRef = useRef(new PendingCardRegistrationQueue<HTMLDivElement>());
+  const requestRenderRef = useRef<() => void>(() => undefined);
   const [rendererReady, setRendererReady] = useState(false);
 
   /** Notify all listeners for a given card id */
@@ -153,6 +156,7 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
       for (const card of cardsRef.current.values()) {
         card.scene.environment = texture;
       }
+      requestRenderRef.current();
     });
 
 
@@ -171,10 +175,11 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
     if (!renderer) return;
 
     let running = true;
+    let scheduled = false;
 
     function render() {
       if (!running || !renderer) return;
-      rafRef.current = requestAnimationFrame(render);
+      scheduled = false;
 
       const container = containerRef.current;
       if (!container) return;
@@ -227,12 +232,32 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
       }
 
       renderer.setScissorTest(false);
+      if (continuous) requestRender();
     }
 
-    render();
+    function requestRender() {
+      if (!running || scheduled) return;
+      scheduled = true;
+      rafRef.current = requestAnimationFrame(render);
+    }
 
-    return () => { running = false; };
-  }, []);
+    requestRenderRef.current = requestRender;
+    requestRender();
+
+    const resizeObserver = new ResizeObserver(requestRender);
+    if (containerRef.current) resizeObserver.observe(containerRef.current);
+    window.addEventListener('resize', requestRender);
+    window.addEventListener('scroll', requestRender, true);
+
+    return () => {
+      running = false;
+      cancelAnimationFrame(rafRef.current);
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', requestRender);
+      window.removeEventListener('scroll', requestRender, true);
+      requestRenderRef.current = () => undefined;
+    };
+  }, [continuous, rendererReady]);
 
   // Load a GLB for a card
   const loadGlb = useCallback((card: CardEntry) => {
@@ -312,6 +337,7 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
     card.loaded = true;
     card.loading = false;
     notifyListeners(card.id);
+    requestRenderRef.current();
   }, [notifyListeners]);
 
   const registerCard = useCallback((id: string, glbUrl: string, div: HTMLDivElement, forceJewelryPalette = false) => {
@@ -356,7 +382,7 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
     controls.enableZoom = true;
     controls.minDistance = 2;
     controls.maxDistance = 15;
-    controls.autoRotate = true;
+    controls.autoRotate = continuous;
     controls.autoRotateSpeed = 1.5;
 
     const entry: CardEntry = {
@@ -374,7 +400,7 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
 
     cardsRef.current.set(id, entry);
     loadGlb(entry);
-  }, [loadGlb]);
+  }, [continuous, loadGlb]);
 
   useEffect(() => {
     if (!rendererReady || !rendererRef.current) return;
@@ -390,6 +416,7 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
       card.controls.dispose();
       disposeScene(card.scene);
       cardsRef.current.delete(id);
+      requestRenderRef.current();
     }
     listenersRef.current.delete(id);
   }, []);

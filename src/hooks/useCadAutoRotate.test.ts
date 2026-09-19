@@ -29,6 +29,15 @@ function mountCanvasWithControls() {
   return { controls, canvas, fire: (type: string) => (listeners[type] ?? []).forEach(l => l()), listeners };
 }
 
+function mountCanvasWithoutControls() {
+  const canvas = document.createElement('canvas');
+  const viewport = document.createElement('div');
+  viewport.dataset.cadViewport = '';
+  viewport.appendChild(canvas);
+  document.body.appendChild(viewport);
+  return canvas;
+}
+
 beforeEach(() => {
   vi.useFakeTimers();
   mockInvalidate.mockClear();
@@ -56,6 +65,20 @@ describe('useCadAutoRotate', () => {
     expect(result.current.isAutoRotating).toBe(true);
     expect(controls.autoRotate).toBe(true);
     expect(controls.autoRotateSpeed).toBe(AUTO_ROTATE_SPEED);
+  });
+
+  it('waits for controls that attach just after the canvas mounts', () => {
+    const canvas = mountCanvasWithoutControls();
+    const { result } = renderHook(() => useCadAutoRotate());
+
+    act(() => { result.current.toggleAutoRotate(); });
+    expect(result.current.isAutoRotating).toBe(true);
+
+    const controls = mountCanvasWithControls().controls;
+    (canvas as unknown as { __orbitControls: unknown }).__orbitControls = controls;
+    act(() => { vi.advanceTimersByTime(20); });
+
+    expect(controls.autoRotate).toBe(true);
   });
 
   it('ignores the version-thumbnail canvas that appears before the workspace', () => {

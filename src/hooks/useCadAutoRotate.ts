@@ -52,6 +52,10 @@ function getOrbitControls(): AutoRotatableControls | null {
   return (canvas as unknown as { __orbitControls?: AutoRotatableControls })?.__orbitControls ?? null;
 }
 
+function getViewportCanvas(): HTMLCanvasElement | null {
+  return document.querySelector<HTMLCanvasElement>('[data-cad-viewport] canvas');
+}
+
 export interface UseCadAutoRotateReturn {
   isAutoRotating: boolean;
   toggleAutoRotate: () => void;
@@ -66,38 +70,55 @@ export function useCadAutoRotate(): UseCadAutoRotateReturn {
   const stopAutoRotate = useCallback(() => setIsAutoRotating(false), []);
 
   useEffect(() => {
-    const controls = getOrbitControls();
-    if (!controls) {
+    const canvas = getViewportCanvas();
+    if (!canvas) {
       // Nothing to drive. Fall back to idle rather than leaving the button
       // showing an active state for rotation that cannot happen.
       if (isAutoRotating) setIsAutoRotating(false);
       return;
     }
 
-    controls.autoRotate = isAutoRotating;
-    controls.autoRotateSpeed = AUTO_ROTATE_SPEED;
-
-    if (!isAutoRotating) return;
+    let controls: AutoRotatableControls | null = null;
+    let frame = 0;
+    let attempts = 0;
+    let active = true;
 
     // OrbitControls fires 'start' on pointer down, never for auto-rotation
     // itself, so it is a clean signal that the user has taken over. Yielding
     // immediately stops the camera fighting the drag.
     const yieldToUser = () => setIsAutoRotating(false);
-    controls.addEventListener('start', yieldToUser);
 
-    // Local, not a ref: the handle is created and cancelled inside this one
-    // effect run and never needs to outlive it.
-    let frame = requestAnimationFrame(function tick() {
-      invalidate();
+    function attachAndTick() {
+      if (!active) return;
+      controls = getOrbitControls();
+      if (!controls) {
+        // CADCanvas publishes its controls after the canvas mounts. Give that
+        // effect up to two seconds instead of turning the user's click off.
+        if (++attempts < 120) frame = requestAnimationFrame(attachAndTick);
+        else setIsAutoRotating(false);
+        return;
+      }
+      controls.autoRotate = isAutoRotating;
+      controls.autoRotateSpeed = AUTO_ROTATE_SPEED;
+      if (!isAutoRotating) return;
+      controls.addEventListener('start', yieldToUser);
+      const tick = () => {
+        if (!active) return;
+        invalidate();
+        frame = requestAnimationFrame(tick);
+      };
       frame = requestAnimationFrame(tick);
-    });
+    }
+
+    attachAndTick();
 
     return () => {
+      active = false;
       cancelAnimationFrame(frame);
-      controls.removeEventListener('start', yieldToUser);
+      controls?.removeEventListener('start', yieldToUser);
       // Always clear it, including on unmount: a viewport left with
       // autoRotate set would resume the moment anything else invalidated.
-      controls.autoRotate = false;
+      if (controls) controls.autoRotate = false;
     };
   }, [isAutoRotating]);
 

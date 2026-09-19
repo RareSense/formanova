@@ -4,7 +4,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { VersionsPanel } from './VersionsPanel';
 
 vi.mock('@/components/generations/ScissorGLBGrid', () => ({
-  ScissorGLBGrid: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  ScissorGLBGrid: ({ children, continuous }: { children: React.ReactNode; continuous?: boolean }) => (
+    <div data-testid="scissor-grid" data-continuous={String(continuous)}>{children}</div>
+  ),
   GLBPreviewSlot: ({ glbUrl }: { glbUrl: string }) => <div data-testid="version-glb" data-url={glbUrl} />,
 }));
 vi.mock('@/hooks/useAuthenticatedImage', () => ({
@@ -24,6 +26,7 @@ describe('VersionsPanel', () => {
 
     expect(container.querySelector('.grid')?.className).toContain('grid-cols-4');
     expect(screen.getAllByTestId('version-glb')).toHaveLength(2);
+    expect(screen.getByTestId('scissor-grid').getAttribute('data-continuous')).toBe('false');
   });
 
   it('shows the saved thumbnail when an older version has no GLB link', () => {

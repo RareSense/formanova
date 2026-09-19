@@ -95,7 +95,7 @@ export function VersionsPanel({ versions, selectedAssetId, onSelect }: VersionsP
 
       {/* Four to a row, matching the reference thumbnails above, so the two
           strips line up instead of each choosing its own width. */}
-      <ScissorGLBGrid>
+      <ScissorGLBGrid continuous={false}>
       <div className="grid grid-cols-4 gap-2">
         {versions.map((version) => {
           const isSelected = version.asset_id === selectedAssetId;
