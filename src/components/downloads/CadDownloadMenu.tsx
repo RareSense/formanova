@@ -57,9 +57,9 @@ const TRIGGER_BASE =
   'active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60';
 
 /**
- * Filled everywhere the download is the only action on offer. In the result
- * bar it stands beside Improve, which is the one the eye should land on, so
- * there it is the quiet one: same size, lighter weight.
+ * Filled everywhere, including the result bar. Download and Improve are
+ * sibling actions there and must not invert to black/white opposites when the
+ * theme changes.
  */
 const TRIGGER_TONES = {
   filled: 'border-primary bg-primary text-primary-foreground transition-opacity hover:opacity-90',
@@ -125,7 +125,10 @@ export function CadDownloadMenu({
   if (!primaryAction) return null;
 
   const primaryLabel = onDownloadThreedm ? 'Download 3DM' : 'Download GLB';
-  const tone = variant === 'result' ? 'quiet' : 'filled';
+  // In the workspace result bar, Download and Improve are peers. Giving one a
+  // card tone and the other a primary tone inverted them in dark mode (black
+  // beside white), so both now use the same theme-aware primary treatment.
+  const tone = 'filled';
 
   // Everything not already the default action. A menu holding a single entry
   // is a dead affordance, so the chevron only appears when it has contents.

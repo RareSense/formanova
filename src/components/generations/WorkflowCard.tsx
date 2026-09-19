@@ -403,7 +403,7 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
                   aria-label={`Preview version ${version.position + 1}`}
                   aria-current={isSelected}
                   className={cn(
-                    'relative h-16 w-16 overflow-hidden border bg-muted/10 transition-colors disabled:opacity-50',
+                    'relative h-20 w-20 overflow-hidden border bg-muted/10 transition-colors disabled:opacity-50',
                     isSelected ? 'border-foreground' : 'border-border hover:border-foreground/50',
                   )}
                 >

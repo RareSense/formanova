@@ -12,6 +12,7 @@
  */
 
 import { ScissorGLBGrid, GLBPreviewSlot } from '@/components/generations/ScissorGLBGrid';
+import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
 import { cn } from '@/lib/utils';
 
 export interface VersionCard {
@@ -52,21 +53,34 @@ function savedAt(value?: string | null): string {
  * rather than as a second thing to drag around.
  */
 function VersionCardModel({ version }: { version: VersionCard }) {
+  const thumbnail = useAuthenticatedImage(version.thumbnail_url);
   if (!version.glb_url) {
-    // Nothing to render yet: the version is still real and still openable.
-    return (
+    // The saved still appears immediately when a version predates GLB links.
+    // Only fall back to a label when neither representation exists.
+    return thumbnail ? (
+      <img src={thumbnail} alt="" className="h-full w-full object-contain p-1" />
+    ) : (
       <span className="font-mono text-[11px] font-bold tracking-wider text-muted-foreground">
         {`V${version.position + 1}`}
       </span>
     );
   }
   return (
-    <GLBPreviewSlot
-      id={version.asset_id}
-      glbUrl={version.glb_url}
-      className="h-full w-full"
-      forceJewelryPalette
-    />
+    <div className="relative h-full w-full">
+      {thumbnail && (
+        <img
+          src={thumbnail}
+          alt=""
+          className="absolute inset-0 h-full w-full object-contain p-1"
+        />
+      )}
+      <GLBPreviewSlot
+        id={version.asset_id}
+        glbUrl={version.glb_url}
+        className="absolute inset-0 h-full w-full"
+        forceJewelryPalette
+      />
+    </div>
   );
 }
 
@@ -86,10 +100,10 @@ export function VersionsPanel({ versions, selectedAssetId, onSelect }: VersionsP
         </span>
       </div>
 
-      {/* Three to a row, matching the reference thumbnails above, so the two
+      {/* Four to a row, matching the reference thumbnails above, so the two
           strips line up instead of each choosing its own width. */}
       <ScissorGLBGrid>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-4 gap-2">
         {versions.map((version) => {
           const isSelected = version.asset_id === selectedAssetId;
           const isNewest = version.asset_id === newest.asset_id;

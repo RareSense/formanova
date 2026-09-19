@@ -292,7 +292,10 @@ export function useImageToCADWorkflow({
     try {
       const started = await startImproveFromVersion(activeVersion.asset_id);
       hasNavigatedAway.current = false;
-      awaitingGeneratedToastRef.current = true;
+      // The current ring stays mounted while Improve runs. Marking a success
+      // toast as owed here makes that already-loaded model announce itself as
+      // newly generated before the improve workflow has produced anything.
+      awaitingGeneratedToastRef.current = false;
       onWorkspaceActivate();
       setIsGenerating(true);
       setGenerationFailed(false);

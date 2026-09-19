@@ -53,6 +53,22 @@ describe('CadResultActions', () => {
     }
   });
 
+  it('gives Download and Improve the same theme-aware color treatment', () => {
+    render(
+      <CadResultActions
+        onDownloadThreedm={vi.fn()}
+        latestVersionLabel="V2"
+        onImproveFromVersion={vi.fn()}
+      />,
+    );
+    const improve = screen.getByRole('button', { name: /improve from v2/i });
+    const download = screen.getByRole('button', { name: /download 3dm/i });
+    expect(improve.className).toContain('bg-primary');
+    expect(download.className).toContain('bg-primary');
+    expect(improve.className).toContain('text-primary-foreground');
+    expect(download.className).toContain('text-primary-foreground');
+  });
+
   it('renders nothing when the run produced no downloadable artifact', () => {
     const { container } = render(<CadResultActions />);
     expect(container.querySelector('button')).toBeNull();
