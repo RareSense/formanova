@@ -29,13 +29,15 @@ describe('VersionsPanel', () => {
     expect(screen.getByTestId('scissor-grid').getAttribute('data-continuous')).toBe('false');
   });
 
-  it('shows the saved thumbnail when an older version has no GLB link', () => {
+  it('prefers saved thumbnails and avoids creating a WebGL renderer', () => {
     render(
       <VersionsPanel
-        versions={[{ asset_id: 'a1', position: 0, thumbnail_url: '/v1.png' }]}
+        versions={[{ asset_id: 'a1', position: 0, thumbnail_url: '/v1.png', glb_url: '/v1.glb' }]}
       />,
     );
 
     expect(document.querySelector('img')?.getAttribute('src')).toBe('/v1.png');
+    expect(screen.queryByTestId('version-glb')).toBeNull();
+    expect(screen.queryByTestId('scissor-grid')).toBeNull();
   });
 });

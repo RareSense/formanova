@@ -38,8 +38,10 @@ import { invalidate } from '@react-three/fiber';
 export const AUTO_ROTATE_SPEED = 2.0;
 
 interface AutoRotatableControls {
+  enabled: boolean;
   autoRotate: boolean;
   autoRotateSpeed: number;
+  update: () => void;
   addEventListener: (type: string, fn: () => void) => void;
   removeEventListener: (type: string, fn: () => void) => void;
 }
@@ -86,7 +88,17 @@ export function useCadAutoRotate(): UseCadAutoRotateReturn {
     // OrbitControls fires 'start' on pointer down, never for auto-rotation
     // itself, so it is a clean signal that the user has taken over. Yielding
     // immediately stops the camera fighting the drag.
-    const yieldToUser = () => setIsAutoRotating(false);
+    const yieldToUser = () => {
+      // Pointer capture runs before OrbitControls' own bubbling handler. Turn
+      // the controls back on synchronously so the same gesture that stops the
+      // presentation orbit also starts the user's drag; no second click is
+      // required.
+      if (controls) {
+        controls.autoRotate = false;
+        controls.enabled = true;
+      }
+      setIsAutoRotating(false);
+    };
 
     function attachAndTick() {
       if (!active) return;
@@ -101,9 +113,19 @@ export function useCadAutoRotate(): UseCadAutoRotateReturn {
       controls.autoRotate = isAutoRotating;
       controls.autoRotateSpeed = AUTO_ROTATE_SPEED;
       if (!isAutoRotating) return;
+
+      // Drei normally advances OrbitControls from useFrame. A demand-rendered
+      // canvas can miss that first update and leave the active button moving
+      // nothing. Drive the live controls here, and temporarily keep Drei from
+      // updating them a second time in the same frame. This also removes the
+      // uneven double-step that reads as fluttering on slower GPUs.
+      controls.enabled = false;
       controls.addEventListener('start', yieldToUser);
+      canvas.addEventListener('pointerdown', yieldToUser, true);
+      canvas.addEventListener('wheel', yieldToUser, true);
       const tick = () => {
         if (!active) return;
+        controls?.update();
         invalidate();
         frame = requestAnimationFrame(tick);
       };
@@ -116,9 +138,14 @@ export function useCadAutoRotate(): UseCadAutoRotateReturn {
       active = false;
       cancelAnimationFrame(frame);
       controls?.removeEventListener('start', yieldToUser);
+      canvas.removeEventListener('pointerdown', yieldToUser, true);
+      canvas.removeEventListener('wheel', yieldToUser, true);
       // Always clear it, including on unmount: a viewport left with
       // autoRotate set would resume the moment anything else invalidated.
-      if (controls) controls.autoRotate = false;
+      if (controls) {
+        controls.autoRotate = false;
+        controls.enabled = true;
+      }
     };
   }, [isAutoRotating]);
 

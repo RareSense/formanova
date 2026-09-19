@@ -54,17 +54,24 @@ function savedAt(value?: string | null): string {
  */
 function VersionCardModel({ version }: { version: VersionCard }) {
   const thumbnail = useAuthenticatedImage(version.thumbnail_url);
-  if (!version.glb_url) {
-    // The saved still appears immediately when a version predates GLB links.
-    // Only fall back to a label when neither representation exists.
-    return thumbnail ? (
-      <img src={thumbnail} alt="" className="h-full w-full object-contain p-1" />
-    ) : (
-      <span className="font-mono text-[11px] font-bold tracking-wider text-muted-foreground">
-        {`V${version.position + 1}`}
-      </span>
-    );
-  }
+  // A version card is deliberately non-interactive, so its saved image is the
+  // right representation and costs almost no GPU memory. Loading every full
+  // GLB here can duplicate a 40 MB model several times beside the main viewer,
+  // starving its OrbitControls and making both auto-rotation and dragging
+  // stutter. Keep the GLB renderer only as a fallback for older versions that
+  // never received a thumbnail.
+  if (version.thumbnail_url) return thumbnail ? (
+    <img src={thumbnail} alt="" className="h-full w-full object-contain p-1" />
+  ) : (
+    <span className="font-mono text-[11px] font-bold tracking-wider text-muted-foreground">
+      {`V${version.position + 1}`}
+    </span>
+  );
+  if (!version.glb_url) return (
+    <span className="font-mono text-[11px] font-bold tracking-wider text-muted-foreground">
+      {`V${version.position + 1}`}
+    </span>
+  );
   return (
     <div className="relative h-full w-full">
       <GLBPreviewSlot
@@ -82,6 +89,43 @@ export function VersionsPanel({ versions, selectedAssetId, onSelect }: VersionsP
 
   const newest = versions.reduce((a, b) => ((b.position ?? 0) >= (a.position ?? 0) ? b : a));
 
+  const cards = (
+    <div className="grid grid-cols-4 gap-2">
+      {versions.map((version) => {
+        const isSelected = version.asset_id === selectedAssetId;
+        const isNewest = version.asset_id === newest.asset_id;
+        return (
+          <button
+            key={version.asset_id}
+            type="button"
+            onClick={() => onSelect?.(version.asset_id)}
+            aria-current={isSelected}
+            title={version.label?.text ?? undefined}
+            className={cn(
+              'group relative overflow-hidden border text-left transition-colors',
+              isSelected ? 'border-foreground' : 'border-border hover:border-foreground/50',
+            )}
+          >
+            {isNewest && (
+              <span className="absolute right-1 top-1 z-10 bg-primary px-1.5 py-0.5 font-mono text-[8px] font-bold uppercase tracking-wider text-primary-foreground">
+                Latest
+              </span>
+            )}
+            <div className="pointer-events-none relative flex aspect-square items-center justify-center">
+              <VersionCardModel version={version} />
+            </div>
+            <div className="flex items-baseline justify-between border-t border-border bg-card px-1.5 py-1">
+              <span className="font-mono text-[10px] font-bold tracking-wider">{`V${version.position + 1}`}</span>
+              <span className="font-mono text-[9px] text-muted-foreground tabular-nums">{savedAt(version.created_at)}</span>
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  const needsGlbFallback = versions.some(version => !version.thumbnail_url && version.glb_url);
+
   return (
     <section>
       {/* Header matches the panel's other sections: small caps label on the
@@ -95,44 +139,7 @@ export function VersionsPanel({ versions, selectedAssetId, onSelect }: VersionsP
 
       {/* Four to a row, matching the reference thumbnails above, so the two
           strips line up instead of each choosing its own width. */}
-      <ScissorGLBGrid continuous={false}>
-      <div className="grid grid-cols-4 gap-2">
-        {versions.map((version) => {
-          const isSelected = version.asset_id === selectedAssetId;
-          const isNewest = version.asset_id === newest.asset_id;
-          return (
-            <button
-              key={version.asset_id}
-              type="button"
-              onClick={() => onSelect?.(version.asset_id)}
-              aria-current={isSelected}
-              title={version.label?.text ?? undefined}
-              className={cn(
-                'group relative overflow-hidden border text-left transition-colors',
-                isSelected ? 'border-foreground' : 'border-border hover:border-foreground/50',
-              )}
-            >
-              {isNewest && (
-                <span className="absolute right-1 top-1 z-10 bg-primary px-1.5 py-0.5 font-mono text-[8px] font-bold uppercase tracking-wider text-primary-foreground">
-                  Latest
-                </span>
-              )}
-              {/* Contain, not cover: a screenshot cropped to a square cuts the
-                  shank off and two versions of the same ring then look like
-                  different rings. The padding keeps the silhouette off the
-                  border so the card does not read as cramped. */}
-              <div className="pointer-events-none relative flex aspect-square items-center justify-center">
-                <VersionCardModel version={version} />
-              </div>
-              <div className="flex items-baseline justify-between border-t border-border bg-card px-1.5 py-1">
-                <span className="font-mono text-[10px] font-bold tracking-wider">{`V${version.position + 1}`}</span>
-                <span className="font-mono text-[9px] text-muted-foreground tabular-nums">{savedAt(version.created_at)}</span>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-      </ScissorGLBGrid>
+      {needsGlbFallback ? <ScissorGLBGrid continuous={false}>{cards}</ScissorGLBGrid> : cards}
     </section>
   );
 }

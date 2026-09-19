@@ -10,8 +10,10 @@ import { useCadAutoRotate, AUTO_ROTATE_SPEED } from './useCadAutoRotate';
 function mountCanvasWithControls() {
   const listeners: Record<string, Array<() => void>> = {};
   const controls = {
+    enabled: true,
     autoRotate: false,
     autoRotateSpeed: 0,
+    update: vi.fn(),
     addEventListener: (type: string, fn: () => void) => {
       (listeners[type] ??= []).push(fn);
     },
@@ -65,6 +67,7 @@ describe('useCadAutoRotate', () => {
     expect(result.current.isAutoRotating).toBe(true);
     expect(controls.autoRotate).toBe(true);
     expect(controls.autoRotateSpeed).toBe(AUTO_ROTATE_SPEED);
+    expect(controls.enabled).toBe(false);
   });
 
   it('waits for controls that attach just after the canvas mounts', () => {
@@ -109,7 +112,7 @@ describe('useCadAutoRotate', () => {
   it('pumps frames while running, because the canvas is frameloop=demand', () => {
     // Without this the native autoRotate advances nothing: R3F only renders on
     // demand, and OrbitControls only rotates inside a rendered frame.
-    mountCanvasWithControls();
+    const { controls } = mountCanvasWithControls();
     const { result } = renderHook(() => useCadAutoRotate());
 
     act(() => { result.current.toggleAutoRotate(); });
@@ -117,6 +120,7 @@ describe('useCadAutoRotate', () => {
     act(() => { vi.advanceTimersByTime(100); });
 
     expect(mockInvalidate.mock.calls.length).toBeGreaterThan(before);
+    expect(controls.update).toHaveBeenCalled();
   });
 
   it('stops pumping frames once switched off', () => {
@@ -141,6 +145,19 @@ describe('useCadAutoRotate', () => {
 
     expect(result.current.isAutoRotating).toBe(false);
     expect(controls.autoRotate).toBe(false);
+    expect(controls.enabled).toBe(true);
+  });
+
+  it('lets the first pointer gesture take over from auto-rotate', () => {
+    const { controls, canvas } = mountCanvasWithControls();
+    const { result } = renderHook(() => useCadAutoRotate());
+
+    act(() => { result.current.toggleAutoRotate(); });
+    act(() => { canvas.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })); });
+
+    expect(result.current.isAutoRotating).toBe(false);
+    expect(controls.autoRotate).toBe(false);
+    expect(controls.enabled).toBe(true);
   });
 
   it('can be stopped explicitly, which is what Reset View needs', () => {
