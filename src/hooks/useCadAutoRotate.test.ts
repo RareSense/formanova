@@ -9,11 +9,14 @@ import { useCadAutoRotate, AUTO_ROTATE_SPEED } from './useCadAutoRotate';
 /** Minimal stand-in for the OrbitControls instance CADCanvas publishes. */
 function mountCanvasWithControls() {
   const listeners: Record<string, Array<() => void>> = {};
+  let azimuth = 0;
   const controls = {
     enabled: true,
+    enableDamping: true,
     autoRotate: false,
     autoRotateSpeed: 0,
-    update: vi.fn(),
+    getAzimuthalAngle: vi.fn(() => azimuth),
+    setAzimuthalAngle: vi.fn((value: number) => { azimuth = value; }),
     addEventListener: (type: string, fn: () => void) => {
       (listeners[type] ??= []).push(fn);
     },
@@ -120,7 +123,8 @@ describe('useCadAutoRotate', () => {
     act(() => { vi.advanceTimersByTime(100); });
 
     expect(mockInvalidate.mock.calls.length).toBeGreaterThan(before);
-    expect(controls.update).toHaveBeenCalled();
+    expect(controls.setAzimuthalAngle).toHaveBeenCalled();
+    expect(controls.getAzimuthalAngle()).toBeLessThan(0);
   });
 
   it('stops pumping frames once switched off', () => {

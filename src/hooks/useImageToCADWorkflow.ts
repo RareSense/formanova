@@ -552,6 +552,22 @@ export function useImageToCADWorkflow({
     setGlbUrl(undefined);
   }, [glbUrl]);
 
+  /**
+   * Stable callback for CADCanvas' onModelReady handler.
+   *
+   * Returning this as a new inline function on every render changes
+   * ImageToCAD's handleModelReady identity. CADCanvas treats that callback as
+   * part of its model-ready effect, so the identity churn re-runs the effect,
+   * updates state again and can continuously restart viewport work. Besides
+   * React's maximum-update-depth warning, that presents as a fluttering model
+   * and repeatedly interrupts camera motion.
+   */
+  const consumeGeneratedToast = useCallback(() => {
+    const owed = awaitingGeneratedToastRef.current;
+    awaitingGeneratedToastRef.current = false;
+    return owed;
+  }, []);
+
   return {
     isGenerating, hasModel, setHasModel,
     isModelLoading, setIsModelLoading,
@@ -587,11 +603,7 @@ export function useImageToCADWorkflow({
     restoredReferenceUrls,
     restoredPrompt,
     /** True once, for the model that a run started here has just produced. */
-    consumeGeneratedToast: () => {
-      const owed = awaitingGeneratedToastRef.current;
-      awaitingGeneratedToastRef.current = false;
-      return owed;
-    },
+    consumeGeneratedToast,
     simulateGeneration,
     restoreCompletedWorkflow,
     handleKeepCreating,

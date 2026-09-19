@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { invalidate } from '@react-three/fiber';
 
 /**
- * Auto-rotate for the CAD viewport, driven entirely by OrbitControls' own
- * `autoRotate`.
+ * Auto-rotate for the CAD viewport, driven through OrbitControls' public
+ * azimuth API.
  *
  * Two things are worth knowing before changing this.
  *
@@ -12,14 +12,11 @@ import { invalidate } from '@react-three/fiber';
  * the mesh transform are all untouched. It is presentation only, which is why
  * it needs no undo entry and leaves nothing to clean up in the scene.
  *
- * Second, this hook has to pump frames. `CADCanvas` runs the R3F canvas with
- * `frameloop="demand"`, so a frame renders only when something calls
- * `invalidate()`. OrbitControls advances auto-rotation inside `update()`, and
- * drei calls `update()` from a `useFrame` - which only runs on a rendered
- * frame. Setting `autoRotate = true` on its own therefore animates nothing:
- * no frame, no update, no rotation, no reason to render another frame. The
- * requestAnimationFrame loop below breaks that standstill by supplying the
- * ticks demand mode withholds. It performs no rotation maths of its own.
+ * Second, `CADCanvas` runs the R3F canvas with `frameloop="demand"`. Relying on
+ * OrbitControls' `autoRotate` flag is unstable here because the R3F primitive
+ * can reconcile that imperative flag between demanded frames. The loop below
+ * advances the same OrbitControls camera target through `setAzimuthalAngle`,
+ * based on elapsed time, then asks R3F to paint the result.
  *
  * It reaches the controls through the `__orbitControls` handle that
  * `CADCanvas` publishes on the canvas element, the same channel its own zoom
@@ -28,20 +25,20 @@ import { invalidate } from '@react-three/fiber';
  */
 
 /**
- * Degrees of orbit per rendered frame, expressed as OrbitControls' speed unit
- * (2*PI/60/60 radians per update). At 2.0 a full revolution takes about 30
- * seconds on a 60Hz display, which reads as a slow inspection turn rather than
- * an animation. Note the unit is per update, not per second, so a 120Hz
- * display completes a turn in about half the time; that is an OrbitControls
- * characteristic, not something introduced here.
+ * OrbitControls' familiar speed scale, converted to elapsed-time movement in
+ * the animation loop below. At 2.0 a full revolution takes about 30 seconds,
+ * independent of display refresh rate, which reads as a slow inspection turn
+ * rather than a distracting animation.
  */
 export const AUTO_ROTATE_SPEED = 2.0;
 
 interface AutoRotatableControls {
   enabled: boolean;
+  enableDamping: boolean;
   autoRotate: boolean;
   autoRotateSpeed: number;
-  update: () => void;
+  getAzimuthalAngle: () => number;
+  setAzimuthalAngle: (angle: number) => void;
   addEventListener: (type: string, fn: () => void) => void;
   removeEventListener: (type: string, fn: () => void) => void;
 }
@@ -84,6 +81,7 @@ export function useCadAutoRotate(): UseCadAutoRotateReturn {
     let frame = 0;
     let attempts = 0;
     let active = true;
+    let previousFrameAt = 0;
 
     // OrbitControls fires 'start' on pointer down, never for auto-rotation
     // itself, so it is a clean signal that the user has taken over. Yielding
@@ -114,18 +112,34 @@ export function useCadAutoRotate(): UseCadAutoRotateReturn {
       controls.autoRotateSpeed = AUTO_ROTATE_SPEED;
       if (!isAutoRotating) return;
 
-      // Drei normally advances OrbitControls from useFrame. A demand-rendered
-      // canvas can miss that first update and leave the active button moving
-      // nothing. Drive the live controls here, and temporarily keep Drei from
-      // updating them a second time in the same frame. This also removes the
-      // uneven double-step that reads as fluttering on slower GPUs.
+      // This hook owns camera advancement while presentation rotation is on.
+      // Keeping Drei's useFrame update disabled prevents a second native
+      // autoRotate step from landing in the same frame.
       controls.enabled = false;
       controls.addEventListener('start', yieldToUser);
       canvas.addEventListener('pointerdown', yieldToUser, true);
       canvas.addEventListener('wheel', yieldToUser, true);
-      const tick = () => {
+      const tick = (now: number) => {
         if (!active) return;
-        controls?.update();
+        if (controls) {
+          if (previousFrameAt > 0) {
+            // OrbitControls speed 2 is one revolution in ~30 seconds at 60Hz.
+            // Cap a resumed/background tab so it cannot jump around the ring.
+            const elapsedSeconds = Math.min((now - previousFrameAt) / 1000, 0.05);
+            const radiansPerSecond = (Math.PI * 2 / 60) * AUTO_ROTATE_SPEED;
+            const hadDamping = controls.enableDamping;
+            controls.autoRotate = false;
+            controls.enableDamping = false;
+            controls.setAzimuthalAngle(
+              controls.getAzimuthalAngle() - radiansPerSecond * elapsedSeconds,
+            );
+            controls.enableDamping = hadDamping;
+            // MotionAdaptiveProvider uses this live flag to keep presentation
+            // rotation sharp. Movement itself does not depend on the flag.
+            controls.autoRotate = true;
+          }
+          previousFrameAt = now;
+        }
         invalidate();
         frame = requestAnimationFrame(tick);
       };
