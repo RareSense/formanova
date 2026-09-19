@@ -37,6 +37,7 @@ import {
   versionLabel,
   type CadRing,
 } from "@/lib/cad-versions-api";
+import { cadStatusNotice, type CadStatusNotice } from '@/lib/cad-status-copy';
 
 
 /** What an Improve press runs, so its price is quoted under the right name. */
@@ -98,6 +99,7 @@ export function useImageToCADWorkflow({
   const [ring, setRing] = useState<CadRing | null>(null);
   /** Why the last Improve press could not start, in the user's own terms. */
   const [improveMessage, setImproveMessage] = useState<string | null>(null);
+  const [statusNotice, setStatusNotice] = useState<CadStatusNotice | null>(null);
   /**
    * The photos and text a restored run was made from.
    *
@@ -160,6 +162,7 @@ export function useImageToCADWorkflow({
       setProgressStep('failed_final');
       setIsGenerating(false);
       setGenerationFailed(true);
+      setStatusNotice(cadStatusNotice(trackedRun.cadFailureReasonCode));
       // Stage 'run': backend accepted the job and then failed. Kept distinct
       // from a 'start' failure because the causes share nothing.
       trackCadGenerationFailed({
@@ -198,7 +201,7 @@ export function useImageToCADWorkflow({
       setIsModelLoading(true);
       setHasModel(true);
     }
-  }, [trackedRun?.status, trackedRun?.glbUrl, trackedRun?.threedmUrl, trackedRun?.generationStep]); // eslint-disable-line react-hooks/exhaustive-deps -- prompt/referenceImages/tier/cadRoute/cadSource and the trackedRun object are excluded: only the run's own transitions should re-drive the overlay, and including the object would re-fire on every progress tick. The analytics values are read from the closure of the render in which status changed, which is the correct moment for them. Regression to watch: if a future edit fires an event here on something other than a status transition, those values could be stale.
+  }, [trackedRun?.status, trackedRun?.glbUrl, trackedRun?.threedmUrl, trackedRun?.generationStep, trackedRun?.cadFailureReasonCode]); // eslint-disable-line react-hooks/exhaustive-deps -- prompt/referenceImages/tier/cadRoute/cadSource and the trackedRun object are excluded: only the run's own transitions should re-drive the overlay, and including the object would re-fire on every progress tick. The analytics values are read from the closure of the render in which status changed, which is the correct moment for them. Regression to watch: if a future edit fires an event here on something other than a status transition, those values could be stale.
 
   /**
    * Looks up the ring this run saved, which is what the Improve button needs.
@@ -215,13 +218,17 @@ export function useImageToCADWorkflow({
     // Starts as soon as the run has a result, not once the GLB has finished
     // loading: parsing a heavy ring takes seconds, and waiting for it left the
     // button missing on a ring that was already saved and improvable.
-    const ready = hasModel || trackedRun?.status === 'completed';
+    const ready = trackedRun ? trackedRun.status === 'completed' : hasModel;
     if (!ready || !sourceWorkflowId) return;
     let cancelled = false;
     findRingForWorkflow(sourceWorkflowId)
       .then(async (found) => {
         if (cancelled) return;
         setRing(found);
+        const producedVersion = (found?.versions ?? []).find(
+          (version) => version.source_workflow_id === sourceWorkflowId,
+        );
+        if (producedVersion) setSelectedVersionId(producedVersion.asset_id);
         // The photos and brief belong to the ring, not to the press: an
         // improve run's own inputs are the saved files it was handed, so
         // opening V3 from history showed no reference images at all. They come
@@ -252,6 +259,7 @@ export function useImageToCADWorkflow({
     const version = (ring?.versions ?? []).find((v) => v.asset_id === assetId);
     if (!version?.glb_url) return;
     awaitingGeneratedToastRef.current = false;
+    setStatusNotice(null);
     setSelectedVersionId(assetId);
     setGlbUrl(version.glb_url);
     setGlbArtifact({ uri: version.glb_url, type: 'model/gltf-binary', bytes: 0, sha256: '' });
@@ -288,11 +296,11 @@ export function useImageToCADWorkflow({
       setIsGenerating(true);
       setGenerationFailed(false);
       setFailureMessage(null);
+      setStatusNotice(null);
       setNotAllSolid(false);
-      setHasModel(false);
-      // The ring is stale the moment a press starts: its next version does not
-      // exist yet, and the button must not offer a second press meanwhile.
-      setRing(null);
+      // Keep the inspected version, its references and the version strip on
+      // screen while Improve runs. A no-change/error result creates no new
+      // model, so clearing these would leave an empty workspace afterward.
       setProgressStep('building');
       generationStartRef.current = Date.now();
       setSourceWorkflowId(started.workflow_id);
@@ -345,6 +353,7 @@ export function useImageToCADWorkflow({
     setIsGenerating(false);
     setGenerationFailed(false);
     setFailureMessage(null);
+    setStatusNotice(null);
     setSourceWorkflowId(workflowId);
     setThreedmArtifact(null);
     setIsModelLoading(true);
@@ -439,6 +448,7 @@ export function useImageToCADWorkflow({
     // would start a press on a ring the user is no longer looking at.
     setRing(null);
     setImproveMessage(null);
+    setStatusNotice(null);
     setRestoredReferenceUrls([]);
     setRestoredPrompt(null);
     setSelectedVersionId(null);
@@ -543,6 +553,12 @@ export function useImageToCADWorkflow({
     sourceWorkflowId, setSourceWorkflowId,
     threedmArtifact, setThreedmArtifact,
     failureMessage, notAllSolid,
+    statusNotice,
+    dismissStatusNotice: () => {
+      setStatusNotice(null);
+      setGenerationFailed(false);
+      setProgressStep('');
+    },
     /**
      * What the Improve button is named after, e.g. "V2". Built from the
      * version's position: the backend's own `label` is the improve verdict

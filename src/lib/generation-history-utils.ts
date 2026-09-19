@@ -126,6 +126,7 @@ export interface RingVersionRef {
   position: number;
   workflowId: string | null;
   thumbnailUrl: string | null;
+  glbUrl: string | null;
 }
 
 /**
@@ -142,7 +143,7 @@ export interface RingVersionRef {
  */
 export function groupRingVersions<T extends { workflow_id: string }>(
   workflows: T[],
-  rings: Array<{ versions?: Array<{ asset_id: string; position?: number; source_workflow_id?: string | null; thumbnail_url?: string | null }> }>,
+  rings: Array<{ versions?: Array<{ asset_id: string; position?: number; source_workflow_id?: string | null; thumbnail_url?: string | null; glb_url?: string | null }> }>,
 ): Array<T & { ring_versions?: RingVersionRef[] }> {
   const newestOf = new Map<string, RingVersionRef[]>();   // workflow id of the newest -> all versions
   const supersededIds = new Set<string>();
@@ -162,6 +163,7 @@ export function groupRingVersions<T extends { workflow_id: string }>(
       position: v.position ?? 0,
       workflowId: v.source_workflow_id ?? null,
       thumbnailUrl: v.thumbnail_url ?? null,
+      glbUrl: v.glb_url ?? null,
     })));
   }
 

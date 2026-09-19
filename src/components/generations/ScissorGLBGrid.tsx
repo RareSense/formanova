@@ -62,13 +62,14 @@ interface CardEntry {
   loaded: boolean;
   loading: boolean;
   error: boolean;
+  forceJewelryPalette: boolean;
 }
 
 /** Listeners that slots register to be notified when their card state changes */
 type CardStateListener = (loaded: boolean, error: boolean) => void;
 
 interface GridContextValue {
-  registerCard: (id: string, glbUrl: string, div: HTMLDivElement) => void;
+  registerCard: (id: string, glbUrl: string, div: HTMLDivElement, forceJewelryPalette?: boolean) => void;
   unregisterCard: (id: string) => void;
   /** Subscribe to state changes for a specific card id. Returns unsubscribe fn. */
   subscribe: (id: string, listener: CardStateListener) => () => void;
@@ -300,7 +301,7 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
     model.position.set(-center.x * scale, -center.y * scale, -center.z * scale);
     model.scale.setScalar(scale);
 
-    applyHistoryPreviewMaterials(model);
+    applyHistoryPreviewMaterials(model, card.forceJewelryPalette);
 
     card.scene.add(model);
 
@@ -313,12 +314,12 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
     notifyListeners(card.id);
   }, [notifyListeners]);
 
-  const registerCard = useCallback((id: string, glbUrl: string, div: HTMLDivElement) => {
+  const registerCard = useCallback((id: string, glbUrl: string, div: HTMLDivElement, forceJewelryPalette = false) => {
     if (cardsRef.current.has(id)) return;
 
     const renderer = rendererRef.current;
     if (!renderer) {
-      pendingRegistrationsRef.current.upsert({ id, glbUrl, element: div });
+      pendingRegistrationsRef.current.upsert({ id, glbUrl, element: div, forceJewelryPalette });
       return;
     }
 
@@ -368,6 +369,7 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
       loaded: false,
       loading: false,
       error: false,
+      forceJewelryPalette,
     };
 
     cardsRef.current.set(id, entry);
@@ -376,8 +378,8 @@ export function ScissorGLBGrid({ children }: ScissorGLBGridProps) {
 
   useEffect(() => {
     if (!rendererReady || !rendererRef.current) return;
-    pendingRegistrationsRef.current.drain(({ id, glbUrl, element }) => {
-      registerCard(id, glbUrl, element);
+    pendingRegistrationsRef.current.drain(({ id, glbUrl, element, forceJewelryPalette }) => {
+      registerCard(id, glbUrl, element, forceJewelryPalette);
     });
   }, [rendererReady, registerCard]);
 
@@ -445,9 +447,10 @@ interface GLBPreviewSlotProps {
   id: string;
   glbUrl: string;
   className?: string;
+  forceJewelryPalette?: boolean;
 }
 
-export function GLBPreviewSlot({ id, glbUrl, className = '' }: GLBPreviewSlotProps) {
+export function GLBPreviewSlot({ id, glbUrl, className = '', forceJewelryPalette = false }: GLBPreviewSlotProps) {
   const divRef = useRef<HTMLDivElement>(null);
   const { registerCard, unregisterCard, subscribe, getCardState } = useScissorGrid();
   const [state, setState] = useState<{ loaded: boolean; error: boolean }>({ loaded: false, error: false });
@@ -456,7 +459,7 @@ export function GLBPreviewSlot({ id, glbUrl, className = '' }: GLBPreviewSlotPro
     const div = divRef.current;
     if (!div || !glbUrl) return;
 
-    registerCard(id, glbUrl, div);
+    registerCard(id, glbUrl, div, forceJewelryPalette);
 
     // Subscribe to state changes — this is the reliable notification path
     const unsub = subscribe(id, (loaded, error) => {
@@ -474,7 +477,7 @@ export function GLBPreviewSlot({ id, glbUrl, className = '' }: GLBPreviewSlotPro
       unregisterCard(id);
       setState({ loaded: false, error: false });
     };
-  }, [id, glbUrl, registerCard, unregisterCard, subscribe, getCardState]);
+  }, [id, glbUrl, forceJewelryPalette, registerCard, unregisterCard, subscribe, getCardState]);
 
   return (
     <div

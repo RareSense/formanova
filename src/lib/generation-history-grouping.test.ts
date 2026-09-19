@@ -3,9 +3,9 @@ import { groupRingVersions } from './generation-history-utils';
 
 const ring = {
   versions: [
-    { asset_id: 'a1', position: 0, source_workflow_id: 'wf_1', thumbnail_url: 't1' },
-    { asset_id: 'a2', position: 1, source_workflow_id: 'wf_2', thumbnail_url: 't2' },
-    { asset_id: 'a3', position: 2, source_workflow_id: 'wf_3', thumbnail_url: null },
+    { asset_id: 'a1', position: 0, source_workflow_id: 'wf_1', thumbnail_url: 't1', glb_url: 'g1' },
+    { asset_id: 'a2', position: 1, source_workflow_id: 'wf_2', thumbnail_url: 't2', glb_url: 'g2' },
+    { asset_id: 'a3', position: 2, source_workflow_id: 'wf_3', thumbnail_url: null, glb_url: 'g3' },
   ],
 };
 
@@ -21,6 +21,7 @@ describe('groupRingVersions', () => {
     const grouped = groupRingVersions(rows, [ring]);
     expect(grouped.map(r => r.workflow_id)).toEqual(['wf_3', 'wf_other']);
     expect(grouped[0].ring_versions?.map(v => v.assetId)).toEqual(['a1', 'a2', 'a3']);
+    expect(grouped[0].ring_versions?.map(v => v.glbUrl)).toEqual(['g1', 'g2', 'g3']);
   });
 
   it('leaves a run the vault never heard of exactly as it was', () => {

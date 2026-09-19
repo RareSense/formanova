@@ -60,7 +60,14 @@ function VersionCardModel({ version }: { version: VersionCard }) {
       </span>
     );
   }
-  return <GLBPreviewSlot id={version.asset_id} glbUrl={version.glb_url} className="h-full w-full" />;
+  return (
+    <GLBPreviewSlot
+      id={version.asset_id}
+      glbUrl={version.glb_url}
+      className="h-full w-full"
+      forceJewelryPalette
+    />
+  );
 }
 
 export function VersionsPanel({ versions, selectedAssetId, onSelect }: VersionsPanelProps) {

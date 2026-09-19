@@ -22,7 +22,10 @@ function mountCanvasWithControls() {
   const canvas = document.createElement('canvas');
   // Same channel CADCanvas itself uses to reach the live controls.
   (canvas as unknown as { __orbitControls: unknown }).__orbitControls = controls;
-  document.body.appendChild(canvas);
+  const viewport = document.createElement('div');
+  viewport.dataset.cadViewport = '';
+  viewport.appendChild(canvas);
+  document.body.appendChild(viewport);
   return { controls, canvas, fire: (type: string) => (listeners[type] ?? []).forEach(l => l()), listeners };
 }
 
@@ -53,6 +56,20 @@ describe('useCadAutoRotate', () => {
     expect(result.current.isAutoRotating).toBe(true);
     expect(controls.autoRotate).toBe(true);
     expect(controls.autoRotateSpeed).toBe(AUTO_ROTATE_SPEED);
+  });
+
+  it('ignores the version-thumbnail canvas that appears before the workspace', () => {
+    const thumbnail = document.createElement('canvas');
+    const thumbnailControls = { autoRotate: false, autoRotateSpeed: 0 };
+    (thumbnail as unknown as { __orbitControls: unknown }).__orbitControls = thumbnailControls;
+    document.body.appendChild(thumbnail);
+    const { controls } = mountCanvasWithControls();
+    const { result } = renderHook(() => useCadAutoRotate());
+
+    act(() => { result.current.toggleAutoRotate(); });
+
+    expect(controls.autoRotate).toBe(true);
+    expect(thumbnailControls.autoRotate).toBe(false);
   });
 
   it('stops when toggled a second time', () => {

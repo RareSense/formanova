@@ -45,8 +45,10 @@ interface AutoRotatableControls {
 }
 
 function getOrbitControls(): AutoRotatableControls | null {
-  // Mirrors CADCanvas's own lookup for zoom and reset.
-  const canvas = document.querySelector<HTMLCanvasElement>('canvas');
+  // Version cards also use a shared canvas. Scope this lookup to the main CAD
+  // viewport so adding version previews cannot make auto-rotate drive a tiny
+  // card while the workspace camera appears to fight or ignore the user.
+  const canvas = document.querySelector<HTMLCanvasElement>('[data-cad-viewport] canvas');
   return (canvas as unknown as { __orbitControls?: AutoRotatableControls })?.__orbitControls ?? null;
 }
 

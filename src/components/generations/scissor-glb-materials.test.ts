@@ -79,4 +79,24 @@ describe('applyHistoryPreviewMaterials', () => {
     expect(material.roughness).toBe(0.67);
     expect(material.transmission).toBe(0.42);
   });
+
+  it('uses the colored jewelry palette for version cards even when the GLB embeds grey clay', () => {
+    const clay = new THREE.MeshStandardMaterial({ color: 0x777777, metalness: 0, roughness: 0.8 });
+    const model = new THREE.Group();
+    const mesh = meshNamed('Shank', clay);
+    model.add(mesh);
+    markEmbeddedGltfMaterials({
+      scene: model,
+      parser: {
+        associations: new Map([[mesh, { meshes: 0, primitives: 0 }]]),
+        json: { meshes: [{ primitives: [{ material: 0 }] }] },
+      },
+    });
+
+    applyHistoryPreviewMaterials(model, true);
+
+    const material = mesh.material as THREE.MeshStandardMaterial;
+    expect(material.color.getHex()).toBe(0xffd88a);
+    expect(material.metalness).toBe(1);
+  });
 });

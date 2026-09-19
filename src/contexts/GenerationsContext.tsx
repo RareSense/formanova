@@ -13,6 +13,7 @@ import type { PhotoshootResultResponse } from '@/lib/photoshoot-api';
 import type { Resolution } from '@/components/studio/OutputSettingsPills';
 import { getWorkflowDetails } from '@/lib/generation-history-api';
 import { fetchImproveOutcome } from '@/lib/cad-versions-api';
+import { cadStatusNotice } from '@/lib/cad-status-copy';
 import {
   RING_CAD_POLL_TIMEOUT_MS,
   isRingCadRepairing,
@@ -167,6 +168,10 @@ export interface TrackedGeneration {
   threedmUrl?: string | null;
   /** CAD only: label for the completion toast. */
   label?: string;
+  /** CAD only: structured fail-step code, used for clear workspace copy. */
+  cadFailureReasonCode?: string;
+  /** CAD only: backend message retained for diagnostics, never shown raw. */
+  cadFailureMessage?: string;
   /**
    * CAD only: true when the run produced parts that are not closed solids.
    *
@@ -604,31 +609,31 @@ export function GenerationsContextProvider({ children }: { children: React.React
       controllers.current.delete(gen.workflowId);
       if (ctrl.signal.aborted) return;
       console.error('[GenerationsContext] CAD poll failed:', err);
+      const outcome = await fetchImproveOutcome(gen.workflowId);
       setGenerations(prev => prev.map(g =>
-        g.workflowId === gen.workflowId ? { ...g, status: 'failed', progress: 100 } : g
+        g.workflowId === gen.workflowId
+          ? {
+              ...g,
+              status: 'failed',
+              progress: 100,
+              cadFailureReasonCode: outcome?.reasonCode,
+              cadFailureMessage: outcome?.message,
+            }
+          : g
       ));
       markGenerationFailed(gen.workflowId, 'CAD poll failed', startTime);
       refreshCredits();
 
-      // An Improve press that found nothing to fix ends as a failed run on
-      // purpose, and the credits are already back. /result says so in a body
-      // written for the user, so ask once before calling this an error:
-      // "your CAD could not be generated" is the wrong thing to tell someone
-      // whose ring simply needed no changes.
-      const outcome = await fetchImproveOutcome(gen.workflowId);
-      if (outcome) {
+      // The active CAD page reads the structured failure above and opens its
+      // centered dialog. A user who navigated away still needs a toast.
+      if (window.location.pathname !== gen.cadRoute) {
+        const notice = cadStatusNotice(outcome?.reasonCode);
         toast({
-          title: 'No changes this time',
-          description: `${outcome.message} Your credits were not charged.`,
+          title: notice.title,
+          description: notice.message,
+          ...(notice.tone === 'error' ? { variant: 'destructive' as const } : {}),
         });
-        return;
       }
-
-      toast({
-        title: 'Your CAD could not be generated',
-        description: 'The run did not complete. Your credits were not charged.',
-        variant: 'destructive',
-      });
     });
   }, [navigate, refreshCredits, toast, emitCadCompleted]);
 

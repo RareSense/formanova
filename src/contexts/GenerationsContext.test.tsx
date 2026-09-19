@@ -17,6 +17,7 @@ vi.mock('@/lib/generation-lifecycle', () => ({
 vi.mock('@/lib/azure-utils', () => ({ azureUriToUrl: (v: string) => v.replace('azure://', 'https://cdn.example.com/') }));
 vi.mock('@/lib/generation-history-api', () => ({ getWorkflowDetails: vi.fn() }));
 vi.mock('@/lib/posthog-events', () => ({ trackCadGenerationCompleted: vi.fn() }));
+vi.mock('@/lib/cad-versions-api', () => ({ fetchImproveOutcome: vi.fn() }));
 vi.mock('@/lib/generation-enrichment', () => ({
   extractPhotoThumbnail: vi.fn(),
   extractProductShotThumbnail: vi.fn(),
@@ -28,6 +29,7 @@ import { getWorkflowDetails } from '@/lib/generation-history-api';
 import { extractPhotoThumbnail, extractProductShotThumbnail } from '@/lib/generation-enrichment';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { trackCadGenerationCompleted } from '@/lib/posthog-events';
+import { fetchImproveOutcome } from '@/lib/cad-versions-api';
 
 const mockTrackCadCompleted = vi.mocked(trackCadGenerationCompleted);
 const mockPollWorkflow = vi.mocked(pollWorkflow);
@@ -37,6 +39,7 @@ const mockGetWorkflowDetails = vi.mocked(getWorkflowDetails);
 const mockExtractPhotoThumbnail = vi.mocked(extractPhotoThumbnail);
 const mockExtractProductShotThumbnail = vi.mocked(extractProductShotThumbnail);
 const mockAuthenticatedFetch = vi.mocked(authenticatedFetch);
+const mockFetchImproveOutcome = vi.mocked(fetchImproveOutcome);
 
 function jsonResponse(body: unknown, status = 200): Response {
   return {
@@ -91,6 +94,7 @@ describe('buildCadRestorePath', () => {
 describe('GenerationsContext', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockFetchImproveOutcome.mockResolvedValue(null);
     localStorage.clear();
     // Default: never resolves (long-running generation)
     mockPollWorkflow.mockReturnValue(new Promise(() => {}));
@@ -435,6 +439,7 @@ describe('GenerationsContext', () => {
 describe('GenerationsContext - Image to 3D runs', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockFetchImproveOutcome.mockResolvedValue(null);
     localStorage.clear();
     mockPollWorkflow.mockReturnValue(new Promise(() => {}));
   });
@@ -601,6 +606,25 @@ describe('GenerationsContext - Image to 3D runs', () => {
 
     await waitFor(() => expect(result.current.generations[0].status).toBe('failed'));
     expect(mockMarkFailed).toHaveBeenCalled();
+  });
+
+  it('keeps a no-safe-fix reason for the active CAD page to show in its dialog', async () => {
+    mockPollWorkflow.mockRejectedValueOnce(new Error('No result artifact'));
+    mockFetchImproveOutcome.mockResolvedValueOnce({
+      message: 'No safe repair was available.',
+      reasonCode: 'no_safe_fix',
+    } as never);
+
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    act(() => {
+      result.current.trackCadGeneration({ workflowId: 'cad-no-safe-fix', cadRoute: '/image-to-cad' });
+    });
+
+    await waitFor(() => expect(result.current.generations[0]).toMatchObject({
+      status: 'failed',
+      cadFailureReasonCode: 'no_safe_fix',
+      cadFailureMessage: 'No safe repair was available.',
+    }));
   });
 
   it('runs cad and photoshoot generations side by side', async () => {

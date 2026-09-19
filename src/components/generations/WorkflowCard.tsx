@@ -60,6 +60,16 @@ interface WorkflowCardProps {
  *  artifact image; the link is auth-gated, so a plain <img> renders broken. */
 function RingVersionThumb({ version }: { version: RingVersionRef }) {
   const src = useAuthenticatedImage(version.thumbnailUrl);
+  if (version.glbUrl) {
+    return (
+      <GLBPreviewSlot
+        id={`ring-version-${version.assetId}`}
+        glbUrl={version.glbUrl}
+        className="h-full w-full"
+        forceJewelryPalette
+      />
+    );
+  }
   return src
     ? <img src={src} alt="" loading="lazy" className="h-full w-full object-contain p-0.5" />
     : <span className="font-mono text-[9px] text-muted-foreground">{`V${version.position + 1}`}</span>;
@@ -78,6 +88,21 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
   const [isDownloading, setIsDownloading] = useState<CadArtifactKind | null>(null);
   const renameButtonRef = useRef<HTMLButtonElement>(null);
   const wasRenamingRef = useRef(false);
+  const ringVersions = (workflow as WorkflowSummary & { ring_versions?: RingVersionRef[] }).ring_versions ?? [];
+  const newestVersion = ringVersions.reduce<RingVersionRef | null>(
+    (latest, version) => (!latest || version.position > latest.position ? version : latest),
+    null,
+  );
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(newestVersion?.assetId ?? null);
+  const selectedVersion = ringVersions.find((version) => version.assetId === selectedVersionId) ?? newestVersion;
+  const selectedWorkflowId = selectedVersion?.workflowId ?? workflow.workflow_id;
+  const previewGlbUrl = selectedVersion?.glbUrl ?? workflow.glb_url;
+
+  useEffect(() => {
+    if (newestVersion && !ringVersions.some((version) => version.assetId === selectedVersionId)) {
+      setSelectedVersionId(newestVersion.assetId);
+    }
+  }, [newestVersion?.assetId, ringVersions, selectedVersionId]);
 
   useEffect(() => {
     if (workflow.output_asset_name && !getStoredRename(loadStoredRenames(), workflow.workflow_id)) {
@@ -146,14 +171,17 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
     try {
       // Refresh the typed result at click time. History cache data may be old,
       // but GLB and 3DM must never be selected positionally or by extension.
-      const fresh = await withTimeout(fetchCadResult(workflow.workflow_id), 5000);
-      const url = selectCadArtifactUrl(kind, fresh, workflow);
+      const fresh = await withTimeout(fetchCadResult(selectedWorkflowId), 5000);
+      const selectedFallback = selectedVersion && selectedWorkflowId !== workflow.workflow_id
+        ? { ...workflow, glb_url: selectedVersion.glbUrl, threedm_url: null }
+        : workflow;
+      const url = selectCadArtifactUrl(kind, fresh, selectedFallback);
       if (!url) throw new Error(`${kind.toUpperCase()} is not available for this design.`);
 
       try {
         await downloadCadArtifact(url, filename, kind);
       } catch (freshError) {
-        const cachedUrl = selectCadArtifactUrl(kind, null, workflow);
+        const cachedUrl = selectCadArtifactUrl(kind, null, selectedFallback);
         if (!cachedUrl || cachedUrl === url) throw freshError;
         await downloadCadArtifact(cachedUrl, filename, kind);
       }
@@ -176,7 +204,7 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
 
   const handleLoadInStudio = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!workflow.glb_url) return;
+    if (!previewGlbUrl) return;
     // One card serves both CAD types, so the workspace has to be chosen by
     // source rather than assumed. Both routes restore from the id alone.
     // Built by the shared helper rather than by hand so this link carries the
@@ -187,24 +215,15 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
     // allowed to be undefined -- a wrong route breaks the user, a guessed
     // source only breaks the data.
     const source = cadSourceFromSourceType(workflow.source_type);
-    navigate(buildCadRestorePath(workflow.workflow_id, workflow.glb_url, cadRouteFromSource(source ?? 'text-to-cad'), 'history'));
+    navigate(buildCadRestorePath(selectedWorkflowId, previewGlbUrl, cadRouteFromSource(source ?? 'text-to-cad'), 'history'));
   };
 
-  /**
-   * Opens one earlier version of this ring.
-   *
-   * Each version was its own run, so it restores exactly the way the card's
-   * own Open in Studio does; the strip below just names which run.
-   */
-  const openVersion = (e: React.MouseEvent, versionWorkflowId: string | null) => {
+  /** Changes the card preview only. Studio navigation stays on its own button. */
+  const selectVersion = (e: React.MouseEvent, version: RingVersionRef) => {
     e.stopPropagation();
-    if (!versionWorkflowId) return;
-    const source = cadSourceFromSourceType(workflow.source_type);
-    navigate(buildCadRestorePath(versionWorkflowId, null, cadRouteFromSource(source ?? 'text-to-cad'), 'history'));
+    if (!version.glbUrl) return;
+    setSelectedVersionId(version.assetId);
   };
-
-  // Only a ring that has actually been improved carries a strip.
-  const ringVersions = (workflow as WorkflowSummary & { ring_versions?: RingVersionRef[] }).ring_versions ?? [];
 
   return (
     <>
@@ -245,16 +264,17 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
         </div>
 
         {/* ── Interactive 3D GLB Preview ── */}
-        {workflow.glb_url && (
+        {previewGlbUrl && (
           <div className="mx-3 mb-2 relative">
             <GLBPreviewSlot
-              id={workflow.workflow_id}
-              glbUrl={workflow.glb_url}
+              id={`${workflow.workflow_id}-${selectedVersionId ?? 'latest'}`}
+              glbUrl={previewGlbUrl}
               className="w-full aspect-[4/3] min-h-[300px] sm:min-h-[360px] bg-background/50 border border-border/30"
+              forceJewelryPalette
             />
           </div>
         )}
-        {!workflow.glb_url && isEnriching && (
+        {!previewGlbUrl && isEnriching && (
           <div
             className="mx-4 mb-3 flex w-[calc(100%-2rem)] aspect-[4/3] items-center justify-center border border-border/30 bg-muted"
             role="status"
@@ -266,7 +286,7 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
 
 
         {/* ── File box — only shown when GLB is available or still loading ── */}
-        {(workflow.glb_url || isEnriching) && (
+        {(previewGlbUrl || isEnriching) && (
           <div className="mx-3 mb-4 flex flex-col gap-3 rounded-sm border border-border/50 bg-muted/20 px-3 py-3 sm:mx-4">
             {/* Shared design name: both artifact extensions are derived below. */}
             <div className="flex min-w-0 flex-1 items-start gap-1.5">
@@ -327,7 +347,7 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
               </div>
             </div>
 
-            {workflow.glb_url ? (
+            {previewGlbUrl ? (
               <div className="flex w-full flex-col gap-2">
                 {/* Both actions are siblings of the same container so their
                     w-full resolves to one width. Nesting the download inside
@@ -336,7 +356,7 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
                   variant="card"
                   isBusy={isDownloading !== null}
                   onDownloadThreedm={supportsThreedm ? () => downloadArtifact('3dm') : undefined}
-                  onDownloadGlb={workflow.glb_url ? () => downloadArtifact('glb') : undefined}
+                  onDownloadGlb={previewGlbUrl ? () => downloadArtifact('glb') : undefined}
                 />
                 <Button
                   size="sm"
@@ -357,25 +377,23 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
         )}
 
         {ringVersions.length > 1 && (
-          // The card shows the newest ring; its earlier versions sit under it
-          // as thumbnails, oldest first, each opening that version in the
-          // studio. Without this a ring improved twice filled three rows that
-          // all looked the same.
+          // Selecting a version swaps the large preview in this card. Opening
+          // the Studio remains an explicit action on the button above.
           <div className="flex flex-wrap items-center gap-2 px-4 pb-4">
             <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">Versions</span>
             {ringVersions.map((version) => {
-              const isNewest = version.workflowId === workflow.workflow_id;
+              const isSelected = version.assetId === selectedVersion?.assetId;
               return (
                 <button
                   key={version.assetId}
                   type="button"
-                  onClick={(e) => openVersion(e, version.workflowId)}
-                  disabled={!version.workflowId}
-                  aria-label={`Open version ${version.position + 1}`}
-                  aria-current={isNewest}
+                  onClick={(e) => selectVersion(e, version)}
+                  disabled={!version.glbUrl}
+                  aria-label={`Preview version ${version.position + 1}`}
+                  aria-current={isSelected}
                   className={cn(
                     'relative h-12 w-12 overflow-hidden rounded border bg-muted/30 transition-colors disabled:opacity-50',
-                    isNewest ? 'border-foreground' : 'border-border hover:border-foreground/50',
+                    isSelected ? 'border-foreground' : 'border-border hover:border-foreground/50',
                   )}
                 >
                   <RingVersionThumb version={version} />

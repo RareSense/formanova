@@ -16,6 +16,7 @@ import { useNotificationEmail } from "@/hooks/useNotificationEmail";
 import { useCadArtifactDownloads } from "@/hooks/useCadArtifactDownloads";
 import { useCadAutoRotate } from "@/hooks/useCadAutoRotate";
 import CadResultActions from "@/components/text-to-cad/CadResultActions";
+import CadStatusDialog from '@/components/text-to-cad/CadStatusDialog';
 import { trackCadStudioOpen, trackCadReferenceUploaded } from "@/lib/posthog-events";
 import { useCADKeyboardShortcuts } from "@/hooks/use-cad-keyboard-shortcuts";
 
@@ -240,6 +241,7 @@ export default function ImageToCAD() {
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
     <div className="flex h-[calc(100vh-5rem)] overflow-hidden bg-background" tabIndex={-1}>
+      <CadStatusDialog notice={workflow.statusNotice} onClose={workflow.dismissStatusNotice} />
       <ResizablePanelGroup direction="horizontal" className="h-full">
         <ResizablePanel
           ref={leftPanelRef}
@@ -322,33 +324,6 @@ export default function ImageToCAD() {
                 onGemModeForced={(mode) => setGemMode(mode)}
               />
             </CADRuntimeErrorBoundary>
-
-            <AnimatePresence>
-              {workflow.generationFailed && !workflow.isGenerating && !workflow.hasModel && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.96 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.96 }}
-                  transition={{ duration: 0.25 }}
-                  className="absolute inset-0 z-[20] flex items-center justify-center"
-                >
-                  <div className="bg-card border border-border shadow-2xl px-10 py-8 max-w-sm text-center">
-                    <div className="font-display text-lg uppercase tracking-[0.15em] text-foreground mb-3">
-                      Generation Unavailable
-                    </div>
-                    <p className="font-mono text-[11px] text-muted-foreground leading-[1.8] tracking-wide mb-6">
-                      We're really sorry. Something went wrong while generating your design. Our AI generation service may be temporarily unavailable. Please try again in a few minutes.
-                    </p>
-                    <button
-                      onClick={() => workflow.setGenerationFailed(false)}
-                      className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground/60 hover:text-foreground transition-colors"
-                    >
-                      Dismiss
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
 
             {!workflow.hasModel && !workflow.isGenerating && !workflow.isModelLoading && !workflow.generationFailed && (
               <div className="absolute inset-0 z-[10] flex items-center justify-center pointer-events-none">

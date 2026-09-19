@@ -569,24 +569,24 @@ function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
               <div className="space-y-2">
                 <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">3D Preview (Output)</p>
                 {cadGlbUrl ? (
-                  // Match the generation-history card size (~1/5 of the panel): a small
-                  // fixed box keeps the shared WebGL canvas small so it renders fast,
-                  // instead of a full-width canvas that is slow to draw.
-                  <div className="w-40">
+                  // Use the same shared renderer, studio lighting and jewelry
+                  // palette as Generation History, at a useful inspection size.
+                  <div className="w-full max-w-2xl">
                     <ScissorGLBGrid>
                       <GLBPreviewSlot
                         id={detail.workflow_id}
                         glbUrl={cadGlbUrl}
-                        className="w-full aspect-[4/3] rounded-md border border-border bg-muted/20"
+                        className="min-h-[360px] w-full aspect-[4/3] rounded-md border border-border bg-muted/20"
+                        forceJewelryPalette
                       />
                     </ScissorGLBGrid>
                   </div>
                 ) : cadResultQuery.isLoading ? (
-                  <div className="flex w-40 aspect-[4/3] items-center justify-center rounded-md border border-border bg-muted/20">
+                  <div className="flex min-h-[360px] w-full max-w-2xl aspect-[4/3] items-center justify-center rounded-md border border-border bg-muted/20">
                     <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                   </div>
                 ) : (
-                  <div className="flex w-40 aspect-[4/3] items-center justify-center rounded-md border border-border bg-muted/20">
+                  <div className="flex min-h-[360px] w-full max-w-2xl aspect-[4/3] items-center justify-center rounded-md border border-border bg-muted/20">
                     <div className="flex flex-col items-center gap-2 text-muted-foreground/50">
                       <ImageOff className="h-6 w-6" />
                       <span className="font-mono text-[10px] uppercase tracking-widest text-center">No 3D output</span>
