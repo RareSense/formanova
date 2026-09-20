@@ -61,31 +61,58 @@ function formatUserType(value: string | null): string {
 function extractImageUrls(value: unknown): string[] {
   const urls = new Set<string>();
 
-  function visit(node: unknown) {
+  function add(value: string) {
+    const normalized = value.toLowerCase();
+    if (
+      value.startsWith('data:image/') ||
+      /\.(png|jpg|jpeg|webp|gif|bmp|svg)(\?|$)/i.test(normalized)
+    ) {
+      urls.add(value);
+    }
+  }
+
+  function visit(node: unknown, key = '') {
     if (typeof node === 'string') {
-      const lower = node.toLowerCase();
-      if (
-        node.startsWith('http://') ||
-        node.startsWith('https://') ||
-        node.startsWith('azure://') ||
-        node.includes('/artifacts/') ||
-        /\.(png|jpg|jpeg|webp|gif|bmp|svg)(\?|$)/i.test(lower)
-      ) {
+      const imageKey = /(^|_)(image|thumbnail|preview|screenshot)(_|$)/i.test(key);
+      if (imageKey && isRenderableUrl(node)) {
         urls.add(node);
+      } else {
+        add(node);
       }
       return;
     }
     if (Array.isArray(node)) {
-      node.forEach(visit);
+      node.forEach((item) => visit(item, key));
       return;
     }
     if (node && typeof node === 'object') {
-      Object.values(node as Record<string, unknown>).forEach(visit);
+      const record = node as Record<string, unknown>;
+      const mime = typeof record.type === 'string' ? record.type : typeof record.mime === 'string' ? record.mime : '';
+      const artifactUrl = typeof record.url === 'string' ? record.url : typeof record.uri === 'string' ? record.uri : null;
+      if (mime.toLowerCase().startsWith('image/') && artifactUrl && isRenderableUrl(artifactUrl)) {
+        urls.add(artifactUrl);
+      }
+      Object.entries(record).forEach(([childKey, child]) => visit(child, childKey));
     }
   }
 
   visit(value);
   return Array.from(urls);
+}
+
+function extractTypedImageArtifacts(value: unknown): string[] {
+  if (!value || typeof value !== 'object') return [];
+  const root = value as Record<string, unknown>;
+  const candidates = [root.reference_image_artifacts, root.image_artifacts, root.reference_images];
+  return candidates.flatMap((candidate) => Array.isArray(candidate) ? candidate : [])
+    .flatMap((entry) => {
+      if (typeof entry === 'string') return isRenderableUrl(entry) ? [entry] : [];
+      if (!entry || typeof entry !== 'object') return [];
+      const artifact = entry as Record<string, unknown>;
+      const mime = typeof artifact.type === 'string' ? artifact.type : typeof artifact.mime === 'string' ? artifact.mime : '';
+      const url = typeof artifact.url === 'string' ? artifact.url : typeof artifact.uri === 'string' ? artifact.uri : null;
+      return mime.toLowerCase().startsWith('image/') && url && isRenderableUrl(url) ? [url] : [];
+    });
 }
 
 function isRenderableUrl(value: string | null): boolean {
@@ -465,6 +492,7 @@ function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
   const jewelryInputUrls = [...new Set(
     [
       ...payloadRoots.flatMap((root) => [
+        ...extractTypedImageArtifacts(root),
         ...findStringArray(root, ['jewelry_image_urls', 'input_image_urls', 'input_images']),
         ...['jewelry_image_url', 'input_image_url', 'image_url', 'source_image_url']
           .map((key) => findString(root, [key]))
@@ -563,6 +591,16 @@ function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
                   <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Text Prompt (Input)</p>
                   <div className="rounded-md border border-border bg-muted/20 px-4 py-3">
                     <p className="text-sm leading-relaxed">{textPrompt}</p>
+                  </div>
+                </div>
+              )}
+              {jewelryInputUrls.length > 0 && (
+                <div className="space-y-2">
+                  <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Uploaded Reference Images (Input)</p>
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    {jewelryInputUrls.map((url, index) => (
+                      <ImagePreview key={`${url}-${index}`} url={url} label={`Uploaded Image ${index + 1}`} />
+                    ))}
                   </div>
                 </div>
               )}
