@@ -1,4 +1,20 @@
-# Starter Pack Pricing A/B Experiment — Cleanup Guide
+# Starter Pack Pricing A/B Experiment - Cleanup Guide
+
+> **Status: ENDED 2026-09-21 - CONTROL won.** Cleanup done on branch
+> `end-starter-pack-experiment` via Option B with the full deeper cleanup:
+> - Removed: `use-starter-pack-experiment.ts`, `StarterPackPage.tsx`,
+>   `src/assets/starter-pack/*`, the flag helpers in `posthog-events.ts` and their tests.
+> - Both `/credits` and `/pricing` now render one shared grid,
+>   `src/components/pricing/CreditPlanGrid.tsx`: $2 one-time card (only while the
+>   backend still returns the starter tier) + $9 / $39 / $99. Indian users see
+>   INR 199 / 999 / 3,499 / 8,999. Cards list photos and CAD generations, and the
+>   $2 card says "Not enough for 1 CAD generation".
+> - Kept: `trackStarterPackPurchased` (still a valid purchase event) and
+>   `src/lib/starter-pack.ts` (the shared `isStarterTier` rule).
+> - Still manual: stop/archive the PostHog experiment and disable the
+>   `starter-pack-pricing-experiment` flag. Nothing in code reads it any more.
+>
+> The rest of this file is the original guide, kept for history.
 
 How to cleanly remove the `starter-pack-pricing-experiment` once results are in.
 Run **exactly one** of the two code options below (depending on which variant won),
