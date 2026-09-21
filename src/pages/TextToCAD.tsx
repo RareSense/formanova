@@ -523,6 +523,7 @@ export default function TextToCAD() {
               onSelectMesh={editor.handleSelectMesh}
               onAction={editor.handleMeshAction}
               onApplyMaterial={editor.handleApplyMaterial}
+              onApplyMetalToAll={editor.handleApplyMetalToAll}
               onSceneAction={editor.handleSceneAction}
             />
           )}

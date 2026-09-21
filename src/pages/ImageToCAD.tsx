@@ -478,6 +478,7 @@ export default function ImageToCAD() {
               onSelectMesh={editor.handleSelectMesh}
               onAction={editor.handleMeshAction}
               onApplyMaterial={editor.handleApplyMaterial}
+              onApplyMetalToAll={editor.handleApplyMetalToAll}
               onSceneAction={editor.handleSceneAction}
             />
           )}

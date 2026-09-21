@@ -4,16 +4,20 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/componen
 import type { MeshItemData } from "./types";
 import { MATERIAL_LIBRARY } from "@/components/cad-studio/materials";
 import MaterialSphere from "@/components/cad-studio/MaterialSphere";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+const METAL_MATERIALS = MATERIAL_LIBRARY.filter((m) => m.category === "metal");
 
 interface MeshPanelProps {
   meshes: MeshItemData[];
   onSelectMesh: (name: string, multi: boolean) => void;
   onAction: (action: string) => void;
   onApplyMaterial: (matId: string) => void;
+  onApplyMetalToAll?: (matId: string) => void;
   onSceneAction: (action: string) => void;
 }
 
-export default function MeshPanel({ meshes, onSelectMesh, onAction, onApplyMaterial, onSceneAction }: MeshPanelProps) {
+export default function MeshPanel({ meshes, onSelectMesh, onAction, onApplyMaterial, onApplyMetalToAll, onSceneAction }: MeshPanelProps) {
   const [search, setSearch] = useState("");
   const [matTab, setMatTab] = useState<"metal" | "gemstone">("metal");
   const [meshCollapsed, setMeshCollapsed] = useState(false);
@@ -77,7 +81,7 @@ export default function MeshPanel({ meshes, onSelectMesh, onAction, onApplyMater
       <div className="flex flex-col bg-card border-l border-border h-full">
         <div className="flex-1 flex flex-col min-h-0">
           <MaterialSectionHeader collapsed={false} onToggle={() => setMaterialCollapsed(true)} hasSelection={hasSelection} selectedMeshes={selectedMeshes} />
-          <MaterialContent hasSelection={hasSelection} matTab={matTab} setMatTab={setMatTab} filteredMaterials={filteredMaterials} onApplyMaterial={onApplyMaterial} />
+          <MaterialContent hasSelection={hasSelection} matTab={matTab} setMatTab={setMatTab} filteredMaterials={filteredMaterials} onApplyMaterial={onApplyMaterial} onApplyMetalToAll={onApplyMetalToAll} />
         </div>
         <SectionHeader title="Meshes" subtitle={meshSubtitle} collapsed onToggle={() => setMeshCollapsed(false)} />
       </div>
@@ -91,7 +95,7 @@ export default function MeshPanel({ meshes, onSelectMesh, onAction, onApplyMater
         <ResizablePanel defaultSize={50} minSize={20}>
           <div className="flex flex-col h-full">
             <MaterialSectionHeader collapsed={false} onToggle={() => setMaterialCollapsed(true)} hasSelection={hasSelection} selectedMeshes={selectedMeshes} />
-            <MaterialContent hasSelection={hasSelection} matTab={matTab} setMatTab={setMatTab} filteredMaterials={filteredMaterials} onApplyMaterial={onApplyMaterial} />
+            <MaterialContent hasSelection={hasSelection} matTab={matTab} setMatTab={setMatTab} filteredMaterials={filteredMaterials} onApplyMaterial={onApplyMaterial} onApplyMetalToAll={onApplyMetalToAll} />
           </div>
         </ResizablePanel>
         <ResizableHandle withHandle />
@@ -145,14 +149,36 @@ function MaterialSectionHeader({ collapsed, onToggle, hasSelection, selectedMesh
 }
 
 // ── Material content ──
-function MaterialContent({ hasSelection, matTab, setMatTab, filteredMaterials, onApplyMaterial }: {
+function MaterialContent({ hasSelection, matTab, setMatTab, filteredMaterials, onApplyMaterial, onApplyMetalToAll }: {
   hasSelection: boolean;
   matTab: "metal" | "gemstone"; setMatTab: (t: "metal" | "gemstone") => void;
   filteredMaterials: typeof MATERIAL_LIBRARY;
   onApplyMaterial: (matId: string) => void;
+  onApplyMetalToAll?: (matId: string) => void;
 }) {
   return (
     <div className="flex-1 overflow-y-auto min-h-0 px-4 pb-3 pt-3 space-y-3 scrollbar-thin">
+      {onApplyMetalToAll && (
+        <div className="space-y-1.5">
+          <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">All metal parts</div>
+          {/* Value stays empty so picking the same metal again re-applies it. */}
+          <Select value="" onValueChange={onApplyMetalToAll}>
+            <SelectTrigger className="h-8 font-mono text-[11px]" aria-label="Apply one metal to all metal parts">
+              <SelectValue placeholder="Choose a metal…" />
+            </SelectTrigger>
+            <SelectContent>
+              {METAL_MATERIALS.map((m) => (
+                <SelectItem key={m.id} value={m.id} className="font-mono text-[11px]">
+                  <span className="flex items-center gap-2">
+                    <MaterialSphere category={m.category} preview={m.preview} size={14} />
+                    {m.name}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       {!hasSelection && (
         <div className="px-3 py-2 font-mono text-[10px] text-muted-foreground bg-muted/40 border border-border">
           Select a mesh to assign material

@@ -21,6 +21,7 @@ import {
 } from "three-mesh-bvh";
 import { findMaterial, findMaterialByName } from "@/components/cad-studio/materials";
 import type { MaterialDef } from "@/components/cad-studio/materials";
+import { classifyCadPartName, isCadGemName } from "@/lib/cad-part-classifier";
 import { getQualitySettings, getGPURendererString, getSettingsForMode, getDynamicGemCaps } from "@/lib/gpu-detect";
 import type { QualityMode } from "@/lib/gpu-detect";
 import type { GemMode } from "./GemInstanceRenderer";
@@ -37,18 +38,8 @@ const Q = getQualitySettings();
 // mutation boundary forbids changing its public API, UI consumers, or adding
 // sibling engine modules. Existing workflow/API concerns are not expanded.
 
-/**
- * Mesh-name hints used wherever meshes are classified without a material name.
- *
- * The CAD pipeline names accent stones `pave_main_left_rows`, `pave_center_stone`
- * and so on, and side stones `accent_*` or `melee_*`; those have to read as
- * gems, or a ring's small stones come out as metal.
- */
-const GEM_KEYWORDS = ["gem", "diamond", "stone", "ruby", "sapphire", "emerald", "crystal", "halo_gem",
-  "center_gem", "pave", "accent", "melee", "side_stone", "halo", "cz", "brilliant", "round_cut",
-  "cushion", "oval", "marquise", "princess", "baguette", "asscher", "trillion", "pear", "facet"];
-/** Settings and holders: metal that often sits inside a stone's own name. */
-const SETTING_KEYWORDS = ["prong", "claw", "bead", "milgrain", "setting", "basket", "collet"];
+// Mesh-name metal/gem classification lives in @/lib/cad-part-classifier so every
+// path below (reference, magic, flat preview, duplicates) agrees on what a gem is.
 
 type ReferenceMaterialKind = "metal" | "gem" | "pearl";
 
@@ -114,13 +105,12 @@ const REFERENCE_TYPE_RULES: [RegExp, string][] = [
   [/tanzanit/i, "tanzanite"], [/morganite/i, "morganite"],
   [/onyx|black[_ ]?diamond/i, "blackDiamond"],
 ];
-const REFERENCE_GEM_RE = /diamond|gem|stone|crystal|jewel|brill|cz|cubic|solitaire|pave|moissanite|briolette|cabochon/i;
-
 function classifyReferenceMaterial(name: string): string {
+  if (!isCadGemName(name)) return "gold18k";
   for (const [pattern, key] of REFERENCE_TYPE_RULES) {
     if (pattern.test(name)) return key;
   }
-  return REFERENCE_GEM_RE.test(name) ? "diamond" : "gold18k";
+  return "diamond";
 }
 
 function referenceKeyForMaterial(material: MaterialDef | undefined, meshName: string): string | null {
@@ -1178,19 +1168,16 @@ const LoadedModel = forwardRef<
     if (useRecognised) {
       // Fill any unrecognised meshes with a sensible fallback based on the recognised set
       const fallbackGold = findMaterial("yellow-gold")!;
+      const fallbackDiamond = findMaterial("diamond")!;
       list.forEach((md) => {
         if (!autoMaterials[md.name]) {
-          autoMaterials[md.name] = fallbackGold;
-          console.log(`[MagicTex] "${md.name}" → Yellow Gold (fallback for unrecognised mesh in recognised GLB)`);
+          autoMaterials[md.name] = isCadGemName(md.name) ? fallbackDiamond : fallbackGold;
         }
       });
       console.log(`[MagicTex] Recognised ${recognisedCount}/${list.length} materials from GLB — skipping heuristics`);
     } else {
       // ── Standard heuristic texturing for fresh/pipeline GLBs ──
-      const gemKeywords = GEM_KEYWORDS;
-      const platinumKeywords = SETTING_KEYWORDS;
       const diamondMatDef = findMaterial("diamond")!;
-      const platinumMatDef = findMaterial("platinum")!;
       const goldMatDef = findMaterial("yellow-gold")!;
 
       // Compute median vertex count to identify small meshes (likely gems)
@@ -1221,10 +1208,11 @@ const LoadedModel = forwardRef<
         const lower = md.name.toLowerCase();
         const verts = md.geometry?.attributes?.position?.count || 0;
 
-        if (gemKeywords.some((kw) => lower.includes(kw))) {
+        const kind = classifyCadPartName(md.name);
+        if (kind === "gem") {
           autoMaterials[md.name] = diamondMatDef;
-        } else if (platinumKeywords.some((kw) => lower.includes(kw))) {
-          autoMaterials[md.name] = platinumMatDef;
+        } else if (kind === "metal") {
+          autoMaterials[md.name] = goldMatDef;
         } else if (looksLikeGem(md.originalMaterial)) {
           autoMaterials[md.name] = diamondMatDef;
           console.log(`[MagicTex] "${md.name}" → diamond (material heuristic)`);
@@ -1242,17 +1230,13 @@ const LoadedModel = forwardRef<
       // Built from the shared list so the flat preview and the real materials
       // agree on what a gem is: `wing_accent_right` is a stone here too, and
       // only `accent_stone` used to match.
-      const gemRe = new RegExp(
-        [...GEM_KEYWORDS, "jewel", "brill", "topaz", "opal", "garnet", "amethyst", "pearl", "cubic",
-          "solitaire", "prong_stone", "center_stone", "main_stone"].join("|"), "i");
-      const metalRe = /band|ring|shank|prong|setting|mount|bezel|basket|gallery|shoulder|bridge|head|collet|metal|gold|silver|platinum|frame|base/i;
 
       list.forEach((md) => {
         const lower = md.name.toLowerCase();
         const phys = md.originalMaterial as THREE.MeshPhysicalMaterial;
-        let isGem = gemRe.test(lower);
-        if (metalRe.test(lower)) isGem = false;
-        if (!gemRe.test(lower) && !metalRe.test(lower)) {
+        const kind = classifyCadPartName(lower);
+        let isGem = kind === "gem";
+        if (kind === null) {
           if (phys.transmission > 0.5 || phys.ior > 2.0) isGem = true;
         }
         const color = isGem ? 0x4a90d9 : 0x77dd77;
@@ -1436,22 +1420,12 @@ const LoadedModel = forwardRef<
             if (newParts.length === 0) return;
 
             // Auto-assign materials to new parts
-            const gemKeywordsLocal = ["gem", "diamond", "stone", "ruby", "sapphire", "emerald", "crystal", "halo_gem", "center_gem", "pave"];
-            const platKeywordsLocal = ["prong", "claw", "bead", "milgrain"];
             const dMat = findMaterial("diamond")!;
-            const pMat = findMaterial("platinum")!;
             const gMat = findMaterial("yellow-gold")!;
 
             const newMaterials: Record<string, MaterialDef> = {};
             newParts.forEach((md) => {
-              const lower = md.name.toLowerCase();
-              if (gemKeywordsLocal.some((kw) => lower.includes(kw))) {
-                newMaterials[md.name] = dMat;
-              } else if (platKeywordsLocal.some((kw) => lower.includes(kw))) {
-                newMaterials[md.name] = pMat;
-              } else {
-                newMaterials[md.name] = gMat;
-              }
+              newMaterials[md.name] = isCadGemName(md.name) ? dMat : gMat;
             });
 
             setMeshDataList((prev) => [...prev, ...newParts]);
@@ -1534,8 +1508,8 @@ const LoadedModel = forwardRef<
   }, [syncTransformFromObject, onTransformEnd, inv, selectedMeshNames]);
 
   // ── Imperative API ──
-  useImperativeHandle(ref, () => ({
-    applyMaterial: (matId: string, meshNames: string[]) => {
+  useImperativeHandle(ref, () => {
+    const applyMaterial = (matId: string, meshNames: string[]) => {
       const matDef = findMaterial(matId);
       if (!matDef) return;
       meshNames.forEach((n) => {
@@ -1555,6 +1529,20 @@ const LoadedModel = forwardRef<
         return next;
       });
       inv();
+    };
+    return {
+    applyMaterial,
+    // Every part that currently renders as metal (explicit metal material, or an
+    // unassigned mesh whose name is not a gem) takes this metal. Gems are untouched.
+    applyMetalToAll: (matId: string) => {
+      const names = meshDataList
+        .filter((md) => {
+          const assigned = assignedMaterials[md.name];
+          return assigned ? assigned.category === "metal" : !isCadGemName(md.name);
+        })
+        .map((md) => md.name);
+      if (names.length > 0) applyMaterial(matId, names);
+      return names.length;
     },
     resetTransform: (meshNames: string[]) => {
       const names = new Set(meshNames);
@@ -1724,15 +1712,11 @@ const LoadedModel = forwardRef<
         list.forEach((md) => {
           if (newMaterials[md.name]) return;
           const lower = md.name.toLowerCase();
-          const isGem = GEM_KEYWORDS.some((kw) => lower.includes(kw))
-            && !SETTING_KEYWORDS.some((kw) => lower.includes(kw));
+          const isGem = isCadGemName(lower);
           newMaterials[md.name] = isGem ? fallbackDiamond : fallbackGold;
         });
       } else {
-        const gemKeywords = GEM_KEYWORDS;
-        const platinumKeywords = SETTING_KEYWORDS;
         const diamondMatDef = findMaterial("diamond")!;
-        const platinumMatDef = findMaterial("platinum")!;
         const goldMatDef = findMaterial("yellow-gold")!;
         const vertCounts = list.map((md) => md.geometry?.attributes?.position?.count || 0).sort((a, b) => a - b);
         const medianVerts = vertCounts[Math.floor(vertCounts.length / 2)] || 0;
@@ -1755,10 +1739,11 @@ const LoadedModel = forwardRef<
           if (newMaterials[md.name]) return;
           const lower = md.name.toLowerCase();
           const verts = md.geometry?.attributes?.position?.count || 0;
-          if (gemKeywords.some((kw) => lower.includes(kw))) {
+          const kind = classifyCadPartName(md.name);
+          if (kind === "gem") {
             newMaterials[md.name] = diamondMatDef;
-          } else if (platinumKeywords.some((kw) => lower.includes(kw))) {
-            newMaterials[md.name] = platinumMatDef;
+          } else if (kind === "metal") {
+            newMaterials[md.name] = goldMatDef;
           } else if (looksLikeGem(md.originalMaterial)) {
             newMaterials[md.name] = diamondMatDef;
           } else if (verts > 0 && verts < medianVerts * 0.3 && !looksLikeMetal(md.originalMaterial)) {
@@ -2125,7 +2110,8 @@ const LoadedModel = forwardRef<
       console.log(`[Raw Export] Done. Blob size: ${blob.size} bytes, normScale: ${normScaleRef.current}`);
       return blob;
     },
-  }), [meshDataList, assignedMaterials, inv, syncTransformFromObject, onTransformEnd, selectedMeshNames]);
+  };
+  }, [meshDataList, assignedMaterials, inv, syncTransformFromObject, onTransformEnd, selectedMeshNames]);
 
   // Selection-change detection moved into useMemo below (synchronous)
 
@@ -2531,6 +2517,8 @@ export interface MeshTransformData {
 
 export interface CADCanvasHandle {
   applyMaterial: (matId: string, meshNames: string[]) => void;
+  /** Applies a metal to every part currently rendered as metal; returns how many. */
+  applyMetalToAll: (matId: string) => number;
   resetTransform: (meshNames: string[]) => void;
   deleteMeshes: (meshNames: string[]) => void;
   duplicateMeshes: (meshNames: string[]) => void;
@@ -2601,6 +2589,7 @@ const CADCanvas = forwardRef<CADCanvasHandle, CADCanvasProps>(
 
     useImperativeHandle(ref, () => ({
       applyMaterial: (matId, meshNames) => modelRef.current?.applyMaterial(matId, meshNames),
+      applyMetalToAll: (matId) => modelRef.current?.applyMetalToAll(matId) ?? 0,
       resetTransform: (meshNames) => modelRef.current?.resetTransform(meshNames),
       deleteMeshes: (meshNames) => modelRef.current?.deleteMeshes(meshNames),
       duplicateMeshes: (meshNames) => modelRef.current?.duplicateMeshes(meshNames),
