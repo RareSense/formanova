@@ -8,61 +8,11 @@ import { useCredits } from '@/contexts/CreditsContext';
 import { toast } from '@/hooks/use-toast';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { useBillingLocale } from '@/hooks/use-billing-locale';
-import { selectStarterTier } from '@/lib/starter-pack';
-import { StarterPackPage } from '@/components/pricing/StarterPackPage';
-import { useStarterPackPricingVariant } from '@/hooks/use-starter-pack-experiment';
+import { isStarterTier, type BillingTier } from '@/lib/starter-pack';
+import { CreditPlanGrid } from '@/components/pricing/CreditPlanGrid';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
 
 const CHECKOUT_URL = '/billing/checkout';
-
-const PLANS = [
-  {
-    tier: 'basic',
-    tierId: 'tier_5e6c6184',
-    name: 'Basic',
-    price: 9,
-    credits: 100,
-    photos: 12,
-    perPhoto: '$0.99',
-    inrPrice: 999,
-    inrPerPhoto: '₹99.9',
-  },
-  {
-    tier: 'standard',
-    tierId: 'tier_6867e598',
-    name: 'Standard',
-    price: 39,
-    credits: 500,
-    photos: 62,
-    perPhoto: '$0.78',
-    inrPrice: 3499,
-    inrPerPhoto: '₹69.9',
-  },
-  {
-    tier: 'pro',
-    tierId: 'tier_a80444ac',
-    name: 'Pro',
-    price: 99,
-    credits: 1500,
-    photos: 187,
-    perPhoto: '$0.66',
-    inrPrice: 8999,
-    inrPerPhoto: '₹59.9',
-  },
-];
-
-interface BillingTier {
-  tier_id: string;
-  name: string;
-  type: string;
-  credits: number;
-}
-
-const PLAN_BY_CREDITS = Object.fromEntries(PLANS.map(p => [p.credits, p])) as Record<number, typeof PLANS[0]>;
-
-function isStarterTier(t: BillingTier): boolean {
-  return !PLAN_BY_CREDITS[t.credits];
-}
 
 export default function Pricing() {
   const { user } = useAuth();
@@ -75,13 +25,6 @@ export default function Pricing() {
   const [unavailableTier, setUnavailableTier] = useState<string | null>(null);
   const { currency, symbol, country } = useBillingLocale();
   const isINR = currency === 'INR';
-
-  // Starter-pack pricing A/B (same as Credits). Eligibility-gated flag read,
-  // before any early return; default-safe (anything but 'control' = Starter Pack).
-  const starterTier = selectStarterTier(tiers);
-  const starterEligible = !tiersLoading && !!starterTier;
-  const { variant: starterPricingVariant, ready: starterPricingReady } =
-    useStarterPackPricingVariant(starterEligible);
 
   const returnTo = searchParams.get('redirect') || '/studio';
   // Back affordance returns the user to wherever the credit gate interrupted them
@@ -158,63 +101,9 @@ export default function Pricing() {
     }
   };
 
-  const gridTiers: BillingTier[] =
-    tiers.length > 0
-      ? tiers
-      : PLANS.map(p => ({ tier_id: p.tierId, name: p.name, type: 'subscription', credits: p.credits }));
-
-  const colsClass = gridTiers.length === 4 ? 'md:grid-cols-4' : 'md:grid-cols-3';
-  const maxWidthClass = gridTiers.length === 4 ? 'max-w-7xl' : 'max-w-5xl';
-
-  // Eligible (never purchased) users get the one-time Starter Pack page instead
-  // of the normal grid. The backend stops returning the starter tier once it is
-  // bought, so this branch naturally turns off afterwards. `starterTier` +
-  // `starterEligible` are computed above (before the early returns).
-  // A/B: hold for eligible users until the flag loads (no control->treatment flash).
-  if (starterEligible && !starterPricingReady) {
-    return (
-      <div className="min-h-[calc(100vh-5rem)] flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-  if (starterEligible && starterPricingVariant !== 'control') {
-    return (
-      <>
-        <Helmet>
-          <title>Starter Pack | FormaNova AI Jewelry Studio</title>
-          <meta name="description" content="One jewelry photo, beautiful outputs. Try your first FormaNova shoot for $2." />
-          <link rel="canonical" href="/pricing" />
-        </Helmet>
-        <div className="min-h-[calc(100vh-5rem)] bg-background px-4 py-6 sm:px-6 lg:px-10">
-          <div className="mx-auto max-w-4xl">
-            <div className="mb-6 flex items-center justify-between gap-4">
-              <Link
-                to="/dashboard"
-                className="inline-flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.3em] text-muted-foreground transition-colors hover:text-foreground"
-              >
-                <ArrowLeft className="h-3 w-3" />
-                Dashboard
-              </Link>
-              {credits !== null && (
-                <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
-                  Balance: {credits} credits
-                </p>
-              )}
-            </div>
-            <StarterPackPage
-              tier={starterTier}
-              isINR={isINR}
-              loadingTier={loadingTier}
-              unavailableTier={unavailableTier}
-              errorTier={errorTier}
-              onCheckout={handleCheckout}
-            />
-          </div>
-        </div>
-      </>
-    );
-  }
+  // 4 cards when the backend still returns the one-time Starter tier (user never
+  // bought it), otherwise the 3 standard plans.
+  const maxWidthClass = tiers.length === 4 ? 'max-w-7xl' : 'max-w-5xl';
 
   return (
     <>
@@ -256,170 +145,16 @@ export default function Pricing() {
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <>
-            <div className={`grid grid-cols-1 sm:grid-cols-2 ${colsClass} gap-6`}>
-              {gridTiers.map((tier) => {
-                if (isStarterTier(tier)) {
-                  return (
-                    <div
-                      key={tier.tier_id}
-                      className="p-8 flex flex-col gap-6 border-2 border-[hsl(var(--formanova-hero-accent))] bg-[hsl(var(--formanova-hero-accent))]/10 shadow-sm"
-                    >
-                      {/* Badge */}
-                      <div>
-                        <span className="inline-block whitespace-nowrap font-mono text-[20px] tracking-[0.15em] text-[hsl(var(--formanova-hero-accent))] uppercase font-bold italic">
-                          One-time offer
-                        </span>
-                      </div>
-
-                      {/* Price */}
-                      <div>
-                        <div className="flex items-baseline gap-1">
-                          <span
-                            className="font-display text-2xl uppercase tracking-tight text-muted-foreground"
-                            style={{ textDecoration: 'line-through', textDecorationThickness: '1.5px' }}
-                          >
-                            {isINR ? '₹499' : '$5'}
-                          </span>
-                          <span className="font-display text-5xl uppercase tracking-tight text-foreground">
-                            {isINR ? '₹199' : '$2'}
-                          </span>
-                          <span className="font-mono text-[10px] tracking-wider text-muted-foreground uppercase">
-                            {isINR ? 'INR' : 'USD'}
-                          </span>
-                        </div>
-                        <p className="font-mono text-[10px] tracking-wider text-muted-foreground mt-1">
-                          {isINR ? '₹3.98' : '$0.40'} per photo
-                        </p>
-                      </div>
-
-                      {/* Description */}
-                      <div>
-                        <p className="text-sm italic leading-relaxed text-[hsl(var(--formanova-hero-accent))]">
-                          Perfect for your first project. A simple way to try FormaNova before moving to a larger pack. Available once per account.
-                        </p>
-                      </div>
-
-                      {/* Credits */}
-                      <div className="border-t border-border/30 pt-5 space-y-2">
-                        <p className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground uppercase">
-                          You get
-                        </p>
-                        <p className="font-mono text-xl text-foreground">
-                          50 credits
-                        </p>
-                        <p className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground uppercase">
-                          Generate up to 6 photos
-                        </p>
-                      </div>
-
-                      {/* CTA */}
-                      <div className="mt-auto pt-2">
-                        <Button
-                          className="w-full font-mono text-[10px] tracking-[0.2em] uppercase"
-                          size="lg"
-                          variant="default"
-                          disabled={loadingTier !== null}
-                          onClick={() => handleCheckout(tier.tier_id)}
-                        >
-                          {loadingTier === tier.tier_id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            'Buy 50 Credits'
-                          )}
-                        </Button>
-                        {unavailableTier === tier.tier_id && (
-                          <p className="font-mono text-[9px] tracking-wider text-destructive mt-2">
-                            Offer unavailable.
-                          </p>
-                        )}
-                        {errorTier === tier.tier_id && (
-                          <p className="font-mono text-[9px] tracking-wider text-destructive mt-2">
-                            Checkout failed. Please try again.
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  );
-                }
-
-                const plan = PLAN_BY_CREDITS[tier.credits];
-                if (!plan) return null;
-
-                return (
-                  <div
-                    key={tier.tier_id}
-                    className="p-8 flex flex-col gap-8 border-2 border-foreground"
-                  >
-                    {/* Plan name */}
-                    <div>
-                      <span className="font-mono text-[10px] tracking-[0.25em] text-muted-foreground uppercase">
-                        {plan.name}
-                      </span>
-                    </div>
-
-                    {/* Price */}
-                    <div>
-                      <div className="flex items-baseline gap-1">
-                        <span className="font-display text-5xl uppercase tracking-tight text-foreground">
-                          {isINR ? `${symbol}${plan.inrPrice.toLocaleString('en-IN')}` : `$${plan.price}`}
-                        </span>
-                        <span className="font-mono text-[10px] tracking-wider text-muted-foreground uppercase">
-                          {currency}
-                        </span>
-                      </div>
-                      <p className="font-mono text-[10px] tracking-wider text-muted-foreground mt-1">
-                        {isINR ? plan.inrPerPhoto : plan.perPhoto} per photo
-                      </p>
-                    </div>
-
-                    {/* What you get */}
-                    <div className="border-t border-border/30 pt-5 space-y-2">
-                      <p className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground uppercase">
-                        You get
-                      </p>
-                      <p className="font-mono text-xl text-foreground">
-                        {plan.credits.toLocaleString()} credits
-                      </p>
-                      <p className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground uppercase">
-                        Generate up to {plan.photos} photos
-                      </p>
-                    </div>
-
-                    {/* CTA */}
-                    <div className="mt-auto pt-2">
-                      <Button
-                        className="w-full font-mono text-[10px] tracking-[0.2em] uppercase"
-                        size="lg"
-                        variant="default"
-                        disabled={loadingTier !== null}
-                        onClick={() => handleCheckout(tier.tier_id)}
-                      >
-                        {loadingTier === tier.tier_id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          `Buy ${plan.credits.toLocaleString()} Credits`
-                        )}
-                      </Button>
-                      {unavailableTier === tier.tier_id && (
-                        <p className="font-mono text-[9px] tracking-wider text-destructive mt-2">
-                          Offer unavailable.
-                        </p>
-                      )}
-                      {errorTier === tier.tier_id && (
-                        <p className="font-mono text-[9px] tracking-wider text-destructive mt-2">
-                          Checkout failed. Please try again.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <p className="font-mono text-sm tracking-wider text-muted-foreground mt-4 text-center">
-              1 standard photo = 8 credits.&nbsp;&nbsp;Higher-resolution photos use more credits.
-            </p>
-          </>
+          <CreditPlanGrid
+            tiers={tiers}
+            isINR={isINR}
+            symbol={symbol}
+            currency={currency}
+            loadingTier={loadingTier}
+            unavailableTier={unavailableTier}
+            errorTier={errorTier}
+            onCheckout={handleCheckout}
+          />
         )}
 
       </div>
