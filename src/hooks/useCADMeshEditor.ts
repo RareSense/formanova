@@ -140,6 +140,12 @@ export function useCADMeshEditor({ canvasRef, transformMode, setTransformMode }:
     canvasRef.current?.applyMaterial(matId, selectedNames);
   }, [canvasRef, selectedNames, pushUndo, showSelectionWarning]);
 
+  const handleApplyMetalToAll = useCallback((matId: string) => {
+    pushUndo("Apply metal to all");
+    const count = canvasRef.current?.applyMetalToAll(matId) ?? 0;
+    if (count === 0) showSelectionWarning("No metal parts to update");
+  }, [canvasRef, pushUndo, showSelectionWarning]);
+
   const handleSelectMesh = useCallback((name: string, multi: boolean) => {
     if (!name) {
       setMeshes((prev) => prev.map((m) => ({ ...m, selected: false })));
@@ -278,6 +284,7 @@ export function useCADMeshEditor({ canvasRef, transformMode, setTransformMode }:
     handleSelectMesh, handleMeshesDetected,
     handleMeshAction, handleSceneAction,
     handleApplyMaterial,
+    handleApplyMetalToAll,
     handleCopy, handlePaste, handleCut,
     toggleWireframe,
     resetMeshEditor,
