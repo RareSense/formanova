@@ -22,6 +22,7 @@ import {
 import { findMaterial, findMaterialByName } from "@/components/cad-studio/materials";
 import type { MaterialDef } from "@/components/cad-studio/materials";
 import { classifyCadPartName, isCadGemName } from "@/lib/cad-part-classifier";
+import { computeExplodeOffsets, easeExplode, EXPLODE_DURATION_S } from "@/lib/cad-explode";
 import { getQualitySettings, getGPURendererString, getSettingsForMode, getDynamicGemCaps } from "@/lib/gpu-detect";
 import type { QualityMode } from "@/lib/gpu-detect";
 import type { GemMode } from "./GemInstanceRenderer";
@@ -999,8 +1000,9 @@ const LoadedModel = forwardRef<
     onSceneWeightChange?: (heavy: boolean) => void;
     gemMode?: GemMode;
     onGemModeForced?: (mode: GemMode) => void;
+    exploded?: boolean;
   }
->(({ url, additionalGlbUrls = [], selectedMeshNames, hiddenMeshNames, onMeshClick, transformMode, onMeshesDetected, onTransformStart, onTransformEnd, onLoadStart, onLoadEnd, onModelReady, magicTexturing = false, onDebugGemStats, onSceneWeightChange, gemMode = "simple", onGemModeForced }, ref) => {
+>(({ url, additionalGlbUrls = [], selectedMeshNames, hiddenMeshNames, onMeshClick, transformMode, onMeshesDetected, onTransformStart, onTransformEnd, onLoadStart, onLoadEnd, onModelReady, magicTexturing = false, onDebugGemStats, onSceneWeightChange, gemMode = "simple", onGemModeForced, exploded = false }, ref) => {
   const [scene, setScene] = useState<THREE.Group | null>(null);
   const loadedUrlRef = useRef<string>("");
 
@@ -2278,6 +2280,31 @@ const LoadedModel = forwardRef<
     inv();
   }, [meshDataList, inv]);
 
+  // ── Explode view: display-only offset on a wrapper group per mesh ──
+  // meshDataList and the mesh transforms are never touched, so export, undo,
+  // weight and transform sync all keep seeing the assembled piece.
+  const explodeGroupRefs = useRef<Map<string, THREE.Group>>(new Map());
+  const explodeProgressRef = useRef(0);
+  const explodeOffsets = useMemo(() => computeExplodeOffsets(meshDataList), [meshDataList]);
+  useEffect(() => { inv(); }, [exploded, inv]);
+  useFrame((_, delta) => {
+    const target = exploded ? 1 : 0;
+    const progress = explodeProgressRef.current;
+    if (progress !== target) {
+      const step = Math.min(delta, 0.05) / EXPLODE_DURATION_S;
+      explodeProgressRef.current = target > progress ? Math.min(target, progress + step) : Math.max(target, progress - step);
+      // Keep painting until settled; one extra frame after that lets gem
+      // overlays copy the final world position.
+      inv();
+    }
+    const eased = easeExplode(explodeProgressRef.current);
+    for (const [name, group] of explodeGroupRefs.current) {
+      const offset = explodeOffsets.get(name);
+      if (offset && eased > 0) group.position.copy(offset).multiplyScalar(eased);
+      else group.position.set(0, 0, 0);
+    }
+  });
+
   // Find selected mesh ref for TransformControls (primary = first selected)
   const selectedMeshName = meshDataList.find((m) => selectedMeshNames.has(m.name))?.name;
   const selectedMeshRef = selectedMeshName ? meshRefs.current.get(selectedMeshName) : undefined;
@@ -2303,18 +2330,25 @@ const LoadedModel = forwardRef<
   return (
     <group>
       {standardElements.map((md) => (
-        <mesh
+        <group
           key={md.name}
-          ref={(r) => { if (r) meshRefs.current.set(md.name, r); }}
-          geometry={md.geometry}
-          material={md.material}
-          castShadow
-          onClick={(e: ThreeEvent<MouseEvent>) => {
-            e.stopPropagation();
-            if (_isTransformDragging) return;
-            onMeshClick(md.name, e.nativeEvent.shiftKey || e.nativeEvent.ctrlKey || e.nativeEvent.metaKey);
+          ref={(g) => {
+            if (g) explodeGroupRefs.current.set(md.name, g);
+            else explodeGroupRefs.current.delete(md.name);
           }}
-        />
+        >
+          <mesh
+            ref={(r) => { if (r) meshRefs.current.set(md.name, r); }}
+            geometry={md.geometry}
+            material={md.material}
+            castShadow
+            onClick={(e: ThreeEvent<MouseEvent>) => {
+              e.stopPropagation();
+              if (_isTransformDragging) return;
+              onMeshClick(md.name, e.nativeEvent.shiftKey || e.nativeEvent.ctrlKey || e.nativeEvent.metaKey);
+            }}
+          />
+        </group>
       ))}
 
       {/* BVH gemstone overlay rendered separately from transform-authority meshes. */}
@@ -2334,7 +2368,8 @@ const LoadedModel = forwardRef<
         />
       ))}
 
-      {selectedMeshRef && transformMode !== "orbit" && (
+      {/* No gizmo while exploded: parts would be edited in a temporary layout. */}
+      {selectedMeshRef && transformMode !== "orbit" && !exploded && (
         <TransformControlsWrapper
           object={selectedMeshRef}
           siblingObjects={siblingObjects}
@@ -2559,10 +2594,12 @@ interface CADCanvasProps {
   qualityMode?: QualityMode;
   gemMode?: GemMode;
   onGemModeForced?: (mode: GemMode) => void;
+  /** Radial explode view; display only, see src/lib/cad-explode.ts. */
+  exploded?: boolean;
 }
 
 const CADCanvas = forwardRef<CADCanvasHandle, CADCanvasProps>(
-  ({ hasModel, glbUrl, additionalGlbUrls = [], selectedMeshNames, hiddenMeshNames = new Set(), onMeshClick, transformMode, onMeshesDetected, onTransformStart, onTransformEnd, lightIntensity = 1, onModelReady, magicTexturing = false, qualityMode = "balanced", gemMode = "simple", onGemModeForced }, ref) => {
+  ({ hasModel, glbUrl, additionalGlbUrls = [], selectedMeshNames, hiddenMeshNames = new Set(), onMeshClick, transformMode, onMeshesDetected, onTransformStart, onTransformEnd, lightIntensity = 1, onModelReady, magicTexturing = false, qualityMode = "balanced", gemMode = "simple", onGemModeForced, exploded = false }, ref) => {
     const modelUrl = glbUrl || "/models/ring.glb";
     const modelRef = useRef<CADCanvasHandle>(null);
     const [heavyScene, setHeavyScene] = useState(false);
@@ -2790,6 +2827,7 @@ const CADCanvas = forwardRef<CADCanvasHandle, CADCanvasProps>(
                 magicTexturing={magicTexturing}
                 gemMode={gemMode}
                 onGemModeForced={onGemModeForced}
+                exploded={exploded}
                 onSceneWeightChange={setHeavyScene}
                 onDebugGemStats={debugActive ? (total, refraction, fallback, bounces) => {
                   setDebugStats(prev => ({

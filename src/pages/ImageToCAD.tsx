@@ -91,6 +91,9 @@ export default function ImageToCAD() {
   /** Presentation-only camera orbit; see useCadAutoRotate. */
   const autoRotate = useCadAutoRotate();
 
+  /** Radial explode view; display only, see src/lib/cad-explode.ts. */
+  const [exploded, setExploded] = useState(false);
+
   const activateWorkspace = useCallback(() => setWorkspaceActive(true), []);
 
   const [isRestoringFromUrl] = useState(
@@ -108,6 +111,9 @@ export default function ImageToCAD() {
     restoringFromUrl: isRestoringFromUrl,
     onWorkspaceActivate: activateWorkspace,
   });
+
+  // A new model starts assembled.
+  useEffect(() => { setExploded(false); }, [workflow.glbUrl]);
 
   useEffect(() => { runMicroBenchmark(); }, []);
 
@@ -322,6 +328,7 @@ export default function ImageToCAD() {
                 qualityMode="balanced"
                 gemMode={gemMode}
                 onGemModeForced={(mode) => setGemMode(mode)}
+                exploded={showCadUpload && exploded}
               />
             </CADRuntimeErrorBoundary>
 
@@ -439,6 +446,8 @@ export default function ImageToCAD() {
               }}
               onAutoRotate={autoRotate.toggleAutoRotate}
               autoRotateActive={autoRotate.isAutoRotating}
+              onExplode={showCadUpload ? () => setExploded(e => !e) : undefined}
+              explodeActive={exploded}
               onUndo={editor.handleUndo}
               onRedo={editor.handleRedo}
               undoCount={editor.undoStack.length}

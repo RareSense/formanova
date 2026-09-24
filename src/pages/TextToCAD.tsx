@@ -97,6 +97,9 @@ export default function TextToCAD() {
   /** Presentation-only camera orbit; see useCadAutoRotate. */
   const autoRotate = useCadAutoRotate();
 
+  /** Radial explode view; display only, see src/lib/cad-explode.ts. */
+  const [exploded, setExploded] = useState(false);
+
   const [isRestoringFromUrl] = useState(
     () => Boolean(searchParams.get('workflow_id')?.trim() || searchParams.get('glb')),
   );
@@ -112,6 +115,9 @@ export default function TextToCAD() {
     restoringFromUrl: isRestoringFromUrl,
     onWorkspaceActivate: activateWorkspace,
   });
+
+  // A new model starts assembled.
+  useEffect(() => { setExploded(false); }, [workflow.glbUrl]);
 
   // Track browser fullscreen state
   useEffect(() => {
@@ -350,6 +356,7 @@ export default function TextToCAD() {
                 qualityMode="balanced"
                 gemMode={gemMode}
                 onGemModeForced={(mode) => setGemMode(mode)}
+                exploded={showCadUpload && exploded}
               />
             </CADRuntimeErrorBoundary>
 
@@ -480,6 +487,8 @@ export default function TextToCAD() {
               }}
               onAutoRotate={autoRotate.toggleAutoRotate}
               autoRotateActive={autoRotate.isAutoRotating}
+              onExplode={showCadUpload ? () => setExploded(e => !e) : undefined}
+              explodeActive={exploded}
               onUndo={editor.handleUndo}
               onRedo={editor.handleRedo}
               undoCount={editor.undoStack.length}

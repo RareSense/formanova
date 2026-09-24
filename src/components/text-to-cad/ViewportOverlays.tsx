@@ -1,4 +1,4 @@
-import { Undo2, Redo2, Plus, Minus, Maximize, Eye, Keyboard, Loader2, Orbit, RotateCcw } from "lucide-react";
+import { Undo2, Redo2, Plus, Minus, Maximize, Eye, Keyboard, Loader2, Orbit, RotateCcw, Boxes } from "lucide-react";
 import { TRANSFORM_MODES, PROGRESS_STEPS } from "./types";
 import type { StatsData } from "./types";
 
@@ -134,7 +134,7 @@ function SideTooltip({ label }: { label: string }) {
   );
 }
 
-export function ViewportSideTools({ visible, onZoomIn, onZoomOut, onResetView, onUndo, onRedo, undoCount, redoCount, onFullscreen, onDisplayMenu, onKeyboardShortcuts, onAutoRotate, autoRotateActive = false  }: {
+export function ViewportSideTools({ visible, onZoomIn, onZoomOut, onResetView, onUndo, onRedo, undoCount, redoCount, onFullscreen, onDisplayMenu, onKeyboardShortcuts, onAutoRotate, autoRotateActive = false, onExplode, explodeActive = false }: {
   visible: boolean;
   onZoomIn: () => void;
   onZoomOut: () => void;
@@ -149,6 +149,9 @@ export function ViewportSideTools({ visible, onZoomIn, onZoomOut, onResetView, o
   /** Omit to hide the control, matching how the other optional tools behave. */
   onAutoRotate?: () => void;
   autoRotateActive?: boolean;
+  /** Radial explode view. Omit to hide the control (allowlisted users only). */
+  onExplode?: () => void;
+  explodeActive?: boolean;
 }) {
   if (!visible) return null;
 
@@ -192,6 +195,17 @@ export function ViewportSideTools({ visible, onZoomIn, onZoomOut, onResetView, o
         >
           <SideTooltip label="Auto Rotate" />
           <Orbit className="w-3.5 h-3.5" />
+        </button>
+      )}
+      {onExplode && (
+        <button
+          onClick={onExplode}
+          className={explodeActive ? SIDE_BTN_ACTIVE : SIDE_BTN}
+          title="Explode view"
+          aria-pressed={explodeActive}
+        >
+          <SideTooltip label="Explode" />
+          <Boxes className="w-3.5 h-3.5" />
         </button>
       )}
       {onFullscreen && (
