@@ -39,6 +39,7 @@ export const RING_CAD_TIERS = {
   GEMINI_3_1_PRO: 'gemini_3_1_pro_openrouter',
   GPT_5_6_LUNA: 'gpt_5_6_luna_openrouter',
   GPT_6_ASTRA: 'gpt_6_astra_openrouter',
+  GPT_6_ASTRA_OPENAI: 'gpt_6_astra_openai',
   GPT_6_ASTRA_PRO: 'gpt_6_astra_pro_openrouter',
 } as const;
 
@@ -49,13 +50,19 @@ export type RingCadTier = (typeof RING_CAD_TIERS)[keyof typeof RING_CAD_TIERS];
  * consistent with CAD_MODEL_SELECTOR_ENABLED being false. This selects the
  * model, not the price: what it costs is backend's to decide.
  *
- * Astra, matching what ring_cad_generate and ring_cad_improve use when no tier
- * is sent: the toolkit's own default for CAD code, repairs and the likeness
- * review is gpt_6_astra_openrouter. Sending the same value keeps a run on one
- * model whichever workflow it lands on. GPT_6_ASTRA_PRO is the heavier
- * sibling, and a one-line switch if the quality is worth the cost.
+ * Astra, reached through OpenAI directly rather than through OpenRouter. The
+ * same model either way; the difference is whose balance pays for it. An empty
+ * OpenRouter account returned 402 and ended five customers' runs as a bare
+ * "failed" with nothing to show for it, so the provider that bills us should
+ * not be a single point of failure. The direct route names the OpenRouter one
+ * as its fallback, so a run still completes if OpenAI is unreachable.
+ *
+ * This no longer matches the toolkit's own default (gpt_6_astra_openrouter),
+ * which applies only when no tier is sent - and this client always sends one.
+ * GPT_6_ASTRA_PRO remains the heavier sibling, a one-line switch if the
+ * quality is worth the cost; it is OpenRouter-only.
  */
-export const RING_CAD_DEFAULT_TIER: RingCadTier = RING_CAD_TIERS.GPT_6_ASTRA;
+export const RING_CAD_DEFAULT_TIER: RingCadTier = RING_CAD_TIERS.GPT_6_ASTRA_OPENAI;
 
 /**
  * Price is not defined here on purpose. It is set by backend per llm_tier and
