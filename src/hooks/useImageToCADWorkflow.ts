@@ -33,6 +33,7 @@ import { fetchCadRunInputs } from "@/lib/cad-result-api";
 import {
   CadImproveError,
   findRingForWorkflow,
+  improveWorkflowFor,
   latestVersion,
   startImproveFromVersion,
   versionLabel,
@@ -42,8 +43,6 @@ import {
 import { cadStatusNotice, type CadStatusNotice } from '@/lib/cad-status-copy';
 
 
-/** What an Improve press runs, so its price is quoted under the right name. */
-const IMPROVE_WORKFLOW = 'ring_cad_improve';
 
 interface WorkflowParams {
   model: string;
@@ -288,7 +287,7 @@ export function useImageToCADWorkflow({
     // path, shows the balance against the price, and sends the user to
     // /credits. Reaching the endpoint's own 402 instead would swap that
     // shared flow for a toast that says less and leads nowhere.
-    const approved = await checkCredits(IMPROVE_WORKFLOW, 1);
+    const approved = await checkCredits(improveWorkflowFor({ family: ring?.family }), 1);
     if (!approved) return;
     try {
       const started = await startImproveFromVersion(activeVersion.asset_id);
@@ -332,7 +331,7 @@ export function useImageToCADWorkflow({
       if (error instanceof CadImproveError && error.failure === 'insufficient_credits') {
         // The balance moved between the gate above and the start call, so hand
         // it back to the same shared flow rather than explaining it here.
-        await checkCredits(IMPROVE_WORKFLOW, 1);
+        await checkCredits(improveWorkflowFor({ family: ring?.family }), 1);
         return;
       }
       const message =
@@ -342,7 +341,7 @@ export function useImageToCADWorkflow({
       setImproveMessage(message);
       toast.error(message);
     }
-  }, [activeVersion, cadRoute, cadSource, checkCredits, onWorkspaceActivate, prompt, referenceImages.length, ring?.improve_running, tier, trackCadGeneration]);
+  }, [activeVersion, cadRoute, cadSource, checkCredits, onWorkspaceActivate, prompt, referenceImages.length, ring?.family, ring?.improve_running, tier, trackCadGeneration]);
 
   /** Leaves the run running in the background and returns to the upload screen. */
   const handleKeepCreating = useCallback(() => {

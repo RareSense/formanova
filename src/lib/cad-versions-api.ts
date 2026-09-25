@@ -3,7 +3,8 @@
  *
  * The ring vault: a ring's versions, and starting an improve on one.
  *
- *   GET  /api/cad/rings                        -> one entry per ring, versions nested
+ *   GET  /api/cad/models                       -> one entry per model, versions nested
+ *                                                 (/api/cad/rings is the older, identical path)
  *   POST /api/cad/versions/{asset_id}/improve  -> 202, starts ring_cad_improve
  *
  * Two things backend confirmed (2026-09-18) shape this module:
@@ -43,6 +44,8 @@ export interface CadRingVersion {
   threedm_url?: string | null;
   /** False when this version cannot be improved; the button stays hidden. */
   improvable?: boolean;
+  /** Why improvable is false (e.g. legacy_workflow_retired); null when it is true. */
+  improve_unavailable_reason?: string | null;
   created_at?: string | null;
 }
 
@@ -53,6 +56,18 @@ export interface CadRing {
   versions: CadRingVersion[];
   improve_running?: boolean;
   running_improve_workflow_id?: string | null;
+  /** Which workflow family made this model; null/absent on old ring records. */
+  family?: 'ring' | 'jewelry' | null;
+  jewelry_type?: 'ring' | 'necklace' | 'bracelet' | 'earring' | null;
+}
+
+/**
+ * The Improve workflow the server will run for this model, so the credit gate
+ * quotes the right price. The server picks it from the model's family; a
+ * record without one is ring output (GraphFlow's LEGACY_FAMILY).
+ */
+export function improveWorkflowFor(ring: Pick<CadRing, 'family'> | null | undefined): string {
+  return ring?.family === 'jewelry' ? 'jewelry_cad_improve' : 'ring_cad_improve';
 }
 
 /** Data Generation History already has and can paint before Studio refetches it. */
@@ -114,7 +129,7 @@ const MAX_PAGE_SIZE = 50;
 /** Paging starts at 0 there, so asking for page 1 skips the newest rings. */
 export async function fetchCadRings(page = 0, pageSize = MAX_PAGE_SIZE): Promise<CadRing[]> {
   const size = Math.min(pageSize, MAX_PAGE_SIZE);
-  const response = await authenticatedFetch(`/api/cad/rings?page=${page}&page_size=${size}`);
+  const response = await authenticatedFetch(`/api/cad/models?page=${page}&page_size=${size}`);
   if (!response.ok) {
     // An empty vault and an unreachable one must not look the same to a caller
     // deciding whether to show an Improve button.

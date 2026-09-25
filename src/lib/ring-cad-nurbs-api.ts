@@ -85,7 +85,13 @@ export const RING_CAD_DEFAULT_TIER: RingCadTier = RING_CAD_TIERS.GPT_6_ASTRA_OPE
  * The old export name is kept as an alias so the call sites that import it do
  * not all have to change in the same commit as the switch.
  */
-export const RING_CAD_WORKFLOW = 'ring_cad_generate';
+export const RING_CAD_WORKFLOW = 'jewelry_cad_generate';
+
+/**
+ * What jewelry_cad_generate builds. Rings take the exact ring pipeline inside
+ * it; the type is saved on the model and decides which Improve runs later.
+ */
+export type JewelryType = 'ring' | 'necklace' | 'bracelet' | 'earring';
 
 /** @deprecated Use RING_CAD_WORKFLOW; kept so existing imports keep working. */
 export const RING_CAD_NURBS_WORKFLOW = RING_CAD_WORKFLOW;
@@ -146,6 +152,8 @@ export interface RingCadStartParams {
   /** Required when there are no images; optional but always used otherwise. */
   userDescription?: string;
   tier?: string | null;
+  /** Defaults to 'ring', which is all this studio builds today. */
+  jewelryType?: JewelryType;
 }
 
 /**
@@ -225,6 +233,7 @@ export function buildRingCadStartBody({
   referenceImages,
   userDescription,
   tier = RING_CAD_DEFAULT_TIER,
+  jewelryType = 'ring',
 }: RingCadStartParams): RingCadStartBody {
   const images = [...referenceImages];
   const description = (userDescription ?? '').trim();
@@ -237,6 +246,7 @@ export function buildRingCadStartBody({
   }
 
   const payload: Record<string, unknown> = {
+    jewelry_type: jewelryType,
     reference_image_count: images.length,
     validation_screenshot_count: RING_CAD_VALIDATION_SCREENSHOT_COUNT,
     cad_run_mode: RING_CAD_RUN_MODE,

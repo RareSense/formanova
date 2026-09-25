@@ -439,3 +439,12 @@ describe('extractWorkflowCredits never sums unbilled attempts', () => {
     expect(extractWorkflowCredits({ line_items: [{ cost: 8 }, { cost: 2 }] })).toBeNull();
   });
 });
+
+describe('jewelry CAD workflows in history', () => {
+  it('are filed with the ring CAD workflows, not generic text-to-CAD', async () => {
+    const { isRingCadWorkflow } = await import('./generation-history-api');
+    expect(isRingCadWorkflow('jewelry_cad_generate')).toBe(true);
+    expect(isRingCadWorkflow('jewelry_cad_improve')).toBe(true);
+    expect(isRingCadWorkflow('jewelry_photoshoot')).toBe(false);
+  });
+});

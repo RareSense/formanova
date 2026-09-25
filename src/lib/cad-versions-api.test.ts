@@ -173,3 +173,20 @@ describe('readImproveResultFailure', () => {
     expect(readImproveResultFailure(500, { detail: { message: 'boom' } })).toBeNull();
   });
 });
+
+describe('jewelry families', () => {
+  it('history reads GET /api/cad/models', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { items: [RING] }));
+    await fetchCadRings();
+    expect(String(fetchMock.mock.calls[0][0])).toContain('/api/cad/models?');
+  });
+
+  it('prices Improve under the workflow the server will actually run', async () => {
+    const { improveWorkflowFor } = await import('./cad-versions-api');
+    expect(improveWorkflowFor({ ...RING, family: 'jewelry', jewelry_type: 'necklace' })).toBe('jewelry_cad_improve');
+    expect(improveWorkflowFor({ ...RING, family: 'ring', jewelry_type: null })).toBe('ring_cad_improve');
+    // Old records without a family are ring output (GraphFlow's LEGACY_FAMILY).
+    expect(improveWorkflowFor(RING)).toBe('ring_cad_improve');
+    expect(improveWorkflowFor(null)).toBe('ring_cad_improve');
+  });
+});
