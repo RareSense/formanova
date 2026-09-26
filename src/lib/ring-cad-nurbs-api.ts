@@ -111,6 +111,28 @@ export const RING_CAD_TOTAL_NODES = (() => {
   return Number.isFinite(raw) && raw > 0 ? raw : 64;
 })();
 
+// -- Jewelry type ----------------------------------------------------------
+
+/**
+ * The product the customer wants built. Sent as payload.jewelry_type, the key
+ * the v2 staging handoff (2026-09-25) names for routing one Generate flow by
+ * product. It is separate from the input mode: text and image runs can each
+ * ask for any type.
+ *
+ * Only ring has a registered graph today. Until backend routes the others,
+ * ring_cad_generate ignores this key and builds a ring whatever is chosen.
+ */
+export const CAD_JEWELRY_TYPES = [
+  { value: 'ring', label: 'Ring' },
+  { value: 'bracelet', label: 'Bracelet' },
+  { value: 'necklace', label: 'Necklace' },
+  { value: 'earring', label: 'Earring' },
+] as const;
+
+export type CadJewelryType = (typeof CAD_JEWELRY_TYPES)[number]['value'];
+
+export const DEFAULT_CAD_JEWELRY_TYPE: CadJewelryType = 'ring';
+
 // -- Request ---------------------------------------------------------------
 
 /** A stored blob reference, the same shape the run produces internally. */
@@ -146,6 +168,8 @@ export interface RingCadStartParams {
   /** Required when there are no images; optional but always used otherwise. */
   userDescription?: string;
   tier?: string | null;
+  /** Product to build. Defaults to ring, the only type with a registered graph. */
+  jewelryType?: CadJewelryType;
 }
 
 /**
@@ -225,6 +249,7 @@ export function buildRingCadStartBody({
   referenceImages,
   userDescription,
   tier = RING_CAD_DEFAULT_TIER,
+  jewelryType = DEFAULT_CAD_JEWELRY_TYPE,
 }: RingCadStartParams): RingCadStartBody {
   const images = [...referenceImages];
   const description = (userDescription ?? '').trim();
@@ -242,6 +267,7 @@ export function buildRingCadStartBody({
     cad_run_mode: RING_CAD_RUN_MODE,
     llm_api_key: RING_CAD_MANAGED_KEY,
     variant_api_key: RING_CAD_MANAGED_KEY,
+    jewelry_type: jewelryType,
   };
 
   // Text is optional whenever an image is supplied, mandatory when none is.

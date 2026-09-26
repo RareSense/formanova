@@ -6,6 +6,7 @@ import { AuthExpiredError, authenticatedFetch } from "@/lib/authenticated-fetch"
 import {
   RING_CAD_NURBS_WORKFLOW,
   RING_CAD_DEFAULT_TIER,
+  DEFAULT_CAD_JEWELRY_TYPE,
   RING_CAD_POLL_TIMEOUT_MS,
   buildRingCadStartBody,
   parseRingCadResult,
@@ -13,6 +14,7 @@ import {
   ringCadProgressFraction,
   isRingCadRepairing,
   type ArtifactRef,
+  type CadJewelryType,
 } from "@/lib/ring-cad-nurbs-api";
 import { buildReferenceInputs } from "@/lib/cad-reference-upload";
 import {
@@ -52,6 +54,8 @@ interface WorkflowParams {
   referenceImages: File[];
   /** ring_cad_nurbs_v1 tier; selects both the model and the price. */
   tier?: string;
+  /** Product to build, sent as payload.jewelry_type. Defaults to ring. */
+  jewelryType?: CadJewelryType;
   /** Which page owns this run, so the header/toast restore link returns here. */
   cadRoute: '/text-to-cad' | '/image-to-cad';
   /**
@@ -70,6 +74,7 @@ export function useImageToCADWorkflow({
   prompt,
   referenceImages,
   tier = RING_CAD_DEFAULT_TIER,
+  jewelryType = DEFAULT_CAD_JEWELRY_TYPE,
   cadRoute,
   restoringFromUrl = false,
   onWorkspaceActivate,
@@ -483,6 +488,7 @@ export function useImageToCADWorkflow({
         referenceImages: await buildReferenceInputs(referenceImages),
         userDescription: prompt,
         tier,
+        jewelryType,
       });
 
       // JWT only - the tenant API key and on-behalf-of header are applied by the
@@ -551,7 +557,7 @@ export function useImageToCADWorkflow({
       setProgressStep("failed_final");
       setGenerationFailed(true);
     }
-  }, [prompt, referenceImages, tier, cadRoute, cadSource, isGenerating, onWorkspaceActivate, trackCadGeneration, checkCredits]);
+  }, [prompt, referenceImages, tier, jewelryType, cadRoute, cadSource, isGenerating, onWorkspaceActivate, trackCadGeneration, checkCredits]);
 
   const resetWorkflow = useCallback(() => {
     hasNavigatedAway.current = false;

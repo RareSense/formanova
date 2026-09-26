@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildRingCadStartBody,
+  CAD_JEWELRY_TYPES,
+  DEFAULT_CAD_JEWELRY_TYPE,
   isRingCadSuccess,
   parseRingCadFailure,
   parseRingCadResult,
@@ -137,6 +139,37 @@ describe('ring_cad_nurbs_v1 start body', () => {
       expect(payload.llm_api_key).toBe('managed');
       expect(payload.variant_api_key).toBe('managed');
     }
+  });
+});
+
+describe('jewelry_type in the start body', () => {
+  it('offers ring, bracelet, necklace and earring, in that order', () => {
+    expect(CAD_JEWELRY_TYPES.map((t) => t.value)).toEqual(['ring', 'bracelet', 'necklace', 'earring']);
+  });
+
+  it('defaults to ring when no type is passed, so existing callers are unchanged', () => {
+    expect(DEFAULT_CAD_JEWELRY_TYPE).toBe('ring');
+    const { payload } = buildRingCadStartBody({ referenceImages: [], userDescription: 'plain band' });
+    expect(payload.jewelry_type).toBe('ring');
+  });
+
+  it('sends the chosen type in every input mode', () => {
+    for (const imgs of [[], [IMG(1)], [IMG(1), IMG(2)]] as const) {
+      const { payload } = buildRingCadStartBody({
+        referenceImages: [...imgs],
+        userDescription: imgs.length === 0 ? 'tennis bracelet' : undefined,
+        jewelryType: 'bracelet',
+      });
+      expect(payload.jewelry_type).toBe('bracelet');
+    }
+  });
+
+  it('does not change any other field of the ring payload', () => {
+    const base = buildRingCadStartBody({ referenceImages: [IMG(1)], userDescription: 'x' }).payload;
+    const typed = buildRingCadStartBody({ referenceImages: [IMG(1)], userDescription: 'x', jewelryType: 'necklace' }).payload;
+    const { jewelry_type: _a, ...restBase } = base;
+    const { jewelry_type: _b, ...restTyped } = typed;
+    expect(restTyped).toEqual(restBase);
   });
 });
 

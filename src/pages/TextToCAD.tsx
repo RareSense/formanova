@@ -36,7 +36,7 @@ import {
 import GemToggle from "@/components/text-to-cad/QualityToggle";
 import { runMicroBenchmark } from "@/lib/gpu-detect";
 import type { GemMode } from "@/components/text-to-cad/CADCanvas";
-import { RING_CAD_DEFAULT_TIER, RING_CAD_TIERS } from "@/lib/ring-cad-nurbs-api";
+import { RING_CAD_DEFAULT_TIER, RING_CAD_TIERS, DEFAULT_CAD_JEWELRY_TYPE, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
 import { recordStudioVisit } from '@/lib/studio-preference';
 import { useCadRestoreFromUrl } from "@/hooks/useCadRestoreFromUrl";
 
@@ -65,6 +65,7 @@ export default function TextToCAD() {
 
   const [model] = useState("gemini");
   const [prompt, setPrompt] = useState("");
+  const [jewelryType, setJewelryType] = useState<CadJewelryType>(DEFAULT_CAD_JEWELRY_TYPE);
   const [transformMode, setTransformMode] = useState("orbit");
   const wasManualUploadRef = useRef(false);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
@@ -109,6 +110,7 @@ export default function TextToCAD() {
     prompt,
     referenceImages: NO_REFERENCE_IMAGES,
     tier: activeTier,
+    jewelryType,
     cadRoute: '/text-to-cad',
     // Read once, at first render, so arriving from the result email
     // paints the loading state instead of an empty workspace.
@@ -247,6 +249,8 @@ export default function TextToCAD() {
           setModel={() => {}}
           prompt={prompt}
           setPrompt={setPrompt}
+          jewelryType={jewelryType}
+          setJewelryType={setJewelryType}
           isGenerating={workflow.isGenerating}
           onGenerate={workflow.simulateGeneration}
           onGlbUpload={showCadUpload ? handleGlbUpload : undefined}
