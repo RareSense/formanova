@@ -87,14 +87,10 @@ describe('ring_cad_nurbs_v1 start body', () => {
     expect(payload).not.toHaveProperty('llm_model');
   });
 
-  it('defaults to Astra reached through OpenAI, not through OpenRouter', () => {
-    // Same model as gpt_6_astra_openrouter, billed to OpenAI instead. An empty
-    // OpenRouter balance answered 402 and ended five customers' runs with
-    // nothing delivered, so the billing provider is chosen here deliberately.
-    // The direct route falls back to OpenRouter, so this is not a hard cutover.
+  it('defaults to Claude Opus 5.5 through OpenRouter', () => {
     const { payload } = buildRingCadStartBody({ referenceImages: [IMG(1)] });
     expect(payload.llm_tier).toBe(RING_CAD_DEFAULT_TIER);
-    expect(RING_CAD_DEFAULT_TIER).toBe(RING_CAD_TIERS.GPT_6_ASTRA_OPENAI);
+    expect(RING_CAD_DEFAULT_TIER).toBe('claude_opus_5_5_openrouter');
   });
 
   it('sends the fixed tier, which selects the model rather than the price', () => {
