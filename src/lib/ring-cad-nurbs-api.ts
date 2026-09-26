@@ -41,6 +41,7 @@ export const RING_CAD_TIERS = {
   GPT_6_ASTRA: 'gpt_6_astra_openrouter',
   GPT_6_ASTRA_OPENAI: 'gpt_6_astra_openai',
   GPT_6_ASTRA_PRO: 'gpt_6_astra_pro_openrouter',
+  CLAUDE_OPUS_5_5_ANTHROPIC: 'claude_opus_5_5_anthropic',
 } as const;
 
 export type RingCadTier = (typeof RING_CAD_TIERS)[keyof typeof RING_CAD_TIERS];
@@ -50,19 +51,17 @@ export type RingCadTier = (typeof RING_CAD_TIERS)[keyof typeof RING_CAD_TIERS];
  * consistent with CAD_MODEL_SELECTOR_ENABLED being false. This selects the
  * model, not the price: what it costs is backend's to decide.
  *
- * Astra, reached through OpenAI directly rather than through OpenRouter. The
- * same model either way; the difference is whose balance pays for it. An empty
- * OpenRouter account returned 402 and ended five customers' runs as a bare
- * "failed" with nothing to show for it, so the provider that bills us should
- * not be a single point of failure. The direct route names the OpenRouter one
- * as its fallback, so a run still completes if OpenAI is unreachable.
+ * Claude Opus 5.5 through Anthropic directly, not through OpenRouter: an empty
+ * OpenRouter balance ended customers' runs, so the account that bills us is
+ * Anthropic's. The toolkit tier runs it with adaptive thinking at effort high,
+ * streaming, 128k output and a two-hour budget. GPT_6_ASTRA_OPENAI (Astra via
+ * OpenAI directly) remains a one-line switch back.
  *
- * This no longer matches the toolkit's own default (gpt_6_astra_openrouter),
- * which applies only when no tier is sent - and this client always sends one.
- * GPT_6_ASTRA_PRO remains the heavier sibling, a one-line switch if the
- * quality is worth the cost; it is OpenRouter-only.
+ * The tier must exist in the toolkit that serves the environment: it does in
+ * FormaNova_cad_toolkit_v2 (staging); production's toolkit needs it before this
+ * default ships there.
  */
-export const RING_CAD_DEFAULT_TIER: RingCadTier = RING_CAD_TIERS.GPT_6_ASTRA_OPENAI;
+export const RING_CAD_DEFAULT_TIER: RingCadTier = RING_CAD_TIERS.CLAUDE_OPUS_5_5_ANTHROPIC;
 
 /**
  * Price is not defined here on purpose. It is set by backend per llm_tier and
