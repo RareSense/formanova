@@ -116,6 +116,28 @@ export const RING_CAD_TOTAL_NODES = (() => {
   return Number.isFinite(raw) && raw > 0 ? raw : 64;
 })();
 
+// -- Jewelry type ----------------------------------------------------------
+
+/**
+ * The product the customer wants built. Sent as payload.jewelry_type, the key
+ * the v2 staging handoff (2026-09-25) names for routing one Generate flow by
+ * product. It is separate from the input mode: text and image runs can each
+ * ask for any type.
+ *
+ * jewelry_cad_generate routes on it: ring takes the exact ring pipeline, the
+ * others take the jewelry pipeline. Values match JewelryType above.
+ */
+export const CAD_JEWELRY_TYPES = [
+  { value: 'ring', label: 'Ring' },
+  { value: 'bracelet', label: 'Bracelet' },
+  { value: 'necklace', label: 'Necklace' },
+  { value: 'earring', label: 'Earring' },
+] as const;
+
+export type CadJewelryType = (typeof CAD_JEWELRY_TYPES)[number]['value'];
+
+export const DEFAULT_CAD_JEWELRY_TYPE: CadJewelryType = 'ring';
+
 // -- Request ---------------------------------------------------------------
 
 /** A stored blob reference, the same shape the run produces internally. */
@@ -151,8 +173,8 @@ export interface RingCadStartParams {
   /** Required when there are no images; optional but always used otherwise. */
   userDescription?: string;
   tier?: string | null;
-  /** Defaults to 'ring', which is all this studio builds today. */
-  jewelryType?: JewelryType;
+  /** Product to build, from the Text/Image to CAD dropdown. Defaults to ring. */
+  jewelryType?: CadJewelryType;
 }
 
 /**
@@ -232,7 +254,7 @@ export function buildRingCadStartBody({
   referenceImages,
   userDescription,
   tier = RING_CAD_DEFAULT_TIER,
-  jewelryType = 'ring',
+  jewelryType = DEFAULT_CAD_JEWELRY_TYPE,
 }: RingCadStartParams): RingCadStartBody {
   const images = [...referenceImages];
   const description = (userDescription ?? '').trim();

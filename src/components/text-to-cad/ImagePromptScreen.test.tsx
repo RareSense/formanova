@@ -23,6 +23,8 @@ function renderScreen() {
       tier="claude_opus_5_openrouter"
       prompt=""
       setPrompt={vi.fn()}
+      jewelryType="ring"
+      setJewelryType={vi.fn()}
       isGenerating={false}
       onGenerate={vi.fn()}
       referenceImagePreviewUrls={[]}
@@ -49,5 +51,11 @@ describe('ImagePromptScreen', () => {
   it('shows the examples while there is no history', () => {
     renderScreen();
     expect(screen.getByText('Try an Example')).toBeTruthy();
+  });
+
+  it('shows the jewelry type picker beside Generate, set to Ring', () => {
+    renderScreen();
+    const picker = screen.getByRole('combobox', { name: 'Jewelry type' });
+    expect(picker.textContent).toContain('Ring');
   });
 });

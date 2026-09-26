@@ -3,7 +3,8 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { useEstimatedCost } from "@/hooks/use-estimated-cost";
-import { RING_CAD_NURBS_WORKFLOW } from "@/lib/ring-cad-nurbs-api";
+import { RING_CAD_NURBS_WORKFLOW, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
+import CadJewelryTypeSelect from "@/components/text-to-cad/CadJewelryTypeSelect";
 
 const EXAMPLE_PROMPTS = [
   "Serpentine ring with a coiled snake design",
@@ -20,13 +21,15 @@ interface InitialPromptScreenProps {
   setModel: (m: string) => void;
   prompt: string;
   setPrompt: (p: string) => void;
+  jewelryType: CadJewelryType;
+  setJewelryType: (t: CadJewelryType) => void;
   isGenerating: boolean;
   onGenerate: () => void;
   onGlbUpload?: (file: File) => void;
 }
 
 export default function InitialPromptScreen({
-  model, tier, setModel, prompt, setPrompt,
+  model, tier, setModel, prompt, setPrompt, jewelryType, setJewelryType,
   isGenerating, onGenerate, onGlbUpload,
 }: InitialPromptScreenProps) {
   const glbInputRef = useRef<HTMLInputElement>(null);
@@ -98,7 +101,8 @@ export default function InitialPromptScreen({
             {/* Generate — matches Photo Studio's Next button: right-aligned,
                 gold gradient, size="lg". */}
             {(
-              <div className="mx-auto flex max-w-[680px] items-center justify-end gap-3">
+              <div className="mx-auto flex max-w-[680px] flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end">
+                <CadJewelryTypeSelect value={jewelryType} onChange={setJewelryType} disabled={isGenerating} />
                 <Button
                   size="lg"
                   onClick={onGenerate}
