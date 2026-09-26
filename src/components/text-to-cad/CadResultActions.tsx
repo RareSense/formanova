@@ -36,6 +36,8 @@ export interface CadResultActionsProps {
   latestVersionLabel?: string;
   /** Required for the Improve button to render, alongside latestVersionLabel. */
   onImproveFromVersion?: () => void;
+  /** Grays Improve out and ignores presses: this version cannot be improved. */
+  improveDisabled?: boolean;
 }
 
 // Improve is where the eye should land, so it carries the filled treatment and
@@ -53,6 +55,7 @@ export function CadResultActions({
   isBusy = false,
   latestVersionLabel,
   onImproveFromVersion,
+  improveDisabled = false,
 }: CadResultActionsProps) {
   const showImprove = Boolean(latestVersionLabel && onImproveFromVersion);
 
@@ -65,6 +68,8 @@ export function CadResultActions({
         <button
           type="button"
           onClick={onImproveFromVersion}
+          disabled={improveDisabled}
+          title={improveDisabled ? 'This version cannot be improved' : undefined}
           className={cn('pointer-events-auto', CAD_RESULT_ACTION_WIDTH, IMPROVE_BASE, CAD_RESULT_ACTION_SIZE)}
         >
           <Sparkles className="h-[18px] w-[18px] shrink-0" />

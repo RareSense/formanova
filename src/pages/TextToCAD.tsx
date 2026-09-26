@@ -399,6 +399,7 @@ export default function TextToCAD() {
                 onExportEdited={hasEdits ? downloads.exportEdited : undefined}
                 latestVersionLabel={workflow.latestVersionLabel}
                 onImproveFromVersion={workflow.improveFromLatestVersion}
+                improveDisabled={!workflow.canImproveLatestVersion}
               />
             )}
 

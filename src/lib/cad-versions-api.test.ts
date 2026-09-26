@@ -5,6 +5,7 @@ vi.mock('@/lib/authenticated-fetch', () => ({ authenticatedFetch: vi.fn() }));
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import {
   CadImproveError,
+  canImproveVersion,
   fetchImproveOutcome,
   fetchCadRings,
   findRingForWorkflow,
@@ -188,5 +189,15 @@ describe('jewelry families', () => {
     // Old records without a family are ring output (GraphFlow's LEGACY_FAMILY).
     expect(improveWorkflowFor(RING)).toBe('ring_cad_improve');
     expect(improveWorkflowFor(null)).toBe('ring_cad_improve');
+  });
+});
+
+describe('canImproveVersion', () => {
+  it('allows Improve only when the backend says improvable is exactly true', () => {
+    expect(canImproveVersion({ improvable: true })).toBe(true);
+    expect(canImproveVersion({ improvable: false, improve_unavailable_reason: 'legacy_workflow_retired' })).toBe(false);
+    // A missing flag is not permission: GraphFlow shows IMPROVE only on true.
+    expect(canImproveVersion({})).toBe(false);
+    expect(canImproveVersion(null)).toBe(false);
   });
 });

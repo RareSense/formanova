@@ -36,6 +36,7 @@ import {
   CadImproveError,
   findRingForWorkflow,
   improveWorkflowFor,
+  canImproveVersion,
   latestVersion,
   startImproveFromVersion,
   versionLabel,
@@ -286,7 +287,7 @@ export function useImageToCADWorkflow({
    * came from a different button.
    */
   const improveFromLatestVersion = useCallback(async () => {
-    if (!activeVersion || activeVersion.improvable === false || ring?.improve_running) return;
+    if (!activeVersion || !canImproveVersion(activeVersion) || ring?.improve_running) return;
     setImproveMessage(null);
     // The same gate every paid run uses: it saves this page as the return
     // path, shows the balance against the price, and sends the user to
@@ -611,10 +612,9 @@ export function useImageToCADWorkflow({
      * ("Looks better"), which is a different thing and belongs on the version
      * list, not on the button.
      */
-    latestVersionLabel:
-      activeVersion && activeVersion.improvable !== false
-        ? versionLabel(activeVersion)
-        : undefined,
+    latestVersionLabel: activeVersion ? versionLabel(activeVersion) : undefined,
+    /** False grays the Improve button out: only improvable === true may be pressed. */
+    canImproveLatestVersion: canImproveVersion(activeVersion),
     /** Every saved version of this ring, oldest first, for the side panel. */
     versions,
     selectedVersionId: activeVersion?.asset_id ?? null,

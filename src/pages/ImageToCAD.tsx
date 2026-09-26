@@ -370,6 +370,7 @@ export default function ImageToCAD() {
                 onExportEdited={hasEdits ? downloads.exportEdited : undefined}
                 latestVersionLabel={workflow.latestVersionLabel}
                 onImproveFromVersion={workflow.improveFromLatestVersion}
+                improveDisabled={!workflow.canImproveLatestVersion}
               />
             )}
 

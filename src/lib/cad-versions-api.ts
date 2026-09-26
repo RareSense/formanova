@@ -70,6 +70,15 @@ export function improveWorkflowFor(ring: Pick<CadRing, 'family'> | null | undefi
   return ring?.family === 'jewelry' ? 'jewelry_cad_improve' : 'ring_cad_improve';
 }
 
+/**
+ * Whether Improve may be pressed on this version. Only an explicit true
+ * counts: GraphFlow shows IMPROVE only when improvable is true, and a missing
+ * flag is not permission. The server refuses the press either way.
+ */
+export function canImproveVersion(version: Pick<CadRingVersion, 'improvable'> | null | undefined): boolean {
+  return version?.improvable === true;
+}
+
 /** Data Generation History already has and can paint before Studio refetches it. */
 export interface CadRestoreSeed {
   ring: CadRing;

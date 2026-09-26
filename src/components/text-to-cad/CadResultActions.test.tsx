@@ -4,7 +4,7 @@
  * the download still offers exactly what the run produced, and its size does
  * not depend on whether the Improve button is beside it.
  */
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 
 import { CadResultActions } from './CadResultActions';
@@ -35,6 +35,29 @@ describe('CadResultActions', () => {
       />,
     );
     expect(screen.getByRole('button', { name: /improve from v3/i })).toBeTruthy();
+  });
+
+  it('shows Improve grayed out and unpressable when the version cannot be improved', () => {
+    const onImprove = vi.fn();
+    render(
+      <CadResultActions
+        onDownloadThreedm={vi.fn()}
+        latestVersionLabel="V2"
+        onImproveFromVersion={onImprove}
+        improveDisabled
+      />,
+    );
+    const improve = screen.getByRole('button', { name: /improve from v2/i }) as HTMLButtonElement;
+    expect(improve.disabled).toBe(true);
+    fireEvent.click(improve);
+    expect(onImprove).not.toHaveBeenCalled();
+  });
+
+  it('keeps Improve pressable when the version can be improved', () => {
+    const onImprove = vi.fn();
+    render(<CadResultActions latestVersionLabel="V2" onImproveFromVersion={onImprove} />);
+    fireEvent.click(screen.getByRole('button', { name: /improve from v2/i }));
+    expect(onImprove).toHaveBeenCalledTimes(1);
   });
 
   it('gives both controls the same size, so siblings stay equal', () => {
