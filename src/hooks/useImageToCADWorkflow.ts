@@ -669,9 +669,11 @@ export function useImageToCADWorkflow({
     latestVersionLabel: activeVersion ? versionLabel(activeVersion) : undefined,
     /**
      * False grays the Improve button out: only improvable === true may be
-     * pressed, and never from a press until the ring is re-read after the run.
+     * pressed, never from a press until the ring is re-read after the run, and
+     * never while the server says an improve of this model is running (which
+     * covers a page opened or reloaded mid-run, where no press happened here).
      */
-    canImproveLatestVersion: canImproveVersion(activeVersion) && !improveLocked,
+    canImproveLatestVersion: canImproveVersion(activeVersion) && !improveLocked && !ring?.improve_running,
     /** This version's paid review left nothing to fix: Improve reads "Can't be improved". */
     improveExhausted: isImprovementExhausted(activeVersion),
     /** Every saved version of this ring, oldest first, for the side panel. */
