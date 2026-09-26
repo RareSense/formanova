@@ -35,6 +35,7 @@ import type { CadReferenceItem } from '@/lib/microservices-api';
 export const RING_CAD_TIERS = {
   FABLE_5: 'claude_fable_5_openrouter',
   OPUS_5: 'claude_opus_5_openrouter',
+  OPUS_5_5: 'claude_opus_5_5_openrouter',
   GPT_5_6_SOL: 'gpt_5_6_sol_openrouter',
   GEMINI_3_1_PRO: 'gemini_3_1_pro_openrouter',
   GPT_5_6_LUNA: 'gpt_5_6_luna_openrouter',
@@ -50,19 +51,12 @@ export type RingCadTier = (typeof RING_CAD_TIERS)[keyof typeof RING_CAD_TIERS];
  * consistent with CAD_MODEL_SELECTOR_ENABLED being false. This selects the
  * model, not the price: what it costs is backend's to decide.
  *
- * Astra, reached through OpenAI directly rather than through OpenRouter. The
- * same model either way; the difference is whose balance pays for it. An empty
- * OpenRouter account returned 402 and ended five customers' runs as a bare
- * "failed" with nothing to show for it, so the provider that bills us should
- * not be a single point of failure. The direct route names the OpenRouter one
- * as its fallback, so a run still completes if OpenAI is unreachable.
- *
- * This no longer matches the toolkit's own default (gpt_6_astra_openrouter),
- * which applies only when no tier is sent - and this client always sends one.
- * GPT_6_ASTRA_PRO remains the heavier sibling, a one-line switch if the
- * quality is worth the cost; it is OpenRouter-only.
+ * Claude Opus 5.5 through OpenRouter. This is not the toolkit's own default
+ * (gpt_6_astra_openrouter), which applies only when no tier is sent - and this
+ * client always sends one. GPT_6_ASTRA_OPENAI is a one-line switch back if
+ * the OpenRouter balance or the quality says otherwise.
  */
-export const RING_CAD_DEFAULT_TIER: RingCadTier = RING_CAD_TIERS.GPT_6_ASTRA_OPENAI;
+export const RING_CAD_DEFAULT_TIER: RingCadTier = RING_CAD_TIERS.OPUS_5_5;
 
 /**
  * Price is not defined here on purpose. It is set by backend per llm_tier and
