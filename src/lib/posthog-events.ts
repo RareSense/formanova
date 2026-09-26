@@ -392,15 +392,18 @@ export function trackCadImproveRequested(props: CadImproveRequestedProps) {
 
 export function trackCadImproveFinished(props: CadImproveFinishedProps) {
   capture('cad_improve_finished', { ...props });
-  if (posthog.__loaded) {
+  if (!posthog.__loaded) return;
+  // posthog-js has no people.increment (people is set/set_once only); calling
+  // it threw inside the failure handler and left a failed Improve stuck on
+  // "generating". Counts come from the cad_improve_finished events. Analytics
+  // must never break the flow that calls it, hence the guard.
+  try {
     posthog.people.set({
       last_improve_at: new Date().toISOString(),
       last_improve_outcome: props.outcome,
     });
-    posthog.people.increment({
-      improve_count: 1,
-      improve_versions_created: props.new_version_created ? 1 : 0,
-    });
+  } catch {
+    // ignore: the event above is already captured
   }
 }
 

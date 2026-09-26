@@ -130,6 +130,12 @@ export function useImageToCADWorkflow({
    * be worse.
    */
   const [improveLocked, setImproveLocked] = useState(false);
+  /**
+   * Set on the click itself, before any await: a second click 150 ms later
+   * still sees the old state and got through, sending two paid improve POSTs
+   * (staging browser test, 2026-09-27).
+   */
+  const improvePressRef = useRef(false);
 
   /**
    * True only while a run this page started is still on its way to the screen.
@@ -329,15 +335,23 @@ export function useImageToCADWorkflow({
    * came from a different button.
    */
   const improveFromLatestVersion = useCallback(async () => {
-    if (!activeVersion || !canImproveVersion(activeVersion) || ring?.improve_running || improveLocked) return;
+    if (!activeVersion || !canImproveVersion(activeVersion) || ring?.improve_running || improveLocked
+      || improvePressRef.current) return;
+    improvePressRef.current = true;
+    // Locked from the click, not after the credit check: that check can take
+    // seconds, and the button stayed pressable the whole time.
+    setImproveLocked(true);
     setImproveMessage(null);
     // The same gate every paid run uses: it saves this page as the return
     // path, shows the balance against the price, and sends the user to
     // /credits. Reaching the endpoint's own 402 instead would swap that
     // shared flow for a toast that says less and leads nowhere.
     const approved = await checkCredits(improveWorkflowFor({ family: ring?.family }), 1);
-    if (!approved) return;
-    setImproveLocked(true);
+    if (!approved) {
+      improvePressRef.current = false;
+      setImproveLocked(false);
+      return;
+    }
     try {
       const started = await startImproveFromVersion(activeVersion.asset_id);
       const fromVersion = (activeVersion.position ?? 0) + 1;
@@ -400,6 +414,9 @@ export function useImageToCADWorkflow({
         if (found) setRing(found);
       }
       setImproveLocked(false);
+    } finally {
+      // The click is handled; the run itself stays locked by improveLocked.
+      improvePressRef.current = false;
     }
   }, [activeVersion, cadRoute, cadSource, checkCredits, onWorkspaceActivate, prompt, referenceImages.length, ring?.family, ring?.improve_running, ring?.set_id, improveLocked, tier, trackCadGeneration]);
 

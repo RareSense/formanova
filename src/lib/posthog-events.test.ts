@@ -4,7 +4,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('posthog-js', () => ({
   default: {
     capture: vi.fn(),
-    people: { set: vi.fn(), increment: vi.fn() },
+    // posthog-js 1.354.3: people has set and set_once only; there is no increment.
+    people: { set: vi.fn(), set_once: vi.fn() },
     setPersonProperties: vi.fn(),
     reset: vi.fn(),
     identify: vi.fn(),
@@ -256,15 +257,16 @@ describe('trackCadImproveFinished', () => {
       last_improve_at: expect.any(String),
       last_improve_outcome: 'improved',
     })
-    expect(posthog.people.increment).toHaveBeenCalledWith({
-      improve_count: 1,
-      improve_versions_created: 1,
-    })
     expect(posthog.identify).not.toHaveBeenCalled()
   })
 
-  it('increments improve_versions_created by zero when no version was created', () => {
-    trackCadImproveFinished({
+  it('never throws into the app, even when the PostHog person API fails', () => {
+    // A throw here once left a failed Improve stuck on "generating": the
+    // failure handler emits this before it marks the run failed.
+    vi.mocked(posthog.people.set).mockImplementationOnce(() => {
+      throw new TypeError('people.set is not a function')
+    })
+    expect(() => trackCadImproveFinished({
       workflow_id: 'state-improve-2',
       source: 'text-to-cad',
       from_version: 2,
@@ -275,12 +277,8 @@ describe('trackCadImproveFinished', () => {
       new_issue_count: 0,
       open_issue_count: 1,
       duration_ms: 3000,
-    })
-
-    expect(posthog.people.increment).toHaveBeenCalledWith({
-      improve_count: 1,
-      improve_versions_created: 0,
-    })
+    })).not.toThrow()
+    expect(posthog.capture).toHaveBeenCalledWith('cad_improve_finished', expect.objectContaining({ outcome: 'no_safe_fix' }))
   })
 })
 
