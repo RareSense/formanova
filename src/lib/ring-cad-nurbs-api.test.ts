@@ -139,8 +139,14 @@ describe('ring_cad_nurbs_v1 start body', () => {
 });
 
 describe('jewelry_type in the start body', () => {
-  it('offers ring, bracelet, necklace and earring, in that order', () => {
-    expect(CAD_JEWELRY_TYPES.map((t) => t.value)).toEqual(['ring', 'bracelet', 'necklace', 'earring']);
+  it('offers ring, bracelet, necklace, earring and other, in that order', () => {
+    expect(CAD_JEWELRY_TYPES.map((t) => t.value)).toEqual(['ring', 'bracelet', 'necklace', 'earring', 'other']);
+    expect(CAD_JEWELRY_TYPES.find((t) => t.value === 'other')?.label).toBe('Other');
+  });
+
+  it('sends other for pieces outside the four families (brooch, cufflinks, ...)', () => {
+    const { payload } = buildRingCadStartBody({ referenceImages: [IMG(1)], userDescription: 'a brooch', jewelryType: 'other' });
+    expect(payload.jewelry_type).toBe('other');
   });
 
   it('defaults to ring when no type is passed, so existing callers are unchanged', () => {

@@ -90,7 +90,7 @@ export const RING_CAD_WORKFLOW = 'jewelry_cad_generate';
  * What jewelry_cad_generate builds. Rings take the exact ring pipeline inside
  * it; the type is saved on the model and decides which Improve runs later.
  */
-export type JewelryType = 'ring' | 'necklace' | 'bracelet' | 'earring';
+export type JewelryType = 'ring' | 'necklace' | 'bracelet' | 'earring' | 'other';
 
 /** @deprecated Use RING_CAD_WORKFLOW; kept so existing imports keep working. */
 export const RING_CAD_NURBS_WORKFLOW = RING_CAD_WORKFLOW;
@@ -132,6 +132,9 @@ export const CAD_JEWELRY_TYPES = [
   { value: 'bracelet', label: 'Bracelet' },
   { value: 'necklace', label: 'Necklace' },
   { value: 'earring', label: 'Earring' },
+  // Brooch, tiara, cufflinks, anklet, charm, watch case and the like. The
+  // backend works out the actual piece from the photos and description.
+  { value: 'other', label: 'Other' },
 ] as const;
 
 export type CadJewelryType = (typeof CAD_JEWELRY_TYPES)[number]['value'];

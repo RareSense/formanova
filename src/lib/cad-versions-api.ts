@@ -58,7 +58,7 @@ export interface CadRing {
   running_improve_workflow_id?: string | null;
   /** Which workflow family made this model; null/absent on old ring records. */
   family?: 'ring' | 'jewelry' | null;
-  jewelry_type?: 'ring' | 'necklace' | 'bracelet' | 'earring' | null;
+  jewelry_type?: 'ring' | 'necklace' | 'bracelet' | 'earring' | 'other' | null;
 }
 
 /**
