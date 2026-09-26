@@ -7,6 +7,7 @@ import {
   CadImproveError,
   canImproveVersion,
   fetchImproveOutcome,
+  fetchCadRingBySetId,
   fetchCadRings,
   findRingForWorkflow,
   latestVersion,
@@ -199,5 +200,50 @@ describe('canImproveVersion', () => {
     // A missing flag is not permission: GraphFlow shows IMPROVE only on true.
     expect(canImproveVersion({})).toBe(false);
     expect(canImproveVersion(null)).toBe(false);
+  });
+});
+
+describe('fetchImproveOutcome time limit', () => {
+  it('gives up when /result does not answer in time, like any unreadable outcome', async () => {
+    vi.useFakeTimers();
+    try {
+      fetchMock.mockImplementationOnce((_url, init) => new Promise((_resolve, reject) => {
+        (init as RequestInit | undefined)?.signal?.addEventListener('abort', () => {
+          reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+        });
+      }));
+      const pending = fetchImproveOutcome('wf_slow', { timeoutMs: 1000 });
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(await pending).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('passes an abort signal so the wait can be cut short', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, {}));
+    await fetchImproveOutcome('wf_2');
+    const init = fetchMock.mock.calls[0][1] as RequestInit | undefined;
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
+  });
+});
+
+describe('fetchCadRingBySetId', () => {
+  it('reloads the one ring by set_id, with its fresh improvable flags', async () => {
+    const refreshed = {
+      ...RING,
+      versions: [RING.versions[0], { ...RING.versions[1], improvable: false,
+        improve_unavailable_reason: 'improvement_exhausted' }],
+    };
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { items: [{ set_id: 'other', versions: [] }, refreshed] }));
+    const ring = await fetchCadRingBySetId('set_1');
+    expect(ring?.versions[1]).toMatchObject({ improvable: false, improve_unavailable_reason: 'improvement_exhausted' });
+  });
+
+  it('is null when the ring is not listed or the list cannot be read', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { items: [] }));
+    expect(await fetchCadRingBySetId('set_1')).toBeNull();
+    fetchMock.mockResolvedValueOnce(jsonResponse(500, {}));
+    expect(await fetchCadRingBySetId('set_1')).toBeNull();
   });
 });

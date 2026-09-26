@@ -628,6 +628,48 @@ describe('GenerationsContext - Image to 3D runs', () => {
     }));
   });
 
+  it('reads the outcome when returning to the tab is what finds the run failed', async () => {
+    // The focus check used to mark the run failed without asking /result, so
+    // the reason (e.g. "Can't be improved") was lost and nothing reloaded.
+    mockAuthenticatedFetch.mockResolvedValueOnce(jsonResponse({ runtime: { state: 'failed' } }));
+    mockFetchImproveOutcome.mockResolvedValueOnce({
+      message: 'Nothing more to fix on this version.',
+      reasonCode: 'improvement_exhausted',
+    } as never);
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    act(() => { result.current.trackCadGeneration({ workflowId: 'cad-stale-failed', cadRoute: '/image-to-cad' }); });
+
+    act(() => { window.dispatchEvent(new Event('focus')); });
+
+    await waitFor(() => expect(result.current.generations[0]).toMatchObject({
+      status: 'failed',
+      cadFailureReasonCode: 'improvement_exhausted',
+    }));
+    expect(mockFetchImproveOutcome.mock.calls[0][0]).toBe('cad-stale-failed');
+    expect(mockMarkFailed).toHaveBeenCalledTimes(1);
+  });
+
+  it('settles a failed run once even when the poll and the focus check both see it', async () => {
+    let finishPoll: (reason: Error) => void = () => {};
+    mockPollWorkflow.mockReturnValueOnce(new Promise((_resolve, reject) => { finishPoll = reject; }) as never);
+    let answerOutcome: (value: null) => void = () => {};
+    mockFetchImproveOutcome.mockReturnValueOnce(new Promise((resolve) => { answerOutcome = resolve; }) as never);
+    mockAuthenticatedFetch.mockResolvedValue(jsonResponse({ runtime: { state: 'failed' } }));
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    act(() => { result.current.trackCadGeneration({ workflowId: 'cad-race', cadRoute: '/image-to-cad' }); });
+    await waitFor(() => expect(mockPollWorkflow).toHaveBeenCalled());
+
+    // The poll reports failed and is still waiting on /result ...
+    await act(async () => { finishPoll(new Error('Workflow failed')); });
+    // ... when the user returns to the tab.
+    act(() => { window.dispatchEvent(new Event('focus')); });
+    await act(async () => { answerOutcome(null); });
+
+    await waitFor(() => expect(result.current.generations[0].status).toBe('failed'));
+    expect(mockMarkFailed).toHaveBeenCalledTimes(1);
+    expect(mockFetchImproveOutcome).toHaveBeenCalledTimes(1);
+  });
+
   it('runs cad and photoshoot generations side by side', async () => {
     const { result } = renderHook(() => useGenerations(), { wrapper });
     act(() => {

@@ -132,6 +132,9 @@ export interface CadImproveStarted {
   authorized_budget?: number;
 }
 
+/** How long a failed run's outcome is waited for before generic copy is shown. */
+export const IMPROVE_OUTCOME_TIMEOUT_MS = 20_000;
+
 /** Page size the vault endpoint accepts; larger values are rejected. */
 const MAX_PAGE_SIZE = 50;
 
@@ -211,6 +214,23 @@ export async function findRingForWorkflow(
   return null;
 }
 
+/**
+ * One ring re-read from the list by its set_id, or null.
+ *
+ * After a failed or refused press the version's improvable flag may have
+ * changed on the backend (a "Can't be improved" mark is written just after the
+ * run fails), so the ring on screen must be refreshed from the list. A ring
+ * being improved is a recent one, so the first page is enough.
+ */
+export async function fetchCadRingBySetId(setId: string): Promise<CadRing | null> {
+  try {
+    const rings = await fetchCadRings();
+    return rings.find((ring) => ring.set_id === setId) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** Starts one repair pass on a version. The backend builds the payload. */
 export async function startImproveFromVersion(assetId: string): Promise<CadImproveStarted> {
   const response = await authenticatedFetch(`/api/cad/versions/${assetId}/improve`, { method: 'POST' });
@@ -251,15 +271,25 @@ export async function startImproveFromVersion(assetId: string): Promise<CadImpro
  * reason}`. Everything else keeps a plain string detail, so the two are told
  * apart by the shape of the body rather than by the status alone.
  */
-export async function fetchImproveOutcome(workflowId: string): Promise<CadImproveError | null> {
+export async function fetchImproveOutcome(
+  workflowId: string,
+  { timeoutMs = IMPROVE_OUTCOME_TIMEOUT_MS }: { timeoutMs?: number } = {},
+): Promise<CadImproveError | null> {
+  // /result answers only after the backend's shutdown bookkeeping, which is
+  // normally seconds but can run longer while it retries. The failed run must
+  // not stay on screen as running meanwhile, so the wait is bounded.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await authenticatedFetch(`/api/result/${workflowId}`);
+    const response = await authenticatedFetch(`/api/result/${workflowId}`, { signal: controller.signal });
     if (response.ok) return null;
     return readImproveResultFailure(response.status, await response.json().catch(() => null));
   } catch {
     // A press whose outcome cannot be read is reported as an ordinary failure
     // by the caller, which is the safer of the two stories to tell.
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 

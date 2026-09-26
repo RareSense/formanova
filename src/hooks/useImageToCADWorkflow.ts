@@ -34,6 +34,7 @@ import { fetchCadResult } from "@/lib/generation-history-api";
 import { fetchCadRunInputs } from "@/lib/cad-result-api";
 import {
   CadImproveError,
+  fetchCadRingBySetId,
   findRingForWorkflow,
   improveWorkflowFor,
   canImproveVersion,
@@ -256,6 +257,29 @@ export function useImageToCADWorkflow({
     };
   }, [hasModel, trackedRun?.status, sourceWorkflowId]);
 
+  /**
+   * Re-reads the ring on screen after an Improve press failed.
+   *
+   * A failed press makes no new version, so the lookup above never runs, yet
+   * the backend may have just marked the version "Can't be improved". The run
+   * is shown failed only after /result answered, which is after that mark is
+   * written, so one read here picks it up and the button greys out. The
+   * selected version is kept.
+   */
+  const improveFailedRingId = trackedRun?.status === 'failed' && trackedRun.cadAnalytics?.operation === 'improve'
+    ? ring?.set_id ?? null
+    : null;
+  useEffect(() => {
+    if (!improveFailedRingId) return;
+    let cancelled = false;
+    void fetchCadRingBySetId(improveFailedRingId).then((found) => {
+      if (!cancelled && found) setRing(found);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [improveFailedRingId, trackedRun?.workflowId]);
+
   const versions = ring?.versions ? [...ring.versions].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)) : [];
   const latestRingVersion = ring ? latestVersion(ring) : null;
   /** What Improve acts on: the version on screen, which is the newest until picked. */
@@ -346,8 +370,14 @@ export function useImageToCADWorkflow({
           : 'Could not start the improvement. Please try again.';
       setImproveMessage(message);
       toast.error(message);
+      // A refused press means the flags on screen are stale; re-read them so
+      // the button reflects the backend instead of inviting another press.
+      if (error instanceof CadImproveError && error.failure === 'not_improvable' && ring?.set_id) {
+        const found = await fetchCadRingBySetId(ring.set_id);
+        if (found) setRing(found);
+      }
     }
-  }, [activeVersion, cadRoute, cadSource, checkCredits, onWorkspaceActivate, prompt, referenceImages.length, ring?.family, ring?.improve_running, tier, trackCadGeneration]);
+  }, [activeVersion, cadRoute, cadSource, checkCredits, onWorkspaceActivate, prompt, referenceImages.length, ring?.family, ring?.improve_running, ring?.set_id, tier, trackCadGeneration]);
 
   /** Leaves the run running in the background and returns to the upload screen. */
   const handleKeepCreating = useCallback(() => {
