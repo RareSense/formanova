@@ -53,6 +53,25 @@ describe('CadResultActions', () => {
     expect(onImprove).not.toHaveBeenCalled();
   });
 
+  it('says it cannot be improved when the version has nothing left to fix', () => {
+    const onImprove = vi.fn();
+    render(
+      <CadResultActions
+        onDownloadThreedm={vi.fn()}
+        latestVersionLabel="V3"
+        onImproveFromVersion={onImprove}
+        improveDisabled
+        improveExhausted
+      />,
+    );
+    const button = screen.getByRole('button', { name: "Can't be improved" }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    fireEvent.click(button);
+    expect(onImprove).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /improve from/i })).toBeNull();
+    for (const size of CAD_RESULT_ACTION_SIZE.split(' ')) expect(button.className).toContain(size);
+  });
+
   it('keeps Improve pressable when the version can be improved', () => {
     const onImprove = vi.fn();
     render(<CadResultActions latestVersionLabel="V2" onImproveFromVersion={onImprove} />);

@@ -38,6 +38,11 @@ export interface CadResultActionsProps {
   onImproveFromVersion?: () => void;
   /** Grays Improve out and ignores presses: this version cannot be improved. */
   improveDisabled?: boolean;
+  /**
+   * The version's paid review left nothing to fix. Improve stays in its slot,
+   * greyed out, and reads "Can't be improved" so the bar does not move.
+   */
+  improveExhausted?: boolean;
 }
 
 // Improve is where the eye should land, so it carries the filled treatment and
@@ -56,6 +61,7 @@ export function CadResultActions({
   latestVersionLabel,
   onImproveFromVersion,
   improveDisabled = false,
+  improveExhausted = false,
 }: CadResultActionsProps) {
   const showImprove = Boolean(latestVersionLabel && onImproveFromVersion);
 
@@ -68,12 +74,12 @@ export function CadResultActions({
         <button
           type="button"
           onClick={onImproveFromVersion}
-          disabled={improveDisabled}
-          title={improveDisabled ? 'This version cannot be improved' : undefined}
+          disabled={improveDisabled || improveExhausted}
+          title={improveDisabled && !improveExhausted ? 'This version cannot be improved' : undefined}
           className={cn('pointer-events-auto', CAD_RESULT_ACTION_WIDTH, IMPROVE_BASE, CAD_RESULT_ACTION_SIZE)}
         >
           <Sparkles className="h-[18px] w-[18px] shrink-0" />
-          {`Improve from ${latestVersionLabel}`}
+          {improveExhausted ? "Can't be improved" : `Improve from ${latestVersionLabel}`}
         </button>
       )}
       <CadDownloadMenu

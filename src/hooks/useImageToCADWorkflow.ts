@@ -38,6 +38,7 @@ import {
   findRingForWorkflow,
   improveWorkflowFor,
   canImproveVersion,
+  isImprovementExhausted,
   latestVersion,
   startImproveFromVersion,
   versionLabel,
@@ -120,6 +121,15 @@ export function useImageToCADWorkflow({
   const [restoredPrompt, setRestoredPrompt] = useState<string | null>(null);
   /** Which version the panel is showing; the newest until the user picks another. */
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+  /**
+   * Improve is locked on every version of this model from the press until the
+   * ring is re-read after the run ends (GraphFlow's rule: one improve per model,
+   * and the "Can't be improved" mark is written just after a run fails, so the
+   * flags on screen are stale until that re-read). A failed re-read unlocks
+   * too: the server still refuses a stale press, and a button stuck grey would
+   * be worse.
+   */
+  const [improveLocked, setImproveLocked] = useState(false);
 
   /**
    * True only while a run this page started is still on its way to the screen.
@@ -228,11 +238,15 @@ export function useImageToCADWorkflow({
     // button missing on a ring that was already saved and improvable.
     const ready = trackedRun ? trackedRun.status === 'completed' : hasModel;
     if (!ready || !sourceWorkflowId) return;
+    // Only the re-read after a run of ours completed may lift the lock; the
+    // render right after a press has no tracked run yet and must not.
+    const runCompleted = trackedRun?.status === 'completed';
     let cancelled = false;
     findRingForWorkflow(sourceWorkflowId)
       .then(async (found) => {
         if (cancelled) return;
         setRing(found);
+        if (runCompleted) setImproveLocked(false);
         const producedVersion = (found?.versions ?? []).find(
           (version) => version.source_workflow_id === sourceWorkflowId,
         );
@@ -250,7 +264,9 @@ export function useImageToCADWorkflow({
         }
       })
       .catch(() => {
-        if (!cancelled) setRing(null);
+        if (cancelled) return;
+        setRing(null);
+        if (runCompleted) setImproveLocked(false);
       });
     return () => {
       cancelled = true;
@@ -273,7 +289,9 @@ export function useImageToCADWorkflow({
     if (!improveFailedRingId) return;
     let cancelled = false;
     void fetchCadRingBySetId(improveFailedRingId).then((found) => {
-      if (!cancelled && found) setRing(found);
+      if (cancelled) return;
+      if (found) setRing(found);
+      setImproveLocked(false);
     });
     return () => {
       cancelled = true;
@@ -311,7 +329,7 @@ export function useImageToCADWorkflow({
    * came from a different button.
    */
   const improveFromLatestVersion = useCallback(async () => {
-    if (!activeVersion || !canImproveVersion(activeVersion) || ring?.improve_running) return;
+    if (!activeVersion || !canImproveVersion(activeVersion) || ring?.improve_running || improveLocked) return;
     setImproveMessage(null);
     // The same gate every paid run uses: it saves this page as the return
     // path, shows the balance against the price, and sends the user to
@@ -319,6 +337,7 @@ export function useImageToCADWorkflow({
     // shared flow for a toast that says less and leads nowhere.
     const approved = await checkCredits(improveWorkflowFor({ family: ring?.family }), 1);
     if (!approved) return;
+    setImproveLocked(true);
     try {
       const started = await startImproveFromVersion(activeVersion.asset_id);
       const fromVersion = (activeVersion.position ?? 0) + 1;
@@ -359,6 +378,7 @@ export function useImageToCADWorkflow({
       });
     } catch (error) {
       if (error instanceof CadImproveError && error.failure === 'insufficient_credits') {
+        setImproveLocked(false);
         // The balance moved between the gate above and the start call, so hand
         // it back to the same shared flow rather than explaining it here.
         await checkCredits(improveWorkflowFor({ family: ring?.family }), 1);
@@ -370,14 +390,18 @@ export function useImageToCADWorkflow({
           : 'Could not start the improvement. Please try again.';
       setImproveMessage(message);
       toast.error(message);
-      // A refused press means the flags on screen are stale; re-read them so
-      // the button reflects the backend instead of inviting another press.
-      if (error instanceof CadImproveError && error.failure === 'not_improvable' && ring?.set_id) {
+      // A refused press (409 version_not_improvable or improve_already_running)
+      // means the flags on screen are stale; re-read them so the button
+      // reflects the backend instead of inviting another press.
+      const refused = error instanceof CadImproveError
+        && (error.failure === 'not_improvable' || error.failure === 'already_running');
+      if (refused && ring?.set_id) {
         const found = await fetchCadRingBySetId(ring.set_id);
         if (found) setRing(found);
       }
+      setImproveLocked(false);
     }
-  }, [activeVersion, cadRoute, cadSource, checkCredits, onWorkspaceActivate, prompt, referenceImages.length, ring?.family, ring?.improve_running, ring?.set_id, tier, trackCadGeneration]);
+  }, [activeVersion, cadRoute, cadSource, checkCredits, onWorkspaceActivate, prompt, referenceImages.length, ring?.family, ring?.improve_running, ring?.set_id, improveLocked, tier, trackCadGeneration]);
 
   /** Leaves the run running in the background and returns to the upload screen. */
   const handleKeepCreating = useCallback(() => {
@@ -643,8 +667,13 @@ export function useImageToCADWorkflow({
      * list, not on the button.
      */
     latestVersionLabel: activeVersion ? versionLabel(activeVersion) : undefined,
-    /** False grays the Improve button out: only improvable === true may be pressed. */
-    canImproveLatestVersion: canImproveVersion(activeVersion),
+    /**
+     * False grays the Improve button out: only improvable === true may be
+     * pressed, and never from a press until the ring is re-read after the run.
+     */
+    canImproveLatestVersion: canImproveVersion(activeVersion) && !improveLocked,
+    /** This version's paid review left nothing to fix: Improve reads "Can't be improved". */
+    improveExhausted: isImprovementExhausted(activeVersion),
     /** Every saved version of this ring, oldest first, for the side panel. */
     versions,
     selectedVersionId: activeVersion?.asset_id ?? null,

@@ -10,6 +10,7 @@ import {
   fetchCadRingBySetId,
   fetchCadRings,
   findRingForWorkflow,
+  isImprovementExhausted,
   latestVersion,
   readImproveResultFailure,
   startImproveFromVersion,
@@ -46,6 +47,27 @@ describe('latestVersion', () => {
 
   it('is null for a ring with no versions, so no button is offered', () => {
     expect(latestVersion({ set_id: 's', versions: [] })).toBeNull();
+  });
+});
+
+describe('isImprovementExhausted', () => {
+  const base = { asset_id: 'a1', position: 0 };
+
+  it('is true only when the version is not improvable for the exhausted reason', () => {
+    expect(isImprovementExhausted({ ...base, improvable: false, improve_unavailable_reason: 'improvement_exhausted' })).toBe(true);
+  });
+
+  it('is false for any other reason a version cannot be improved', () => {
+    expect(isImprovementExhausted({ ...base, improvable: false, improve_unavailable_reason: 'version_incomplete' })).toBe(false);
+    expect(isImprovementExhausted({ ...base, improvable: false })).toBe(false);
+  });
+
+  it('is false while the version is still improvable', () => {
+    expect(isImprovementExhausted({ ...base, improvable: true, improve_unavailable_reason: null })).toBe(false);
+  });
+
+  it('is false with no version on screen', () => {
+    expect(isImprovementExhausted(null)).toBe(false);
   });
 });
 

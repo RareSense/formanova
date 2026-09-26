@@ -371,6 +371,7 @@ export default function ImageToCAD() {
                 latestVersionLabel={workflow.latestVersionLabel}
                 onImproveFromVersion={workflow.improveFromLatestVersion}
                 improveDisabled={!workflow.canImproveLatestVersion}
+                improveExhausted={workflow.improveExhausted}
               />
             )}
 

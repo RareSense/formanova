@@ -400,6 +400,7 @@ export default function TextToCAD() {
                 latestVersionLabel={workflow.latestVersionLabel}
                 onImproveFromVersion={workflow.improveFromLatestVersion}
                 improveDisabled={!workflow.canImproveLatestVersion}
+                improveExhausted={workflow.improveExhausted}
               />
             )}
 

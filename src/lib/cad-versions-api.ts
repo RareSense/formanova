@@ -79,6 +79,19 @@ export function canImproveVersion(version: Pick<CadRingVersion, 'improvable'> | 
   return version?.improvable === true;
 }
 
+/**
+ * A paid review of this exact version found nothing more to fix, so GraphFlow
+ * refuses further presses on it. The greyed button then says so instead of
+ * still offering "Improve from Vn".
+ */
+export const IMPROVEMENT_EXHAUSTED = 'improvement_exhausted';
+
+export function isImprovementExhausted(
+  version: Pick<CadRingVersion, 'improvable' | 'improve_unavailable_reason'> | null | undefined,
+): boolean {
+  return version?.improvable === false && version.improve_unavailable_reason === IMPROVEMENT_EXHAUSTED;
+}
+
 /** Data Generation History already has and can paint before Studio refetches it. */
 export interface CadRestoreSeed {
   ring: CadRing;
