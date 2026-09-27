@@ -292,7 +292,12 @@ export function buildRingCadStartBody({
     payload.reference_evidence_by_slot = { image_1: images.map(referenceEvidence) };
   }
 
-  if (tier) payload.llm_tier = tier;
+  // Analysis has an independent server default; send both so the selected
+  // provider applies to contract/review as well as coding.
+  if (tier) {
+    payload.llm_tier = tier;
+    payload.analysis_tier = tier;
+  }
 
   return { payload };
 }

@@ -86,6 +86,7 @@ describe('ring_cad_nurbs_v1 start body', () => {
       tier: RING_CAD_TIERS.FABLE_5,
     });
     expect(payload.llm_tier).toBe(RING_CAD_TIERS.FABLE_5);
+    expect(payload.analysis_tier).toBe(RING_CAD_TIERS.FABLE_5);
     expect(payload).not.toHaveProperty('llm_model');
   });
 
@@ -93,6 +94,26 @@ describe('ring_cad_nurbs_v1 start body', () => {
     const { payload } = buildRingCadStartBody({ referenceImages: [IMG(1)] });
     expect(payload.llm_tier).toBe(RING_CAD_DEFAULT_TIER);
     expect(RING_CAD_DEFAULT_TIER).toBe('gpt_6_astra_openai');
+    expect(payload.analysis_tier).toBe('gpt_6_astra_openai');
+  });
+
+  it('uses direct OpenAI for coding and analysis across jewelry categories and input modes', () => {
+    for (const { value: jewelryType } of CAD_JEWELRY_TYPES) {
+      for (const referenceImages of [[], [IMG(1)], [IMG(1), IMG(2)]]) {
+        const { payload } = buildRingCadStartBody({
+          jewelryType, referenceImages, userDescription: 'A jewelry design',
+        });
+        expect(payload.llm_tier).toBe('gpt_6_astra_openai');
+        expect(payload.analysis_tier).toBe('gpt_6_astra_openai');
+        expect(payload).not.toHaveProperty('llm_model');
+      }
+    }
+  });
+
+  it('preserves explicit omission of both tier overrides', () => {
+    const { payload } = buildRingCadStartBody({ referenceImages: [IMG(1)], tier: null });
+    expect(payload).not.toHaveProperty('llm_tier');
+    expect(payload).not.toHaveProperty('analysis_tier');
   });
 
   it('sends the fixed tier, which selects the model rather than the price', () => {
