@@ -37,6 +37,9 @@ import GemToggle from "@/components/text-to-cad/QualityToggle";
 import { runMicroBenchmark } from "@/lib/gpu-detect";
 import type { GemMode } from "@/components/text-to-cad/CADCanvas";
 import { RING_CAD_DEFAULT_TIER, RING_CAD_TIERS, DEFAULT_CAD_JEWELRY_TYPE, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
+import CadModelPicker from "@/components/text-to-cad/CadModelPicker";
+import { DEFAULT_CAD_PICK, cadPickerTier, type CadModelPick } from "@/lib/cad-model-picker";
 import { recordStudioVisit } from '@/lib/studio-preference';
 import { useCadRestoreFromUrl } from "@/hooks/useCadRestoreFromUrl";
 
@@ -61,7 +64,11 @@ export default function TextToCAD() {
   const requestedTier = searchParams.get('tier') === RING_CAD_TIERS.GPT_5_6_SOL
     ? RING_CAD_TIERS.GPT_5_6_SOL
     : undefined;
-  const activeTier = requestedTier ?? RING_CAD_DEFAULT_TIER;
+  const isAdmin = useIsAdmin();
+  const [modelPick, setModelPick] = useState<CadModelPick>(DEFAULT_CAD_PICK);
+  // Admins choose the model and provider; everyone else keeps the fixed default.
+  const pickedTier = isAdmin ? cadPickerTier(modelPick.model, modelPick.provider) : RING_CAD_DEFAULT_TIER;
+  const activeTier = requestedTier ?? pickedTier;
 
   const [model] = useState("gemini");
   const [prompt, setPrompt] = useState("");
@@ -254,6 +261,9 @@ export default function TextToCAD() {
           isGenerating={workflow.isGenerating}
           onGenerate={workflow.simulateGeneration}
           onGlbUpload={showCadUpload ? handleGlbUpload : undefined}
+          modelPicker={isAdmin ? (
+            <CadModelPicker value={modelPick} onChange={setModelPick} disabled={workflow.isGenerating} />
+          ) : undefined}
         />
       </div>
     );

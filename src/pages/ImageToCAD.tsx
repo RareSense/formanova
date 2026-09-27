@@ -33,6 +33,9 @@ import { ViewportToolbar, ViewportSideTools } from "@/components/text-to-cad/Vie
 import GemToggle from "@/components/text-to-cad/QualityToggle";
 import type { GemMode } from "@/components/text-to-cad/CADCanvas";
 import { RING_CAD_DEFAULT_TIER, DEFAULT_CAD_JEWELRY_TYPE, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
+import CadModelPicker from "@/components/text-to-cad/CadModelPicker";
+import { DEFAULT_CAD_PICK, cadPickerTier, type CadModelPick } from "@/lib/cad-model-picker";
 import { recordStudioVisit } from '@/lib/studio-preference';
 import { useCadRestoreFromUrl } from "@/hooks/useCadRestoreFromUrl";
 
@@ -49,7 +52,11 @@ export default function ImageToCAD() {
   const showCadUpload = isCadUploadEnabled(user?.email);
 
   const [model] = useState("gemini");
-  const activeTier = RING_CAD_DEFAULT_TIER;
+  const isAdmin = useIsAdmin();
+  const [modelPick, setModelPick] = useState<CadModelPick>(DEFAULT_CAD_PICK);
+  // Admins choose the model and provider; everyone else keeps the fixed default.
+  const pickedTier = isAdmin ? cadPickerTier(modelPick.model, modelPick.provider) : RING_CAD_DEFAULT_TIER;
+  const activeTier = pickedTier;
   const {
     referenceImages,
     referenceImagePreviewUrls,
@@ -228,6 +235,9 @@ export default function ImageToCAD() {
           onAddReferenceImages={addReferenceImages}
           onRemoveReferenceImage={removeReferenceImage}
           onReplaceReferenceImages={replaceReferenceImages}
+          modelPicker={isAdmin ? (
+            <CadModelPicker value={modelPick} onChange={setModelPick} disabled={workflow.isGenerating} />
+          ) : undefined}
           onGlbUpload={showCadUpload ? (file) => {
             setWorkspaceActive(true);
             workflow.setHasModel(true);

@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect, useState } from "react";
+import { useRef, useCallback, useEffect, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
@@ -77,6 +77,8 @@ interface ImagePromptScreenProps {
   /** Replaces the whole set (used by the example designs). */
   onReplaceReferenceImages: (files: File[]) => void;
   onGlbUpload?: (file: File) => void;
+  /** Admin-only model/provider picker; the page passes it only for admins. */
+  modelPicker?: ReactNode;
 }
 
 export default function ImagePromptScreen({
@@ -84,7 +86,7 @@ export default function ImagePromptScreen({
   isGenerating, onGenerate,
   referenceImagePreviewUrls,
   onAddReferenceImages, onRemoveReferenceImage, onReplaceReferenceImages,
-  onGlbUpload,
+  onGlbUpload, modelPicker,
 }: ImagePromptScreenProps) {
   const glbInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -200,6 +202,8 @@ export default function ImagePromptScreen({
               </div>
 
             </div>
+
+            {modelPicker && <div className="mt-4">{modelPicker}</div>}
 
             {/* Action area — matches Photo Studio's Next button exactly:
                 right-aligned below the canvas, gold gradient, size="lg". */}

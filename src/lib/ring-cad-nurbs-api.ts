@@ -43,6 +43,10 @@ export const RING_CAD_TIERS = {
   GPT_6_ASTRA_PRO: 'gpt_6_astra_pro_openrouter',
   CLAUDE_OPUS_5_5_ANTHROPIC: 'claude_opus_5_5_anthropic',
   CLAUDE_OPUS_5_5_OPENROUTER: 'claude_opus_5_5_openrouter',
+  QWEN_3_8_MAX_QWEN: 'qwen_3_8_max_qwen',
+  QWEN_3_8_MAX_OPENROUTER: 'qwen_3_8_max_openrouter',
+  GEMINI_3_8_FLASH_GOOGLE: 'gemini_3_8_flash_google',
+  GEMINI_3_8_FLASH_OPENROUTER: 'gemini_3_8_flash_openrouter',
 } as const;
 
 export type RingCadTier = (typeof RING_CAD_TIERS)[keyof typeof RING_CAD_TIERS];
