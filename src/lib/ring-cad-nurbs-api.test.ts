@@ -89,10 +89,10 @@ describe('ring_cad_nurbs_v1 start body', () => {
     expect(payload).not.toHaveProperty('llm_model');
   });
 
-  it('defaults to GPT-6 Astra through OpenRouter', () => {
+  it('defaults to GPT-6 Astra through direct OpenAI', () => {
     const { payload } = buildRingCadStartBody({ referenceImages: [IMG(1)] });
     expect(payload.llm_tier).toBe(RING_CAD_DEFAULT_TIER);
-    expect(RING_CAD_DEFAULT_TIER).toBe('gpt_6_astra_openrouter');
+    expect(RING_CAD_DEFAULT_TIER).toBe('gpt_6_astra_openai');
   });
 
   it('sends the fixed tier, which selects the model rather than the price', () => {
