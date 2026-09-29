@@ -26,6 +26,8 @@ describe('CAD model picker tiers', () => {
       'qwen_3_8_max/openrouter': 'qwen_3_8_max_openrouter',
       'gemini_3_8_flash/direct': 'gemini_3_8_flash_google',
       'gemini_3_8_flash/openrouter': 'gemini_3_8_flash_openrouter',
+      'gemini_3_1_pro/direct': 'gemini_3_1_pro_google',
+      'gemini_3_1_pro/openrouter': 'gemini_3_1_pro_openrouter',
     });
   });
 
@@ -39,6 +41,7 @@ describe('CAD model picker tiers', () => {
       'GPT-6 Astra',
       'Qwen 3.8 Max',
       'Gemini 3.8 Flash',
+      'Gemini 3.1 Pro',
     ]);
     expect(CAD_PICKER_PROVIDERS.map((p) => p.label)).toEqual(['Direct', 'OpenRouter']);
   });

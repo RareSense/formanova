@@ -37,6 +37,7 @@ export const RING_CAD_TIERS = {
   OPUS_5: 'claude_opus_5_openrouter',
   GPT_5_6_SOL: 'gpt_5_6_sol_openrouter',
   GEMINI_3_1_PRO: 'gemini_3_1_pro_openrouter',
+  GEMINI_3_1_PRO_GOOGLE: 'gemini_3_1_pro_google',
   GPT_5_6_LUNA: 'gpt_5_6_luna_openrouter',
   GPT_6_ASTRA: 'gpt_6_astra_openrouter',
   GPT_6_ASTRA_OPENAI: 'gpt_6_astra_openai',

@@ -39,6 +39,11 @@ export const CAD_PICKER_MODELS: readonly CadPickerModel[] = [
     label: 'Gemini 3.8 Flash',
     tiers: { direct: RING_CAD_TIERS.GEMINI_3_8_FLASH_GOOGLE, openrouter: RING_CAD_TIERS.GEMINI_3_8_FLASH_OPENROUTER },
   },
+  {
+    id: 'gemini_3_1_pro',
+    label: 'Gemini 3.1 Pro',
+    tiers: { direct: RING_CAD_TIERS.GEMINI_3_1_PRO_GOOGLE, openrouter: RING_CAD_TIERS.GEMINI_3_1_PRO },
+  },
 ];
 
 export const CAD_PICKER_PROVIDERS: readonly { id: CadPickerProviderId; label: string }[] = [
