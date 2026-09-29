@@ -505,7 +505,7 @@ export function useImageToCADWorkflow({
     return true;
   }, [onWorkspaceActivate, cadSource]);
 
-  const simulateGeneration = useCallback(async () => {
+  const startGeneration = useCallback(async () => {
     if (isGenerating) return;
     const imageCount = referenceImages.length;
     const hasPrompt = !!prompt.trim();
@@ -629,6 +629,23 @@ export function useImageToCADWorkflow({
       setGenerationFailed(true);
     }
   }, [prompt, referenceImages, tier, jewelryType, cadRoute, cadSource, isGenerating, onWorkspaceActivate, trackCadGeneration, checkCredits]);
+
+  /**
+   * One press, one run. isGenerating only turns true after the credit check
+   * answers, so on a slow connection a second press during that wait started
+   * (and charged) a second run. The ref is set synchronously on the first
+   * press and cleared however the start ends, so the button never sticks.
+   */
+  const startInFlightRef = useRef(false);
+  const simulateGeneration = useCallback(async () => {
+    if (startInFlightRef.current) return;
+    startInFlightRef.current = true;
+    try {
+      await startGeneration();
+    } finally {
+      startInFlightRef.current = false;
+    }
+  }, [startGeneration]);
 
   const resetWorkflow = useCallback(() => {
     hasNavigatedAway.current = false;
