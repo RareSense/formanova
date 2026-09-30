@@ -54,6 +54,22 @@ describe('useCadArtifactDownloads', () => {
     expect(exportEditedBlob).not.toHaveBeenCalled();
   });
 
+  it('saves the viewing copy under its own name, never as the NURBS 3dm', async () => {
+    const { result } = setup({ viewerThreedmUrl: 'https://api/artifacts/ccc' });
+    await act(async () => { await result.current.downloadViewerThreedm(); });
+
+    const [url, filename, kind] = mockDownloadCadArtifact.mock.calls[0];
+    expect(url).toBe('https://api/artifacts/ccc');
+    expect(filename).toMatch(/-viewing-copy\.3dm$/);
+    expect(kind).toBe('3dm');
+  });
+
+  it('does not fetch anything when the version has no viewing copy', async () => {
+    const { result } = setup({ viewerThreedmUrl: null });
+    await act(async () => { await result.current.downloadViewerThreedm(); });
+    expect(mockDownloadCadArtifact).not.toHaveBeenCalled();
+  });
+
   it('uses the scene export only for the explicit edited export', async () => {
     const blob = new Blob(['x']);
     const exportEditedBlob = vi.fn().mockResolvedValue(blob);

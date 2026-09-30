@@ -134,6 +134,12 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
   const glbFilename = buildCadArtifactFilename(displayName, rawFilename, 'glb');
   const visibleBaseName = truncateDisplayName(shownBaseName);
   const supportsThreedm = Boolean(workflow.threedm_url) || /ring[_-]cad[_-]nurbs/i.test(workflow.name);
+  // The mesh-only viewing copy of the version this card shows. It lives on the
+  // vault's version rows, which the restore seed carries whole.
+  const shownVersionId = selectedVersion?.assetId ?? groupedWorkflow.cad_restore_seed?.selectedVersionId ?? null;
+  const viewerThreedmUrl = (groupedWorkflow.cad_restore_seed?.ring?.versions ?? [])
+    .find((version) => version.asset_id === shownVersionId)?.viewer_threedm_url ?? null;
+  const viewerThreedmFilename = `${shownBaseName}-viewing-copy.3dm`;
   const renameInputId = `cad-design-name-${workflow.workflow_id}`;
 
   const handleStartRename = (e: React.MouseEvent) => {
@@ -202,6 +208,26 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
     } catch (err) {
       console.error(`[WorkflowCard] ${kind} download error:`, err);
       toast.error(err instanceof Error ? err.message : `Could not download the ${kind.toUpperCase()} file.`);
+    } finally {
+      setIsDownloading(null);
+    }
+  };
+
+  /** The viewing copy is published once and never re-derived, so no fresh lookup. */
+  const downloadViewerThreedm = async () => {
+    if (isDownloading || !viewerThreedmUrl) return;
+    setIsDownloading('3dm');
+    try {
+      await downloadCadArtifact(viewerThreedmUrl, viewerThreedmFilename, '3dm');
+      import('@/lib/posthog-events').then(m => m.trackDownloadClicked({
+        file_name: viewerThreedmFilename,
+        file_type: '3dm-viewing-copy',
+        context: 'generations',
+        source: cadSourceFromSourceType(workflow.source_type),
+      }));
+    } catch (err) {
+      console.error('[WorkflowCard] viewing copy download error:', err);
+      toast.error(err instanceof Error ? err.message : 'Could not download the 3DM viewing copy.');
     } finally {
       setIsDownloading(null);
     }
@@ -368,6 +394,7 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
                   isBusy={isDownloading !== null}
                   onDownloadThreedm={supportsThreedm ? () => downloadArtifact('3dm') : undefined}
                   onDownloadGlb={previewGlbUrl ? () => downloadArtifact('glb') : undefined}
+                  onDownloadViewerThreedm={viewerThreedmUrl ? downloadViewerThreedm : undefined}
                 />
                 <Button
                   size="sm"

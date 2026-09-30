@@ -42,6 +42,13 @@ export interface CadRingVersion {
   glb_url?: string | null;
   thumbnail_url?: string | null;
   threedm_url?: string | null;
+  /**
+   * A mesh-only 3DM made from the GLB, for generic 3DM viewers. Not the
+   * editable NURBS file: offered only as an extra download, never shown in the
+   * viewer (it drops the GLB materials the viewer uses to find the gems) and
+   * never used in place of threedm_url. Null on versions before 2026-09-29.
+   */
+  viewer_threedm_url?: string | null;
   /** False when this version cannot be improved; the button stays hidden. */
   improvable?: boolean;
   /** Why improvable is false (e.g. legacy_workflow_retired); null when it is true. */

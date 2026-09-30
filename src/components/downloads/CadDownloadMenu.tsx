@@ -29,6 +29,11 @@ export interface CadDownloadMenuProps {
   /** Omit when the run has no GLB yet. */
   onDownloadGlb?: () => void;
   /**
+   * Omit when the version has no viewing copy. A mesh-only 3DM for generic
+   * viewers, never the default action: the editable NURBS 3DM stays the lead.
+   */
+  onDownloadViewerThreedm?: () => void;
+  /**
    * Omit unless the user has actually edited the model. Passing it
    * unconditionally would offer an export that is byte-identical to the plain
    * GLB, which reads as two options that do the same thing.
@@ -112,6 +117,7 @@ const VARIANTS = {
 export function CadDownloadMenu({
   onDownloadThreedm,
   onDownloadGlb,
+  onDownloadViewerThreedm,
   onExportEdited,
   isBusy = false,
   variant = 'viewport',
@@ -131,6 +137,9 @@ export function CadDownloadMenu({
   const menuItems: { label: string; onSelect: () => void }[] = [];
   if (onDownloadThreedm && onDownloadGlb) {
     menuItems.push({ label: 'Download GLB', onSelect: onDownloadGlb });
+  }
+  if (onDownloadViewerThreedm) {
+    menuItems.push({ label: '3DM viewing copy (mesh)', onSelect: onDownloadViewerThreedm });
   }
   if (onExportEdited) {
     menuItems.push({ label: 'Export GLB with my edits', onSelect: onExportEdited });

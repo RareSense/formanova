@@ -75,3 +75,37 @@ describe('useImageToCADWorkflow start', () => {
     expect(startCalls()).toHaveLength(1);
   });
 });
+
+describe('useImageToCADWorkflow viewing copy', () => {
+  const ring = {
+    set_id: 'set-1',
+    versions: [
+      { asset_id: 'v1', position: 0, glb_url: '/v1.glb', viewer_threedm_url: '/v1.viewer.3dm' },
+      { asset_id: 'v2', position: 1, glb_url: '/v2.glb', viewer_threedm_url: '/v2.viewer.3dm' },
+    ],
+  };
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValue({ ok: false, status: 404, json: async () => ({}) } as Response);
+  });
+
+  it('follows the version on screen', async () => {
+    const { result } = renderWorkflow();
+    await act(async () => {
+      await result.current.restoreCompletedWorkflow('state-v2', '/v2.glb', { ring, selectedVersionId: 'v2' });
+    });
+    expect(result.current.viewerThreedmUrl).toBe('/v2.viewer.3dm');
+
+    act(() => result.current.selectVersion('v1'));
+    expect(result.current.viewerThreedmUrl).toBe('/v1.viewer.3dm');
+  });
+
+  it('is withheld when the viewer shows a different model than the version', async () => {
+    const { result } = renderWorkflow();
+    await act(async () => {
+      await result.current.restoreCompletedWorkflow('state-x', '/other.glb', { ring, selectedVersionId: 'v2' });
+    });
+    expect(result.current.viewerThreedmUrl).toBeNull();
+  });
+});

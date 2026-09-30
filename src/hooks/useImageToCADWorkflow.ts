@@ -308,6 +308,14 @@ export function useImageToCADWorkflow({
   const latestRingVersion = ring ? latestVersion(ring) : null;
   /** What Improve acts on: the version on screen, which is the newest until picked. */
   const activeVersion = versions.find((v) => v.asset_id === selectedVersionId) ?? latestRingVersion;
+  /**
+   * The mesh-only viewing copy of the model on screen. Offered only when the
+   * viewer really shows that version's GLB, so the download can never belong
+   * to a different version than the one the user is looking at.
+   */
+  const viewerThreedmUrl = activeVersion?.viewer_threedm_url && activeVersion.glb_url === glbUrl
+    ? activeVersion.viewer_threedm_url
+    : null;
 
   /** Opens an earlier version in the viewer. Its files are already published. */
   const selectVersion = useCallback((assetId: string) => {
@@ -687,6 +695,7 @@ export function useImageToCADWorkflow({
     glbUrl, setGlbUrl, glbArtifact, setGlbArtifact,
     sourceWorkflowId, setSourceWorkflowId,
     threedmArtifact, setThreedmArtifact,
+    viewerThreedmUrl,
     failureMessage, notAllSolid,
     statusNotice,
     dismissStatusNotice: () => {

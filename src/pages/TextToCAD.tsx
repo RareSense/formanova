@@ -218,6 +218,7 @@ export default function TextToCAD() {
    */
   const downloads = useCadArtifactDownloads({
     threedmUrl: workflow.threedmArtifact?.url,
+    viewerThreedmUrl: workflow.viewerThreedmUrl,
     glbUrl: workflow.glbUrl,
     exportEditedBlob: () => canvasRef.current?.exportSceneBlob() ?? Promise.resolve(undefined),
     source: 'text-to-cad',
@@ -406,6 +407,7 @@ export default function TextToCAD() {
                 isBusy={downloads.isBusy}
                 onDownloadThreedm={workflow.threedmArtifact ? downloads.downloadThreedm : undefined}
                 onDownloadGlb={workflow.glbUrl ? downloads.downloadGlb : undefined}
+                onDownloadViewerThreedm={workflow.viewerThreedmUrl ? downloads.downloadViewerThreedm : undefined}
                 onExportEdited={hasEdits ? downloads.exportEdited : undefined}
                 latestVersionLabel={workflow.latestVersionLabel}
                 onImproveFromVersion={workflow.improveFromLatestVersion}

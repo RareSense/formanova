@@ -121,6 +121,71 @@ describe('CAD generation history card', () => {
     expect(screen.getByTestId('location-state').textContent).toContain('/reference.jpg');
   });
 
+  it('downloads the viewing copy of the version on screen, from the menu only', async () => {
+    render(
+      <MemoryRouter>
+        <WorkflowCard
+          workflow={{
+            ...cadWorkflow,
+            ring_versions: [
+              { assetId: 'asset-v1', position: 0, workflowId: 'workflow-v1', thumbnailUrl: null, glbUrl: '/v1.glb' },
+              { assetId: 'asset-v2', position: 1, workflowId: 'workflow-v2', thumbnailUrl: null, glbUrl: '/v2.glb' },
+            ],
+            cad_restore_seed: {
+              ring: {
+                set_id: 'set-1',
+                versions: [
+                  { asset_id: 'asset-v1', position: 0, viewer_threedm_url: '/v1.viewer.3dm' },
+                  { asset_id: 'asset-v2', position: 1, viewer_threedm_url: '/v2.viewer.3dm' },
+                ],
+              },
+              selectedVersionId: 'asset-v2',
+            },
+          } as WorkflowSummary}
+          index={1}
+          onClick={() => {}}
+        />
+      </MemoryRouter>,
+    );
+
+    const openMenu = () =>
+      fireEvent.keyDown(screen.getByRole('button', { name: /more download options/i }), { key: 'Enter' });
+
+    openMenu();
+    fireEvent.click(await screen.findByText(/viewing copy/i));
+    await waitFor(() => expect(downloadCadArtifact).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(downloadCadArtifact).mock.calls[0][0]).toBe('/v2.viewer.3dm');
+    expect(vi.mocked(downloadCadArtifact).mock.calls[0][1]).toMatch(/-viewing-copy\.3dm$/);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Preview version 1' }));
+    openMenu();
+    fireEvent.click(await screen.findByText(/viewing copy/i));
+    await waitFor(() => expect(downloadCadArtifact).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(downloadCadArtifact).mock.calls[1][0]).toBe('/v1.viewer.3dm');
+  });
+
+  it('offers no viewing copy for a version made before it existed', async () => {
+    render(
+      <MemoryRouter>
+        <WorkflowCard
+          workflow={{
+            ...cadWorkflow,
+            cad_restore_seed: {
+              ring: { set_id: 'set-1', versions: [{ asset_id: 'asset-1', position: 0, viewer_threedm_url: null }] },
+              selectedVersionId: 'asset-1',
+            },
+          } as WorkflowSummary}
+          index={1}
+          onClick={() => {}}
+        />
+      </MemoryRouter>,
+    );
+
+    fireEvent.keyDown(screen.getByRole('button', { name: /more download options/i }), { key: 'Enter' });
+    await screen.findByText(/download glb/i);
+    expect(screen.queryByText(/viewing copy/i)).toBeNull();
+  });
+
   it('does not expose internal mode or provider values', () => {
     render(
       <MemoryRouter>

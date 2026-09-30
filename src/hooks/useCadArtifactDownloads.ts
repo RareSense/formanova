@@ -9,6 +9,8 @@ import type { CadSource } from '@/lib/cad-analytics';
 interface UseCadArtifactDownloadsInput {
   /** Backend URL for the machinable NURBS file, or null when the run has none. */
   threedmUrl?: string | null;
+  /** Mesh-only viewing copy of the 3DM, or null when the version has none. */
+  viewerThreedmUrl?: string | null;
   /** Backend URL for the preview mesh, or null before the run finishes. */
   glbUrl?: string | null;
   /**
@@ -41,6 +43,7 @@ function stamp(): string {
  */
 export function useCadArtifactDownloads({
   threedmUrl,
+  viewerThreedmUrl,
   glbUrl,
   exportEditedBlob,
   source,
@@ -80,6 +83,12 @@ export function useCadArtifactDownloads({
     [save, threedmUrl],
   );
 
+  // Named apart from the NURBS file so the two can never be mistaken on disk.
+  const downloadViewerThreedm = useCallback(
+    () => save(viewerThreedmUrl, `model-${stamp()}-viewing-copy.3dm`, '3dm'),
+    [save, viewerThreedmUrl],
+  );
+
   const downloadGlb = useCallback(
     () => save(glbUrl, `model-${stamp()}.glb`, 'glb'),
     [save, glbUrl],
@@ -113,5 +122,5 @@ export function useCadArtifactDownloads({
     }
   }, [exportEditedBlob, isBusy, source]);
 
-  return { downloadThreedm, downloadGlb, exportEdited, isBusy };
+  return { downloadThreedm, downloadViewerThreedm, downloadGlb, exportEdited, isBusy };
 }

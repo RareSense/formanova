@@ -15,6 +15,8 @@ import {
   readImproveResultFailure,
   startImproveFromVersion,
   versionLabel,
+  type CadRing,
+  type CadRingVersion,
 } from './cad-versions-api';
 
 const fetchMock = vi.mocked(authenticatedFetch);
@@ -207,10 +209,10 @@ describe('jewelry families', () => {
 
   it('prices Improve under the workflow the server will actually run', async () => {
     const { improveWorkflowFor } = await import('./cad-versions-api');
-    expect(improveWorkflowFor({ ...RING, family: 'jewelry', jewelry_type: 'necklace' })).toBe('jewelry_cad_improve');
-    expect(improveWorkflowFor({ ...RING, family: 'ring', jewelry_type: null })).toBe('ring_cad_improve');
+    expect(improveWorkflowFor({ ...RING, family: 'jewelry', jewelry_type: 'necklace' } as CadRing)).toBe('jewelry_cad_improve');
+    expect(improveWorkflowFor({ ...RING, family: 'ring', jewelry_type: null } as CadRing)).toBe('ring_cad_improve');
     // Old records without a family are ring output (GraphFlow's LEGACY_FAMILY).
-    expect(improveWorkflowFor(RING)).toBe('ring_cad_improve');
+    expect(improveWorkflowFor(RING as CadRing)).toBe('ring_cad_improve');
     expect(improveWorkflowFor(null)).toBe('ring_cad_improve');
   });
 });
@@ -218,7 +220,7 @@ describe('jewelry families', () => {
 describe('canImproveVersion', () => {
   it('allows Improve only when the backend says improvable is exactly true', () => {
     expect(canImproveVersion({ improvable: true })).toBe(true);
-    expect(canImproveVersion({ improvable: false, improve_unavailable_reason: 'legacy_workflow_retired' })).toBe(false);
+    expect(canImproveVersion({ improvable: false, improve_unavailable_reason: 'legacy_workflow_retired' } as CadRingVersion)).toBe(false);
     // A missing flag is not permission: GraphFlow shows IMPROVE only on true.
     expect(canImproveVersion({})).toBe(false);
     expect(canImproveVersion(null)).toBe(false);

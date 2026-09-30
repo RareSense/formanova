@@ -316,6 +316,7 @@ describe('trackCadGenerationStarted', () => {
       reference_image_count: 2,
       llm_tier: 'claude_opus_5_openrouter',
       is_first_ever: true,
+      operation: 'generate',
       workflow_id: 'state-abc123',
     })
     expect(posthog.capture).toHaveBeenCalledWith('cad_generation_started', {
@@ -325,6 +326,7 @@ describe('trackCadGenerationStarted', () => {
       reference_image_count: 2,
       llm_tier: 'claude_opus_5_openrouter',
       is_first_ever: true,
+      operation: 'generate',
       workflow_id: 'state-abc123',
     })
   })

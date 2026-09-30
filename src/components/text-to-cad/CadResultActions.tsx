@@ -22,6 +22,8 @@ export interface CadResultActionsProps {
   onDownloadThreedm?: () => void;
   /** Omit when the run has no GLB yet. */
   onDownloadGlb?: () => void;
+  /** Omit when the version has no mesh-only viewing copy of the 3DM. */
+  onDownloadViewerThreedm?: () => void;
   /** Omit unless the user has actually edited the model. */
   onExportEdited?: () => void;
   /** Disables the download while bytes are being fetched. */
@@ -56,6 +58,7 @@ const IMPROVE_BASE =
 export function CadResultActions({
   onDownloadThreedm,
   onDownloadGlb,
+  onDownloadViewerThreedm,
   onExportEdited,
   isBusy = false,
   latestVersionLabel,
@@ -88,6 +91,7 @@ export function CadResultActions({
         isBusy={isBusy}
         onDownloadThreedm={onDownloadThreedm}
         onDownloadGlb={onDownloadGlb}
+        onDownloadViewerThreedm={onDownloadViewerThreedm}
         onExportEdited={onExportEdited}
       />
     </div>

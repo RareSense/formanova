@@ -63,7 +63,8 @@ export interface PaywallHitProps {
 
 export interface CadGenerationCompletedProps {
   category: string;
-  prompt_length: number;
+  /** Absent for a run persisted before the analytics bundle existed. */
+  prompt_length?: number;
   duration_ms: number;
   /** The Temporal workflow id this run was given at submission. Present on
    *  every generation event so a run's start, completion and failure can be

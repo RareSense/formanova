@@ -63,6 +63,34 @@ describe('CadDownloadMenu', () => {
     expect(onExportEdited).toHaveBeenCalledTimes(1);
   });
 
+  it('offers the 3dm viewing copy from the menu, never as the default', async () => {
+    const onDownloadThreedm = vi.fn();
+    const onDownloadViewerThreedm = vi.fn();
+    render(
+      <CadDownloadMenu
+        onDownloadThreedm={onDownloadThreedm}
+        onDownloadGlb={noop}
+        onDownloadViewerThreedm={onDownloadViewerThreedm}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /download 3dm/i }));
+    expect(onDownloadThreedm).toHaveBeenCalledTimes(1);
+    expect(onDownloadViewerThreedm).not.toHaveBeenCalled();
+
+    openMenu();
+    fireEvent.click(await screen.findByText(/viewing copy/i));
+    expect(onDownloadViewerThreedm).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides the viewing copy when the version has none', async () => {
+    render(<CadDownloadMenu onDownloadThreedm={noop} onDownloadGlb={noop} />);
+
+    openMenu();
+    await screen.findByText(/download glb/i);
+    expect(screen.queryByText(/viewing copy/i)).toBeNull();
+  });
+
   it('falls back to the glb as the default action when no 3dm exists', () => {
     // Older runs predate ring_cad_nurbs_v1 and have no .3dm at all. The button
     // must still do something useful rather than render a dead default.
