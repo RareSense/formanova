@@ -171,6 +171,12 @@ export interface TrackedGeneration {
   glbUrl?: string | null;
   /** CAD only: the machinable NURBS .3dm deliverable. */
   threedmUrl?: string | null;
+  /** CAD only: optional postprocessed print meshes. */
+  stlUrls?: string[];
+  /** CAD only: optional postprocessed neutral exchange files. */
+  stepUrls?: string[];
+  /** CAD only: validated volume multiplied by the user-selected alloy density. */
+  estimatedMetalMassG?: number | null;
   /** CAD only: label for the completion toast. */
   label?: string;
   /** CAD only: structured fail-step code, used for clear workspace copy. */
@@ -699,6 +705,9 @@ export function GenerationsContextProvider({ children }: { children: React.React
               progress: 100,
               glbUrl: parsed.glbUrl,
               threedmUrl: parsed.threedmArtifact?.url ?? null,
+              stlUrls: parsed.stlArtifacts.map(artifact => artifact.url),
+              stepUrls: parsed.stepArtifacts.map(artifact => artifact.url),
+              estimatedMetalMassG: parsed.estimatedMetalMassG,
               notAllSolid: parsed.notAllSolid,
             }
           : g
@@ -826,6 +835,9 @@ export function GenerationsContextProvider({ children }: { children: React.React
                   generationStep: parsed ? 'Completed' : 'Completed — result unavailable',
                   glbUrl: parsed?.glbUrl ?? null,
                   threedmUrl: parsed?.threedmArtifact?.url ?? null,
+                  stlUrls: parsed?.stlArtifacts.map(artifact => artifact.url) ?? [],
+                  stepUrls: parsed?.stepArtifacts.map(artifact => artifact.url) ?? [],
+                  estimatedMetalMassG: parsed?.estimatedMetalMassG ?? null,
                   notAllSolid: parsed?.notAllSolid ?? false,
                 }
               : g

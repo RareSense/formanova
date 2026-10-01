@@ -24,6 +24,9 @@ export interface CadResultActionsProps {
   onDownloadGlb?: () => void;
   /** Omit when the version has no mesh-only viewing copy of the 3DM. */
   onDownloadViewerThreedm?: () => void;
+  onDownloadStl?: () => void;
+  onDownloadStep?: () => void;
+  estimatedMetalMassG?: number | null;
   /** Omit unless the user has actually edited the model. */
   onExportEdited?: () => void;
   /** Disables the download while bytes are being fetched. */
@@ -59,6 +62,9 @@ export function CadResultActions({
   onDownloadThreedm,
   onDownloadGlb,
   onDownloadViewerThreedm,
+  onDownloadStl,
+  onDownloadStep,
+  estimatedMetalMassG,
   onExportEdited,
   isBusy = false,
   latestVersionLabel,
@@ -92,6 +98,9 @@ export function CadResultActions({
         onDownloadThreedm={onDownloadThreedm}
         onDownloadGlb={onDownloadGlb}
         onDownloadViewerThreedm={onDownloadViewerThreedm}
+        onDownloadStl={onDownloadStl}
+        onDownloadStep={onDownloadStep}
+        estimatedMetalMassG={estimatedMetalMassG}
         onExportEdited={onExportEdited}
       />
     </div>

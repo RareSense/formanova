@@ -15,6 +15,7 @@ import {
   isRingCadRepairing,
   type ArtifactRef,
   type CadJewelryType,
+  type CadMaterialProfile,
 } from "@/lib/ring-cad-nurbs-api";
 import { buildReferenceInputs } from "@/lib/cad-reference-upload";
 import {
@@ -58,6 +59,7 @@ interface WorkflowParams {
   tier?: string;
   /** Product to build, sent as payload.jewelry_type. Defaults to ring. */
   jewelryType?: CadJewelryType;
+  material?: CadMaterialProfile | null;
   /** Which page owns this run, so the header/toast restore link returns here. */
   cadRoute: '/text-to-cad' | '/image-to-cad';
   /**
@@ -77,6 +79,7 @@ export function useImageToCADWorkflow({
   referenceImages,
   tier = RING_CAD_DEFAULT_TIER,
   jewelryType = DEFAULT_CAD_JEWELRY_TYPE,
+  material = null,
   cadRoute,
   restoringFromUrl = false,
   onWorkspaceActivate,
@@ -94,6 +97,9 @@ export function useImageToCADWorkflow({
   const [sourceWorkflowId, setSourceWorkflowId] = useState<string | null>(null);
   /** The machinable deliverable. Present only for ring_cad_nurbs_v1 runs. */
   const [threedmArtifact, setThreedmArtifact] = useState<ArtifactRef | null>(null);
+  const [stlArtifacts, setStlArtifacts] = useState<ArtifactRef[]>([]);
+  const [stepArtifacts, setStepArtifacts] = useState<ArtifactRef[]>([]);
+  const [estimatedMetalMassG, setEstimatedMetalMassG] = useState<number | null>(null);
   /** Backend-authored failure copy, safe to show the user directly. */
   const [failureMessage, setFailureMessage] = useState<string | null>(null);
   /** Exports fine but some part is not a closed solid - flag before manufacture. */
@@ -217,6 +223,9 @@ export function useImageToCADWorkflow({
       if (trackedRun.threedmUrl) {
         setThreedmArtifact({ uri: trackedRun.threedmUrl, url: trackedRun.threedmUrl, type: 'model/3dm', bytes: 0, sha256: '' });
       }
+      setStlArtifacts((trackedRun.stlUrls ?? []).map(url => ({ uri: url, url, type: 'model/stl', bytes: 0, sha256: '' })));
+      setStepArtifacts((trackedRun.stepUrls ?? []).map(url => ({ uri: url, url, type: 'model/step', bytes: 0, sha256: '' })));
+      setEstimatedMetalMassG(trackedRun.estimatedMetalMassG ?? null);
       // cad_generation_completed is NOT emitted here. This effect does not run
       // once the page unmounts and bails out early on hasNavigatedAway, so
       // every run finishing after the user left was never counted.
@@ -225,7 +234,7 @@ export function useImageToCADWorkflow({
       setIsModelLoading(true);
       setHasModel(true);
     }
-  }, [trackedRun?.status, trackedRun?.glbUrl, trackedRun?.threedmUrl, trackedRun?.generationStep, trackedRun?.cadFailureReasonCode]); // eslint-disable-line react-hooks/exhaustive-deps -- prompt/referenceImages/tier/cadRoute/cadSource and the trackedRun object are excluded: only the run's own transitions should re-drive the overlay, and including the object would re-fire on every progress tick. The analytics values are read from the closure of the render in which status changed, which is the correct moment for them. Regression to watch: if a future edit fires an event here on something other than a status transition, those values could be stale.
+  }, [trackedRun?.status, trackedRun?.glbUrl, trackedRun?.threedmUrl, trackedRun?.stlUrls, trackedRun?.stepUrls, trackedRun?.estimatedMetalMassG, trackedRun?.generationStep, trackedRun?.cadFailureReasonCode]); // eslint-disable-line react-hooks/exhaustive-deps -- prompt/referenceImages/tier/cadRoute/cadSource and the trackedRun object are excluded: only the run's own transitions should re-drive the overlay, and including the object would re-fire on every progress tick. The analytics values are read from the closure of the render in which status changed, which is the correct moment for them. Regression to watch: if a future edit fires an event here on something other than a status transition, those values could be stale.
 
   /**
    * Looks up the ring this run saved, which is what the Improve button needs.
@@ -464,6 +473,9 @@ export function useImageToCADWorkflow({
     setRestoredReferenceUrls(seed?.referenceImageUrls ?? []);
     setRestoredPrompt(seed?.prompt ?? null);
     setThreedmArtifact(null);
+    setStlArtifacts([]);
+    setStepArtifacts([]);
+    setEstimatedMetalMassG(null);
     setIsModelLoading(true);
     setProgressStep('_loading');
 
@@ -527,11 +539,31 @@ export function useImageToCADWorkflow({
     // any of it. The tier price is backend's to set and it moves, so no
     // fallback figure is written here; when the estimate is unavailable the
     // start call below is the authority and rejects with 402.
-    const approved = await checkCredits(RING_CAD_NURBS_WORKFLOW, 1, {
+    const approved = (import.meta.env.VITE_DEMO_NO_AUTH === 'true' && import.meta.env.VITE_DEMO_GLB_URL) ? true : await checkCredits(RING_CAD_NURBS_WORKFLOW, 1, {
       pricingContext: { llm_tier: tier },
     });
     if (!approved) {
       trackPaywallHit({ category: 'ring', steps_completed: 1, source: cadSource });
+      return;
+    }
+
+    // Local demo recording build only (.env.local): play the real progress screen, then load a
+    // finished model from public/demo instead of starting a paid run.
+    const demoGlb = import.meta.env.VITE_DEMO_GLB_URL;
+    if (import.meta.env.VITE_DEMO_NO_AUTH === 'true' && demoGlb) {
+      const wait = (ms: number) => new Promise(r => setTimeout(r, ms));
+      hasNavigatedAway.current = false; onWorkspaceActivate();
+      setIsGenerating(true); setHasModel(false); setThreedmArtifact(null); setProgressStep('analyzing');
+      await wait(Number(import.meta.env.VITE_DEMO_STEP_MS || 2500)); setProgressStep('building');
+      await wait(Number(import.meta.env.VITE_DEMO_STEP_MS || 2500) * 1.6);
+      setIsGenerating(false); setGlbUrl(demoGlb);
+      setGlbArtifact({ uri: demoGlb, type: 'model/gltf-binary', bytes: 0, sha256: '' });
+      const demo3dm = import.meta.env.VITE_DEMO_3DM_URL;
+      if (demo3dm) setThreedmArtifact({ uri: demo3dm, url: demo3dm, type: 'model/3dm', bytes: 0, sha256: '' });
+      // A saved version, so the result bar shows Improve beside Download as it does for real rings.
+      setRing({ set_id: 'demo-ring', name: 'Rose ring', family: 'ring', versions: [{ asset_id: 'demo-v1', position: 0,
+        source_workflow_id: 'demo', improvable: true, glb_url: demoGlb, threedm_url: demo3dm ?? null }] } as CadRing);
+      setProgressStep('_loading'); setIsModelLoading(true); setHasModel(true);
       return;
     }
 
@@ -549,6 +581,9 @@ export function useImageToCADWorkflow({
     setHasModel(false);
     setSourceWorkflowId(null);
     setThreedmArtifact(null);
+    setStlArtifacts([]);
+    setStepArtifacts([]);
+    setEstimatedMetalMassG(null);
     // Clear the previous ring's solidity result: a stale warning on a new run
     // is worse than none, because it trains people to ignore it.
     setNotAllSolid(false);
@@ -568,6 +603,7 @@ export function useImageToCADWorkflow({
         userDescription: prompt,
         tier,
         jewelryType,
+        material,
       });
 
       // JWT only - the tenant API key and on-behalf-of header are applied by the
@@ -636,7 +672,7 @@ export function useImageToCADWorkflow({
       setProgressStep("failed_final");
       setGenerationFailed(true);
     }
-  }, [prompt, referenceImages, tier, jewelryType, cadRoute, cadSource, isGenerating, onWorkspaceActivate, trackCadGeneration, checkCredits]);
+  }, [prompt, referenceImages, tier, jewelryType, material, cadRoute, cadSource, isGenerating, onWorkspaceActivate, trackCadGeneration, checkCredits]);
 
   /**
    * One press, one run. isGenerating only turns true after the credit check
@@ -696,6 +732,7 @@ export function useImageToCADWorkflow({
     sourceWorkflowId, setSourceWorkflowId,
     threedmArtifact, setThreedmArtifact,
     viewerThreedmUrl,
+    stlArtifacts, stepArtifacts, estimatedMetalMassG,
     failureMessage, notAllSolid,
     statusNotice,
     dismissStatusNotice: () => {

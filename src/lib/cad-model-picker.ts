@@ -20,6 +20,16 @@ export interface CadPickerModel {
 
 export const CAD_PICKER_MODELS: readonly CadPickerModel[] = [
   {
+    id: 'gemini_4_argon',
+    label: 'Gemini 4 Argon',
+    tiers: { direct: RING_CAD_TIERS.GEMINI_4_ARGON_GOOGLE, openrouter: RING_CAD_TIERS.GEMINI_4_ARGON_OPENROUTER },
+  },
+  {
+    id: 'fable_5_1',
+    label: 'Fable 5.1',
+    tiers: { direct: RING_CAD_TIERS.FABLE_5_1_ANTHROPIC, openrouter: RING_CAD_TIERS.FABLE_5_1_OPENROUTER },
+  },
+  {
     id: 'opus_5_5',
     label: 'Opus 5.5',
     tiers: { direct: RING_CAD_TIERS.CLAUDE_OPUS_5_5_ANTHROPIC, openrouter: RING_CAD_TIERS.CLAUDE_OPUS_5_5_OPENROUTER },

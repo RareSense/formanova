@@ -34,6 +34,8 @@ import type { CadReferenceItem } from '@/lib/microservices-api';
  */
 export const RING_CAD_TIERS = {
   FABLE_5: 'claude_fable_5_openrouter',
+  FABLE_5_1_ANTHROPIC: 'claude_fable_5_1_anthropic',
+  FABLE_5_1_OPENROUTER: 'claude_fable_5_1_openrouter',
   OPUS_5: 'claude_opus_5_openrouter',
   GPT_5_6_SOL: 'gpt_5_6_sol_openrouter',
   GEMINI_3_1_PRO: 'gemini_3_1_pro_openrouter',
@@ -48,6 +50,8 @@ export const RING_CAD_TIERS = {
   QWEN_3_8_MAX_OPENROUTER: 'qwen_3_8_max_openrouter',
   GEMINI_3_8_FLASH_GOOGLE: 'gemini_3_8_flash_google',
   GEMINI_3_8_FLASH_OPENROUTER: 'gemini_3_8_flash_openrouter',
+  GEMINI_4_ARGON_GOOGLE: 'gemini_4_argon_google',
+  GEMINI_4_ARGON_OPENROUTER: 'gemini_4_argon_openrouter',
 } as const;
 
 export type RingCadTier = (typeof RING_CAD_TIERS)[keyof typeof RING_CAD_TIERS];
@@ -144,6 +148,28 @@ export type CadJewelryType = (typeof CAD_JEWELRY_TYPES)[number]['value'];
 
 export const DEFAULT_CAD_JEWELRY_TYPE: CadJewelryType = 'ring';
 
+export interface CadMaterialProfile {
+  id: string;
+  label: string;
+  alloy: string;
+  density_g_cm3: number;
+  density_source: string;
+}
+
+const STULLER_DENSITY_SOURCE = 'Stuller specific-gravity chart: https://www.stuller.com/articles/view/where-to-find-gravity-of-materials/';
+
+/** Explicit presets only. Alloy density varies by formulation, so no prompt inference is used. */
+export const CAD_MATERIAL_PROFILES: readonly CadMaterialProfile[] = [
+  { id: 'sterling_silver', label: 'Sterling silver', alloy: 'Sterling silver', density_g_cm3: 10.40, density_source: STULLER_DENSITY_SOURCE },
+  { id: '14k_yellow_gold', label: '14K yellow gold', alloy: '14K yellow gold', density_g_cm3: 13.07, density_source: STULLER_DENSITY_SOURCE },
+  { id: '14k_white_gold', label: '14K white gold', alloy: '14K white gold', density_g_cm3: 12.61, density_source: STULLER_DENSITY_SOURCE },
+  { id: '14k_rose_gold', label: '14K rose gold', alloy: '14K red/rose gold', density_g_cm3: 13.26, density_source: STULLER_DENSITY_SOURCE },
+  { id: '18k_yellow_gold', label: '18K yellow gold', alloy: '18K yellow gold', density_g_cm3: 15.58, density_source: STULLER_DENSITY_SOURCE },
+  { id: '18k_white_gold', label: '18K white gold', alloy: '18K white gold', density_g_cm3: 14.64, density_source: STULLER_DENSITY_SOURCE },
+  { id: '18k_rose_gold', label: '18K rose gold', alloy: '18K red/rose gold', density_g_cm3: 15.18, density_source: STULLER_DENSITY_SOURCE },
+  { id: 'platinum_cobalt', label: 'Platinum cobalt', alloy: 'Platinum cobalt', density_g_cm3: 20.80, density_source: STULLER_DENSITY_SOURCE },
+] as const;
+
 // -- Request ---------------------------------------------------------------
 
 /** A stored blob reference, the same shape the run produces internally. */
@@ -181,6 +207,7 @@ export interface RingCadStartParams {
   tier?: string | null;
   /** Product to build, from the Text/Image to CAD dropdown. Defaults to ring. */
   jewelryType?: CadJewelryType;
+  material?: CadMaterialProfile | null;
 }
 
 /**
@@ -261,6 +288,7 @@ export function buildRingCadStartBody({
   userDescription,
   tier = RING_CAD_DEFAULT_TIER,
   jewelryType = DEFAULT_CAD_JEWELRY_TYPE,
+  material = null,
 }: RingCadStartParams): RingCadStartBody {
   const images = [...referenceImages];
   const description = (userDescription ?? '').trim();
@@ -303,6 +331,13 @@ export function buildRingCadStartBody({
     payload.llm_tier = tier;
     payload.analysis_tier = tier;
   }
+  if (material) {
+    payload.material = {
+      alloy: material.alloy,
+      density_g_cm3: material.density_g_cm3,
+      density_source: material.density_source,
+    };
+  }
 
   return { payload };
 }
@@ -329,6 +364,12 @@ export interface RingCadResult {
   /** Preview mesh for web viewers. */
   glbArtifact: ArtifactRef | null;
   glbUrl: string | null;
+  /** Print-ready meshes emitted by the optional postprocessor, one per solid part. */
+  stlArtifacts: ArtifactRef[];
+  /** Neutral CAD exchange files emitted by the optional postprocessor. */
+  stepArtifacts: ArtifactRef[];
+  /** Calculated from validated solid volume and the explicitly selected alloy density. */
+  estimatedMetalMassG: number | null;
   validationStatus: RingCadValidationStatus | null;
   diagnostics: RingCadDiagnostics;
   notAllSolid: boolean;
@@ -379,6 +420,15 @@ function readArtifact(value: unknown): ArtifactRef | null {
     bytes: typeof a.bytes === 'number' ? a.bytes : 0,
     sha256: typeof a.sha256 === 'string' ? a.sha256 : '',
   };
+}
+
+function readArtifactList(node: Record<string, unknown>, pluralKey: string, singularKey: string): ArtifactRef[] {
+  const raw = node[pluralKey] ?? findKeyDeep(node, (key) => key === pluralKey);
+  const values = Array.isArray(raw) ? raw : [];
+  const artifacts = values.map(readArtifact).filter((item): item is ArtifactRef => item !== null);
+  if (artifacts.length > 0) return artifacts;
+  const singular = readArtifact(node[singularKey] ?? findKeyDeep(node, (key) => key === singularKey));
+  return singular ? [singular] : [];
 }
 
 /**
@@ -491,6 +541,13 @@ export function parseRingCadResult(data: unknown): RingCadResult {
   const glb = readStagedArtifact(d, GLB_STAGES);
   const threedmArtifact = threedm.artifact;
   const glbArtifact = glb.artifact;
+  const stlArtifacts = readArtifactList(d, 'stl_artifacts', 'stl_artifact');
+  const stepArtifacts = readArtifactList(d, 'step_artifacts', 'step_artifact');
+  const massRaw = d.estimated_metal_mass_g
+    ?? findKeyDeep(root, (key) => key === 'estimated_metal_mass_g');
+  const estimatedMetalMassG = typeof massRaw === 'number' && Number.isFinite(massRaw) && massRaw >= 0
+    ? massRaw
+    : null;
 
   // cad_diagnostics is the documented flat-shape field; an unrecognised
   // sink-node shape nests the per-node tool output under a different key
@@ -526,6 +583,9 @@ export function parseRingCadResult(data: unknown): RingCadResult {
     threedmArtifact,
     glbArtifact,
     glbUrl: glbArtifact?.url ?? null,
+    stlArtifacts,
+    stepArtifacts,
+    estimatedMetalMassG,
     validationStatus,
     diagnostics,
     notAllSolid: diagnostics.not_all_solid === true,

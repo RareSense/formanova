@@ -7,12 +7,21 @@ import { DEFAULT_CAD_PICK } from '@/lib/cad-model-picker';
 describe('CadModelPicker', () => {
   it('shows every model and provider as a toggle, with the current pick pressed', () => {
     render(<CadModelPicker value={DEFAULT_CAD_PICK} onChange={() => {}} />);
-    for (const name of ['Opus 5.5', 'GPT-6 Astra', 'Qwen 3.8 Max', 'Gemini 3.8 Flash', 'Direct', 'OpenRouter']) {
+    for (const name of ['Gemini 4 Argon', 'Fable 5.1', 'Opus 5.5', 'GPT-6 Astra', 'Qwen 3.8 Max', 'Gemini 3.8 Flash', 'Direct', 'OpenRouter']) {
       expect(screen.getByRole('button', { name })).toBeTruthy();
     }
     expect(screen.getByRole('button', { name: 'GPT-6 Astra' }).getAttribute('aria-pressed')).toBe('true');
     expect(screen.getByRole('button', { name: 'Direct' }).getAttribute('aria-pressed')).toBe('true');
     expect(screen.getByRole('button', { name: 'Qwen 3.8 Max' }).getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('keeps Gemini 4 Argon selectable', () => {
+    const onChange = vi.fn();
+    render(<CadModelPicker value={DEFAULT_CAD_PICK} onChange={onChange} />);
+    const argon = screen.getByRole('button', { name: 'Gemini 4 Argon' }) as HTMLButtonElement;
+    expect(argon.disabled).toBe(false);
+    fireEvent.click(argon);
+    expect(onChange).toHaveBeenLastCalledWith({ model: 'gemini_4_argon', provider: 'direct' });
   });
 
   it('keeps the provider when the model changes and the model when the provider changes', () => {

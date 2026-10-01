@@ -28,6 +28,9 @@ export interface CadDownloadMenuProps {
   onDownloadThreedm?: () => void;
   /** Omit when the run has no GLB yet. */
   onDownloadGlb?: () => void;
+  onDownloadStl?: () => void;
+  onDownloadStep?: () => void;
+  estimatedMetalMassG?: number | null;
   /**
    * Omit when the version has no viewing copy. A mesh-only 3DM for generic
    * viewers, never the default action: the editable NURBS 3DM stays the lead.
@@ -118,6 +121,9 @@ export function CadDownloadMenu({
   onDownloadThreedm,
   onDownloadGlb,
   onDownloadViewerThreedm,
+  onDownloadStl,
+  onDownloadStep,
+  estimatedMetalMassG,
   onExportEdited,
   isBusy = false,
   variant = 'viewport',
@@ -141,6 +147,8 @@ export function CadDownloadMenu({
   if (onDownloadViewerThreedm) {
     menuItems.push({ label: '3DM viewing copy (mesh)', onSelect: onDownloadViewerThreedm });
   }
+  if (onDownloadStl) menuItems.push({ label: 'Download STL', onSelect: onDownloadStl });
+  if (onDownloadStep) menuItems.push({ label: 'Download STEP', onSelect: onDownloadStep });
   if (onExportEdited) {
     menuItems.push({ label: 'Export GLB with my edits', onSelect: onExportEdited });
   }
@@ -184,6 +192,11 @@ export function CadDownloadMenu({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-[13rem]">
+            {typeof estimatedMetalMassG === 'number' && (
+              <div className="px-2 py-2 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                Est. metal weight: {estimatedMetalMassG.toFixed(2)} g
+              </div>
+            )}
             {menuItems.map(item => (
               <DropdownMenuItem
                 key={item.label}
