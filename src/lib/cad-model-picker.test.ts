@@ -18,6 +18,10 @@ describe('CAD model picker tiers', () => {
         ),
       ),
     ).toEqual({
+      'gemini_4_argon/direct': 'gemini_4_argon_google',
+      'gemini_4_argon/openrouter': 'gemini_4_argon_openrouter',
+      'fable_5_1/direct': 'claude_fable_5_1_anthropic',
+      'fable_5_1/openrouter': 'claude_fable_5_1_openrouter',
       'opus_5_5/direct': 'claude_opus_5_5_anthropic',
       'opus_5_5/openrouter': 'claude_opus_5_5_openrouter',
       'gpt_6_astra/direct': 'gpt_6_astra_openai',
@@ -37,6 +41,8 @@ describe('CAD model picker tiers', () => {
 
   it('labels the buttons with the model names the team uses', () => {
     expect(CAD_PICKER_MODELS.map((m) => m.label)).toEqual([
+      'Gemini 4 Argon',
+      'Fable 5.1',
       'Opus 5.5',
       'GPT-6 Astra',
       'Qwen 3.8 Max',

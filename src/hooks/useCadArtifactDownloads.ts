@@ -13,6 +13,8 @@ interface UseCadArtifactDownloadsInput {
   viewerThreedmUrl?: string | null;
   /** Backend URL for the preview mesh, or null before the run finishes. */
   glbUrl?: string | null;
+  stlUrls?: string[];
+  stepUrls?: string[];
   /**
    * Produces a GLB of the live scene including the user's edits. Supplied only
    * by the workspaces, which have a canvas; history has no scene to export.
@@ -45,6 +47,8 @@ export function useCadArtifactDownloads({
   threedmUrl,
   viewerThreedmUrl,
   glbUrl,
+  stlUrls = [],
+  stepUrls = [],
   exportEditedBlob,
   source,
 }: UseCadArtifactDownloadsInput) {
@@ -53,7 +57,7 @@ export function useCadArtifactDownloads({
   const save = useCallback(async (
     url: string | null | undefined,
     filename: string,
-    kind: '3dm' | 'glb',
+    kind: '3dm' | 'glb' | 'stl' | 'step',
   ) => {
     if (!url) {
       toast.error(`No ${kind.toUpperCase()} file is available for this model.`);
@@ -94,6 +98,29 @@ export function useCadArtifactDownloads({
     [save, glbUrl],
   );
 
+  const saveMany = useCallback(async (urls: string[], kind: 'stl' | 'step') => {
+    if (urls.length === 0 || isBusy) return;
+    setIsBusy(true);
+    try {
+      const suffix = stamp();
+      for (let index = 0; index < urls.length; index += 1) {
+        const part = urls.length > 1 ? `-part-${index + 1}` : '';
+        const filename = `model-${suffix}${part}.${kind}`;
+        await downloadCadArtifact(urls[index], filename, kind);
+        trackDownloadClicked({ file_name: filename, file_type: kind, context: source, source });
+      }
+    } catch (err) {
+      if (err instanceof AuthExpiredError) return;
+      console.error(`[CadDownload] ${kind} failed:`, err);
+      toast.error(err instanceof Error && err.message ? err.message : `Failed to download the ${kind.toUpperCase()} file.`);
+    } finally {
+      setIsBusy(false);
+    }
+  }, [isBusy, source]);
+
+  const downloadStl = useCallback(() => saveMany(stlUrls, 'stl'), [saveMany, stlUrls]);
+  const downloadStep = useCallback(() => saveMany(stepUrls, 'step'), [saveMany, stepUrls]);
+
   const exportEdited = useCallback(async () => {
     if (!exportEditedBlob || isBusy) return;
     const filename = `model-${stamp()}-edited.glb`;
@@ -122,5 +149,5 @@ export function useCadArtifactDownloads({
     }
   }, [exportEditedBlob, isBusy, source]);
 
-  return { downloadThreedm, downloadViewerThreedm, downloadGlb, exportEdited, isBusy };
+  return { downloadThreedm, downloadViewerThreedm, downloadGlb, downloadStl, downloadStep, exportEdited, isBusy };
 }

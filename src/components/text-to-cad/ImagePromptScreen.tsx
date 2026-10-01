@@ -3,8 +3,9 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { useEstimatedCost } from "@/hooks/use-estimated-cost";
-import { RING_CAD_NURBS_WORKFLOW, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
+import { RING_CAD_NURBS_WORKFLOW, type CadJewelryType, type CadMaterialProfile } from "@/lib/ring-cad-nurbs-api";
 import CadJewelryTypeSelect from "@/components/text-to-cad/CadJewelryTypeSelect";
+import CadMaterialSelect from "@/components/text-to-cad/CadMaterialSelect";
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import ReferenceImageUploader from "./ReferenceImageUploader";
 import CadHistoryLibrary from "./CadHistoryLibrary";
@@ -67,6 +68,8 @@ interface ImagePromptScreenProps {
   setPrompt: (p: string) => void;
   jewelryType: CadJewelryType;
   setJewelryType: (t: CadJewelryType) => void;
+  material: CadMaterialProfile | null;
+  setMaterial: (material: CadMaterialProfile | null) => void;
   isGenerating: boolean;
   onGenerate: () => void;
   /** Ordered previews; index 0 is the primary reference. Length 0..MAX_RING_CAD_REFERENCE_IMAGES. */
@@ -82,7 +85,7 @@ interface ImagePromptScreenProps {
 }
 
 export default function ImagePromptScreen({
-  model, tier, prompt, setPrompt, jewelryType, setJewelryType,
+  model, tier, prompt, setPrompt, jewelryType, setJewelryType, material, setMaterial,
   isGenerating, onGenerate,
   referenceImagePreviewUrls,
   onAddReferenceImages, onRemoveReferenceImage, onReplaceReferenceImages,
@@ -210,6 +213,7 @@ export default function ImagePromptScreen({
             {(
               <div className="mt-3 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end">
                 <CadJewelryTypeSelect value={jewelryType} onChange={setJewelryType} disabled={isGenerating} />
+                <CadMaterialSelect value={material} onChange={setMaterial} disabled={isGenerating} />
                 <Button
                   size="lg"
                   onClick={onGenerate}

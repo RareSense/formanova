@@ -36,7 +36,7 @@ import {
 import GemToggle from "@/components/text-to-cad/QualityToggle";
 import { runMicroBenchmark } from "@/lib/gpu-detect";
 import type { GemMode } from "@/components/text-to-cad/CADCanvas";
-import { RING_CAD_DEFAULT_TIER, RING_CAD_TIERS, DEFAULT_CAD_JEWELRY_TYPE, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
+import { RING_CAD_DEFAULT_TIER, RING_CAD_TIERS, DEFAULT_CAD_JEWELRY_TYPE, type CadJewelryType, type CadMaterialProfile } from "@/lib/ring-cad-nurbs-api";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import CadModelPicker from "@/components/text-to-cad/CadModelPicker";
 import { DEFAULT_CAD_PICK, cadPickerTier, type CadModelPick } from "@/lib/cad-model-picker";
@@ -73,6 +73,7 @@ export default function TextToCAD() {
   const [model] = useState("gemini");
   const [prompt, setPrompt] = useState("");
   const [jewelryType, setJewelryType] = useState<CadJewelryType>(DEFAULT_CAD_JEWELRY_TYPE);
+  const [material, setMaterial] = useState<CadMaterialProfile | null>(null);
   const [transformMode, setTransformMode] = useState("orbit");
   const wasManualUploadRef = useRef(false);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
@@ -118,6 +119,7 @@ export default function TextToCAD() {
     referenceImages: NO_REFERENCE_IMAGES,
     tier: activeTier,
     jewelryType,
+    material,
     cadRoute: '/text-to-cad',
     // Read once, at first render, so arriving from the result email
     // paints the loading state instead of an empty workspace.
@@ -220,6 +222,8 @@ export default function TextToCAD() {
     threedmUrl: workflow.threedmArtifact?.url,
     viewerThreedmUrl: workflow.viewerThreedmUrl,
     glbUrl: workflow.glbUrl,
+    stlUrls: workflow.stlArtifacts.map(artifact => artifact.url),
+    stepUrls: workflow.stepArtifacts.map(artifact => artifact.url),
     exportEditedBlob: () => canvasRef.current?.exportSceneBlob() ?? Promise.resolve(undefined),
     source: 'text-to-cad',
   });
@@ -259,6 +263,8 @@ export default function TextToCAD() {
           setPrompt={setPrompt}
           jewelryType={jewelryType}
           setJewelryType={setJewelryType}
+          material={material}
+          setMaterial={setMaterial}
           isGenerating={workflow.isGenerating}
           onGenerate={workflow.simulateGeneration}
           onGlbUpload={showCadUpload ? handleGlbUpload : undefined}
@@ -408,6 +414,9 @@ export default function TextToCAD() {
                 onDownloadThreedm={workflow.threedmArtifact ? downloads.downloadThreedm : undefined}
                 onDownloadGlb={workflow.glbUrl ? downloads.downloadGlb : undefined}
                 onDownloadViewerThreedm={workflow.viewerThreedmUrl ? downloads.downloadViewerThreedm : undefined}
+                onDownloadStl={workflow.stlArtifacts.length ? downloads.downloadStl : undefined}
+                onDownloadStep={workflow.stepArtifacts.length ? downloads.downloadStep : undefined}
+                estimatedMetalMassG={workflow.estimatedMetalMassG}
                 onExportEdited={hasEdits ? downloads.exportEdited : undefined}
                 latestVersionLabel={workflow.latestVersionLabel}
                 onImproveFromVersion={workflow.improveFromLatestVersion}

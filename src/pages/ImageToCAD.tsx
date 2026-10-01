@@ -32,7 +32,7 @@ import GenerationProgress from "@/components/text-to-cad/GenerationProgress";
 import { ViewportToolbar, ViewportSideTools } from "@/components/text-to-cad/ViewportOverlays";
 import GemToggle from "@/components/text-to-cad/QualityToggle";
 import type { GemMode } from "@/components/text-to-cad/CADCanvas";
-import { RING_CAD_DEFAULT_TIER, DEFAULT_CAD_JEWELRY_TYPE, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
+import { RING_CAD_DEFAULT_TIER, DEFAULT_CAD_JEWELRY_TYPE, type CadJewelryType, type CadMaterialProfile } from "@/lib/ring-cad-nurbs-api";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import CadModelPicker from "@/components/text-to-cad/CadModelPicker";
 import { DEFAULT_CAD_PICK, cadPickerTier, type CadModelPick } from "@/lib/cad-model-picker";
@@ -89,6 +89,7 @@ export default function ImageToCAD() {
   const [workspaceActive, setWorkspaceActive] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [jewelryType, setJewelryType] = useState<CadJewelryType>(DEFAULT_CAD_JEWELRY_TYPE);
+  const [material, setMaterial] = useState<CadMaterialProfile | null>(null);
 
   const canvasRef = useRef<CADCanvasHandle>(null);
   const leftPanelRef = useRef<ImperativePanelHandle>(null);
@@ -114,6 +115,7 @@ export default function ImageToCAD() {
     referenceImages,
     tier: activeTier,
     jewelryType,
+    material,
     cadRoute: '/image-to-cad',
     // Read once, at first render, so arriving from the result email
     // paints the loading state instead of an empty workspace.
@@ -194,6 +196,8 @@ export default function ImageToCAD() {
     threedmUrl: workflow.threedmArtifact?.url,
     viewerThreedmUrl: workflow.viewerThreedmUrl,
     glbUrl: workflow.glbUrl,
+    stlUrls: workflow.stlArtifacts.map(artifact => artifact.url),
+    stepUrls: workflow.stepArtifacts.map(artifact => artifact.url),
     exportEditedBlob: () => canvasRef.current?.exportSceneBlob() ?? Promise.resolve(undefined),
     source: 'image-to-cad',
   });
@@ -230,6 +234,8 @@ export default function ImageToCAD() {
           setPrompt={setPrompt}
           jewelryType={jewelryType}
           setJewelryType={setJewelryType}
+          material={material}
+          setMaterial={setMaterial}
           isGenerating={workflow.isGenerating}
           onGenerate={workflow.simulateGeneration}
           referenceImagePreviewUrls={panelReferenceUrls}
@@ -246,6 +252,12 @@ export default function ImageToCAD() {
             workflow.setProgressStep("_loading");
             const url = URL.createObjectURL(file);
             workflow.setGlbUrl(url);
+            // Local demo recording build only (.env.local): the uploaded GLB's native 3DM,
+            // served from public/demo, so the 3DM download button shows the real Rhino file.
+            const demo3dm = import.meta.env.VITE_DEMO_3DM_URL;
+            if (import.meta.env.VITE_DEMO_NO_AUTH === 'true' && demo3dm) {
+              workflow.setThreedmArtifact({ uri: demo3dm, url: demo3dm, type: 'model/3dm', bytes: 0, sha256: '' });
+            }
           } : undefined}
         />
       </div>
@@ -379,6 +391,9 @@ export default function ImageToCAD() {
                 onDownloadThreedm={workflow.threedmArtifact ? downloads.downloadThreedm : undefined}
                 onDownloadGlb={workflow.glbUrl ? downloads.downloadGlb : undefined}
                 onDownloadViewerThreedm={workflow.viewerThreedmUrl ? downloads.downloadViewerThreedm : undefined}
+                onDownloadStl={workflow.stlArtifacts.length ? downloads.downloadStl : undefined}
+                onDownloadStep={workflow.stepArtifacts.length ? downloads.downloadStep : undefined}
+                estimatedMetalMassG={workflow.estimatedMetalMassG}
                 onExportEdited={hasEdits ? downloads.exportEdited : undefined}
                 latestVersionLabel={workflow.latestVersionLabel}
                 onImproveFromVersion={workflow.improveFromLatestVersion}
