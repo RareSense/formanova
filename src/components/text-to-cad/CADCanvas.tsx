@@ -93,6 +93,14 @@ const REFERENCE_MATERIALS: Record<string, ReferenceMaterialSpec> = {
   opal:         { label: "Opal", kind: "pearl", color: 0xf2f0ea, sheen: 0xffffff, irid: 1, opal: true },
 };
 
+/** Whether a reference look is a stone, including the unassigned-stone default. */
+export function isStoneLook(key: string | null): boolean {
+  if (!key) return false;
+  if (key === "stoneBlue") return true;
+  if (key === "wax") return false;
+  return REFERENCE_MATERIALS[key]?.kind !== "metal";
+}
+
 const REFERENCE_BASE_ENV = { metal: 1.15, gem: 2.3, pearl: 1.1 } as const;
 const REFERENCE_ENVIRONMENTS = {
   room: null,
@@ -2267,7 +2275,7 @@ const LoadedModel = forwardRef<
       triangleCount += (mesh.geometry.index?.count ?? positionCount) / 3;
       const assigned = assignedMaterials[mesh.name];
       const referenceKey = referenceKeyForMaterial(assigned, mesh.name);
-      if (referenceKey && REFERENCE_MATERIALS[referenceKey]?.kind !== "metal") gemCount++;
+      if (referenceKey) { if (isStoneLook(referenceKey)) gemCount++; }
       else if (!referenceKey && assigned?.category === "gemstone") gemCount++;
     }
     onSceneWeightChange?.(gemCount >= 18 || triangleCount > 350000);
