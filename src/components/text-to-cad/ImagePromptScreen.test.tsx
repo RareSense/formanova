@@ -25,6 +25,8 @@ function renderScreen() {
       setPrompt={vi.fn()}
       jewelryType="ring"
       setJewelryType={vi.fn()}
+      material={null}
+      setMaterial={vi.fn()}
       isGenerating={false}
       onGenerate={vi.fn()}
       referenceImagePreviewUrls={[]}
