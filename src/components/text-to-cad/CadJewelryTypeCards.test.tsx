@@ -1,0 +1,64 @@
+import { describe, expect, it, vi } from 'vitest';
+import '@testing-library/jest-dom/vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+
+import CadJewelryTypeCards from './CadJewelryTypeCards';
+
+describe('CadJewelryTypeCards', () => {
+  it('offers the five pieces in order as one radio group', () => {
+    render(<CadJewelryTypeCards value="ring" onChange={() => {}} />);
+
+    expect(screen.getByRole('radiogroup', { name: 'Jewelry type' })).toBeInTheDocument();
+    expect(screen.getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual(
+      ['Ring', 'Necklace', 'Bracelet', 'Earring', 'Other'],
+    );
+  });
+
+  it('marks only the chosen piece as selected', () => {
+    render(<CadJewelryTypeCards value="necklace" onChange={() => {}} />);
+
+    expect(screen.getByRole('radio', { name: 'Necklace' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: 'Ring' })).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('reports the piece that was clicked', () => {
+    const onChange = vi.fn();
+    render(<CadJewelryTypeCards value="ring" onChange={onChange} />);
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Bracelet' }));
+    expect(onChange).toHaveBeenCalledWith('bracelet');
+  });
+
+  it('moves the choice with the arrow keys, wrapping at the ends', () => {
+    const onChange = vi.fn();
+    render(<CadJewelryTypeCards value="ring" onChange={onChange} />);
+
+    fireEvent.keyDown(screen.getByRole('radio', { name: 'Ring' }), { key: 'ArrowRight' });
+    expect(onChange).toHaveBeenLastCalledWith('necklace');
+    fireEvent.keyDown(screen.getByRole('radio', { name: 'Ring' }), { key: 'ArrowLeft' });
+    expect(onChange).toHaveBeenLastCalledWith('other');
+  });
+
+  it('keeps only the chosen card in the tab order', () => {
+    render(<CadJewelryTypeCards value="earring" onChange={() => {}} />);
+
+    expect(screen.getByRole('radio', { name: 'Earring' })).toHaveAttribute('tabindex', '0');
+    expect(screen.getByRole('radio', { name: 'Ring' })).toHaveAttribute('tabindex', '-1');
+  });
+
+  it('explains what Other covers', () => {
+    render(<CadJewelryTypeCards value="ring" onChange={() => {}} />);
+
+    expect(screen.getByText('Brooches, tiaras, watches & more')).toBeInTheDocument();
+  });
+
+  it('cannot be changed while a run is generating', () => {
+    const onChange = vi.fn();
+    render(<CadJewelryTypeCards value="ring" onChange={onChange} disabled />);
+
+    for (const radio of screen.getAllByRole('radio')) expect(radio).toBeDisabled();
+    fireEvent.click(screen.getByRole('radio', { name: 'Necklace' }));
+    fireEvent.keyDown(screen.getByRole('radio', { name: 'Ring' }), { key: 'ArrowRight' });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+});
