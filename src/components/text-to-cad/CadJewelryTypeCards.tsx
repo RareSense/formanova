@@ -7,7 +7,7 @@
  * card sits in the tab order.
  */
 
-import { useRef, type KeyboardEvent } from 'react';
+import { useId, useRef, type KeyboardEvent } from 'react';
 import { Check, Sparkles } from 'lucide-react';
 
 import { CAD_JEWELRY_TYPES, type CadJewelryType } from '@/lib/ring-cad-nurbs-api';
@@ -31,6 +31,7 @@ interface CadJewelryTypeCardsProps {
 }
 
 export default function CadJewelryTypeCards({ value, onChange, disabled }: CadJewelryTypeCardsProps) {
+  const otherHintId = useId();
   const cardRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
@@ -58,7 +59,7 @@ export default function CadJewelryTypeCards({ value, onChange, disabled }: CadJe
             role="radio"
             aria-checked={selected}
             aria-label={type.label}
-            aria-describedby={type.value === 'other' ? 'cad-type-other-hint' : undefined}
+            aria-describedby={type.value === 'other' ? otherHintId : undefined}
             tabIndex={selected ? 0 : -1}
             disabled={disabled}
             onClick={() => onChange(type.value)}
@@ -79,7 +80,7 @@ export default function CadJewelryTypeCards({ value, onChange, disabled }: CadJe
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-2 px-2 text-center">
                   <Sparkles aria-hidden="true" strokeWidth={1.5} className="h-6 w-6 text-zinc-700" />
-                  <span id="cad-type-other-hint" className="hidden text-[11px] leading-snug text-zinc-700 sm:block">Brooches, tiaras, watches &amp; more</span>
+                  <span id={otherHintId} className="hidden text-[11px] leading-snug text-zinc-700 sm:block">Brooches, tiaras, watches &amp; more</span>
                 </div>
               )}
               {selected && (

@@ -179,7 +179,7 @@ export default function ReferenceImageUploader({
               if (url) {
                 return (
                   <div key={index} className="relative h-full min-h-0 min-w-0 overflow-hidden border border-border bg-muted/10">
-                    <img src={url} alt={index === 0 ? "Primary inspiration ring" : `Inspiration angle ${index}`} className="h-full w-full object-contain p-1" />
+                    <img src={url} alt={index === 0 ? "Primary inspiration image" : `Inspiration angle ${index}`} className="h-full w-full object-contain p-1" />
                     <button
                       onClick={() => onRemoveReferenceImage(index)}
                       className="absolute top-1 right-1 w-6 h-6 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"

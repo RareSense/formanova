@@ -113,6 +113,15 @@ interface FormatRow {
   onSelect: () => void;
 }
 
+function FormatItem({ format, hint, onSelect }: FormatRow) {
+  return (
+    <DropdownMenuItem onSelect={onSelect} className="gap-3 py-2">
+      <span className="w-10 shrink-0 font-mono text-[11px] font-semibold uppercase tracking-wider">{format}</span>
+      <span className="text-[12px] text-muted-foreground">{hint}</span>
+    </DropdownMenuItem>
+  );
+}
+
 export function CadDownloadMenu({
   onDownloadThreedm,
   onDownloadGlb,
@@ -163,18 +172,12 @@ export function CadDownloadMenu({
           </div>
         )}
         {formats.map((row) => (
-          <DropdownMenuItem key={`${row.format}-${row.hint}`} onSelect={row.onSelect} className="gap-3 py-2">
-            <span className="w-10 shrink-0 font-mono text-[11px] font-semibold uppercase tracking-wider">{row.format}</span>
-            <span className="text-[12px] text-muted-foreground">{row.hint}</span>
-          </DropdownMenuItem>
+          <FormatItem key={`${row.format}-${row.hint}`} {...row} />
         ))}
         {onExportEdited && (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={onExportEdited} className="gap-3 py-2">
-              <span className="w-10 shrink-0 font-mono text-[11px] font-semibold uppercase tracking-wider">GLB</span>
-              <span className="text-[12px] text-muted-foreground">With my edits</span>
-            </DropdownMenuItem>
+            <FormatItem format="GLB" hint="With my edits" onSelect={onExportEdited} />
           </>
         )}
       </DropdownMenuContent>
