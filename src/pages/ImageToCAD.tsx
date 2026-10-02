@@ -32,10 +32,7 @@ import GenerationProgress from "@/components/text-to-cad/GenerationProgress";
 import { ViewportToolbar, ViewportSideTools } from "@/components/text-to-cad/ViewportOverlays";
 import GemToggle from "@/components/text-to-cad/QualityToggle";
 import type { GemMode } from "@/components/text-to-cad/CADCanvas";
-import { RING_CAD_DEFAULT_TIER, DEFAULT_CAD_JEWELRY_TYPE, type CadJewelryType, type CadMaterialProfile } from "@/lib/ring-cad-nurbs-api";
-import { useIsAdmin } from "@/hooks/useIsAdmin";
-import CadModelPicker from "@/components/text-to-cad/CadModelPicker";
-import { DEFAULT_CAD_PICK, cadPickerTier, type CadModelPick } from "@/lib/cad-model-picker";
+import { RING_CAD_DEFAULT_TIER, DEFAULT_CAD_JEWELRY_TYPE, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
 import { recordStudioVisit } from '@/lib/studio-preference';
 import { useCadRestoreFromUrl } from "@/hooks/useCadRestoreFromUrl";
 
@@ -52,11 +49,8 @@ export default function ImageToCAD() {
   const showCadUpload = isCadUploadEnabled(user?.email);
 
   const [model] = useState("gemini");
-  const isAdmin = useIsAdmin();
-  const [modelPick, setModelPick] = useState<CadModelPick>(DEFAULT_CAD_PICK);
-  // Admins choose the model and provider; everyone else keeps the fixed default.
-  const pickedTier = isAdmin ? cadPickerTier(modelPick.model, modelPick.provider) : RING_CAD_DEFAULT_TIER;
-  const activeTier = pickedTier;
+  // Every run uses the customer default: GPT-6 Astra, OpenAI direct.
+  const activeTier = RING_CAD_DEFAULT_TIER;
   const {
     referenceImages,
     referenceImagePreviewUrls,
@@ -89,7 +83,6 @@ export default function ImageToCAD() {
   const [workspaceActive, setWorkspaceActive] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [jewelryType, setJewelryType] = useState<CadJewelryType>(DEFAULT_CAD_JEWELRY_TYPE);
-  const [material, setMaterial] = useState<CadMaterialProfile | null>(null);
 
   const canvasRef = useRef<CADCanvasHandle>(null);
   const leftPanelRef = useRef<ImperativePanelHandle>(null);
@@ -115,7 +108,6 @@ export default function ImageToCAD() {
     referenceImages,
     tier: activeTier,
     jewelryType,
-    material,
     cadRoute: '/image-to-cad',
     // Read once, at first render, so arriving from the result email
     // paints the loading state instead of an empty workspace.
@@ -234,17 +226,12 @@ export default function ImageToCAD() {
           setPrompt={setPrompt}
           jewelryType={jewelryType}
           setJewelryType={setJewelryType}
-          material={material}
-          setMaterial={setMaterial}
           isGenerating={workflow.isGenerating}
           onGenerate={workflow.simulateGeneration}
           referenceImagePreviewUrls={panelReferenceUrls}
           onAddReferenceImages={addReferenceImages}
           onRemoveReferenceImage={removeReferenceImage}
           onReplaceReferenceImages={replaceReferenceImages}
-          modelPicker={isAdmin ? (
-            <CadModelPicker value={modelPick} onChange={setModelPick} disabled={workflow.isGenerating} />
-          ) : undefined}
           onGlbUpload={showCadUpload ? (file) => {
             setWorkspaceActive(true);
             workflow.setHasModel(true);
@@ -318,7 +305,10 @@ export default function ImageToCAD() {
             {!isFullscreen && (
               <>
                 <button
-                  onClick={() => { const p = leftPanelRef.current; if (p) { leftCollapsed ? p.expand(22) : p.collapse(); } }}
+                  onClick={() => { const p = leftPanelRef.current; if (p) {
+                    if (leftCollapsed) p.expand(22);
+                    else p.collapse();
+                  } }}
                   className="absolute top-2 left-2 z-[60] w-8 h-8 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
                   title={leftCollapsed ? "Show left panel" : "Hide left panel"}
                 >
@@ -326,7 +316,10 @@ export default function ImageToCAD() {
                 </button>
                 {workflow.hasModel && (
                   <button
-                    onClick={() => { const p = rightPanelRef.current; if (p) { rightCollapsed ? p.expand(22) : p.collapse(); } }}
+                    onClick={() => { const p = rightPanelRef.current; if (p) {
+                      if (rightCollapsed) p.expand(22);
+                      else p.collapse();
+                    } }}
                     className="absolute top-2 right-2 z-[60] w-8 h-8 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
                     title={rightCollapsed ? "Show right panel" : "Hide right panel"}
                   >
@@ -487,7 +480,10 @@ export default function ImageToCAD() {
               redoCount={editor.redoStack.length}
               onFullscreen={() => {
                 const el = document.querySelector('[data-cad-viewport]') as HTMLElement;
-                if (el) { document.fullscreenElement ? document.exitFullscreen() : el.requestFullscreen(); }
+                if (el) {
+                  if (document.fullscreenElement) document.exitFullscreen();
+                  else el.requestFullscreen();
+                }
               }}
               onDisplayMenu={() => setDisplayMenuOpen(p => !p)}
               onKeyboardShortcuts={() => setShortcutsOpen(true)}

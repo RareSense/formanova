@@ -16,17 +16,15 @@ vi.mock('@/hooks/use-estimated-cost', () => ({
 
 import ImagePromptScreen from './ImagePromptScreen';
 
-function renderScreen() {
+function renderScreen(jewelryType: 'ring' | 'necklace' | 'bracelet' | 'earring' | 'other' = 'ring') {
   return render(
     <ImagePromptScreen
       model="gemini"
       tier="claude_opus_5_openrouter"
       prompt=""
       setPrompt={vi.fn()}
-      jewelryType="ring"
+      jewelryType={jewelryType}
       setJewelryType={vi.fn()}
-      material={null}
-      setMaterial={vi.fn()}
       isGenerating={false}
       onGenerate={vi.fn()}
       referenceImagePreviewUrls={[]}
@@ -55,9 +53,31 @@ describe('ImagePromptScreen', () => {
     expect(screen.getByText('Try an Example')).toBeTruthy();
   });
 
-  it('shows the jewelry type picker beside Generate, set to Ring', () => {
+  it('asks what is being made first, as Step 1, with the picture cards', () => {
     renderScreen();
-    const picker = screen.getByRole('combobox', { name: 'Jewelry type' });
-    expect(picker.textContent).toContain('Ring');
+
+    expect(screen.getByText(/image to cad · step 1/i)).toBeTruthy();
+    expect(screen.getByRole('heading', { name: /what are you making\?/i })).toBeTruthy();
+    expect(screen.getByRole('radiogroup', { name: 'Jewelry type' })).toBeTruthy();
+    expect(screen.queryByRole('combobox')).toBeNull();
+  });
+
+  it('words the upload step for the chosen piece', () => {
+    renderScreen('earring');
+
+    expect(screen.getByRole('heading', { name: /upload your earring images/i })).toBeTruthy();
+    expect(screen.getByText(/drop your earring images or sketches here/i)).toBeTruthy();
+  });
+
+  it('calls an Other piece a piece', () => {
+    renderScreen('other');
+
+    expect(screen.getByRole('heading', { name: /upload your piece images/i })).toBeTruthy();
+  });
+
+  it('asks for a description or the details that matter for the chosen piece', () => {
+    renderScreen('bracelet');
+
+    expect(screen.getByPlaceholderText(/add a description or any details, e\.g\. 17 cm length, 5 mm wide/i)).toBeTruthy();
   });
 });

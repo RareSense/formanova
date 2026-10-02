@@ -1,11 +1,10 @@
-import { useRef, useCallback, useEffect, useState, type ReactNode } from "react";
+import { useRef, useCallback, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { useEstimatedCost } from "@/hooks/use-estimated-cost";
-import { RING_CAD_NURBS_WORKFLOW, type CadJewelryType, type CadMaterialProfile } from "@/lib/ring-cad-nurbs-api";
-import CadJewelryTypeSelect from "@/components/text-to-cad/CadJewelryTypeSelect";
-import CadMaterialSelect from "@/components/text-to-cad/CadMaterialSelect";
+import { RING_CAD_NURBS_WORKFLOW, cadJewelryNoun, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
+import CadJewelryTypeCards from "@/components/text-to-cad/CadJewelryTypeCards";
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import ReferenceImageUploader from "./ReferenceImageUploader";
 import CadHistoryLibrary from "./CadHistoryLibrary";
@@ -40,6 +39,16 @@ const EXAMPLE_DESIGNS = [
   },
 ];
 
+// What a jeweller would want to pin down for each piece. The pipeline builds
+// to these numbers when they are given, so the box asks for them up front.
+const DIMENSION_PLACEHOLDERS: Record<CadJewelryType, string> = {
+  ring: "Add a description or any details, e.g. ring size 7, 2 mm band, 1 ct oval stone",
+  necklace: "Add a description or any details, e.g. 18 mm pendant, 45 cm chain, 4 mm stones",
+  bracelet: "Add a description or any details, e.g. 17 cm length, 5 mm wide, 2 mm stones",
+  earring: "Add a description or any details, e.g. 25 mm drop, 5 mm studs, push-back",
+  other: "Add a description or any details, e.g. 40 mm brooch, 3 mm stones, pin back",
+};
+
 function RingReferenceExamples({ onSelect }: { onSelect: (example: typeof EXAMPLE_DESIGNS[0]) => void }) {
   return (
     <div className={`grid grid-cols-2 gap-3 overflow-hidden border border-border/30 p-3 ${PANEL_H}`}>
@@ -68,8 +77,6 @@ interface ImagePromptScreenProps {
   setPrompt: (p: string) => void;
   jewelryType: CadJewelryType;
   setJewelryType: (t: CadJewelryType) => void;
-  material: CadMaterialProfile | null;
-  setMaterial: (material: CadMaterialProfile | null) => void;
   isGenerating: boolean;
   onGenerate: () => void;
   /** Ordered previews; index 0 is the primary reference. Length 0..MAX_RING_CAD_REFERENCE_IMAGES. */
@@ -80,19 +87,18 @@ interface ImagePromptScreenProps {
   /** Replaces the whole set (used by the example designs). */
   onReplaceReferenceImages: (files: File[]) => void;
   onGlbUpload?: (file: File) => void;
-  /** Admin-only model/provider picker; the page passes it only for admins. */
-  modelPicker?: ReactNode;
 }
 
 export default function ImagePromptScreen({
-  model, tier, prompt, setPrompt, jewelryType, setJewelryType, material, setMaterial,
+  model, tier, prompt, setPrompt, jewelryType, setJewelryType,
   isGenerating, onGenerate,
   referenceImagePreviewUrls,
   onAddReferenceImages, onRemoveReferenceImage, onReplaceReferenceImages,
-  onGlbUpload, modelPicker,
+  onGlbUpload,
 }: ImagePromptScreenProps) {
   const glbInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const noun = cadJewelryNoun(jewelryType);
   const [hasImageHistory, setHasImageHistory] = useState(false);
 
   const primaryPreviewUrl = referenceImagePreviewUrls[0] ?? null;
@@ -154,12 +160,22 @@ export default function ImagePromptScreen({
         transition={{ duration: 0.5, ease: "easeOut" }}
         className="w-full px-3 pb-6 pt-20 sm:px-6 lg:px-3"
       >
+        {/* Step 1: which piece. Above the two-column grid so the upload box
+            and the right-hand panel still start and end on the same lines. */}
+        <div className="mb-8 max-w-[680px]">
+          <span className="marta-label block mb-1">Image to CAD &middot; Step 1</span>
+          <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">What are you making?</h3>
+          <div className="mt-4">
+            <CadJewelryTypeCards value={jewelryType} onChange={setJewelryType} disabled={isGenerating} />
+          </div>
+        </div>
+
         <div className="grid gap-8 lg:gap-10 lg:grid-cols-3">
           <div className="lg:col-span-2">
               <div className="mb-2 flex items-start justify-between gap-3">
                 <div>
-                  <span className="marta-label block mb-1">Image to CAD &middot; Step 1</span>
-                  <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">Upload Your Ring Images</h3>
+                  <span className="marta-label block mb-1">Image to CAD &middot; Step 2</span>
+                  <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">Upload your {noun} images</h3>
                   {/* Sets the expectation before the upload, not after the
                       result. Weight and colour carry the emphasis rather than
                       a warning colour: this is how the tool works, not a
@@ -176,7 +192,7 @@ export default function ImagePromptScreen({
                 referenceImagePreviewUrls={referenceImagePreviewUrls}
                 onAddReferenceImages={onAddReferenceImages}
                 onRemoveReferenceImage={onRemoveReferenceImage}
-                primaryLabel="Drop your ring images or sketches here"
+                primaryLabel={`Drop your ${noun} images or sketches here`}
                 canvasClassName={PANEL_H}
                 photoStudioEmptyState
               />
@@ -188,7 +204,7 @@ export default function ImagePromptScreen({
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Add optional description"
+                  placeholder={DIMENSION_PLACEHOLDERS[jewelryType]}
                   rows={3}
                   /* Full-strength border, not a faded one: this is an input and
                      needs to read as an editable field at a glance. */
@@ -206,14 +222,10 @@ export default function ImagePromptScreen({
 
             </div>
 
-            {modelPicker && <div className="mt-4">{modelPicker}</div>}
-
             {/* Action area — matches Photo Studio's Next button exactly:
                 right-aligned below the canvas, gold gradient, size="lg". */}
             {(
               <div className="mt-3 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end">
-                <CadJewelryTypeSelect value={jewelryType} onChange={setJewelryType} disabled={isGenerating} />
-                <CadMaterialSelect value={material} onChange={setMaterial} disabled={isGenerating} />
                 <Button
                   size="lg"
                   onClick={onGenerate}
@@ -247,7 +259,7 @@ export default function ImagePromptScreen({
             {!hasImageHistory && (
               <>
                 <div className="mb-2">
-                  <span className="marta-label block mb-1 invisible" aria-hidden="true">Step 1</span>
+                  <span className="marta-label block mb-1 invisible" aria-hidden="true">Step 2</span>
                   <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">Try an Example</h3>
                   <p className="mt-1.5 text-sm text-muted-foreground">Choose one to load its image and prompt</p>
                   {/* First run only: this whole block is gated on having no
