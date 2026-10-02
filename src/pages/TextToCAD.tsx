@@ -36,10 +36,7 @@ import {
 import GemToggle from "@/components/text-to-cad/QualityToggle";
 import { runMicroBenchmark } from "@/lib/gpu-detect";
 import type { GemMode } from "@/components/text-to-cad/CADCanvas";
-import { RING_CAD_DEFAULT_TIER, RING_CAD_TIERS, DEFAULT_CAD_JEWELRY_TYPE, type CadJewelryType, type CadMaterialProfile } from "@/lib/ring-cad-nurbs-api";
-import { useIsAdmin } from "@/hooks/useIsAdmin";
-import CadModelPicker from "@/components/text-to-cad/CadModelPicker";
-import { DEFAULT_CAD_PICK, cadPickerTier, type CadModelPick } from "@/lib/cad-model-picker";
+import { RING_CAD_DEFAULT_TIER, RING_CAD_TIERS, DEFAULT_CAD_JEWELRY_TYPE, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
 import { recordStudioVisit } from '@/lib/studio-preference';
 import { useCadRestoreFromUrl } from "@/hooks/useCadRestoreFromUrl";
 
@@ -64,16 +61,13 @@ export default function TextToCAD() {
   const requestedTier = searchParams.get('tier') === RING_CAD_TIERS.GPT_5_6_SOL
     ? RING_CAD_TIERS.GPT_5_6_SOL
     : undefined;
-  const isAdmin = useIsAdmin();
-  const [modelPick, setModelPick] = useState<CadModelPick>(DEFAULT_CAD_PICK);
-  // Admins choose the model and provider; everyone else keeps the fixed default.
-  const pickedTier = isAdmin ? cadPickerTier(modelPick.model, modelPick.provider) : RING_CAD_DEFAULT_TIER;
-  const activeTier = requestedTier ?? pickedTier;
+  // Every run uses the customer default (GPT-6 Astra, OpenAI direct) unless
+  // the URL explicitly asks for the GPT-5.6 Sol tier.
+  const activeTier = requestedTier ?? RING_CAD_DEFAULT_TIER;
 
   const [model] = useState("gemini");
   const [prompt, setPrompt] = useState("");
   const [jewelryType, setJewelryType] = useState<CadJewelryType>(DEFAULT_CAD_JEWELRY_TYPE);
-  const [material, setMaterial] = useState<CadMaterialProfile | null>(null);
   const [transformMode, setTransformMode] = useState("orbit");
   const wasManualUploadRef = useRef(false);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
@@ -119,7 +113,6 @@ export default function TextToCAD() {
     referenceImages: NO_REFERENCE_IMAGES,
     tier: activeTier,
     jewelryType,
-    material,
     cadRoute: '/text-to-cad',
     // Read once, at first render, so arriving from the result email
     // paints the loading state instead of an empty workspace.
@@ -263,14 +256,9 @@ export default function TextToCAD() {
           setPrompt={setPrompt}
           jewelryType={jewelryType}
           setJewelryType={setJewelryType}
-          material={material}
-          setMaterial={setMaterial}
           isGenerating={workflow.isGenerating}
           onGenerate={workflow.simulateGeneration}
           onGlbUpload={showCadUpload ? handleGlbUpload : undefined}
-          modelPicker={isAdmin ? (
-            <CadModelPicker value={modelPick} onChange={setModelPick} disabled={workflow.isGenerating} />
-          ) : undefined}
         />
       </div>
     );

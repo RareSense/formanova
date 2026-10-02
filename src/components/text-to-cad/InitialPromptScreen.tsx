@@ -1,11 +1,10 @@
-import { useRef, useCallback, useEffect, useState, type ReactNode } from "react";
+import { useRef, useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { useEstimatedCost } from "@/hooks/use-estimated-cost";
-import { RING_CAD_NURBS_WORKFLOW, type CadJewelryType, type CadMaterialProfile } from "@/lib/ring-cad-nurbs-api";
-import CadJewelryTypeSelect from "@/components/text-to-cad/CadJewelryTypeSelect";
-import CadMaterialSelect from "@/components/text-to-cad/CadMaterialSelect";
+import { RING_CAD_NURBS_WORKFLOW, cadJewelryNoun, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
+import CadJewelryTypeCards from "@/components/text-to-cad/CadJewelryTypeCards";
 
 const EXAMPLE_PROMPTS = [
   "Serpentine ring with a coiled snake design",
@@ -24,21 +23,18 @@ interface InitialPromptScreenProps {
   setPrompt: (p: string) => void;
   jewelryType: CadJewelryType;
   setJewelryType: (t: CadJewelryType) => void;
-  material: CadMaterialProfile | null;
-  setMaterial: (material: CadMaterialProfile | null) => void;
   isGenerating: boolean;
   onGenerate: () => void;
   onGlbUpload?: (file: File) => void;
-  /** Admin-only model/provider picker; the page passes it only for admins. */
-  modelPicker?: ReactNode;
 }
 
 export default function InitialPromptScreen({
-  model, tier, setModel, prompt, setPrompt, jewelryType, setJewelryType, material, setMaterial,
-  isGenerating, onGenerate, onGlbUpload, modelPicker,
+  model, tier, setModel, prompt, setPrompt, jewelryType, setJewelryType,
+  isGenerating, onGenerate, onGlbUpload,
 }: InitialPromptScreenProps) {
   const glbInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const noun = cadJewelryNoun(jewelryType);
   const { cost: estimatedCost, loading: costLoading } = useEstimatedCost({
     workflowName: RING_CAD_NURBS_WORKFLOW,
     model,
@@ -74,8 +70,17 @@ export default function InitialPromptScreen({
                 Text to CAD
               </h1>
               <p className="font-mono text-[11px] text-muted-foreground tracking-[0.15em] uppercase">
-                Describe your ring design · Rings only
+                Describe your {noun} design
               </p>
+            </div>
+
+            {/* Step 1: which piece. Chosen before the brief, because the
+                piece decides what a useful description looks like. */}
+            <div className="mx-auto mb-6 max-w-[680px]">
+              <h2 className="mb-3 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                What are you making?
+              </h2>
+              <CadJewelryTypeCards value={jewelryType} onChange={setJewelryType} disabled={isGenerating} />
             </div>
 
             {/* Prompt */}
@@ -85,7 +90,9 @@ export default function InitialPromptScreen({
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Describe your ring, e.g. A rose ring with three blooming roses, twisted vine band with thorns, and diamond accents"
+                placeholder={jewelryType === "ring"
+                  ? "Describe your ring, e.g. A rose ring with three blooming roses, twisted vine band with thorns, and diamond accents"
+                  : `Describe your ${noun}: shape, stones, metal details and any motif`}
                 rows={6}
                 className="w-full min-h-[220px] max-h-[60vh] px-5 py-4 pb-9 text-[15px] text-foreground placeholder:text-muted-foreground/40 resize-y font-body leading-relaxed transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-ring bg-muted/20 border border-border overflow-y-auto"
               />
@@ -103,14 +110,10 @@ export default function InitialPromptScreen({
               )}
             </div>
 
-            {modelPicker && <div className="mx-auto mb-4 max-w-[680px]">{modelPicker}</div>}
-
             {/* Generate — matches Photo Studio's Next button: right-aligned,
                 gold gradient, size="lg". */}
             {(
               <div className="mx-auto flex max-w-[680px] flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end">
-                <CadJewelryTypeSelect value={jewelryType} onChange={setJewelryType} disabled={isGenerating} />
-                <CadMaterialSelect value={material} onChange={setMaterial} disabled={isGenerating} />
                 <Button
                   size="lg"
                   onClick={onGenerate}
