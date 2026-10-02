@@ -135,18 +135,23 @@ export const RING_CAD_TOTAL_NODES = (() => {
  * others take the jewelry pipeline. Values match JewelryType above.
  */
 export const CAD_JEWELRY_TYPES = [
-  { value: 'ring', label: 'Ring' },
-  { value: 'bracelet', label: 'Bracelet' },
-  { value: 'necklace', label: 'Necklace' },
-  { value: 'earring', label: 'Earring' },
+  { value: 'ring', label: 'Ring', noun: 'ring' },
+  { value: 'necklace', label: 'Necklace', noun: 'necklace' },
+  { value: 'bracelet', label: 'Bracelet', noun: 'bracelet' },
+  { value: 'earring', label: 'Earring', noun: 'earring' },
   // Brooch, tiara, cufflinks, anklet, charm, watch case and the like. The
   // backend works out the actual piece from the photos and description.
-  { value: 'other', label: 'Other' },
+  { value: 'other', label: 'Other', noun: 'piece' },
 ] as const;
 
 export type CadJewelryType = (typeof CAD_JEWELRY_TYPES)[number]['value'];
 
 export const DEFAULT_CAD_JEWELRY_TYPE: CadJewelryType = 'ring';
+
+/** The word the prompt screens use for the chosen piece, e.g. "Upload your necklace images". */
+export function cadJewelryNoun(type: CadJewelryType): string {
+  return CAD_JEWELRY_TYPES.find((t) => t.value === type)?.noun ?? 'piece';
+}
 
 export interface CadMaterialProfile {
   id: string;

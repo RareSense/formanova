@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildRingCadStartBody,
   CAD_JEWELRY_TYPES,
+  cadJewelryNoun,
   DEFAULT_CAD_JEWELRY_TYPE,
   isRingCadSuccess,
   parseRingCadFailure,
@@ -160,9 +161,15 @@ describe('ring_cad_nurbs_v1 start body', () => {
 });
 
 describe('jewelry_type in the start body', () => {
-  it('offers ring, bracelet, necklace, earring and other, in that order', () => {
-    expect(CAD_JEWELRY_TYPES.map((t) => t.value)).toEqual(['ring', 'bracelet', 'necklace', 'earring', 'other']);
+  it('offers ring, necklace, bracelet, earring and other, in that order', () => {
+    expect(CAD_JEWELRY_TYPES.map((t) => t.value)).toEqual(['ring', 'necklace', 'bracelet', 'earring', 'other']);
     expect(CAD_JEWELRY_TYPES.find((t) => t.value === 'other')?.label).toBe('Other');
+  });
+
+  it('names each piece for the wording on the prompt screens', () => {
+    expect(CAD_JEWELRY_TYPES.map((t) => cadJewelryNoun(t.value))).toEqual(
+      ['ring', 'necklace', 'bracelet', 'earring', 'piece'],
+    );
   });
 
   it('sends other for pieces outside the four families (brooch, cufflinks, ...)', () => {
