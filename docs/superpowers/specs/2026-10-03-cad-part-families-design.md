@@ -33,9 +33,8 @@ steel-blue metallic, until the user picks a material.
   - `AccentStone.L.Up`, `AccentStone.R.Dn` → `accent stone`
   - `Prong_Claw_0_1`, `CenterProng_-1_1_mesh` → `prong claw`, `center prong`
   - `HaloDiamond.inner.00` vs `HaloDiamond.outer.00` stay separate (inner/outer kept)
-- `cadPartKind(name)`: `classifyCadPartName` → `"stone"` (gem) / `"metal"` / `"other"` (null).
-- `groupCadParts(names)`: `{ key, label, kind, names }[]`; kinds ordered stone, metal,
-  other; inside a kind, larger families first, then label A–Z. `label` = key with
+- `cadPartKind(name)`: `classifyCadPartName` → `"stone"` (gem) / `"metal"` (metal, and unknown names — same convention as the classifier fixture and the viewer default).
+- `groupCadParts(names)`: `{ key, label, kind, names }[]`; kinds ordered stone, metal; inside a kind, larger families first, then label A–Z. `label` = key with
   the first letter upper-cased (no pluralising).
 - `cadFamilyMembers(name, allNames)`: every name with the same key.
 
@@ -79,7 +78,7 @@ steel-blue metallic, until the user picks a material.
 - "Meshes" → "Parts" (all four section headers, the stats label, "Search parts…",
   "Generate a piece to see its parts", "No matching parts", "Select a part to assign
   material").
-- Grouped list from `groupCadParts`: kind headers (STONES / METAL / OTHER), then family
+- Grouped list from `groupCadParts`: kind headers (STONES / METAL), then family
   rows "Pave gem · 40" with a chevron. Click a family row → `onSelectFamily(firstName, multi)`.
   Chevron expands to part rows; click a part row → `onSelectMesh(name, multi)`.
   A family row shows selected when all members are selected, partly selected (dot)
