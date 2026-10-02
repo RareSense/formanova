@@ -66,6 +66,10 @@ const REFERENCE_MATERIALS: Record<string, ReferenceMaterialSpec> = {
   platinum:     { label: "Platinum", kind: "metal", color: 0xe9e9e7, rough: 0.11 },
   silver:       { label: "Silver", kind: "metal", color: 0xfbfaf6, rough: 0.05 },
   blackRhodium: { label: "Black Rhodium", kind: "metal", color: 0x3b3b40, rough: 0.28 },
+  // Default look on load, before the user picks a material: green casting wax for
+  // metal and steel blue for stones, the way CAD tools show unassigned parts.
+  wax:          { label: "Casting Wax", kind: "pearl", color: 0x1f6e44 },
+  stoneBlue:    { label: "Stone Blue", kind: "metal", color: 0x3f6fc4, rough: 0.22 },
 
   diamond:      { label: "Diamond", kind: "gem", color: 0xffffff, atten: 0xffffff, ior: 2.42, disp: 0.02 },
   champagne:    { label: "Champagne", kind: "gem", color: 0xf6e3bd, atten: 0xc89a4e, ior: 2.42, disp: 0.02 },
@@ -114,7 +118,7 @@ function classifyReferenceMaterial(name: string): string {
   return "diamond";
 }
 
-function referenceKeyForMaterial(material: MaterialDef | undefined, meshName: string): string | null {
+export function referenceKeyForMaterial(material: MaterialDef | undefined, meshName: string): string | null {
   const idMap: Record<string, string> = {
     "gold-yellow-polished": "gold18k",
     "gold-rose-polished": "roseGold",
@@ -134,10 +138,7 @@ function referenceKeyForMaterial(material: MaterialDef | undefined, meshName: st
 
   if (material?.id && idMap[material.id]) return idMap[material.id];
   if (material?.id?.startsWith("flat-")) {
-    const classified = classifyReferenceMaterial(meshName);
-    return material.category === "gemstone"
-      ? REFERENCE_MATERIALS[classified]?.kind === "metal" ? "diamond" : classified
-      : "gold18k";
+    return material.category === "gemstone" ? "stoneBlue" : "wax";
   }
 
   // Preserve unsupported explicit CAD material definitions. Unassigned meshes
@@ -391,6 +392,13 @@ const SELECTION_MATERIAL = new THREE.MeshPhysicalMaterial({
   emissiveIntensity: 0.3,
   side: THREE.DoubleSide,
 });
+
+/** Soft white glow on every part of the hovered family; distinct from the orange selection. */
+const HOVER_MATERIAL = new THREE.MeshBasicMaterial({
+  color: 0xffffff, transparent: true, opacity: 0.28, depthWrite: false,
+  polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1,
+});
+const NO_RAYCAST = () => null;
 
 // ── Dynamic light intensity controller (updates toneMappingExposure + invalidates) ──
 function LightController({ intensity }: { intensity: number }) {
@@ -988,6 +996,9 @@ const LoadedModel = forwardRef<
     selectedMeshNames: Set<string>;
     hiddenMeshNames: Set<string>;
     onMeshClick: (name: string, multi: boolean) => void;
+    onMeshDoubleClick?: (name: string, multi: boolean) => void;
+    onMeshHover?: (name: string | null) => void;
+    highlightedMeshNames?: Set<string>;
     transformMode: string;
     onMeshesDetected?: (meshes: { name: string; verts: number; faces: number }[]) => void;
     onTransformStart?: () => void;
@@ -1002,7 +1013,7 @@ const LoadedModel = forwardRef<
     onGemModeForced?: (mode: GemMode) => void;
     exploded?: boolean;
   }
->(({ url, additionalGlbUrls = [], selectedMeshNames, hiddenMeshNames, onMeshClick, transformMode, onMeshesDetected, onTransformStart, onTransformEnd, onLoadStart, onLoadEnd, onModelReady, magicTexturing = false, onDebugGemStats, onSceneWeightChange, gemMode = "simple", onGemModeForced, exploded = false }, ref) => {
+>(({ url, additionalGlbUrls = [], selectedMeshNames, hiddenMeshNames, onMeshClick, onMeshDoubleClick, onMeshHover, highlightedMeshNames, transformMode, onMeshesDetected, onTransformStart, onTransformEnd, onLoadStart, onLoadEnd, onModelReady, magicTexturing = false, onDebugGemStats, onSceneWeightChange, gemMode = "simple", onGemModeForced, exploded = false }, ref) => {
   const [scene, setScene] = useState<THREE.Group | null>(null);
   const loadedUrlRef = useRef<string>("");
 
@@ -2347,7 +2358,23 @@ const LoadedModel = forwardRef<
               if (_isTransformDragging) return;
               onMeshClick(md.name, e.nativeEvent.shiftKey || e.nativeEvent.ctrlKey || e.nativeEvent.metaKey);
             }}
-          />
+            onDoubleClick={(e: ThreeEvent<MouseEvent>) => {
+              e.stopPropagation();
+              if (_isTransformDragging) return;
+              onMeshDoubleClick?.(md.name, e.nativeEvent.shiftKey || e.nativeEvent.ctrlKey || e.nativeEvent.metaKey);
+            }}
+            onPointerOver={(e: ThreeEvent<PointerEvent>) => {
+              e.stopPropagation();
+              if (_isTransformDragging || e.nativeEvent.buttons !== 0) return;
+              onMeshHover?.(md.name);
+            }}
+            onPointerOut={(e: ThreeEvent<PointerEvent>) => {
+              e.stopPropagation();
+              onMeshHover?.(null);
+            }}
+          >
+            {highlightedMeshNames?.has(md.name) && <mesh geometry={md.geometry} material={HOVER_MATERIAL} raycast={NO_RAYCAST} renderOrder={2} />}
+          </mesh>
         </group>
       ))}
 
@@ -2365,6 +2392,8 @@ const LoadedModel = forwardRef<
           isSelected={gem.isSelected}
           meshRefs={meshRefs}
           onMeshClick={onMeshClick}
+          onMeshDoubleClick={onMeshDoubleClick}
+          onMeshHover={onMeshHover}
         />
       ))}
 
@@ -2404,6 +2433,8 @@ function SyncedGemOverlay({
   isSelected,
   meshRefs,
   onMeshClick,
+  onMeshDoubleClick,
+  onMeshHover,
 }: {
   meshName: string;
   geometry: THREE.BufferGeometry;
@@ -2415,6 +2446,8 @@ function SyncedGemOverlay({
   isSelected: boolean;
   meshRefs: React.MutableRefObject<Map<string, THREE.Mesh>>;
   onMeshClick: (name: string, multi: boolean) => void;
+  onMeshDoubleClick?: (name: string, multi: boolean) => void;
+  onMeshHover?: (name: string | null) => void;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
 
@@ -2448,6 +2481,8 @@ function SyncedGemOverlay({
       isSelected={isSelected}
       meshName={meshName}
       onMeshClick={onMeshClick}
+      onMeshDoubleClick={onMeshDoubleClick}
+      onMeshHover={onMeshHover}
     />
   );
 }
@@ -2466,6 +2501,8 @@ function ReferenceGemMesh({
   isSelected,
   meshName,
   onMeshClick,
+  onMeshDoubleClick,
+  onMeshHover,
 }: {
   meshRef: React.RefObject<THREE.Mesh>;
   geometry: THREE.BufferGeometry;
@@ -2477,6 +2514,8 @@ function ReferenceGemMesh({
   isSelected: boolean;
   meshName: string;
   onMeshClick: (name: string, multi: boolean) => void;
+  onMeshDoubleClick?: (name: string, multi: boolean) => void;
+  onMeshHover?: (name: string | null) => void;
 }) {
   const { rawEnvironment } = React.useContext(ReferenceEnvironmentContext);
   const gemMaterial = useMemo(() => {
@@ -2539,6 +2578,20 @@ function ReferenceGemMesh({
         if (_isTransformDragging) return;
         onMeshClick(meshName, e.nativeEvent.shiftKey || e.nativeEvent.ctrlKey || e.nativeEvent.metaKey);
       }}
+      onDoubleClick={(e: ThreeEvent<MouseEvent>) => {
+        e.stopPropagation();
+        if (_isTransformDragging) return;
+        onMeshDoubleClick?.(meshName, e.nativeEvent.shiftKey || e.nativeEvent.ctrlKey || e.nativeEvent.metaKey);
+      }}
+      onPointerOver={(e: ThreeEvent<PointerEvent>) => {
+        e.stopPropagation();
+        if (_isTransformDragging || e.nativeEvent.buttons !== 0) return;
+        onMeshHover?.(meshName);
+      }}
+      onPointerOut={(e: ThreeEvent<PointerEvent>) => {
+        e.stopPropagation();
+        onMeshHover?.(null);
+      }}
     />
   );
 }
@@ -2584,6 +2637,12 @@ interface CADCanvasProps {
   selectedMeshNames: Set<string>;
   hiddenMeshNames?: Set<string>;
   onMeshClick: (name: string, multi: boolean) => void;
+  /** Double-click a part: select just that one part (not its family). */
+  onMeshDoubleClick?: (name: string, multi: boolean) => void;
+  /** Pointer enters a part (its name) or leaves it (null). */
+  onMeshHover?: (name: string | null) => void;
+  /** Parts drawn with the soft hover glow. */
+  highlightedMeshNames?: Set<string>;
   transformMode: string;
   onMeshesDetected?: (meshes: { name: string; verts: number; faces: number }[]) => void;
   onTransformStart?: () => void;
@@ -2599,7 +2658,7 @@ interface CADCanvasProps {
 }
 
 const CADCanvas = forwardRef<CADCanvasHandle, CADCanvasProps>(
-  ({ hasModel, glbUrl, additionalGlbUrls = [], selectedMeshNames, hiddenMeshNames = new Set(), onMeshClick, transformMode, onMeshesDetected, onTransformStart, onTransformEnd, lightIntensity = 1, onModelReady, magicTexturing = false, qualityMode = "balanced", gemMode = "simple", onGemModeForced, exploded = false }, ref) => {
+  ({ hasModel, glbUrl, additionalGlbUrls = [], selectedMeshNames, hiddenMeshNames = new Set(), onMeshClick, onMeshDoubleClick, onMeshHover, highlightedMeshNames, transformMode, onMeshesDetected, onTransformStart, onTransformEnd, lightIntensity = 1, onModelReady, magicTexturing = false, qualityMode = "balanced", gemMode = "simple", onGemModeForced, exploded = false }, ref) => {
     const modelUrl = glbUrl || "/models/ring.glb";
     const modelRef = useRef<CADCanvasHandle>(null);
     const [heavyScene, setHeavyScene] = useState(false);
@@ -2817,6 +2876,9 @@ const CADCanvas = forwardRef<CADCanvasHandle, CADCanvasProps>(
                 selectedMeshNames={selectedMeshNames}
                 hiddenMeshNames={hiddenMeshNames}
                 onMeshClick={onMeshClick}
+                onMeshDoubleClick={onMeshDoubleClick}
+                onMeshHover={onMeshHover}
+                highlightedMeshNames={highlightedMeshNames}
                 transformMode={transformMode}
                 onMeshesDetected={handleMeshesDetectedWithDebug}
                 onTransformStart={onTransformStart}
