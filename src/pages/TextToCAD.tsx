@@ -324,7 +324,10 @@ export default function TextToCAD() {
                 <button
                   onClick={() => {
                     const panel = leftPanelRef.current;
-                    if (panel) { leftCollapsed ? panel.expand(22) : panel.collapse(); }
+                    if (panel) {
+                      if (leftCollapsed) panel.expand(22);
+                      else panel.collapse();
+                    }
                   }}
                   className="absolute top-2 left-2 z-[60] w-8 h-8 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
                   title={leftCollapsed ? "Show left panel" : "Hide left panel"}
@@ -335,7 +338,10 @@ export default function TextToCAD() {
                   <button
                     onClick={() => {
                       const panel = rightPanelRef.current;
-                      if (panel) { rightCollapsed ? panel.expand(22) : panel.collapse(); }
+                      if (panel) {
+                        if (rightCollapsed) panel.expand(22);
+                        else panel.collapse();
+                      }
                     }}
                     className="absolute top-2 right-2 z-[60] w-8 h-8 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
                     title={rightCollapsed ? "Show right panel" : "Hide right panel"}
