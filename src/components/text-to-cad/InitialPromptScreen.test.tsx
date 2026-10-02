@@ -53,4 +53,10 @@ describe('InitialPromptScreen', () => {
 
     expect(screen.getByPlaceholderText(/a rose ring with three blooming roses/i)).toBeInTheDocument();
   });
+
+  it('offers briefs for the chosen piece', () => {
+    renderScreen('earring');
+    expect(screen.getByText('Small polished gold hoop earrings')).toBeTruthy();
+    expect(screen.queryByText('Sculptural flowing gold band')).toBeNull();
+  });
 });

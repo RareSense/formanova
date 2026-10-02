@@ -8,36 +8,13 @@ import CadJewelryTypeCards from "@/components/text-to-cad/CadJewelryTypeCards";
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import ReferenceImageUploader from "./ReferenceImageUploader";
 import CadHistoryLibrary from "./CadHistoryLibrary";
-
-import cadExample1 from "@/assets/examples/cad-example-1.webp";
-import cadExample2 from "@/assets/examples/cad-example-2.webp";
-import cadExample3 from "@/assets/examples/cad-example-3.webp";
-import cadExample4 from "@/assets/examples/cad-example-4.webp";
+import { CAD_EXAMPLE_DESIGNS, type CadExampleDesign } from "./cad-examples";
 
 // Shared fixed height for the upload workspace box and the "My Rings" panel,
 // so the two columns frame identically — same top edge (both start right
 // below their own header) and same bottom edge, matching Photo Studio's
 // CANVAS_H technique (StudioVaultUploadStep.tsx).
 const PANEL_H = "h-[500px] md:h-[640px]";
-
-const EXAMPLE_DESIGNS = [
-  {
-    image: cadExample1,
-    prompt: "Oval center stone with ball-tip prong setting, flanked by marquise side stones and small round accent clusters, tapered rounded band",
-  },
-  {
-    image: cadExample2,
-    prompt: "Asymmetric botanical ring with two large leaf forms rising from a split flowing band, small round center stone nestled between the leaves, accent stones along leaf edges",
-  },
-  {
-    image: cadExample3,
-    prompt: "Large oval center stone in four-prong setting surrounded by round halo, split shank band with accent stones running along each shank",
-  },
-  {
-    image: cadExample4,
-    prompt: "Wide dome cluster ring, oval center stone surrounded by six oval accents, filigree openwork shoulders",
-  },
-];
 
 // What a jeweller would want to pin down for each piece. The pipeline builds
 // to these numbers when they are given, so the box asks for them up front.
@@ -49,18 +26,18 @@ const DIMENSION_PLACEHOLDERS: Record<CadJewelryType, string> = {
   other: "Add a description or any details, e.g. 40 mm brooch, 3 mm stones, pin back",
 };
 
-function RingReferenceExamples({ onSelect }: { onSelect: (example: typeof EXAMPLE_DESIGNS[0]) => void }) {
+function ReferenceExamples({ examples, noun, onSelect }: { examples: CadExampleDesign[]; noun: string; onSelect: (example: CadExampleDesign) => void }) {
   return (
     <div className={`grid grid-cols-2 gap-3 overflow-hidden border border-border/30 p-3 ${PANEL_H}`}>
-      {EXAMPLE_DESIGNS.map((example, index) => (
+      {examples.map((example, index) => (
         <button
           key={example.image}
           type="button"
           onClick={() => onSelect(example)}
           className="group relative min-h-0 overflow-hidden border border-border/20 bg-muted/10 transition-colors hover:border-foreground/30"
-          aria-label={`Use ring example ${index + 1}`}
+          aria-label={`Use ${noun} example ${index + 1}`}
         >
-          <img src={example.image} alt={`Ring example ${index + 1}`} className="h-full w-full object-cover" />
+          <img src={example.image} alt={`${noun} example ${index + 1}`} className="h-full w-full object-cover" />
           <div className="absolute inset-0 flex items-center justify-center bg-background/85 p-4 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
             <p className="text-center font-mono text-[10px] leading-[1.6] text-foreground/80">{example.prompt}</p>
           </div>
@@ -112,17 +89,17 @@ export default function ImagePromptScreen({
     pricingContext: { llm_tier: tier },
   });
 
-  const handleExampleClick = useCallback(async (example: typeof EXAMPLE_DESIGNS[0]) => {
+  const handleExampleClick = useCallback(async (example: CadExampleDesign) => {
     setPrompt(example.prompt);
     try {
       const res = await fetch(example.image);
       const blob = await res.blob();
-      const file = new File([blob], "example-ring.webp", { type: "image/webp" });
+      const file = new File([blob], `example-${jewelryType}.webp`, { type: "image/webp" });
       onReplaceReferenceImages([file]);
     } catch {
       // image load failed -- just set prompt
     }
-  }, [setPrompt, onReplaceReferenceImages]);
+  }, [setPrompt, onReplaceReferenceImages, jewelryType]);
 
   // "My Rings" reuse — urls are same-origin, auth-gated /api/artifacts proxy
   // URLs (see useCadHistoryLibrary), so these must go through authenticatedFetch,
@@ -269,7 +246,7 @@ export default function ImagePromptScreen({
                     Examples are for inspiration. Your CAD will be a new interpretation, not an exact copy.
                   </p>
                 </div>
-                <RingReferenceExamples onSelect={handleExampleClick} />
+                <ReferenceExamples examples={CAD_EXAMPLE_DESIGNS[jewelryType]} noun={noun} onSelect={handleExampleClick} />
               </>
             )}
           </div>

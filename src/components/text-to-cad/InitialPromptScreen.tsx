@@ -5,15 +5,7 @@ import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { useEstimatedCost } from "@/hooks/use-estimated-cost";
 import { RING_CAD_NURBS_WORKFLOW, cadJewelryNoun, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
 import CadJewelryTypeCards from "@/components/text-to-cad/CadJewelryTypeCards";
-
-const EXAMPLE_PROMPTS = [
-  "Serpentine ring with a coiled snake design",
-  "Sculptural flowing gold band",
-  "Botanical ring with leaves wrapping around the band",
-  "Gothic ring with sharp arches and dark gemstones",
-  "Twisted vine ring with small diamonds",
-  "Minimalist ring with a single oval diamond",
-];
+import { CAD_EXAMPLE_PROMPTS } from "./cad-examples";
 
 interface InitialPromptScreenProps {
   model: string;
@@ -142,7 +134,7 @@ export default function InitialPromptScreen({
                   Try an example
                 </h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {EXAMPLE_PROMPTS.map((ex) => (
+                  {CAD_EXAMPLE_PROMPTS[jewelryType].map((ex) => (
                     <button
                       key={ex}
                       onClick={() => setPrompt(ex)}

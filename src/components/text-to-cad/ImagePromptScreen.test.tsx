@@ -80,4 +80,10 @@ describe('ImagePromptScreen', () => {
 
     expect(screen.getByPlaceholderText(/add a description or any details, e\.g\. 17 cm length, 5 mm wide/i)).toBeTruthy();
   });
+
+  it('shows examples for the chosen piece', () => {
+    renderScreen('necklace');
+    expect(screen.getByRole('button', { name: 'Use necklace example 1' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Use ring example 1' })).toBeNull();
+  });
 });
