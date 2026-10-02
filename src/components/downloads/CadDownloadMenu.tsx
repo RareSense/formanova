@@ -6,11 +6,10 @@
  * not a CAD feature and must not import from those folders (CLAUDE.md module
  * boundaries), so a control both sides need cannot live inside one of them.
  *
- * Why a split button rather than two buttons: the backend produces a `.3dm`
- * and a `.glb` for every run and both are real deliverables, but they are not
- * peers. The `.3dm` is the machinable NURBS file people came for; the `.glb`
- * is the preview mesh. So the chevron decides which is one click and which is
- * two, never which one exists.
+ * One button that opens a list of formats, rather than a one-click default:
+ * jewellers pick the file for the job (Rhino, preview, printing, other CAD),
+ * so every format is named with a short hint and none is downloaded by a
+ * stray click. The editable NURBS .3dm still leads the list.
  */
 
 import { Download, ChevronDown } from 'lucide-react';
@@ -19,6 +18,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
@@ -72,12 +72,6 @@ const TRIGGER_TONES = {
   quiet: 'border-zinc-300 bg-white text-zinc-950 transition-colors hover:bg-zinc-100',
 } as const;
 
-/** Keeps the chevron readable as part of the same control in either tone. */
-const DIVIDER_TONES = {
-  filled: 'border-l-primary-foreground/25',
-  quiet: 'border-l-zinc-300',
-} as const;
-
 /**
  * The size every control in the result action bar shares.
  *
@@ -117,6 +111,12 @@ const VARIANTS = {
   result: `${CAD_RESULT_ACTION_SIZE} flex-1`,
 } as const;
 
+interface FormatRow {
+  format: string;
+  hint: string;
+  onSelect: () => void;
+}
+
 export function CadDownloadMenu({
   onDownloadThreedm,
   onDownloadGlb,
@@ -129,86 +129,59 @@ export function CadDownloadMenu({
   variant = 'viewport',
   className,
 }: CadDownloadMenuProps) {
-  // The .3dm leads when it exists. Older runs that only ever produced a GLB
-  // fall back to it rather than rendering a default action that does nothing.
-  const primaryAction = onDownloadThreedm ?? onDownloadGlb;
-  if (!primaryAction) return null;
+  // STL, STEP and the viewing copy are only ever produced alongside a 3DM or
+  // GLB, so a run with neither has nothing to offer.
+  if (!onDownloadThreedm && !onDownloadGlb) return null;
 
-  const primaryLabel = onDownloadThreedm ? 'Download 3DM' : 'Download GLB';
   // Fixed light download beside fixed dark Improve, in every theme.
   const tone = variant === 'result' ? 'quiet' : 'filled';
 
-  // Everything not already the default action. A menu holding a single entry
-  // is a dead affordance, so the chevron only appears when it has contents.
-  const menuItems: { label: string; onSelect: () => void }[] = [];
-  if (onDownloadThreedm && onDownloadGlb) {
-    menuItems.push({ label: 'Download GLB', onSelect: onDownloadGlb });
-  }
-  if (onDownloadViewerThreedm) {
-    menuItems.push({ label: '3DM viewing copy (mesh)', onSelect: onDownloadViewerThreedm });
-  }
-  if (onDownloadStl) menuItems.push({ label: 'Download STL', onSelect: onDownloadStl });
-  if (onDownloadStep) menuItems.push({ label: 'Download STEP', onSelect: onDownloadStep });
-  if (onExportEdited) {
-    menuItems.push({ label: 'Export GLB with my edits', onSelect: onExportEdited });
-  }
+  // Fixed order: the editable file first, then preview, viewer copy, and the
+  // exchange formats. Only formats this run actually has are listed.
+  const formats: FormatRow[] = [];
+  if (onDownloadThreedm) formats.push({ format: '3DM', hint: 'Rhino, editable', onSelect: onDownloadThreedm });
+  if (onDownloadGlb) formats.push({ format: 'GLB', hint: '3D preview', onSelect: onDownloadGlb });
+  if (onDownloadViewerThreedm) formats.push({ format: '3DM', hint: 'Viewer only (mesh)', onSelect: onDownloadViewerThreedm });
+  if (onDownloadStep) formats.push({ format: 'STEP', hint: 'Other CAD software', onSelect: onDownloadStep });
+  if (onDownloadStl) formats.push({ format: 'STL', hint: '3D printing', onSelect: onDownloadStl });
+
+  const iconSize = variant === 'result' ? 'h-[18px] w-[18px]' : 'h-3.5 w-3.5';
 
   return (
-    <div className={cn('flex items-stretch', variant === 'card' && 'w-full', className)}>
-      <button
-        type="button"
-        onClick={primaryAction}
-        disabled={isBusy}
-        className={cn(
-          TRIGGER_BASE,
-          TRIGGER_TONES[tone],
-          VARIANTS[variant],
-          menuItems.length > 0 && 'border-r-0',
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild disabled={isBusy}>
+        <button
+          type="button"
+          disabled={isBusy}
+          className={cn(TRIGGER_BASE, TRIGGER_TONES[tone], VARIANTS[variant], className)}
+        >
+          <Download aria-hidden="true" className={cn('shrink-0', iconSize)} />
+          <span>{isBusy ? 'Preparing...' : 'Download'}</span>
+          <ChevronDown aria-hidden="true" className="h-3.5 w-3.5 shrink-0 opacity-70" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-[15rem]">
+        {typeof estimatedMetalMassG === 'number' && (
+          <div className="px-2 py-2 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            Est. metal weight: {estimatedMetalMassG.toFixed(2)} g
+          </div>
         )}
-      >
-        <Download className={cn('shrink-0', variant === 'result' ? 'h-[18px] w-[18px]' : 'h-3.5 w-3.5')} />
-        {isBusy ? 'Preparing...' : primaryLabel}
-      </button>
-
-      {menuItems.length > 0 && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              aria-label="More download options"
-              disabled={isBusy}
-              className={cn(
-                TRIGGER_BASE,
-                TRIGGER_TONES[tone],
-                'justify-center px-2',
-                variant === 'viewport' ? 'h-[42px]' : variant === 'result' ? 'h-[56px]' : 'h-11',
-                // A hairline keeps the two halves readable as one control
-                // without letting the divider read as a gap between siblings.
-                'border-l',
-                DIVIDER_TONES[tone],
-              )}
-            >
-              <ChevronDown className="h-3.5 w-3.5" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-[13rem]">
-            {typeof estimatedMetalMassG === 'number' && (
-              <div className="px-2 py-2 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                Est. metal weight: {estimatedMetalMassG.toFixed(2)} g
-              </div>
-            )}
-            {menuItems.map(item => (
-              <DropdownMenuItem
-                key={item.label}
-                onSelect={item.onSelect}
-                className="font-mono text-[10px] uppercase tracking-wider py-2"
-              >
-                {item.label}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
-    </div>
+        {formats.map((row) => (
+          <DropdownMenuItem key={`${row.format}-${row.hint}`} onSelect={row.onSelect} className="gap-3 py-2">
+            <span className="w-10 shrink-0 font-mono text-[11px] font-semibold uppercase tracking-wider">{row.format}</span>
+            <span className="text-[12px] text-muted-foreground">{row.hint}</span>
+          </DropdownMenuItem>
+        ))}
+        {onExportEdited && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={onExportEdited} className="gap-3 py-2">
+              <span className="w-10 shrink-0 font-mono text-[11px] font-semibold uppercase tracking-wider">GLB</span>
+              <span className="text-[12px] text-muted-foreground">With my edits</span>
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

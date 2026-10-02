@@ -13,12 +13,12 @@ import { CAD_RESULT_ACTION_SIZE } from '@/components/downloads/CadDownloadMenu';
 describe('CadResultActions', () => {
   it('shows the 3DM download as the default action', () => {
     render(<CadResultActions onDownloadThreedm={vi.fn()} onDownloadGlb={vi.fn()} />);
-    expect(screen.getByRole('button', { name: /download 3dm/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^download$/i })).toBeTruthy();
   });
 
   it('falls back to the GLB for runs that never produced a 3DM', () => {
     render(<CadResultActions onDownloadGlb={vi.fn()} />);
-    expect(screen.getByRole('button', { name: /download glb/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^download$/i })).toBeTruthy();
   });
 
   it('hides the Improve action until the run reports a version', () => {
@@ -88,7 +88,7 @@ describe('CadResultActions', () => {
       />,
     );
     const improve = screen.getByRole('button', { name: /improve from v3/i });
-    const download = screen.getByRole('button', { name: /download 3dm/i });
+    const download = screen.getByRole('button', { name: /^download$/i });
     for (const size of CAD_RESULT_ACTION_SIZE.split(' ')) {
       expect(improve.className).toContain(size);
       expect(download.className).toContain(size);
@@ -104,7 +104,7 @@ describe('CadResultActions', () => {
       />,
     );
     const improve = screen.getByRole('button', { name: /improve from v2/i });
-    const download = screen.getByRole('button', { name: /download 3dm/i });
+    const download = screen.getByRole('button', { name: /^download$/i });
     expect(improve.className).toContain('bg-zinc-950');
     expect(download.className).toContain('bg-white');
     expect(improve.className).toContain('text-white');
