@@ -1120,3 +1120,11 @@ git rebase origin/feature/jewelry-cad-workflows   # only if the branch moved; re
 git push origin HEAD:feature/jewelry-cad-workflows
 ```
 Expected: fast-forward push to `feature/jewelry-cad-workflows`.
+
+## Addendum to Task 4 (user request, 2026-10-03)
+
+Image to CAD's optional description box uses a per-piece placeholder asking for dimensions (`DIMENSION_PLACEHOLDERS` in `ImagePromptScreen.tsx`), e.g. ring: "Optional: ring size, band width, stone size (e.g. size 7, 2 mm band, 1 ct oval)". Test: bracelet placeholder mentions "length or wrist size, width, stone size". Full text in the Task 4 brief.
+
+## Follow-up task (after user supplies images): per-piece examples
+
+Example images (Image to CAD) and example descriptions (Text to CAD) follow the selected card. Ring examples stay as they are. Pending the user's 16 images.
