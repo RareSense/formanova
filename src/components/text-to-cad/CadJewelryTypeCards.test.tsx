@@ -52,6 +52,15 @@ describe('CadJewelryTypeCards', () => {
     expect(screen.getByText('Brooches, tiaras, watches & more')).toBeInTheDocument();
   });
 
+  it('connects the Other hint to its card for screen readers', () => {
+    render(<CadJewelryTypeCards value="ring" onChange={() => {}} />);
+
+    const id = screen.getByRole('radio', { name: 'Other' }).getAttribute('aria-describedby');
+    expect(id).toBeTruthy();
+    expect(document.getElementById(id as string)?.textContent).toContain('Brooches');
+    expect(screen.getByRole('radio', { name: 'Ring' }).getAttribute('aria-describedby')).toBeNull();
+  });
+
   it('cannot be changed while a run is generating', () => {
     const onChange = vi.fn();
     render(<CadJewelryTypeCards value="ring" onChange={onChange} disabled />);

@@ -48,12 +48,12 @@ export default function InitialPromptScreen({
   };
 
   return (
-    <div className="flex-1 flex items-center justify-center bg-background overflow-y-auto">
+    <div className="flex-1 flex items-start justify-center bg-background overflow-y-auto">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
-        className="w-full max-w-[1100px] px-6 py-6"
+        className="w-full max-w-[1100px] px-6 py-6 my-auto"
       >
         <div>
             {/* Title */}

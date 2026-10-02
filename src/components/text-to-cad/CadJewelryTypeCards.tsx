@@ -58,6 +58,7 @@ export default function CadJewelryTypeCards({ value, onChange, disabled }: CadJe
             role="radio"
             aria-checked={selected}
             aria-label={type.label}
+            aria-describedby={type.value === 'other' ? 'cad-type-other-hint' : undefined}
             tabIndex={selected ? 0 : -1}
             disabled={disabled}
             onClick={() => onChange(type.value)}
@@ -72,13 +73,13 @@ export default function CadJewelryTypeCards({ value, onChange, disabled }: CadJe
           >
             {/* The renders share one grey backdrop; Other uses the same grey so
                 all five squares read as one set. */}
-            <div className="relative aspect-square w-full bg-[#dfdedf]">
+            <div className="relative aspect-square w-full overflow-hidden bg-[#dfdedf]">
               {image ? (
                 <img src={image} alt="" draggable={false} className="h-full w-full object-cover" />
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-2 px-2 text-center">
                   <Sparkles aria-hidden="true" strokeWidth={1.5} className="h-6 w-6 text-zinc-700" />
-                  <span className="text-[11px] leading-snug text-zinc-700">Brooches, tiaras, watches &amp; more</span>
+                  <span id="cad-type-other-hint" className="hidden text-[11px] leading-snug text-zinc-700 sm:block">Brooches, tiaras, watches &amp; more</span>
                 </div>
               )}
               {selected && (
