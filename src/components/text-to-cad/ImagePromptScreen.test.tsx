@@ -36,6 +36,13 @@ function renderScreen(jewelryType: 'ring' | 'necklace' | 'bracelet' | 'earring' 
 }
 
 describe('ImagePromptScreen', () => {
+  it('names the chosen piece on the browse button', () => {
+    renderScreen('bracelet');
+
+    expect(screen.getByText('Browse bracelet files')).toBeTruthy();
+    expect(screen.queryByText('Browse ring files')).toBeNull();
+  });
+
   it('mounts My Rings even before any history is known', () => {
     // Regression guard: gating this render on hasImageHistory deadlocks the
     // panel. The flag is only ever set by the library's own callback, so if it

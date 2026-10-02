@@ -11,12 +11,12 @@ import { CadResultActions } from './CadResultActions';
 import { CAD_RESULT_ACTION_SIZE } from '@/components/downloads/CadDownloadMenu';
 
 describe('CadResultActions', () => {
-  it('shows the 3DM download as the default action', () => {
+  it('shows one Download button when a 3DM exists', () => {
     render(<CadResultActions onDownloadThreedm={vi.fn()} onDownloadGlb={vi.fn()} />);
     expect(screen.getByRole('button', { name: /^download$/i })).toBeTruthy();
   });
 
-  it('falls back to the GLB for runs that never produced a 3DM', () => {
+  it('shows the Download button for GLB-only runs', () => {
     render(<CadResultActions onDownloadGlb={vi.fn()} />);
     expect(screen.getByRole('button', { name: /^download$/i })).toBeTruthy();
   });

@@ -42,7 +42,7 @@ export interface CadDownloadMenuProps {
    * GLB, which reads as two options that do the same thing.
    */
   onExportEdited?: () => void;
-  /** Disables the default action while bytes are being fetched. */
+  /** Disables the Download button while a file is being prepared. */
   isBusy?: boolean;
   /**
    * `viewport` is the overlay button in the 3D workspace; `card` is the

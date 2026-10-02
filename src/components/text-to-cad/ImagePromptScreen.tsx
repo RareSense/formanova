@@ -170,6 +170,7 @@ export default function ImagePromptScreen({
                 onAddReferenceImages={onAddReferenceImages}
                 onRemoveReferenceImage={onRemoveReferenceImage}
                 primaryLabel={`Drop your ${noun} images or sketches here`}
+                browseLabel={`Browse ${noun} files`}
                 canvasClassName={PANEL_H}
                 photoStudioEmptyState
               />

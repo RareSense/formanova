@@ -12,6 +12,8 @@ interface ReferenceImageUploaderProps {
   onRemoveReferenceImage: (index: number) => void;
   primaryLabel?: string;
   primaryHint?: string;
+  /** Text of the button in the empty drop box. */
+  browseLabel?: string;
   /** Allows Image-to-CAD to use the same tall upload canvas as Photo Studio. */
   canvasClassName?: string;
   /** Uses Photo Studio's full-size empty drop affordance. */
@@ -30,6 +32,7 @@ export default function ReferenceImageUploader({
   onAddReferenceImages,
   onRemoveReferenceImage,
   primaryLabel = "Drop your ring image or sketch here",
+  browseLabel = "Browse ring files",
   primaryHint = "Drag & drop · click to browse · paste (Ctrl+V)",
   canvasClassName = "h-[150px] sm:h-[170px]",
   photoStudioEmptyState = false,
@@ -134,7 +137,7 @@ export default function ReferenceImageUploader({
           <p className="mb-6 text-sm text-muted-foreground">{primaryHint}</p>
           <Button variant="outline" size="lg" className="gap-2 pointer-events-none">
             <ImageIcon className="h-4 w-4" />
-            Browse ring files
+            {browseLabel}
           </Button>
         </div>
       ) : (

@@ -256,7 +256,7 @@ export default function ImageToCAD() {
     <>
       <Helmet>
         <title>Image to CAD | FormaNova</title>
-        <meta name="description" content="Upload a ring sketch or reference image and convert it into a 3D CAD model with AI-powered accuracy. Rings only." />
+        <meta name="description" content="Upload a sketch or reference image and convert it into a 3D CAD model with AI-powered accuracy. Works for rings, necklaces, bracelets, earrings and more." />
         <link rel="canonical" href="/image-to-cad" />
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>

@@ -269,7 +269,7 @@ export default function TextToCAD() {
     <>
       <Helmet>
         <title>Text to CAD | FormaNova</title>
-        <meta name="description" content="Describe a ring in text and get a manufacturable 3D CAD model in minutes. Rings only." />
+        <meta name="description" content="Describe a piece in text and get a manufacturable 3D CAD model in minutes. Works for rings, necklaces, bracelets, earrings and more." />
         <link rel="canonical" href="/text-to-cad" />
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
