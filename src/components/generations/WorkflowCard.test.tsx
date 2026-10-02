@@ -221,6 +221,7 @@ describe('CAD generation history card', () => {
     // shorter than the other.
     expect(threedm.className).toContain('h-11');
     expect(studio.className).toContain('h-11');
+    expect(threedm.className).not.toContain('flex-1');
     expect(threedm.className).toContain('w-full');
     expect(studio.className).toContain('w-full');
     // One filled action, not two. The original rule here was that two solid

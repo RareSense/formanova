@@ -86,10 +86,8 @@ export const CAD_RESULT_ACTION_SIZE =
 /**
  * The width both controls in the result bar take.
  *
- * Set here rather than left to each label, because the download is a split
- * button: its chevron is a sibling INSIDE its own width, so matching only the
- * primary halves would still leave the pair looking mismatched by the width of
- * the chevron. Full width when the bar stacks on a narrow panel.
+ * Set here rather than left to each label so both controls stay the same
+ * width. Full width when the bar stacks on a narrow panel.
  */
 export const CAD_RESULT_ACTION_WIDTH = 'w-full sm:w-[264px]';
 
@@ -100,15 +98,13 @@ const VARIANTS = {
   // border on the button itself, and box-sizing is border-box, so h-[40px]
   // would render 40px total and sit 2px short at the bottom.
   viewport: 'h-[42px] px-4 text-[11px] uppercase tracking-[0.12em]',
-  // flex-1, not w-full: the chevron is a sibling inside the same row, so a
-  // full-width primary would push it out of the card.
-  card: 'h-11 w-full flex-1 justify-center px-3 font-mono text-[9px] uppercase tracking-wider',
+  card: 'h-11 w-full justify-center px-3 font-mono text-[9px] uppercase tracking-wider',
   // The finished-result action at the bottom of the viewport. Larger than
   // `viewport` because it is no longer one control among the tools: it is the
   // end of the job, shown once the object is there to download.
-  // flex-1 so the button fills the bar's full-width stacked layout on a narrow
-  // panel, the same reason the card variant carries it.
-  result: `${CAD_RESULT_ACTION_SIZE} flex-1`,
+  // Width comes from the caller (CAD_RESULT_ACTION_WIDTH). No flex-1: in a
+  // column container it would override the explicit height.
+  result: CAD_RESULT_ACTION_SIZE,
 } as const;
 
 interface FormatRow {

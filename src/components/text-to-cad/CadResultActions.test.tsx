@@ -93,6 +93,7 @@ describe('CadResultActions', () => {
       expect(improve.className).toContain(size);
       expect(download.className).toContain(size);
     }
+    expect(download.className).not.toContain('flex-1');
   });
 
   it('keeps Download light and Improve dark independently of theme', () => {
