@@ -240,14 +240,16 @@ export default function ImagePromptScreen({
                   <span className="marta-label block mb-1 invisible" aria-hidden="true">Step 2</span>
                   <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">Try an Example</h3>
                   <p className="mt-1.5 text-sm text-muted-foreground">Choose one to load its image and prompt</p>
-                  {/* First run only: this whole block is gated on having no
-                      history, so it retires itself once someone has generated
-                      once and does not need its own dismissal state. */}
-                  <p className="mt-1 text-xs text-muted-foreground/80">
-                    Examples are for inspiration. Your CAD will be a new interpretation, not an exact copy.
-                  </p>
                 </div>
                 <ReferenceExamples examples={CAD_EXAMPLE_DESIGNS[jewelryType]} noun={noun} onSelect={handleExampleClick} />
+                {/* Below the panel, not in the header: the header must stay the
+                    same height as the upload column's, so both panels share a
+                    top and bottom edge. First run only: this whole block is
+                    gated on having no history, so it retires itself once
+                    someone has generated once. */}
+                <p className="mt-2 text-xs text-muted-foreground/80">
+                  Examples are for inspiration. Your CAD will be a new interpretation, not an exact copy.
+                </p>
               </>
             )}
           </div>
