@@ -337,7 +337,10 @@ export default function ImageToCAD() {
                 additionalGlbUrls={[]}
                 selectedMeshNames={editor.selectedMeshNames}
                 hiddenMeshNames={editor.hiddenMeshNames}
-                onMeshClick={editor.handleSelectMesh}
+                onMeshClick={editor.handleSelectFamily}
+                onMeshDoubleClick={editor.handleSelectMesh}
+                onMeshHover={editor.setHoveredPart}
+                highlightedMeshNames={editor.hoveredFamilyNames}
                 transformMode={transformMode}
                 onMeshesDetected={editor.handleMeshesDetected}
                 onTransformStart={editor.handleTransformStart}
@@ -514,6 +517,9 @@ export default function ImageToCAD() {
             <MeshPanel
               meshes={editor.meshes}
               onSelectMesh={editor.handleSelectMesh}
+              onSelectFamily={editor.handleSelectFamily}
+              onHoverPart={editor.setHoveredPart}
+              onApplyGemToAll={editor.handleApplyGemToAll}
               onAction={editor.handleMeshAction}
               onApplyMaterial={editor.handleApplyMaterial}
               onApplyMetalToAll={editor.handleApplyMetalToAll}
