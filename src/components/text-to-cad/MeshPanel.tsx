@@ -24,6 +24,15 @@ interface MeshPanelProps {
 
 export default function MeshPanel({ meshes, onSelectMesh, onAction, onApplyMaterial, onApplyMetalToAll, onSelectFamily, onHoverPart, onApplyGemToAll, onSceneAction }: MeshPanelProps) {
   const [search, setSearch] = useState("");
+  // Lifted here: MeshList remounts when the Material section collapses/expands.
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const toggleFamily = (key: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   const [matTab, setMatTab] = useState<"metal" | "gemstone">("metal");
   const [meshCollapsed, setMeshCollapsed] = useState(false);
   const [materialCollapsed, setMaterialCollapsed] = useState(false);
@@ -60,7 +69,7 @@ export default function MeshPanel({ meshes, onSelectMesh, onAction, onApplyMater
         <SectionHeader title="Material" subtitle={hasSelection ? `${selectedMeshes.length} sel` : ""} collapsed onToggle={() => setMaterialCollapsed(false)} />
         <div className="flex-1 flex flex-col min-h-0 border-t border-border">
           <SectionHeader title="Parts" subtitle={meshSubtitle} collapsed={false} onToggle={() => setMeshCollapsed(true)} />
-          <MeshList search={search} setSearch={setSearch} filtered={filtered} meshes={meshes} onSelectMesh={onSelectMesh} onSelectFamily={onSelectFamily} onHoverPart={onHoverPart} />
+          <MeshList search={search} setSearch={setSearch} filtered={filtered} meshes={meshes} expanded={expanded} onToggleFamily={toggleFamily} onSelectMesh={onSelectMesh} onSelectFamily={onSelectFamily} onHoverPart={onHoverPart} />
         </div>
       </div>
     );
@@ -92,7 +101,7 @@ export default function MeshPanel({ meshes, onSelectMesh, onAction, onApplyMater
         <ResizablePanel defaultSize={50} minSize={20}>
           <div className="flex flex-col h-full">
             <SectionHeader title="Parts" subtitle={meshSubtitle} collapsed={false} onToggle={() => setMeshCollapsed(true)} />
-            <MeshList search={search} setSearch={setSearch} filtered={filtered} meshes={meshes} onSelectMesh={onSelectMesh} onSelectFamily={onSelectFamily} onHoverPart={onHoverPart} />
+            <MeshList search={search} setSearch={setSearch} filtered={filtered} meshes={meshes} expanded={expanded} onToggleFamily={toggleFamily} onSelectMesh={onSelectMesh} onSelectFamily={onSelectFamily} onHoverPart={onHoverPart} />
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>
@@ -233,47 +242,48 @@ function MaterialContent({ hasSelection, matTab, setMatTab, filteredMaterials, o
 }
 
 // ── Parts list ──
-function MeshList({ search, setSearch, filtered, meshes, onSelectMesh, onSelectFamily, onHoverPart }: {
+function MeshList({ search, setSearch, filtered, meshes, expanded, onToggleFamily, onSelectMesh, onSelectFamily, onHoverPart }: {
   search: string; setSearch: (v: string) => void;
   filtered: MeshItemData[];
   meshes: MeshItemData[];
+  expanded: Set<string>;
+  onToggleFamily: (key: string) => void;
   onSelectMesh: (name: string, multi: boolean) => void;
   onSelectFamily?: (name: string, multi: boolean) => void;
   onHoverPart?: (name: string | null) => void;
 }) {
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const byName = useMemo(() => new Map(filtered.map((m) => [m.name, m])), [filtered]);
   const groups = useMemo(() => groupCadParts(filtered.map((m) => m.name)), [filtered]);
   const isMulti = (e: React.MouseEvent) => e.shiftKey || e.ctrlKey || e.metaKey;
 
-  const toggle = (key: string) =>
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-
-  const partRow = (name: string, indent: string) => {
+  const partRow = (name: string, indent: string, label?: string) => {
     const mesh = byName.get(name);
     if (!mesh) return null;
-    return (
+    const row = (
       <button
-        key={name}
+        key={label ? undefined : name}
         onClick={(e) => onSelectMesh(name, isMulti(e))}
         onMouseEnter={() => onHoverPart?.(name)}
         onMouseLeave={() => onHoverPart?.(null)}
-        className={`w-full text-left ${indent} pr-3 py-2.5 mb-1 cursor-pointer transition-all duration-200 border ${
+        className={`${label ? "flex-1 min-w-0" : "w-full"} text-left ${indent} pr-3 py-2.5 mb-1 transition-all duration-200 border ${
           mesh.selected ? "text-foreground bg-accent border-border" : "hover:bg-accent/50 text-foreground/80 border-transparent"
         } ${!mesh.visible ? "opacity-35" : ""}`}
       >
         <div className="text-[11px] mb-0.5 truncate font-medium">
-          {!mesh.visible && "[H] "}{mesh.name}
+          {!mesh.visible && "[H] "}{label ?? mesh.name}
         </div>
-        <div className="font-mono text-[9px] text-muted-foreground">
-          {mesh.verts} verts / {mesh.faces} faces
+        <div className="font-mono text-[9px] text-muted-foreground truncate">
+          {label ? `${mesh.name} · ` : ""}{mesh.verts} verts / {mesh.faces} faces
         </div>
       </button>
+    );
+    if (!label) return row;
+    // One-part family: reserve the chevron column (px-2 + border + w-3.5 icon = w-8) so right edges align.
+    return (
+      <div key={name} className="flex items-stretch gap-1">
+        {row}
+        <span aria-hidden="true" className="w-8 flex-shrink-0" />
+      </div>
     );
   };
 
@@ -285,7 +295,7 @@ function MeshList({ search, setSearch, filtered, meshes, onSelectMesh, onSelectF
         <div className="px-3 pt-2 pb-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{heading}</div>
         {families.map((fam) => {
           if (!onSelectFamily) return fam.names.map((n) => partRow(n, "pl-3"));
-          if (fam.names.length === 1) return partRow(fam.names[0], "pl-3");
+          if (fam.names.length === 1) return partRow(fam.names[0], "pl-3", fam.label);
           const selectedCount = fam.names.filter((n) => byName.get(n)?.selected).length;
           const state = selectedCount === 0 ? "false" : selectedCount === fam.names.length ? "true" : "mixed";
           const allHidden = fam.names.every((n) => !byName.get(n)?.visible);
@@ -312,7 +322,7 @@ function MeshList({ search, setSearch, filtered, meshes, onSelectMesh, onSelectF
                   </div>
                 </button>
                 <button
-                  onClick={() => toggle(fam.key)}
+                  onClick={() => onToggleFamily(fam.key)}
                   aria-expanded={isOpen}
                   aria-label={`Show parts in ${fam.label}`}
                   className="flex items-center justify-center px-2 border border-transparent text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors duration-150"

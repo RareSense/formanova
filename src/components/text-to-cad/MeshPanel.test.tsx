@@ -83,8 +83,63 @@ describe("MeshPanel parts tree", () => {
   it("single-part family has no chevron and selects the part", () => {
     const p = setup();
     expect(screen.queryByRole("button", { name: /show parts in shank base/i })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: /shank_base_mesh/i }));
+    const row = screen.getByRole("button", { name: /shank base/i });
+    expect(row.children[0]).toHaveTextContent("Shank base");
+    expect(row.children[1]).toHaveTextContent("Shank_Base_mesh · 10 verts / 20 faces");
+    fireEvent.click(row);
     expect(p.onSelectMesh).toHaveBeenCalledWith("Shank_Base_mesh", false);
+    fireEvent.mouseEnter(row);
+    expect(p.onHoverPart).toHaveBeenLastCalledWith("Shank_Base_mesh");
+  });
+
+  it("one-part rows reserve the chevron column with an aria-hidden spacer", () => {
+    setup();
+    const wrap = screen.getByRole("button", { name: /shank base/i }).parentElement;
+    const spacer = wrap?.querySelector('[aria-hidden="true"]');
+    expect(spacer).not.toBeNull();
+    expect(spacer).toHaveClass("w-8");
+  });
+
+  it("part rows do not use cursor-pointer", () => {
+    const p = setup();
+    fireEvent.click(screen.getByRole("button", { name: /show parts in pave gem/i }));
+    expect(screen.getByText("Pave_Gem_01").closest("button")).not.toHaveClass("cursor-pointer");
+    expect(p.onSelectMesh).not.toHaveBeenCalled();
+  });
+
+  it("reports hover on part rows", () => {
+    const p = setup();
+    fireEvent.click(screen.getByRole("button", { name: /show parts in pave gem/i }));
+    const row = screen.getByText("Pave_Gem_01").closest("button");
+    fireEvent.mouseEnter(row);
+    expect(p.onHoverPart).toHaveBeenLastCalledWith("Pave_Gem_01");
+    fireEvent.mouseLeave(row);
+    expect(p.onHoverPart).toHaveBeenLastCalledWith(null);
+  });
+
+  it("Shift+click on a family row selects the family as multi", () => {
+    const p = setup();
+    fireEvent.click(screen.getByRole("button", { name: /pave gem.*3/i }), { shiftKey: true });
+    expect(p.onSelectFamily).toHaveBeenLastCalledWith("Pave_Gem_00", true);
+  });
+
+  it("expanded families survive collapsing and re-expanding the Material section", () => {
+    setup();
+    fireEvent.click(screen.getByRole("button", { name: /show parts in pave gem/i }));
+    expect(screen.getByText("Pave_Gem_01")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^material/i }));
+    expect(screen.getByText("Pave_Gem_01")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /show parts in pave gem/i })).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(screen.getByRole("button", { name: /^material/i }));
+    expect(screen.getByText("Pave_Gem_01")).toBeInTheDocument();
+  });
+
+  it("renders every part as its own row without onSelectFamily", () => {
+    render(<MeshPanel meshes={[mk("Pave_Gem_00"), mk("Pave_Gem_01"), mk("Shank_Base_mesh")]} onSelectMesh={vi.fn()} onAction={vi.fn()} onApplyMaterial={vi.fn()} onSceneAction={vi.fn()} />);
+    expect(screen.getByRole("button", { name: /^pave_gem_00/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^pave_gem_01/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^shank_base_mesh/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /show parts in/i })).toBeNull();
   });
 
   it("reports hover on family rows", () => {
