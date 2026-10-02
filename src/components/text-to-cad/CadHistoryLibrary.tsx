@@ -1,5 +1,5 @@
 /**
- * CadHistoryLibrary — "My Prompts" (text_to_cad) / "My Rings" (image_to_cad)
+ * CadHistoryLibrary — "My Prompts" (text_to_cad) / "My Pieces" (image_to_cad)
  * right-column panel for the CAD Studio upload screens.
  *
  * Presentational shell only — search/pagination/data ownership lives in
@@ -225,7 +225,7 @@ export default function CadHistoryLibrary({ variant, onSelectPrompt, onSelectIma
   // no history at all — the caller falls back to "Try an example" instead.
   if (isLoading || !hasHistory) return null;
 
-  const title = variant === "prompts" ? "My Prompts" : "My Rings";
+  const title = variant === "prompts" ? "My Prompts" : "My Pieces";
   const subtitle = variant === "prompts" ? "Reuse a past design brief" : "Reuse a past upload as inspiration";
 
   return (

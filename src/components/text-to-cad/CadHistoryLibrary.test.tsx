@@ -73,6 +73,16 @@ describe('CadHistoryLibrary', () => {
     expect(onSelectImages).toHaveBeenCalledWith(['/api/artifacts/abc']);
   });
 
+  it('calls past uploads "My Pieces", since CAD covers every kind of jewelry', () => {
+    mockUseCadHistoryLibrary.mockReturnValue(baseState({
+      items: [{ id: 'wf-3', createdAt: '2026-08-15T00:00:00Z', prompt: null, referenceImageUrls: ['/api/artifacts/abc'] }],
+    }));
+    render(<CadHistoryLibrary variant="images" />);
+
+    expect(screen.getByRole('heading', { name: 'My Pieces' })).toBeTruthy();
+    expect(screen.queryByText('My Rings')).toBeNull();
+  });
+
   it('gives images a real name search box, wired to the hook', () => {
     const setSearch = vi.fn();
     mockUseCadHistoryLibrary.mockReturnValue(baseState({

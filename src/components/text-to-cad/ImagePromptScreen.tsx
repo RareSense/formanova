@@ -10,7 +10,7 @@ import ReferenceImageUploader from "./ReferenceImageUploader";
 import CadHistoryLibrary from "./CadHistoryLibrary";
 import { CAD_EXAMPLE_DESIGNS, type CadExampleDesign } from "./cad-examples";
 
-// Shared fixed height for the upload workspace box and the "My Rings" panel,
+// Shared fixed height for the upload workspace box and the "My Pieces" panel,
 // so the two columns frame identically — same top edge (both start right
 // below their own header) and same bottom edge, matching Photo Studio's
 // CANVAS_H technique (StudioVaultUploadStep.tsx).
@@ -101,7 +101,7 @@ export default function ImagePromptScreen({
     }
   }, [setPrompt, onReplaceReferenceImages, jewelryType]);
 
-  // "My Rings" reuse — urls are same-origin, auth-gated /api/artifacts proxy
+  // "My Pieces" reuse — urls are same-origin, auth-gated /api/artifacts proxy
   // URLs (see useCadHistoryLibrary), so these must go through authenticatedFetch,
   // unlike the bundled example assets above. A multi-angle entry reuses as a
   // whole set in one call, so all its images land together (respecting the
@@ -226,7 +226,7 @@ export default function ImagePromptScreen({
           </div>
 
           <div>
-            {/* My Rings must stay mounted even while hidden: it is what reports
+            {/* My Pieces must stay mounted even while hidden: it is what reports
                 whether any history exists, so gating its render on
                 hasImageHistory would deadlock — the flag could never flip
                 because nothing would ever fetch and report back. */}
