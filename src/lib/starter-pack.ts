@@ -5,9 +5,10 @@
 // returned and the user falls back to the normal pricing grid. So eligibility
 // is simply "is a starter-shaped tier present in the tiers response".
 //
-// A starter tier is identified by NOT matching one of the standard plan credit
-// amounts. Keeping this in one place lets Pricing, Credits and tests agree on
-// the rule without re-deriving it.
+// The Starter tier is identified positively, by its backend tier ID. It must
+// never be inferred from "not a known plan": new packages (Plus) and any future
+// unfamiliar tier would otherwise be mistaken for Starter. Keeping this in one
+// place lets Pricing, Credits and tests agree on the rule.
 
 export interface BillingTier {
   tier_id: string;
@@ -16,12 +17,12 @@ export interface BillingTier {
   credits: number;
 }
 
-/** Credit amounts of the three standard packages (Basic / Standard / Pro). */
-export const STANDARD_PLAN_CREDITS: ReadonlySet<number> = new Set([100, 500, 1500]);
+/** Backend tier ID of the one-time Starter Pack (50 credits, introductory offer). */
+export const STARTER_TIER_ID = 'tier_425a5db7';
 
-/** A tier is the Starter Pack when its credit count is not a standard plan. */
+/** A tier is the Starter Pack only when it carries the Starter tier ID. */
 export function isStarterTier(tier: BillingTier): boolean {
-  return !STANDARD_PLAN_CREDITS.has(tier.credits);
+  return tier.tier_id === STARTER_TIER_ID;
 }
 
 /** The starter tier from a tiers response, or null when the user is not eligible. */

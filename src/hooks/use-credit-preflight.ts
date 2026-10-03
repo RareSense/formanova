@@ -1,7 +1,7 @@
 // Hook for credit preflight validation with modal UI
 // Wraps performCreditPreflight and manages insufficient credits modal state
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { performCreditPreflight, type PreflightResult } from '@/lib/credit-preflight';
 import { AuthExpiredError } from '@/lib/authenticated-fetch';
@@ -54,6 +54,7 @@ export function useCreditPreflight(
   const [showInsufficientModal, setShowInsufficientModal] = useState(false);
   const [preflightResult, setPreflightResult] = useState<PreflightResult | null>(null);
   const [checking, setChecking] = useState(false);
+  const workflowRef = useRef<string>();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -63,6 +64,7 @@ export function useCreditPreflight(
     metadata?: CreditPreflightMetadata,
   ): Promise<boolean> => {
     setChecking(true);
+    workflowRef.current = workflowName;
     try {
       const result = await performCreditPreflight(workflowName, numVariations, metadata);
       setPreflightResult(result);
@@ -103,7 +105,7 @@ export function useCreditPreflight(
 
     savePostPurchaseReturn(`${location.pathname}${location.search}`);
     setShowInsufficientModal(false);
-    navigate('/credits', { state: { requiredCredits: preflightResult.estimatedCredits } });
+    navigate('/credits', { state: { requiredCredits: preflightResult.estimatedCredits, workflowName: workflowRef.current } });
   }, [redirectOnInsufficient, showInsufficientModal, preflightResult, location.pathname, location.search, navigate]);
 
   return {
