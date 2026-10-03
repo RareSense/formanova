@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { CadPhoneSheet, sheetAfterDrag, sheetAfterTabPress } from './CadPhoneSheet';
+import { CadPhoneSheet } from './CadPhoneSheet';
+import { sheetAfterDrag, sheetAfterTabPress } from './cad-sheet-snap';
 
 const H = { peek: 56, half: 300, full: 544 };
 

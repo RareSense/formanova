@@ -24,7 +24,8 @@ import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import type { CadBreakpoint } from '@/hooks/use-cad-breakpoint';
 import { cn } from '@/lib/utils';
 
-import { CadPhoneSheet, type CadSheetSnap } from './CadPhoneSheet';
+import { CadPhoneSheet } from './CadPhoneSheet';
+import type { CadSheetSnap } from './cad-sheet-snap';
 
 export type CadPanelSection = 'material' | 'parts';
 

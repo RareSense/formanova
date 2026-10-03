@@ -13,39 +13,13 @@ import { useEffect, useRef, type ReactNode } from 'react';
 
 import { cn } from '@/lib/utils';
 
-export type CadSheetSnap = 'peek' | 'half' | 'full';
+import { sheetAfterDrag, sheetAfterTabPress, type CadSheetHeights, type CadSheetSnap } from './cad-sheet-snap';
 
-export interface CadSheetHeights {
-  peek: number;
-  half: number;
-  full: number;
-}
-
-const ORDER: CadSheetSnap[] = ['peek', 'half', 'full'];
 /** A drag shorter than this is a tap, not a drag. */
 const TAP_SLOP_PX = 6;
-/** A drag at least this long moves one step even when it ends nearer to where it started. */
-const FLICK_PX = 40;
 
-/** Where a drag that started at `start` and left the sheet `height` px tall should settle. */
-export function sheetAfterDrag(start: CadSheetSnap, height: number, heights: CadSheetHeights): CadSheetSnap {
-  const nearest = ORDER.reduce((best, s) => (Math.abs(height - heights[s]) < Math.abs(height - heights[best]) ? s : best));
-  if (nearest !== start) return nearest;
-  const delta = height - heights[start];
-  if (Math.abs(delta) < FLICK_PX) return start;
-  const i = ORDER.indexOf(start) + (delta > 0 ? 1 : -1);
-  return ORDER[Math.max(0, Math.min(ORDER.length - 1, i))];
-}
-
-/** A tab press: opens a peeking sheet, switches an open one, or lowers it when the open tab is pressed again. */
-export function sheetAfterTabPress(snap: CadSheetSnap, active: string, pressed: string): { snap: CadSheetSnap; tab: string } {
-  if (snap === 'peek') return { snap: 'half', tab: pressed };
-  if (pressed === active) return { snap: 'peek', tab: active };
-  return { snap, tab: pressed };
-}
-
-/** Height of the peeking tab bar (grip + tabs): 0.75rem + 2.75rem. */
-export const CAD_SHEET_PEEK = '3.5rem';
+/** Height of the peeking tab bar (grip + tabs): 0.75rem + 2.75rem. The layout's spacer under the view matches it (h-14). */
+const CAD_SHEET_PEEK = '3.5rem';
 
 const SNAP_HEIGHT: Record<CadSheetSnap, string> = {
   peek: CAD_SHEET_PEEK,
