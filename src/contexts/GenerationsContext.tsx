@@ -171,6 +171,12 @@ export interface TrackedGeneration {
   glbUrl?: string | null;
   /** CAD only: the machinable NURBS .3dm deliverable. */
   threedmUrl?: string | null;
+  /** CAD only: optional postprocessed print meshes. */
+  stlUrls?: string[];
+  /** CAD only: optional postprocessed neutral exchange files. */
+  stepUrls?: string[];
+  /** CAD only: validated volume multiplied by the user-selected alloy density. */
+  estimatedMetalMassG?: number | null;
   /** CAD only: label for the completion toast. */
   label?: string;
   /** CAD only: structured fail-step code, used for clear workspace copy. */
@@ -558,6 +564,48 @@ export function GenerationsContextProvider({ children }: { children: React.React
     });
   }, []);
 
+  /**
+   * Settles a failed CAD run once, whichever check found it failed first.
+   *
+   * The outcome is read from /result before the run is shown failed: the
+   * backend answers /result only after its shutdown bookkeeping (refund, and
+   * a "Can't be improved" mark on the version), so a page reloading its
+   * versions on this failed state sees that mark. The read is time-limited in
+   * fetchImproveOutcome, so a slow answer never keeps the run shown running.
+   */
+  const settleCadFailure = useCallback(async (
+    gen: TrackedGeneration,
+    startTime: number,
+    failureText: string,
+  ) => {
+    const outcome = await fetchImproveOutcome(gen.workflowId);
+    emitCadImproveFinished(gen, null, outcome?.reasonCode);
+    setGenerations(prev => prev.map(g =>
+      g.workflowId === gen.workflowId
+        ? {
+            ...g,
+            status: 'failed',
+            progress: 100,
+            cadFailureReasonCode: outcome?.reasonCode,
+            cadFailureMessage: outcome?.message,
+          }
+        : g
+    ));
+    markGenerationFailed(gen.workflowId, failureText, startTime);
+    refreshCredits();
+
+    // The active CAD page reads the structured failure above and opens its
+    // centered dialog. A user who navigated away still needs a toast.
+    if (window.location.pathname !== gen.cadRoute) {
+      const notice = cadStatusNotice(outcome?.reasonCode);
+      toast({
+        title: notice.title,
+        description: notice.message,
+        ...(notice.tone === 'error' ? { variant: 'destructive' as const } : {}),
+      });
+    }
+  }, [refreshCredits, toast, emitCadImproveFinished]);
+
   const clearGeneration = useCallback((workflowId: string) => {
     const ctrl = controllers.current.get(workflowId);
     if (ctrl) {
@@ -657,6 +705,9 @@ export function GenerationsContextProvider({ children }: { children: React.React
               progress: 100,
               glbUrl: parsed.glbUrl,
               threedmUrl: parsed.threedmArtifact?.url ?? null,
+              stlUrls: parsed.stlArtifacts.map(artifact => artifact.url),
+              stepUrls: parsed.stepArtifacts.map(artifact => artifact.url),
+              estimatedMetalMassG: parsed.estimatedMetalMassG,
               notAllSolid: parsed.notAllSolid,
             }
           : g
@@ -686,34 +737,12 @@ export function GenerationsContextProvider({ children }: { children: React.React
       controllers.current.delete(gen.workflowId);
       if (ctrl.signal.aborted) return;
       console.error('[GenerationsContext] CAD poll failed:', err);
-      const outcome = await fetchImproveOutcome(gen.workflowId);
-      emitCadImproveFinished(gen, null, outcome?.reasonCode);
-      setGenerations(prev => prev.map(g =>
-        g.workflowId === gen.workflowId
-          ? {
-              ...g,
-              status: 'failed',
-              progress: 100,
-              cadFailureReasonCode: outcome?.reasonCode,
-              cadFailureMessage: outcome?.message,
-            }
-          : g
-      ));
-      markGenerationFailed(gen.workflowId, 'CAD poll failed', startTime);
-      refreshCredits();
-
-      // The active CAD page reads the structured failure above and opens its
-      // centered dialog. A user who navigated away still needs a toast.
-      if (window.location.pathname !== gen.cadRoute) {
-        const notice = cadStatusNotice(outcome?.reasonCode);
-        toast({
-          title: notice.title,
-          description: notice.message,
-          ...(notice.tone === 'error' ? { variant: 'destructive' as const } : {}),
-        });
-      }
+      // The focus check may reach the same failure while /result is awaited.
+      if (settledCadIds.current.has(gen.workflowId)) return;
+      settledCadIds.current.add(gen.workflowId);
+      await settleCadFailure(gen, startTime, 'CAD poll failed');
     });
-  }, [navigate, refreshCredits, toast, emitCadCompleted, emitCadImproveFinished]);
+  }, [navigate, refreshCredits, toast, emitCadCompleted, emitCadImproveFinished, settleCadFailure]);
 
   const runningKey = generations
     .filter(g => g.status === 'running')
@@ -806,6 +835,9 @@ export function GenerationsContextProvider({ children }: { children: React.React
                   generationStep: parsed ? 'Completed' : 'Completed — result unavailable',
                   glbUrl: parsed?.glbUrl ?? null,
                   threedmUrl: parsed?.threedmArtifact?.url ?? null,
+                  stlUrls: parsed?.stlArtifacts.map(artifact => artifact.url) ?? [],
+                  stepUrls: parsed?.stepArtifacts.map(artifact => artifact.url) ?? [],
+                  estimatedMetalMassG: parsed?.estimatedMetalMassG ?? null,
                   notAllSolid: parsed?.notAllSolid ?? false,
                 }
               : g
@@ -831,11 +863,9 @@ export function GenerationsContextProvider({ children }: { children: React.React
           settledCadIds.current.add(gen.workflowId);
           controllers.current.get(gen.workflowId)?.abort();
           controllers.current.delete(gen.workflowId);
-          setGenerations(prev => prev.map(g =>
-            g.workflowId === gen.workflowId ? { ...g, status: 'failed', progress: 100 } : g
-          ));
-          markGenerationFailed(gen.workflowId, `CAD workflow ${state}`, gen.startedAt);
-          refreshCredits();
+          // Same path as the poll: read the outcome first, so the reason and
+          // any "Can't be improved" mark are not lost when this check wins.
+          await settleCadFailure(gen, gen.startedAt, `CAD workflow ${state}`);
         }
       } catch {
         // The primary poll owns transient-error UI; reconciliation stays silent.
@@ -843,7 +873,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
         reconcilingCadIds.current.delete(gen.workflowId);
       }
     }
-  }, [navigate, refreshCredits, toast, emitCadCompleted, emitCadImproveFinished]);
+  }, [navigate, refreshCredits, toast, emitCadCompleted, emitCadImproveFinished, settleCadFailure]);
 
   useEffect(() => {
     const reconcileOnReturn = () => {

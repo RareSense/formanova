@@ -1,18 +1,12 @@
-import { useRef, useCallback, useEffect, useState } from "react";
+import { useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { useEstimatedCost } from "@/hooks/use-estimated-cost";
-import { RING_CAD_NURBS_WORKFLOW } from "@/lib/ring-cad-nurbs-api";
-
-const EXAMPLE_PROMPTS = [
-  "Serpentine ring with a coiled snake design",
-  "Sculptural flowing gold band",
-  "Botanical ring with leaves wrapping around the band",
-  "Gothic ring with sharp arches and dark gemstones",
-  "Twisted vine ring with small diamonds",
-  "Minimalist ring with a single oval diamond",
-];
+import { RING_CAD_NURBS_WORKFLOW, cadJewelryNoun, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
+import CadJewelryTypeCards from "@/components/text-to-cad/CadJewelryTypeCards";
+import { useJewelryTypeGate } from "@/components/text-to-cad/useJewelryTypeGate";
+import { CAD_EXAMPLE_PROMPTS } from "./cad-examples";
 
 interface InitialPromptScreenProps {
   model: string;
@@ -20,17 +14,21 @@ interface InitialPromptScreenProps {
   setModel: (m: string) => void;
   prompt: string;
   setPrompt: (p: string) => void;
+  jewelryType: CadJewelryType | null;
+  setJewelryType: (t: CadJewelryType) => void;
   isGenerating: boolean;
   onGenerate: () => void;
   onGlbUpload?: (file: File) => void;
 }
 
 export default function InitialPromptScreen({
-  model, tier, setModel, prompt, setPrompt,
+  model, tier, setModel, prompt, setPrompt, jewelryType, setJewelryType,
   isGenerating, onGenerate, onGlbUpload,
 }: InitialPromptScreenProps) {
   const glbInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const noun = jewelryType ? cadJewelryNoun(jewelryType) : "jewelry";
+  const { cardsRef, guardedGenerate, typeError } = useJewelryTypeGate(jewelryType, onGenerate);
   const { cost: estimatedCost, loading: costLoading } = useEstimatedCost({
     workflowName: RING_CAD_NURBS_WORKFLOW,
     model,
@@ -47,17 +45,17 @@ export default function InitialPromptScreen({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (canGenerate && !isGenerating) onGenerate();
+      if (canGenerate && !isGenerating) guardedGenerate();
     }
   };
 
   return (
-    <div className="flex-1 flex items-center justify-center bg-background overflow-y-auto">
+    <div className="flex-1 flex items-start justify-center bg-background overflow-y-auto">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
-        className="w-full max-w-[1100px] px-6 py-6"
+        className="w-full max-w-[1100px] px-6 py-6 my-auto"
       >
         <div>
             {/* Title */}
@@ -66,8 +64,19 @@ export default function InitialPromptScreen({
                 Text to CAD
               </h1>
               <p className="font-mono text-[11px] text-muted-foreground tracking-[0.15em] uppercase">
-                Describe your ring design · Rings only
+                Describe your {noun} design
               </p>
+            </div>
+
+            {/* Step 1: which piece. Chosen before the brief, because the
+                piece decides what a useful description looks like. */}
+            <div className="mx-auto mb-6 max-w-[680px]">
+              <h2 className="mb-3 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                What are you making?
+              </h2>
+              <div ref={cardsRef}>
+                <CadJewelryTypeCards value={jewelryType} onChange={setJewelryType} disabled={isGenerating} error={typeError} />
+              </div>
             </div>
 
             {/* Prompt */}
@@ -77,7 +86,9 @@ export default function InitialPromptScreen({
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Describe your ring, e.g. A rose ring with three blooming roses, twisted vine band with thorns, and diamond accents"
+                placeholder={jewelryType === "ring"
+                  ? "Describe your ring, e.g. A rose ring with three blooming roses, twisted vine band with thorns, and diamond accents"
+                  : `Describe your ${noun}: shape, stones, metal details and any motif`}
                 rows={6}
                 className="w-full min-h-[220px] max-h-[60vh] px-5 py-4 pb-9 text-[15px] text-foreground placeholder:text-muted-foreground/40 resize-y font-body leading-relaxed transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-ring bg-muted/20 border border-border overflow-y-auto"
               />
@@ -98,10 +109,10 @@ export default function InitialPromptScreen({
             {/* Generate — matches Photo Studio's Next button: right-aligned,
                 gold gradient, size="lg". */}
             {(
-              <div className="mx-auto flex max-w-[680px] items-center justify-end gap-3">
+              <div className="mx-auto flex max-w-[680px] flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end">
                 <Button
                   size="lg"
-                  onClick={onGenerate}
+                  onClick={guardedGenerate}
                   disabled={isGenerating || !canGenerate}
                   className="gap-2.5 border-0 bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] px-10 font-display text-base uppercase tracking-wide text-background transition-opacity hover:opacity-90 disabled:opacity-60"
                 >
@@ -127,7 +138,7 @@ export default function InitialPromptScreen({
                   Try an example
                 </h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {EXAMPLE_PROMPTS.map((ex) => (
+                  {(jewelryType ? CAD_EXAMPLE_PROMPTS[jewelryType] : []).map((ex) => (
                     <button
                       key={ex}
                       onClick={() => setPrompt(ex)}

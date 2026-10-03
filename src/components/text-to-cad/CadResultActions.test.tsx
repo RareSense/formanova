@@ -4,21 +4,21 @@
  * the download still offers exactly what the run produced, and its size does
  * not depend on whether the Improve button is beside it.
  */
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 
 import { CadResultActions } from './CadResultActions';
 import { CAD_RESULT_ACTION_SIZE } from '@/components/downloads/CadDownloadMenu';
 
 describe('CadResultActions', () => {
-  it('shows the 3DM download as the default action', () => {
+  it('shows one Download button when a 3DM exists', () => {
     render(<CadResultActions onDownloadThreedm={vi.fn()} onDownloadGlb={vi.fn()} />);
-    expect(screen.getByRole('button', { name: /download 3dm/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^download$/i })).toBeTruthy();
   });
 
-  it('falls back to the GLB for runs that never produced a 3DM', () => {
+  it('shows the Download button for GLB-only runs', () => {
     render(<CadResultActions onDownloadGlb={vi.fn()} />);
-    expect(screen.getByRole('button', { name: /download glb/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^download$/i })).toBeTruthy();
   });
 
   it('hides the Improve action until the run reports a version', () => {
@@ -37,6 +37,48 @@ describe('CadResultActions', () => {
     expect(screen.getByRole('button', { name: /improve from v3/i })).toBeTruthy();
   });
 
+  it('shows Improve grayed out and unpressable when the version cannot be improved', () => {
+    const onImprove = vi.fn();
+    render(
+      <CadResultActions
+        onDownloadThreedm={vi.fn()}
+        latestVersionLabel="V2"
+        onImproveFromVersion={onImprove}
+        improveDisabled
+      />,
+    );
+    const improve = screen.getByRole('button', { name: /improve from v2/i }) as HTMLButtonElement;
+    expect(improve.disabled).toBe(true);
+    fireEvent.click(improve);
+    expect(onImprove).not.toHaveBeenCalled();
+  });
+
+  it('says it cannot be improved when the version has nothing left to fix', () => {
+    const onImprove = vi.fn();
+    render(
+      <CadResultActions
+        onDownloadThreedm={vi.fn()}
+        latestVersionLabel="V3"
+        onImproveFromVersion={onImprove}
+        improveDisabled
+        improveExhausted
+      />,
+    );
+    const button = screen.getByRole('button', { name: "Can't be improved" }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    fireEvent.click(button);
+    expect(onImprove).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /improve from/i })).toBeNull();
+    for (const size of CAD_RESULT_ACTION_SIZE.split(' ')) expect(button.className).toContain(size);
+  });
+
+  it('keeps Improve pressable when the version can be improved', () => {
+    const onImprove = vi.fn();
+    render(<CadResultActions latestVersionLabel="V2" onImproveFromVersion={onImprove} />);
+    fireEvent.click(screen.getByRole('button', { name: /improve from v2/i }));
+    expect(onImprove).toHaveBeenCalledTimes(1);
+  });
+
   it('gives both controls the same size, so siblings stay equal', () => {
     render(
       <CadResultActions
@@ -46,11 +88,12 @@ describe('CadResultActions', () => {
       />,
     );
     const improve = screen.getByRole('button', { name: /improve from v3/i });
-    const download = screen.getByRole('button', { name: /download 3dm/i });
+    const download = screen.getByRole('button', { name: /^download$/i });
     for (const size of CAD_RESULT_ACTION_SIZE.split(' ')) {
       expect(improve.className).toContain(size);
       expect(download.className).toContain(size);
     }
+    expect(download.className).not.toContain('flex-1');
   });
 
   it('keeps Download light and Improve dark independently of theme', () => {
@@ -62,7 +105,7 @@ describe('CadResultActions', () => {
       />,
     );
     const improve = screen.getByRole('button', { name: /improve from v2/i });
-    const download = screen.getByRole('button', { name: /download 3dm/i });
+    const download = screen.getByRole('button', { name: /^download$/i });
     expect(improve.className).toContain('bg-zinc-950');
     expect(download.className).toContain('bg-white');
     expect(improve.className).toContain('text-white');

@@ -1,55 +1,46 @@
-import { useRef, useCallback, useEffect, useState } from "react";
+import { useRef, useCallback, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { useEstimatedCost } from "@/hooks/use-estimated-cost";
-import { RING_CAD_NURBS_WORKFLOW } from "@/lib/ring-cad-nurbs-api";
+import { RING_CAD_NURBS_WORKFLOW, cadJewelryNoun, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
+import CadJewelryTypeCards from "@/components/text-to-cad/CadJewelryTypeCards";
+import { useJewelryTypeGate } from "@/components/text-to-cad/useJewelryTypeGate";
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import ReferenceImageUploader from "./ReferenceImageUploader";
 import CadHistoryLibrary from "./CadHistoryLibrary";
+import { CAD_EXAMPLE_DESIGNS, type CadExampleDesign } from "./cad-examples";
 
-import cadExample1 from "@/assets/examples/cad-example-1.webp";
-import cadExample2 from "@/assets/examples/cad-example-2.webp";
-import cadExample3 from "@/assets/examples/cad-example-3.webp";
-import cadExample4 from "@/assets/examples/cad-example-4.webp";
-
-// Shared fixed height for the upload workspace box and the "My Rings" panel,
+// Shared fixed height for the upload workspace box and the "My Pieces" panel,
 // so the two columns frame identically — same top edge (both start right
 // below their own header) and same bottom edge, matching Photo Studio's
 // CANVAS_H technique (StudioVaultUploadStep.tsx).
 const PANEL_H = "h-[500px] md:h-[640px]";
 
-const EXAMPLE_DESIGNS = [
-  {
-    image: cadExample1,
-    prompt: "Oval center stone with ball-tip prong setting, flanked by marquise side stones and small round accent clusters, tapered rounded band",
-  },
-  {
-    image: cadExample2,
-    prompt: "Asymmetric botanical ring with two large leaf forms rising from a split flowing band, small round center stone nestled between the leaves, accent stones along leaf edges",
-  },
-  {
-    image: cadExample3,
-    prompt: "Large oval center stone in four-prong setting surrounded by round halo, split shank band with accent stones running along each shank",
-  },
-  {
-    image: cadExample4,
-    prompt: "Wide dome cluster ring, oval center stone surrounded by six oval accents, filigree openwork shoulders",
-  },
-];
+// What a jeweller would want to pin down for each piece. The pipeline builds
+// to these numbers when they are given, so the box asks for them up front.
+const DIMENSION_PLACEHOLDERS: Record<CadJewelryType, string> = {
+  ring: "Add a description or any details, e.g. ring size 7, 2 mm band, 1 ct oval stone",
+  necklace: "Add a description or any details, e.g. 18 mm pendant, 45 cm chain, 4 mm stones",
+  bracelet: "Add a description or any details, e.g. 17 cm length, 5 mm wide, 2 mm stones",
+  earring: "Add a description or any details, e.g. 25 mm drop, 5 mm studs, push-back",
+  other: "Add a description or any details, e.g. 40 mm brooch, 3 mm stones, pin back",
+};
 
-function RingReferenceExamples({ onSelect }: { onSelect: (example: typeof EXAMPLE_DESIGNS[0]) => void }) {
+const DEFAULT_PLACEHOLDER = "Add a description or any details, e.g. sizes, stone sizes, finish";
+
+function ReferenceExamples({ examples, noun, onSelect }: { examples: CadExampleDesign[]; noun: string; onSelect: (example: CadExampleDesign) => void }) {
   return (
     <div className={`grid grid-cols-2 gap-3 overflow-hidden border border-border/30 p-3 ${PANEL_H}`}>
-      {EXAMPLE_DESIGNS.map((example, index) => (
+      {examples.map((example, index) => (
         <button
           key={example.image}
           type="button"
           onClick={() => onSelect(example)}
           className="group relative min-h-0 overflow-hidden border border-border/20 bg-muted/10 transition-colors hover:border-foreground/30"
-          aria-label={`Use ring example ${index + 1}`}
+          aria-label={`Use ${noun} example ${index + 1}`}
         >
-          <img src={example.image} alt={`Ring example ${index + 1}`} className="h-full w-full object-cover" />
+          <img src={example.image} alt={`${noun} example ${index + 1}`} className="h-full w-full object-cover" />
           <div className="absolute inset-0 flex items-center justify-center bg-background/85 p-4 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
             <p className="text-center font-mono text-[10px] leading-[1.6] text-foreground/80">{example.prompt}</p>
           </div>
@@ -64,6 +55,8 @@ interface ImagePromptScreenProps {
   tier: string;
   prompt: string;
   setPrompt: (p: string) => void;
+  jewelryType: CadJewelryType | null;
+  setJewelryType: (t: CadJewelryType) => void;
   isGenerating: boolean;
   onGenerate: () => void;
   /** Ordered previews; index 0 is the primary reference. Length 0..MAX_RING_CAD_REFERENCE_IMAGES. */
@@ -77,7 +70,7 @@ interface ImagePromptScreenProps {
 }
 
 export default function ImagePromptScreen({
-  model, tier, prompt, setPrompt,
+  model, tier, prompt, setPrompt, jewelryType, setJewelryType,
   isGenerating, onGenerate,
   referenceImagePreviewUrls,
   onAddReferenceImages, onRemoveReferenceImage, onReplaceReferenceImages,
@@ -85,6 +78,8 @@ export default function ImagePromptScreen({
 }: ImagePromptScreenProps) {
   const glbInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const noun = jewelryType ? cadJewelryNoun(jewelryType) : "jewelry";
+  const { cardsRef, guardedGenerate, typeError } = useJewelryTypeGate(jewelryType, onGenerate);
   const [hasImageHistory, setHasImageHistory] = useState(false);
 
   const primaryPreviewUrl = referenceImagePreviewUrls[0] ?? null;
@@ -98,19 +93,19 @@ export default function ImagePromptScreen({
     pricingContext: { llm_tier: tier },
   });
 
-  const handleExampleClick = useCallback(async (example: typeof EXAMPLE_DESIGNS[0]) => {
+  const handleExampleClick = useCallback(async (example: CadExampleDesign) => {
     setPrompt(example.prompt);
     try {
       const res = await fetch(example.image);
       const blob = await res.blob();
-      const file = new File([blob], "example-ring.webp", { type: "image/webp" });
+      const file = new File([blob], `example-${jewelryType ?? "piece"}.webp`, { type: "image/webp" });
       onReplaceReferenceImages([file]);
     } catch {
       // image load failed -- just set prompt
     }
-  }, [setPrompt, onReplaceReferenceImages]);
+  }, [setPrompt, onReplaceReferenceImages, jewelryType]);
 
-  // "My Rings" reuse — urls are same-origin, auth-gated /api/artifacts proxy
+  // "My Pieces" reuse — urls are same-origin, auth-gated /api/artifacts proxy
   // URLs (see useCadHistoryLibrary), so these must go through authenticatedFetch,
   // unlike the bundled example assets above. A multi-angle entry reuses as a
   // whole set in one call, so all its images land together (respecting the
@@ -132,7 +127,7 @@ export default function ImagePromptScreen({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (canGenerate && !isGenerating) onGenerate();
+      if (canGenerate && !isGenerating) guardedGenerate();
     }
   };
 
@@ -146,12 +141,24 @@ export default function ImagePromptScreen({
         transition={{ duration: 0.5, ease: "easeOut" }}
         className="w-full px-3 pb-6 pt-20 sm:px-6 lg:px-3"
       >
+        {/* Step 1: which piece. Above the two-column grid so the upload box
+            and the right-hand panel still start and end on the same lines. */}
+        <div className="mb-8 max-w-[680px]">
+          <span className="marta-label block mb-1">Image to CAD &middot; Step 1</span>
+          <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">What are you making?</h3>
+          <div className="mt-4">
+            <div ref={cardsRef}>
+              <CadJewelryTypeCards value={jewelryType} onChange={setJewelryType} disabled={isGenerating} error={typeError} />
+            </div>
+          </div>
+        </div>
+
         <div className="grid gap-8 lg:gap-10 lg:grid-cols-3">
           <div className="lg:col-span-2">
               <div className="mb-2 flex items-start justify-between gap-3">
                 <div>
-                  <span className="marta-label block mb-1">Image to CAD &middot; Step 1</span>
-                  <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">Upload Your Ring Images</h3>
+                  <span className="marta-label block mb-1">Image to CAD &middot; Step 2</span>
+                  <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">Upload your {noun} images</h3>
                   {/* Sets the expectation before the upload, not after the
                       result. Weight and colour carry the emphasis rather than
                       a warning colour: this is how the tool works, not a
@@ -168,7 +175,8 @@ export default function ImagePromptScreen({
                 referenceImagePreviewUrls={referenceImagePreviewUrls}
                 onAddReferenceImages={onAddReferenceImages}
                 onRemoveReferenceImage={onRemoveReferenceImage}
-                primaryLabel="Drop your ring images or sketches here"
+                primaryLabel={`Drop your ${noun} images or sketches here`}
+                browseLabel={`Browse ${noun} files`}
                 canvasClassName={PANEL_H}
                 photoStudioEmptyState
               />
@@ -180,7 +188,7 @@ export default function ImagePromptScreen({
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Add optional description"
+                  placeholder={jewelryType ? DIMENSION_PLACEHOLDERS[jewelryType] : DEFAULT_PLACEHOLDER}
                   rows={3}
                   /* Full-strength border, not a faded one: this is an input and
                      needs to read as an editable field at a glance. */
@@ -201,10 +209,10 @@ export default function ImagePromptScreen({
             {/* Action area — matches Photo Studio's Next button exactly:
                 right-aligned below the canvas, gold gradient, size="lg". */}
             {(
-              <div className="mt-3 flex items-center justify-end gap-3">
+              <div className="mt-3 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end">
                 <Button
                   size="lg"
-                  onClick={onGenerate}
+                  onClick={guardedGenerate}
                   disabled={isGenerating || !canGenerate}
                   className="gap-2.5 border-0 bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] px-10 font-display text-base uppercase tracking-wide text-background transition-opacity hover:opacity-90 disabled:opacity-60"
                 >
@@ -224,7 +232,7 @@ export default function ImagePromptScreen({
           </div>
 
           <div>
-            {/* My Rings must stay mounted even while hidden: it is what reports
+            {/* My Pieces must stay mounted even while hidden: it is what reports
                 whether any history exists, so gating its render on
                 hasImageHistory would deadlock — the flag could never flip
                 because nothing would ever fetch and report back. */}
@@ -235,17 +243,25 @@ export default function ImagePromptScreen({
             {!hasImageHistory && (
               <>
                 <div className="mb-2">
-                  <span className="marta-label block mb-1 invisible" aria-hidden="true">Step 1</span>
+                  <span className="marta-label block mb-1 invisible" aria-hidden="true">Step 2</span>
                   <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">Try an Example</h3>
                   <p className="mt-1.5 text-sm text-muted-foreground">Choose one to load its image and prompt</p>
-                  {/* First run only: this whole block is gated on having no
-                      history, so it retires itself once someone has generated
-                      once and does not need its own dismissal state. */}
-                  <p className="mt-1 text-xs text-muted-foreground/80">
-                    Examples are for inspiration. Your CAD will be a new interpretation, not an exact copy.
-                  </p>
                 </div>
-                <RingReferenceExamples onSelect={handleExampleClick} />
+                {jewelryType ? (
+                  <ReferenceExamples examples={CAD_EXAMPLE_DESIGNS[jewelryType]} noun={noun} onSelect={handleExampleClick} />
+                ) : (
+                  <div className={`flex items-center justify-center border border-border/30 p-6 text-center text-sm text-muted-foreground ${PANEL_H}`}>
+                    Choose what you are making to see examples
+                  </div>
+                )}
+                {/* Below the panel, not in the header: the header must stay the
+                    same height as the upload column's, so both panels share a
+                    top and bottom edge. First run only: this whole block is
+                    gated on having no history, so it retires itself once
+                    someone has generated once. */}
+                <p className="mt-2 text-xs text-muted-foreground/80">
+                  Examples are for inspiration. Your CAD will be a new interpretation, not an exact copy.
+                </p>
               </>
             )}
           </div>

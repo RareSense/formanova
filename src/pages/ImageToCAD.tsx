@@ -32,7 +32,7 @@ import GenerationProgress from "@/components/text-to-cad/GenerationProgress";
 import { ViewportToolbar, ViewportSideTools } from "@/components/text-to-cad/ViewportOverlays";
 import GemToggle from "@/components/text-to-cad/QualityToggle";
 import type { GemMode } from "@/components/text-to-cad/CADCanvas";
-import { RING_CAD_DEFAULT_TIER } from "@/lib/ring-cad-nurbs-api";
+import { RING_CAD_DEFAULT_TIER, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
 import { recordStudioVisit } from '@/lib/studio-preference';
 import { useCadRestoreFromUrl } from "@/hooks/useCadRestoreFromUrl";
 
@@ -49,6 +49,7 @@ export default function ImageToCAD() {
   const showCadUpload = isCadUploadEnabled(user?.email);
 
   const [model] = useState("gemini");
+  // Every run uses the customer default: GPT-6 Astra, OpenAI direct.
   const activeTier = RING_CAD_DEFAULT_TIER;
   const {
     referenceImages,
@@ -81,6 +82,7 @@ export default function ImageToCAD() {
   const [gemMode, setGemMode] = useState<GemMode>("simple");
   const [workspaceActive, setWorkspaceActive] = useState(false);
   const [prompt, setPrompt] = useState("");
+  const [jewelryType, setJewelryType] = useState<CadJewelryType | null>(null);
 
   const canvasRef = useRef<CADCanvasHandle>(null);
   const leftPanelRef = useRef<ImperativePanelHandle>(null);
@@ -105,6 +107,7 @@ export default function ImageToCAD() {
     prompt,
     referenceImages,
     tier: activeTier,
+    jewelryType: jewelryType ?? undefined,
     cadRoute: '/image-to-cad',
     // Read once, at first render, so arriving from the result email
     // paints the loading state instead of an empty workspace.
@@ -183,7 +186,10 @@ export default function ImageToCAD() {
    */
   const downloads = useCadArtifactDownloads({
     threedmUrl: workflow.threedmArtifact?.url,
+    viewerThreedmUrl: workflow.viewerThreedmUrl,
     glbUrl: workflow.glbUrl,
+    stlUrls: workflow.stlArtifacts.map(artifact => artifact.url),
+    stepUrls: workflow.stepArtifacts.map(artifact => artifact.url),
     exportEditedBlob: () => canvasRef.current?.exportSceneBlob() ?? Promise.resolve(undefined),
     source: 'image-to-cad',
   });
@@ -218,6 +224,8 @@ export default function ImageToCAD() {
           tier={activeTier}
           prompt={prompt}
           setPrompt={setPrompt}
+          jewelryType={jewelryType}
+          setJewelryType={setJewelryType}
           isGenerating={workflow.isGenerating}
           onGenerate={workflow.simulateGeneration}
           referenceImagePreviewUrls={panelReferenceUrls}
@@ -231,6 +239,12 @@ export default function ImageToCAD() {
             workflow.setProgressStep("_loading");
             const url = URL.createObjectURL(file);
             workflow.setGlbUrl(url);
+            // Local demo recording build only (.env.local): the uploaded GLB's native 3DM,
+            // served from public/demo, so the 3DM download button shows the real Rhino file.
+            const demo3dm = import.meta.env.VITE_DEMO_3DM_URL;
+            if (import.meta.env.VITE_DEMO_NO_AUTH === 'true' && demo3dm) {
+              workflow.setThreedmArtifact({ uri: demo3dm, url: demo3dm, type: 'model/3dm', bytes: 0, sha256: '' });
+            }
           } : undefined}
         />
       </div>
@@ -242,7 +256,7 @@ export default function ImageToCAD() {
     <>
       <Helmet>
         <title>Image to CAD | FormaNova</title>
-        <meta name="description" content="Upload a ring sketch or reference image and convert it into a 3D CAD model with AI-powered accuracy. Rings only." />
+        <meta name="description" content="Upload a sketch or reference image and convert it into a 3D CAD model with AI-powered accuracy. Works for rings, necklaces, bracelets, earrings and more." />
         <link rel="canonical" href="/image-to-cad" />
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
@@ -291,7 +305,10 @@ export default function ImageToCAD() {
             {!isFullscreen && (
               <>
                 <button
-                  onClick={() => { const p = leftPanelRef.current; if (p) { leftCollapsed ? p.expand(22) : p.collapse(); } }}
+                  onClick={() => { const p = leftPanelRef.current; if (p) {
+                    if (leftCollapsed) p.expand(22);
+                    else p.collapse();
+                  } }}
                   className="absolute top-2 left-2 z-[60] w-8 h-8 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
                   title={leftCollapsed ? "Show left panel" : "Hide left panel"}
                 >
@@ -299,7 +316,10 @@ export default function ImageToCAD() {
                 </button>
                 {workflow.hasModel && (
                   <button
-                    onClick={() => { const p = rightPanelRef.current; if (p) { rightCollapsed ? p.expand(22) : p.collapse(); } }}
+                    onClick={() => { const p = rightPanelRef.current; if (p) {
+                      if (rightCollapsed) p.expand(22);
+                      else p.collapse();
+                    } }}
                     className="absolute top-2 right-2 z-[60] w-8 h-8 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
                     title={rightCollapsed ? "Show right panel" : "Hide right panel"}
                   >
@@ -317,7 +337,10 @@ export default function ImageToCAD() {
                 additionalGlbUrls={[]}
                 selectedMeshNames={editor.selectedMeshNames}
                 hiddenMeshNames={editor.hiddenMeshNames}
-                onMeshClick={editor.handleSelectMesh}
+                onMeshClick={editor.handleSelectFamily}
+                onMeshDoubleClick={editor.handleSelectMesh}
+                onMeshHover={editor.setHoveredPart}
+                highlightedMeshNames={editor.hoveredFamilyNames}
                 transformMode={transformMode}
                 onMeshesDetected={editor.handleMeshesDetected}
                 onTransformStart={editor.handleTransformStart}
@@ -363,9 +386,15 @@ export default function ImageToCAD() {
                 isBusy={downloads.isBusy}
                 onDownloadThreedm={workflow.threedmArtifact ? downloads.downloadThreedm : undefined}
                 onDownloadGlb={workflow.glbUrl ? downloads.downloadGlb : undefined}
+                onDownloadViewerThreedm={workflow.viewerThreedmUrl ? downloads.downloadViewerThreedm : undefined}
+                onDownloadStl={workflow.stlArtifacts.length ? downloads.downloadStl : undefined}
+                onDownloadStep={workflow.stepArtifacts.length ? downloads.downloadStep : undefined}
+                estimatedMetalMassG={workflow.estimatedMetalMassG}
                 onExportEdited={hasEdits ? downloads.exportEdited : undefined}
                 latestVersionLabel={workflow.latestVersionLabel}
                 onImproveFromVersion={workflow.improveFromLatestVersion}
+                improveDisabled={!workflow.canImproveLatestVersion}
+                improveExhausted={workflow.improveExhausted}
               />
             )}
 
@@ -454,7 +483,10 @@ export default function ImageToCAD() {
               redoCount={editor.redoStack.length}
               onFullscreen={() => {
                 const el = document.querySelector('[data-cad-viewport]') as HTMLElement;
-                if (el) { document.fullscreenElement ? document.exitFullscreen() : el.requestFullscreen(); }
+                if (el) {
+                  if (document.fullscreenElement) document.exitFullscreen();
+                  else el.requestFullscreen();
+                }
               }}
               onDisplayMenu={() => setDisplayMenuOpen(p => !p)}
               onKeyboardShortcuts={() => setShortcutsOpen(true)}
@@ -485,6 +517,10 @@ export default function ImageToCAD() {
             <MeshPanel
               meshes={editor.meshes}
               onSelectMesh={editor.handleSelectMesh}
+              onSelectFamily={editor.handleSelectFamily}
+              onHoverPart={editor.setHoveredPart}
+              hoveredNames={editor.hoveredFamilyNames}
+              onApplyGemToAll={editor.handleApplyGemToAll}
               onAction={editor.handleMeshAction}
               onApplyMaterial={editor.handleApplyMaterial}
               onApplyMetalToAll={editor.handleApplyMetalToAll}

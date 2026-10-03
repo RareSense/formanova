@@ -3,7 +3,8 @@
  *
  * The ring vault: a ring's versions, and starting an improve on one.
  *
- *   GET  /api/cad/rings                        -> one entry per ring, versions nested
+ *   GET  /api/cad/models                       -> one entry per model, versions nested
+ *                                                 (/api/cad/rings is the older, identical path)
  *   POST /api/cad/versions/{asset_id}/improve  -> 202, starts ring_cad_improve
  *
  * Two things backend confirmed (2026-09-18) shape this module:
@@ -41,8 +42,17 @@ export interface CadRingVersion {
   glb_url?: string | null;
   thumbnail_url?: string | null;
   threedm_url?: string | null;
+  /**
+   * A mesh-only 3DM made from the GLB, for generic 3DM viewers. Not the
+   * editable NURBS file: offered only as an extra download, never shown in the
+   * viewer (it drops the GLB materials the viewer uses to find the gems) and
+   * never used in place of threedm_url. Null on versions before 2026-09-29.
+   */
+  viewer_threedm_url?: string | null;
   /** False when this version cannot be improved; the button stays hidden. */
   improvable?: boolean;
+  /** Why improvable is false (e.g. legacy_workflow_retired); null when it is true. */
+  improve_unavailable_reason?: string | null;
   created_at?: string | null;
 }
 
@@ -53,6 +63,40 @@ export interface CadRing {
   versions: CadRingVersion[];
   improve_running?: boolean;
   running_improve_workflow_id?: string | null;
+  /** Which workflow family made this model; null/absent on old ring records. */
+  family?: 'ring' | 'jewelry' | null;
+  jewelry_type?: 'ring' | 'necklace' | 'bracelet' | 'earring' | 'other' | null;
+}
+
+/**
+ * The Improve workflow the server will run for this model, so the credit gate
+ * quotes the right price. The server picks it from the model's family; a
+ * record without one is ring output (GraphFlow's LEGACY_FAMILY).
+ */
+export function improveWorkflowFor(ring: Pick<CadRing, 'family'> | null | undefined): string {
+  return ring?.family === 'jewelry' ? 'jewelry_cad_improve' : 'ring_cad_improve';
+}
+
+/**
+ * Whether Improve may be pressed on this version. Only an explicit true
+ * counts: GraphFlow shows IMPROVE only when improvable is true, and a missing
+ * flag is not permission. The server refuses the press either way.
+ */
+export function canImproveVersion(version: Pick<CadRingVersion, 'improvable'> | null | undefined): boolean {
+  return version?.improvable === true;
+}
+
+/**
+ * A paid review of this exact version found nothing more to fix, so GraphFlow
+ * refuses further presses on it. The greyed button then says so instead of
+ * still offering "Improve from Vn".
+ */
+export const IMPROVEMENT_EXHAUSTED = 'improvement_exhausted';
+
+export function isImprovementExhausted(
+  version: Pick<CadRingVersion, 'improvable' | 'improve_unavailable_reason'> | null | undefined,
+): boolean {
+  return version?.improvable === false && version.improve_unavailable_reason === IMPROVEMENT_EXHAUSTED;
 }
 
 /** Data Generation History already has and can paint before Studio refetches it. */
@@ -108,13 +152,16 @@ export interface CadImproveStarted {
   authorized_budget?: number;
 }
 
+/** How long a failed run's outcome is waited for before generic copy is shown. */
+export const IMPROVE_OUTCOME_TIMEOUT_MS = 20_000;
+
 /** Page size the vault endpoint accepts; larger values are rejected. */
 const MAX_PAGE_SIZE = 50;
 
 /** Paging starts at 0 there, so asking for page 1 skips the newest rings. */
 export async function fetchCadRings(page = 0, pageSize = MAX_PAGE_SIZE): Promise<CadRing[]> {
   const size = Math.min(pageSize, MAX_PAGE_SIZE);
-  const response = await authenticatedFetch(`/api/cad/rings?page=${page}&page_size=${size}`);
+  const response = await authenticatedFetch(`/api/cad/models?page=${page}&page_size=${size}`);
   if (!response.ok) {
     // An empty vault and an unreachable one must not look the same to a caller
     // deciding whether to show an Improve button.
@@ -187,6 +234,23 @@ export async function findRingForWorkflow(
   return null;
 }
 
+/**
+ * One ring re-read from the list by its set_id, or null.
+ *
+ * After a failed or refused press the version's improvable flag may have
+ * changed on the backend (a "Can't be improved" mark is written just after the
+ * run fails), so the ring on screen must be refreshed from the list. A ring
+ * being improved is a recent one, so the first page is enough.
+ */
+export async function fetchCadRingBySetId(setId: string): Promise<CadRing | null> {
+  try {
+    const rings = await fetchCadRings();
+    return rings.find((ring) => ring.set_id === setId) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** Starts one repair pass on a version. The backend builds the payload. */
 export async function startImproveFromVersion(assetId: string): Promise<CadImproveStarted> {
   const response = await authenticatedFetch(`/api/cad/versions/${assetId}/improve`, { method: 'POST' });
@@ -227,15 +291,25 @@ export async function startImproveFromVersion(assetId: string): Promise<CadImpro
  * reason}`. Everything else keeps a plain string detail, so the two are told
  * apart by the shape of the body rather than by the status alone.
  */
-export async function fetchImproveOutcome(workflowId: string): Promise<CadImproveError | null> {
+export async function fetchImproveOutcome(
+  workflowId: string,
+  { timeoutMs = IMPROVE_OUTCOME_TIMEOUT_MS }: { timeoutMs?: number } = {},
+): Promise<CadImproveError | null> {
+  // /result answers only after the backend's shutdown bookkeeping, which is
+  // normally seconds but can run longer while it retries. The failed run must
+  // not stay on screen as running meanwhile, so the wait is bounded.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await authenticatedFetch(`/api/result/${workflowId}`);
+    const response = await authenticatedFetch(`/api/result/${workflowId}`, { signal: controller.signal });
     if (response.ok) return null;
     return readImproveResultFailure(response.status, await response.json().catch(() => null));
   } catch {
     // A press whose outcome cannot be read is reported as an ordinary failure
     // by the caller, which is the safer of the two stories to tell.
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 

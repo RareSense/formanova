@@ -1,6 +1,6 @@
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 
-export type CadArtifactKind = 'glb' | '3dm';
+export type CadArtifactKind = 'glb' | '3dm' | 'stl' | 'step';
 
 interface CadArtifactUrls {
   glb_url?: string | null;
@@ -19,7 +19,7 @@ export function selectCadArtifactUrl(
 export async function isExpectedCadArtifact(blob: Blob, kind: CadArtifactKind): Promise<boolean> {
   if (blob.size === 0) return false;
 
-  const prefix = blob.slice(0, Math.min(blob.size, 32));
+  const prefix = blob.slice(0, Math.min(blob.size, 84));
   const buffer = await new Promise<ArrayBuffer>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result as ArrayBuffer);
@@ -36,6 +36,19 @@ export async function isExpectedCadArtifact(blob: Blob, kind: CadArtifactKind): 
       && header[3] === 0x46
       && view.getUint32(4, true) === 2
       && view.getUint32(8, true) === blob.size;
+  }
+
+  if (kind === 'step') {
+    const text = new TextDecoder('ascii').decode(header);
+    return text.trimStart().startsWith('ISO-10303-21;');
+  }
+
+  if (kind === 'stl') {
+    const text = new TextDecoder('ascii').decode(header).trimStart().toLowerCase();
+    if (text.startsWith('solid')) return true;
+    if (blob.size < 84 || header.length < 84) return false;
+    const triangles = new DataView(header.buffer, header.byteOffset, header.byteLength).getUint32(80, true);
+    return blob.size === 84 + triangles * 50;
   }
 
   if (blob.size < 32 || header.length < 32) return false;

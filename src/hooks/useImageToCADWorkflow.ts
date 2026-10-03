@@ -6,6 +6,7 @@ import { AuthExpiredError, authenticatedFetch } from "@/lib/authenticated-fetch"
 import {
   RING_CAD_NURBS_WORKFLOW,
   RING_CAD_DEFAULT_TIER,
+  DEFAULT_CAD_JEWELRY_TYPE,
   RING_CAD_POLL_TIMEOUT_MS,
   buildRingCadStartBody,
   parseRingCadResult,
@@ -13,6 +14,8 @@ import {
   ringCadProgressFraction,
   isRingCadRepairing,
   type ArtifactRef,
+  type CadJewelryType,
+  type CadMaterialProfile,
 } from "@/lib/ring-cad-nurbs-api";
 import { buildReferenceInputs } from "@/lib/cad-reference-upload";
 import {
@@ -32,7 +35,11 @@ import { fetchCadResult } from "@/lib/generation-history-api";
 import { fetchCadRunInputs } from "@/lib/cad-result-api";
 import {
   CadImproveError,
+  fetchCadRingBySetId,
   findRingForWorkflow,
+  improveWorkflowFor,
+  canImproveVersion,
+  isImprovementExhausted,
   latestVersion,
   startImproveFromVersion,
   versionLabel,
@@ -42,8 +49,6 @@ import {
 import { cadStatusNotice, type CadStatusNotice } from '@/lib/cad-status-copy';
 
 
-/** What an Improve press runs, so its price is quoted under the right name. */
-const IMPROVE_WORKFLOW = 'ring_cad_improve';
 
 interface WorkflowParams {
   model: string;
@@ -52,6 +57,9 @@ interface WorkflowParams {
   referenceImages: File[];
   /** ring_cad_nurbs_v1 tier; selects both the model and the price. */
   tier?: string;
+  /** Product to build, sent as payload.jewelry_type. Defaults to ring. */
+  jewelryType?: CadJewelryType;
+  material?: CadMaterialProfile | null;
   /** Which page owns this run, so the header/toast restore link returns here. */
   cadRoute: '/text-to-cad' | '/image-to-cad';
   /**
@@ -70,6 +78,8 @@ export function useImageToCADWorkflow({
   prompt,
   referenceImages,
   tier = RING_CAD_DEFAULT_TIER,
+  jewelryType = DEFAULT_CAD_JEWELRY_TYPE,
+  material = null,
   cadRoute,
   restoringFromUrl = false,
   onWorkspaceActivate,
@@ -87,6 +97,9 @@ export function useImageToCADWorkflow({
   const [sourceWorkflowId, setSourceWorkflowId] = useState<string | null>(null);
   /** The machinable deliverable. Present only for ring_cad_nurbs_v1 runs. */
   const [threedmArtifact, setThreedmArtifact] = useState<ArtifactRef | null>(null);
+  const [stlArtifacts, setStlArtifacts] = useState<ArtifactRef[]>([]);
+  const [stepArtifacts, setStepArtifacts] = useState<ArtifactRef[]>([]);
+  const [estimatedMetalMassG, setEstimatedMetalMassG] = useState<number | null>(null);
   /** Backend-authored failure copy, safe to show the user directly. */
   const [failureMessage, setFailureMessage] = useState<string | null>(null);
   /** Exports fine but some part is not a closed solid - flag before manufacture. */
@@ -114,6 +127,21 @@ export function useImageToCADWorkflow({
   const [restoredPrompt, setRestoredPrompt] = useState<string | null>(null);
   /** Which version the panel is showing; the newest until the user picks another. */
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+  /**
+   * Improve is locked on every version of this model from the press until the
+   * ring is re-read after the run ends (GraphFlow's rule: one improve per model,
+   * and the "Can't be improved" mark is written just after a run fails, so the
+   * flags on screen are stale until that re-read). A failed re-read unlocks
+   * too: the server still refuses a stale press, and a button stuck grey would
+   * be worse.
+   */
+  const [improveLocked, setImproveLocked] = useState(false);
+  /**
+   * Set on the click itself, before any await: a second click 150 ms later
+   * still sees the old state and got through, sending two paid improve POSTs
+   * (staging browser test, 2026-09-27).
+   */
+  const improvePressRef = useRef(false);
 
   /**
    * True only while a run this page started is still on its way to the screen.
@@ -195,6 +223,9 @@ export function useImageToCADWorkflow({
       if (trackedRun.threedmUrl) {
         setThreedmArtifact({ uri: trackedRun.threedmUrl, url: trackedRun.threedmUrl, type: 'model/3dm', bytes: 0, sha256: '' });
       }
+      setStlArtifacts((trackedRun.stlUrls ?? []).map(url => ({ uri: url, url, type: 'model/stl', bytes: 0, sha256: '' })));
+      setStepArtifacts((trackedRun.stepUrls ?? []).map(url => ({ uri: url, url, type: 'model/step', bytes: 0, sha256: '' })));
+      setEstimatedMetalMassG(trackedRun.estimatedMetalMassG ?? null);
       // cad_generation_completed is NOT emitted here. This effect does not run
       // once the page unmounts and bails out early on hasNavigatedAway, so
       // every run finishing after the user left was never counted.
@@ -203,7 +234,7 @@ export function useImageToCADWorkflow({
       setIsModelLoading(true);
       setHasModel(true);
     }
-  }, [trackedRun?.status, trackedRun?.glbUrl, trackedRun?.threedmUrl, trackedRun?.generationStep, trackedRun?.cadFailureReasonCode]); // eslint-disable-line react-hooks/exhaustive-deps -- prompt/referenceImages/tier/cadRoute/cadSource and the trackedRun object are excluded: only the run's own transitions should re-drive the overlay, and including the object would re-fire on every progress tick. The analytics values are read from the closure of the render in which status changed, which is the correct moment for them. Regression to watch: if a future edit fires an event here on something other than a status transition, those values could be stale.
+  }, [trackedRun?.status, trackedRun?.glbUrl, trackedRun?.threedmUrl, trackedRun?.stlUrls, trackedRun?.stepUrls, trackedRun?.estimatedMetalMassG, trackedRun?.generationStep, trackedRun?.cadFailureReasonCode]); // eslint-disable-line react-hooks/exhaustive-deps -- prompt/referenceImages/tier/cadRoute/cadSource and the trackedRun object are excluded: only the run's own transitions should re-drive the overlay, and including the object would re-fire on every progress tick. The analytics values are read from the closure of the render in which status changed, which is the correct moment for them. Regression to watch: if a future edit fires an event here on something other than a status transition, those values could be stale.
 
   /**
    * Looks up the ring this run saved, which is what the Improve button needs.
@@ -222,11 +253,15 @@ export function useImageToCADWorkflow({
     // button missing on a ring that was already saved and improvable.
     const ready = trackedRun ? trackedRun.status === 'completed' : hasModel;
     if (!ready || !sourceWorkflowId) return;
+    // Only the re-read after a run of ours completed may lift the lock; the
+    // render right after a press has no tracked run yet and must not.
+    const runCompleted = trackedRun?.status === 'completed';
     let cancelled = false;
     findRingForWorkflow(sourceWorkflowId)
       .then(async (found) => {
         if (cancelled) return;
         setRing(found);
+        if (runCompleted) setImproveLocked(false);
         const producedVersion = (found?.versions ?? []).find(
           (version) => version.source_workflow_id === sourceWorkflowId,
         );
@@ -244,17 +279,52 @@ export function useImageToCADWorkflow({
         }
       })
       .catch(() => {
-        if (!cancelled) setRing(null);
+        if (cancelled) return;
+        setRing(null);
+        if (runCompleted) setImproveLocked(false);
       });
     return () => {
       cancelled = true;
     };
   }, [hasModel, trackedRun?.status, sourceWorkflowId]);
 
+  /**
+   * Re-reads the ring on screen after an Improve press failed.
+   *
+   * A failed press makes no new version, so the lookup above never runs, yet
+   * the backend may have just marked the version "Can't be improved". The run
+   * is shown failed only after /result answered, which is after that mark is
+   * written, so one read here picks it up and the button greys out. The
+   * selected version is kept.
+   */
+  const improveFailedRingId = trackedRun?.status === 'failed' && trackedRun.cadAnalytics?.operation === 'improve'
+    ? ring?.set_id ?? null
+    : null;
+  useEffect(() => {
+    if (!improveFailedRingId) return;
+    let cancelled = false;
+    void fetchCadRingBySetId(improveFailedRingId).then((found) => {
+      if (cancelled) return;
+      if (found) setRing(found);
+      setImproveLocked(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [improveFailedRingId, trackedRun?.workflowId]);
+
   const versions = ring?.versions ? [...ring.versions].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)) : [];
   const latestRingVersion = ring ? latestVersion(ring) : null;
   /** What Improve acts on: the version on screen, which is the newest until picked. */
   const activeVersion = versions.find((v) => v.asset_id === selectedVersionId) ?? latestRingVersion;
+  /**
+   * The mesh-only viewing copy of the model on screen. Offered only when the
+   * viewer really shows that version's GLB, so the download can never belong
+   * to a different version than the one the user is looking at.
+   */
+  const viewerThreedmUrl = activeVersion?.viewer_threedm_url && activeVersion.glb_url === glbUrl
+    ? activeVersion.viewer_threedm_url
+    : null;
 
   /** Opens an earlier version in the viewer. Its files are already published. */
   const selectVersion = useCallback((assetId: string) => {
@@ -282,14 +352,23 @@ export function useImageToCADWorkflow({
    * came from a different button.
    */
   const improveFromLatestVersion = useCallback(async () => {
-    if (!activeVersion || activeVersion.improvable === false || ring?.improve_running) return;
+    if (!activeVersion || !canImproveVersion(activeVersion) || ring?.improve_running || improveLocked
+      || improvePressRef.current) return;
+    improvePressRef.current = true;
+    // Locked from the click, not after the credit check: that check can take
+    // seconds, and the button stayed pressable the whole time.
+    setImproveLocked(true);
     setImproveMessage(null);
     // The same gate every paid run uses: it saves this page as the return
     // path, shows the balance against the price, and sends the user to
     // /credits. Reaching the endpoint's own 402 instead would swap that
     // shared flow for a toast that says less and leads nowhere.
-    const approved = await checkCredits(IMPROVE_WORKFLOW, 1);
-    if (!approved) return;
+    const approved = await checkCredits(improveWorkflowFor({ family: ring?.family }), 1);
+    if (!approved) {
+      improvePressRef.current = false;
+      setImproveLocked(false);
+      return;
+    }
     try {
       const started = await startImproveFromVersion(activeVersion.asset_id);
       const fromVersion = (activeVersion.position ?? 0) + 1;
@@ -330,9 +409,10 @@ export function useImageToCADWorkflow({
       });
     } catch (error) {
       if (error instanceof CadImproveError && error.failure === 'insufficient_credits') {
+        setImproveLocked(false);
         // The balance moved between the gate above and the start call, so hand
         // it back to the same shared flow rather than explaining it here.
-        await checkCredits(IMPROVE_WORKFLOW, 1);
+        await checkCredits(improveWorkflowFor({ family: ring?.family }), 1);
         return;
       }
       const message =
@@ -341,8 +421,21 @@ export function useImageToCADWorkflow({
           : 'Could not start the improvement. Please try again.';
       setImproveMessage(message);
       toast.error(message);
+      // A refused press (409 version_not_improvable or improve_already_running)
+      // means the flags on screen are stale; re-read them so the button
+      // reflects the backend instead of inviting another press.
+      const refused = error instanceof CadImproveError
+        && (error.failure === 'not_improvable' || error.failure === 'already_running');
+      if (refused && ring?.set_id) {
+        const found = await fetchCadRingBySetId(ring.set_id);
+        if (found) setRing(found);
+      }
+      setImproveLocked(false);
+    } finally {
+      // The click is handled; the run itself stays locked by improveLocked.
+      improvePressRef.current = false;
     }
-  }, [activeVersion, cadRoute, cadSource, checkCredits, onWorkspaceActivate, prompt, referenceImages.length, ring?.improve_running, tier, trackCadGeneration]);
+  }, [activeVersion, cadRoute, cadSource, checkCredits, onWorkspaceActivate, prompt, referenceImages.length, ring?.family, ring?.improve_running, ring?.set_id, improveLocked, tier, trackCadGeneration]);
 
   /** Leaves the run running in the background and returns to the upload screen. */
   const handleKeepCreating = useCallback(() => {
@@ -380,6 +473,9 @@ export function useImageToCADWorkflow({
     setRestoredReferenceUrls(seed?.referenceImageUrls ?? []);
     setRestoredPrompt(seed?.prompt ?? null);
     setThreedmArtifact(null);
+    setStlArtifacts([]);
+    setStepArtifacts([]);
+    setEstimatedMetalMassG(null);
     setIsModelLoading(true);
     setProgressStep('_loading');
 
@@ -429,7 +525,7 @@ export function useImageToCADWorkflow({
     return true;
   }, [onWorkspaceActivate, cadSource]);
 
-  const simulateGeneration = useCallback(async () => {
+  const startGeneration = useCallback(async () => {
     if (isGenerating) return;
     const imageCount = referenceImages.length;
     const hasPrompt = !!prompt.trim();
@@ -443,11 +539,31 @@ export function useImageToCADWorkflow({
     // any of it. The tier price is backend's to set and it moves, so no
     // fallback figure is written here; when the estimate is unavailable the
     // start call below is the authority and rejects with 402.
-    const approved = await checkCredits(RING_CAD_NURBS_WORKFLOW, 1, {
+    const approved = (import.meta.env.VITE_DEMO_NO_AUTH === 'true' && import.meta.env.VITE_DEMO_GLB_URL) ? true : await checkCredits(RING_CAD_NURBS_WORKFLOW, 1, {
       pricingContext: { llm_tier: tier },
     });
     if (!approved) {
       trackPaywallHit({ category: 'ring', steps_completed: 1, source: cadSource });
+      return;
+    }
+
+    // Local demo recording build only (.env.local): play the real progress screen, then load a
+    // finished model from public/demo instead of starting a paid run.
+    const demoGlb = import.meta.env.VITE_DEMO_GLB_URL;
+    if (import.meta.env.VITE_DEMO_NO_AUTH === 'true' && demoGlb) {
+      const wait = (ms: number) => new Promise(r => setTimeout(r, ms));
+      hasNavigatedAway.current = false; onWorkspaceActivate();
+      setIsGenerating(true); setHasModel(false); setThreedmArtifact(null); setProgressStep('analyzing');
+      await wait(Number(import.meta.env.VITE_DEMO_STEP_MS || 2500)); setProgressStep('building');
+      await wait(Number(import.meta.env.VITE_DEMO_STEP_MS || 2500) * 1.6);
+      setIsGenerating(false); setGlbUrl(demoGlb);
+      setGlbArtifact({ uri: demoGlb, type: 'model/gltf-binary', bytes: 0, sha256: '' });
+      const demo3dm = import.meta.env.VITE_DEMO_3DM_URL;
+      if (demo3dm) setThreedmArtifact({ uri: demo3dm, url: demo3dm, type: 'model/3dm', bytes: 0, sha256: '' });
+      // A saved version, so the result bar shows Improve beside Download as it does for real rings.
+      setRing({ set_id: 'demo-ring', name: 'Rose ring', family: 'ring', versions: [{ asset_id: 'demo-v1', position: 0,
+        source_workflow_id: 'demo', improvable: true, glb_url: demoGlb, threedm_url: demo3dm ?? null }] } as CadRing);
+      setProgressStep('_loading'); setIsModelLoading(true); setHasModel(true);
       return;
     }
 
@@ -465,6 +581,9 @@ export function useImageToCADWorkflow({
     setHasModel(false);
     setSourceWorkflowId(null);
     setThreedmArtifact(null);
+    setStlArtifacts([]);
+    setStepArtifacts([]);
+    setEstimatedMetalMassG(null);
     // Clear the previous ring's solidity result: a stale warning on a new run
     // is worse than none, because it trains people to ignore it.
     setNotAllSolid(false);
@@ -483,6 +602,8 @@ export function useImageToCADWorkflow({
         referenceImages: await buildReferenceInputs(referenceImages),
         userDescription: prompt,
         tier,
+        jewelryType,
+        material,
       });
 
       // JWT only - the tenant API key and on-behalf-of header are applied by the
@@ -551,7 +672,24 @@ export function useImageToCADWorkflow({
       setProgressStep("failed_final");
       setGenerationFailed(true);
     }
-  }, [prompt, referenceImages, tier, cadRoute, cadSource, isGenerating, onWorkspaceActivate, trackCadGeneration, checkCredits]);
+  }, [prompt, referenceImages, tier, jewelryType, material, cadRoute, cadSource, isGenerating, onWorkspaceActivate, trackCadGeneration, checkCredits]);
+
+  /**
+   * One press, one run. isGenerating only turns true after the credit check
+   * answers, so on a slow connection a second press during that wait started
+   * (and charged) a second run. The ref is set synchronously on the first
+   * press and cleared however the start ends, so the button never sticks.
+   */
+  const startInFlightRef = useRef(false);
+  const simulateGeneration = useCallback(async () => {
+    if (startInFlightRef.current) return;
+    startInFlightRef.current = true;
+    try {
+      await startGeneration();
+    } finally {
+      startInFlightRef.current = false;
+    }
+  }, [startGeneration]);
 
   const resetWorkflow = useCallback(() => {
     hasNavigatedAway.current = false;
@@ -593,6 +731,8 @@ export function useImageToCADWorkflow({
     glbUrl, setGlbUrl, glbArtifact, setGlbArtifact,
     sourceWorkflowId, setSourceWorkflowId,
     threedmArtifact, setThreedmArtifact,
+    viewerThreedmUrl,
+    stlArtifacts, stepArtifacts, estimatedMetalMassG,
     failureMessage, notAllSolid,
     statusNotice,
     dismissStatusNotice: () => {
@@ -606,10 +746,16 @@ export function useImageToCADWorkflow({
      * ("Looks better"), which is a different thing and belongs on the version
      * list, not on the button.
      */
-    latestVersionLabel:
-      activeVersion && activeVersion.improvable !== false
-        ? versionLabel(activeVersion)
-        : undefined,
+    latestVersionLabel: activeVersion ? versionLabel(activeVersion) : undefined,
+    /**
+     * False grays the Improve button out: only improvable === true may be
+     * pressed, never from a press until the ring is re-read after the run, and
+     * never while the server says an improve of this model is running (which
+     * covers a page opened or reloaded mid-run, where no press happened here).
+     */
+    canImproveLatestVersion: canImproveVersion(activeVersion) && !improveLocked && !ring?.improve_running,
+    /** This version's paid review left nothing to fix: Improve reads "Can't be improved". */
+    improveExhausted: isImprovementExhausted(activeVersion),
     /** Every saved version of this ring, oldest first, for the side panel. */
     versions,
     selectedVersionId: activeVersion?.asset_id ?? null,

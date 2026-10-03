@@ -36,7 +36,7 @@ import {
 import GemToggle from "@/components/text-to-cad/QualityToggle";
 import { runMicroBenchmark } from "@/lib/gpu-detect";
 import type { GemMode } from "@/components/text-to-cad/CADCanvas";
-import { RING_CAD_DEFAULT_TIER, RING_CAD_TIERS } from "@/lib/ring-cad-nurbs-api";
+import { RING_CAD_DEFAULT_TIER, RING_CAD_TIERS, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
 import { recordStudioVisit } from '@/lib/studio-preference';
 import { useCadRestoreFromUrl } from "@/hooks/useCadRestoreFromUrl";
 
@@ -61,10 +61,13 @@ export default function TextToCAD() {
   const requestedTier = searchParams.get('tier') === RING_CAD_TIERS.GPT_5_6_SOL
     ? RING_CAD_TIERS.GPT_5_6_SOL
     : undefined;
+  // Every run uses the customer default (GPT-6 Astra, OpenAI direct) unless
+  // the URL explicitly asks for the GPT-5.6 Sol tier.
   const activeTier = requestedTier ?? RING_CAD_DEFAULT_TIER;
 
   const [model] = useState("gemini");
   const [prompt, setPrompt] = useState("");
+  const [jewelryType, setJewelryType] = useState<CadJewelryType | null>(null);
   const [transformMode, setTransformMode] = useState("orbit");
   const wasManualUploadRef = useRef(false);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
@@ -109,6 +112,7 @@ export default function TextToCAD() {
     prompt,
     referenceImages: NO_REFERENCE_IMAGES,
     tier: activeTier,
+    jewelryType: jewelryType ?? undefined,
     cadRoute: '/text-to-cad',
     // Read once, at first render, so arriving from the result email
     // paints the loading state instead of an empty workspace.
@@ -209,7 +213,10 @@ export default function TextToCAD() {
    */
   const downloads = useCadArtifactDownloads({
     threedmUrl: workflow.threedmArtifact?.url,
+    viewerThreedmUrl: workflow.viewerThreedmUrl,
     glbUrl: workflow.glbUrl,
+    stlUrls: workflow.stlArtifacts.map(artifact => artifact.url),
+    stepUrls: workflow.stepArtifacts.map(artifact => artifact.url),
     exportEditedBlob: () => canvasRef.current?.exportSceneBlob() ?? Promise.resolve(undefined),
     source: 'text-to-cad',
   });
@@ -247,6 +254,8 @@ export default function TextToCAD() {
           setModel={() => {}}
           prompt={prompt}
           setPrompt={setPrompt}
+          jewelryType={jewelryType}
+          setJewelryType={setJewelryType}
           isGenerating={workflow.isGenerating}
           onGenerate={workflow.simulateGeneration}
           onGlbUpload={showCadUpload ? handleGlbUpload : undefined}
@@ -260,7 +269,7 @@ export default function TextToCAD() {
     <>
       <Helmet>
         <title>Text to CAD | FormaNova</title>
-        <meta name="description" content="Describe a ring in text and get a manufacturable 3D CAD model in minutes. Rings only." />
+        <meta name="description" content="Describe a piece in text and get a manufacturable 3D CAD model in minutes. Works for rings, necklaces, bracelets, earrings and more." />
         <link rel="canonical" href="/text-to-cad" />
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
@@ -315,7 +324,10 @@ export default function TextToCAD() {
                 <button
                   onClick={() => {
                     const panel = leftPanelRef.current;
-                    if (panel) { leftCollapsed ? panel.expand(22) : panel.collapse(); }
+                    if (panel) {
+                      if (leftCollapsed) panel.expand(22);
+                      else panel.collapse();
+                    }
                   }}
                   className="absolute top-2 left-2 z-[60] w-8 h-8 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
                   title={leftCollapsed ? "Show left panel" : "Hide left panel"}
@@ -326,7 +338,10 @@ export default function TextToCAD() {
                   <button
                     onClick={() => {
                       const panel = rightPanelRef.current;
-                      if (panel) { rightCollapsed ? panel.expand(22) : panel.collapse(); }
+                      if (panel) {
+                        if (rightCollapsed) panel.expand(22);
+                        else panel.collapse();
+                      }
                     }}
                     className="absolute top-2 right-2 z-[60] w-8 h-8 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
                     title={rightCollapsed ? "Show right panel" : "Hide right panel"}
@@ -345,7 +360,10 @@ export default function TextToCAD() {
                 additionalGlbUrls={additionalParts}
                 selectedMeshNames={editor.selectedMeshNames}
                 hiddenMeshNames={editor.hiddenMeshNames}
-                onMeshClick={editor.handleSelectMesh}
+                onMeshClick={editor.handleSelectFamily}
+                onMeshDoubleClick={editor.handleSelectMesh}
+                onMeshHover={editor.setHoveredPart}
+                highlightedMeshNames={editor.hoveredFamilyNames}
                 transformMode={transformMode}
                 onMeshesDetected={editor.handleMeshesDetected}
                 onTransformStart={editor.handleTransformStart}
@@ -392,9 +410,15 @@ export default function TextToCAD() {
                 isBusy={downloads.isBusy}
                 onDownloadThreedm={workflow.threedmArtifact ? downloads.downloadThreedm : undefined}
                 onDownloadGlb={workflow.glbUrl ? downloads.downloadGlb : undefined}
+                onDownloadViewerThreedm={workflow.viewerThreedmUrl ? downloads.downloadViewerThreedm : undefined}
+                onDownloadStl={workflow.stlArtifacts.length ? downloads.downloadStl : undefined}
+                onDownloadStep={workflow.stepArtifacts.length ? downloads.downloadStep : undefined}
+                estimatedMetalMassG={workflow.estimatedMetalMassG}
                 onExportEdited={hasEdits ? downloads.exportEdited : undefined}
                 latestVersionLabel={workflow.latestVersionLabel}
                 onImproveFromVersion={workflow.improveFromLatestVersion}
+                improveDisabled={!workflow.canImproveLatestVersion}
+                improveExhausted={workflow.improveExhausted}
               />
             )}
 
@@ -530,6 +554,10 @@ export default function TextToCAD() {
             <MeshPanel
               meshes={editor.meshes}
               onSelectMesh={editor.handleSelectMesh}
+              onSelectFamily={editor.handleSelectFamily}
+              onHoverPart={editor.setHoveredPart}
+              hoveredNames={editor.hoveredFamilyNames}
+              onApplyGemToAll={editor.handleApplyGemToAll}
               onAction={editor.handleMeshAction}
               onApplyMaterial={editor.handleApplyMaterial}
               onApplyMetalToAll={editor.handleApplyMetalToAll}

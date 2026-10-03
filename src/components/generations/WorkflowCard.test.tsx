@@ -22,6 +22,12 @@ import { WorkflowCard } from './WorkflowCard';
 import { fetchCadResult } from '@/lib/generation-history-api';
 import { downloadCadArtifact } from '@/lib/cad-artifact-download';
 
+/** Open the card's Download list and pick the row with this hint. */
+async function chooseDownload(hint: string) {
+  fireEvent.keyDown(screen.getByRole('button', { name: 'Download' }), { key: 'Enter' });
+  fireEvent.click(await screen.findByText(hint));
+}
+
 beforeEach(() => {
   localStorage.clear();
   vi.clearAllMocks();
@@ -121,6 +127,71 @@ describe('CAD generation history card', () => {
     expect(screen.getByTestId('location-state').textContent).toContain('/reference.jpg');
   });
 
+  it('downloads the viewing copy of the version on screen, from the menu only', async () => {
+    render(
+      <MemoryRouter>
+        <WorkflowCard
+          workflow={{
+            ...cadWorkflow,
+            ring_versions: [
+              { assetId: 'asset-v1', position: 0, workflowId: 'workflow-v1', thumbnailUrl: null, glbUrl: '/v1.glb' },
+              { assetId: 'asset-v2', position: 1, workflowId: 'workflow-v2', thumbnailUrl: null, glbUrl: '/v2.glb' },
+            ],
+            cad_restore_seed: {
+              ring: {
+                set_id: 'set-1',
+                versions: [
+                  { asset_id: 'asset-v1', position: 0, viewer_threedm_url: '/v1.viewer.3dm' },
+                  { asset_id: 'asset-v2', position: 1, viewer_threedm_url: '/v2.viewer.3dm' },
+                ],
+              },
+              selectedVersionId: 'asset-v2',
+            },
+          } as WorkflowSummary}
+          index={1}
+          onClick={() => {}}
+        />
+      </MemoryRouter>,
+    );
+
+    const openMenu = () =>
+      fireEvent.keyDown(screen.getByRole('button', { name: 'Download' }), { key: 'Enter' });
+
+    openMenu();
+    fireEvent.click(await screen.findByText('Viewer only (mesh)'));
+    await waitFor(() => expect(downloadCadArtifact).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(downloadCadArtifact).mock.calls[0][0]).toBe('/v2.viewer.3dm');
+    expect(vi.mocked(downloadCadArtifact).mock.calls[0][1]).toMatch(/-viewing-copy\.3dm$/);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Preview version 1' }));
+    openMenu();
+    fireEvent.click(await screen.findByText('Viewer only (mesh)'));
+    await waitFor(() => expect(downloadCadArtifact).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(downloadCadArtifact).mock.calls[1][0]).toBe('/v1.viewer.3dm');
+  });
+
+  it('offers no viewing copy for a version made before it existed', async () => {
+    render(
+      <MemoryRouter>
+        <WorkflowCard
+          workflow={{
+            ...cadWorkflow,
+            cad_restore_seed: {
+              ring: { set_id: 'set-1', versions: [{ asset_id: 'asset-1', position: 0, viewer_threedm_url: null }] },
+              selectedVersionId: 'asset-1',
+            },
+          } as WorkflowSummary}
+          index={1}
+          onClick={() => {}}
+        />
+      </MemoryRouter>,
+    );
+
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Download' }), { key: 'Enter' });
+    await screen.findByText('Rhino, editable');
+    expect(screen.queryByText('Viewer only (mesh)')).toBeNull();
+  });
+
   it('does not expose internal mode or provider values', () => {
     render(
       <MemoryRouter>
@@ -140,16 +211,17 @@ describe('CAD generation history card', () => {
     );
 
     expect(screen.getAllByRole('button').map((button) => button.textContent?.trim()).filter(Boolean)).toEqual([
-      'Download 3DM',
+      'Download',
       'Open in Studio',
     ]);
 
-    const threedm = screen.getByRole('button', { name: 'Download 3DM' });
+    const threedm = screen.getByRole('button', { name: 'Download' });
     const studio = screen.getByRole('button', { name: 'Open in Studio' });
     // Sibling actions match in height and width rather than one sitting
     // shorter than the other.
     expect(threedm.className).toContain('h-11');
     expect(studio.className).toContain('h-11');
+    expect(threedm.className).not.toContain('flex-1');
     expect(threedm.className).toContain('w-full');
     expect(studio.className).toContain('w-full');
     // One filled action, not two. The original rule here was that two solid
@@ -180,7 +252,7 @@ describe('CAD generation history card', () => {
     expect((screen.getByRole('textbox') as HTMLInputElement).value).toBe('ring');
     expect(screen.queryByText('.glb')).toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Download 3DM' }));
+    await chooseDownload('Rhino, editable');
     await waitFor(() => expect(downloadCadArtifact).toHaveBeenCalledWith(
       expect.any(String),
       'ring.3dm',
@@ -198,7 +270,7 @@ describe('CAD generation history card', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Rename design' }));
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Customer Ring' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save design name' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Download 3DM' }));
+    await chooseDownload('Rhino, editable');
 
     await waitFor(() => expect(downloadCadArtifact).toHaveBeenCalledWith(
       '/fresh/manufacturing-3dm',
@@ -208,16 +280,18 @@ describe('CAD generation history card', () => {
   });
 
   it('falls back to the cached 3DM URL when the fresh result fetch times out', async () => {
+    vi.mocked(fetchCadResult).mockReturnValue(new Promise(() => {})); // never resolves
+    render(
+      <MemoryRouter>
+        <WorkflowCard workflow={cadWorkflow} index={1} onClick={() => {}} />
+      </MemoryRouter>,
+    );
+
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Download' }), { key: 'Enter' });
+    const row = await screen.findByText('Rhino, editable');
     vi.useFakeTimers();
     try {
-      vi.mocked(fetchCadResult).mockReturnValue(new Promise(() => {})); // never resolves
-      render(
-        <MemoryRouter>
-          <WorkflowCard workflow={cadWorkflow} index={1} onClick={() => {}} />
-        </MemoryRouter>,
-      );
-
-      fireEvent.click(screen.getByRole('button', { name: 'Download 3DM' }));
+      fireEvent.click(row);
       await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
 
       expect(downloadCadArtifact).toHaveBeenCalledWith('/api/artifacts/3dm', 'ring.3dm', '3dm');
@@ -237,7 +311,7 @@ describe('CAD generation history card', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Download 3DM' }));
+    await chooseDownload('Rhino, editable');
 
     await waitFor(() => expect(downloadCadArtifact).toHaveBeenCalledWith('/api/artifacts/3dm', 'ring.3dm', '3dm'));
     expect(downloadCadArtifact).toHaveBeenNthCalledWith(1, '/fresh/manufacturing-3dm', 'ring.3dm', '3dm');

@@ -5,71 +5,110 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { CadDownloadMenu } from './CadDownloadMenu';
 
 /**
- * The contract these tests protect: the .3dm is the deliverable people came
- * for, so it is always the one-click default; the .glb the backend also
- * produces is always reachable from the menu; and the edited export is only
- * offered when there is actually an edit to export.
+ * The contract: one Download button. Pressing it never downloads by itself;
+ * it opens the list of formats this run actually has, in a fixed order, each
+ * with a plain-English hint, so nobody grabs the wrong file by accident.
  */
 
 const noop = () => {};
 
-/** Radix opens on pointerdown or keyboard, not on a synthetic click, so the
- *  chevron is driven the way a keyboard user would drive it. */
+/** Radix opens on pointerdown or keyboard, not on a synthetic click. */
 const openMenu = () =>
-  fireEvent.keyDown(screen.getByRole('button', { name: /more download options/i }), { key: 'Enter' });
+  fireEvent.keyDown(screen.getByRole('button', { name: /^download$/i }), { key: 'Enter' });
+
+const menuRows = () => screen.getAllByRole('menuitem').map((item) => item.textContent);
 
 describe('CadDownloadMenu', () => {
-  it('makes the 3dm the default action, reachable in one click', () => {
-    const onDownloadThreedm = vi.fn();
-    render(<CadDownloadMenu onDownloadThreedm={onDownloadThreedm} onDownloadGlb={noop} />);
-
-    fireEvent.click(screen.getByRole('button', { name: /download 3dm/i }));
-    expect(onDownloadThreedm).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not fire the default action when the chevron is opened', () => {
+  it('opens the format list without downloading anything', async () => {
     const onDownloadThreedm = vi.fn();
     render(<CadDownloadMenu onDownloadThreedm={onDownloadThreedm} onDownloadGlb={noop} />);
 
     openMenu();
+    await screen.findByText('Rhino, editable');
     expect(onDownloadThreedm).not.toHaveBeenCalled();
   });
 
-  it('offers the glb from the menu', async () => {
-    const onDownloadGlb = vi.fn();
-    render(<CadDownloadMenu onDownloadThreedm={noop} onDownloadGlb={onDownloadGlb} />);
-
-    openMenu();
-    fireEvent.click(await screen.findByText(/download glb/i));
-    expect(onDownloadGlb).toHaveBeenCalledTimes(1);
-  });
-
-  it('hides the edited export when there are no edits', async () => {
-    render(<CadDownloadMenu onDownloadThreedm={noop} onDownloadGlb={noop} />);
-
-    openMenu();
-    await screen.findByText(/download glb/i);
-    expect(screen.queryByText(/with my edits/i)).toBeNull();
-  });
-
-  it('offers the edited export once an edit exists', async () => {
-    const onExportEdited = vi.fn();
+  it('lists every format in a fixed order with a hint', async () => {
     render(
-      <CadDownloadMenu onDownloadThreedm={noop} onDownloadGlb={noop} onExportEdited={onExportEdited} />,
+      <CadDownloadMenu
+        onDownloadThreedm={noop}
+        onDownloadGlb={noop}
+        onDownloadViewerThreedm={noop}
+        onDownloadStep={noop}
+        onDownloadStl={noop}
+      />,
     );
 
     openMenu();
-    fireEvent.click(await screen.findByText(/with my edits/i));
+    await screen.findByText('Rhino, editable');
+    expect(menuRows()).toEqual([
+      '3DMRhino, editable',
+      'GLB3D preview',
+      '3DMViewer only (mesh)',
+      'STEPOther CAD software',
+      'STL3D printing',
+    ]);
+  });
+
+  it('downloads the format that was chosen', async () => {
+    const handlers = {
+      onDownloadThreedm: vi.fn(),
+      onDownloadGlb: vi.fn(),
+      onDownloadViewerThreedm: vi.fn(),
+      onDownloadStep: vi.fn(),
+      onDownloadStl: vi.fn(),
+    };
+    render(<CadDownloadMenu {...handlers} />);
+
+    const cases: [string, keyof typeof handlers][] = [
+      ['Rhino, editable', 'onDownloadThreedm'],
+      ['3D preview', 'onDownloadGlb'],
+      ['Viewer only (mesh)', 'onDownloadViewerThreedm'],
+      ['Other CAD software', 'onDownloadStep'],
+      ['3D printing', 'onDownloadStl'],
+    ];
+    for (const [hint, handler] of cases) {
+      openMenu();
+      fireEvent.click(await screen.findByText(hint));
+      expect(handlers[handler]).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it('shows only the formats this run has', async () => {
+    render(<CadDownloadMenu onDownloadThreedm={noop} onDownloadGlb={noop} />);
+
+    openMenu();
+    await screen.findByText('Rhino, editable');
+    expect(menuRows()).toEqual(['3DMRhino, editable', 'GLB3D preview']);
+  });
+
+  it('offers the edited export only once there is an edit', async () => {
+    const onExportEdited = vi.fn();
+    const { unmount } = render(<CadDownloadMenu onDownloadThreedm={noop} onDownloadGlb={noop} />);
+    openMenu();
+    await screen.findByText('Rhino, editable');
+    expect(screen.queryByText('With my edits')).toBeNull();
+    unmount();
+
+    render(<CadDownloadMenu onDownloadThreedm={noop} onDownloadGlb={noop} onExportEdited={onExportEdited} />);
+    openMenu();
+    fireEvent.click(await screen.findByText('With my edits'));
     expect(onExportEdited).toHaveBeenCalledTimes(1);
   });
 
-  it('falls back to the glb as the default action when no 3dm exists', () => {
-    // Older runs predate ring_cad_nurbs_v1 and have no .3dm at all. The button
-    // must still do something useful rather than render a dead default.
+  it('shows the estimated metal weight above the formats', async () => {
+    render(<CadDownloadMenu onDownloadThreedm={noop} estimatedMetalMassG={4.214} />);
+
+    openMenu();
+    expect(await screen.findByText(/est\. metal weight: 4\.21 g/i)).toBeInTheDocument();
+  });
+
+  it('works for older runs that only have a GLB', async () => {
     const onDownloadGlb = vi.fn();
     render(<CadDownloadMenu onDownloadGlb={onDownloadGlb} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /download glb/i }));
+    openMenu();
+    fireEvent.click(await screen.findByText('3D preview'));
     expect(onDownloadGlb).toHaveBeenCalledTimes(1);
   });
 
@@ -78,22 +117,12 @@ describe('CadDownloadMenu', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('does not open the menu when the 3dm is the only artifact', () => {
-    // A lone action needs no chevron: offering a menu with one item in it is
-    // a dead affordance.
-    render(<CadDownloadMenu onDownloadThreedm={noop} />);
-    expect(screen.queryByRole('button', { name: /more download options/i })).toBeNull();
-  });
-
-  it('disables the default action while a download is in flight', () => {
-    const onDownloadThreedm = vi.fn();
-    render(
-      <CadDownloadMenu onDownloadThreedm={onDownloadThreedm} onDownloadGlb={noop} isBusy />,
-    );
+  it('is disabled and says so while a download is in flight', () => {
+    render(<CadDownloadMenu onDownloadThreedm={noop} onDownloadGlb={noop} isBusy />);
 
     const button = screen.getByRole('button', { name: /preparing/i });
     expect(button).toBeDisabled();
-    fireEvent.click(button);
-    expect(onDownloadThreedm).not.toHaveBeenCalled();
+    fireEvent.keyDown(button, { key: 'Enter' });
+    expect(screen.queryByRole('menuitem')).toBeNull();
   });
 });

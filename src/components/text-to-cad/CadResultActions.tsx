@@ -22,6 +22,11 @@ export interface CadResultActionsProps {
   onDownloadThreedm?: () => void;
   /** Omit when the run has no GLB yet. */
   onDownloadGlb?: () => void;
+  /** Omit when the version has no mesh-only viewing copy of the 3DM. */
+  onDownloadViewerThreedm?: () => void;
+  onDownloadStl?: () => void;
+  onDownloadStep?: () => void;
+  estimatedMetalMassG?: number | null;
   /** Omit unless the user has actually edited the model. */
   onExportEdited?: () => void;
   /** Disables the download while bytes are being fetched. */
@@ -36,6 +41,13 @@ export interface CadResultActionsProps {
   latestVersionLabel?: string;
   /** Required for the Improve button to render, alongside latestVersionLabel. */
   onImproveFromVersion?: () => void;
+  /** Grays Improve out and ignores presses: this version cannot be improved. */
+  improveDisabled?: boolean;
+  /**
+   * The version's paid review left nothing to fix. Improve stays in its slot,
+   * greyed out, and reads "Can't be improved" so the bar does not move.
+   */
+  improveExhausted?: boolean;
 }
 
 // Improve is where the eye should land, so it carries the filled treatment and
@@ -49,10 +61,16 @@ const IMPROVE_BASE =
 export function CadResultActions({
   onDownloadThreedm,
   onDownloadGlb,
+  onDownloadViewerThreedm,
+  onDownloadStl,
+  onDownloadStep,
+  estimatedMetalMassG,
   onExportEdited,
   isBusy = false,
   latestVersionLabel,
   onImproveFromVersion,
+  improveDisabled = false,
+  improveExhausted = false,
 }: CadResultActionsProps) {
   const showImprove = Boolean(latestVersionLabel && onImproveFromVersion);
 
@@ -65,10 +83,12 @@ export function CadResultActions({
         <button
           type="button"
           onClick={onImproveFromVersion}
+          disabled={improveDisabled || improveExhausted}
+          title={improveDisabled && !improveExhausted ? 'This version cannot be improved' : undefined}
           className={cn('pointer-events-auto', CAD_RESULT_ACTION_WIDTH, IMPROVE_BASE, CAD_RESULT_ACTION_SIZE)}
         >
           <Sparkles className="h-[18px] w-[18px] shrink-0" />
-          {`Improve from ${latestVersionLabel}`}
+          {improveExhausted ? "Can't be improved" : `Improve from ${latestVersionLabel}`}
         </button>
       )}
       <CadDownloadMenu
@@ -77,6 +97,10 @@ export function CadResultActions({
         isBusy={isBusy}
         onDownloadThreedm={onDownloadThreedm}
         onDownloadGlb={onDownloadGlb}
+        onDownloadViewerThreedm={onDownloadViewerThreedm}
+        onDownloadStl={onDownloadStl}
+        onDownloadStep={onDownloadStep}
+        estimatedMetalMassG={estimatedMetalMassG}
         onExportEdited={onExportEdited}
       />
     </div>

@@ -5,13 +5,18 @@ vi.mock('@/lib/authenticated-fetch', () => ({ authenticatedFetch: vi.fn() }));
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import {
   CadImproveError,
+  canImproveVersion,
   fetchImproveOutcome,
+  fetchCadRingBySetId,
   fetchCadRings,
   findRingForWorkflow,
+  isImprovementExhausted,
   latestVersion,
   readImproveResultFailure,
   startImproveFromVersion,
   versionLabel,
+  type CadRing,
+  type CadRingVersion,
 } from './cad-versions-api';
 
 const fetchMock = vi.mocked(authenticatedFetch);
@@ -44,6 +49,27 @@ describe('latestVersion', () => {
 
   it('is null for a ring with no versions, so no button is offered', () => {
     expect(latestVersion({ set_id: 's', versions: [] })).toBeNull();
+  });
+});
+
+describe('isImprovementExhausted', () => {
+  const base = { asset_id: 'a1', position: 0 };
+
+  it('is true only when the version is not improvable for the exhausted reason', () => {
+    expect(isImprovementExhausted({ ...base, improvable: false, improve_unavailable_reason: 'improvement_exhausted' })).toBe(true);
+  });
+
+  it('is false for any other reason a version cannot be improved', () => {
+    expect(isImprovementExhausted({ ...base, improvable: false, improve_unavailable_reason: 'version_incomplete' })).toBe(false);
+    expect(isImprovementExhausted({ ...base, improvable: false })).toBe(false);
+  });
+
+  it('is false while the version is still improvable', () => {
+    expect(isImprovementExhausted({ ...base, improvable: true, improve_unavailable_reason: null })).toBe(false);
+  });
+
+  it('is false with no version on screen', () => {
+    expect(isImprovementExhausted(null)).toBe(false);
   });
 });
 
@@ -171,5 +197,77 @@ describe('readImproveResultFailure', () => {
 
   it('ignores every other status', () => {
     expect(readImproveResultFailure(500, { detail: { message: 'boom' } })).toBeNull();
+  });
+});
+
+describe('jewelry families', () => {
+  it('history reads GET /api/cad/models', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { items: [RING] }));
+    await fetchCadRings();
+    expect(String(fetchMock.mock.calls[0][0])).toContain('/api/cad/models?');
+  });
+
+  it('prices Improve under the workflow the server will actually run', async () => {
+    const { improveWorkflowFor } = await import('./cad-versions-api');
+    expect(improveWorkflowFor({ ...RING, family: 'jewelry', jewelry_type: 'necklace' } as CadRing)).toBe('jewelry_cad_improve');
+    expect(improveWorkflowFor({ ...RING, family: 'ring', jewelry_type: null } as CadRing)).toBe('ring_cad_improve');
+    // Old records without a family are ring output (GraphFlow's LEGACY_FAMILY).
+    expect(improveWorkflowFor(RING as CadRing)).toBe('ring_cad_improve');
+    expect(improveWorkflowFor(null)).toBe('ring_cad_improve');
+  });
+});
+
+describe('canImproveVersion', () => {
+  it('allows Improve only when the backend says improvable is exactly true', () => {
+    expect(canImproveVersion({ improvable: true })).toBe(true);
+    expect(canImproveVersion({ improvable: false, improve_unavailable_reason: 'legacy_workflow_retired' } as CadRingVersion)).toBe(false);
+    // A missing flag is not permission: GraphFlow shows IMPROVE only on true.
+    expect(canImproveVersion({})).toBe(false);
+    expect(canImproveVersion(null)).toBe(false);
+  });
+});
+
+describe('fetchImproveOutcome time limit', () => {
+  it('gives up when /result does not answer in time, like any unreadable outcome', async () => {
+    vi.useFakeTimers();
+    try {
+      fetchMock.mockImplementationOnce((_url, init) => new Promise((_resolve, reject) => {
+        (init as RequestInit | undefined)?.signal?.addEventListener('abort', () => {
+          reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+        });
+      }));
+      const pending = fetchImproveOutcome('wf_slow', { timeoutMs: 1000 });
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(await pending).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('passes an abort signal so the wait can be cut short', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, {}));
+    await fetchImproveOutcome('wf_2');
+    const init = fetchMock.mock.calls[0][1] as RequestInit | undefined;
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
+  });
+});
+
+describe('fetchCadRingBySetId', () => {
+  it('reloads the one ring by set_id, with its fresh improvable flags', async () => {
+    const refreshed = {
+      ...RING,
+      versions: [RING.versions[0], { ...RING.versions[1], improvable: false,
+        improve_unavailable_reason: 'improvement_exhausted' }],
+    };
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { items: [{ set_id: 'other', versions: [] }, refreshed] }));
+    const ring = await fetchCadRingBySetId('set_1');
+    expect(ring?.versions[1]).toMatchObject({ improvable: false, improve_unavailable_reason: 'improvement_exhausted' });
+  });
+
+  it('is null when the ring is not listed or the list cannot be read', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { items: [] }));
+    expect(await fetchCadRingBySetId('set_1')).toBeNull();
+    fetchMock.mockResolvedValueOnce(jsonResponse(500, {}));
+    expect(await fetchCadRingBySetId('set_1')).toBeNull();
   });
 });

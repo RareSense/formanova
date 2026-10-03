@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import type { CADCanvasHandle, CanvasSnapshot, MeshTransformData } from "@/components/text-to-cad/CADCanvas";
 import type { MeshItemData } from "@/components/text-to-cad/types";
+import { cadFamilyMembers, cadPartKind } from "@/lib/cad-part-families";
 
 export interface UndoEntry {
   label: string;
@@ -42,6 +43,11 @@ export function useCADMeshEditor({ canvasRef, transformMode, setTransformMode }:
   const selectedNames = useMemo(
     () => meshes.filter((m) => m.selected).map((m) => m.name),
     [meshes]
+  );
+  const [hoveredPart, setHoveredPart] = useState<string | null>(null);
+  const hoveredFamilyNames = useMemo(
+    () => new Set(hoveredPart ? cadFamilyMembers(hoveredPart, meshes.map((m) => m.name)) : []),
+    [hoveredPart, meshes],
   );
 
   const pushUndoEntry = useCallback((label: string, entry: UndoEntry) => {
@@ -145,6 +151,26 @@ export function useCADMeshEditor({ canvasRef, transformMode, setTransformMode }:
     const count = canvasRef.current?.applyMetalToAll(matId) ?? 0;
     if (count === 0) showSelectionWarning("No metal parts to update");
   }, [canvasRef, pushUndo, showSelectionWarning]);
+
+  const handleApplyGemToAll = useCallback((matId: string) => {
+    const stones = meshesRef.current.filter((m) => cadPartKind(m.name) === "stone").map((m) => m.name);
+    if (stones.length === 0) { showSelectionWarning("No stones to update"); return; }
+    pushUndo("Material: all stones");
+    canvasRef.current?.applyMaterial(matId, stones);
+  }, [canvasRef, pushUndo, showSelectionWarning]);
+
+  const handleSelectFamily = useCallback((name: string, multi: boolean) => {
+    if (!name) {
+      setMeshes((prev) => prev.map((m) => ({ ...m, selected: false })));
+      return;
+    }
+    setMeshes((prev) => {
+      const members = new Set(cadFamilyMembers(name, prev.map((m) => m.name)));
+      if (!multi) return prev.map((m) => ({ ...m, selected: members.has(m.name) }));
+      const allSelected = prev.every((m) => !members.has(m.name) || m.selected);
+      return prev.map((m) => (members.has(m.name) ? { ...m, selected: !allSelected } : m));
+    });
+  }, []);
 
   const handleSelectMesh = useCallback((name: string, multi: boolean) => {
     if (!name) {
@@ -281,10 +307,11 @@ export function useCADMeshEditor({ canvasRef, transformMode, setTransformMode }:
     handleUndo, handleRedo,
     handleTransformStart, handleTransformEnd,
     handleNumericTransformChange,
-    handleSelectMesh, handleMeshesDetected,
+    handleSelectMesh, handleSelectFamily, handleMeshesDetected,
+    setHoveredPart, hoveredFamilyNames,
     handleMeshAction, handleSceneAction,
     handleApplyMaterial,
-    handleApplyMetalToAll,
+    handleApplyMetalToAll, handleApplyGemToAll,
     handleCopy, handlePaste, handleCut,
     toggleWireframe,
     resetMeshEditor,

@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 import {
   Dialog,
   DialogClose,
@@ -27,11 +27,14 @@ const toneStyles = {
     border: 'border-amber-500/45',
     button: 'bg-amber-500 text-black hover:bg-amber-400',
   },
+  // Same look as the Studio's "AI is overwhelmed" overlay: theme colours only,
+  // so it matches every theme instead of shouting red. It is a temporary
+  // capacity notice, not the user's mistake.
   error: {
-    Icon: XCircle,
-    icon: 'text-red-500',
-    border: 'border-red-500/55',
-    button: 'bg-red-600 text-white hover:bg-red-500',
+    Icon: AlertTriangle,
+    icon: 'text-muted-foreground',
+    border: 'border-border',
+    button: 'bg-primary text-primary-foreground hover:bg-primary/90',
   },
 } as const;
 

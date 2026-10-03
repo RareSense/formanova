@@ -12,6 +12,8 @@ interface ReferenceImageUploaderProps {
   onRemoveReferenceImage: (index: number) => void;
   primaryLabel?: string;
   primaryHint?: string;
+  /** Text of the button in the empty drop box. */
+  browseLabel?: string;
   /** Allows Image-to-CAD to use the same tall upload canvas as Photo Studio. */
   canvasClassName?: string;
   /** Uses Photo Studio's full-size empty drop affordance. */
@@ -30,6 +32,7 @@ export default function ReferenceImageUploader({
   onAddReferenceImages,
   onRemoveReferenceImage,
   primaryLabel = "Drop your ring image or sketch here",
+  browseLabel = "Browse ring files",
   primaryHint = "Drag & drop · click to browse · paste (Ctrl+V)",
   canvasClassName = "h-[150px] sm:h-[170px]",
   photoStudioEmptyState = false,
@@ -134,7 +137,7 @@ export default function ReferenceImageUploader({
           <p className="mb-6 text-sm text-muted-foreground">{primaryHint}</p>
           <Button variant="outline" size="lg" className="gap-2 pointer-events-none">
             <ImageIcon className="h-4 w-4" />
-            Browse ring files
+            {browseLabel}
           </Button>
         </div>
       ) : (
@@ -176,7 +179,7 @@ export default function ReferenceImageUploader({
               if (url) {
                 return (
                   <div key={index} className="relative h-full min-h-0 min-w-0 overflow-hidden border border-border bg-muted/10">
-                    <img src={url} alt={index === 0 ? "Primary inspiration ring" : `Inspiration angle ${index}`} className="h-full w-full object-contain p-1" />
+                    <img src={url} alt={index === 0 ? "Primary inspiration image" : `Inspiration angle ${index}`} className="h-full w-full object-contain p-1" />
                     <button
                       onClick={() => onRemoveReferenceImage(index)}
                       className="absolute top-1 right-1 w-6 h-6 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"

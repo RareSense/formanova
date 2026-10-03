@@ -92,7 +92,7 @@ describe('Dashboard as the merged studio hub', () => {
     const el = renderDashboard();
 
     expect(el.textContent).toContain('Describe your jewelry and generate a CAD model.');
-    expect(el.textContent).toContain('Turn inspiration images into a CAD model.');
+    expect(el.textContent).toContain('Turn jewelry inspiration images into a CAD model.');
   });
 
   // The note describes both CAD workflows, so it belongs to the category

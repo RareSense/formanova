@@ -93,7 +93,7 @@ export function ProgressOverlay({ visible, progress, currentStep }: { visible: b
 export function StatsBar({ visible, stats }: { visible: boolean; stats: StatsData }) {
   if (!visible) return null;
   const items = [
-    { val: stats.meshes.toString(), label: "Meshes" },
+    { val: stats.meshes.toString(), label: "Parts" },
     { val: `${stats.sizeKB}`, label: "KB" },
     { val: `${stats.timeSec}s`, label: "Time" },
   ];
@@ -230,9 +230,6 @@ export function ViewportSideTools({ visible, onZoomIn, onZoomOut, onResetView, o
           <Keyboard className="w-3.5 h-3.5" />
         </button>
       )}
-
-      {/* Download 3DM lives in ViewportToolbar, top-right: it is a
-          result-level action rather than a viewport utility. */}
     </div>
   );
 }
