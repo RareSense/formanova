@@ -32,7 +32,7 @@ import GenerationProgress from "@/components/text-to-cad/GenerationProgress";
 import { ViewportToolbar, ViewportSideTools } from "@/components/text-to-cad/ViewportOverlays";
 import GemToggle from "@/components/text-to-cad/QualityToggle";
 import type { GemMode } from "@/components/text-to-cad/CADCanvas";
-import { RING_CAD_DEFAULT_TIER, DEFAULT_CAD_JEWELRY_TYPE, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
+import { RING_CAD_DEFAULT_TIER, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
 import { recordStudioVisit } from '@/lib/studio-preference';
 import { useCadRestoreFromUrl } from "@/hooks/useCadRestoreFromUrl";
 
@@ -82,7 +82,7 @@ export default function ImageToCAD() {
   const [gemMode, setGemMode] = useState<GemMode>("simple");
   const [workspaceActive, setWorkspaceActive] = useState(false);
   const [prompt, setPrompt] = useState("");
-  const [jewelryType, setJewelryType] = useState<CadJewelryType>(DEFAULT_CAD_JEWELRY_TYPE);
+  const [jewelryType, setJewelryType] = useState<CadJewelryType | null>(null);
 
   const canvasRef = useRef<CADCanvasHandle>(null);
   const leftPanelRef = useRef<ImperativePanelHandle>(null);
@@ -107,7 +107,7 @@ export default function ImageToCAD() {
     prompt,
     referenceImages,
     tier: activeTier,
-    jewelryType,
+    jewelryType: jewelryType ?? undefined,
     cadRoute: '/image-to-cad',
     // Read once, at first render, so arriving from the result email
     // paints the loading state instead of an empty workspace.

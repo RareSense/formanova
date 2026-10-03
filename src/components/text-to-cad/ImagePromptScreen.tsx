@@ -5,6 +5,7 @@ import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { useEstimatedCost } from "@/hooks/use-estimated-cost";
 import { RING_CAD_NURBS_WORKFLOW, cadJewelryNoun, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
 import CadJewelryTypeCards from "@/components/text-to-cad/CadJewelryTypeCards";
+import { useJewelryTypeGate } from "@/components/text-to-cad/useJewelryTypeGate";
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import ReferenceImageUploader from "./ReferenceImageUploader";
 import CadHistoryLibrary from "./CadHistoryLibrary";
@@ -25,6 +26,8 @@ const DIMENSION_PLACEHOLDERS: Record<CadJewelryType, string> = {
   earring: "Add a description or any details, e.g. 25 mm drop, 5 mm studs, push-back",
   other: "Add a description or any details, e.g. 40 mm brooch, 3 mm stones, pin back",
 };
+
+const DEFAULT_PLACEHOLDER = "Add a description or any details, e.g. sizes, stone sizes, finish";
 
 function ReferenceExamples({ examples, noun, onSelect }: { examples: CadExampleDesign[]; noun: string; onSelect: (example: CadExampleDesign) => void }) {
   return (
@@ -52,7 +55,7 @@ interface ImagePromptScreenProps {
   tier: string;
   prompt: string;
   setPrompt: (p: string) => void;
-  jewelryType: CadJewelryType;
+  jewelryType: CadJewelryType | null;
   setJewelryType: (t: CadJewelryType) => void;
   isGenerating: boolean;
   onGenerate: () => void;
@@ -75,7 +78,8 @@ export default function ImagePromptScreen({
 }: ImagePromptScreenProps) {
   const glbInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const noun = cadJewelryNoun(jewelryType);
+  const noun = jewelryType ? cadJewelryNoun(jewelryType) : "jewelry";
+  const { cardsRef, guardedGenerate, typeError } = useJewelryTypeGate(jewelryType, onGenerate);
   const [hasImageHistory, setHasImageHistory] = useState(false);
 
   const primaryPreviewUrl = referenceImagePreviewUrls[0] ?? null;
@@ -94,7 +98,7 @@ export default function ImagePromptScreen({
     try {
       const res = await fetch(example.image);
       const blob = await res.blob();
-      const file = new File([blob], `example-${jewelryType}.webp`, { type: "image/webp" });
+      const file = new File([blob], `example-${jewelryType ?? "piece"}.webp`, { type: "image/webp" });
       onReplaceReferenceImages([file]);
     } catch {
       // image load failed -- just set prompt
@@ -123,7 +127,7 @@ export default function ImagePromptScreen({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (canGenerate && !isGenerating) onGenerate();
+      if (canGenerate && !isGenerating) guardedGenerate();
     }
   };
 
@@ -143,7 +147,9 @@ export default function ImagePromptScreen({
           <span className="marta-label block mb-1">Image to CAD &middot; Step 1</span>
           <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">What are you making?</h3>
           <div className="mt-4">
-            <CadJewelryTypeCards value={jewelryType} onChange={setJewelryType} disabled={isGenerating} />
+            <div ref={cardsRef}>
+              <CadJewelryTypeCards value={jewelryType} onChange={setJewelryType} disabled={isGenerating} error={typeError} />
+            </div>
           </div>
         </div>
 
@@ -182,7 +188,7 @@ export default function ImagePromptScreen({
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder={DIMENSION_PLACEHOLDERS[jewelryType]}
+                  placeholder={jewelryType ? DIMENSION_PLACEHOLDERS[jewelryType] : DEFAULT_PLACEHOLDER}
                   rows={3}
                   /* Full-strength border, not a faded one: this is an input and
                      needs to read as an editable field at a glance. */
@@ -206,7 +212,7 @@ export default function ImagePromptScreen({
               <div className="mt-3 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end">
                 <Button
                   size="lg"
-                  onClick={onGenerate}
+                  onClick={guardedGenerate}
                   disabled={isGenerating || !canGenerate}
                   className="gap-2.5 border-0 bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] px-10 font-display text-base uppercase tracking-wide text-background transition-opacity hover:opacity-90 disabled:opacity-60"
                 >
@@ -241,7 +247,13 @@ export default function ImagePromptScreen({
                   <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">Try an Example</h3>
                   <p className="mt-1.5 text-sm text-muted-foreground">Choose one to load its image and prompt</p>
                 </div>
-                <ReferenceExamples examples={CAD_EXAMPLE_DESIGNS[jewelryType]} noun={noun} onSelect={handleExampleClick} />
+                {jewelryType ? (
+                  <ReferenceExamples examples={CAD_EXAMPLE_DESIGNS[jewelryType]} noun={noun} onSelect={handleExampleClick} />
+                ) : (
+                  <div className={`flex items-center justify-center border border-border/30 p-6 text-center text-sm text-muted-foreground ${PANEL_H}`}>
+                    Choose what you are making to see examples
+                  </div>
+                )}
                 {/* Below the panel, not in the header: the header must stay the
                     same height as the upload column's, so both panels share a
                     top and bottom edge. First run only: this whole block is

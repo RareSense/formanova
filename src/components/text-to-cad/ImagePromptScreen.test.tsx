@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 // The real library fetches; we only care that it gets MOUNTED, since that is
@@ -16,7 +16,10 @@ vi.mock('@/hooks/use-estimated-cost', () => ({
 
 import ImagePromptScreen from './ImagePromptScreen';
 
-function renderScreen(jewelryType: 'ring' | 'necklace' | 'bracelet' | 'earring' | 'other' = 'ring') {
+function renderScreen(
+  jewelryType: 'ring' | 'necklace' | 'bracelet' | 'earring' | 'other' | null = 'ring',
+  { onGenerate = vi.fn(), previews = [] as string[] } = {},
+) {
   return render(
     <ImagePromptScreen
       model="gemini"
@@ -26,8 +29,8 @@ function renderScreen(jewelryType: 'ring' | 'necklace' | 'bracelet' | 'earring' 
       jewelryType={jewelryType}
       setJewelryType={vi.fn()}
       isGenerating={false}
-      onGenerate={vi.fn()}
-      referenceImagePreviewUrls={[]}
+      onGenerate={onGenerate}
+      referenceImagePreviewUrls={previews}
       onAddReferenceImages={vi.fn()}
       onRemoveReferenceImage={vi.fn()}
       onReplaceReferenceImages={vi.fn()}
@@ -92,5 +95,31 @@ describe('ImagePromptScreen', () => {
     renderScreen('necklace');
     expect(screen.getByRole('button', { name: 'Use necklace example 1' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Use ring example 1' })).toBeNull();
+  });
+  it('does not generate until a piece is chosen, and says so', () => {
+    const onGenerate = vi.fn();
+    renderScreen(null, { onGenerate, previews: ['blob:one'] });
+    expect(screen.queryByRole('alert')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: /generate cad/i }));
+
+    expect(onGenerate).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert').textContent).toMatch(/choose what you are making/i);
+  });
+
+  it('generates once a piece is chosen', () => {
+    const onGenerate = vi.fn();
+    renderScreen('earring', { onGenerate, previews: ['blob:one'] });
+
+    fireEvent.click(screen.getByRole('button', { name: /generate cad/i }));
+
+    expect(onGenerate).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks for a piece instead of showing examples while none is chosen', () => {
+    renderScreen(null);
+
+    expect(screen.getByText(/choose what you are making to see examples/i)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /example 1/i })).toBeNull();
   });
 });

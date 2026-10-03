@@ -70,4 +70,18 @@ describe('CadJewelryTypeCards', () => {
     fireEvent.keyDown(screen.getByRole('radio', { name: 'Ring' }), { key: 'ArrowRight' });
     expect(onChange).not.toHaveBeenCalled();
   });
+  it('starts with nothing chosen and the first card reachable by Tab', () => {
+    render(<CadJewelryTypeCards value={null} onChange={() => {}} />);
+
+    for (const radio of screen.getAllByRole('radio')) expect(radio).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('radio', { name: 'Ring' })).toHaveAttribute('tabindex', '0');
+    expect(screen.getByRole('radio', { name: 'Necklace' })).toHaveAttribute('tabindex', '-1');
+  });
+
+  it('shows the error under the cards and marks the group invalid', () => {
+    render(<CadJewelryTypeCards value={null} onChange={() => {}} error="Pick one." />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Pick one.');
+    expect(screen.getByRole('radiogroup', { name: 'Jewelry type' })).toHaveAttribute('aria-invalid', 'true');
+  });
 });

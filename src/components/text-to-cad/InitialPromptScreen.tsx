@@ -5,6 +5,7 @@ import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { useEstimatedCost } from "@/hooks/use-estimated-cost";
 import { RING_CAD_NURBS_WORKFLOW, cadJewelryNoun, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
 import CadJewelryTypeCards from "@/components/text-to-cad/CadJewelryTypeCards";
+import { useJewelryTypeGate } from "@/components/text-to-cad/useJewelryTypeGate";
 import { CAD_EXAMPLE_PROMPTS } from "./cad-examples";
 
 interface InitialPromptScreenProps {
@@ -13,7 +14,7 @@ interface InitialPromptScreenProps {
   setModel: (m: string) => void;
   prompt: string;
   setPrompt: (p: string) => void;
-  jewelryType: CadJewelryType;
+  jewelryType: CadJewelryType | null;
   setJewelryType: (t: CadJewelryType) => void;
   isGenerating: boolean;
   onGenerate: () => void;
@@ -26,7 +27,8 @@ export default function InitialPromptScreen({
 }: InitialPromptScreenProps) {
   const glbInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const noun = cadJewelryNoun(jewelryType);
+  const noun = jewelryType ? cadJewelryNoun(jewelryType) : "jewelry";
+  const { cardsRef, guardedGenerate, typeError } = useJewelryTypeGate(jewelryType, onGenerate);
   const { cost: estimatedCost, loading: costLoading } = useEstimatedCost({
     workflowName: RING_CAD_NURBS_WORKFLOW,
     model,
@@ -43,7 +45,7 @@ export default function InitialPromptScreen({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (canGenerate && !isGenerating) onGenerate();
+      if (canGenerate && !isGenerating) guardedGenerate();
     }
   };
 
@@ -72,7 +74,9 @@ export default function InitialPromptScreen({
               <h2 className="mb-3 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                 What are you making?
               </h2>
-              <CadJewelryTypeCards value={jewelryType} onChange={setJewelryType} disabled={isGenerating} />
+              <div ref={cardsRef}>
+                <CadJewelryTypeCards value={jewelryType} onChange={setJewelryType} disabled={isGenerating} error={typeError} />
+              </div>
             </div>
 
             {/* Prompt */}
@@ -108,7 +112,7 @@ export default function InitialPromptScreen({
               <div className="mx-auto flex max-w-[680px] flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end">
                 <Button
                   size="lg"
-                  onClick={onGenerate}
+                  onClick={guardedGenerate}
                   disabled={isGenerating || !canGenerate}
                   className="gap-2.5 border-0 bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] px-10 font-display text-base uppercase tracking-wide text-background transition-opacity hover:opacity-90 disabled:opacity-60"
                 >
@@ -134,7 +138,7 @@ export default function InitialPromptScreen({
                   Try an example
                 </h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {CAD_EXAMPLE_PROMPTS[jewelryType].map((ex) => (
+                  {(jewelryType ? CAD_EXAMPLE_PROMPTS[jewelryType] : []).map((ex) => (
                     <button
                       key={ex}
                       onClick={() => setPrompt(ex)}

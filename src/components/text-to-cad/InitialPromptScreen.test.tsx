@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 
 vi.mock('@/hooks/use-estimated-cost', () => ({
   useEstimatedCost: () => ({ cost: 70, loading: false }),
@@ -9,18 +9,18 @@ vi.mock('@/hooks/use-estimated-cost', () => ({
 import InitialPromptScreen from './InitialPromptScreen';
 import type { CadJewelryType } from '@/lib/ring-cad-nurbs-api';
 
-function renderScreen(jewelryType: CadJewelryType = 'ring') {
+function renderScreen(jewelryType: CadJewelryType | null = 'ring', onGenerate = vi.fn()) {
   return render(
     <InitialPromptScreen
       model="gemini"
       tier="gpt_6_astra_openai"
       setModel={vi.fn()}
-      prompt=""
+      prompt="A rose ring"
       setPrompt={vi.fn()}
       jewelryType={jewelryType}
       setJewelryType={vi.fn()}
       isGenerating={false}
-      onGenerate={vi.fn()}
+      onGenerate={onGenerate}
     />,
   );
 }
@@ -58,5 +58,24 @@ describe('InitialPromptScreen', () => {
     renderScreen('earring');
     expect(screen.getByText('Small polished gold hoop earrings')).toBeTruthy();
     expect(screen.queryByText('Sculptural flowing gold band')).toBeNull();
+  });
+  it('does not generate until a piece is chosen, and says so', () => {
+    const onGenerate = vi.fn();
+    renderScreen(null, onGenerate);
+    expect(screen.queryByRole('alert')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: /generate cad/i }));
+
+    expect(onGenerate).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert').textContent).toMatch(/choose what you are making/i);
+  });
+
+  it('generates once a piece is chosen', () => {
+    const onGenerate = vi.fn();
+    renderScreen('necklace', onGenerate);
+
+    fireEvent.click(screen.getByRole('button', { name: /generate cad/i }));
+
+    expect(onGenerate).toHaveBeenCalledTimes(1);
   });
 });
