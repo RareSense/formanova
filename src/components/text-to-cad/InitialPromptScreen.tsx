@@ -1,4 +1,4 @@
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
@@ -19,11 +19,13 @@ interface InitialPromptScreenProps {
   isGenerating: boolean;
   onGenerate: () => void;
   onGlbUpload?: (file: File) => void;
+  /** Admin-only model picker; customers never get one. */
+  modelPicker?: ReactNode;
 }
 
 export default function InitialPromptScreen({
   model, tier, setModel, prompt, setPrompt, jewelryType, setJewelryType,
-  isGenerating, onGenerate, onGlbUpload,
+  isGenerating, onGenerate, onGlbUpload, modelPicker,
 }: InitialPromptScreenProps) {
   const glbInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -105,6 +107,9 @@ export default function InitialPromptScreen({
                 </button>
               )}
             </div>
+
+            {/* Admin-only model picker: which LLM tier the run sends. */}
+            {modelPicker && <div className="mx-auto mb-4 max-w-[680px]">{modelPicker}</div>}
 
             {/* Generate — matches Photo Studio's Next button: right-aligned,
                 gold gradient, size="lg". */}

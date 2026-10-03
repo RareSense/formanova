@@ -37,6 +37,9 @@ import GemToggle from "@/components/text-to-cad/QualityToggle";
 import { runMicroBenchmark } from "@/lib/gpu-detect";
 import type { GemMode } from "@/components/text-to-cad/CADCanvas";
 import { RING_CAD_DEFAULT_TIER, RING_CAD_TIERS, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
+import CadModelPicker from "@/components/text-to-cad/CadModelPicker";
+import { DEFAULT_CAD_PICK, cadPickerTier, type CadModelPick } from "@/lib/cad-model-picker";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { recordStudioVisit } from '@/lib/studio-preference';
 import { useCadRestoreFromUrl } from "@/hooks/useCadRestoreFromUrl";
 
@@ -63,9 +66,12 @@ export default function TextToCAD() {
   const requestedTier = searchParams.get('tier') === RING_CAD_TIERS.GPT_5_6_SOL
     ? RING_CAD_TIERS.GPT_5_6_SOL
     : undefined;
-  // Every run uses the customer default (GPT-6 Astra, OpenAI direct) unless
-  // the URL explicitly asks for the GPT-5.6 Sol tier.
-  const activeTier = requestedTier ?? RING_CAD_DEFAULT_TIER;
+  // Customers always get the default (GPT-6 Astra, OpenAI direct) unless the
+  // URL explicitly asks for the GPT-5.6 Sol tier. Admins pick any tier.
+  const isAdmin = useIsAdmin();
+  const [modelPick, setModelPick] = useState<CadModelPick>(DEFAULT_CAD_PICK);
+  const pickedTier = isAdmin ? cadPickerTier(modelPick.model, modelPick.provider) : RING_CAD_DEFAULT_TIER;
+  const activeTier = requestedTier ?? pickedTier;
 
   const [model] = useState("gemini");
   const [prompt, setPrompt] = useState("");
@@ -271,6 +277,9 @@ export default function TextToCAD() {
         <InitialPromptScreen
           model={model}
           tier={activeTier}
+          modelPicker={isAdmin ? (
+            <CadModelPicker value={modelPick} onChange={setModelPick} disabled={workflow.isGenerating} />
+          ) : undefined}
           setModel={() => {}}
           prompt={prompt}
           setPrompt={setPrompt}

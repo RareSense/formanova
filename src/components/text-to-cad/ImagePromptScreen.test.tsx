@@ -18,7 +18,7 @@ import ImagePromptScreen from './ImagePromptScreen';
 
 function renderScreen(
   jewelryType: 'ring' | 'necklace' | 'bracelet' | 'earring' | 'other' | null = 'ring',
-  { onGenerate = vi.fn(), previews = [] as string[] } = {},
+  { onGenerate = vi.fn(), previews = [] as string[], modelPicker = undefined as React.ReactNode } = {},
 ) {
   return render(
     <ImagePromptScreen
@@ -34,6 +34,7 @@ function renderScreen(
       onAddReferenceImages={vi.fn()}
       onRemoveReferenceImage={vi.fn()}
       onReplaceReferenceImages={vi.fn()}
+      modelPicker={modelPicker}
     />,
   );
 }
@@ -121,5 +122,13 @@ describe('ImagePromptScreen', () => {
 
     expect(screen.getByText(/choose what you are making to see examples/i)).toBeTruthy();
     expect(screen.queryByRole('button', { name: /example 1/i })).toBeNull();
+  });
+
+  it('shows the admin model picker only when one is passed', () => {
+    const { unmount } = renderScreen('ring', { modelPicker: <div data-testid="cad-model-picker" /> });
+    expect(screen.getByTestId('cad-model-picker')).toBeTruthy();
+    unmount();
+    renderScreen('ring');
+    expect(screen.queryByTestId('cad-model-picker')).toBeNull();
   });
 });

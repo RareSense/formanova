@@ -32,6 +32,9 @@ import { ViewportToolbar, ViewportSideTools } from "@/components/text-to-cad/Vie
 import GemToggle from "@/components/text-to-cad/QualityToggle";
 import type { GemMode } from "@/components/text-to-cad/CADCanvas";
 import { RING_CAD_DEFAULT_TIER, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
+import CadModelPicker from "@/components/text-to-cad/CadModelPicker";
+import { DEFAULT_CAD_PICK, cadPickerTier, type CadModelPick } from "@/lib/cad-model-picker";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { recordStudioVisit } from '@/lib/studio-preference';
 import { useCadRestoreFromUrl } from "@/hooks/useCadRestoreFromUrl";
 
@@ -52,7 +55,10 @@ export default function ImageToCAD() {
 
   const [model] = useState("gemini");
   // Every run uses the customer default: GPT-6 Astra, OpenAI direct.
-  const activeTier = RING_CAD_DEFAULT_TIER;
+  // Customers always get the default tier; admins pick any tier.
+  const isAdmin = useIsAdmin();
+  const [modelPick, setModelPick] = useState<CadModelPick>(DEFAULT_CAD_PICK);
+  const activeTier = isAdmin ? cadPickerTier(modelPick.model, modelPick.provider) : RING_CAD_DEFAULT_TIER;
   const {
     referenceImages,
     referenceImagePreviewUrls,
@@ -243,6 +249,9 @@ export default function ImageToCAD() {
         <ImagePromptScreen
           model={model}
           tier={activeTier}
+          modelPicker={isAdmin ? (
+            <CadModelPicker value={modelPick} onChange={setModelPick} disabled={workflow.isGenerating} />
+          ) : undefined}
           prompt={prompt}
           setPrompt={setPrompt}
           jewelryType={jewelryType}

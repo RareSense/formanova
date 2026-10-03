@@ -9,7 +9,7 @@ vi.mock('@/hooks/use-estimated-cost', () => ({
 import InitialPromptScreen from './InitialPromptScreen';
 import type { CadJewelryType } from '@/lib/ring-cad-nurbs-api';
 
-function renderScreen(jewelryType: CadJewelryType | null = 'ring', onGenerate = vi.fn()) {
+function renderScreen(jewelryType: CadJewelryType | null = 'ring', onGenerate = vi.fn(), modelPicker?: React.ReactNode) {
   return render(
     <InitialPromptScreen
       model="gemini"
@@ -21,6 +21,7 @@ function renderScreen(jewelryType: CadJewelryType | null = 'ring', onGenerate = 
       setJewelryType={vi.fn()}
       isGenerating={false}
       onGenerate={onGenerate}
+      modelPicker={modelPicker}
     />,
   );
 }
@@ -77,5 +78,13 @@ describe('InitialPromptScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: /generate cad/i }));
 
     expect(onGenerate).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the admin model picker only when one is passed', () => {
+    const { unmount } = renderScreen('ring', vi.fn(), <div data-testid="cad-model-picker" />);
+    expect(screen.getByTestId('cad-model-picker')).toBeInTheDocument();
+    unmount();
+    renderScreen('ring');
+    expect(screen.queryByTestId('cad-model-picker')).toBeNull();
   });
 });
