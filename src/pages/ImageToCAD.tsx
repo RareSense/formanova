@@ -215,6 +215,7 @@ export default function ImageToCAD() {
       onImproveFromVersion={workflow.improveFromLatestVersion}
       improveDisabled={!workflow.canImproveLatestVersion}
       improveExhausted={workflow.improveExhausted}
+      improveRetired={workflow.improveRetired}
     />
   );
 

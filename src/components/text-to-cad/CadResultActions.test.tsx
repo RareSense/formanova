@@ -72,6 +72,27 @@ describe('CadResultActions', () => {
     for (const size of CAD_RESULT_ACTION_SIZE.split(' ')) expect(button.className).toContain(size);
   });
 
+  it('says it cannot be improved, and why, for a model from the retired ring workflow', () => {
+    const onImprove = vi.fn();
+    render(
+      <CadResultActions
+        onDownloadThreedm={vi.fn()}
+        latestVersionLabel="V1"
+        onImproveFromVersion={onImprove}
+        improveDisabled
+        improveRetired
+      />,
+    );
+    const button = screen.getByRole('button', { name: /can't be improved/i }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    fireEvent.click(button);
+    expect(onImprove).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /improve from/i })).toBeNull();
+    // The reason is visible text, not only a tooltip: a disabled button shows none on touch screens.
+    expect(screen.getByText(/older ring workflow/i)).toBeTruthy();
+    for (const size of CAD_RESULT_ACTION_SIZE.split(' ')) expect(button.className).toContain(size);
+  });
+
   it('keeps Improve pressable when the version can be improved', () => {
     const onImprove = vi.fn();
     render(<CadResultActions latestVersionLabel="V2" onImproveFromVersion={onImprove} />);
@@ -147,5 +168,24 @@ describe('CadResultActions', () => {
   it('renders nothing when the run produced no downloadable artifact', () => {
     const { container } = render(<CadResultActions />);
     expect(container.querySelector('button')).toBeNull();
+  });
+
+  it('the phone dock also greys Improve out and says why for a retired ring model', () => {
+    const onImprove = vi.fn();
+    render(
+      <CadResultActions
+        layout="row"
+        onDownloadThreedm={vi.fn()}
+        latestVersionLabel="V1"
+        onImproveFromVersion={onImprove}
+        improveDisabled
+        improveRetired
+      />,
+    );
+    const button = screen.getByRole('button', { name: /can't improve/i }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    fireEvent.click(button);
+    expect(onImprove).not.toHaveBeenCalled();
+    expect(screen.getByText(/older ring workflow/i)).toBeTruthy();
   });
 });
