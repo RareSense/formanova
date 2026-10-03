@@ -91,7 +91,10 @@ export function CadPhoneSheet({ tabs, activeTab, snap, onChange, children }: Cad
       window.removeEventListener('pointercancel', onUp);
       drag.current = null;
       if (!d.moved) return;
+      // Swallow the click this release may produce, and only that one: a drag
+      // that ends off the tab bar produces none, and must not eat the next tap.
       suppressClick.current = true;
+      setTimeout(() => { suppressClick.current = false; }, 0);
       const h = measure();
       const { snap: from, activeTab: tab, onChange: emit } = latest.current;
       const next = h ? sheetAfterDrag(from, el.offsetHeight, h) : from;
