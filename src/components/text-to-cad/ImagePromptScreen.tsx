@@ -181,9 +181,18 @@ export default function ImagePromptScreen({
                 photoStudioEmptyState
               />
 
-              {/* Text prompt — secondary */}
+              {/* Text prompt — secondary. The ask for dimensions is a visible
+                  label, not placeholder text: a placeholder vanishes on the
+                  first keystroke, and the numbers are what the build is made
+                  to. Same weight-and-colour emphasis as the upload note. */}
               <div className="relative flex-shrink-0">
+                <label htmlFor="image-to-cad-details" className="mb-1.5 flex flex-wrap items-baseline gap-x-2 text-sm">
+                  <span className="font-medium text-foreground">Provide dimensions</span>
+                  <span className="text-muted-foreground">(optional)</span>
+                  <span className="text-muted-foreground">&middot; sizes, widths and stone sizes in mm. We build to the numbers you give.</span>
+                </label>
                 <textarea
+                  id="image-to-cad-details"
                   ref={textareaRef}
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}

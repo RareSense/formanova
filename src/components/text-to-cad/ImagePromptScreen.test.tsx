@@ -91,6 +91,15 @@ describe('ImagePromptScreen', () => {
     expect(screen.getByPlaceholderText(/add a description or any details, e\.g\. 17 cm length, 5 mm wide/i)).toBeTruthy();
   });
 
+  it('asks plainly for dimensions above the prompt box, marked optional, and labels the box with it', () => {
+    renderScreen('ring');
+
+    // The ask is a visible label, not placeholder text that disappears on the first keystroke.
+    expect(screen.getByText('Provide dimensions')).toBeTruthy();
+    expect(screen.getByText('(optional)')).toBeTruthy();
+    expect(screen.getByRole('textbox', { name: /provide dimensions/i })).toBeTruthy();
+  });
+
   it('shows examples for the chosen piece', () => {
     renderScreen('necklace');
     expect(screen.getByRole('button', { name: 'Use necklace example 1' })).toBeTruthy();
