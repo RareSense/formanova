@@ -7,7 +7,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 
-import { CadResultActions } from './CadResultActions';
+import { CadResultActions, CAD_RESULT_ACTION_ROW_SIZE } from './CadResultActions';
 import { CAD_RESULT_ACTION_SIZE } from '@/components/downloads/CadDownloadMenu';
 
 describe('CadResultActions', () => {
@@ -110,6 +110,38 @@ describe('CadResultActions', () => {
     expect(download.className).toContain('bg-white');
     expect(improve.className).toContain('text-white');
     expect(download.className).toContain('text-zinc-950');
+  });
+
+  it('row layout puts both controls side by side at one shared size', () => {
+    const { container } = render(
+      <CadResultActions
+        layout="row"
+        onDownloadThreedm={vi.fn()}
+        latestVersionLabel="V3"
+        onImproveFromVersion={vi.fn()}
+      />,
+    );
+    const bar = container.firstElementChild as HTMLElement;
+    expect(bar.className).toContain('grid-cols-2');
+    expect(bar.className).not.toContain('absolute');
+    const improve = screen.getByRole('button', { name: /improve v3/i });
+    const download = screen.getByRole('button', { name: /^download$/i });
+    for (const size of CAD_RESULT_ACTION_ROW_SIZE.split(' ')) {
+      expect(improve.className).toContain(size);
+      expect(download.className).toContain(size);
+    }
+  });
+
+  it('row layout gives a lone Download the whole row', () => {
+    const { container } = render(<CadResultActions layout="row" onDownloadGlb={vi.fn()} />);
+    expect((container.firstElementChild as HTMLElement).className).toContain('grid-cols-1');
+  });
+
+  it('row layout says it cannot be improved in a phone-sized label', () => {
+    render(
+      <CadResultActions layout="row" onDownloadGlb={vi.fn()} latestVersionLabel="V3" onImproveFromVersion={vi.fn()} improveDisabled improveExhausted />,
+    );
+    expect((screen.getByRole('button', { name: "Can't improve" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('renders nothing when the run produced no downloadable artifact', () => {

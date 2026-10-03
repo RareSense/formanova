@@ -48,6 +48,12 @@ export interface CadResultActionsProps {
    * greyed out, and reads "Can't be improved" so the bar does not move.
    */
   improveExhausted?: boolean;
+  /**
+   * `overlay` (default) floats the bar over the bottom of the 3D view.
+   * `row` is the phone dock: an in-flow row, both controls side by side at
+   * one shared, shorter size, with labels short enough for a 320px screen.
+   */
+  layout?: 'overlay' | 'row';
 }
 
 // Improve is where the eye should land, so it carries the filled treatment and
@@ -57,6 +63,9 @@ const IMPROVE_BASE =
   'flex items-center gap-2 border border-zinc-700 bg-zinc-950 text-white ' +
   'font-bold shadow-lg transition-opacity hover:opacity-90 active:scale-[0.98] ' +
   'disabled:pointer-events-none disabled:opacity-60';
+
+/** Phone dock size: both buttons share it, so the pair stays equal. Overrides CAD_RESULT_ACTION_SIZE via tailwind-merge. */
+export const CAD_RESULT_ACTION_ROW_SIZE = 'h-12 justify-center gap-2 rounded-lg px-3 text-[13px] tracking-normal';
 
 export function CadResultActions({
   onDownloadThreedm,
@@ -71,8 +80,41 @@ export function CadResultActions({
   onImproveFromVersion,
   improveDisabled = false,
   improveExhausted = false,
+  layout = 'overlay',
 }: CadResultActionsProps) {
   const showImprove = Boolean(latestVersionLabel && onImproveFromVersion);
+
+  if (layout === 'row') {
+    const width = 'pointer-events-auto w-full min-w-0';
+    return (
+      <div className={cn('grid w-full gap-2', showImprove ? 'grid-cols-2' : 'grid-cols-1')}>
+        {showImprove && (
+          <button
+            type="button"
+            onClick={onImproveFromVersion}
+            disabled={improveDisabled || improveExhausted}
+            title={improveExhausted ? "Can't be improved" : `Improve from ${latestVersionLabel}`}
+            className={cn(width, IMPROVE_BASE, CAD_RESULT_ACTION_ROW_SIZE)}
+          >
+            <Sparkles className="h-4 w-4 shrink-0" />
+            <span className="truncate">{improveExhausted ? "Can't improve" : `Improve ${latestVersionLabel}`}</span>
+          </button>
+        )}
+        <CadDownloadMenu
+          variant="result"
+          className={cn(width, CAD_RESULT_ACTION_ROW_SIZE)}
+          isBusy={isBusy}
+          onDownloadThreedm={onDownloadThreedm}
+          onDownloadGlb={onDownloadGlb}
+          onDownloadViewerThreedm={onDownloadViewerThreedm}
+          onDownloadStl={onDownloadStl}
+          onDownloadStep={onDownloadStep}
+          estimatedMetalMassG={estimatedMetalMassG}
+          onExportEdited={onExportEdited}
+        />
+      </div>
+    );
+  }
 
   return (
     // bottom-14 clears the gem toggle and the Ready indicator, which both sit
