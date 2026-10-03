@@ -95,11 +95,6 @@ export function CadResultActions({
     const width = 'pointer-events-auto w-full min-w-0';
     return (
       <div className={cn('grid w-full gap-2', showImprove ? 'grid-cols-2' : 'grid-cols-1')}>
-        {showImprove && improveRetired && (
-          <p className="col-span-2 text-center text-[11px] leading-snug text-muted-foreground">
-            Made with the older ring workflow. Start a new design to improve it.
-          </p>
-        )}
         {showImprove && (
           <button
             type="button"
@@ -133,11 +128,6 @@ export function CadResultActions({
     // at bottom-4 and are 30px tall. px-4 keeps the bar off the viewport edges
     // once it wraps on a narrow panel.
     <div className="pointer-events-none absolute bottom-14 left-1/2 z-50 flex w-full -translate-x-1/2 flex-col items-center gap-3 px-4 sm:w-auto sm:flex-row sm:justify-center">
-      {showImprove && improveRetired && (
-        <p className="pointer-events-none absolute -top-8 left-1/2 w-max max-w-[min(92vw,22rem)] -translate-x-1/2 bg-zinc-950/85 px-3 py-1 text-center text-[11px] leading-snug text-white/85">
-          Made with the older ring workflow. Start a new design to improve it.
-        </p>
-      )}
       {showImprove && (
         <button
           type="button"

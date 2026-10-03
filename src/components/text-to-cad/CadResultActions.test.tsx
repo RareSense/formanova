@@ -72,7 +72,7 @@ describe('CadResultActions', () => {
     for (const size of CAD_RESULT_ACTION_SIZE.split(' ')) expect(button.className).toContain(size);
   });
 
-  it('says it cannot be improved, and why, for a model from the retired ring workflow', () => {
+  it('says it cannot be improved, with no extra note, for a model from the retired ring workflow', () => {
     const onImprove = vi.fn();
     render(
       <CadResultActions
@@ -88,8 +88,8 @@ describe('CadResultActions', () => {
     fireEvent.click(button);
     expect(onImprove).not.toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: /improve from/i })).toBeNull();
-    // The reason is visible text, not only a tooltip: a disabled button shows none on touch screens.
-    expect(screen.getByText(/older ring workflow/i)).toBeTruthy();
+    // Only the greyed button: no floating note about the older workflow.
+    expect(screen.queryByText(/older ring workflow/i)).toBeNull();
     for (const size of CAD_RESULT_ACTION_SIZE.split(' ')) expect(button.className).toContain(size);
   });
 
@@ -170,7 +170,7 @@ describe('CadResultActions', () => {
     expect(container.querySelector('button')).toBeNull();
   });
 
-  it('the phone dock also greys Improve out and says why for a retired ring model', () => {
+  it('the phone dock also greys Improve out, with no extra note, for a retired ring model', () => {
     const onImprove = vi.fn();
     render(
       <CadResultActions
@@ -186,6 +186,6 @@ describe('CadResultActions', () => {
     expect(button.disabled).toBe(true);
     fireEvent.click(button);
     expect(onImprove).not.toHaveBeenCalled();
-    expect(screen.getByText(/older ring workflow/i)).toBeTruthy();
+    expect(screen.queryByText(/older ring workflow/i)).toBeNull();
   });
 });
