@@ -10,6 +10,7 @@ import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { useBillingLocale } from '@/hooks/use-billing-locale';
 import { isStarterTier, type BillingTier } from '@/lib/starter-pack';
 import { CreditPlanGrid } from '@/components/pricing/CreditPlanGrid';
+import { resolveGridTiers } from '@/lib/credit-plans';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
 
 const CHECKOUT_URL = '/billing/checkout';
@@ -102,8 +103,9 @@ export default function Pricing() {
   };
 
   // 4 cards when the backend still returns the one-time Starter tier (user never
-  // bought it), otherwise the 3 standard plans.
-  const maxWidthClass = tiers.length === 4 ? 'max-w-7xl' : 'max-w-5xl';
+  // bought it), otherwise the 3 standard plans. Counted after the grid's own
+  // filtering, since the backend list also carries packages that are not shown.
+  const maxWidthClass = resolveGridTiers(tiers).length === 4 ? 'max-w-7xl' : 'max-w-5xl';
 
   return (
     <>
