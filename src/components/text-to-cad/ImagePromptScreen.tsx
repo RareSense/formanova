@@ -17,17 +17,8 @@ import { CAD_EXAMPLE_DESIGNS, type CadExampleDesign } from "./cad-examples";
 // CANVAS_H technique (StudioVaultUploadStep.tsx).
 const PANEL_H = "h-[500px] md:h-[640px]";
 
-// What a jeweller would want to pin down for each piece. The pipeline builds
-// to these numbers when they are given, so the box asks for them up front.
-const DIMENSION_PLACEHOLDERS: Record<CadJewelryType, string> = {
-  ring: "Add a description or any details, e.g. ring size 7, 2 mm band, 1 ct oval stone",
-  necklace: "Add a description or any details, e.g. 18 mm pendant, 45 cm chain, 4 mm stones",
-  bracelet: "Add a description or any details, e.g. 17 cm length, 5 mm wide, 2 mm stones",
-  earring: "Add a description or any details, e.g. 25 mm drop, 5 mm studs, push-back",
-  other: "Add a description or any details, e.g. 40 mm brooch, 3 mm stones, pin back",
-};
-
-const DEFAULT_PLACEHOLDER = "Add a description or any details, e.g. sizes, stone sizes, finish";
+// The box asks for the spec only: no examples, no promise about the result.
+const DIMENSION_PLACEHOLDER = "Sizes, widths and stone sizes in mm";
 
 function ReferenceExamples({ examples, noun, onSelect }: { examples: CadExampleDesign[]; noun: string; onSelect: (example: CadExampleDesign) => void }) {
   return (
@@ -183,13 +174,13 @@ export default function ImagePromptScreen({
 
               {/* Text prompt — secondary. The ask for dimensions is a visible
                   label, not placeholder text: a placeholder vanishes on the
-                  first keystroke, and the numbers are what the build is made
-                  to. Same weight-and-colour emphasis as the upload note. */}
+                  first keystroke. The copy names what to enter and nothing
+                  else. Same weight-and-colour emphasis as the upload note. */}
               <div className="relative flex-shrink-0">
                 <label htmlFor="image-to-cad-details" className="mb-1.5 flex flex-wrap items-baseline gap-x-2 text-sm">
                   <span className="font-medium text-foreground">Provide dimensions</span>
                   <span className="text-muted-foreground">(optional)</span>
-                  <span className="text-muted-foreground">&middot; sizes, widths and stone sizes in mm. We build to the numbers you give.</span>
+                  <span className="text-muted-foreground">&middot; sizes, widths and stone sizes in mm</span>
                 </label>
                 <textarea
                   id="image-to-cad-details"
@@ -197,7 +188,7 @@ export default function ImagePromptScreen({
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder={jewelryType ? DIMENSION_PLACEHOLDERS[jewelryType] : DEFAULT_PLACEHOLDER}
+                  placeholder={DIMENSION_PLACEHOLDER}
                   rows={3}
                   /* Full-strength border, not a faded one: this is an input and
                      needs to read as an editable field at a glance. */

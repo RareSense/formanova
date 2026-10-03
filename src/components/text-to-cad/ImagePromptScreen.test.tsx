@@ -85,10 +85,10 @@ describe('ImagePromptScreen', () => {
     expect(screen.getByRole('heading', { name: /upload your piece images/i })).toBeTruthy();
   });
 
-  it('asks for a description or the details that matter for the chosen piece', () => {
+  it('asks for the spec only in the prompt box, whatever the piece', () => {
     renderScreen('bracelet');
 
-    expect(screen.getByPlaceholderText(/add a description or any details, e\.g\. 17 cm length, 5 mm wide/i)).toBeTruthy();
+    expect(screen.getByPlaceholderText('Sizes, widths and stone sizes in mm')).toBeTruthy();
   });
 
   it('asks plainly for dimensions above the prompt box, marked optional, and labels the box with it', () => {
