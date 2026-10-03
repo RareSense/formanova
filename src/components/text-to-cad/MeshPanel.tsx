@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { ChevronUp, ChevronDown, ChevronRight } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import type { MeshItemData } from "./types";
@@ -18,14 +18,18 @@ interface MeshPanelProps {
   onApplyMetalToAll?: (matId: string) => void;
   onSelectFamily?: (name: string, multi: boolean) => void;
   onHoverPart?: (name: string | null) => void;
+  /** Parts under the pointer in the 3D view; their rows light up like a hovered row. */
+  hoveredNames?: Set<string>;
   onApplyGemToAll?: (matId: string) => void;
   onSceneAction: (action: string) => void;
 }
 
-export default function MeshPanel({ meshes, onSelectMesh, onAction, onApplyMaterial, onApplyMetalToAll, onSelectFamily, onHoverPart, onApplyGemToAll, onSceneAction }: MeshPanelProps) {
+export default function MeshPanel({ meshes, onSelectMesh, onAction, onApplyMaterial, onApplyMetalToAll, onSelectFamily, onHoverPart, hoveredNames, onApplyGemToAll, onSceneAction }: MeshPanelProps) {
   const [search, setSearch] = useState("");
   // Lifted here: MeshList remounts when the Material section collapses/expands.
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const expandFamily = (key: string) =>
+    setExpanded((prev) => (prev.has(key) ? prev : new Set(prev).add(key)));
   const toggleFamily = (key: string) =>
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -69,7 +73,7 @@ export default function MeshPanel({ meshes, onSelectMesh, onAction, onApplyMater
         <SectionHeader title="Material" subtitle={hasSelection ? `${selectedMeshes.length} sel` : ""} collapsed onToggle={() => setMaterialCollapsed(false)} />
         <div className="flex-1 flex flex-col min-h-0 border-t border-border">
           <SectionHeader title="Parts" subtitle={meshSubtitle} collapsed={false} onToggle={() => setMeshCollapsed(true)} />
-          <MeshList search={search} setSearch={setSearch} filtered={filtered} meshes={meshes} expanded={expanded} onToggleFamily={toggleFamily} onSelectMesh={onSelectMesh} onSelectFamily={onSelectFamily} onHoverPart={onHoverPart} />
+          <MeshList search={search} setSearch={setSearch} filtered={filtered} meshes={meshes} expanded={expanded} onToggleFamily={toggleFamily} onExpandFamily={expandFamily} hoveredNames={hoveredNames} onSelectMesh={onSelectMesh} onSelectFamily={onSelectFamily} onHoverPart={onHoverPart} />
         </div>
       </div>
     );
@@ -101,7 +105,7 @@ export default function MeshPanel({ meshes, onSelectMesh, onAction, onApplyMater
         <ResizablePanel defaultSize={50} minSize={20}>
           <div className="flex flex-col h-full">
             <SectionHeader title="Parts" subtitle={meshSubtitle} collapsed={false} onToggle={() => setMeshCollapsed(true)} />
-            <MeshList search={search} setSearch={setSearch} filtered={filtered} meshes={meshes} expanded={expanded} onToggleFamily={toggleFamily} onSelectMesh={onSelectMesh} onSelectFamily={onSelectFamily} onHoverPart={onHoverPart} />
+            <MeshList search={search} setSearch={setSearch} filtered={filtered} meshes={meshes} expanded={expanded} onToggleFamily={toggleFamily} onExpandFamily={expandFamily} hoveredNames={hoveredNames} onSelectMesh={onSelectMesh} onSelectFamily={onSelectFamily} onHoverPart={onHoverPart} />
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>
@@ -242,18 +246,41 @@ function MaterialContent({ hasSelection, matTab, setMatTab, filteredMaterials, o
 }
 
 // ── Parts list ──
-function MeshList({ search, setSearch, filtered, meshes, expanded, onToggleFamily, onSelectMesh, onSelectFamily, onHoverPart }: {
+function MeshList({ search, setSearch, filtered, meshes, expanded, onToggleFamily, onExpandFamily, hoveredNames, onSelectMesh, onSelectFamily, onHoverPart }: {
   search: string; setSearch: (v: string) => void;
   filtered: MeshItemData[];
   meshes: MeshItemData[];
   expanded: Set<string>;
   onToggleFamily: (key: string) => void;
+  onExpandFamily: (key: string) => void;
+  hoveredNames?: Set<string>;
   onSelectMesh: (name: string, multi: boolean) => void;
   onSelectFamily?: (name: string, multi: boolean) => void;
   onHoverPart?: (name: string | null) => void;
 }) {
   const byName = useMemo(() => new Map(filtered.map((m) => [m.name, m])), [filtered]);
   const groups = useMemo(() => groupCadParts(filtered.map((m) => m.name)), [filtered]);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  // Selecting in the 3D view reveals the row, as in Figma's layers: a single
+  // part inside a family opens that family, and the first selected row scrolls
+  // into view. Keyed on the selection only, so collapsing a family by hand
+  // is not undone.
+  const selectionKey = useMemo(() => filtered.filter((m) => m.selected).map((m) => m.name).join("|"), [filtered]);
+  useEffect(() => {
+    if (!selectionKey) return;
+    const selected = new Set(selectionKey.split("|"));
+    for (const fam of groups) {
+      const count = fam.names.filter((n) => selected.has(n)).length;
+      if (count > 0 && count < fam.names.length && fam.names.length > 1) onExpandFamily(fam.key);
+    }
+    const id = requestAnimationFrame(() => {
+      listRef.current?.querySelector<HTMLElement>("[data-selected-row='true']")?.scrollIntoView?.({ block: "nearest" });
+    });
+    return () => cancelAnimationFrame(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectionKey]);
+
   const isMulti = (e: React.MouseEvent) => e.shiftKey || e.ctrlKey || e.metaKey;
 
   const partRow = (name: string, indent: string, label?: string) => {
@@ -262,11 +289,14 @@ function MeshList({ search, setSearch, filtered, meshes, expanded, onToggleFamil
     const row = (
       <button
         key={label ? undefined : name}
+        data-selected-row={mesh.selected ? "true" : undefined}
         onClick={(e) => onSelectMesh(name, isMulti(e))}
         onMouseEnter={() => onHoverPart?.(name)}
         onMouseLeave={() => onHoverPart?.(null)}
         className={`${label ? "flex-1 min-w-0" : "w-full"} text-left ${indent} pr-3 py-2.5 mb-1 transition-all duration-200 border ${
-          mesh.selected ? "text-foreground bg-accent border-border" : "hover:bg-accent/50 text-foreground/80 border-transparent"
+          mesh.selected ? "text-foreground bg-accent border-border"
+            : hoveredNames?.has(name) ? "bg-accent/50 text-foreground border-transparent"
+            : "hover:bg-accent/50 text-foreground/80 border-transparent"
         } ${!mesh.visible ? "opacity-35" : ""}`}
       >
         <div className="text-[11px] mb-0.5 truncate font-medium">
@@ -308,9 +338,11 @@ function MeshList({ search, setSearch, filtered, meshes, expanded, onToggleFamil
                   onMouseEnter={() => onHoverPart?.(fam.names[0])}
                   onMouseLeave={() => onHoverPart?.(null)}
                   aria-pressed={state}
+                  data-selected-row={state !== "false" ? "true" : undefined}
                   className={`flex-1 min-w-0 text-left px-3 py-2.5 transition-all duration-200 border ${
                     state === "true" ? "text-foreground bg-accent border-border"
                       : state === "mixed" ? "text-foreground bg-accent/50 border-border"
+                      : hoveredNames?.has(fam.names[0]) ? "bg-accent/50 text-foreground border-transparent"
                       : "hover:bg-accent/50 text-foreground/80 border-transparent"
                   } ${allHidden ? "opacity-35" : ""}`}
                 >
@@ -349,7 +381,7 @@ function MeshList({ search, setSearch, filtered, meshes, expanded, onToggleFamil
           className="w-full px-3 py-2 text-[11px] text-foreground placeholder:text-muted-foreground/50 transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-ring font-body bg-muted/30 border border-border"
         />
       </div>
-      <div className="flex-1 overflow-y-auto min-h-0 px-2 pb-1 scrollbar-thin">
+      <div ref={listRef} className="flex-1 overflow-y-auto min-h-0 px-2 pb-1 scrollbar-thin">
         {filtered.length === 0 && (
           <div className="text-center font-mono text-[10px] text-muted-foreground/50 py-5">
             {meshes.length === 0 ? "Generate a piece to see its parts" : "No matching parts"}

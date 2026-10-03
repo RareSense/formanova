@@ -68,7 +68,7 @@ describe("MeshPanel parts tree", () => {
   });
 
   it("expands a family to its parts", () => {
-    const p = setup();
+    const p = setup(0);
     expect(screen.queryByText("Pave_Gem_01")).toBeNull();
     const chevron = screen.getByRole("button", { name: /show parts in pave gem/i });
     expect(chevron).toHaveAttribute("aria-expanded", "false");
@@ -101,14 +101,14 @@ describe("MeshPanel parts tree", () => {
   });
 
   it("part rows do not use cursor-pointer", () => {
-    const p = setup();
+    const p = setup(0);
     fireEvent.click(screen.getByRole("button", { name: /show parts in pave gem/i }));
     expect(screen.getByText("Pave_Gem_01").closest("button")).not.toHaveClass("cursor-pointer");
     expect(p.onSelectMesh).not.toHaveBeenCalled();
   });
 
   it("reports hover on part rows", () => {
-    const p = setup();
+    const p = setup(0);
     fireEvent.click(screen.getByRole("button", { name: /show parts in pave gem/i }));
     const row = screen.getByText("Pave_Gem_01").closest("button");
     fireEvent.mouseEnter(row);
@@ -124,7 +124,7 @@ describe("MeshPanel parts tree", () => {
   });
 
   it("expanded families survive collapsing and re-expanding the Material section", () => {
-    setup();
+    setup(0);
     fireEvent.click(screen.getByRole("button", { name: /show parts in pave gem/i }));
     expect(screen.getByText("Pave_Gem_01")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /^material/i }));
@@ -163,5 +163,29 @@ describe("MeshPanel parts tree", () => {
   it("shows the empty state", () => {
     render(<MeshPanel meshes={[]} onSelectMesh={vi.fn()} onAction={vi.fn()} onApplyMaterial={vi.fn()} onSceneAction={vi.fn()} />);
     expect(screen.getByText("Generate a piece to see its parts")).toBeInTheDocument();
+  });
+  it("lights up the row of a family hovered in the 3D view", () => {
+    const meshes = [mk("Pave_Gem_00"), mk("Pave_Gem_01"), mk("Prong_Claw_0_1"), mk("Prong_Claw_0_2")];
+    const names = new Set(["Pave_Gem_00", "Pave_Gem_01"]);
+    render(<MeshPanel meshes={meshes} hoveredNames={names} onSelectMesh={vi.fn()} onSelectFamily={vi.fn()} onAction={vi.fn()} onApplyMaterial={vi.fn()} onSceneAction={vi.fn()} />);
+    const pave = screen.getByRole("button", { name: /pave gem.*2/i });
+    const prong = screen.getByRole("button", { name: /prong claw.*2/i });
+    expect(pave.className).toContain("bg-accent/50 text-foreground border-transparent");
+    expect(prong.className).not.toContain("bg-accent/50 text-foreground border-transparent");
+  });
+
+  it("opens the family when one of its parts is selected in the 3D view", () => {
+    const meshes = [mk("Pave_Gem_00"), mk("Pave_Gem_01"), mk("Pave_Gem_02")];
+    const props = { onSelectMesh: vi.fn(), onSelectFamily: vi.fn(), onAction: vi.fn(), onApplyMaterial: vi.fn(), onSceneAction: vi.fn() };
+    const { rerender } = render(<MeshPanel meshes={meshes} {...props} />);
+    expect(screen.queryByText(/Pave_Gem_01 ·|^Pave_Gem_01$/)).toBeNull();
+    rerender(<MeshPanel meshes={[mk("Pave_Gem_00"), mk("Pave_Gem_01", true), mk("Pave_Gem_02")]} {...props} />);
+    expect(screen.getByRole("button", { name: /Show parts in/i })).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("keeps a family open or closed as chosen when the whole family is selected", () => {
+    const meshes = [mk("Pave_Gem_00", true), mk("Pave_Gem_01", true)];
+    render(<MeshPanel meshes={meshes} onSelectMesh={vi.fn()} onSelectFamily={vi.fn()} onAction={vi.fn()} onApplyMaterial={vi.fn()} onSceneAction={vi.fn()} />);
+    expect(screen.getByRole("button", { name: /Show parts in/i })).toHaveAttribute("aria-expanded", "false");
   });
 });

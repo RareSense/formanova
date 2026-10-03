@@ -519,6 +519,7 @@ export default function ImageToCAD() {
               onSelectMesh={editor.handleSelectMesh}
               onSelectFamily={editor.handleSelectFamily}
               onHoverPart={editor.setHoveredPart}
+              hoveredNames={editor.hoveredFamilyNames}
               onApplyGemToAll={editor.handleApplyGemToAll}
               onAction={editor.handleMeshAction}
               onApplyMaterial={editor.handleApplyMaterial}

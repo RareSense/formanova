@@ -401,9 +401,9 @@ const SELECTION_MATERIAL = new THREE.MeshPhysicalMaterial({
   side: THREE.DoubleSide,
 });
 
-/** Soft white glow on every part of the hovered family; distinct from the orange selection. */
+/** Clear white glow on every part of the hovered family; distinct from the orange selection. */
 const HOVER_MATERIAL = new THREE.MeshBasicMaterial({
-  color: 0xffffff, transparent: true, opacity: 0.28, depthWrite: false,
+  color: 0xffffff, transparent: true, opacity: 0.6, depthWrite: false,
   polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1,
 });
 const NO_RAYCAST = () => null;
