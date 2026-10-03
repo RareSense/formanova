@@ -11,6 +11,7 @@ import {
   fetchCadRings,
   findRingForWorkflow,
   isImprovementExhausted,
+  isLegacyWorkflowRetired,
   latestVersion,
   readImproveResultFailure,
   startImproveFromVersion,
@@ -269,5 +270,20 @@ describe('fetchCadRingBySetId', () => {
     expect(await fetchCadRingBySetId('set_1')).toBeNull();
     fetchMock.mockResolvedValueOnce(jsonResponse(500, {}));
     expect(await fetchCadRingBySetId('set_1')).toBeNull();
+  });
+});
+
+describe('isLegacyWorkflowRetired', () => {
+  const base = { asset_id: 'a', position: 0 } as never;
+  it('is true only for a version the backend marked legacy_workflow_retired', () => {
+    expect(isLegacyWorkflowRetired({ ...(base as object), improvable: false, improve_unavailable_reason: 'legacy_workflow_retired' } as never)).toBe(true);
+  });
+  it('is false for an improvable version, other reasons, and nothing', () => {
+    expect(isLegacyWorkflowRetired({ ...(base as object), improvable: true, improve_unavailable_reason: null } as never)).toBe(false);
+    expect(isLegacyWorkflowRetired({ ...(base as object), improvable: false, improve_unavailable_reason: 'improvement_exhausted' } as never)).toBe(false);
+    expect(isLegacyWorkflowRetired(null)).toBe(false);
+  });
+  it('is not mistaken for an exhausted version', () => {
+    expect(isImprovementExhausted({ ...(base as object), improvable: false, improve_unavailable_reason: 'legacy_workflow_retired' } as never)).toBe(false);
   });
 });

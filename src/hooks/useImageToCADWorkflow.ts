@@ -40,6 +40,7 @@ import {
   improveWorkflowFor,
   canImproveVersion,
   isImprovementExhausted,
+  isLegacyWorkflowRetired,
   latestVersion,
   startImproveFromVersion,
   versionLabel,
@@ -756,6 +757,8 @@ export function useImageToCADWorkflow({
     canImproveLatestVersion: canImproveVersion(activeVersion) && !improveLocked && !ring?.improve_running,
     /** This version's paid review left nothing to fix: Improve reads "Can't be improved". */
     improveExhausted: isImprovementExhausted(activeVersion),
+    /** Made by the retired ring workflow: Improve reads "Can't be improved" with the reason beside it. */
+    improveRetired: isLegacyWorkflowRetired(activeVersion),
     /** Every saved version of this ring, oldest first, for the side panel. */
     versions,
     selectedVersionId: activeVersion?.asset_id ?? null,

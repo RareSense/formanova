@@ -99,6 +99,19 @@ export function isImprovementExhausted(
   return version?.improvable === false && version.improve_unavailable_reason === IMPROVEMENT_EXHAUSTED;
 }
 
+/**
+ * The model was made by the old ring workflow, which is switched off, so the
+ * backend marks it not improvable with this reason. It stays viewable and
+ * downloadable; the greyed button says why instead of offering "Improve".
+ */
+export const LEGACY_WORKFLOW_RETIRED = 'legacy_workflow_retired';
+
+export function isLegacyWorkflowRetired(
+  version: Pick<CadRingVersion, 'improvable' | 'improve_unavailable_reason'> | null | undefined,
+): boolean {
+  return version?.improvable === false && version.improve_unavailable_reason === LEGACY_WORKFLOW_RETIRED;
+}
+
 /** Data Generation History already has and can paint before Studio refetches it. */
 export interface CadRestoreSeed {
   ring: CadRing;

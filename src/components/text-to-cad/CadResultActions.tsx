@@ -48,6 +48,12 @@ export interface CadResultActionsProps {
    * greyed out, and reads "Can't be improved" so the bar does not move.
    */
   improveExhausted?: boolean;
+  /**
+   * The model came from the retired ring workflow. Same greyed "Can't be
+   * improved" button, plus a visible note saying why (a disabled button shows
+   * no tooltip on touch screens).
+   */
+  improveRetired?: boolean;
 }
 
 // Improve is where the eye should land, so it carries the filled treatment and
@@ -71,6 +77,7 @@ export function CadResultActions({
   onImproveFromVersion,
   improveDisabled = false,
   improveExhausted = false,
+  improveRetired = false,
 }: CadResultActionsProps) {
   const showImprove = Boolean(latestVersionLabel && onImproveFromVersion);
 
@@ -79,16 +86,21 @@ export function CadResultActions({
     // at bottom-4 and are 30px tall. px-4 keeps the bar off the viewport edges
     // once it wraps on a narrow panel.
     <div className="pointer-events-none absolute bottom-14 left-1/2 z-50 flex w-full -translate-x-1/2 flex-col items-center gap-3 px-4 sm:w-auto sm:flex-row sm:justify-center">
+      {showImprove && improveRetired && (
+        <p className="pointer-events-none absolute -top-8 left-1/2 w-max max-w-[min(92vw,22rem)] -translate-x-1/2 bg-zinc-950/85 px-3 py-1 text-center text-[11px] leading-snug text-white/85">
+          Made with the older ring workflow. Start a new design to improve it.
+        </p>
+      )}
       {showImprove && (
         <button
           type="button"
           onClick={onImproveFromVersion}
-          disabled={improveDisabled || improveExhausted}
-          title={improveDisabled && !improveExhausted ? 'This version cannot be improved' : undefined}
+          disabled={improveDisabled || improveExhausted || improveRetired}
+          title={improveDisabled && !improveExhausted && !improveRetired ? 'This version cannot be improved' : undefined}
           className={cn('pointer-events-auto', CAD_RESULT_ACTION_WIDTH, IMPROVE_BASE, CAD_RESULT_ACTION_SIZE)}
         >
           <Sparkles className="h-[18px] w-[18px] shrink-0" />
-          {improveExhausted ? "Can't be improved" : `Improve from ${latestVersionLabel}`}
+          {improveExhausted || improveRetired ? "Can't be improved" : `Improve from ${latestVersionLabel}`}
         </button>
       )}
       <CadDownloadMenu
