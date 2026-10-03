@@ -188,8 +188,9 @@ export default function LeftPanel({
             rows={4}
             /* Fixed, modest default with a hard ceiling; the user can still drag
                the corner grip to grow it. Without max-h a long brief expands the
-               textarea until it pushes the Generate button out of the panel. */
-            className="w-full min-h-[96px] max-h-[240px] resize-y overflow-y-auto border border-border bg-muted/30 px-4 py-3 font-body text-[13px] leading-relaxed text-foreground transition-all duration-200 placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
+               textarea until it pushes the Generate button out of the panel.
+               16px below md: iOS Safari zooms into any focused field smaller than that. */
+            className="w-full min-h-[96px] max-h-[240px] resize-y overflow-y-auto border border-border bg-muted/30 px-4 py-3 font-body text-[16px] md:text-[13px] leading-relaxed text-foreground transition-all duration-200 placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
           />
 
           {/* Generate button */}

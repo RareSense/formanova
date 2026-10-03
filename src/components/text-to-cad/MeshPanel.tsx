@@ -22,9 +22,11 @@ interface MeshPanelProps {
   hoveredNames?: Set<string>;
   onApplyGemToAll?: (matId: string) => void;
   onSceneAction: (action: string) => void;
+  /** Show one section alone (phone sheet tab). Omit for the stacked Material + Parts panel. */
+  section?: "material" | "parts";
 }
 
-export default function MeshPanel({ meshes, onSelectMesh, onAction, onApplyMaterial, onApplyMetalToAll, onSelectFamily, onHoverPart, hoveredNames, onApplyGemToAll, onSceneAction }: MeshPanelProps) {
+export default function MeshPanel({ meshes, onSelectMesh, onAction, onApplyMaterial, onApplyMetalToAll, onSelectFamily, onHoverPart, hoveredNames, onApplyGemToAll, onSceneAction, section }: MeshPanelProps) {
   const [search, setSearch] = useState("");
   // Lifted here: MeshList remounts when the Material section collapses/expands.
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
@@ -55,6 +57,23 @@ export default function MeshPanel({ meshes, onSelectMesh, onAction, onApplyMater
   }, [matTab]);
 
   const meshSubtitle = meshes.length > 0 ? `${meshes.length} · ${totalVerts.toLocaleString()}v` : "—";
+
+  // One section on its own, under a tab of the phone's bottom sheet: the tab is
+  // the header, so the collapsible section headers are left out.
+  if (section === "material") {
+    return (
+      <div className="flex flex-col bg-card h-full min-h-0">
+        <MaterialContent hasSelection={hasSelection} matTab={matTab} setMatTab={setMatTab} filteredMaterials={filteredMaterials} onApplyMaterial={onApplyMaterial} onApplyMetalToAll={onApplyMetalToAll} onApplyGemToAll={onApplyGemToAll} />
+      </div>
+    );
+  }
+  if (section === "parts") {
+    return (
+      <div className="flex flex-col bg-card h-full min-h-0">
+        <MeshList search={search} setSearch={setSearch} filtered={filtered} meshes={meshes} expanded={expanded} onToggleFamily={toggleFamily} onExpandFamily={expandFamily} hoveredNames={hoveredNames} onSelectMesh={onSelectMesh} onSelectFamily={onSelectFamily} onHoverPart={onHoverPart} />
+      </div>
+    );
+  }
 
   // Both collapsed
   if (materialCollapsed && meshCollapsed) {
@@ -378,7 +397,8 @@ function MeshList({ search, setSearch, filtered, meshes, expanded, onToggleFamil
           placeholder="Search parts..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full px-3 py-2 text-[11px] text-foreground placeholder:text-muted-foreground/50 transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-ring font-body bg-muted/30 border border-border"
+          // 16px below md: iOS Safari zooms the page into any focused input smaller than that.
+          className="w-full px-3 py-2 text-[16px] md:text-[11px] text-foreground placeholder:text-muted-foreground/50 transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-ring font-body bg-muted/30 border border-border"
         />
       </div>
       <div ref={listRef} className="flex-1 overflow-y-auto min-h-0 px-2 pb-1 scrollbar-thin">

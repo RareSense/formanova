@@ -1,4 +1,4 @@
-import { Undo2, Redo2, Plus, Minus, Maximize, Eye, Keyboard, Loader2, Orbit, RotateCcw, Boxes } from "lucide-react";
+import { Undo2, Redo2, Plus, Minus, Maximize, Eye, Keyboard, Loader2, Orbit, RotateCcw, Boxes, Rotate3d, Move, RotateCw, Scaling } from "lucide-react";
 import { TRANSFORM_MODES, PROGRESS_STEPS } from "./types";
 import type { StatsData } from "./types";
 
@@ -7,32 +7,63 @@ const VT_BTN = "h-[40px] min-w-[72px] flex-1 text-[11px] font-bold uppercase tra
 const VT_BTN_DEFAULT = `${VT_BTN} text-foreground/70 hover:text-foreground hover:bg-accent/40`;
 const VT_BTN_ACTIVE = `${VT_BTN} text-primary-foreground bg-primary`;
 
+// Compact (phone) buttons: a 40px square icon, same height as the labelled ones.
+const VT_BTN_COMPACT = "h-[40px] w-[40px] transition-all duration-150 flex items-center justify-center";
+const VT_BTN_COMPACT_DEFAULT = `${VT_BTN_COMPACT} text-foreground/70 hover:text-foreground hover:bg-accent/40`;
+const VT_BTN_COMPACT_ACTIVE = `${VT_BTN_COMPACT} text-primary-foreground bg-primary`;
+const MODE_ICONS: Record<string, typeof Rotate3d> = { orbit: Rotate3d, translate: Move, rotate: RotateCw, scale: Scaling };
+
 // ── Viewport Toolbar ──
 export function ViewportToolbar({
   mode,
   setMode,
+  compact = false,
+  modes,
 }: {
   mode: string;
   setMode: (m: string) => void;
   transformData?: unknown;
   onTransformChange?: unknown;
   onResetTransform?: unknown;
+  /** Icons instead of labels, for narrow screens. Each button keeps its name for screen readers. */
+  compact?: boolean;
+  /** Mode ids to offer; all of them when omitted. */
+  modes?: readonly string[];
 }) {
-  const isTransformActive = mode !== "orbit"; // kept for potential future use
+  const shown = modes ? TRANSFORM_MODES.filter((tm) => modes.includes(tm.id)) : TRANSFORM_MODES;
 
   return (
     <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-center pt-2 pointer-events-none">
       {/* Centered mode buttons */}
       <div className="pointer-events-auto flex gap-0 bg-card border border-border shadow-lg">
-        {TRANSFORM_MODES.map((tm) => (
-          <button
-            key={tm.id}
-            onClick={() => setMode(tm.id)}
-            className={mode === tm.id ? VT_BTN_ACTIVE : VT_BTN_DEFAULT}
-          >
-            {tm.label}
-          </button>
-        ))}
+        {shown.map((tm) => {
+          const active = mode === tm.id;
+          if (compact) {
+            const Icon = MODE_ICONS[tm.id];
+            return (
+              <button
+                key={tm.id}
+                onClick={() => setMode(tm.id)}
+                aria-label={tm.label}
+                aria-pressed={active}
+                title={tm.label}
+                className={active ? VT_BTN_COMPACT_ACTIVE : VT_BTN_COMPACT_DEFAULT}
+              >
+                <Icon className="w-4 h-4" aria-hidden="true" />
+              </button>
+            );
+          }
+          return (
+            <button
+              key={tm.id}
+              onClick={() => setMode(tm.id)}
+              aria-pressed={active}
+              className={active ? VT_BTN_ACTIVE : VT_BTN_DEFAULT}
+            >
+              {tm.label}
+            </button>
+          );
+        })}
       </div>
 
     </div>
@@ -134,7 +165,7 @@ function SideTooltip({ label }: { label: string }) {
   );
 }
 
-export function ViewportSideTools({ visible, onZoomIn, onZoomOut, onResetView, onUndo, onRedo, undoCount, redoCount, onFullscreen, onDisplayMenu, onKeyboardShortcuts, onAutoRotate, autoRotateActive = false, onExplode, explodeActive = false }: {
+export function ViewportSideTools({ visible, onZoomIn, onZoomOut, onResetView, onUndo, onRedo, undoCount, redoCount, onFullscreen, onDisplayMenu, onKeyboardShortcuts, onAutoRotate, autoRotateActive = false, onExplode, explodeActive = false, compact = false }: {
   visible: boolean;
   onZoomIn: () => void;
   onZoomOut: () => void;
@@ -152,11 +183,17 @@ export function ViewportSideTools({ visible, onZoomIn, onZoomOut, onResetView, o
   /** Radial explode view. Omit to hide the control (allowlisted users only). */
   onExplode?: () => void;
   explodeActive?: boolean;
+  /**
+   * Phones: hug the top-right corner under the toolbar instead of centring on
+   * the right edge, so the strip stays clear of the axis gizmo in the
+   * bottom-right of a short view; buttons a little shorter (32px) for the same reason.
+   */
+  compact?: boolean;
 }) {
   if (!visible) return null;
 
   return (
-    <div className="absolute right-8 top-1/2 -translate-y-1/2 z-50 flex flex-col bg-card/85 backdrop-blur-sm border border-border/40 rounded-sm shadow-lg overflow-visible">
+    <div className={`absolute z-50 flex flex-col bg-card/85 backdrop-blur-sm border border-border/40 rounded-sm shadow-lg overflow-visible ${compact ? "right-2 top-14 [&>button]:h-8" : "right-8 top-1/2 -translate-y-1/2"}`}>
       {/* Zoom */}
       <button onClick={onZoomIn} className={SIDE_BTN} title="Zoom in">
         <SideTooltip label="Zoom In" />

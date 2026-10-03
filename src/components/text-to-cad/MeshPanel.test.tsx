@@ -189,3 +189,24 @@ describe("MeshPanel parts tree", () => {
     expect(screen.getByRole("button", { name: /Show parts in/i })).toHaveAttribute("aria-expanded", "false");
   });
 });
+
+describe("MeshPanel section (phone sheet tabs)", () => {
+  const base = { onSelectMesh: vi.fn(), onSelectFamily: vi.fn(), onAction: vi.fn(), onApplyMaterial: vi.fn(), onSceneAction: vi.fn() };
+  const meshes = [mk("Pave_Gem_00", true), mk("Shank_Base_mesh")];
+
+  it("material shows only the materials, without the collapsible section headers", () => {
+    render(<MeshPanel meshes={meshes} {...base} section="material" />);
+    expect(screen.getByRole("button", { name: "Metals" })).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Search parts...")).toBeNull();
+    expect(screen.queryByText("Parts")).toBeNull();
+    expect(screen.queryByText("Material")).toBeNull();
+  });
+
+  it("parts shows only the parts list, where a single part is picked from its row", () => {
+    render(<MeshPanel meshes={meshes} {...base} section="parts" />);
+    expect(screen.getByPlaceholderText("Search parts...")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Metals" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /shank/i }));
+    expect(base.onSelectMesh).toHaveBeenCalledWith("Shank_Base_mesh", false);
+  });
+});

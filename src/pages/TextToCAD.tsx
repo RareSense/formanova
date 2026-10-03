@@ -3,10 +3,10 @@ import { Helmet } from "react-helmet-async";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
-import { PanelLeftClose, PanelRightClose, PanelLeft, PanelRight, X } from "lucide-react";
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
-import type { ImperativePanelHandle } from "react-resizable-panels";
+import { X } from "lucide-react";
 import { pollWorkflow } from "@/lib/poll-workflow";
+import CadWorkspaceLayout from "@/components/text-to-cad/CadWorkspaceLayout";
+import { useCadBreakpoint, useCadCanHover } from "@/hooks/use-cad-breakpoint";
 
 import InitialPromptScreen from "@/components/text-to-cad/InitialPromptScreen";
 import LeftPanel from "@/components/text-to-cad/LeftPanel";
@@ -41,6 +41,8 @@ import { recordStudioVisit } from '@/lib/studio-preference';
 import { useCadRestoreFromUrl } from "@/hooks/useCadRestoreFromUrl";
 
 const NO_REFERENCE_IMAGES: File[] = [];
+/** Touch gizmos are too fiddly on a phone: the view only orbits there. */
+const PHONE_TRANSFORM_MODES = ["orbit"] as const;
 
 export default function TextToCAD() {
   // Counts towards which studio this user lands in after sign-in. The
@@ -70,8 +72,10 @@ export default function TextToCAD() {
   const [jewelryType, setJewelryType] = useState<CadJewelryType | null>(null);
   const [transformMode, setTransformMode] = useState("orbit");
   const wasManualUploadRef = useRef(false);
-  const [leftCollapsed, setLeftCollapsed] = useState(false);
-  const [rightCollapsed, setRightCollapsed] = useState(true);
+  const layoutMode = useCadBreakpoint();
+  const canHover = useCadCanHover();
+  /** A sheet or drawer is open: keyboard shortcuts pause so keys never act on parts behind it. */
+  const [panelsOpen, setPanelsOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [displayMenuOpen, setDisplayMenuOpen] = useState(false);
   const [magicTexturing, setMagicTexturing] = useState(false);
@@ -92,8 +96,6 @@ export default function TextToCAD() {
   const activateWorkspace = useCallback(() => setWorkspaceActive(true), []);
 
   const canvasRef = useRef<CADCanvasHandle>(null);
-  const leftPanelRef = useRef<ImperativePanelHandle>(null);
-  const rightPanelRef = useRef<ImperativePanelHandle>(null);
 
   const editor = useCADMeshEditor({ canvasRef, transformMode, setTransformMode });
 
@@ -130,11 +132,8 @@ export default function TextToCAD() {
     return () => document.removeEventListener('fullscreenchange', handler);
   }, []);
 
-  // Expand right panel when model is loaded, collapse when no model
-  useEffect(() => {
-    if (workflow.hasModel) rightPanelRef.current?.expand(22);
-    else rightPanelRef.current?.collapse();
-  }, [workflow.hasModel]);
+  // Phones offer Orbit only; never leave a Move/Rotate/Scale gizmo behind on one.
+  useEffect(() => { if (layoutMode === "phone") setTransformMode("orbit"); }, [layoutMode]);
 
   // Boot directly into the workspace from a stable workflow result link. The
   // optional GLB param renders eagerly; the workflow id restores the full
@@ -225,6 +224,27 @@ export default function TextToCAD() {
    *  so an unedited model never offers an export identical to the plain GLB. */
   const hasEdits = editor.undoStack.length > 0;
 
+  // Same visibility rule the download carried in the toolbar before the move:
+  // hidden mid-regeneration, not just mid-initial-generation.
+  const resultActions = workflow.hasModel && !workflow.isGenerating && !workflow.isModelLoading && (
+    <CadResultActions
+      layout={layoutMode === "phone" ? "row" : "overlay"}
+      isBusy={downloads.isBusy}
+      onDownloadThreedm={workflow.threedmArtifact ? downloads.downloadThreedm : undefined}
+      onDownloadGlb={workflow.glbUrl ? downloads.downloadGlb : undefined}
+      onDownloadViewerThreedm={workflow.viewerThreedmUrl ? downloads.downloadViewerThreedm : undefined}
+      onDownloadStl={workflow.stlArtifacts.length ? downloads.downloadStl : undefined}
+      onDownloadStep={workflow.stepArtifacts.length ? downloads.downloadStep : undefined}
+      estimatedMetalMassG={workflow.estimatedMetalMassG}
+      onExportEdited={hasEdits ? downloads.exportEdited : undefined}
+      latestVersionLabel={workflow.latestVersionLabel}
+      onImproveFromVersion={workflow.improveFromLatestVersion}
+      improveDisabled={!workflow.canImproveLatestVersion}
+      improveExhausted={workflow.improveExhausted}
+      improveRetired={workflow.improveRetired}
+    />
+  );
+
 
 
   useCADKeyboardShortcuts({
@@ -241,7 +261,7 @@ export default function TextToCAD() {
     onPaste: editor.handlePaste,
     onCut: editor.handleCut,
     onResetTransform: () => editor.handleSceneAction("reset-transform"),
-    enabled: workspaceActive,
+    enabled: workspaceActive && !panelsOpen,
   });
 
   // ── Phase 1: Initial prompt screen ──
@@ -273,27 +293,14 @@ export default function TextToCAD() {
         <link rel="canonical" href="/text-to-cad" />
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
-    <div
-      className="flex h-[calc(100vh-5rem)] overflow-hidden bg-background"
-      tabIndex={-1}
-    >
-      <CadStatusDialog notice={workflow.statusNotice} onClose={workflow.dismissStatusNotice} />
-      <ResizablePanelGroup direction="horizontal" className="h-full">
-        {/* Left panel — always mounted, use imperative collapse/expand */}
-        <ResizablePanel
-          ref={leftPanelRef}
-          id="left-panel"
-          order={1}
-          defaultSize={22}
-          minSize={15}
-          maxSize={35}
-          collapsible
-          collapsedSize={0}
-          onCollapse={() => setLeftCollapsed(true)}
-          onExpand={() => setLeftCollapsed(false)}
-          className="relative"
-        >
-          {!leftCollapsed && (
+    <CadWorkspaceLayout
+      mode={layoutMode}
+      hasModel={workflow.hasModel}
+      isFullscreen={isFullscreen}
+      onPanelsOpenChange={setPanelsOpen}
+      before={<CadStatusDialog notice={workflow.statusNotice} onClose={workflow.dismissStatusNotice} />}
+      leftLabel="Prompt"
+      left={
             <LeftPanel
               model={model} setModel={() => {}}
               prompt={prompt} setPrompt={setPrompt}
@@ -311,47 +318,25 @@ export default function TextToCAD() {
               }}
               onReset={workflow.hasModel ? handleReset : undefined}
             />
-          )}
-        </ResizablePanel>
-        <ResizableHandle withHandle />
-
-        {/* Viewport */}
-        <ResizablePanel id="viewport-panel" order={2} defaultSize={workflow.hasModel ? 56 : 78} minSize={30}>
-          <div data-cad-viewport className="relative h-full border-x-2 border-primary/20 shadow-[inset_0_0_30px_-10px_hsl(var(--primary)/0.15)]" style={{ background: "#000000" }}>
-            {/* Panel collapse toggles — hidden in fullscreen */}
-            {!isFullscreen && (
-              <>
-                <button
-                  onClick={() => {
-                    const panel = leftPanelRef.current;
-                    if (panel) {
-                      if (leftCollapsed) panel.expand(22);
-                      else panel.collapse();
-                    }
-                  }}
-                  className="absolute top-2 left-2 z-[60] w-8 h-8 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
-                  title={leftCollapsed ? "Show left panel" : "Hide left panel"}
-                >
-                  {leftCollapsed ? <PanelLeft className="w-4 h-4 text-foreground/70" /> : <PanelLeftClose className="w-4 h-4 text-foreground/70" />}
-                </button>
-                {workflow.hasModel && (
-                  <button
-                    onClick={() => {
-                      const panel = rightPanelRef.current;
-                      if (panel) {
-                        if (rightCollapsed) panel.expand(22);
-                        else panel.collapse();
-                      }
-                    }}
-                    className="absolute top-2 right-2 z-[60] w-8 h-8 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
-                    title={rightCollapsed ? "Show right panel" : "Hide right panel"}
-                  >
-                    {rightCollapsed ? <PanelRight className="w-4 h-4 text-foreground/70" /> : <PanelRightClose className="w-4 h-4 text-foreground/70" />}
-                  </button>
-                )}
-              </>
-            )}
-
+      }
+      right={(section) => (
+            <MeshPanel
+              section={section}
+              meshes={editor.meshes}
+              onSelectMesh={editor.handleSelectMesh}
+              onSelectFamily={editor.handleSelectFamily}
+              onHoverPart={canHover ? editor.setHoveredPart : undefined}
+              hoveredNames={editor.hoveredFamilyNames}
+              onApplyGemToAll={editor.handleApplyGemToAll}
+              onAction={editor.handleMeshAction}
+              onApplyMaterial={editor.handleApplyMaterial}
+              onApplyMetalToAll={editor.handleApplyMetalToAll}
+              onSceneAction={editor.handleSceneAction}
+            />
+      )}
+      phoneActions={layoutMode === "phone" ? resultActions : undefined}
+      viewport={
+          <>
             <CADRuntimeErrorBoundary resetKeys={[workflow.glbUrl, workflow.hasModel]}>
               <CADCanvas
                 ref={canvasRef}
@@ -362,7 +347,7 @@ export default function TextToCAD() {
                 hiddenMeshNames={editor.hiddenMeshNames}
                 onMeshClick={editor.handleSelectFamily}
                 onMeshDoubleClick={editor.handleSelectMesh}
-                onMeshHover={editor.setHoveredPart}
+                onMeshHover={canHover ? editor.setHoveredPart : undefined}
                 highlightedMeshNames={editor.hoveredFamilyNames}
                 transformMode={transformMode}
                 onMeshesDetected={editor.handleMeshesDetected}
@@ -399,28 +384,13 @@ export default function TextToCAD() {
                 transformData={editor.selectedTransform}
                 onTransformChange={editor.handleNumericTransformChange}
                 onResetTransform={() => editor.handleSceneAction("reset-transform")}
+                compact={layoutMode === "phone"}
+                modes={layoutMode === "phone" ? PHONE_TRANSFORM_MODES : undefined}
               />
             )}
 
-            {/* Result actions, bottom center. Same visibility rule the download
-                carried in the toolbar before the move: hidden mid-regeneration,
-                not just mid-initial-generation. */}
-            {workflow.hasModel && !workflow.isGenerating && !workflow.isModelLoading && (
-              <CadResultActions
-                isBusy={downloads.isBusy}
-                onDownloadThreedm={workflow.threedmArtifact ? downloads.downloadThreedm : undefined}
-                onDownloadGlb={workflow.glbUrl ? downloads.downloadGlb : undefined}
-                onDownloadViewerThreedm={workflow.viewerThreedmUrl ? downloads.downloadViewerThreedm : undefined}
-                onDownloadStl={workflow.stlArtifacts.length ? downloads.downloadStl : undefined}
-                onDownloadStep={workflow.stepArtifacts.length ? downloads.downloadStep : undefined}
-                estimatedMetalMassG={workflow.estimatedMetalMassG}
-                onExportEdited={hasEdits ? downloads.exportEdited : undefined}
-                latestVersionLabel={workflow.latestVersionLabel}
-                onImproveFromVersion={workflow.improveFromLatestVersion}
-                improveDisabled={!workflow.canImproveLatestVersion}
-                improveExhausted={workflow.improveExhausted}
-              />
-            )}
+            {/* Result actions, bottom center (on phones, the dock under the sheet). */}
+            {layoutMode !== "phone" && resultActions}
 
             {/* Bottom-left: gem toggle */}
             {workflow.hasModel && !workflow.isGenerating && !workflow.isModelLoading && (
@@ -500,6 +470,7 @@ export default function TextToCAD() {
             />
             <ViewportSideTools
               visible={workflow.hasModel && !workflow.isGenerating && !workflow.isModelLoading}
+              compact={layoutMode === "phone"}
               onZoomIn={() => canvasRef.current?.zoomIn()}
               onZoomOut={() => canvasRef.current?.zoomOut()}
               onResetView={() => {
@@ -517,7 +488,9 @@ export default function TextToCAD() {
               onRedo={editor.handleRedo}
               undoCount={editor.undoStack.length}
               redoCount={editor.redoStack.length}
-              onFullscreen={() => {
+              // Phones get none: iPhone Safari cannot fullscreen an element,
+              // and fullscreening the view alone would hide the sheet and dock.
+              onFullscreen={layoutMode === "phone" ? undefined : () => {
                 const el = document.querySelector('[data-cad-viewport]') as HTMLElement;
                 if (el) {
                   if (document.fullscreenElement) document.exitFullscreen();
@@ -525,49 +498,11 @@ export default function TextToCAD() {
                 }
               }}
               onDisplayMenu={() => setDisplayMenuOpen(p => !p)}
-              onKeyboardShortcuts={() => setShortcutsOpen(true)}
+              onKeyboardShortcuts={layoutMode === "phone" ? undefined : () => setShortcutsOpen(true)}
             />
-          </div>
-        </ResizablePanel>
-
-        {/* No handle until there is a model: a divider against an empty
-            panel reads as a region that failed to load. */}
-        {workflow.hasModel && <ResizableHandle withHandle />}
-
-        {/* Right panel — always mounted, use imperative collapse/expand */}
-        <ResizablePanel
-          ref={rightPanelRef}
-          id="right-panel"
-          order={3}
-          // Starts collapsed. With defaultSize 22 the panel rendered empty on
-          // mount until the effect collapsed it, which flashed a blank region
-          // during generation.
-          defaultSize={0}
-          minSize={15}
-          maxSize={35}
-          collapsible
-          collapsedSize={0}
-          onCollapse={() => setRightCollapsed(true)}
-          onExpand={() => setRightCollapsed(false)}
-        >
-          {workflow.hasModel && !rightCollapsed && (
-            <MeshPanel
-              meshes={editor.meshes}
-              onSelectMesh={editor.handleSelectMesh}
-              onSelectFamily={editor.handleSelectFamily}
-              onHoverPart={editor.setHoveredPart}
-              hoveredNames={editor.hoveredFamilyNames}
-              onApplyGemToAll={editor.handleApplyGemToAll}
-              onAction={editor.handleMeshAction}
-              onApplyMaterial={editor.handleApplyMaterial}
-              onApplyMetalToAll={editor.handleApplyMetalToAll}
-              onSceneAction={editor.handleSceneAction}
-            />
-          )}
-        </ResizablePanel>
-      </ResizablePanelGroup>
-
-    </div>
+          </>
+      }
+    />
     </>
   );
 }
