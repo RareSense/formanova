@@ -95,7 +95,7 @@ describe('useCreditPreflight door-in redirect', () => {
     await act(async () => { await result.current.checkCredits('ring_cad_nurbs_v1'); });
 
     await waitFor(() => expect(mockNavigate).toHaveBeenCalled());
-    expect(mockNavigate).toHaveBeenCalledWith('/credits', { state: { requiredCredits: 120 } });
+    expect(mockNavigate).toHaveBeenCalledWith('/credits', { state: { requiredCredits: 120, workflowName: 'ring_cad_nurbs_v1' } });
   });
 
   it('remembers where to return so the user resumes after buying', async () => {

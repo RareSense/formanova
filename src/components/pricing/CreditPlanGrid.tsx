@@ -7,29 +7,12 @@
 import { Info, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { isStarterTier, type BillingTier } from '@/lib/starter-pack';
-
-const CREDIT_PLANS = [
-  { tierId: 'tier_5e6c6184', name: 'Basic', price: 9, inrPrice: 999, credits: 100, photos: 12, cads: 1 },
-  { tierId: 'tier_6867e598', name: 'Standard', price: 39, inrPrice: 3499, credits: 500, photos: 62, cads: 5 },
-  { tierId: 'tier_a80444ac', name: 'Pro', price: 99, inrPrice: 8999, credits: 1500, photos: 187, cads: 15 },
-];
-
-const STARTER_OFFER = { price: 2, inrPrice: 199, credits: 50, photos: 6 };
-
-const PLAN_BY_CREDITS = Object.fromEntries(CREDIT_PLANS.map(p => [p.credits, p])) as Record<
-  number,
-  (typeof CREDIT_PLANS)[number]
->;
-
-/** Tiers to render: the backend list, or the three standard plans if it failed. */
-function resolveGridTiers(tiers: BillingTier[]): BillingTier[] {
-  return tiers.length > 0
-    ? tiers
-    : CREDIT_PLANS.map(p => ({ tier_id: p.tierId, name: p.name, type: 'subscription', credits: p.credits }));
-}
+import { PLAN_BY_CREDITS, STARTER_OFFER, resolveGridTiers } from '@/lib/credit-plans';
 
 interface CreditPlanGridProps {
   tiers: BillingTier[];
+  /** Set on the CAD shortfall view: the credits the blocked run needs. */
+  cadRequiredCredits?: number;
   isINR: boolean;
   symbol: string;
   currency: string;
@@ -41,6 +24,7 @@ interface CreditPlanGridProps {
 
 export function CreditPlanGrid({
   tiers,
+  cadRequiredCredits,
   isINR,
   symbol,
   currency,
@@ -49,7 +33,7 @@ export function CreditPlanGrid({
   errorTier,
   onCheckout,
 }: CreditPlanGridProps) {
-  const gridTiers = resolveGridTiers(tiers);
+  const gridTiers = resolveGridTiers(tiers, cadRequiredCredits);
   const colsClass = gridTiers.length === 4 ? 'xl:grid-cols-4' : 'md:grid-cols-3';
   const formatPrice = (usd: number, inr: number) =>
     isINR ? `${symbol}${inr.toLocaleString('en-IN')}` : `$${usd}`;

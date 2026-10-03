@@ -14,6 +14,7 @@ import { useBillingLocale } from '@/hooks/use-billing-locale';
 import { isStarterTier, type BillingTier } from '@/lib/starter-pack';
 import { getPostPurchaseReturn, clearPostPurchaseReturn } from '@/lib/post-purchase-return';
 import { CreditPlanGrid } from '@/components/pricing/CreditPlanGrid';
+import { isCadWorkflow, resolveGridTiers } from '@/lib/credit-plans';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
 
 const CHECKOUT_URL = '/billing/checkout';
@@ -168,15 +169,20 @@ export default function Credits() {
     );
   }
 
-  // 4 cards when the backend still returns the one-time Starter tier (user never
-  // bought it), otherwise the 3 standard plans.
-  const maxWidthClass = tiers.length === 4 ? 'max-w-7xl' : 'max-w-5xl';
-
   // If the user arrived after a generate attempt they couldn't afford, the
   // originating flow passes `requiredCredits` in router state and we show a
   // shortfall message in place of the balance header.
-  const requiredCredits = (location.state as { requiredCredits?: number } | null)?.requiredCredits;
+  const navState = location.state as { requiredCredits?: number; workflowName?: string } | null;
+  const requiredCredits = navState?.requiredCredits;
   const isShort = typeof requiredCredits === 'number' && credits !== null && credits < requiredCredits;
+  // A CAD run blocked on credits: offer only the packages that can fund it
+  // (display-only; the other packages stay available on a normal visit).
+  const cadRequiredCredits = isShort && isCadWorkflow(navState?.workflowName) ? requiredCredits : undefined;
+
+  // 4 cards when the backend still returns the one-time Starter tier (user never
+  // bought it), otherwise the 3 standard plans. Counted after the grid's own
+  // filtering, since the backend list also carries packages that are not shown.
+  const maxWidthClass = resolveGridTiers(tiers, cadRequiredCredits).length === 4 ? 'max-w-7xl' : 'max-w-5xl';
   // A normal visit (no requiredCredits) shows the balance instead.
   const insufficientNotice = (
     <div className="w-full">
@@ -262,6 +268,7 @@ export default function Credits() {
           ) : (
             <CreditPlanGrid
               tiers={tiers}
+              cadRequiredCredits={cadRequiredCredits}
               isINR={isINR}
               symbol={symbol}
               currency={currency}
