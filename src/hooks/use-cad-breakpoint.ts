@@ -29,6 +29,20 @@ function read(): CadBreakpoint {
   return 'phone';
 }
 
+/**
+ * Whether the main pointer can hover. On touch screens a tap fires the mouse
+ * enter events but never the leave, so hover highlights would stick; callers
+ * leave hover handlers off there. Read once: the device does not change.
+ */
+export function useCadCanHover(): boolean {
+  const [canHover] = useState(() =>
+    typeof window === 'undefined' || typeof window.matchMedia !== 'function'
+      ? true
+      : !window.matchMedia('(hover: none)').matches,
+  );
+  return canHover;
+}
+
 /** Read synchronously on first render so a phone never paints the desktop columns first. */
 export function useCadBreakpoint(): CadBreakpoint {
   const [mode, setMode] = useState<CadBreakpoint>(read);

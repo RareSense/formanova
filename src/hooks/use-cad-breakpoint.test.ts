@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { cadBreakpointFor, useCadBreakpoint } from './use-cad-breakpoint';
+import { cadBreakpointFor, useCadBreakpoint, useCadCanHover } from './use-cad-breakpoint';
 
 type Listener = () => void;
 
@@ -38,6 +38,20 @@ describe('cadBreakpointFor', () => {
     expect(cadBreakpointFor(1279)).toBe('tablet');
     expect(cadBreakpointFor(1280)).toBe('desktop');
     expect(cadBreakpointFor(1920)).toBe('desktop');
+  });
+});
+
+describe('useCadCanHover', () => {
+  it('is false on touch screens and true with a mouse', () => {
+    vi.stubGlobal('matchMedia', (q: string) => ({ matches: q === '(hover: none)' }));
+    expect(renderHook(() => useCadCanHover()).result.current).toBe(false);
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    expect(renderHook(() => useCadCanHover()).result.current).toBe(true);
+  });
+
+  it('assumes a mouse where matchMedia does not exist', () => {
+    vi.stubGlobal('matchMedia', undefined);
+    expect(renderHook(() => useCadCanHover()).result.current).toBe(true);
   });
 });
 
