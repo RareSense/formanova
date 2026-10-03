@@ -165,7 +165,7 @@ function SideTooltip({ label }: { label: string }) {
   );
 }
 
-export function ViewportSideTools({ visible, onZoomIn, onZoomOut, onResetView, onUndo, onRedo, undoCount, redoCount, onFullscreen, onDisplayMenu, onKeyboardShortcuts, onAutoRotate, autoRotateActive = false, onExplode, explodeActive = false }: {
+export function ViewportSideTools({ visible, onZoomIn, onZoomOut, onResetView, onUndo, onRedo, undoCount, redoCount, onFullscreen, onDisplayMenu, onKeyboardShortcuts, onAutoRotate, autoRotateActive = false, onExplode, explodeActive = false, compact = false }: {
   visible: boolean;
   onZoomIn: () => void;
   onZoomOut: () => void;
@@ -183,11 +183,17 @@ export function ViewportSideTools({ visible, onZoomIn, onZoomOut, onResetView, o
   /** Radial explode view. Omit to hide the control (allowlisted users only). */
   onExplode?: () => void;
   explodeActive?: boolean;
+  /**
+   * Phones: hug the top-right corner under the toolbar instead of centring on
+   * the right edge, so the strip stays clear of the axis gizmo in the
+   * bottom-right of a short view; buttons a little shorter (32px) for the same reason.
+   */
+  compact?: boolean;
 }) {
   if (!visible) return null;
 
   return (
-    <div className="absolute right-8 top-1/2 -translate-y-1/2 z-50 flex flex-col bg-card/85 backdrop-blur-sm border border-border/40 rounded-sm shadow-lg overflow-visible">
+    <div className={`absolute z-50 flex flex-col bg-card/85 backdrop-blur-sm border border-border/40 rounded-sm shadow-lg overflow-visible ${compact ? "right-2 top-14 [&>button]:h-8" : "right-8 top-1/2 -translate-y-1/2"}`}>
       {/* Zoom */}
       <button onClick={onZoomIn} className={SIDE_BTN} title="Zoom in">
         <SideTooltip label="Zoom In" />

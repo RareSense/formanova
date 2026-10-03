@@ -469,6 +469,7 @@ export default function TextToCAD() {
             />
             <ViewportSideTools
               visible={workflow.hasModel && !workflow.isGenerating && !workflow.isModelLoading}
+              compact={layoutMode === "phone"}
               onZoomIn={() => canvasRef.current?.zoomIn()}
               onZoomOut={() => canvasRef.current?.zoomOut()}
               onResetView={() => {

@@ -1,7 +1,25 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { ViewportToolbar } from './ViewportOverlays';
+import { ViewportSideTools, ViewportToolbar } from './ViewportOverlays';
+
+describe('ViewportSideTools', () => {
+  const props = { visible: true, onZoomIn: vi.fn(), onZoomOut: vi.fn(), onResetView: vi.fn(), onUndo: vi.fn(), onRedo: vi.fn(), undoCount: 0, redoCount: 0 };
+
+  it('centres on the right edge by default', () => {
+    const { container } = render(<ViewportSideTools {...props} />);
+    const strip = container.firstElementChild as HTMLElement;
+    expect(strip.className).toContain('top-1/2');
+    expect(strip.className).toContain('right-8');
+  });
+
+  it('compact hugs the top-right corner under the toolbar', () => {
+    const { container } = render(<ViewportSideTools {...props} compact />);
+    const strip = container.firstElementChild as HTMLElement;
+    expect(strip.className).toContain('top-14');
+    expect(strip.className).not.toContain('top-1/2');
+  });
+});
 
 describe('ViewportToolbar', () => {
   it('shows all four modes with their labels by default', () => {
