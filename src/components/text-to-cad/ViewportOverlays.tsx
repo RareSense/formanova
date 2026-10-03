@@ -1,4 +1,4 @@
-import { Undo2, Redo2, Plus, Minus, Maximize, Eye, Keyboard, Loader2, Orbit, RotateCcw, Boxes } from "lucide-react";
+import { Undo2, Redo2, Plus, Minus, Maximize, Eye, Keyboard, Loader2, Orbit, RotateCcw, Boxes, Rotate3d, Move, RotateCw, Scaling } from "lucide-react";
 import { TRANSFORM_MODES, PROGRESS_STEPS } from "./types";
 import type { StatsData } from "./types";
 
@@ -7,32 +7,63 @@ const VT_BTN = "h-[40px] min-w-[72px] flex-1 text-[11px] font-bold uppercase tra
 const VT_BTN_DEFAULT = `${VT_BTN} text-foreground/70 hover:text-foreground hover:bg-accent/40`;
 const VT_BTN_ACTIVE = `${VT_BTN} text-primary-foreground bg-primary`;
 
+// Compact (phone) buttons: a 40px square icon, same height as the labelled ones.
+const VT_BTN_COMPACT = "h-[40px] w-[40px] transition-all duration-150 flex items-center justify-center";
+const VT_BTN_COMPACT_DEFAULT = `${VT_BTN_COMPACT} text-foreground/70 hover:text-foreground hover:bg-accent/40`;
+const VT_BTN_COMPACT_ACTIVE = `${VT_BTN_COMPACT} text-primary-foreground bg-primary`;
+const MODE_ICONS: Record<string, typeof Rotate3d> = { orbit: Rotate3d, translate: Move, rotate: RotateCw, scale: Scaling };
+
 // ── Viewport Toolbar ──
 export function ViewportToolbar({
   mode,
   setMode,
+  compact = false,
+  modes,
 }: {
   mode: string;
   setMode: (m: string) => void;
   transformData?: unknown;
   onTransformChange?: unknown;
   onResetTransform?: unknown;
+  /** Icons instead of labels, for narrow screens. Each button keeps its name for screen readers. */
+  compact?: boolean;
+  /** Mode ids to offer; all of them when omitted. */
+  modes?: readonly string[];
 }) {
-  const isTransformActive = mode !== "orbit"; // kept for potential future use
+  const shown = modes ? TRANSFORM_MODES.filter((tm) => modes.includes(tm.id)) : TRANSFORM_MODES;
 
   return (
     <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-center pt-2 pointer-events-none">
       {/* Centered mode buttons */}
       <div className="pointer-events-auto flex gap-0 bg-card border border-border shadow-lg">
-        {TRANSFORM_MODES.map((tm) => (
-          <button
-            key={tm.id}
-            onClick={() => setMode(tm.id)}
-            className={mode === tm.id ? VT_BTN_ACTIVE : VT_BTN_DEFAULT}
-          >
-            {tm.label}
-          </button>
-        ))}
+        {shown.map((tm) => {
+          const active = mode === tm.id;
+          if (compact) {
+            const Icon = MODE_ICONS[tm.id];
+            return (
+              <button
+                key={tm.id}
+                onClick={() => setMode(tm.id)}
+                aria-label={tm.label}
+                aria-pressed={active}
+                title={tm.label}
+                className={active ? VT_BTN_COMPACT_ACTIVE : VT_BTN_COMPACT_DEFAULT}
+              >
+                <Icon className="w-4 h-4" aria-hidden="true" />
+              </button>
+            );
+          }
+          return (
+            <button
+              key={tm.id}
+              onClick={() => setMode(tm.id)}
+              aria-pressed={active}
+              className={active ? VT_BTN_ACTIVE : VT_BTN_DEFAULT}
+            >
+              {tm.label}
+            </button>
+          );
+        })}
       </div>
 
     </div>
