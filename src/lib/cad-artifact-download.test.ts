@@ -60,6 +60,19 @@ describe('CAD artifact signatures', () => {
     await expect(isExpectedCadArtifact(rhinoHeader('100'), '3dm')).resolves.toBe(true);
   });
 
+  it('accepts a real 3DM whose binary content follows the 32-byte header', async () => {
+    // A real file never ends at the header. These are the first 48 bytes of a
+    // production 3DM (state-9a24ba81): the header, then the first chunk, whose
+    // bytes used to leak into the version field and fail every download.
+    const header = new TextEncoder().encode('3D Geometry File Format       80');
+    const chunk = new Uint8Array([0x01, 0, 0, 0, 0x7c, 0, 0, 0, 0, 0, 0, 0, 0x20, 0x52, 0x75, 0x6e]);
+    const body = new Uint8Array(4096).fill(0x41);
+    await expect(isExpectedCadArtifact(new Blob([header, chunk, body]), '3dm')).resolves.toBe(true);
+    // and a file whose header version field is not a number is still rejected
+    const bad = new TextEncoder().encode('3D Geometry File Format     8x0');
+    await expect(isExpectedCadArtifact(new Blob([bad, chunk, body]), '3dm')).resolves.toBe(false);
+  });
+
   it('rejects truncated or internally inconsistent containers', async () => {
     await expect(isExpectedCadArtifact(bytes(0x67, 0x6c, 0x54, 0x46), 'glb')).resolves.toBe(false);
     await expect(isExpectedCadArtifact(new Blob(['3D Geometry File Format']), '3dm')).resolves.toBe(false);

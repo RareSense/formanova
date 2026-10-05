@@ -56,7 +56,10 @@ export async function isExpectedCadArtifact(blob: Blob, kind: CadArtifactKind): 
   // Bytes 24-31 are an 8-char right-justified, space-padded version number
   // (openNURBS GetFirst32BytesOf3dmFile). Older Rhino files write 1-digit
   // versions (e.g. "4"); don't require exactly 2.
-  const version = text.slice(23).trim();
+  // The version is the 8-char field at bytes 24-31 only. The prefix read above is 84
+  // bytes (for STL), so slicing to the end took binary chunk data after the header
+  // and rejected every real 3DM as "not a valid 3DM file" (Oct 1 - Oct 5, 2026).
+  const version = text.slice(23, 32).trim();
   return text.startsWith('3D Geometry File Format') && /^\d{1,8}$/.test(version);
 }
 
