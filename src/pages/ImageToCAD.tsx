@@ -190,6 +190,8 @@ export default function ImageToCAD() {
     glbUrl: workflow.glbUrl,
     stlUrls: workflow.stlArtifacts.map(artifact => artifact.url),
     stepUrls: workflow.stepArtifacts.map(artifact => artifact.url),
+    castingStepUrls: workflow.castingStepUrls,
+    castingStlUrls: workflow.castingStlUrls,
     exportEditedBlob: () => canvasRef.current?.exportSceneBlob() ?? Promise.resolve(undefined),
     source: 'image-to-cad',
   });
@@ -209,6 +211,8 @@ export default function ImageToCAD() {
       onDownloadViewerThreedm={workflow.viewerThreedmUrl ? downloads.downloadViewerThreedm : undefined}
       onDownloadStl={workflow.stlArtifacts.length ? downloads.downloadStl : undefined}
       onDownloadStep={workflow.stepArtifacts.length ? downloads.downloadStep : undefined}
+      onDownloadCastingStep={workflow.castingStepUrls.length ? downloads.downloadCastingStep : undefined}
+      onDownloadCastingStl={workflow.castingStlUrls.length ? downloads.downloadCastingStl : undefined}
       estimatedMetalMassG={workflow.estimatedMetalMassG}
       onExportEdited={hasEdits ? downloads.exportEdited : undefined}
       latestVersionLabel={workflow.latestVersionLabel}

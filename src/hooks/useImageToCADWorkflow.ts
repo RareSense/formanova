@@ -48,8 +48,9 @@ import {
   type CadRestoreSeed,
 } from "@/lib/cad-versions-api";
 import { cadStatusNotice, type CadStatusNotice } from '@/lib/cad-status-copy';
+import type { CastingBodyUrls } from '@/lib/casting-body-artifacts';
 
-
+const NO_CASTING_BODY: CastingBodyUrls = { castingStepUrls: [], castingStlUrls: [] };
 
 interface WorkflowParams {
   model: string;
@@ -100,6 +101,7 @@ export function useImageToCADWorkflow({
   const [threedmArtifact, setThreedmArtifact] = useState<ArtifactRef | null>(null);
   const [stlArtifacts, setStlArtifacts] = useState<ArtifactRef[]>([]);
   const [stepArtifacts, setStepArtifacts] = useState<ArtifactRef[]>([]);
+  const [castingBody, setCastingBody] = useState<CastingBodyUrls>(NO_CASTING_BODY);
   const [estimatedMetalMassG, setEstimatedMetalMassG] = useState<number | null>(null);
   /** Backend-authored failure copy, safe to show the user directly. */
   const [failureMessage, setFailureMessage] = useState<string | null>(null);
@@ -226,6 +228,7 @@ export function useImageToCADWorkflow({
       }
       setStlArtifacts((trackedRun.stlUrls ?? []).map(url => ({ uri: url, url, type: 'model/stl', bytes: 0, sha256: '' })));
       setStepArtifacts((trackedRun.stepUrls ?? []).map(url => ({ uri: url, url, type: 'model/step', bytes: 0, sha256: '' })));
+      setCastingBody({ castingStepUrls: trackedRun.castingStepUrls ?? [], castingStlUrls: trackedRun.castingStlUrls ?? [] });
       setEstimatedMetalMassG(trackedRun.estimatedMetalMassG ?? null);
       // cad_generation_completed is NOT emitted here. This effect does not run
       // once the page unmounts and bails out early on hasNavigatedAway, so
@@ -235,7 +238,7 @@ export function useImageToCADWorkflow({
       setIsModelLoading(true);
       setHasModel(true);
     }
-  }, [trackedRun?.status, trackedRun?.glbUrl, trackedRun?.threedmUrl, trackedRun?.stlUrls, trackedRun?.stepUrls, trackedRun?.estimatedMetalMassG, trackedRun?.generationStep, trackedRun?.cadFailureReasonCode]); // eslint-disable-line react-hooks/exhaustive-deps -- prompt/referenceImages/tier/cadRoute/cadSource and the trackedRun object are excluded: only the run's own transitions should re-drive the overlay, and including the object would re-fire on every progress tick. The analytics values are read from the closure of the render in which status changed, which is the correct moment for them. Regression to watch: if a future edit fires an event here on something other than a status transition, those values could be stale.
+  }, [trackedRun?.status, trackedRun?.glbUrl, trackedRun?.threedmUrl, trackedRun?.stlUrls, trackedRun?.stepUrls, trackedRun?.castingStepUrls, trackedRun?.castingStlUrls, trackedRun?.estimatedMetalMassG, trackedRun?.generationStep, trackedRun?.cadFailureReasonCode]); // eslint-disable-line react-hooks/exhaustive-deps -- prompt/referenceImages/tier/cadRoute/cadSource and the trackedRun object are excluded: only the run's own transitions should re-drive the overlay, and including the object would re-fire on every progress tick. The analytics values are read from the closure of the render in which status changed, which is the correct moment for them. Regression to watch: if a future edit fires an event here on something other than a status transition, those values could be stale.
 
   /**
    * Looks up the ring this run saved, which is what the Improve button needs.
@@ -476,6 +479,7 @@ export function useImageToCADWorkflow({
     setThreedmArtifact(null);
     setStlArtifacts([]);
     setStepArtifacts([]);
+    setCastingBody(NO_CASTING_BODY);
     setEstimatedMetalMassG(null);
     setIsModelLoading(true);
     setProgressStep('_loading');
@@ -584,6 +588,7 @@ export function useImageToCADWorkflow({
     setThreedmArtifact(null);
     setStlArtifacts([]);
     setStepArtifacts([]);
+    setCastingBody(NO_CASTING_BODY);
     setEstimatedMetalMassG(null);
     // Clear the previous ring's solidity result: a stale warning on a new run
     // is worse than none, because it trains people to ignore it.
@@ -734,6 +739,7 @@ export function useImageToCADWorkflow({
     threedmArtifact, setThreedmArtifact,
     viewerThreedmUrl,
     stlArtifacts, stepArtifacts, estimatedMetalMassG,
+    ...castingBody,
     failureMessage, notAllSolid,
     statusNotice,
     dismissStatusNotice: () => {

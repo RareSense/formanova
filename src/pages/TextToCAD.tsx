@@ -216,6 +216,8 @@ export default function TextToCAD() {
     glbUrl: workflow.glbUrl,
     stlUrls: workflow.stlArtifacts.map(artifact => artifact.url),
     stepUrls: workflow.stepArtifacts.map(artifact => artifact.url),
+    castingStepUrls: workflow.castingStepUrls,
+    castingStlUrls: workflow.castingStlUrls,
     exportEditedBlob: () => canvasRef.current?.exportSceneBlob() ?? Promise.resolve(undefined),
     source: 'text-to-cad',
   });
@@ -235,6 +237,8 @@ export default function TextToCAD() {
       onDownloadViewerThreedm={workflow.viewerThreedmUrl ? downloads.downloadViewerThreedm : undefined}
       onDownloadStl={workflow.stlArtifacts.length ? downloads.downloadStl : undefined}
       onDownloadStep={workflow.stepArtifacts.length ? downloads.downloadStep : undefined}
+      onDownloadCastingStep={workflow.castingStepUrls.length ? downloads.downloadCastingStep : undefined}
+      onDownloadCastingStl={workflow.castingStlUrls.length ? downloads.downloadCastingStl : undefined}
       estimatedMetalMassG={workflow.estimatedMetalMassG}
       onExportEdited={hasEdits ? downloads.exportEdited : undefined}
       latestVersionLabel={workflow.latestVersionLabel}
