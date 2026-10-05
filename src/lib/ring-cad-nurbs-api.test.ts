@@ -14,6 +14,7 @@ import {
   RING_CAD_TIERS,
   RING_CAD_TOTAL_NODES,
 } from './ring-cad-nurbs-api';
+import { castingBodyUrls } from './casting-body-artifacts';
 
 const IMG = (n: number) => `data:image/jpeg;base64,IMG${n}`;
 
@@ -390,6 +391,72 @@ describe('ring_cad_nurbs_v1 result parsing', () => {
     expect(r.threedmArtifact?.url).toBe('https://s/ring.3dm');
     expect(r.validationStatus).toBe(expectedStatus);
     expect(r.diagnostics.part_count).toBe(12);
+  });
+});
+
+describe('ring_cad_nurbs_v1 casting body', () => {
+  const BASE = {
+    ok: true,
+    status: 'completed',
+    glb_artifact: { uri: 'azure://a/ring.glb', type: 'model/gltf-binary', bytes: 34, sha256: 'y' },
+  };
+  const SHA_STEP = 'a'.repeat(64);
+  const SHA_STL = 'b'.repeat(64);
+  const castingBody = (status: string, extra: Record<string, unknown> = {}) => ({
+    ...BASE,
+    derivatives: {
+      stl: { status: 'completed', files: [] },
+      casting_body: {
+        status,
+        budget_seconds: 120,
+        elapsed_seconds: 14.2,
+        files: [
+          { name: 'casting_body_18k_yellow.step', bytes: 900, units: 'mm', sha256: SHA_STEP, uri: `azure://c/${SHA_STEP}.step`, material: '18k_yellow' },
+          { name: 'casting_body_18k_yellow.stl', bytes: 800, units: 'mm', sha256: SHA_STL, role: 'metal' },
+        ],
+        ...extra,
+      },
+    },
+  });
+
+  it('reads a completed casting body into one STEP and one STL per alloy', () => {
+    const r = parseRingCadResult(castingBody('completed'));
+    expect(r.castingBodyArtifacts.map((a) => [a.format, a.url, a.material])).toEqual([
+      ['step', `/api/artifacts/${SHA_STEP}`, '18k_yellow'],
+      ['stl', `/api/artifacts/${SHA_STL}`, 'metal'],
+    ]);
+    expect(castingBodyUrls(r.castingBodyArtifacts)).toEqual({
+      castingStepUrls: [`/api/artifacts/${SHA_STEP}`],
+      castingStlUrls: [`/api/artifacts/${SHA_STL}`],
+    });
+  });
+
+  it('offers nothing when the casting body was skipped', () => {
+    const r = parseRingCadResult(castingBody('skipped', { reason: 'no metal parts', files: [] }));
+    expect(r.castingBodyArtifacts).toEqual([]);
+  });
+
+  it('offers nothing when the casting body failed or is partial, even with files listed', () => {
+    expect(parseRingCadResult(castingBody('failed', { reason: 'boolean union failed' })).castingBodyArtifacts).toEqual([]);
+    expect(parseRingCadResult(castingBody('partial')).castingBodyArtifacts).toEqual([]);
+  });
+
+  it('offers nothing for older runs that have no casting body', () => {
+    const r = parseRingCadResult(BASE);
+    expect(r.castingBodyArtifacts).toEqual([]);
+    expect(castingBodyUrls(r.castingBodyArtifacts)).toEqual({ castingStepUrls: [], castingStlUrls: [] });
+  });
+
+  it('skips files that cannot be downloaded or are not STEP/STL', () => {
+    const r = parseRingCadResult({
+      ...BASE,
+      derivatives: { casting_body: { status: 'completed', files: [
+        { name: 'casting_body.step', bytes: 1, units: 'mm', sha256: 'not-a-sha' },
+        { name: 'casting_body.obj', bytes: 1, units: 'mm', sha256: SHA_STL, uri: 'azure://c/x.obj' },
+        null,
+      ] } },
+    });
+    expect(r.castingBodyArtifacts).toEqual([]);
   });
 });
 

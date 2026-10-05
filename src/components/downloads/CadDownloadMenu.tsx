@@ -30,6 +30,9 @@ export interface CadDownloadMenuProps {
   onDownloadGlb?: () => void;
   onDownloadStl?: () => void;
   onDownloadStep?: () => void;
+  /** Omit unless the casting body completed: metal fused into one solid, stones excluded. */
+  onDownloadCastingStep?: () => void;
+  onDownloadCastingStl?: () => void;
   estimatedMetalMassG?: number | null;
   /**
    * Omit when the version has no viewing copy. A mesh-only 3DM for generic
@@ -113,6 +116,21 @@ interface FormatRow {
   onSelect: () => void;
 }
 
+const CASTING_HINT = 'Metal joined into one solid, stones excluded';
+
+/**
+ * The casting body rows. Their name is too long for the format column, so the
+ * name sits on its own line with the hint below it, at the same row width.
+ */
+function CastingItem({ format, onSelect }: { format: 'STEP' | 'STL'; onSelect: () => void }) {
+  return (
+    <DropdownMenuItem onSelect={onSelect} className="flex-col items-start gap-1 py-2">
+      <span className="font-mono text-[11px] font-semibold uppercase tracking-wider">Casting body ({format})</span>
+      <span className="text-[12px] text-muted-foreground">{CASTING_HINT}</span>
+    </DropdownMenuItem>
+  );
+}
+
 function FormatItem({ format, hint, onSelect }: FormatRow) {
   return (
     <DropdownMenuItem onSelect={onSelect} className="gap-3 py-2">
@@ -128,6 +146,8 @@ export function CadDownloadMenu({
   onDownloadViewerThreedm,
   onDownloadStl,
   onDownloadStep,
+  onDownloadCastingStep,
+  onDownloadCastingStl,
   estimatedMetalMassG,
   onExportEdited,
   isBusy = false,
@@ -174,6 +194,8 @@ export function CadDownloadMenu({
         {formats.map((row) => (
           <FormatItem key={`${row.format}-${row.hint}`} {...row} />
         ))}
+        {onDownloadCastingStep && <CastingItem format="STEP" onSelect={onDownloadCastingStep} />}
+        {onDownloadCastingStl && <CastingItem format="STL" onSelect={onDownloadCastingStl} />}
         {onExportEdited && (
           <>
             <DropdownMenuSeparator />

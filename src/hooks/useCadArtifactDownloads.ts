@@ -15,6 +15,9 @@ interface UseCadArtifactDownloadsInput {
   glbUrl?: string | null;
   stlUrls?: string[];
   stepUrls?: string[];
+  /** The casting body: metal fused into one solid per alloy, stones excluded. */
+  castingStepUrls?: string[];
+  castingStlUrls?: string[];
   /**
    * Produces a GLB of the live scene including the user's edits. Supplied only
    * by the workspaces, which have a canvas; history has no scene to export.
@@ -49,6 +52,8 @@ export function useCadArtifactDownloads({
   glbUrl,
   stlUrls = [],
   stepUrls = [],
+  castingStepUrls = [],
+  castingStlUrls = [],
   exportEditedBlob,
   source,
 }: UseCadArtifactDownloadsInput) {
@@ -98,16 +103,18 @@ export function useCadArtifactDownloads({
     [save, glbUrl],
   );
 
-  const saveMany = useCallback(async (urls: string[], kind: 'stl' | 'step') => {
+  /** `casting` names the files apart and reports format casting_body_<kind>. */
+  const saveMany = useCallback(async (urls: string[], kind: 'stl' | 'step', casting = false) => {
     if (urls.length === 0 || isBusy) return;
     setIsBusy(true);
     try {
       const suffix = stamp();
       for (let index = 0; index < urls.length; index += 1) {
         const part = urls.length > 1 ? `-part-${index + 1}` : '';
-        const filename = `model-${suffix}${part}.${kind}`;
+        const filename = `model-${suffix}${casting ? '-casting-body' : ''}${part}.${kind}`;
         await downloadCadArtifact(urls[index], filename, kind);
-        trackDownloadClicked({ file_name: filename, file_type: kind, context: source, source });
+        const fileType = casting ? `casting_body_${kind}` : kind;
+        trackDownloadClicked({ file_name: filename, file_type: fileType, context: source, source });
       }
     } catch (err) {
       if (err instanceof AuthExpiredError) return;
@@ -120,6 +127,8 @@ export function useCadArtifactDownloads({
 
   const downloadStl = useCallback(() => saveMany(stlUrls, 'stl'), [saveMany, stlUrls]);
   const downloadStep = useCallback(() => saveMany(stepUrls, 'step'), [saveMany, stepUrls]);
+  const downloadCastingStep = useCallback(() => saveMany(castingStepUrls, 'step', true), [saveMany, castingStepUrls]);
+  const downloadCastingStl = useCallback(() => saveMany(castingStlUrls, 'stl', true), [saveMany, castingStlUrls]);
 
   const exportEdited = useCallback(async () => {
     if (!exportEditedBlob || isBusy) return;
@@ -149,5 +158,8 @@ export function useCadArtifactDownloads({
     }
   }, [exportEditedBlob, isBusy, source]);
 
-  return { downloadThreedm, downloadViewerThreedm, downloadGlb, downloadStl, downloadStep, exportEdited, isBusy };
+  return {
+    downloadThreedm, downloadViewerThreedm, downloadGlb, downloadStl, downloadStep,
+    downloadCastingStep, downloadCastingStl, exportEdited, isBusy,
+  };
 }
