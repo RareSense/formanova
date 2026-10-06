@@ -39,6 +39,8 @@ import GemToggle from "@/components/text-to-cad/QualityToggle";
 import { runMicroBenchmark } from "@/lib/gpu-detect";
 import type { GemMode } from "@/components/text-to-cad/CADCanvas";
 import { RING_CAD_DEFAULT_TIER, RING_CAD_NURBS_WORKFLOW, RING_CAD_TIERS, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
+import CadModelPicker from "@/components/create-cad/CadModelPicker";
+import { useCadModelChoice } from "@/hooks/useCadModelChoice";
 import { recordStudioVisit } from '@/lib/studio-preference';
 import { useCadRestoreFromUrl } from "@/hooks/useCadRestoreFromUrl";
 
@@ -66,7 +68,9 @@ export default function TextToCAD() {
     : undefined;
   // Every run uses the customer default (GPT-6 Astra, OpenAI direct) unless
   // the URL explicitly asks for the GPT-5.6 Sol tier.
-  const activeTier = requestedTier ?? RING_CAD_DEFAULT_TIER;
+  // Admins pick the model instead (CadModelPicker).
+  const modelChoice = useCadModelChoice(requestedTier ?? RING_CAD_DEFAULT_TIER);
+  const activeTier = modelChoice.tier;
 
   const [model] = useState("gemini");
   const [prompt, setPrompt] = useState("");
@@ -296,6 +300,7 @@ export default function TextToCAD() {
           cadCostLoading={cadCostLoading}
           creatingCad={pendingCad || workflow.isGenerating}
           onCreateCad={(files) => { void Promise.resolve(replaceReferenceImages(files)).then(() => setPendingCad(true)); }}
+          modelPicker={modelChoice.isAdmin ? <CadModelPicker value={modelChoice.tier} onChange={modelChoice.setTier} disabled={pendingCad || workflow.isGenerating} /> : null}
         />
       </div>
     );

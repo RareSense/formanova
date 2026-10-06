@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useDesignImageRun } from "@/hooks/useDesignImageRun";
 import { CAD_EXAMPLE_DESIGNS } from "@/components/text-to-cad/cad-examples";
 import { blobToDataUrl } from "@/lib/design-image-run";
@@ -18,6 +18,8 @@ interface DesignToCadFlowProps {
   onDimensions: (text: string) => void;
   cadCost: number | null;
   cadCostLoading: boolean;
+  /** Admin-only model choice, shown beside Generate CAD. */
+  modelPicker?: ReactNode;
   creatingCad: boolean;
   /** Generate CAD from the approved pictures (main first). */
   onCreateCad: (files: File[]) => void;
@@ -39,7 +41,7 @@ async function requestFor(brief: DesignBrief, jewelryType: CadJewelryType | null
  * pick from, then the same editor as Image to CAD (edit, angles, Ready for
  * CAD). Generate CAD hands the approved pictures to the page's normal CAD run.
  */
-export default function DesignToCadFlow({ jewelryType, setJewelryType, onGlbUpload, dimensions, onDimensions, cadCost, cadCostLoading, creatingCad, onCreateCad }: DesignToCadFlowProps) {
+export default function DesignToCadFlow({ jewelryType, setJewelryType, onGlbUpload, dimensions, onDimensions, cadCost, cadCostLoading, creatingCad, onCreateCad, modelPicker }: DesignToCadFlowProps) {
   const { generate } = useDesignImageRun();
   const [stage, setStage] = useState<"start" | "pick">("start");
   const [brief, setBrief] = useState<DesignBrief | null>(null);
@@ -109,6 +111,7 @@ export default function DesignToCadFlow({ jewelryType, setJewelryType, onGlbUplo
         cadCost={cadCost}
         cadCostLoading={cadCostLoading}
         creatingCad={creatingCad}
+        modelPicker={modelPicker}
       />
     </>
   );

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { ArrowRight, Diamond, Mic, MousePointerClick, Send, X } from "lucide-react";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
@@ -41,6 +41,8 @@ interface DesignEditorProps {
   onDimensions: (text: string) => void;
   cadCost: number | null;
   cadCostLoading: boolean;
+  /** Admin-only model choice, shown beside Generate CAD. */
+  modelPicker?: ReactNode;
   creatingCad: boolean;
 }
 
@@ -78,7 +80,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
  *  angles - optional extra angles of the approved version.
  *  ready  - the approved pictures, optional dimensions, Generate CAD.
  */
-export default function DesignEditor({ open, source, jewelryType, onCancel, onKeep, onCreateCad, dimensions, onDimensions, cadCost, cadCostLoading, creatingCad }: DesignEditorProps) {
+export default function DesignEditor({ open, source, jewelryType, onCancel, onKeep, onCreateCad, dimensions, onDimensions, cadCost, cadCostLoading, creatingCad, modelPicker }: DesignEditorProps) {
   const { generate } = useDesignImageRun();
   const [versions, setVersions] = useState<Version[]>([]);
   const [current, setCurrent] = useState(0);
@@ -273,6 +275,7 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
               cost={cadCost}
               costLoading={cadCostLoading}
               generating={creatingCad}
+              modelPicker={modelPicker}
               onBack={() => setStage(angles.length ? "angles" : "edit")}
               onGenerate={() => void picturesToFiles(approvedPictures).then(onCreateCad)}
             />

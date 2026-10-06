@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState } from "react";
+import { useRef, useCallback, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
@@ -52,6 +52,8 @@ function ReferenceExamples({ examples, noun, onSelect }: { examples: CadExampleD
 interface ImagePromptScreenProps {
   model: string;
   tier: string;
+  /** Admin-only model choice, shown beside Generate CAD. */
+  modelPicker?: ReactNode;
   prompt: string;
   setPrompt: (p: string) => void;
   jewelryType: CadJewelryType | null;
@@ -80,7 +82,7 @@ interface ImagePromptScreenProps {
 }
 
 export default function ImagePromptScreen({
-  model, tier, prompt, setPrompt, jewelryType, setJewelryType,
+  model, tier, modelPicker, prompt, setPrompt, jewelryType, setJewelryType,
   isGenerating, onGenerate,
   referenceImagePreviewUrls,
   onAddReferenceImages, onRemoveReferenceImage, onReplaceReferenceImages,
@@ -259,7 +261,8 @@ export default function ImagePromptScreen({
             {/* Action area — matches Photo Studio's Next button exactly:
                 right-aligned below the canvas, gold gradient, size="lg". */}
             {(
-              <div className="mt-3 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end">
+              <div className="mt-3 flex flex-col items-stretch gap-3 sm:flex-row sm:items-end sm:justify-end">
+                {!editing && modelPicker}
                 {editing ? (
                 <Button
                   size="lg"

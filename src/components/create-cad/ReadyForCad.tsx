@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { ArrowLeft, ArrowRight, Check, Mic, Ruler } from "lucide-react";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import type { CadJewelryType } from "@/lib/ring-cad-nurbs-api";
@@ -24,13 +25,15 @@ interface ReadyForCadProps {
   onBack: () => void;
   onGenerate: () => void;
   generating: boolean;
+  /** Admin-only model choice, shown beside Generate CAD. */
+  modelPicker?: ReactNode;
 }
 
 /**
  * The last step in the editor window: the approved pictures, optional
  * dimensions, and Generate CAD, which starts the normal Image to CAD run.
  */
-export default function ReadyForCad({ pictures, jewelryType, dimensions, onDimensions, cost, costLoading, onBack, onGenerate, generating }: ReadyForCadProps) {
+export default function ReadyForCad({ pictures, jewelryType, dimensions, onDimensions, cost, costLoading, onBack, onGenerate, generating, modelPicker }: ReadyForCadProps) {
   const speech = useSpeechInput((text) => onDimensions(dimensions.trim() ? `${dimensions.trim()}, ${text}` : text));
   const [main, ...angles] = pictures;
 
@@ -105,6 +108,7 @@ export default function ReadyForCad({ pictures, jewelryType, dimensions, onDimen
           <ArrowLeft className="h-4 w-4" /> Back
         </button>
         <span className="flex-1 text-center text-xs text-muted-foreground">Ready in 30–40 min · Rhino 3DM, STL, STEP</span>
+        {modelPicker}
         <button
           type="button"
           onClick={onGenerate}

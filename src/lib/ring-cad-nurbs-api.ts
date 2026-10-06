@@ -52,6 +52,11 @@ export const RING_CAD_TIERS = {
   GEMINI_3_8_FLASH_OPENROUTER: 'gemini_3_8_flash_openrouter',
   GEMINI_4_ARGON_GOOGLE: 'gemini_4_argon_google',
   GEMINI_4_ARGON_OPENROUTER: 'gemini_4_argon_openrouter',
+  // Run on the Claude or ChatGPT subscription connected to the toolkit, not an API key.
+  CLAUDE_FABLE_5_1_SUBSCRIPTION: 'claude_fable_5_1_subscription',
+  CLAUDE_OPUS_5_5_SUBSCRIPTION: 'claude_opus_5_5_subscription',
+  GPT_6_ASTRA_CHATGPT_SUBSCRIPTION: 'gpt_6_astra_chatgpt_subscription',
+  GPT_5_6_SOL_CHATGPT_SUBSCRIPTION: 'gpt_5_6_sol_chatgpt_subscription',
 } as const;
 
 export type RingCadTier = (typeof RING_CAD_TIERS)[keyof typeof RING_CAD_TIERS];

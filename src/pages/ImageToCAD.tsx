@@ -34,6 +34,8 @@ import { ViewportToolbar, ViewportSideTools } from "@/components/text-to-cad/Vie
 import GemToggle from "@/components/text-to-cad/QualityToggle";
 import type { GemMode } from "@/components/text-to-cad/CADCanvas";
 import { RING_CAD_DEFAULT_TIER, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
+import CadModelPicker from "@/components/create-cad/CadModelPicker";
+import { useCadModelChoice } from "@/hooks/useCadModelChoice";
 import { recordStudioVisit } from '@/lib/studio-preference';
 import { useCadRestoreFromUrl } from "@/hooks/useCadRestoreFromUrl";
 
@@ -53,8 +55,9 @@ export default function ImageToCAD() {
   const showCadUpload = isCadUploadEnabled(user?.email);
 
   const [model] = useState("gemini");
-  // Every run uses the customer default: GPT-6 Astra, OpenAI direct.
-  const activeTier = RING_CAD_DEFAULT_TIER;
+  // Customers always run the default (GPT-6 Astra, OpenAI direct); admins pick the model.
+  const modelChoice = useCadModelChoice(RING_CAD_DEFAULT_TIER);
+  const activeTier = modelChoice.tier;
   const {
     referenceImages,
     referenceImagePreviewUrls,
@@ -118,6 +121,9 @@ export default function ImageToCAD() {
     restoringFromUrl: isRestoringFromUrl,
     onWorkspaceActivate: activateWorkspace,
   });
+  const modelPicker = modelChoice.isAdmin
+    ? <CadModelPicker value={modelChoice.tier} onChange={modelChoice.setTier} disabled={workflow.isGenerating} />
+    : null;
 
   // Edit before CAD: the choice under the upload and the editor window.
   const editBeforeCad = useEditBeforeCad({
@@ -255,6 +261,7 @@ export default function ImageToCAD() {
         <ImagePromptScreen
           model={model}
           tier={activeTier}
+          modelPicker={modelPicker}
           prompt={prompt}
           setPrompt={setPrompt}
           jewelryType={jewelryType}
@@ -289,6 +296,7 @@ export default function ImageToCAD() {
           jewelryType={jewelryType}
           dimensions={prompt}
           onDimensions={setPrompt}
+          modelPicker={modelPicker}
         />
       </div>
     );
