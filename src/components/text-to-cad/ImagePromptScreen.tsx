@@ -11,7 +11,7 @@ import ReferenceImageUploader from "./ReferenceImageUploader";
 import CadHistoryLibrary from "./CadHistoryLibrary";
 import { CAD_EXAMPLE_DESIGNS, type CadExampleDesign } from "./cad-examples";
 import DesignUseChoice, { type DesignUse } from "./DesignUseChoice";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Ruler } from "lucide-react";
 
 // Shared fixed height for the upload workspace box and the "My Pieces" panel,
 // so the two columns frame identically — same top edge (both start right
@@ -19,8 +19,14 @@ import { ArrowRight } from "lucide-react";
 // CANVAS_H technique (StudioVaultUploadStep.tsx).
 const PANEL_H = "h-[500px] md:h-[640px]";
 
-// The box asks for the spec only: no examples, no promise about the result.
-const DIMENSION_PLACEHOLDER = "Sizes, widths and stone sizes in mm";
+// The box asks for the spec only: an example of the sizes for the chosen piece.
+const DIMENSION_PLACEHOLDER: Record<CadJewelryType, string> = {
+  ring: "e.g. ring size US 7, band 2 mm wide, centre stone 9 × 7 mm",
+  necklace: "e.g. pendant 22 mm tall, chain 1.5 mm, centre stone 8 × 6 mm",
+  bracelet: "e.g. 17 cm inner length, 5 mm wide, stones 3 mm",
+  earring: "e.g. 24 mm long, centre stone 7 × 5 mm",
+  other: "e.g. 30 mm tall, 20 mm wide, stones 3 mm",
+};
 
 function ReferenceExamples({ examples, noun, onSelect }: { examples: CadExampleDesign[]; noun: string; onSelect: (example: CadExampleDesign) => void }) {
   return (
@@ -194,31 +200,36 @@ export default function ImagePromptScreen({
                   else. Same weight-and-colour emphasis as the upload note. */}
               {!editing && (
               <div className="relative flex-shrink-0">
-                <label htmlFor="image-to-cad-details" className="mb-1.5 flex flex-wrap items-baseline gap-x-2 text-sm">
-                  <span className="font-medium text-foreground">Provide dimensions</span>
-                  <span className="text-muted-foreground">(optional)</span>
-                  <span className="text-muted-foreground">&middot; sizes, widths and stone sizes in mm</span>
+                <label htmlFor="image-to-cad-details" className="block text-[15px] font-medium text-foreground">
+                  Dimensions <span className="font-normal">(optional)</span>
                 </label>
+                <p id="image-to-cad-details-hint" className="mb-2 mt-0.5 text-sm text-muted-foreground">
+                  Provide sizes, widths and stone sizes in mm. Leave empty for standard proportions.
+                </p>
+                <div className="relative">
+                <Ruler aria-hidden="true" className="pointer-events-none absolute left-4 top-4 h-4 w-4 text-muted-foreground" />
                 <textarea
+                  aria-describedby="image-to-cad-details-hint"
                   id="image-to-cad-details"
                   ref={textareaRef}
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder={DIMENSION_PLACEHOLDER}
-                  rows={3}
+                  placeholder={DIMENSION_PLACEHOLDER[jewelryType ?? "ring"]}
+                  rows={1}
                   /* Full-strength border, not a faded one: this is an input and
                      needs to read as an editable field at a glance. */
-                  className="min-h-[96px] max-h-[240px] w-full resize-y overflow-y-auto border border-border bg-background px-5 py-3 pb-7 font-body text-[14px] leading-relaxed text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-foreground/60 focus:ring-1 focus:ring-border"
+                  className="min-h-[72px] sm:min-h-[48px] max-h-[240px] w-full resize-y overflow-y-auto border border-border bg-background py-3 pl-11 pr-20 font-body text-[14px] leading-relaxed text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-foreground/60 focus:ring-1 focus:ring-border"
                 />
                 {prompt.length > 0 && (
                   <button
                     onClick={() => { setPrompt(""); textareaRef.current?.focus(); }}
-                    className="absolute bottom-2.5 right-8 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground/60 hover:text-foreground transition-colors duration-150 cursor-pointer z-10"
+                    className="absolute right-4 top-3.5 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground/60 hover:text-foreground transition-colors duration-150 cursor-pointer z-10"
                   >
                     Clear
                   </button>
                 )}
+                </div>
               </div>
               )}
 
@@ -248,6 +259,7 @@ export default function ImagePromptScreen({
                   {isGenerating ? "Generating…" : (
                     <>
                       Generate CAD
+                      <ArrowRight className="h-4 w-4" />
                       <span className="inline-flex items-center gap-1 opacity-90">
                         <img src={creditCoinIcon} alt="" className="w-5 h-5" />
                         <span className="font-mono text-sm font-semibold">{costLoading ? '…' : (estimatedCost !== null ? estimatedCost : '—')}</span>

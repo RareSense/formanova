@@ -86,19 +86,19 @@ describe('ImagePromptScreen', () => {
     expect(screen.getByRole('heading', { name: /upload your piece images/i })).toBeTruthy();
   });
 
-  it('asks for the spec only in the prompt box, whatever the piece', () => {
+  it('shows an example of the sizes for the chosen piece in the box', () => {
     renderScreen('bracelet');
 
-    expect(screen.getByPlaceholderText('Sizes, widths and stone sizes in mm')).toBeTruthy();
+    expect(screen.getByPlaceholderText(/17 cm inner length/)).toBeTruthy();
   });
 
   it('asks plainly for dimensions above the prompt box, marked optional, and labels the box with it', () => {
     renderScreen('ring');
 
     // The ask is a visible label, not placeholder text that disappears on the first keystroke.
-    expect(screen.getByText('Provide dimensions')).toBeTruthy();
     expect(screen.getByText('(optional)')).toBeTruthy();
-    expect(screen.getByRole('textbox', { name: /provide dimensions/i })).toBeTruthy();
+    expect(screen.getByText(/leave empty for standard proportions/i)).toBeTruthy();
+    expect(screen.getByRole('textbox', { name: /dimensions/i })).toBeTruthy();
   });
 
   it('shows examples for the chosen piece', () => {
@@ -137,7 +137,7 @@ describe('ImagePromptScreen', () => {
     it('is not offered unless the page supports editing, so the plain flow is unchanged', () => {
       renderScreen('ring', { previews: ['blob:one'] });
       expect(screen.queryByRole('radiogroup', { name: /how should we use this design/i })).toBeNull();
-      expect(screen.getByRole('textbox', { name: /provide dimensions/i })).toBeTruthy();
+      expect(screen.getByRole('textbox', { name: /dimensions/i })).toBeTruthy();
     });
 
     it('appears only once a picture is uploaded', () => {
@@ -149,7 +149,7 @@ describe('ImagePromptScreen', () => {
       const onGenerate = vi.fn();
       renderScreen('ring', { onGenerate, onEditFirst: vi.fn(), previews: ['blob:one'] });
       expect(screen.getByRole('radio', { name: /use as is/i }).getAttribute('aria-checked')).toBe('true');
-      expect(screen.getByRole('textbox', { name: /provide dimensions/i })).toBeTruthy();
+      expect(screen.getByRole('textbox', { name: /dimensions/i })).toBeTruthy();
       fireEvent.click(screen.getByRole('button', { name: /generate cad/i }));
       expect(onGenerate).toHaveBeenCalledTimes(1);
     });
@@ -159,7 +159,7 @@ describe('ImagePromptScreen', () => {
       const onEditFirst = vi.fn();
       renderScreen('ring', { onGenerate, onEditFirst, previews: ['blob:one'] });
       fireEvent.click(screen.getByRole('radio', { name: /edit before cad/i }));
-      expect(screen.queryByRole('textbox', { name: /provide dimensions/i })).toBeNull();
+      expect(screen.queryByRole('textbox', { name: /dimensions/i })).toBeNull();
       expect(screen.queryByRole('button', { name: /generate cad/i })).toBeNull();
       fireEvent.click(screen.getByRole('button', { name: /edit design/i }));
       expect(onEditFirst).toHaveBeenCalledTimes(1);
@@ -170,7 +170,7 @@ describe('ImagePromptScreen', () => {
       renderScreen('ring', { onEditFirst: vi.fn(), previews: ['blob:one'] });
       fireEvent.click(screen.getByRole('radio', { name: /edit before cad/i }));
       fireEvent.click(screen.getByRole('radio', { name: /use as is/i }));
-      expect(screen.getByRole('textbox', { name: /provide dimensions/i })).toBeTruthy();
+      expect(screen.getByRole('textbox', { name: /dimensions/i })).toBeTruthy();
     });
   });
 });
