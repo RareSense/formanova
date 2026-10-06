@@ -404,7 +404,7 @@ export interface RingCadFailure {
   retryable: boolean;
 }
 
-function readArtifact(value: unknown): ArtifactRef | null {
+export function readArtifact(value: unknown): ArtifactRef | null {
   if (!value || typeof value !== 'object') return null;
   const a = value as Partial<ArtifactRef>;
   const signedUrl = typeof a.url === 'string' && a.url ? a.url : '';
