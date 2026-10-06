@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { ArrowRight, Diamond, Info, Keyboard, Mic, MousePointerClick, Send, X } from "lucide-react";
+import { ArrowRight, Diamond, Mic, MousePointerClick, Send, X } from "lucide-react";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import { flattenMarkup, MIN_BRUSH, MAX_BRUSH, type Mark } from "@/lib/design-markup";
@@ -230,7 +230,7 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
   const hint = (
     <span className="pointer-events-none absolute bottom-3 right-3 flex max-w-[90%] items-center gap-2 bg-foreground/85 px-3 py-1.5 text-xs text-background">
       <MousePointerClick className="h-3.5 w-3.5 flex-shrink-0" />
-      {tool === "select" ? "Optional: pick a tool on the left to mark the area you want to change." : MARKUP_TOOLS.find((t) => t.id === tool)?.hint}
+      {tool === "select" ? "Optional: use a tool on the left to mark the area you want to change." : `Optional: ${MARKUP_TOOLS.find((t) => t.id === tool)?.hint.toLowerCase()}`}
     </span>
   );
 
@@ -257,9 +257,7 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
               {stage === "angles" && <span className="bg-muted px-2 py-0.5 text-xs text-muted-foreground">Optional</span>}
               {stage === "edit" && versions.length > 0 && <span className="bg-muted px-2 py-0.5 text-xs text-muted-foreground">V{current + 1} of {versions.length}</span>}
             </div>
-            <button type="button" onClick={() => setHelpOpen(true)} title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts" className="hidden h-10 w-10 items-center justify-center text-muted-foreground hover:text-foreground lg:flex">
-              <Keyboard className="h-5 w-5" />
-            </button>
+            <span className="w-[88px] flex-shrink-0" aria-hidden="true" />
           </header>
 
           {stage === "angles" && approved && (
@@ -299,15 +297,12 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
                 onUndo={() => { history.undo(); setSelected(null); }}
                 onRedo={() => { history.redo(); setSelected(null); }}
                 onClear={() => { history.commit([]); setSelected(null); }}
+                onShowShortcuts={() => setHelpOpen(true)}
                 disabled={busy}
               />
             </aside>
 
             <main className="flex min-w-0 flex-1 flex-col gap-3">
-              <p className="flex items-start gap-2 bg-[hsl(var(--formanova-hero-accent)/0.08)] px-3 py-2.5 text-sm text-foreground">
-                <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-[hsl(var(--formanova-hero-accent))]" />
-                <span><span className="font-medium">Optional:</span> highlight the part you want changed, then describe the edit below.</span>
-              </p>
 
               <div className="h-[46vh] min-h-[260px] border border-border lg:h-auto lg:min-h-0 lg:flex-1">
                 <MarkupCanvas

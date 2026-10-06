@@ -1,4 +1,4 @@
-import { Redo2, Trash2, Undo2 } from "lucide-react";
+import { Keyboard, Redo2, Trash2, Undo2 } from "lucide-react";
 import { MAX_BRUSH, MIN_BRUSH } from "@/lib/design-markup";
 import type { MarkupTool } from "./MarkupCanvas";
 import { MARKUP_TOOLS } from "./markup-tools";
@@ -15,6 +15,7 @@ interface MarkupToolPanelProps {
   onUndo: () => void;
   onRedo: () => void;
   onClear: () => void;
+  onShowShortcuts: () => void;
   disabled?: boolean;
 }
 
@@ -25,7 +26,7 @@ const iconBtn = "flex h-10 flex-1 items-center justify-center gap-1.5 border bor
  * "Mark what to change": optional markup tools. A column of labelled tools
  * with their keyboard keys on desktop; a compact row of icons on phones.
  */
-export default function MarkupToolPanel({ tool, onTool, brush, onBrush, canUndo, canRedo, canClear, onUndo, onRedo, onClear, disabled }: MarkupToolPanelProps) {
+export default function MarkupToolPanel({ tool, onTool, brush, onBrush, canUndo, canRedo, canClear, onUndo, onRedo, onClear, onShowShortcuts, disabled }: MarkupToolPanelProps) {
   const sized = tool === "brush" || tool === "erase";
   return (
     <div className="flex flex-col gap-3" role="toolbar" aria-label="Mark what to change">
@@ -92,6 +93,10 @@ export default function MarkupToolPanel({ tool, onTool, brush, onBrush, canUndo,
           <Trash2 className="h-4 w-4" /><span className="hidden lg:inline">Clear</span>
         </button>
       </div>
+
+      <button type="button" onClick={onShowShortcuts} className="hidden items-center gap-2 text-xs text-muted-foreground hover:text-foreground lg:flex">
+        <Keyboard className="h-4 w-4" /> Keyboard shortcuts <span className={kbd}>?</span>
+      </button>
     </div>
   );
 }

@@ -12,6 +12,13 @@ vi.mock('@/lib/design-image-run', async (importOriginal) => ({
   runDesignImage: mockRun,
 }));
 
+// The live path; preview mode is covered at the end.
+const preview = vi.hoisted(() => ({ live: true }));
+vi.mock('@/lib/design-image-preview', () => ({
+  get DESIGN_IMAGE_BACKEND_LIVE() { return preview.live; },
+  previewDesignImage: vi.fn(async (_r: unknown, fallback: string | null) => ({ image: { uri: fallback, url: fallback, type: 'image/png', bytes: 0, sha256: '' }, consistent: null, drift: [], view: null })),
+}));
+
 import { DesignImageRunError } from '@/lib/design-image-run';
 import { useDesignImageRun } from './useDesignImageRun';
 
@@ -74,5 +81,20 @@ describe('useDesignImageRun', () => {
     const { result } = renderHook(() => useDesignImageRun());
     await act(async () => { await result.current.generate([{ prompt: 'a' }, { prompt: 'b' }], { onOutcome: (i, o) => seen.push([i, o.ok]) }); });
     expect(seen.sort()).toEqual([[0, true], [1, false]]);
+  });
+
+  it('in preview mode makes pictures with no backend call and no credit check', async () => {
+    preview.live = false;
+    try {
+      const { result } = renderHook(() => useDesignImageRun());
+      let outcomes: Array<{ ok: boolean }> = [];
+      await act(async () => { outcomes = (await result.current.generate([{ prompt: 'a' }], { previewFallbacks: ['/example.webp'] })) ?? []; });
+      expect(outcomes[0].ok).toBe(true);
+      expect(mockCheckCredits).not.toHaveBeenCalled();
+      expect(mockRun).not.toHaveBeenCalled();
+      expect(mockRefresh).not.toHaveBeenCalled();
+    } finally {
+      preview.live = true;
+    }
   });
 });
