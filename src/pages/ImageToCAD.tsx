@@ -6,7 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import CadWorkspaceLayout from "@/components/text-to-cad/CadWorkspaceLayout";
 import { useCadBreakpoint, useCadCanHover } from "@/hooks/use-cad-breakpoint";
-import { isCadUploadEnabled } from "@/lib/feature-flags";
+import { IMAGE_TO_CAD_EDIT_ENABLED, isCadUploadEnabled } from "@/lib/feature-flags";
 import { runMicroBenchmark } from "@/lib/gpu-detect";
 import { useImageToCADWorkflow } from "@/hooks/useImageToCADWorkflow";
 import { useCADMeshEditor } from "@/hooks/useCADMeshEditor";
@@ -20,6 +20,8 @@ import { trackCadStudioOpen, trackCadReferenceUploaded } from "@/lib/posthog-eve
 import { useCADKeyboardShortcuts } from "@/hooks/use-cad-keyboard-shortcuts";
 
 import ImagePromptScreen from "@/components/text-to-cad/ImagePromptScreen";
+import type { DesignUse } from "@/components/text-to-cad/DesignUseChoice";
+import DesignEditor from "@/components/create-cad/DesignEditor";
 import LeftPanel from "@/components/text-to-cad/LeftPanel";
 import MeshPanel from "@/components/text-to-cad/MeshPanel";
 import CADCanvas from "@/components/text-to-cad/CADCanvas";
@@ -87,6 +89,9 @@ export default function ImageToCAD() {
   const [workspaceActive, setWorkspaceActive] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [jewelryType, setJewelryType] = useState<CadJewelryType | null>(null);
+  // Edit before CAD (flagged): the choice under the upload, and the editor overlay.
+  const [designUse, setDesignUse] = useState<DesignUse>("as_is");
+  const [editorOpen, setEditorOpen] = useState(false);
 
   const canvasRef = useRef<CADCanvasHandle>(null);
 
@@ -253,6 +258,9 @@ export default function ImageToCAD() {
           onAddReferenceImages={addReferenceImages}
           onRemoveReferenceImage={removeReferenceImage}
           onReplaceReferenceImages={replaceReferenceImages}
+          onEditFirst={IMAGE_TO_CAD_EDIT_ENABLED ? () => setEditorOpen(true) : undefined}
+          designUse={designUse}
+          onDesignUseChange={setDesignUse}
           onGlbUpload={showCadUpload ? (file) => {
             setWorkspaceActive(true);
             workflow.setHasModel(true);
@@ -268,6 +276,22 @@ export default function ImageToCAD() {
             }
           } : undefined}
         />
+        {IMAGE_TO_CAD_EDIT_ENABLED && (
+          <DesignEditor
+            open={editorOpen}
+            source={referenceImages[0] ?? null}
+            jewelryType={jewelryType}
+            onCancel={() => setEditorOpen(false)}
+            onApprove={(file) => {
+              // The approved design becomes the picture the CAD is made from.
+              // Other uploaded angles show the old design, so they are replaced too.
+              replaceReferenceImages([file]);
+              setDesignUse("as_is");
+              setEditorOpen(false);
+              toast.success("Edited design ready. Add dimensions if you have them, then generate the CAD.");
+            }}
+          />
+        )}
       </div>
     );
   }

@@ -72,6 +72,9 @@ interface ImagePromptScreenProps {
    * when omitted the screen is exactly the plain upload-and-generate flow.
    */
   onEditFirst?: () => void;
+  /** Optional control of the choice, so the page can return to Use as is after an edit is approved. */
+  designUse?: DesignUse;
+  onDesignUseChange?: (use: DesignUse) => void;
 }
 
 export default function ImagePromptScreen({
@@ -81,6 +84,8 @@ export default function ImagePromptScreen({
   onAddReferenceImages, onRemoveReferenceImage, onReplaceReferenceImages,
   onGlbUpload,
   onEditFirst,
+  designUse: designUseProp,
+  onDesignUseChange,
 }: ImagePromptScreenProps) {
   const glbInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -138,7 +143,9 @@ export default function ImagePromptScreen({
   };
 
   const canGenerate = imageCount > 0;
-  const [designUse, setDesignUse] = useState<DesignUse>("as_is");
+  const [designUseLocal, setDesignUseLocal] = useState<DesignUse>("as_is");
+  const designUse = designUseProp ?? designUseLocal;
+  const setDesignUse = (use: DesignUse) => { setDesignUseLocal(use); onDesignUseChange?.(use); };
   // Editing only applies once there is a picture to edit.
   const editing = !!onEditFirst && imageCount > 0 && designUse === "edit";
 
