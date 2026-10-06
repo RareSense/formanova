@@ -8,7 +8,9 @@ import { pollWorkflow } from "@/lib/poll-workflow";
 import CadWorkspaceLayout from "@/components/text-to-cad/CadWorkspaceLayout";
 import { useCadBreakpoint, useCadCanHover } from "@/hooks/use-cad-breakpoint";
 
-import InitialPromptScreen from "@/components/text-to-cad/InitialPromptScreen";
+import DesignToCadFlow from "@/components/create-cad/DesignToCadFlow";
+import { useReferenceImages } from "@/hooks/useReferenceImages";
+import { useEstimatedCost } from "@/hooks/use-estimated-cost";
 import LeftPanel from "@/components/text-to-cad/LeftPanel";
 import { useAuth } from "@/contexts/AuthContext";
 import { isCadUploadEnabled } from "@/lib/feature-flags";
@@ -36,11 +38,10 @@ import {
 import GemToggle from "@/components/text-to-cad/QualityToggle";
 import { runMicroBenchmark } from "@/lib/gpu-detect";
 import type { GemMode } from "@/components/text-to-cad/CADCanvas";
-import { RING_CAD_DEFAULT_TIER, RING_CAD_TIERS, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
+import { RING_CAD_DEFAULT_TIER, RING_CAD_NURBS_WORKFLOW, RING_CAD_TIERS, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
 import { recordStudioVisit } from '@/lib/studio-preference';
 import { useCadRestoreFromUrl } from "@/hooks/useCadRestoreFromUrl";
 
-const NO_REFERENCE_IMAGES: File[] = [];
 /** Touch gizmos are too fiddly on a phone: the view only orbits there. */
 const PHONE_TRANSFORM_MODES = ["orbit"] as const;
 
@@ -109,10 +110,20 @@ export default function TextToCAD() {
     () => Boolean(searchParams.get('workflow_id')?.trim() || searchParams.get('glb')),
   );
 
+  // Text to CAD is design first: the CAD is made from the approved design
+  // pictures (main first) plus the dimensions typed in Ready for CAD.
+  const { referenceImages, replaceReferenceImages } = useReferenceImages();
+  const [pendingCad, setPendingCad] = useState(false);
+  const { cost: cadCost, loading: cadCostLoading } = useEstimatedCost({
+    workflowName: RING_CAD_NURBS_WORKFLOW,
+    model,
+    pricingContext: { llm_tier: activeTier },
+  });
+
   const workflow = useImageToCADWorkflow({
     model,
     prompt,
-    referenceImages: NO_REFERENCE_IMAGES,
+    referenceImages,
     tier: activeTier,
     jewelryType: jewelryType ?? undefined,
     cadRoute: '/text-to-cad',
@@ -121,6 +132,13 @@ export default function TextToCAD() {
     restoringFromUrl: isRestoringFromUrl,
     onWorkspaceActivate: activateWorkspace,
   });
+
+  // Start the CAD on the render after the approved pictures are in place.
+  useEffect(() => {
+    if (!pendingCad) return;
+    setPendingCad(false);
+    workflow.simulateGeneration();
+  }, [pendingCad, referenceImages]); // eslint-disable-line react-hooks/exhaustive-deps -- fires once per Generate CAD; workflow changes identity every render and must not re-trigger a paid run
 
   // A new model starts assembled.
   useEffect(() => { setExploded(false); }, [workflow.glbUrl]);
@@ -267,18 +285,17 @@ export default function TextToCAD() {
   // ── Phase 1: Initial prompt screen ──
   if (!workspaceActive) {
     return (
-      <div className="h-[calc(100vh-5rem)] flex bg-background" tabIndex={0}>
-        <InitialPromptScreen
-          model={model}
-          tier={activeTier}
-          setModel={() => {}}
-          prompt={prompt}
-          setPrompt={setPrompt}
+      <div className="min-h-[calc(100vh-5rem)] flex bg-background" tabIndex={0}>
+        <DesignToCadFlow
           jewelryType={jewelryType}
           setJewelryType={setJewelryType}
-          isGenerating={workflow.isGenerating}
-          onGenerate={workflow.simulateGeneration}
           onGlbUpload={showCadUpload ? handleGlbUpload : undefined}
+          dimensions={prompt}
+          onDimensions={setPrompt}
+          cadCost={cadCost}
+          cadCostLoading={cadCostLoading}
+          creatingCad={pendingCad || workflow.isGenerating}
+          onCreateCad={(files) => { void Promise.resolve(replaceReferenceImages(files)).then(() => setPendingCad(true)); }}
         />
       </div>
     );

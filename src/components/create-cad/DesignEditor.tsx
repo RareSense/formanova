@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { ArrowRight, Diamond, Mic, MousePointerClick, Send, X } from "lucide-react";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
-import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import { flattenMarkup, MIN_BRUSH, MAX_BRUSH, type Mark } from "@/lib/design-markup";
 import { blobToDataUrl } from "@/lib/design-image-run";
 import type { CadJewelryType, ImageInput } from "@/lib/ring-cad-nurbs-api";
@@ -15,6 +14,7 @@ import { useSpeechInput } from "./useSpeechInput";
 import AnglesStep from "./AnglesStep";
 import ReadyForCad from "./ReadyForCad";
 import type { EditorPicture } from "./angle-suggestions";
+import { toObjectUrl } from "./picture-urls";
 
 interface Version {
   /** Renderable, same-origin URL (blob:), so the picture can also be flattened on a canvas. */
@@ -60,12 +60,6 @@ const SHORTCUTS: [string, string][] = [
   ["← →", "Previous / next version"], ["Ctrl Enter", "Make it CAD"], ["Esc", "Deselect, then close"],
 ];
 
-/** Object URL for a result picture; artifact URLs need the auth header. */
-async function toObjectUrl(url: string): Promise<string> {
-  const res = url.includes("/artifacts/") ? await authenticatedFetch(url) : await fetch(url);
-  if (!res.ok) throw new Error(`${res.status}`);
-  return URL.createObjectURL(await res.blob());
-}
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
