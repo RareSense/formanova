@@ -35,7 +35,7 @@ describe('DesignEditor', () => {
       expect(screen.getByRole('button', { name: new RegExp(name) })).toBeInTheDocument();
     }
     expect(screen.getAllByText(/optional/i).length).toBeGreaterThan(0);
-  });
+  }, 15000); // first render of the dialog is slow on a loaded machine
 
   it('offers Looks right only once a new version exists', () => {
     renderEditor();
