@@ -18,7 +18,7 @@ import ImagePromptScreen from './ImagePromptScreen';
 
 function renderScreen(
   jewelryType: 'ring' | 'necklace' | 'bracelet' | 'earring' | 'other' | null = 'ring',
-  { onGenerate = vi.fn(), previews = [] as string[] } = {},
+  { onGenerate = vi.fn(), previews = [] as string[], onEditFirst = undefined as (() => void) | undefined } = {},
 ) {
   return render(
     <ImagePromptScreen
@@ -34,6 +34,7 @@ function renderScreen(
       onAddReferenceImages={vi.fn()}
       onRemoveReferenceImage={vi.fn()}
       onReplaceReferenceImages={vi.fn()}
+      onEditFirst={onEditFirst}
     />,
   );
 }
@@ -130,5 +131,46 @@ describe('ImagePromptScreen', () => {
 
     expect(screen.getByText(/choose what you are making to see examples/i)).toBeTruthy();
     expect(screen.queryByRole('button', { name: /example 1/i })).toBeNull();
+  });
+
+  describe('use as is / edit before CAD', () => {
+    it('is not offered unless the page supports editing, so the plain flow is unchanged', () => {
+      renderScreen('ring', { previews: ['blob:one'] });
+      expect(screen.queryByRole('radiogroup', { name: /how should we use this design/i })).toBeNull();
+      expect(screen.getByRole('textbox', { name: /provide dimensions/i })).toBeTruthy();
+    });
+
+    it('appears only once a picture is uploaded', () => {
+      renderScreen('ring', { onEditFirst: vi.fn() });
+      expect(screen.queryByRole('radiogroup', { name: /how should we use this design/i })).toBeNull();
+    });
+
+    it('starts on Use as is, with dimensions and Generate CAD as today', () => {
+      const onGenerate = vi.fn();
+      renderScreen('ring', { onGenerate, onEditFirst: vi.fn(), previews: ['blob:one'] });
+      expect(screen.getByRole('radio', { name: /use as is/i }).getAttribute('aria-checked')).toBe('true');
+      expect(screen.getByRole('textbox', { name: /provide dimensions/i })).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: /generate cad/i }));
+      expect(onGenerate).toHaveBeenCalledTimes(1);
+    });
+
+    it('hides dimensions in edit mode and opens the editor instead of generating', () => {
+      const onGenerate = vi.fn();
+      const onEditFirst = vi.fn();
+      renderScreen('ring', { onGenerate, onEditFirst, previews: ['blob:one'] });
+      fireEvent.click(screen.getByRole('radio', { name: /edit before cad/i }));
+      expect(screen.queryByRole('textbox', { name: /provide dimensions/i })).toBeNull();
+      expect(screen.queryByRole('button', { name: /generate cad/i })).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: /edit design/i }));
+      expect(onEditFirst).toHaveBeenCalledTimes(1);
+      expect(onGenerate).not.toHaveBeenCalled();
+    });
+
+    it('brings dimensions back when switching back to Use as is', () => {
+      renderScreen('ring', { onEditFirst: vi.fn(), previews: ['blob:one'] });
+      fireEvent.click(screen.getByRole('radio', { name: /edit before cad/i }));
+      fireEvent.click(screen.getByRole('radio', { name: /use as is/i }));
+      expect(screen.getByRole('textbox', { name: /provide dimensions/i })).toBeTruthy();
+    });
   });
 });

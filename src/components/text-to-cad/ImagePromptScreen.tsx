@@ -10,6 +10,8 @@ import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import ReferenceImageUploader from "./ReferenceImageUploader";
 import CadHistoryLibrary from "./CadHistoryLibrary";
 import { CAD_EXAMPLE_DESIGNS, type CadExampleDesign } from "./cad-examples";
+import DesignUseChoice, { type DesignUse } from "./DesignUseChoice";
+import { ArrowRight } from "lucide-react";
 
 // Shared fixed height for the upload workspace box and the "My Pieces" panel,
 // so the two columns frame identically — same top edge (both start right
@@ -58,6 +60,12 @@ interface ImagePromptScreenProps {
   /** Replaces the whole set (used by the example designs). */
   onReplaceReferenceImages: (files: File[]) => void;
   onGlbUpload?: (file: File) => void;
+  /**
+   * Opens the design editor with the uploaded pictures. When provided, a
+   * "Use as is / Edit before CAD" choice appears once a picture is uploaded;
+   * when omitted the screen is exactly the plain upload-and-generate flow.
+   */
+  onEditFirst?: () => void;
 }
 
 export default function ImagePromptScreen({
@@ -66,6 +74,7 @@ export default function ImagePromptScreen({
   referenceImagePreviewUrls,
   onAddReferenceImages, onRemoveReferenceImage, onReplaceReferenceImages,
   onGlbUpload,
+  onEditFirst,
 }: ImagePromptScreenProps) {
   const glbInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -123,6 +132,9 @@ export default function ImagePromptScreen({
   };
 
   const canGenerate = imageCount > 0;
+  const [designUse, setDesignUse] = useState<DesignUse>("as_is");
+  // Editing only applies once there is a picture to edit.
+  const editing = !!onEditFirst && imageCount > 0 && designUse === "edit";
 
   return (
     <div className="w-full flex items-start justify-center bg-background">
@@ -172,10 +184,15 @@ export default function ImagePromptScreen({
                 photoStudioEmptyState
               />
 
+              {onEditFirst && imageCount > 0 && (
+                <DesignUseChoice value={designUse} onChange={setDesignUse} disabled={isGenerating} />
+              )}
+
               {/* Text prompt — secondary. The ask for dimensions is a visible
                   label, not placeholder text: a placeholder vanishes on the
                   first keystroke. The copy names what to enter and nothing
                   else. Same weight-and-colour emphasis as the upload note. */}
+              {!editing && (
               <div className="relative flex-shrink-0">
                 <label htmlFor="image-to-cad-details" className="mb-1.5 flex flex-wrap items-baseline gap-x-2 text-sm">
                   <span className="font-medium text-foreground">Provide dimensions</span>
@@ -203,6 +220,7 @@ export default function ImagePromptScreen({
                   </button>
                 )}
               </div>
+              )}
 
             </div>
 
@@ -210,6 +228,17 @@ export default function ImagePromptScreen({
                 right-aligned below the canvas, gold gradient, size="lg". */}
             {(
               <div className="mt-3 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end">
+                {editing ? (
+                <Button
+                  size="lg"
+                  onClick={onEditFirst}
+                  disabled={isGenerating}
+                  className="gap-2.5 border-0 bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] px-10 font-display text-base uppercase tracking-wide text-background transition-opacity hover:opacity-90 disabled:opacity-60"
+                >
+                  Edit design
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+                ) : (
                 <Button
                   size="lg"
                   onClick={guardedGenerate}
@@ -226,6 +255,7 @@ export default function ImagePromptScreen({
                     </>
                   )}
                 </Button>
+                )}
               </div>
             )}
 
