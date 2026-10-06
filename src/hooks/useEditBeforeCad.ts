@@ -16,7 +16,6 @@ import { RING_CAD_NURBS_WORKFLOW } from '@/lib/ring-cad-nurbs-api';
 import type { DesignUse } from '@/components/text-to-cad/DesignUseChoice';
 
 interface UseEditBeforeCadOptions {
-  enabled: boolean;
   model: string;
   tier: string;
   referenceImages: File[];
@@ -26,7 +25,7 @@ interface UseEditBeforeCadOptions {
   isGenerating: boolean;
 }
 
-export function useEditBeforeCad({ enabled, model, tier, referenceImages, replaceReferenceImages, startCad, isGenerating }: UseEditBeforeCadOptions) {
+export function useEditBeforeCad({ model, tier, referenceImages, replaceReferenceImages, startCad, isGenerating }: UseEditBeforeCadOptions) {
   const [designUse, setDesignUse] = useState<DesignUse>('as_is');
   const [editorOpen, setEditorOpen] = useState(false);
   const [editApproved, setEditApproved] = useState(false);
@@ -61,7 +60,7 @@ export function useEditBeforeCad({ enabled, model, tier, referenceImages, replac
     setDesignUse,
     editApproved,
     picturesChanged,
-    openEditor: enabled ? () => setEditorOpen(true) : undefined,
+    openEditor: () => setEditorOpen(true),
     editorProps: {
       open: editorOpen,
       source: referenceImages[0] ?? null,

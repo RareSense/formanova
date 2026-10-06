@@ -25,16 +25,6 @@ function isAllowlistedEmail(email: string | undefined | null, envKey: string): b
 export const CAD_RENAME_ENABLED = import.meta.env.VITE_CAD_RENAME_ENABLED === 'true';
 
 /**
- * "Edit before CAD" on Image to CAD: the Use as is / Edit choice and the
- * design editor. Controlled by VITE_IMAGE_TO_CAD_EDIT_ENABLED ("true" to show).
- * Owner: CAD studio team. Reason: the design_image_v1 backend workflow is not
- * live yet, so editing cannot make pictures in production.
- * Remove when: design_image_v1 is registered and priced in production and the
- * editor has shipped; then inline the choice and delete this flag.
- */
-export const IMAGE_TO_CAD_EDIT_ENABLED = import.meta.env.VITE_IMAGE_TO_CAD_EDIT_ENABLED === 'true';
-
-/**
  * Users allowed to see the weight estimation + STL export tools.
  */
 export function isWeightStlEnabled(email: string | undefined | null): boolean {

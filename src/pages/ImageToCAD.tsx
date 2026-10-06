@@ -6,7 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import CadWorkspaceLayout from "@/components/text-to-cad/CadWorkspaceLayout";
 import { useCadBreakpoint, useCadCanHover } from "@/hooks/use-cad-breakpoint";
-import { IMAGE_TO_CAD_EDIT_ENABLED, isCadUploadEnabled } from "@/lib/feature-flags";
+import { isCadUploadEnabled } from "@/lib/feature-flags";
 import { runMicroBenchmark } from "@/lib/gpu-detect";
 import { useImageToCADWorkflow } from "@/hooks/useImageToCADWorkflow";
 import { useCADMeshEditor } from "@/hooks/useCADMeshEditor";
@@ -119,9 +119,8 @@ export default function ImageToCAD() {
     onWorkspaceActivate: activateWorkspace,
   });
 
-  // Edit before CAD (flagged): the choice under the upload and the editor window.
+  // Edit before CAD: the choice under the upload and the editor window.
   const editBeforeCad = useEditBeforeCad({
-    enabled: IMAGE_TO_CAD_EDIT_ENABLED,
     model,
     tier: activeTier,
     referenceImages,
@@ -285,14 +284,12 @@ export default function ImageToCAD() {
             }
           } : undefined}
         />
-        {IMAGE_TO_CAD_EDIT_ENABLED && (
-          <DesignEditor
-            {...editBeforeCad.editorProps}
-            jewelryType={jewelryType}
-            dimensions={prompt}
-            onDimensions={setPrompt}
-          />
-        )}
+        <DesignEditor
+          {...editBeforeCad.editorProps}
+          jewelryType={jewelryType}
+          dimensions={prompt}
+          onDimensions={setPrompt}
+        />
       </div>
     );
   }
