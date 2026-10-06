@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { Check, Diamond, Info, Keyboard, MousePointerClick, Send, X } from "lucide-react";
+import { Check, Diamond, Info, Keyboard, Mic, MousePointerClick, Send, X } from "lucide-react";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import { flattenMarkup, MIN_BRUSH, MAX_BRUSH, type Mark } from "@/lib/design-markup";
@@ -11,6 +11,7 @@ import MarkupCanvas, { type MarkupTool } from "./MarkupCanvas";
 import MarkupToolPanel from "./MarkupToolPanel";
 import { MARKUP_TOOLS } from "./markup-tools";
 import { useMarkupHistory } from "./useMarkupHistory";
+import { useSpeechInput } from "./useSpeechInput";
 
 interface Version {
   /** Renderable, same-origin URL (blob:), so the picture can also be flattened on a canvas. */
@@ -72,6 +73,7 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onAp
   const [helpOpen, setHelpOpen] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const history = useMarkupHistory();
+  const speech = useSpeechInput((text) => setInstruction((t) => (t.trim() ? `${t.trim()} ${text}` : text)));
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const objectUrls = useRef<string[]>([]);
 
@@ -266,8 +268,21 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onAp
                       rows={1}
                       disabled={busy}
                       placeholder={history.marks.length ? "Describe what to change in the marked area, e.g. make it an oval sapphire" : "Describe what to change, e.g. make the centre stone oval"}
-                      className="min-h-[48px] w-full resize-none border border-border bg-background px-4 py-3 text-[15px] leading-snug text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-foreground/60 disabled:opacity-60"
+                      className="min-h-[48px] w-full resize-none border border-border bg-background py-3 pl-4 pr-12 text-[15px] leading-snug text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-foreground/60 disabled:opacity-60"
                     />
+                    {speech.supported && (
+                      <button
+                        type="button"
+                        onClick={speech.toggle}
+                        disabled={busy}
+                        aria-label={speech.listening ? "Stop listening" : "Speak your change"}
+                        aria-pressed={speech.listening}
+                        title={speech.listening ? "Listening… click to stop" : "Speak your change"}
+                        className={`absolute right-1.5 top-1.5 flex h-9 w-9 items-center justify-center disabled:opacity-50 ${speech.listening ? "animate-pulse text-destructive" : "text-muted-foreground hover:text-foreground"}`}
+                      >
+                        <Mic className="h-5 w-5" />
+                      </button>
+                    )}
                   </div>
                   <button
                     type="button"
