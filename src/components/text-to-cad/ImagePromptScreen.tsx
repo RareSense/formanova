@@ -11,7 +11,7 @@ import ReferenceImageUploader from "./ReferenceImageUploader";
 import CadHistoryLibrary from "./CadHistoryLibrary";
 import { CAD_EXAMPLE_DESIGNS, type CadExampleDesign } from "./cad-examples";
 import DesignUseChoice, { type DesignUse } from "./DesignUseChoice";
-import { ArrowRight, Ruler } from "lucide-react";
+import { ArrowRight, Check, Ruler } from "lucide-react";
 
 // Shared fixed height for the upload workspace box and the "My Pieces" panel,
 // so the two columns frame identically — same top edge (both start right
@@ -75,6 +75,8 @@ interface ImagePromptScreenProps {
   /** Optional control of the choice, so the page can return to Use as is after an edit is approved. */
   designUse?: DesignUse;
   onDesignUseChange?: (use: DesignUse) => void;
+  /** The pictures are an approved edit: show that instead of asking again, with Edit again. */
+  editApproved?: boolean;
 }
 
 export default function ImagePromptScreen({
@@ -86,11 +88,11 @@ export default function ImagePromptScreen({
   onEditFirst,
   designUse: designUseProp,
   onDesignUseChange,
+  editApproved = false,
 }: ImagePromptScreenProps) {
   const glbInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const noun = jewelryType ? cadJewelryNoun(jewelryType) : "jewelry";
-  const { cardsRef, guardedGenerate, typeError } = useJewelryTypeGate(jewelryType, onGenerate);
   const [hasImageHistory, setHasImageHistory] = useState(false);
 
   const primaryPreviewUrl = referenceImagePreviewUrls[0] ?? null;
@@ -147,7 +149,9 @@ export default function ImagePromptScreen({
   const designUse = designUseProp ?? designUseLocal;
   const setDesignUse = (use: DesignUse) => { setDesignUseLocal(use); onDesignUseChange?.(use); };
   // Editing only applies once there is a picture to edit.
-  const editing = !!onEditFirst && imageCount > 0 && designUse === "edit";
+  const editing = !!onEditFirst && imageCount > 0 && !editApproved && designUse === "edit";
+  // One piece-type check for whichever main action is showing: Generate CAD or Edit design.
+  const { cardsRef, guardedGenerate, typeError } = useJewelryTypeGate(jewelryType, editing && onEditFirst ? onEditFirst : onGenerate);
 
   return (
     <div className="w-full flex items-start justify-center bg-background">
@@ -197,8 +201,18 @@ export default function ImagePromptScreen({
                 photoStudioEmptyState
               />
 
-              {onEditFirst && imageCount > 0 && (
+              {onEditFirst && imageCount > 0 && !editApproved && (
                 <DesignUseChoice value={designUse} onChange={setDesignUse} disabled={isGenerating} />
+              )}
+              {onEditFirst && imageCount > 0 && editApproved && (
+                <p className="flex flex-wrap items-center gap-x-1.5 text-sm text-foreground">
+                  <Check className="h-4 w-4 text-emerald-700" aria-hidden="true" />
+                  Edited design approved
+                  <span className="text-muted-foreground" aria-hidden="true">&middot;</span>
+                  <button type="button" onClick={onEditFirst} disabled={isGenerating} className="underline underline-offset-2 hover:text-muted-foreground disabled:opacity-60">
+                    Edit again
+                  </button>
+                </p>
               )}
 
               {/* Text prompt — secondary. The ask for dimensions is a visible
@@ -249,7 +263,7 @@ export default function ImagePromptScreen({
                 {editing ? (
                 <Button
                   size="lg"
-                  onClick={onEditFirst}
+                  onClick={guardedGenerate}
                   disabled={isGenerating}
                   className="gap-2.5 border-0 bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] px-10 font-display text-base uppercase tracking-wide text-background transition-opacity hover:opacity-90 disabled:opacity-60"
                 >

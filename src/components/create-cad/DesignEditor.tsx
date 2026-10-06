@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { Check, Diamond, Info, Keyboard, Mic, MousePointerClick, Send, X } from "lucide-react";
+import { ArrowRight, Diamond, Info, Keyboard, Mic, MousePointerClick, Send, X } from "lucide-react";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import { flattenMarkup, MIN_BRUSH, MAX_BRUSH, type Mark } from "@/lib/design-markup";
@@ -12,6 +12,9 @@ import MarkupToolPanel from "./MarkupToolPanel";
 import { MARKUP_TOOLS } from "./markup-tools";
 import { useMarkupHistory } from "./useMarkupHistory";
 import { useSpeechInput } from "./useSpeechInput";
+import AnglesStep from "./AnglesStep";
+import ReadyForCad from "./ReadyForCad";
+import type { EditorPicture } from "./angle-suggestions";
 
 interface Version {
   /** Renderable, same-origin URL (blob:), so the picture can also be flattened on a canvas. */
@@ -21,21 +24,40 @@ interface Version {
   note: string;
 }
 
+type Stage = "edit" | "angles" | "ready";
+
 interface DesignEditorProps {
   open: boolean;
   /** The uploaded picture to start from. */
   source: File | null;
   jewelryType: CadJewelryType | null;
+  /** Closed before approving: the page keeps its upload as it was. */
   onCancel: () => void;
-  /** The approved picture, as a file the CAD run can use like any upload. */
-  onApprove: (file: File) => void;
+  /** Closed after approving: the page keeps the approved pictures (main first). */
+  onKeep: (files: File[]) => void;
+  /** Generate CAD from the approved pictures (main first) and the dimensions. */
+  onCreateCad: (files: File[]) => void;
+  dimensions: string;
+  onDimensions: (text: string) => void;
+  cadCost: number | null;
+  cadCostLoading: boolean;
+  creatingCad: boolean;
+}
+
+async function picturesToFiles(pictures: EditorPicture[]): Promise<File[]> {
+  return Promise.all(pictures.map(async (p, i) => {
+    const blob = await (await fetch(p.display)).blob();
+    const slug = p.label.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const name = i === 0 ? "edited-design.png" : `edited-design-${slug || i}.png`;
+    return new File([blob], name, { type: blob.type || "image/png" });
+  }));
 }
 
 const SHORTCUTS: [string, string][] = [
   ...MARKUP_TOOLS.map(({ key, name }) => [key, name] as [string, string]),
   ["[  ]", "Smaller / bigger brush"], ["Ctrl Z", "Undo"], ["Ctrl Shift Z", "Redo"], ["Delete", "Delete the selected mark"],
   ["/", "Type a change"], ["Enter", "Send the change"], ["Shift Enter", "New line"],
-  ["← →", "Previous / next version"], ["Ctrl Enter", "Looks right"], ["Esc", "Deselect, then close"],
+  ["← →", "Previous / next version"], ["Ctrl Enter", "Make it CAD"], ["Esc", "Deselect, then close"],
 ];
 
 /** Object URL for a result picture; artifact URLs need the auth header. */
@@ -55,12 +77,14 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 }
 
 /**
- * Edit before CAD: change the uploaded design by describing it, optionally
- * marking where. Each change makes a new version; "Looks right" appears once
- * there is something new to approve, and hands the chosen version back to
- * Image to CAD as its picture.
+ * Edit before CAD, in one window:
+ *  edit   - change the uploaded design by describing it, optionally marking
+ *           where; each change makes a new version. Once there is a new
+ *           version: "Add more angles" or "Make it CAD".
+ *  angles - optional extra angles of the approved version.
+ *  ready  - the approved pictures, optional dimensions, Generate CAD.
  */
-export default function DesignEditor({ open, source, jewelryType, onCancel, onApprove }: DesignEditorProps) {
+export default function DesignEditor({ open, source, jewelryType, onCancel, onKeep, onCreateCad, dimensions, onDimensions, cadCost, cadCostLoading, creatingCad }: DesignEditorProps) {
   const { generate } = useDesignImageRun();
   const [versions, setVersions] = useState<Version[]>([]);
   const [current, setCurrent] = useState(0);
@@ -72,6 +96,9 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onAp
   const [selected, setSelected] = useState<number | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
+  const [stage, setStage] = useState<Stage>("edit");
+  const [approved, setApproved] = useState<EditorPicture | null>(null);
+  const [angles, setAngles] = useState<EditorPicture[]>([]);
   const history = useMarkupHistory();
   const speech = useSpeechInput((text) => setInstruction((t) => (t.trim() ? `${t.trim()} ${text}` : text)));
   const promptRef = useRef<HTMLTextAreaElement>(null);
@@ -88,6 +115,9 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onAp
     setError(null);
     setTool("select");
     setSelected(null);
+    setStage("edit");
+    setApproved(null);
+    setAngles([]);
     history.reset();
   }, [open, source]); // eslint-disable-line react-hooks/exhaustive-deps -- history.reset is stable; re-running on it would wipe a session mid-edit
 
@@ -130,21 +160,36 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onAp
     }
   }, [shown, busy, hasChange, source, history, instruction, jewelryType, generate]);
 
-  const approve = useCallback(async () => {
+  /** Approve the version showing and move on: angles first, or straight to CAD. */
+  const approve = useCallback((next: "angles" | "ready") => {
     if (!canApprove || !shown) return;
-    const blob = await (await fetch(shown.display)).blob();
-    onApprove(new File([blob], `edited-design-v${current + 1}.png`, { type: blob.type || "image/png" }));
-  }, [canApprove, shown, current, onApprove]);
+    setApproved({ display: shown.display, input: shown.input, label: "Main" });
+    setAngles([]);
+    setSelected(null);
+    setStage(next);
+  }, [canApprove, shown]);
 
-  const requestClose = () => (isDirty ? setConfirmClose(true) : onCancel());
+  const resolveApprovedBase = useCallback(async (): Promise<ImageInput> => {
+    if (approved?.input) return approved.input;
+    if (source) return blobToDataUrl(source);
+    throw new Error("The picture is not ready yet");
+  }, [approved, source]);
+
+  const approvedPictures = approved ? [approved, ...angles] : [];
+
+  const requestClose = () => {
+    // After approving, closing keeps the approved pictures on the page.
+    if (stage !== "edit" && approved) { void picturesToFiles(approvedPictures).then(onKeep); return; }
+    if (isDirty) setConfirmClose(true); else onCancel();
+  };
 
   // Keyboard shortcuts, read through a ref so the listener never goes stale.
   const keys = useRef<(e: KeyboardEvent) => void>(() => {});
   keys.current = (e: KeyboardEvent) => {
-    if (helpOpen || confirmClose) return;
+    if (helpOpen || confirmClose || stage !== "edit") return;
     const typing = !!(e.target as HTMLElement)?.closest?.("input, textarea, select");
     const mod = e.ctrlKey || e.metaKey;
-    if (mod && e.key === "Enter") { e.preventDefault(); void approve(); return; }
+    if (mod && e.key === "Enter") { e.preventDefault(); approve("ready"); return; }
     if (typing || busy) return;
     if (mod && e.key.toLowerCase() === "z") { e.preventDefault(); if (e.shiftKey) history.redo(); else history.undo(); setSelected(null); return; }
     if (mod && e.key.toLowerCase() === "y") { e.preventDefault(); history.redo(); setSelected(null); return; }
@@ -205,17 +250,42 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onAp
           {/* Header: Cancel left, title centre, shortcuts right */}
           <header className="flex h-14 flex-shrink-0 items-center gap-2 border-b border-border px-3 sm:px-5">
             <button type="button" onClick={requestClose} className="flex h-10 items-center gap-2 px-2 text-sm text-foreground hover:text-muted-foreground">
-              <X className="h-4 w-4" /> Cancel
+              <X className="h-4 w-4" /> {stage === "edit" ? "Cancel" : "Close"}
             </button>
             <div className="flex min-w-0 flex-1 items-center justify-center gap-2">
-              <DialogPrimitive.Title className="font-display text-xl uppercase tracking-[0.06em] text-foreground">Edit design</DialogPrimitive.Title>
-              {versions.length > 0 && <span className="bg-muted px-2 py-0.5 text-xs text-muted-foreground">V{current + 1} of {versions.length}</span>}
+              <DialogPrimitive.Title className="font-display text-xl uppercase tracking-[0.06em] text-foreground">{stage === "edit" ? "Edit design" : stage === "angles" ? "More angles" : "Ready for CAD"}</DialogPrimitive.Title>
+              {stage === "angles" && <span className="bg-muted px-2 py-0.5 text-xs text-muted-foreground">Optional</span>}
+              {stage === "edit" && versions.length > 0 && <span className="bg-muted px-2 py-0.5 text-xs text-muted-foreground">V{current + 1} of {versions.length}</span>}
             </div>
             <button type="button" onClick={() => setHelpOpen(true)} title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts" className="hidden h-10 w-10 items-center justify-center text-muted-foreground hover:text-foreground lg:flex">
               <Keyboard className="h-5 w-5" />
             </button>
           </header>
 
+          {stage === "angles" && approved && (
+            <AnglesStep
+              approved={approved}
+              resolveBase={resolveApprovedBase}
+              jewelryType={jewelryType}
+              toObjectUrl={async (url) => { const u = await toObjectUrl(url); objectUrls.current.push(u); return u; }}
+              onBack={() => setStage("edit")}
+              onContinue={(ready) => { setAngles(ready); setStage("ready"); }}
+            />
+          )}
+          {stage === "ready" && approved && (
+            <ReadyForCad
+              pictures={approvedPictures}
+              jewelryType={jewelryType}
+              dimensions={dimensions}
+              onDimensions={onDimensions}
+              cost={cadCost}
+              costLoading={cadCostLoading}
+              generating={creatingCad}
+              onBack={() => setStage(angles.length ? "angles" : "edit")}
+              onGenerate={() => void picturesToFiles(approvedPictures).then(onCreateCad)}
+            />
+          )}
+          {stage === "edit" && (
           <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-3 sm:p-5 lg:flex-row">
             <aside className="flex-shrink-0 lg:w-[280px] lg:border lg:border-border lg:p-4">
               <MarkupToolPanel
@@ -327,19 +397,32 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onAp
                   </div>
                 </div>
                 {versions.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => void approve()}
-                    disabled={!canApprove}
-                    title={hasChange ? "Send your change first" : "Use this version (Ctrl Enter)"}
-                    className="flex h-12 flex-shrink-0 items-center justify-center gap-2 bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] px-8 font-display text-base uppercase tracking-wide text-background transition-opacity hover:opacity-90 disabled:opacity-50"
-                  >
-                    <Check className="h-4 w-4" /> Looks right
-                  </button>
+                  <div className="flex flex-shrink-0 flex-col gap-2 sm:w-[260px]">
+                    <button
+                      type="button"
+                      onClick={() => approve("angles")}
+                      disabled={!canApprove}
+                      title={hasChange ? "Send your change first" : "Use this version and add more angles"}
+                      className="flex h-12 items-center justify-center border-2 border-[hsl(var(--formanova-hero-accent))] px-6 font-display text-base uppercase tracking-wide text-[hsl(var(--formanova-hero-accent))] transition-colors hover:bg-[hsl(var(--formanova-hero-accent)/0.06)] disabled:opacity-50"
+                    >
+                      Add more angles
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => approve("ready")}
+                      disabled={!canApprove}
+                      title={hasChange ? "Send your change first" : "Use this version (Ctrl Enter)"}
+                      className="flex h-12 items-center justify-center gap-2 bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] px-6 font-display text-base uppercase tracking-wide text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+                    >
+                      Make it CAD <ArrowRight className="h-4 w-4" />
+                    </button>
+                  </div>
                 )}
               </div>
             </main>
           </div>
+
+          )}
 
           {helpOpen && (
             <div role="dialog" aria-label="Keyboard shortcuts" className="absolute inset-0 z-20 flex items-center justify-center bg-background/60 p-4" onClick={() => setHelpOpen(false)}>

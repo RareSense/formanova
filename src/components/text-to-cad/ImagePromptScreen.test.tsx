@@ -18,7 +18,7 @@ import ImagePromptScreen from './ImagePromptScreen';
 
 function renderScreen(
   jewelryType: 'ring' | 'necklace' | 'bracelet' | 'earring' | 'other' | null = 'ring',
-  { onGenerate = vi.fn(), previews = [] as string[], onEditFirst = undefined as (() => void) | undefined } = {},
+  { onGenerate = vi.fn(), previews = [] as string[], onEditFirst = undefined as (() => void) | undefined, editApproved = false } = {},
 ) {
   return render(
     <ImagePromptScreen
@@ -35,6 +35,7 @@ function renderScreen(
       onRemoveReferenceImage={vi.fn()}
       onReplaceReferenceImages={vi.fn()}
       onEditFirst={onEditFirst}
+      editApproved={editApproved}
     />,
   );
 }
@@ -171,6 +172,25 @@ describe('ImagePromptScreen', () => {
       fireEvent.click(screen.getByRole('radio', { name: /edit before cad/i }));
       fireEvent.click(screen.getByRole('radio', { name: /use as is/i }));
       expect(screen.getByRole('textbox', { name: /dimensions/i })).toBeTruthy();
+    });
+  
+    it('does not ask again once an edited design is approved, and offers Edit again', () => {
+      const onEditFirst = vi.fn();
+      renderScreen('ring', { onEditFirst, previews: ['blob:one'], editApproved: true });
+      expect(screen.queryByRole('radiogroup', { name: /how should we use this design/i })).toBeNull();
+      expect(screen.getByText(/edited design approved/i)).toBeTruthy();
+      expect(screen.getByRole('textbox', { name: /dimensions/i })).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: /edit again/i }));
+      expect(onEditFirst).toHaveBeenCalledTimes(1);
+    });
+
+    it('asks what is being made before opening the editor', () => {
+      const onEditFirst = vi.fn();
+      renderScreen(null, { onEditFirst, previews: ['blob:one'] });
+      fireEvent.click(screen.getByRole('radio', { name: /edit before cad/i }));
+      fireEvent.click(screen.getByRole('button', { name: /edit design/i }));
+      expect(onEditFirst).not.toHaveBeenCalled();
+      expect(screen.getByRole('alert').textContent).toMatch(/choose what you are making/i);
     });
   });
 });

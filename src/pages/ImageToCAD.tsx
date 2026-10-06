@@ -20,8 +20,8 @@ import { trackCadStudioOpen, trackCadReferenceUploaded } from "@/lib/posthog-eve
 import { useCADKeyboardShortcuts } from "@/hooks/use-cad-keyboard-shortcuts";
 
 import ImagePromptScreen from "@/components/text-to-cad/ImagePromptScreen";
-import type { DesignUse } from "@/components/text-to-cad/DesignUseChoice";
 import DesignEditor from "@/components/create-cad/DesignEditor";
+import { useEditBeforeCad } from "@/hooks/useEditBeforeCad";
 import LeftPanel from "@/components/text-to-cad/LeftPanel";
 import MeshPanel from "@/components/text-to-cad/MeshPanel";
 import CADCanvas from "@/components/text-to-cad/CADCanvas";
@@ -89,9 +89,6 @@ export default function ImageToCAD() {
   const [workspaceActive, setWorkspaceActive] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [jewelryType, setJewelryType] = useState<CadJewelryType | null>(null);
-  // Edit before CAD (flagged): the choice under the upload, and the editor overlay.
-  const [designUse, setDesignUse] = useState<DesignUse>("as_is");
-  const [editorOpen, setEditorOpen] = useState(false);
 
   const canvasRef = useRef<CADCanvasHandle>(null);
 
@@ -120,6 +117,17 @@ export default function ImageToCAD() {
     // paints the loading state instead of an empty workspace.
     restoringFromUrl: isRestoringFromUrl,
     onWorkspaceActivate: activateWorkspace,
+  });
+
+  // Edit before CAD (flagged): the choice under the upload and the editor window.
+  const editBeforeCad = useEditBeforeCad({
+    enabled: IMAGE_TO_CAD_EDIT_ENABLED,
+    model,
+    tier: activeTier,
+    referenceImages,
+    replaceReferenceImages,
+    startCad: workflow.simulateGeneration,
+    isGenerating: workflow.isGenerating,
   });
 
   // A new model starts assembled.
@@ -255,12 +263,13 @@ export default function ImageToCAD() {
           isGenerating={workflow.isGenerating}
           onGenerate={workflow.simulateGeneration}
           referenceImagePreviewUrls={panelReferenceUrls}
-          onAddReferenceImages={addReferenceImages}
-          onRemoveReferenceImage={removeReferenceImage}
+          onAddReferenceImages={(files) => { editBeforeCad.picturesChanged(); addReferenceImages(files); }}
+          onRemoveReferenceImage={(index) => { editBeforeCad.picturesChanged(); removeReferenceImage(index); }}
           onReplaceReferenceImages={replaceReferenceImages}
-          onEditFirst={IMAGE_TO_CAD_EDIT_ENABLED ? () => setEditorOpen(true) : undefined}
-          designUse={designUse}
-          onDesignUseChange={setDesignUse}
+          onEditFirst={editBeforeCad.openEditor}
+          designUse={editBeforeCad.designUse}
+          onDesignUseChange={editBeforeCad.setDesignUse}
+          editApproved={editBeforeCad.editApproved}
           onGlbUpload={showCadUpload ? (file) => {
             setWorkspaceActive(true);
             workflow.setHasModel(true);
@@ -278,18 +287,10 @@ export default function ImageToCAD() {
         />
         {IMAGE_TO_CAD_EDIT_ENABLED && (
           <DesignEditor
-            open={editorOpen}
-            source={referenceImages[0] ?? null}
+            {...editBeforeCad.editorProps}
             jewelryType={jewelryType}
-            onCancel={() => setEditorOpen(false)}
-            onApprove={(file) => {
-              // The approved design becomes the picture the CAD is made from.
-              // Other uploaded angles show the old design, so they are replaced too.
-              replaceReferenceImages([file]);
-              setDesignUse("as_is");
-              setEditorOpen(false);
-              toast.success("Edited design ready. Add dimensions if you have them, then generate the CAD.");
-            }}
+            dimensions={prompt}
+            onDimensions={setPrompt}
           />
         )}
       </div>

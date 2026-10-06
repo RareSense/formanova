@@ -13,6 +13,8 @@ beforeAll(() => {
   URL.createObjectURL = vi.fn(() => 'blob:mock');
   URL.revokeObjectURL = vi.fn();
   HTMLCanvasElement.prototype.getContext = vi.fn(() => null) as never;
+  // Result pictures and approved pictures are fetched as blobs.
+  globalThis.fetch = vi.fn(async () => ({ ok: true, status: 200, blob: async () => new Blob(['x'], { type: 'image/png' }) })) as never;
 });
 
 beforeEach(() => mockGenerate.mockReset());
@@ -21,9 +23,25 @@ const source = new File(['x'], 'ring.png', { type: 'image/png' });
 
 function renderEditor(props: Partial<React.ComponentProps<typeof DesignEditor>> = {}) {
   const onCancel = vi.fn();
-  const onApprove = vi.fn();
-  render(<DesignEditor open source={source} jewelryType="ring" onCancel={onCancel} onApprove={onApprove} {...props} />);
-  return { onCancel, onApprove };
+  const onKeep = vi.fn();
+  const onCreateCad = vi.fn();
+  render(
+    <DesignEditor
+      open source={source} jewelryType="ring" onCancel={onCancel} onKeep={onKeep} onCreateCad={onCreateCad}
+      dimensions="" onDimensions={vi.fn()} cadCost={140} cadCostLoading={false} creatingCad={false}
+      {...props}
+    />,
+  );
+  return { onCancel, onKeep, onCreateCad };
+}
+
+const NEW_VERSION = [{ ok: true, result: { image: { uri: 'u', url: 'https://x/v2.png', type: 'image/png', bytes: 1, sha256: 's' }, consistent: null, drift: [], view: null } }];
+
+async function makeNewVersion() {
+  mockGenerate.mockResolvedValueOnce(NEW_VERSION);
+  fireEvent.change(screen.getByLabelText(/describe what to change/i), { target: { value: 'make the stone oval' } });
+  fireEvent.click(screen.getByRole('button', { name: /send/i }));
+  await screen.findByText('V2 of 2');
 }
 
 describe('DesignEditor', () => {
@@ -37,9 +55,43 @@ describe('DesignEditor', () => {
     expect(screen.getAllByText(/optional/i).length).toBeGreaterThan(0);
   }, 15000); // first render of the dialog is slow on a loaded machine
 
-  it('offers Looks right only once a new version exists', () => {
+  it('offers Add more angles and Make it CAD only once a new version exists', async () => {
     renderEditor();
-    expect(screen.queryByRole('button', { name: /looks right/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /make it cad/i })).toBeNull();
+    await makeNewVersion();
+    expect(screen.getByRole('button', { name: /add more angles/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /make it cad/i })).toBeEnabled();
+  });
+
+  it('Make it CAD goes to Ready for CAD, and Generate CAD hands over the approved picture', async () => {
+    const { onCreateCad } = renderEditor();
+    await makeNewVersion();
+    fireEvent.click(screen.getByRole('button', { name: /make it cad/i }));
+    expect(screen.getByText(/ready for cad/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/dimensions/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /generate cad/i }));
+    await waitFor(() => expect(onCreateCad).toHaveBeenCalledTimes(1));
+    expect(onCreateCad.mock.calls[0][0]).toHaveLength(1);
+  });
+
+  it('Add more angles suggests four angles for the piece, three ticked', async () => {
+    renderEditor();
+    await makeNewVersion();
+    fireEvent.click(screen.getByRole('button', { name: /add more angles/i }));
+    expect(screen.getByText(/more angles/i, { selector: 'h2' })).toBeInTheDocument();
+    const boxes = screen.getAllByRole('checkbox');
+    expect(boxes).toHaveLength(4);
+    expect(boxes.filter((b) => (b as HTMLInputElement).checked)).toHaveLength(3);
+    expect(screen.getByRole('button', { name: /make 3 angles/i })).toBeInTheDocument();
+  });
+
+  it('closing after approval keeps the approved pictures on the page', async () => {
+    const { onKeep, onCancel } = renderEditor();
+    await makeNewVersion();
+    fireEvent.click(screen.getByRole('button', { name: /make it cad/i }));
+    fireEvent.click(screen.getByRole('button', { name: /close/i }));
+    await waitFor(() => expect(onKeep).toHaveBeenCalledTimes(1));
+    expect(onCancel).not.toHaveBeenCalled();
   });
 
   it('cannot send an empty change', () => {

@@ -66,4 +66,13 @@ describe('useDesignImageRun', () => {
     unmount();
     expect(seenSignal?.aborted).toBe(true);
   });
+
+  it('reports each picture as soon as it lands', async () => {
+    mockCheckCredits.mockResolvedValue(true);
+    mockRun.mockResolvedValueOnce(RESULT).mockRejectedValueOnce(new DesignImageRunError('nope', null, true));
+    const seen: Array<[number, boolean]> = [];
+    const { result } = renderHook(() => useDesignImageRun());
+    await act(async () => { await result.current.generate([{ prompt: 'a' }, { prompt: 'b' }], { onOutcome: (i, o) => seen.push([i, o.ok]) }); });
+    expect(seen.sort()).toEqual([[0, true], [1, false]]);
+  });
 });

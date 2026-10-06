@@ -26,7 +26,10 @@ export interface UseDesignImageRun {
    * Resolves with one outcome per request, in order, or null when the batch
    * never started (not enough credits) or the component unmounted.
    */
-  generate: (requests: DesignImageStartParams[]) => Promise<DesignImageOutcome[] | null>;
+  generate: (
+    requests: DesignImageStartParams[],
+    options?: { onOutcome?: (index: number, outcome: DesignImageOutcome) => void },
+  ) => Promise<DesignImageOutcome[] | null>;
   /** True while any batch is running. */
   running: boolean;
 }
@@ -47,7 +50,10 @@ export function useDesignImageRun(): UseDesignImageRun {
     };
   }, []);
 
-  const generate = useCallback(async (requests: DesignImageStartParams[]): Promise<DesignImageOutcome[] | null> => {
+  const generate = useCallback(async (
+    requests: DesignImageStartParams[],
+    options: { onOutcome?: (index: number, outcome: DesignImageOutcome) => void } = {},
+  ): Promise<DesignImageOutcome[] | null> => {
     if (requests.length === 0) return [];
     const approved = await checkCredits(DESIGN_IMAGE_WORKFLOW, requests.length);
     if (!approved) return null;
@@ -56,9 +62,7 @@ export function useDesignImageRun(): UseDesignImageRun {
     controllers.current.add(ctrl);
     setInFlight((n) => n + 1);
     try {
-      const settled = await Promise.allSettled(requests.map((r) => runDesignImage(r, ctrl.signal)));
-      if (ctrl.signal.aborted) return null;
-      return settled.map((s): DesignImageOutcome => {
+      const toOutcome = (s: PromiseSettledResult<DesignImageResult | null>): DesignImageOutcome => {
         if (s.status === 'fulfilled' && s.value) return { ok: true, result: s.value };
         const err = s.status === 'rejected' ? s.reason : null;
         return {
@@ -66,7 +70,19 @@ export function useDesignImageRun(): UseDesignImageRun {
           message: err instanceof Error && err.message ? err.message : GENERIC,
           retryable: err instanceof DesignImageRunError ? err.retryable : true,
         };
-      });
+      };
+      // Each picture is reported as soon as it lands, so slots can fill one by one.
+      const settled = await Promise.allSettled(requests.map(async (r, i) => {
+        const result = await runDesignImage(r, ctrl.signal).then(
+          (value) => ({ status: 'fulfilled', value }) as const,
+          (reason) => ({ status: 'rejected', reason }) as const,
+        );
+        if (!ctrl.signal.aborted) options.onOutcome?.(i, toOutcome(result));
+        if (result.status === 'rejected') throw result.reason;
+        return result.value;
+      }));
+      if (ctrl.signal.aborted) return null;
+      return settled.map(toOutcome);
     } finally {
       controllers.current.delete(ctrl);
       if (!ctrl.signal.aborted) {
