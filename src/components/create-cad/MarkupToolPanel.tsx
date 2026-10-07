@@ -23,8 +23,9 @@ const kbd = "border border-border px-1.5 py-px font-mono text-[10px] leading-4 t
 const iconBtn = "flex h-10 flex-1 items-center justify-center gap-1.5 border border-border text-xs text-foreground transition-colors hover:border-foreground/40 disabled:opacity-40 disabled:hover:border-border";
 
 /**
- * "Mark what to change": optional markup tools. A column of labelled tools
- * with their keyboard keys on desktop; a compact row of icons on phones.
+ * "Mark what to change": optional markup tools. A compact column of tools
+ * (icon, name, key; what each does is in its tooltip) on desktop; a row of
+ * icons on phones.
  */
 export default function MarkupToolPanel({ tool, onTool, brush, onBrush, canUndo, canRedo, canClear, onUndo, onRedo, onClear, onShowShortcuts, disabled }: MarkupToolPanelProps) {
   const sized = tool === "brush" || tool === "erase";
@@ -45,18 +46,15 @@ export default function MarkupToolPanel({ tool, onTool, brush, onBrush, canUndo,
               onClick={() => onTool(id)}
               aria-pressed={active}
               aria-keyshortcuts={key}
-              title={`${name} (${key})`}
-              className={`flex flex-col items-center gap-1 border px-1 py-2 text-left transition-colors disabled:opacity-50 lg:flex-row lg:gap-3 lg:px-3 lg:py-2.5 ${
+              title={`${name}: ${hint} (${key})`}
+              className={`flex flex-col items-center gap-1 border px-1 py-2 text-left transition-colors disabled:opacity-50 lg:flex-row lg:gap-3 lg:px-3 lg:py-2 ${
                 active
                   ? "border-[hsl(var(--formanova-hero-accent))] bg-[hsl(var(--formanova-hero-accent)/0.08)]"
                   : "border-border bg-background hover:border-foreground/40"
               }`}
             >
               <Icon className="h-5 w-5 flex-shrink-0 text-foreground" />
-              <span className="min-w-0 flex-1 text-center lg:text-left">
-                <span className="block text-[11px] font-medium text-foreground lg:text-sm">{name}</span>
-                <span className="hidden text-xs text-muted-foreground lg:block">{hint}</span>
-              </span>
+              <span className="min-w-0 flex-1 text-center text-[11px] font-medium text-foreground lg:text-left lg:text-sm">{name}</span>
               <span className={`hidden lg:inline ${kbd}`}>{key}</span>
             </button>
           );
