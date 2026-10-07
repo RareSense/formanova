@@ -1,4 +1,4 @@
-import { Keyboard, Redo2, Trash2, Undo2 } from "lucide-react";
+import { Redo2, Trash2, Undo2 } from "lucide-react";
 import { MAX_BRUSH, MIN_BRUSH } from "@/lib/design-markup";
 import type { MarkupTool } from "./MarkupCanvas";
 import { MARKUP_TOOLS } from "./markup-tools";
@@ -15,7 +15,6 @@ interface MarkupToolPanelProps {
   onUndo: () => void;
   onRedo: () => void;
   onClear: () => void;
-  onShowShortcuts: () => void;
   disabled?: boolean;
 }
 
@@ -27,12 +26,13 @@ const iconBtn = "flex h-10 flex-1 items-center justify-center gap-1.5 border bor
  * (icon, name, key; what each does is in its tooltip) on desktop; a row of
  * icons on phones.
  */
-export default function MarkupToolPanel({ tool, onTool, brush, onBrush, canUndo, canRedo, canClear, onUndo, onRedo, onClear, onShowShortcuts, disabled }: MarkupToolPanelProps) {
+export default function MarkupToolPanel({ tool, onTool, brush, onBrush, canUndo, canRedo, canClear, onUndo, onRedo, onClear, disabled }: MarkupToolPanelProps) {
   const sized = tool === "brush" || tool === "erase";
   return (
     <div className="flex flex-col gap-3" role="toolbar" aria-label="Mark what to change">
       <div className="hidden lg:block">
-        <h2 className="text-[15px] font-semibold text-foreground">Mark what to change <span className="font-normal text-muted-foreground">(optional)</span></h2>
+        <span className="marta-label block mb-1.5">Optional</span>
+        <h2 className="font-display text-lg uppercase tracking-[0.06em] text-foreground">Mark what to change</h2>
       </div>
 
       <div className="grid grid-cols-5 gap-1.5 lg:grid-cols-1 lg:gap-2">
@@ -89,9 +89,6 @@ export default function MarkupToolPanel({ tool, onTool, brush, onBrush, canUndo,
         </button>
       </div>
 
-      <button type="button" onClick={onShowShortcuts} className="hidden items-center gap-2 text-xs text-muted-foreground hover:text-foreground lg:flex">
-        <Keyboard className="h-4 w-4" /> Keyboard shortcuts <span className={kbd}>?</span>
-      </button>
     </div>
   );
 }

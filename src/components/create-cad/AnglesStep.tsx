@@ -106,7 +106,7 @@ export default function AnglesStep({ approved, resolveBase, jewelryType, toObjec
     <>
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-3 sm:p-5 lg:flex-row">
         <aside className="flex-shrink-0 lg:w-[280px] lg:border lg:border-border lg:p-4">
-          <h2 className="text-[15px] font-semibold text-foreground">Your approved design</h2>
+          <h2 className="font-display text-lg uppercase tracking-[0.06em] text-foreground">Your approved design</h2>
           <div className="relative mt-3 border-2 border-[hsl(var(--formanova-hero-accent))]">
             <img src={approved.display} alt="Approved design" className="aspect-square w-full object-cover" />
             <span className="absolute left-2 top-2 flex items-center gap-1 bg-background px-2 py-0.5 text-xs"><Check className="h-3 w-3 text-emerald-700" /> Approved</span>

@@ -41,7 +41,7 @@ export default function ReadyForCad({ pictures, jewelryType, dimensions, onDimen
     <>
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-3 sm:p-5 lg:flex-row">
         <aside className="flex-shrink-0 lg:w-[280px] lg:border lg:border-border lg:p-4">
-          <h2 className="text-[15px] font-semibold text-foreground">Your approved design</h2>
+          <h2 className="font-display text-lg uppercase tracking-[0.06em] text-foreground">Your approved design</h2>
           {main && (
             <div className="relative mt-3 border-2 border-[hsl(var(--formanova-hero-accent))]">
               <img src={main.display} alt="Approved design" className="aspect-square w-full object-cover" />

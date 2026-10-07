@@ -93,6 +93,14 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
   const [helpOpen, setHelpOpen] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const [stage, setStage] = useState<Stage>("edit");
+  // The canvas hint shows for a few seconds when the editor opens or the tool changes.
+  const [hintShown, setHintShown] = useState(true);
+  useEffect(() => {
+    if (!open) return;
+    setHintShown(true);
+    const timer = setTimeout(() => setHintShown(false), 4000);
+    return () => clearTimeout(timer);
+  }, [open, tool, stage]);
   const [approved, setApproved] = useState<EditorPicture | null>(null);
   const [angles, setAngles] = useState<EditorPicture[]>([]);
   const history = useMarkupHistory();
@@ -224,7 +232,10 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
   ) : null;
 
   const hint = (
-    <span className="pointer-events-none absolute bottom-3 right-3 flex max-w-[90%] items-center gap-2 bg-foreground/85 px-3 py-1.5 text-xs text-background">
+    <span
+      aria-hidden={!hintShown}
+      className={`pointer-events-none absolute bottom-3 left-1/2 flex max-w-[90%] -translate-x-1/2 items-center gap-2 bg-foreground/85 px-3 py-1.5 text-xs text-background transition-opacity duration-500 ${hintShown ? "opacity-100" : "opacity-0"}`}
+    >
       <MousePointerClick className="h-3.5 w-3.5 flex-shrink-0" />
       {tool === "select" ? "Optional: use a tool on the left to mark the area you want to change." : `Optional: ${MARKUP_TOOLS.find((t) => t.id === tool)?.hint.toLowerCase()}`}
     </span>
@@ -294,7 +305,6 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
                 onUndo={() => { history.undo(); setSelected(null); }}
                 onRedo={() => { history.redo(); setSelected(null); }}
                 onClear={() => { history.commit([]); setSelected(null); }}
-                onShowShortcuts={() => setHelpOpen(true)}
                 disabled={busy}
               />
             </aside>
