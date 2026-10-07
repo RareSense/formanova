@@ -356,10 +356,11 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
                     <span className="inline-flex items-center gap-1"><img src={creditCoinIcon} alt="" className="h-4 w-4" /><span className="font-mono text-sm">5</span></span>
                   </button>
                 </div>
-                <p className="mt-1.5 text-xs text-muted-foreground">
-                  {history.marks.length > 0 ? `${history.marks.length} mark${history.marks.length > 1 ? "s" : ""} on the picture · ` : ""}
-                  Enter to send · Shift + Enter for a new line · Each change creates a new version
-                </p>
+                {history.marks.length > 0 && (
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    {history.marks.length} mark{history.marks.length > 1 ? "s" : ""} on the picture
+                  </p>
+                )}
                 {error && <p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}
               </div>
 
