@@ -165,7 +165,7 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
         <div className="mt-6 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end">
           {!ready && <span className="text-sm text-muted-foreground">{why}</span>}
           <button type="button" onClick={guardedGenerate} disabled={busy || !ready}
-            className="flex h-12 items-center justify-center gap-2.5 bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] px-10 font-display text-base uppercase tracking-wide text-background transition-opacity hover:opacity-90 disabled:opacity-60">
+            className="flex h-12 items-center justify-center gap-2.5 bg-[hsl(var(--formanova-hero-accent))] px-10 font-display text-base uppercase tracking-wide text-background transition-opacity hover:opacity-90 disabled:opacity-60">
             {count === 4 ? "Make 4 designs" : "Make my design"}
             <span className="inline-flex items-center gap-1"><img src={creditCoinIcon} alt="" className="h-5 w-5" /><span className="font-mono text-sm font-semibold">{count === 4 ? 20 : 5}</span></span>
           </button>

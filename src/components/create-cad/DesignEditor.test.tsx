@@ -41,13 +41,19 @@ async function makeNewVersion() {
   mockGenerate.mockResolvedValueOnce(NEW_VERSION);
   fireEvent.change(screen.getByLabelText(/describe what to change/i), { target: { value: 'make the stone oval' } });
   fireEvent.click(screen.getByRole('button', { name: /send/i }));
-  await screen.findByText('V2 of 2');
+  await screen.findByText('V1 of 1');
+}
+
+/** Approve the version showing: the next steps appear only after this. */
+function approveShown() {
+  fireEvent.click(screen.getByRole('button', { name: /approve v1/i }));
 }
 
 describe('DesignEditor', () => {
-  it('opens on the uploaded picture as V1, with the optional markup tools', () => {
+  it('opens on the uploaded picture as the Original (not a version), with the optional markup tools', () => {
     renderEditor();
-    expect(screen.getByText('V1 of 1')).toBeInTheDocument();
+    expect(screen.getAllByText('Original').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/of 1$/)).toBeNull();
     expect(screen.getByRole('toolbar', { name: /mark what to change/i })).toBeInTheDocument();
     for (const name of ['Select', 'Brush', 'Rectangle', 'Arrow', 'Erase']) {
       expect(screen.getByRole('button', { name: new RegExp(name) })).toBeInTheDocument();
@@ -55,17 +61,32 @@ describe('DesignEditor', () => {
     expect(screen.getAllByText(/optional/i).length).toBeGreaterThan(0);
   }, 15000); // first render of the dialog is slow on a loaded machine
 
-  it('offers Add more angles and Make it CAD only once a new version exists', async () => {
+  it('offers Approve and Try again for a new version, and the next steps only once approved', async () => {
     renderEditor();
-    expect(screen.queryByRole('button', { name: /make it cad/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /approve/i })).toBeNull();
     await makeNewVersion();
+    expect(screen.getByRole('button', { name: /try again/i })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: /make it cad/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /add more angles/i })).toBeNull();
+    approveShown();
     expect(screen.getByRole('button', { name: /add more angles/i })).toBeEnabled();
     expect(screen.getByRole('button', { name: /make it cad/i })).toBeEnabled();
+  });
+
+  it('Try again makes the version again from the same request, as a new version', async () => {
+    renderEditor();
+    await makeNewVersion();
+    const firstRequest = mockGenerate.mock.calls[0][0];
+    mockGenerate.mockResolvedValueOnce(NEW_VERSION);
+    fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+    await screen.findByText('V2 of 2');
+    expect(mockGenerate.mock.calls[1][0]).toEqual(firstRequest);
   });
 
   it('Make it CAD goes to Ready for CAD, and Generate CAD hands over the approved picture', async () => {
     const { onCreateCad } = renderEditor();
     await makeNewVersion();
+    approveShown();
     fireEvent.click(screen.getByRole('button', { name: /make it cad/i }));
     expect(screen.getByText(/ready for cad/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/dimensions/i)).toBeInTheDocument();
@@ -77,6 +98,7 @@ describe('DesignEditor', () => {
   it('Add more angles suggests four angles for the piece, three ticked', async () => {
     renderEditor();
     await makeNewVersion();
+    approveShown();
     fireEvent.click(screen.getByRole('button', { name: /add more angles/i }));
     expect(screen.getByText(/more angles/i, { selector: 'h2' })).toBeInTheDocument();
     const boxes = screen.getAllByRole('checkbox');
@@ -88,6 +110,7 @@ describe('DesignEditor', () => {
   it('closing after approval keeps the approved pictures on the page', async () => {
     const { onKeep, onCancel } = renderEditor();
     await makeNewVersion();
+    approveShown();
     fireEvent.click(screen.getByRole('button', { name: /make it cad/i }));
     fireEvent.click(screen.getByRole('button', { name: /close/i }));
     await waitFor(() => expect(onKeep).toHaveBeenCalledTimes(1));

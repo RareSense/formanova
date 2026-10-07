@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { ArrowRight, Diamond, MousePointerClick, Send, X } from "lucide-react";
+import { ArrowRight, Check, Diamond, MousePointerClick, RotateCcw, Send, X } from "lucide-react";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { flattenMarkup, MIN_BRUSH, MAX_BRUSH, type Mark } from "@/lib/design-markup";
 import { blobToDataUrl } from "@/lib/design-image-run";
@@ -21,6 +21,8 @@ interface Version {
   /** What is sent as the base for the next change: a data: URL or the run's artifact. */
   input: ImageInput | null;
   note: string;
+  /** How it was made (absent for the original): rerun as-is to redo it. */
+  request?: { prompt: string; images: { role: "base" | "markup"; image: ImageInput }[] };
 }
 
 type Stage = "edit" | "angles" | "ready";
@@ -92,6 +94,8 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
   const [helpOpen, setHelpOpen] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const [stage, setStage] = useState<Stage>("edit");
+  /** The version the customer approved; until then the next steps stay hidden. */
+  const [approvedIndex, setApprovedIndex] = useState<number | null>(null);
   // The canvas hint shows for a few seconds when the editor opens or the tool changes.
   const [hintShown, setHintShown] = useState(true);
   useEffect(() => {
@@ -111,13 +115,14 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
     if (!open || !source) return;
     const url = URL.createObjectURL(source);
     objectUrls.current.push(url);
-    setVersions([{ display: url, input: null, note: "Your picture" }]);
+    setVersions([{ display: url, input: null, note: "" }]);
     setCurrent(0);
     setInstruction("");
     setError(null);
     setTool("select");
     setSelected(null);
     setStage("edit");
+    setApprovedIndex(null);
     setApproved(null);
     setAngles([]);
     history.reset();
@@ -128,48 +133,72 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
   const shown = versions[current];
   const hasChange = instruction.trim().length > 0;
   const canApprove = versions.length > 1 && !busy && !hasChange;
+  const isApproved = approvedIndex !== null && approvedIndex === current;
+  /** The original is not a version: it is "Original", edits are V1, V2... */
+  const versionLabel = (i: number) => (i === 0 ? "Original" : `V${i}`);
   const isDirty = versions.length > 1 || history.marks.length > 0 || hasChange;
 
-  const send = useCallback(async () => {
-    if (!shown || busy || !hasChange) return;
+  /** Make one new version from a request; true when it was added. */
+  const runRequest = useCallback(async (request: NonNullable<Version["request"]>, note: string) => {
     setBusy(true);
     setError(null);
     setSelected(null);
+    setApprovedIndex(null);
     try {
-      const base = shown.input ?? (source ? await blobToDataUrl(source) : null);
-      if (!base) throw new Error("The picture is not ready yet");
-      const images = history.marks.length > 0
-        ? [{ role: "markup" as const, image: await blobToDataUrl(await flattenMarkup(await loadImage(shown.display), history.marks)) }]
-        : [{ role: "base" as const, image: base }];
-      const outcomes = await generate([{ prompt: instruction, images, jewelryType }]);
-      if (!outcomes) return; // credits page opened, or the editor closed
+      const outcomes = await generate([{ prompt: request.prompt, images: request.images, jewelryType }]);
+      if (!outcomes) return false; // credits page opened, or the editor closed
       const outcome = outcomes[0];
-      if (!("result" in outcome)) { setError("message" in outcome ? outcome.message : "We couldn't make that change. Please try again."); return; }
+      if (!("result" in outcome)) { setError("message" in outcome ? outcome.message : "We couldn't make that change. Please try again."); return false; }
       const display = await toObjectUrl(outcome.result.image.url);
       objectUrls.current.push(display);
       setVersions((v) => {
-        const next = [...v, { display, input: outcome.result.image, note: instruction.trim() }];
+        const next = [...v, { display, input: outcome.result.image, note, request }];
         setCurrent(next.length - 1);
         return next;
       });
-      setInstruction("");
-      history.reset();
-      setTool("select");
+      return true;
     } catch (err) {
       setError(err instanceof Error && err.message ? err.message : "We couldn't make that change. Please try again.");
+      return false;
     } finally {
       setBusy(false);
     }
-  }, [shown, busy, hasChange, source, history, instruction, jewelryType, generate]);
+  }, [jewelryType, generate]);
+
+  const send = useCallback(async () => {
+    if (!shown || busy || !hasChange) return;
+    let images: NonNullable<Version["request"]>["images"];
+    try {
+      const base = shown.input ?? (source ? await blobToDataUrl(source) : null);
+      if (!base) throw new Error("The picture is not ready yet");
+      images = history.marks.length > 0
+        ? [{ role: "markup", image: await blobToDataUrl(await flattenMarkup(await loadImage(shown.display), history.marks)) }]
+        : [{ role: "base", image: base }];
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : "We couldn't make that change. Please try again.");
+      return;
+    }
+    if (await runRequest({ prompt: instruction, images }, instruction.trim())) {
+      setInstruction("");
+      history.reset();
+      setTool("select");
+    }
+  }, [shown, busy, hasChange, source, history, instruction, runRequest]);
+
+  /** Redo the version showing: the same request from the same starting picture, as a new version. */
+  const redo = useCallback(() => {
+    if (!shown?.request || busy) return;
+    void runRequest(shown.request, shown.note);
+  }, [shown, busy, runRequest]);
 
   /** Approve the version showing and move on: angles first, or straight to CAD. */
   const approve = useCallback((next: "angles" | "ready") => {
-    if (!canApprove || !shown) return;
+    if (!canApprove || !shown || !isApproved) return;
     setApproved({ display: shown.display, input: shown.input, label: "Main" });
     setAngles([]);
     setSelected(null);
     setStage(next);
-  }, [canApprove, shown]);
+  }, [canApprove, shown, isApproved]);
 
   const resolveApprovedBase = useCallback(async (): Promise<ImageInput> => {
     if (approved?.input) return approved.input;
@@ -191,7 +220,11 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
     if (helpOpen || confirmClose || stage !== "edit") return;
     const typing = !!(e.target as HTMLElement)?.closest?.("input, textarea, select");
     const mod = e.ctrlKey || e.metaKey;
-    if (mod && e.key === "Enter") { e.preventDefault(); approve("ready"); return; }
+    if (mod && e.key === "Enter") {
+      e.preventDefault();
+      if (isApproved) approve("ready"); else if (canApprove && current > 0) setApprovedIndex(current);
+      return;
+    }
     if (typing || busy) return;
     if (mod && e.key.toLowerCase() === "z") { e.preventDefault(); if (e.shiftKey) history.redo(); else history.undo(); setSelected(null); return; }
     if (mod && e.key.toLowerCase() === "y") { e.preventDefault(); history.redo(); setSelected(null); return; }
@@ -260,7 +293,11 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
             <div className="flex min-w-0 flex-1 items-center justify-center gap-2">
               <DialogPrimitive.Title className="font-display text-xl uppercase tracking-[0.06em] text-foreground">{stage === "edit" ? "Edit design" : stage === "angles" ? "More angles" : "Ready for CAD"}</DialogPrimitive.Title>
               {stage === "angles" && <span className="bg-muted px-2 py-0.5 text-xs text-muted-foreground">Optional</span>}
-              {stage === "edit" && versions.length > 0 && <span className="bg-muted px-2 py-0.5 text-xs text-muted-foreground">V{current + 1} of {versions.length}</span>}
+              {stage === "edit" && versions.length > 0 && (
+                <span className="bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                  {current === 0 ? "Original" : `V${current} of ${versions.length - 1}`}
+                </span>
+              )}
             </div>
             <span className="w-[88px] flex-shrink-0" aria-hidden="true" />
           </header>
@@ -312,7 +349,7 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
               <div className="h-[46vh] min-h-[260px] border border-border lg:h-auto lg:min-h-0 lg:flex-1">
                 <MarkupCanvas
                   src={shown?.display ?? null}
-                  alt={shown ? `Design version ${current + 1}` : "Design"}
+                  alt={shown ? (current === 0 ? "Your original picture" : `Design version ${current}`) : "Design"}
                   marks={history.marks}
                   onCommit={history.commit}
                   tool={tool}
@@ -345,7 +382,7 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
                     type="button"
                     onClick={() => void send()}
                     disabled={busy || !hasChange}
-                    className="flex h-12 flex-shrink-0 items-center gap-3 bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] px-7 font-display text-base uppercase tracking-[0.08em] text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+                    className="flex h-12 flex-shrink-0 items-center gap-3 bg-[hsl(var(--formanova-hero-accent))] px-7 font-display text-base uppercase tracking-[0.08em] text-background transition-opacity hover:opacity-90 disabled:opacity-50"
                   >
                     <Send className="h-4 w-4" strokeWidth={1.5} /> Send
                     <span className="ml-1 inline-flex items-center gap-1.5 border-l border-background/30 pl-3"><img src={creditCoinIcon} alt="" className="h-4 w-4" /><span className="font-mono text-sm">5</span></span>
@@ -373,8 +410,8 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
                         className="w-20 flex-shrink-0 text-left disabled:opacity-60"
                       >
                         <img src={v.display} alt="" className={`aspect-square w-full object-cover ${i === current ? "border-2 border-[hsl(var(--formanova-hero-accent))]" : "border border-border"}`} />
-                        <span className="mt-1 block text-xs font-medium text-foreground">V{i + 1}</span>
-                        <span title={v.note} className="block truncate text-[11px] leading-tight text-muted-foreground">{v.note}</span>
+                        <span className="mt-1 block text-xs font-medium text-foreground">{versionLabel(i)}</span>
+                        {i > 0 && <span title={v.note} className="block truncate text-[11px] leading-tight text-muted-foreground">{v.note}</span>}
                       </button>
                     ))}
                     {busy && (
@@ -384,14 +421,39 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
                     )}
                   </div>
                 </div>
-                {versions.length > 1 && (
-                  <div className="flex flex-shrink-0 flex-col gap-2 sm:w-[260px]">
+                {current > 0 && !isApproved && (
+                  <div className="flex flex-shrink-0 gap-2 sm:w-[300px]">
+                    <button
+                      type="button"
+                      onClick={redo}
+                      disabled={busy || !shown?.request}
+                      title={`Make ${versionLabel(current)} again from the same picture`}
+                      className="flex h-12 items-center justify-center gap-2 border border-border px-4 text-sm text-foreground transition-colors hover:border-foreground/40 disabled:opacity-50"
+                    >
+                      <RotateCcw className="h-4 w-4" strokeWidth={1.5} /> Try again
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setApprovedIndex(current)}
+                      disabled={!canApprove}
+                      title={hasChange ? "Send your change first" : "Use this version (Ctrl Enter)"}
+                      className="flex h-12 flex-1 items-center justify-center gap-2 bg-[hsl(var(--formanova-hero-accent))] px-6 font-display text-base uppercase tracking-[0.08em] text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+                    >
+                      <Check className="h-4 w-4" strokeWidth={1.5} /> Approve {versionLabel(current)}
+                    </button>
+                  </div>
+                )}
+                {isApproved && (
+                  <div className="flex flex-shrink-0 flex-col gap-2 sm:w-[300px]">
+                    <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Check className="h-3.5 w-3.5 text-emerald-700" strokeWidth={1.5} /> {versionLabel(current)} approved ·
+                      <button type="button" onClick={() => setApprovedIndex(null)} className="underline underline-offset-2 hover:text-foreground">Change</button>
+                    </p>
                     <button
                       type="button"
                       onClick={() => approve("angles")}
                       disabled={!canApprove}
-                      title={hasChange ? "Send your change first" : "Use this version and add more angles"}
-                      className="flex h-12 items-center justify-center border-2 border-[hsl(var(--formanova-hero-accent))] px-6 font-display text-base uppercase tracking-wide text-[hsl(var(--formanova-hero-accent))] transition-colors hover:bg-[hsl(var(--formanova-hero-accent)/0.06)] disabled:opacity-50"
+                      className="flex h-12 items-center justify-center border border-[hsl(var(--formanova-hero-accent))] px-6 font-display text-base uppercase tracking-[0.08em] text-[hsl(var(--formanova-hero-accent))] transition-colors hover:bg-[hsl(var(--formanova-hero-accent)/0.06)] disabled:opacity-50"
                     >
                       Add more angles
                     </button>
@@ -399,10 +461,11 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
                       type="button"
                       onClick={() => approve("ready")}
                       disabled={!canApprove}
-                      title={hasChange ? "Send your change first" : "Use this version (Ctrl Enter)"}
-                      className="flex h-12 items-center justify-center gap-2 bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] px-6 font-display text-base uppercase tracking-wide text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+                      title="Make it CAD (Ctrl Enter)"
+                      className="flex h-12 items-center justify-center gap-3 bg-[hsl(var(--formanova-hero-accent))] px-6 font-display text-base uppercase tracking-[0.08em] text-background transition-opacity hover:opacity-90 disabled:opacity-50"
                     >
-                      Make it CAD <ArrowRight className="h-4 w-4" />
+                      Make it CAD <ArrowRight className="h-4 w-4" strokeWidth={1.5} />
+                      <span className="inline-flex items-center gap-1.5 border-l border-background/30 pl-3"><img src={creditCoinIcon} alt="" className="h-4 w-4" /><span className="font-mono text-sm">{cadCostLoading ? "…" : cadCost ?? "—"}</span></span>
                     </button>
                   </div>
                 )}

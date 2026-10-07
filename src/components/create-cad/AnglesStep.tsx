@@ -28,7 +28,7 @@ interface AnglesStepProps {
   onContinue: (angles: EditorPicture[]) => void;
 }
 
-const goldBtn = "flex h-12 items-center justify-center gap-2 bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] px-6 font-display text-base uppercase tracking-wide text-background transition-opacity hover:opacity-90 disabled:opacity-50";
+const goldBtn = "flex h-12 items-center justify-center gap-2 bg-[hsl(var(--formanova-hero-accent))] px-6 font-display text-base uppercase tracking-wide text-background transition-opacity hover:opacity-90 disabled:opacity-50";
 const lineBtn = "flex h-12 items-center justify-center gap-2 border border-border px-5 text-sm text-foreground hover:border-foreground/40 disabled:opacity-50";
 const smallBtn = "flex h-7 items-center gap-1 border border-border bg-background px-2 font-mono text-[10px] uppercase tracking-[0.08em] text-foreground hover:border-foreground/40 disabled:opacity-50";
 

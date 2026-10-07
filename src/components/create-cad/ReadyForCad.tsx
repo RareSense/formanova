@@ -99,7 +99,7 @@ export default function ReadyForCad({ pictures, jewelryType, dimensions, onDimen
           type="button"
           onClick={onGenerate}
           disabled={generating}
-          className="flex h-12 items-center justify-center gap-2.5 bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] px-8 font-display text-base uppercase tracking-wide text-background transition-opacity hover:opacity-90 disabled:opacity-60"
+          className="flex h-12 items-center justify-center gap-2.5 bg-[hsl(var(--formanova-hero-accent))] px-8 font-display text-base uppercase tracking-wide text-background transition-opacity hover:opacity-90 disabled:opacity-60"
         >
           {generating ? "Starting…" : <>Generate CAD <ArrowRight className="h-4 w-4" />
             <span className="inline-flex items-center gap-1"><img src={creditCoinIcon} alt="" className="h-5 w-5" /><span className="font-mono text-sm font-semibold">{costLoading ? "…" : cost ?? "—"}</span></span></>}
