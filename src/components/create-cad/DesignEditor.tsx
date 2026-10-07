@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { ArrowRight, Diamond, Mic, MousePointerClick, Send, X } from "lucide-react";
+import { ArrowRight, Diamond, MousePointerClick, Send, X } from "lucide-react";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { flattenMarkup, MIN_BRUSH, MAX_BRUSH, type Mark } from "@/lib/design-markup";
 import { blobToDataUrl } from "@/lib/design-image-run";
@@ -10,7 +10,6 @@ import MarkupCanvas, { type MarkupTool } from "./MarkupCanvas";
 import MarkupToolPanel from "./MarkupToolPanel";
 import { MARKUP_TOOLS } from "./markup-tools";
 import { useMarkupHistory } from "./useMarkupHistory";
-import { useSpeechInput } from "./useSpeechInput";
 import AnglesStep from "./AnglesStep";
 import ReadyForCad from "./ReadyForCad";
 import type { EditorPicture } from "./angle-suggestions";
@@ -104,7 +103,6 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
   const [approved, setApproved] = useState<EditorPicture | null>(null);
   const [angles, setAngles] = useState<EditorPicture[]>([]);
   const history = useMarkupHistory();
-  const speech = useSpeechInput((text) => setInstruction((t) => (t.trim() ? `${t.trim()} ${text}` : text)));
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const objectUrls = useRef<string[]>([]);
 
@@ -340,30 +338,17 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
                       rows={1}
                       disabled={busy}
                       placeholder={history.marks.length ? "Describe what to change in the marked area, e.g. make it an oval sapphire" : "Describe what to change, e.g. make the centre stone oval"}
-                      className="min-h-[48px] w-full resize-none border border-border bg-background py-3 pl-4 pr-12 text-[15px] leading-snug text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-foreground/60 disabled:opacity-60"
+                      className="min-h-[48px] w-full resize-none border border-border bg-background py-3 px-4 text-[15px] leading-snug text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-foreground/60 disabled:opacity-60"
                     />
-                    {speech.supported && (
-                      <button
-                        type="button"
-                        onClick={speech.toggle}
-                        disabled={busy}
-                        aria-label={speech.listening ? "Stop listening" : "Speak your change"}
-                        aria-pressed={speech.listening}
-                        title={speech.listening ? "Listening… click to stop" : "Speak your change"}
-                        className={`absolute right-1.5 top-1.5 flex h-9 w-9 items-center justify-center disabled:opacity-50 ${speech.listening ? "animate-pulse text-destructive" : "text-muted-foreground hover:text-foreground"}`}
-                      >
-                        <Mic className="h-5 w-5" />
-                      </button>
-                    )}
                   </div>
                   <button
                     type="button"
                     onClick={() => void send()}
                     disabled={busy || !hasChange}
-                    className="flex h-12 flex-shrink-0 items-center gap-2 bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] px-5 font-display text-base uppercase tracking-wide text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+                    className="flex h-12 flex-shrink-0 items-center gap-3 bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] px-7 font-display text-base uppercase tracking-[0.08em] text-background transition-opacity hover:opacity-90 disabled:opacity-50"
                   >
-                    <Send className="h-4 w-4" /> Send
-                    <span className="inline-flex items-center gap-1"><img src={creditCoinIcon} alt="" className="h-4 w-4" /><span className="font-mono text-sm">5</span></span>
+                    <Send className="h-4 w-4" strokeWidth={1.5} /> Send
+                    <span className="ml-1 inline-flex items-center gap-1.5 border-l border-background/30 pl-3"><img src={creditCoinIcon} alt="" className="h-4 w-4" /><span className="font-mono text-sm">5</span></span>
                   </button>
                 </div>
                 {history.marks.length > 0 && (

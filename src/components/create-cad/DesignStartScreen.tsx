@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Layers, Mic, Shapes, Type } from "lucide-react";
+import { Layers, Shapes, Type } from "lucide-react";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import CadJewelryTypeCards from "@/components/text-to-cad/CadJewelryTypeCards";
 import ReferenceImageUploader from "@/components/text-to-cad/ReferenceImageUploader";
@@ -8,7 +8,6 @@ import { CAD_EXAMPLE_PROMPTS } from "@/components/text-to-cad/cad-examples";
 import { MAX_DESIGN_IMAGES } from "@/lib/design-image-api";
 import { cadJewelryNoun, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
 import DoodlePad, { type DoodlePadHandle } from "./DoodlePad";
-import { useSpeechInput } from "./useSpeechInput";
 
 export type StartMode = "describe" | "draw" | "mix";
 
@@ -46,7 +45,6 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
   const [count, setCount] = useState<1 | 4>(4);
   const doodleRef = useRef<DoodlePadHandle>(null);
   const glbInputRef = useRef<HTMLInputElement>(null);
-  const speech = useSpeechInput((said) => setText((t) => (t.trim() ? `${t.trim()} ${said}` : said)));
 
   const ready = mode === "describe" ? !!text.trim() : mode === "draw" ? hasInk : mixFiles.length >= 2;
   const why = mode === "describe" ? "Describe the piece to continue" : mode === "draw" ? "Draw something to continue" : "Add at least 2 pictures to continue";
@@ -79,14 +77,8 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
         rows={rows}
         disabled={busy}
         placeholder={placeholder}
-        className="w-full resize-y border border-border bg-background py-3 pl-4 pr-12 text-[15px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-foreground/60 disabled:opacity-60"
+        className="w-full resize-y border border-border bg-background py-3 px-4 text-[15px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-foreground/60 disabled:opacity-60"
       />
-      {speech.supported && (
-        <button type="button" onClick={speech.toggle} disabled={busy} aria-label={speech.listening ? "Stop listening" : "Speak instead of typing"} aria-pressed={speech.listening}
-          className={`absolute right-1.5 top-1.5 flex h-9 w-9 items-center justify-center ${speech.listening ? "animate-pulse text-destructive" : "text-muted-foreground hover:text-foreground"}`}>
-          <Mic className="h-5 w-5" />
-        </button>
-      )}
     </div>
   );
 

@@ -1,9 +1,8 @@
 import type { ReactNode } from "react";
-import { ArrowLeft, ArrowRight, Check, Mic, Ruler } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Ruler } from "lucide-react";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import type { CadJewelryType } from "@/lib/ring-cad-nurbs-api";
 import type { EditorPicture } from "./angle-suggestions";
-import { useSpeechInput } from "./useSpeechInput";
 
 const DIMENSION_EXAMPLE: Record<CadJewelryType, string> = {
   ring: "e.g. ring size US 7, band 2 mm wide, centre stone 9 × 7 mm",
@@ -34,7 +33,6 @@ interface ReadyForCadProps {
  * dimensions, and Generate CAD, which starts the normal Image to CAD run.
  */
 export default function ReadyForCad({ pictures, jewelryType, dimensions, onDimensions, cost, costLoading, onBack, onGenerate, generating, modelPicker }: ReadyForCadProps) {
-  const speech = useSpeechInput((text) => onDimensions(dimensions.trim() ? `${dimensions.trim()}, ${text}` : text));
   const [main, ...angles] = pictures;
 
   return (
@@ -84,19 +82,8 @@ export default function ReadyForCad({ pictures, jewelryType, dimensions, onDimen
                 onChange={(e) => onDimensions(e.target.value)}
                 rows={1}
                 placeholder={DIMENSION_EXAMPLE[jewelryType ?? "ring"]}
-                className="min-h-[72px] w-full resize-y border border-border bg-background py-3 pl-11 pr-12 text-[14px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-foreground/60 sm:min-h-[48px]"
+                className="min-h-[72px] w-full resize-y border border-border bg-background py-3 pl-11 pr-4 text-[14px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-foreground/60 sm:min-h-[48px]"
               />
-              {speech.supported && (
-                <button
-                  type="button"
-                  onClick={speech.toggle}
-                  aria-label={speech.listening ? "Stop listening" : "Speak the dimensions"}
-                  aria-pressed={speech.listening}
-                  className={`absolute right-1.5 top-1.5 flex h-9 w-9 items-center justify-center ${speech.listening ? "animate-pulse text-destructive" : "text-muted-foreground hover:text-foreground"}`}
-                >
-                  <Mic className="h-5 w-5" />
-                </button>
-              )}
             </div>
           </div>
         </main>
