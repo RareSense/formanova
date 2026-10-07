@@ -140,7 +140,7 @@ export default function AnglesStep({ approved, resolveBase, jewelryType, toObjec
               const editable = slot.status === "idle" || slot.status === "failed";
               const canTick = slot.ticked || roomLeft;
               return (
-                <div key={i} className={`flex flex-col border transition-colors ${slot.status === "mismatch" ? "border-amber-600/60" : slot.ticked ? "border-[hsl(var(--formanova-hero-accent))]" : "border-border"}`}>
+                <div key={i} className={`flex flex-col border transition-colors ${slot.status === "mismatch" ? "border-amber-600/60" : slot.ticked ? "border-[hsl(var(--formanova-hero-accent))]" : "border-border/60"}`}>
                   <div className="relative flex aspect-square items-center justify-center overflow-hidden bg-muted/20">
                     {slot.picture ? (
                       <img src={slot.picture.display} alt={`${slot.view} view`} className={`h-full w-full object-contain ${slot.status === "mismatch" ? "opacity-60" : ""}`} />
@@ -156,7 +156,7 @@ export default function AnglesStep({ approved, resolveBase, jewelryType, toObjec
                     )}
                     {slot.status === "ready" && <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center bg-emerald-700 text-white" title="Matches your design"><Check className="h-3 w-3" strokeWidth={2} /></span>}
                   </div>
-                  <div className="flex flex-col gap-1.5 border-t border-border px-2.5 py-2">
+                  <div className="flex flex-col gap-1.5 border-t border-border/60 px-2.5 py-2">
                     {editable ? (
                       <label className={`flex items-center gap-2 text-sm font-medium text-foreground ${canTick ? "" : "opacity-50"}`}>
                         <input type="checkbox" checked={slot.ticked} disabled={!canTick || making} onChange={(e) => update(i, { ticked: e.target.checked })} className="h-4 w-4 accent-[hsl(var(--formanova-hero-accent))]" />
@@ -188,7 +188,7 @@ export default function AnglesStep({ approved, resolveBase, jewelryType, toObjec
           </div>
         </section>
 
-        <aside className="flex flex-shrink-0 flex-col gap-3 lg:w-[280px] lg:border-l lg:border-border lg:pl-8">
+        <aside className="flex flex-shrink-0 flex-col gap-3 lg:w-[280px] lg:border-l lg:border-border/60 lg:pl-8">
           <div>
             <h3 className="text-sm font-medium text-foreground">Custom angle <span className="font-normal text-muted-foreground">(optional)</span></h3>
             <p className="mt-0.5 text-xs text-muted-foreground">Describe any other view you need.</p>
@@ -209,7 +209,7 @@ export default function AnglesStep({ approved, resolveBase, jewelryType, toObjec
         </aside>
       </div>
 
-      <footer className="flex flex-shrink-0 flex-col-reverse gap-2 border-t border-border px-3 py-3 sm:flex-row sm:items-center sm:justify-end sm:gap-4 sm:px-5">
+      <footer className="flex flex-shrink-0 flex-col-reverse gap-2 border-t border-border/60 px-3 py-3 sm:flex-row sm:items-center sm:justify-end sm:gap-4 sm:px-5">
         <span className="flex-1 text-center text-xs text-muted-foreground sm:text-left" aria-live="polite">{note}</span>
         {toMake.length > 0 ? (
           <button type="button" onClick={() => void make(toMake)} disabled={making} className={goldBtn}>

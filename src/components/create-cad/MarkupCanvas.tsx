@@ -29,6 +29,8 @@ interface MarkupCanvasProps {
   tool: MarkupTool;
   /** Brush width, percent of the picture width. */
   brush: number;
+  /** Colour for new marks. */
+  colour?: string;
   selected: number | null;
   onSelect: (index: number | null) => void;
   disabled?: boolean;
@@ -49,7 +51,7 @@ type Drag =
  * the numbered badges are plain elements on top so they stay crisp and
  * clickable. Pointer events cover mouse, pen and touch alike.
  */
-export default function MarkupCanvas({ src, alt, marks, onCommit, tool, brush, selected, onSelect, disabled, overlay, hint }: MarkupCanvasProps) {
+export default function MarkupCanvas({ src, alt, marks, onCommit, tool, brush, colour = MARK_COLOUR, selected, onSelect, disabled, overlay, hint }: MarkupCanvasProps) {
   const layerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dragRef = useRef<Drag | null>(null);
@@ -125,7 +127,7 @@ export default function MarkupCanvas({ src, alt, marks, onCommit, tool, brush, s
     const kind = tool === "erase" ? "erase" : tool;
     dragRef.current = {
       kind: "draw",
-      mark: { kind, points: kind === "brush" || kind === "erase" ? [p] : [p, p], width: kind === "erase" ? brush * ERASER_SCALE : brush },
+      mark: { kind, points: kind === "brush" || kind === "erase" ? [p] : [p, p], width: kind === "erase" ? brush * ERASER_SCALE : brush, ...(kind === "erase" ? {} : { colour }) },
     };
     setLive([...marks]);
   };
@@ -230,7 +232,7 @@ export default function MarkupCanvas({ src, alt, marks, onCommit, tool, brush, s
               onClick={() => onSelect(index)}
               aria-label={`Mark ${n + 1}`}
               className={`absolute flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-background text-[11px] font-semibold text-background shadow ${selected === index ? "bg-foreground" : ""}`}
-              style={{ left: `${b.x0}%`, top: `${b.y0}%`, background: selected === index ? undefined : MARK_COLOUR }}
+              style={{ left: `${b.x0}%`, top: `${b.y0}%`, background: selected === index ? undefined : shown[index].colour ?? MARK_COLOUR }}
             >
               {n + 1}
             </button>
@@ -242,8 +244,8 @@ export default function MarkupCanvas({ src, alt, marks, onCommit, tool, brush, s
             className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2"
             style={{
               left: `${hover.x}%`, top: `${hover.y}%`, width: cursorSize, height: cursorSize,
-              borderColor: tool === "erase" ? "hsl(var(--foreground))" : MARK_COLOUR,
-              background: tool === "erase" ? "hsl(var(--background) / 0.35)" : "rgba(229,56,59,0.15)",
+              borderColor: tool === "erase" ? "hsl(var(--foreground))" : colour,
+              background: tool === "erase" ? "hsl(var(--background) / 0.35)" : `${colour}26`,
             }}
           />
         )}

@@ -77,10 +77,22 @@ describe('DesignEditor', () => {
     expect(screen.getByRole('button', { name: /create cad directly/i })).toBeInTheDocument();
   });
 
-  it('the original can be approved as it is', () => {
+  it('offers Looks right only once a change has been made', async () => {
     renderEditor();
-    looksRight();
-    expect(screen.getByText(/what would you like to do next/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /looks right/i })).toBeNull();
+    await makeChange();
+    expect(screen.getByRole('button', { name: /looks right/i })).toBeEnabled();
+  });
+
+  it('offers mark colours for the brush, rectangle and arrow, not the eraser', () => {
+    renderEditor();
+    expect(screen.queryByRole('radiogroup', { name: /mark colour/i })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /^brush$/i }));
+    const blue = screen.getByRole('radio', { name: /blue/i });
+    fireEvent.click(blue);
+    expect(blue).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(screen.getByRole('button', { name: /^erase$/i }));
+    expect(screen.queryByRole('radiogroup', { name: /mark colour/i })).toBeNull();
   });
 
   it('Create CAD directly shows the reference images and dimensions, and Create CAD hands over the approved picture', async () => {
@@ -101,6 +113,7 @@ describe('DesignEditor', () => {
 
   it('Add more angles suggests four views for the piece, none ticked, with the price inside Generate', async () => {
     renderEditor();
+    await makeChange();
     looksRight();
     fireEvent.click(screen.getByRole('button', { name: /add more angles/i }));
     const boxes = screen.getAllByRole('checkbox');
@@ -112,8 +125,9 @@ describe('DesignEditor', () => {
     expect(screen.getByRole('button', { name: /generate 2 angles/i })).toHaveTextContent('20');
   });
 
-  it('allows five pictures in total: the design and four angles', () => {
+  it('allows five pictures in total: the design and four angles', async () => {
     renderEditor();
+    await makeChange();
     looksRight();
     fireEvent.click(screen.getByRole('button', { name: /add more angles/i }));
     fireEvent.click(screen.getByRole('button', { name: /select all angles/i }));

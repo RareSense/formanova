@@ -1,5 +1,5 @@
 import { Redo2, Trash2, Undo2 } from "lucide-react";
-import { MAX_BRUSH, MIN_BRUSH } from "@/lib/design-markup";
+import { MARK_COLOURS, MAX_BRUSH, MIN_BRUSH } from "@/lib/design-markup";
 import type { MarkupTool } from "./MarkupCanvas";
 import { MARKUP_TOOLS } from "./markup-tools";
 
@@ -9,6 +9,8 @@ interface MarkupToolPanelProps {
   onTool: (t: MarkupTool) => void;
   brush: number;
   onBrush: (w: number) => void;
+  colour: string;
+  onColour: (c: string) => void;
   canUndo: boolean;
   canRedo: boolean;
   canClear: boolean;
@@ -27,11 +29,12 @@ const quietBtn = "flex h-8 w-9 items-center justify-center text-muted-foreground
  * as quiet icons underneath. The brush size appears beside it only while
  * painting or erasing.
  */
-export default function MarkupToolPanel({ tool, onTool, brush, onBrush, canUndo, canRedo, canClear, onUndo, onRedo, onClear, disabled }: MarkupToolPanelProps) {
+export default function MarkupToolPanel({ tool, onTool, brush, onBrush, colour, onColour, canUndo, canRedo, canClear, onUndo, onRedo, onClear, disabled }: MarkupToolPanelProps) {
   const sized = tool === "brush" || tool === "erase";
+  const painting = tool === "brush" || tool === "box" || tool === "arrow";
   return (
     <div className="flex items-start gap-2">
-      <div role="toolbar" aria-label="Mark what to change" aria-orientation="vertical" className="flex flex-col items-center border border-border bg-background/95 p-1 shadow-sm backdrop-blur">
+      <div role="toolbar" aria-label="Mark what to change" aria-orientation="vertical" className="flex flex-col items-center border border-border/60 bg-background/95 p-1 backdrop-blur">
         {MARKUP_TOOLS.map(({ id, name, hint, key, Icon }) => {
           const active = tool === id;
           return (
@@ -62,8 +65,28 @@ export default function MarkupToolPanel({ tool, onTool, brush, onBrush, canUndo,
         </button>
       </div>
 
-      {sized && (
-        <label className="flex items-center gap-2 border border-border bg-background/95 px-3 py-2 shadow-sm backdrop-blur">
+      {(sized || painting) && (
+        <div className="flex flex-col gap-2 border border-border/60 bg-background/95 px-3 py-2 backdrop-blur">
+          {painting && (
+            <div role="radiogroup" aria-label="Mark colour" className="flex items-center gap-2">
+              {MARK_COLOURS.map((c) => (
+                <button
+                  key={c.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={colour === c.value}
+                  aria-label={c.name}
+                  title={c.name}
+                  disabled={disabled}
+                  onClick={() => onColour(c.value)}
+                  className={`h-5 w-5 rounded-full transition-transform hover:scale-110 ${colour === c.value ? "ring-1 ring-foreground ring-offset-2 ring-offset-background" : ""}`}
+                  style={{ background: c.value }}
+                />
+              ))}
+            </div>
+          )}
+          {sized && (
+        <label className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">Size</span>
           <input
             type="range"
@@ -75,6 +98,8 @@ export default function MarkupToolPanel({ tool, onTool, brush, onBrush, canUndo,
             className="h-1 w-24 accent-[hsl(var(--formanova-hero-accent))]"
           />
         </label>
+          )}
+        </div>
       )}
     </div>
   );

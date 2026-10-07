@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { ArrowRight, Box, Check, ChevronLeft, Diamond, Ruler, X } from "lucide-react";
-import { flattenMarkup, MIN_BRUSH, MAX_BRUSH } from "@/lib/design-markup";
+import { flattenMarkup, MARK_COLOUR, MIN_BRUSH, MAX_BRUSH } from "@/lib/design-markup";
 import { blobToDataUrl } from "@/lib/design-image-run";
 import { DESIGN_IMAGE_CREDITS } from "@/lib/design-image-api";
 import type { CadJewelryType, ImageInput } from "@/lib/ring-cad-nurbs-api";
@@ -92,6 +92,7 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
   const [error, setError] = useState<string | null>(null);
   const [tool, setTool] = useState<MarkupTool>("select");
   const [brush, setBrush] = useState(5);
+  const [colour, setColour] = useState(MARK_COLOUR);
   const [selected, setSelected] = useState<number | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
@@ -126,7 +127,8 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
   useEffect(() => () => { objectUrls.current.forEach((u) => URL.revokeObjectURL(u)); }, []);
 
   const hasChange = instruction.trim().length > 0;
-  const canApprove = !!picture && !busy && !hasChange;
+  // "Looks right" only once a change has been made: the editor is for changing.
+  const canApprove = !!picture && edited && !busy && !hasChange;
   const isDirty = edited || history.marks.length > 0 || hasChange;
 
   const send = useCallback(async () => {
@@ -241,15 +243,17 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
         <DialogPrimitive.Overlay className="fixed inset-0 z-[120] bg-background/40 backdrop-blur-md" />
         <DialogPrimitive.Content
           aria-describedby={undefined}
+          // Start in the change box, not on Cancel: no heavy focus box on open.
+          onOpenAutoFocus={(e) => { e.preventDefault(); promptRef.current?.focus({ preventScroll: true }); }}
           onEscapeKeyDown={(e) => {
             if (confirmClose) { e.preventDefault(); setConfirmClose(false); return; }
             if (helpOpen) { e.preventDefault(); setHelpOpen(false); return; }
             if (selected !== null || tool !== "select") { e.preventDefault(); setSelected(null); setTool("select"); }
           }}
-          className="fixed inset-0 z-[121] flex flex-col bg-background outline-none lg:inset-6 lg:mx-auto lg:max-w-[1180px] lg:border lg:border-border lg:shadow-2xl"
+          className="fixed inset-0 z-[121] flex flex-col bg-background outline-none lg:inset-6 lg:mx-auto lg:max-w-[1180px] lg:border lg:border-border/60 lg:shadow-xl"
         >
           {/* Header: Cancel / Back left, title centre, Original or Close right */}
-          <header className="grid h-14 flex-shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b border-border px-3 sm:px-5">
+          <header className="grid h-14 flex-shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b border-border/60 px-3 sm:px-5">
             <div>
               {stage === "edit" ? (
                 <button type="button" onClick={requestClose} className="flex h-10 items-center gap-1.5 px-1 text-sm text-foreground hover:text-muted-foreground">
@@ -283,6 +287,7 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
                   onCommit={history.commit}
                   tool={tool}
                   brush={brush}
+                  colour={colour}
                   selected={selected}
                   onSelect={(i) => { setSelected(i); if (i !== null) setTool("select"); }}
                   disabled={busy}
@@ -294,6 +299,8 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
                     onTool={(t) => { setTool(t); if (t !== "select") setSelected(null); }}
                     brush={brush}
                     onBrush={setBrush}
+                    colour={colour}
+                    onColour={setColour}
                     canUndo={history.canUndo}
                     canRedo={history.canRedo}
                     canClear={marks > 0}
@@ -305,12 +312,12 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
                 </div>
               </div>
 
-              <div className="flex-shrink-0 border-t border-border px-3 pb-4 pt-2 sm:px-5">
+              <div className="flex-shrink-0 border-t border-border/60 px-3 pb-4 pt-2 sm:px-5">
                 <p className="mb-2 text-center text-xs text-muted-foreground">
                   {marks > 0 ? `${marks} mark${marks > 1 ? "s" : ""} on the picture · describe the change below` : "Mark an area if needed"}
                 </p>
                 <div className="mx-auto max-w-[760px]">
-                  <div className="flex items-stretch border border-border bg-background focus-within:border-foreground/60">
+                  <div className="flex items-stretch border border-border/70 bg-background transition-colors focus-within:border-foreground/40">
                     <label htmlFor="design-editor-change" className="sr-only">Describe what to change</label>
                     <textarea
                       id="design-editor-change"
@@ -329,17 +336,19 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
                     </button>
                   </div>
                   {error && <p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}
+                  {edited && (
                   <div className="mt-3 flex justify-center">
                     <button
                       type="button"
                       onClick={looksRight}
                       disabled={!canApprove}
                       title={hasChange ? "Send your change first" : "Use this design (Ctrl Enter)"}
-                      className="flex h-11 items-center gap-2 border border-foreground px-8 font-display text-base uppercase tracking-[0.08em] text-foreground transition-colors hover:bg-foreground hover:text-background disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-foreground"
+                      className="flex h-11 items-center gap-2 border border-border px-8 font-display text-base uppercase tracking-[0.08em] text-foreground transition-colors hover:border-[hsl(var(--formanova-hero-accent))] hover:text-[hsl(var(--formanova-hero-accent))] disabled:opacity-40"
                     >
                       <Check className="h-4 w-4" strokeWidth={1.5} /> Looks right
                     </button>
                   </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -355,7 +364,7 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
                 <h2 className="mt-2 font-display text-3xl uppercase tracking-[0.02em] text-foreground">What would you like to do next?</h2>
                 <p className="mt-2 text-sm text-muted-foreground">More views and dimensions help the CAD follow your design more accurately.</p>
                 <div className="mt-6 flex flex-col gap-3">
-                  <button type="button" onClick={openAngles} className="group flex items-start gap-4 border border-border p-5 text-left transition-colors hover:border-[hsl(var(--formanova-hero-accent))]">
+                  <button type="button" onClick={openAngles} className="group flex items-start gap-4 border border-border/60 p-5 text-left transition-colors hover:border-[hsl(var(--formanova-hero-accent))]">
                     <Box className="mt-0.5 h-5 w-5 flex-shrink-0 text-foreground" strokeWidth={1.5} />
                     <span className="min-w-0 flex-1">
                       <span className="block text-base font-medium text-foreground">Add more angles</span>
@@ -363,7 +372,7 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
                     </span>
                     <ArrowRight className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" strokeWidth={1.5} />
                   </button>
-                  <button type="button" onClick={() => setStage("ready")} className="group flex items-start gap-4 border border-border p-5 text-left transition-colors hover:border-[hsl(var(--formanova-hero-accent))]">
+                  <button type="button" onClick={() => setStage("ready")} className="group flex items-start gap-4 border border-border/60 p-5 text-left transition-colors hover:border-[hsl(var(--formanova-hero-accent))]">
                     <Ruler className="mt-0.5 h-5 w-5 flex-shrink-0 text-foreground" strokeWidth={1.5} />
                     <span className="min-w-0 flex-1">
                       <span className="block text-base font-medium text-foreground">Create CAD directly</span>

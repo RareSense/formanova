@@ -45,9 +45,9 @@ export default function ReadyForCad({ pictures, jewelryType, dimensions, onDimen
           <p className="mt-1 text-sm text-muted-foreground">These will be used to create your CAD.</p>
           <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-5">
             {pictures.map((p, i) => (
-              <figure key={p.display} className={`relative border ${i === 0 ? "border-[hsl(var(--formanova-hero-accent))]" : "border-border"}`}>
+              <figure key={p.display} className={`relative border ${i === 0 ? "border-[hsl(var(--formanova-hero-accent))]" : "border-border/60"}`}>
                 <img src={p.display} alt={i === 0 ? "Your approved design" : `${p.label} view`} className="aspect-square w-full bg-muted/20 object-contain" />
-                <figcaption className="truncate border-t border-border px-2 py-1.5 text-xs text-foreground">{i === 0 ? "Main design" : p.label}</figcaption>
+                <figcaption className="truncate border-t border-border/60 px-2 py-1.5 text-xs text-foreground">{i === 0 ? "Main design" : p.label}</figcaption>
               </figure>
             ))}
             {canAddAngle && (
@@ -83,7 +83,7 @@ export default function ReadyForCad({ pictures, jewelryType, dimensions, onDimen
         </section>
       </div>
 
-      <footer className="flex flex-shrink-0 flex-col-reverse gap-2 border-t border-border px-3 py-3 sm:flex-row sm:items-center sm:justify-end sm:gap-4 sm:px-5">
+      <footer className="flex flex-shrink-0 flex-col-reverse gap-2 border-t border-border/60 px-3 py-3 sm:flex-row sm:items-center sm:justify-end sm:gap-4 sm:px-5">
         <span className="flex-1 text-center text-xs text-muted-foreground sm:text-left">Ready in 30–40 min · Rhino 3DM, STL, STEP</span>
         {modelPicker}
         <button

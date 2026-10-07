@@ -23,6 +23,8 @@ export interface Mark {
   points: MarkPoint[];
   /** Stroke width as a percent of the picture width. */
   width: number;
+  /** Paint colour; marks made before colours existed are red. */
+  colour?: string;
 }
 
 export interface MarkBounds {
@@ -36,6 +38,14 @@ export interface MarkBounds {
 export type MarkHandle = 0 | 1 | 2 | 3;
 
 export const MARK_COLOUR = '#e5383b';
+/** The colours a customer can mark with: strong, and easy to tell apart on metal and stones. */
+export const MARK_COLOURS: { name: string; value: string }[] = [
+  { name: 'Red', value: MARK_COLOUR },
+  { name: 'Blue', value: '#2563eb' },
+  { name: 'Green', value: '#16a34a' },
+  { name: 'Yellow', value: '#facc15' },
+  { name: 'Black', value: '#111111' },
+];
 /** Marks are painted semi-transparent so the design stays readable under them. */
 export const MARK_OPACITY = 0.6;
 export const MIN_BRUSH = 2;
@@ -164,8 +174,8 @@ export function paintMarks(ctx: CanvasRenderingContext2D, marks: Mark[], w: numb
   ctx.lineJoin = 'round';
   for (const mark of marks) {
     ctx.globalCompositeOperation = mark.kind === 'erase' ? 'destination-out' : 'source-over';
-    ctx.strokeStyle = MARK_COLOUR;
-    ctx.fillStyle = MARK_COLOUR;
+    ctx.strokeStyle = mark.colour ?? MARK_COLOUR;
+    ctx.fillStyle = mark.colour ?? MARK_COLOUR;
     if (mark.kind === 'brush' || mark.kind === 'erase') {
       ctx.lineWidth = (mark.width / 100) * w;
       ctx.beginPath();
