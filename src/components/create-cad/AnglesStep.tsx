@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { ArrowLeft, ArrowRight, Check, Diamond, Info, Plus, RotateCcw, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Diamond, Plus, RotateCcw, X } from "lucide-react";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { useDesignImageRun, type DesignImageOutcome } from "@/hooks/useDesignImageRun";
 import type { CadJewelryType, ImageInput } from "@/lib/ring-cad-nurbs-api";
@@ -115,11 +115,6 @@ export default function AnglesStep({ approved, resolveBase, jewelryType, toObjec
         </aside>
 
         <main className="flex min-w-0 flex-1 flex-col gap-3">
-          <p className="flex items-start gap-2 bg-[hsl(var(--formanova-hero-accent)/0.08)] px-3 py-2.5 text-sm text-foreground">
-            <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-[hsl(var(--formanova-hero-accent))]" />
-            <span><span className="font-medium">Optional:</span> more angles help the CAD get hidden parts right. We suggest these {MAX_ANGLES}. Untick any you don't need, or swap one for your own angle.</span>
-          </p>
-
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             {slots.map((slot, i) => (
               <div key={i} className={`flex flex-col border ${slot.ticked ? "border-[hsl(var(--formanova-hero-accent))]" : "border-border"} ${slot.status === "mismatch" ? "border-amber-600/60" : ""}`}>
