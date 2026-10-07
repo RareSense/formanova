@@ -37,82 +37,95 @@ function renderEditor(props: Partial<React.ComponentProps<typeof DesignEditor>> 
 
 const NEW_VERSION = [{ ok: true, result: { image: { uri: 'u', url: 'https://x/v2.png', type: 'image/png', bytes: 1, sha256: 's' }, consistent: null, drift: [], view: null } }];
 
-async function makeNewVersion() {
+async function makeChange() {
   mockGenerate.mockResolvedValueOnce(NEW_VERSION);
   fireEvent.change(screen.getByLabelText(/describe what to change/i), { target: { value: 'make the stone oval' } });
   fireEvent.click(screen.getByRole('button', { name: /send/i }));
-  await screen.findByText('V1 of 1');
+  await waitFor(() => expect(screen.queryByText('Original')).toBeNull());
 }
 
-/** Approve the version showing: the next steps appear only after this. */
-function approveShown() {
-  fireEvent.click(screen.getByRole('button', { name: /approve v1/i }));
+function looksRight() {
+  fireEvent.click(screen.getByRole('button', { name: /looks right/i }));
 }
 
 describe('DesignEditor', () => {
-  it('opens on the uploaded picture as the Original (not a version), with the optional markup tools', () => {
+  it('opens on the uploaded picture as the Original, with a small markup toolbar and the price inside Send', () => {
     renderEditor();
-    expect(screen.getAllByText('Original').length).toBeGreaterThan(0);
-    expect(screen.queryByText(/of 1$/)).toBeNull();
+    expect(screen.getByText('Original')).toBeInTheDocument();
     expect(screen.getByRole('toolbar', { name: /mark what to change/i })).toBeInTheDocument();
     for (const name of ['Select', 'Brush', 'Rectangle', 'Arrow', 'Erase']) {
-      expect(screen.getByRole('button', { name: new RegExp(name) })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: new RegExp(`^${name}$`) })).toBeInTheDocument();
     }
-    expect(screen.getAllByText(/optional/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/mark an area if needed/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /send/i })).toHaveTextContent('10');
   }, 15000); // first render of the dialog is slow on a loaded machine
 
-  it('offers Approve and Try again for a new version, and the next steps only once approved', async () => {
+  it('each change replaces the picture: no versions are shown', async () => {
     renderEditor();
-    expect(screen.queryByRole('button', { name: /approve/i })).toBeNull();
-    await makeNewVersion();
-    expect(screen.getByRole('button', { name: /try again/i })).toBeEnabled();
-    expect(screen.queryByRole('button', { name: /make it cad/i })).toBeNull();
-    expect(screen.queryByRole('button', { name: /add more angles/i })).toBeNull();
-    approveShown();
-    expect(screen.getByRole('button', { name: /add more angles/i })).toBeEnabled();
-    expect(screen.getByRole('button', { name: /make it cad/i })).toBeEnabled();
+    await makeChange();
+    expect(screen.queryByText(/versions/i)).toBeNull();
+    expect(screen.queryByText(/^V\d/)).toBeNull();
+    expect(screen.getByAltText(/your edited design/i)).toBeInTheDocument();
   });
 
-  it('Try again makes the version again from the same request, as a new version', async () => {
+  it('Looks right leads to the next step: add more angles or create CAD directly', async () => {
     renderEditor();
-    await makeNewVersion();
-    const firstRequest = mockGenerate.mock.calls[0][0];
-    mockGenerate.mockResolvedValueOnce(NEW_VERSION);
-    fireEvent.click(screen.getByRole('button', { name: /try again/i }));
-    await screen.findByText('V2 of 2');
-    expect(mockGenerate.mock.calls[1][0]).toEqual(firstRequest);
+    await makeChange();
+    looksRight();
+    expect(screen.getByText(/what would you like to do next/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /add more angles/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /create cad directly/i })).toBeInTheDocument();
   });
 
-  it('Make it CAD goes to Ready for CAD, and Generate CAD hands over the approved picture', async () => {
+  it('the original can be approved as it is', () => {
+    renderEditor();
+    looksRight();
+    expect(screen.getByText(/what would you like to do next/i)).toBeInTheDocument();
+  });
+
+  it('Create CAD directly shows the reference images and dimensions, and Create CAD hands over the approved picture', async () => {
     const { onCreateCad } = renderEditor();
-    await makeNewVersion();
-    approveShown();
-    fireEvent.click(screen.getByRole('button', { name: /make it cad/i }));
-    expect(screen.getByText(/ready for cad/i)).toBeInTheDocument();
+    await makeChange();
+    looksRight();
+    fireEvent.click(screen.getByRole('button', { name: /create cad directly/i }));
+    expect(screen.getByText(/reference images/i)).toBeInTheDocument();
+    expect(screen.getByText('Main design')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /add another angle/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/dimensions/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /generate cad/i }));
+    const create = screen.getByRole('button', { name: /^create cad/i });
+    expect(create).toHaveTextContent('140');
+    fireEvent.click(create);
     await waitFor(() => expect(onCreateCad).toHaveBeenCalledTimes(1));
     expect(onCreateCad.mock.calls[0][0]).toHaveLength(1);
   });
 
-  it('Add more angles suggests four angles for the piece, three ticked', async () => {
+  it('Add more angles suggests four views for the piece, none ticked, with the price inside Generate', async () => {
     renderEditor();
-    await makeNewVersion();
-    approveShown();
+    looksRight();
     fireEvent.click(screen.getByRole('button', { name: /add more angles/i }));
-    expect(screen.getByText(/more angles/i, { selector: 'h2' })).toBeInTheDocument();
     const boxes = screen.getAllByRole('checkbox');
     expect(boxes).toHaveLength(4);
-    expect(boxes.filter((b) => (b as HTMLInputElement).checked)).toHaveLength(3);
-    expect(screen.getByRole('button', { name: /make 3 angles/i })).toBeInTheDocument();
+    expect(boxes.filter((b) => (b as HTMLInputElement).checked)).toHaveLength(0);
+    fireEvent.click(boxes[0]);
+    fireEvent.click(boxes[1]);
+    expect(screen.getAllByPlaceholderText(/anything specific/i)).toHaveLength(2);
+    expect(screen.getByRole('button', { name: /generate 2 angles/i })).toHaveTextContent('20');
+  });
+
+  it('allows five pictures in total: the design and four angles', () => {
+    renderEditor();
+    looksRight();
+    fireEvent.click(screen.getByRole('button', { name: /add more angles/i }));
+    fireEvent.click(screen.getByRole('button', { name: /select all angles/i }));
+    expect(screen.getAllByRole('checkbox').filter((b) => (b as HTMLInputElement).checked)).toHaveLength(4);
+    expect(screen.getByLabelText(/custom angle/i)).toBeDisabled();
   });
 
   it('closing after approval keeps the approved pictures on the page', async () => {
     const { onKeep, onCancel } = renderEditor();
-    await makeNewVersion();
-    approveShown();
-    fireEvent.click(screen.getByRole('button', { name: /make it cad/i }));
-    fireEvent.click(screen.getByRole('button', { name: /close/i }));
+    await makeChange();
+    looksRight();
+    fireEvent.click(screen.getByRole('button', { name: /^close/i }));
     await waitFor(() => expect(onKeep).toHaveBeenCalledTimes(1));
     expect(onCancel).not.toHaveBeenCalled();
   });
@@ -128,7 +141,7 @@ describe('DesignEditor', () => {
     renderEditor();
     fireEvent.change(screen.getByLabelText(/describe what to change/i), { target: { value: 'make the stone oval' } });
     fireEvent.click(screen.getByRole('button', { name: /send/i }));
-    expect(await screen.findByText(/making your new version/i)).toBeInTheDocument();
+    expect(await screen.findByText(/making your change/i)).toBeInTheDocument();
     expect(screen.getByText(/takes a few seconds/i)).toBeInTheDocument();
     await act(async () => { resolve([{ ok: false, message: 'That picture was blocked.', retryable: false }]); });
     expect(await screen.findByRole('alert')).toHaveTextContent('That picture was blocked.');
@@ -153,8 +166,8 @@ describe('DesignEditor', () => {
   it('switches tools from the keyboard', () => {
     renderEditor();
     fireEvent.keyDown(window, { key: 'b' });
-    expect(screen.getByRole('button', { name: /brush/i })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /^brush$/i })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.keyDown(window, { key: 'r' });
-    expect(screen.getByRole('button', { name: /rectangle/i })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /^rectangle$/i })).toHaveAttribute('aria-pressed', 'true');
   });
 });

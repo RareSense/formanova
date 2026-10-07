@@ -39,10 +39,7 @@ function ReferenceExamples({ examples, noun, onSelect }: { examples: CadExampleD
           className="group relative min-h-0 overflow-hidden border border-border/20 bg-muted/10 transition-colors hover:border-foreground/30"
           aria-label={`Use ${noun} example ${index + 1}`}
         >
-          <img src={example.image} alt={`${noun} example ${index + 1}`} className="h-full w-full object-cover" />
-          <div className="absolute inset-0 flex items-center justify-center bg-background/85 p-4 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
-            <p className="text-center font-mono text-[10px] leading-[1.6] text-foreground/80">{example.prompt}</p>
-          </div>
+          <img src={example.image} alt={`${noun} example ${index + 1}`} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
         </button>
       ))}
     </div>
@@ -108,17 +105,18 @@ export default function ImagePromptScreen({
     pricingContext: { llm_tier: tier },
   });
 
+  // Loads only the picture: the description stays the customer's own.
   const handleExampleClick = useCallback(async (example: CadExampleDesign) => {
-    setPrompt(example.prompt);
+    if (!jewelryType) setJewelryType("ring");
     try {
       const res = await fetch(example.image);
       const blob = await res.blob();
       const file = new File([blob], `example-${jewelryType ?? "piece"}.webp`, { type: "image/webp" });
       onReplaceReferenceImages([file]);
     } catch {
-      // image load failed -- just set prompt
+      // image load failed -- nothing to load
     }
-  }, [setPrompt, onReplaceReferenceImages, jewelryType]);
+  }, [onReplaceReferenceImages, jewelryType, setJewelryType]);
 
   // "My Pieces" reuse — urls are same-origin, auth-gated /api/artifacts proxy
   // URLs (see useCadHistoryLibrary), so these must go through authenticatedFetch,
@@ -311,15 +309,10 @@ export default function ImagePromptScreen({
                 <div className="mb-2">
                   <span className="marta-label block mb-1 invisible" aria-hidden="true">Step 2</span>
                   <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">Try an Example</h3>
-                  <p className="mt-1.5 text-sm text-muted-foreground">Choose one to load its image and prompt</p>
+                  <p className="mt-1.5 text-sm text-muted-foreground">Choose one to load its picture</p>
                 </div>
-                {jewelryType ? (
-                  <ReferenceExamples examples={CAD_EXAMPLE_DESIGNS[jewelryType]} noun={noun} onSelect={handleExampleClick} />
-                ) : (
-                  <div className={`flex items-center justify-center border border-border/30 p-6 text-center text-sm text-muted-foreground ${PANEL_H}`}>
-                    Choose what you are making to see examples
-                  </div>
-                )}
+                {/* Rings until they pick another kind of piece. */}
+                <ReferenceExamples examples={CAD_EXAMPLE_DESIGNS[jewelryType ?? "ring"]} noun={jewelryType ? noun : "ring"} onSelect={handleExampleClick} />
                 {/* Below the panel, not in the header: the header must stay the
                     same height as the upload column's, so both panels share a
                     top and bottom edge. First run only: this whole block is

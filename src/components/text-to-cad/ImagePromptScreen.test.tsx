@@ -127,11 +127,12 @@ describe('ImagePromptScreen', () => {
     expect(onGenerate).toHaveBeenCalledTimes(1);
   });
 
-  it('asks for a piece instead of showing examples while none is chosen', () => {
+  it('shows ring examples until another piece is chosen, and loads only the picture', () => {
     renderScreen(null);
 
-    expect(screen.getByText(/choose what you are making to see examples/i)).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /example 1/i })).toBeNull();
+    expect(screen.queryByText(/choose what you are making to see examples/i)).toBeNull();
+    expect(screen.getByText(/choose one to load its picture/i)).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: /ring example/i }).length).toBeGreaterThan(0);
   });
 
   describe('use as is / edit before CAD', () => {
