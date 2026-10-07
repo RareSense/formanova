@@ -250,7 +250,7 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
             if (helpOpen) { e.preventDefault(); setHelpOpen(false); return; }
             if (selected !== null || tool !== "select") { e.preventDefault(); setSelected(null); setTool("select"); }
           }}
-          className="fixed inset-0 z-[121] flex flex-col bg-background outline-none lg:inset-6 lg:mx-auto lg:max-w-[1180px] lg:border lg:border-border/60 lg:shadow-xl"
+          className="fixed inset-0 z-[121] flex flex-col bg-background outline-none lg:inset-auto lg:left-1/2 lg:top-1/2 lg:h-[min(700px,calc(100vh-48px))] lg:w-[min(1000px,calc(100vw-48px))] lg:-translate-x-1/2 lg:-translate-y-1/2 lg:border lg:border-border/60 lg:shadow-xl"
         >
           {/* Header: Cancel / Back left, title centre, Original or Close right */}
           <header className="grid h-14 flex-shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b border-border/60 px-3 sm:px-5">
@@ -355,8 +355,8 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
           )}
 
           {stage === "next" && approved && (
-            <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-4 sm:p-8 lg:flex-row lg:items-center lg:gap-12 lg:p-12">
-              <div className="flex-shrink-0 bg-muted/20 lg:w-[46%]">
+            <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-4 sm:p-8 lg:flex-row lg:items-center lg:gap-10 lg:p-10">
+              <div className="flex-shrink-0 bg-muted/20 lg:w-[44%]">
                 <img src={approved.display} alt="Your approved design" className="aspect-square w-full object-contain" />
               </div>
               <div className="min-w-0 flex-1">

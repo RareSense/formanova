@@ -32,7 +32,7 @@ interface AnglesStepProps {
   onContinue: (angles: EditorPicture[]) => void;
 }
 
-const goldBtn = "flex h-12 items-center justify-center gap-3 bg-[hsl(var(--formanova-hero-accent))] px-6 font-display text-base uppercase tracking-[0.08em] text-background transition-opacity hover:opacity-90 disabled:opacity-50";
+const goldBtn = "flex h-12 items-center justify-center gap-3 whitespace-nowrap bg-[hsl(var(--formanova-hero-accent))] px-5 font-display text-[15px] uppercase tracking-[0.06em] text-background transition-opacity hover:opacity-90 disabled:opacity-50";
 const lineBtn = "flex h-11 items-center justify-center gap-2 border border-border px-5 text-sm text-foreground hover:border-foreground/40 disabled:opacity-50";
 const smallBtn = "flex h-7 items-center gap-1 px-1.5 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50";
 
@@ -206,11 +206,9 @@ export default function AnglesStep({ approved, resolveBase, jewelryType, toObjec
           />
           <button type="button" onClick={addCustom} disabled={!roomLeft || !custom.trim() || making} className={lineBtn}><Plus className="h-4 w-4" strokeWidth={1.5} /> Add angle</button>
           <button type="button" onClick={selectAll} disabled={allSelected || making} className={lineBtn}>Select all angles</button>
-        </aside>
-      </div>
 
-      <footer className="flex flex-shrink-0 flex-col-reverse gap-2 border-t border-border/60 px-3 py-3 sm:flex-row sm:items-center sm:justify-end sm:gap-4 sm:px-5">
-        <span className="flex-1 text-center text-xs text-muted-foreground sm:text-left" aria-live="polite">{note}</span>
+          <div className="flex flex-col gap-2 pt-3">
+        <span className="text-xs text-muted-foreground" aria-live="polite">{note}</span>
         {toMake.length > 0 ? (
           <button type="button" onClick={() => void make(toMake)} disabled={making} className={goldBtn}>
             Generate {toMake.length === 1 ? "1 angle" : `${toMake.length} angles`} <ArrowRight className="h-4 w-4" strokeWidth={1.5} />
@@ -221,7 +219,9 @@ export default function AnglesStep({ approved, resolveBase, jewelryType, toObjec
             Continue <ArrowRight className="h-4 w-4" strokeWidth={1.5} />
           </button>
         )}
-      </footer>
+          </div>
+        </aside>
+      </div>
     </>
   );
 }

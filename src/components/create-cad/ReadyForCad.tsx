@@ -39,7 +39,7 @@ export default function ReadyForCad({ pictures, jewelryType, dimensions, onDimen
 
   return (
     <>
-      <div className="flex min-h-0 flex-1 flex-col gap-8 overflow-y-auto p-4 sm:p-6">
+      <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-4 sm:p-6">
         <section>
           <h2 className="font-display text-lg uppercase tracking-[0.06em] text-foreground">Reference images</h2>
           <p className="mt-1 text-sm text-muted-foreground">These will be used to create your CAD.</p>
@@ -64,7 +64,7 @@ export default function ReadyForCad({ pictures, jewelryType, dimensions, onDimen
           </div>
         </section>
 
-        <section className="max-w-[760px]">
+        <section>
           <label htmlFor="ready-dimensions" className="block text-sm font-medium text-foreground">
             Dimensions <span className="font-normal text-muted-foreground">(optional)</span>
           </label>
@@ -81,9 +81,8 @@ export default function ReadyForCad({ pictures, jewelryType, dimensions, onDimen
             className="w-full resize-y border border-border bg-background px-4 py-3 text-[14px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-foreground/60"
           />
         </section>
-      </div>
 
-      <footer className="flex flex-shrink-0 flex-col-reverse gap-2 border-t border-border/60 px-3 py-3 sm:flex-row sm:items-center sm:justify-end sm:gap-4 sm:px-5">
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
         <span className="flex-1 text-center text-xs text-muted-foreground sm:text-left">Ready in 30–40 min · Rhino 3DM, STL, STEP</span>
         {modelPicker}
         <button
@@ -94,7 +93,8 @@ export default function ReadyForCad({ pictures, jewelryType, dimensions, onDimen
         >
           {generating ? "Starting…" : <>Create CAD <ArrowRight className="h-4 w-4" strokeWidth={1.5} /><CreditTag value={costLoading ? "…" : cost ?? "—"} /></>}
         </button>
-      </footer>
+        </div>
+      </div>
     </>
   );
 }
