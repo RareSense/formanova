@@ -1,10 +1,8 @@
-import { Image as ImageIcon, PenLine } from "lucide-react";
-
 export type DesignUse = "as_is" | "edit";
 
-const OPTIONS: { value: DesignUse; title: string; description: string; Icon: typeof ImageIcon }[] = [
-  { value: "as_is", title: "Use as is", description: "Create the CAD to match the uploaded piece.", Icon: ImageIcon },
-  { value: "edit", title: "Edit before CAD", description: "Change stone, metal, or details and preview it first.", Icon: PenLine },
+const OPTIONS: { value: DesignUse; title: string; description: string }[] = [
+  { value: "as_is", title: "Use as is", description: "Create the CAD to match the uploaded piece." },
+  { value: "edit", title: "Edit before CAD", description: "Change stone, metal, or details and preview it first." },
 ];
 
 /**
@@ -16,9 +14,8 @@ export default function DesignUseChoice({ value, onChange, disabled }: { value: 
   return (
     <fieldset className="flex-shrink-0" disabled={disabled}>
       <legend className="text-[15px] font-semibold text-foreground">How should we use this design?</legend>
-      <p className="mt-0.5 text-sm text-muted-foreground">Choose how you want to proceed with your CAD.</p>
       <div role="radiogroup" aria-label="How should we use this design?" className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {OPTIONS.map(({ value: v, title, description, Icon }) => {
+        {OPTIONS.map(({ value: v, title, description }) => {
           const selected = value === v;
           return (
             <button
@@ -44,12 +41,6 @@ export default function DesignUseChoice({ value, onChange, disabled }: { value: 
                 className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border-2 ${selected ? "border-foreground" : "border-border"}`}
               >
                 {selected && <span className="h-2.5 w-2.5 rounded-full bg-foreground" />}
-              </span>
-              <span
-                aria-hidden="true"
-                className={`flex h-11 w-11 flex-shrink-0 items-center justify-center ${selected ? "bg-[hsl(var(--formanova-hero-accent)/0.12)]" : "bg-muted/50"}`}
-              >
-                <Icon className="h-5 w-5 text-foreground" />
               </span>
               <span className="min-w-0">
                 <span className="block text-[15px] font-medium text-foreground">{title}</span>
