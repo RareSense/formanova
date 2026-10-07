@@ -379,7 +379,7 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
                       >
                         <img src={v.display} alt="" className={`aspect-square w-full object-cover ${i === current ? "border-2 border-[hsl(var(--formanova-hero-accent))]" : "border border-border"}`} />
                         <span className="mt-1 block text-xs font-medium text-foreground">V{i + 1}</span>
-                        <span className="line-clamp-2 block text-[11px] leading-tight text-muted-foreground">{v.note}</span>
+                        <span title={v.note} className="block truncate text-[11px] leading-tight text-muted-foreground">{v.note}</span>
                       </button>
                     ))}
                     {busy && (
