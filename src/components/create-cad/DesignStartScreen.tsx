@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Layers, Mic, Shapes, Sparkles, Type } from "lucide-react";
+import { Layers, Mic, Shapes, Type } from "lucide-react";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import CadJewelryTypeCards from "@/components/text-to-cad/CadJewelryTypeCards";
 import ReferenceImageUploader from "@/components/text-to-cad/ReferenceImageUploader";
@@ -174,7 +174,7 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
           {!ready && <span className="text-sm text-muted-foreground">{why}</span>}
           <button type="button" onClick={guardedGenerate} disabled={busy || !ready}
             className="flex h-12 items-center justify-center gap-2.5 bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] px-10 font-display text-base uppercase tracking-wide text-background transition-opacity hover:opacity-90 disabled:opacity-60">
-            <Sparkles className="h-4 w-4" />{count === 4 ? "Make 4 designs" : "Make my design"}
+            {count === 4 ? "Make 4 designs" : "Make my design"}
             <span className="inline-flex items-center gap-1"><img src={creditCoinIcon} alt="" className="h-5 w-5" /><span className="font-mono text-sm font-semibold">{count === 4 ? 20 : 5}</span></span>
           </button>
         </div>
