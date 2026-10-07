@@ -29,6 +29,9 @@ export const DESIGN_IMAGE_WORKFLOW = 'design_image_v1';
 /** Toolkit limits (schemas.py MAX_IMAGES / VIEW_MAX_CHARS / prompt max_length). */
 export const MAX_DESIGN_IMAGES = 4;
 export const MAX_DESIGN_VIEW_CHARS = 200;
+
+/** Credits for one picture (a design change or one angle), shown before sending. */
+export const DESIGN_IMAGE_CREDITS = 10;
 export const MAX_DESIGN_PROMPT_CHARS = 4000;
 
 /** Status polling for one picture. Typical runs finish in 20-60 s. */

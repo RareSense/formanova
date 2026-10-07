@@ -4,6 +4,7 @@ import { ArrowRight, Check, Diamond, MousePointerClick, RotateCcw, Send, X } fro
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { flattenMarkup, MIN_BRUSH, MAX_BRUSH, type Mark } from "@/lib/design-markup";
 import { blobToDataUrl } from "@/lib/design-image-run";
+import { DESIGN_IMAGE_CREDITS } from "@/lib/design-image-api";
 import type { CadJewelryType, ImageInput } from "@/lib/ring-cad-nurbs-api";
 import { useDesignImageRun } from "@/hooks/useDesignImageRun";
 import MarkupCanvas, { type MarkupTool } from "./MarkupCanvas";
@@ -385,7 +386,7 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
                     className="flex h-12 flex-shrink-0 items-center gap-3 bg-[hsl(var(--formanova-hero-accent))] px-7 font-display text-base uppercase tracking-[0.08em] text-background transition-opacity hover:opacity-90 disabled:opacity-50"
                   >
                     <Send className="h-4 w-4" strokeWidth={1.5} /> Send
-                    <span className="ml-1 inline-flex items-center gap-1.5 border-l border-background/30 pl-3"><img src={creditCoinIcon} alt="" className="h-4 w-4" /><span className="font-mono text-sm">5</span></span>
+                    <span className="ml-1 inline-flex items-center gap-1.5 border-l border-background/30 pl-3"><img src={creditCoinIcon} alt="" className="h-4 w-4" /><span className="font-mono text-sm">{DESIGN_IMAGE_CREDITS}</span></span>
                   </button>
                 </div>
                 {history.marks.length > 0 && (

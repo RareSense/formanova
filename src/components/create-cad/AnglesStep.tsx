@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowRight, Check, Diamond, Plus, RotateCcw, X } from "lucid
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { useDesignImageRun, type DesignImageOutcome } from "@/hooks/useDesignImageRun";
 import type { CadJewelryType, ImageInput } from "@/lib/ring-cad-nurbs-api";
-import { MAX_DESIGN_VIEW_CHARS } from "@/lib/design-image-api";
+import { DESIGN_IMAGE_CREDITS, MAX_DESIGN_VIEW_CHARS } from "@/lib/design-image-api";
 import { ANGLE_SUGGESTIONS, DEFAULT_TICKED, MAX_ANGLES, type EditorPicture } from "./angle-suggestions";
 
 type SlotStatus = "idle" | "making" | "ready" | "mismatch" | "failed";
@@ -100,7 +100,7 @@ export default function AnglesStep({ approved, resolveBase, jewelryType, toObjec
   const mismatched = slots.some((s) => s.ticked && s.status === "mismatch");
   const ready = slots.filter((s) => s.ticked && s.status === "ready" && s.picture).map((s) => ({ ...s.picture!, label: s.view }));
   const roomForCustom = slots.some((s) => !s.ticked && s.status === "idle");
-  const note = making ? "Making your angles…" : mismatched ? "Redo or remove the angle that doesn't match" : toMake.length ? `${toMake.length} angle${toMake.length > 1 ? "s" : ""} to make · 5 credits each` : ready.length ? `${ready.length} angle${ready.length > 1 ? "s" : ""} ready` : "Tick the angles you want";
+  const note = making ? "Making your angles…" : mismatched ? "Redo or remove the angle that doesn't match" : toMake.length ? `${toMake.length} angle${toMake.length > 1 ? "s" : ""} to make · ${DESIGN_IMAGE_CREDITS} credits each` : ready.length ? `${ready.length} angle${ready.length > 1 ? "s" : ""} ready` : "Tick the angles you want";
 
   return (
     <>
@@ -179,7 +179,7 @@ export default function AnglesStep({ approved, resolveBase, jewelryType, toObjec
         {toMake.length > 0 && (
           <button type="button" onClick={() => void make(toMake)} disabled={making} className={toMake.length && !ready.length ? goldBtn : lineBtn}>
             Make {toMake.length} angle{toMake.length > 1 ? "s" : ""}
-            <span className="inline-flex items-center gap-1"><img src={creditCoinIcon} alt="" className="h-4 w-4" /><span className="font-mono text-sm">{toMake.length * 5}</span></span>
+            <span className="inline-flex items-center gap-1"><img src={creditCoinIcon} alt="" className="h-4 w-4" /><span className="font-mono text-sm">{toMake.length * DESIGN_IMAGE_CREDITS}</span></span>
           </button>
         )}
         {(ready.length > 0 || toMake.length === 0) && (
