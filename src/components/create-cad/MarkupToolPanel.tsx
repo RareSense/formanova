@@ -31,10 +31,7 @@ export default function MarkupToolPanel({ tool, onTool, brush, onBrush, canUndo,
   return (
     <div className="flex flex-col gap-3" role="toolbar" aria-label="Mark what to change">
       <div className="hidden lg:block">
-        <h2 className="text-[15px] font-semibold text-foreground">Mark what to change</h2>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">Optional.</span> Choose a tool and highlight the part you want to change.
-        </p>
+        <h2 className="text-[15px] font-semibold text-foreground">Mark what to change <span className="font-normal text-muted-foreground">(optional)</span></h2>
       </div>
 
       <div className="grid grid-cols-5 gap-1.5 lg:grid-cols-1 lg:gap-2">
