@@ -1,7 +1,10 @@
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 
-import { downloadCadArtifact } from '@/lib/cad-artifact-download';
+import JSZip from 'jszip';
+
+import { downloadCadArtifact, fetchCadArtifact, saveBlob } from '@/lib/cad-artifact-download';
+import { mergeStlBlobs } from '@/lib/stl-merge';
 import { trackDownloadClicked } from '@/lib/posthog-events';
 import { AuthExpiredError } from '@/lib/authenticated-fetch';
 import type { CadSource } from '@/lib/cad-analytics';
@@ -103,12 +106,27 @@ export function useCadArtifactDownloads({
     setIsBusy(true);
     try {
       const suffix = stamp();
-      for (let index = 0; index < urls.length; index += 1) {
-        const part = urls.length > 1 ? `-part-${index + 1}` : '';
-        const filename = `model-${suffix}${part}.${kind}`;
-        await downloadCadArtifact(urls[index], filename, kind);
+      if (urls.length === 1) {
+        const filename = `model-${suffix}.${kind}`;
+        await downloadCadArtifact(urls[0], filename, kind);
         trackDownloadClicked({ file_name: filename, file_type: kind, context: source, source });
+        return;
       }
+      // A model exported part by part is still ONE download, never one browser download per part
+      // (a 15-part piece used to start 15). STL: one file, as manufacturers expect. STEP: one .zip.
+      const parts: Blob[] = [];
+      for (const url of urls) parts.push(await fetchCadArtifact(url, kind));
+      if (kind === 'stl') {
+        const filename = `model-${suffix}.stl`;
+        saveBlob(await mergeStlBlobs(parts), filename);
+        trackDownloadClicked({ file_name: filename, file_type: kind, context: source, source });
+        return;
+      }
+      const zip = new JSZip();
+      parts.forEach((blob, index) => zip.file(`model-${suffix}-part-${index + 1}.${kind}`, blob));
+      const filename = `model-${suffix}-${kind}.zip`;
+      saveBlob(await zip.generateAsync({ type: 'blob' }), filename);
+      trackDownloadClicked({ file_name: filename, file_type: kind, context: source, source });
     } catch (err) {
       if (err instanceof AuthExpiredError) return;
       console.error(`[CadDownload] ${kind} failed:`, err);

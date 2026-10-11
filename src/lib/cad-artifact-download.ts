@@ -103,11 +103,8 @@ export async function matchesExpectedSha256(blob: Blob, expected: string | null)
   return actual === expected;
 }
 
-export async function downloadCadArtifact(
-  url: string,
-  filename: string,
-  kind: CadArtifactKind,
-): Promise<void> {
+/** Fetches an artifact and checks it is the file type and the exact bytes the URL promises. */
+export async function fetchCadArtifact(url: string, kind: CadArtifactKind): Promise<Blob> {
   const parsed = new URL(url, window.location.origin);
   const needsAuth = parsed.origin === window.location.origin
     && (parsed.pathname.startsWith('/api/') || parsed.pathname.startsWith('/artifacts/'));
@@ -124,7 +121,11 @@ export async function downloadCadArtifact(
   if (!(await matchesExpectedSha256(blob, expectedSha256FromUrl(url)))) {
     throw new Error(`The downloaded ${kind.toUpperCase()} file was incomplete. Please try again.`);
   }
+  return blob;
+}
 
+/** Hands a blob to the browser as one saved file. */
+export function saveBlob(blob: Blob, filename: string): void {
   const blobUrl = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = blobUrl;
@@ -133,4 +134,12 @@ export async function downloadCadArtifact(
   anchor.click();
   anchor.remove();
   setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+}
+
+export async function downloadCadArtifact(
+  url: string,
+  filename: string,
+  kind: CadArtifactKind,
+): Promise<void> {
+  saveBlob(await fetchCadArtifact(url, kind), filename);
 }

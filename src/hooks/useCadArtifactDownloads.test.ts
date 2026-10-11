@@ -2,8 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 
 const mockDownloadCadArtifact = vi.hoisted(() => vi.fn());
+const mockFetchCadArtifact = vi.hoisted(() => vi.fn());
+const mockSaveBlob = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/cad-artifact-download', () => ({
   downloadCadArtifact: mockDownloadCadArtifact,
+  fetchCadArtifact: mockFetchCadArtifact,
+  saveBlob: mockSaveBlob,
 }));
 
 const mockTrackDownloadClicked = vi.hoisted(() => vi.fn());
@@ -14,6 +18,7 @@ vi.mock('@/lib/posthog-events', () => ({
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
 import { useCadArtifactDownloads } from './useCadArtifactDownloads';
+import { blobBytes } from '@/lib/stl-merge';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -120,5 +125,30 @@ describe('useCadArtifactDownloads', () => {
 
     expect(mockDownloadCadArtifact).toHaveBeenCalledTimes(1);
     await act(async () => { release(); });
+  });
+
+  it('downloads a part-by-part STL as ONE merged file, never one download per part', async () => {
+    const binaryStl = (triangles: number) => {
+      const buffer = new ArrayBuffer(84 + triangles * 50);
+      new DataView(buffer).setUint32(80, triangles, true);
+      return new Blob([buffer]);
+    };
+    mockFetchCadArtifact.mockImplementation(async (url: string) => binaryStl(url.endsWith('1') ? 2 : 3));
+    const { result } = setup({ stlUrls: ['https://api/artifacts/p1', 'https://api/artifacts/p2', 'https://api/artifacts/p3'] });
+    await act(async () => { await result.current.downloadStl(); });
+
+    expect(mockDownloadCadArtifact).not.toHaveBeenCalled();
+    expect(mockSaveBlob).toHaveBeenCalledTimes(1);
+    const [blob, filename] = mockSaveBlob.mock.calls[0];
+    expect(filename).toMatch(/^model-.*\.stl$/);
+    const merged = new DataView(await blobBytes(blob as Blob));
+    expect(merged.getUint32(80, true)).toBe(2 + 3 + 3);
+  });
+
+  it('downloads a single-part STL directly', async () => {
+    const { result } = setup({ stlUrls: ['https://api/artifacts/only'] });
+    await act(async () => { await result.current.downloadStl(); });
+    expect(mockDownloadCadArtifact).toHaveBeenCalledTimes(1);
+    expect(mockSaveBlob).not.toHaveBeenCalled();
   });
 });
