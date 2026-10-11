@@ -340,14 +340,14 @@ export default function ImagePromptScreen({
         </div>
       </motion.div>
       <AlertDialog open={pendingExample !== null} onOpenChange={(open) => { if (!open) setPendingExample(null); }}>
-        <AlertDialogContent className="max-w-md">
+        <AlertDialogContent className="flex aspect-square w-[min(92vw,520px)] max-w-none flex-col justify-center gap-6 p-8 sm:p-10">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-center">Replace your {imageCount === 1 ? "photo" : "photos"} with this example?</AlertDialogTitle>
+            <AlertDialogTitle className="text-center text-xl">Replace your {imageCount === 1 ? "photo" : "photos"} with this example?</AlertDialogTitle>
             <AlertDialogDescription className="text-center">Your CAD is made from these:</AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex flex-wrap justify-center gap-2" data-testid="example-replace-current">
             {referenceImagePreviewUrls.map((url, index) => (
-              <img key={url} src={url} alt={`Your image ${index + 1}`} className="h-20 w-20 border border-border/40 object-cover" />
+              <img key={url} src={url} alt={`Your image ${index + 1}`} className="h-28 w-28 border border-border/40 object-cover" />
             ))}
           </div>
           {prompt.trim() && (
