@@ -12,6 +12,10 @@ import CadHistoryLibrary from "./CadHistoryLibrary";
 import { CAD_EXAMPLE_DESIGNS, type CadExampleDesign } from "./cad-examples";
 import DesignUseChoice, { type DesignUse } from "./DesignUseChoice";
 import { ArrowRight, Check, Ruler } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // Shared fixed height for the upload workspace box and the "My Pieces" panel,
 // so the two columns frame identically — same top edge (both start right
@@ -105,8 +109,12 @@ export default function ImagePromptScreen({
     pricingContext: { llm_tier: tier },
   });
 
+  // A customer once had their own piece in, clicked an example by accident and paid for a model
+  // of the example. Their pictures are never replaced without asking.
+  const [pendingExample, setPendingExample] = useState<CadExampleDesign | null>(null);
+
   // Loads only the picture: the description stays the customer's own.
-  const handleExampleClick = useCallback(async (example: CadExampleDesign) => {
+  const loadExample = useCallback(async (example: CadExampleDesign) => {
     if (!jewelryType) setJewelryType("ring");
     try {
       const res = await fetch(example.image);
@@ -117,6 +125,11 @@ export default function ImagePromptScreen({
       // image load failed -- nothing to load
     }
   }, [onReplaceReferenceImages, jewelryType, setJewelryType]);
+
+  const handleExampleClick = useCallback((example: CadExampleDesign) => {
+    if (imageCount > 0) setPendingExample(example);
+    else void loadExample(example);
+  }, [imageCount, loadExample]);
 
   // "My Pieces" reuse — urls are same-origin, auth-gated /api/artifacts proxy
   // URLs (see useCadHistoryLibrary), so these must go through authenticatedFetch,
@@ -326,6 +339,28 @@ export default function ImagePromptScreen({
           </div>
         </div>
       </motion.div>
+      <AlertDialog open={pendingExample !== null} onOpenChange={(open) => { if (!open) setPendingExample(null); }}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-center">Replace your {imageCount === 1 ? "photo" : "photos"} with this example?</AlertDialogTitle>
+            <AlertDialogDescription className="text-center">Your CAD is made from these:</AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex flex-wrap justify-center gap-2" data-testid="example-replace-current">
+            {referenceImagePreviewUrls.map((url, index) => (
+              <img key={url} src={url} alt={`Your image ${index + 1}`} className="h-20 w-20 border border-border/40 object-cover" />
+            ))}
+          </div>
+          {prompt.trim() && (
+            <p className="text-center text-sm text-foreground">&ldquo;{prompt.trim()}&rdquo;</p>
+          )}
+          <AlertDialogFooter className="sm:justify-center">
+            <AlertDialogCancel>Keep mine</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { const example = pendingExample; setPendingExample(null); if (example) void loadExample(example); }}>
+              Use example
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

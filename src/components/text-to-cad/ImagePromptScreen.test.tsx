@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 // The real library fetches; we only care that it gets MOUNTED, since that is
@@ -193,5 +193,43 @@ describe('ImagePromptScreen', () => {
       expect(onEditFirst).not.toHaveBeenCalled();
       expect(screen.getByRole('alert').textContent).toMatch(/choose what you are making/i);
     });
+  });
+});
+
+describe('an example never silently replaces the customer\'s own pictures', () => {
+  function renderWith(previews: string[], prompt = '') {
+    const onReplace = vi.fn();
+    render(
+      <ImagePromptScreen
+        model="gemini" tier="t" prompt={prompt} setPrompt={vi.fn()} jewelryType="earring" setJewelryType={vi.fn()}
+        isGenerating={false} onGenerate={vi.fn()} referenceImagePreviewUrls={previews}
+        onAddReferenceImages={vi.fn()} onRemoveReferenceImage={vi.fn()} onReplaceReferenceImages={onReplace}
+      />,
+    );
+    return onReplace;
+  }
+
+  it('shows their pictures and text and asks first; Keep mine keeps them', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const onReplace = renderWith(['blob:panthere-front', 'blob:panthere-side'], 'panther head stud, 13 mm');
+    fireEvent.click(screen.getByRole('button', { name: /use earring example 1/i }));
+
+    expect(await screen.findByText(/replace your photos with this example\?/i)).toBeTruthy();
+    const dialog = within(screen.getByRole('alertdialog'));
+    expect(dialog.getAllByAltText(/your image/i)).toHaveLength(2);
+    expect(dialog.getByText(/panther head stud, 13 mm/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /keep mine/i }));
+    expect(onReplace).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('loads the example straight away when the box is empty', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(new Blob(['x'], { type: 'image/webp' })));
+    renderWith([]);
+    fireEvent.click(screen.getByRole('button', { name: /use earring example 1/i }));
+    expect(screen.queryByText(/with this example\?/i)).toBeNull();
+    expect(fetchSpy).toHaveBeenCalled();
+    fetchSpy.mockRestore();
   });
 });
