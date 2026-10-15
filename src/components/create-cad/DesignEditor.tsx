@@ -400,7 +400,25 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
                 </button>
               )}
             </div>
-            <DialogPrimitive.Title className="font-display text-xl uppercase tracking-[0.06em] text-foreground">{TITLES[stage]}</DialogPrimitive.Title>
+            {/* Where you are, like a checkout stepper: the picture is step 1, the CAD comes next. */}
+            <div className="flex flex-col items-center">
+              <DialogPrimitive.Title className="sr-only">{TITLES[stage]}</DialogPrimitive.Title>
+              <ol aria-label="Steps" className="flex items-center gap-2 text-sm">
+                {(["Design", "CAD"] as const).map((name, i) => {
+                  const current = (stage === "edit" ? 0 : 1) === i;
+                  const done = stage !== "edit" && i === 0;
+                  return (
+                    <li key={name} aria-current={current ? "step" : undefined} className="flex items-center gap-2">
+                      {i > 0 && <span aria-hidden="true" className="h-px w-6 bg-border" />}
+                      <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold ${current ? "bg-foreground text-background" : done ? "bg-emerald-700 text-white" : "border border-border text-muted-foreground"}`}>
+                        {done ? <Check className="h-3 w-3" strokeWidth={2.5} /> : i + 1}
+                      </span>
+                      <span className={`font-display uppercase tracking-[0.06em] ${current ? "text-foreground" : "text-muted-foreground"}`}>{name}</span>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
             <div className="flex justify-end">
               {stage === "edit" && !edited && <span className="bg-muted px-2 py-0.5 text-xs text-muted-foreground">Original</span>}
               {stage !== "edit" && (

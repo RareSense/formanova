@@ -27,7 +27,7 @@ export default function CadStoryPicture({ story }: { story: CadStory }) {
       </div>
       <span aria-hidden="true" className="relative h-px w-3 flex-shrink-0 bg-[hsl(var(--formanova-hero-accent))] after:absolute after:-right-px after:-top-[3px] after:border-y-[3.5px] after:border-l-[6px] after:border-y-transparent after:border-l-[hsl(var(--formanova-hero-accent))] sm:w-5" />
       <div className="relative h-full flex-1 overflow-hidden border border-border/70">
-        <span className={label}>Rhino CAD</span>
+        <span className={label}>NURBS CAD</span>
         <ThemedCadPicture {...story.cad} className="h-full w-full p-1.5 pt-4" />
       </div>
     </div>
