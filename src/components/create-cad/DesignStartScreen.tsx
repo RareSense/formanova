@@ -48,7 +48,8 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
   const [hasInk, setHasInk] = useState(false);
   const [mixFiles, setMixFiles] = useState<File[]>([]);
   const [mixPreviews, setMixPreviews] = useState<string[]>([]);
-  const [count, setCount] = useState<1 | 4>(4);
+  // One design, straight to the editor; Regenerate there covers "another".
+  const count = 1 as const;
   const doodleRef = useRef<DoodlePadHandle>(null);
   const glbInputRef = useRef<HTMLInputElement>(null);
 
@@ -154,29 +155,13 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
           )}
         </div>
 
-        <fieldset className="mt-8" disabled={busy}>
-          <legend className="text-[15px] font-semibold text-foreground">How many designs?</legend>
-          <div role="radiogroup" aria-label="How many designs?" className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {([[4, "4 to choose from", "Pick the closest, then edit it", 20], [1, "Just 1", "Straight to editing", 5]] as const).map(([n, title, sub, cost]) => {
-              const on = count === n;
-              return (
-                <button key={n} type="button" role="radio" aria-checked={on} onClick={() => setCount(n)}
-                  className={`flex items-center gap-4 border px-4 py-4 text-left transition-colors ${on ? "border-[hsl(var(--formanova-hero-accent))] bg-[hsl(var(--formanova-hero-accent)/0.06)]" : "border-border hover:border-foreground/40"}`}>
-                  <span aria-hidden="true" className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border-2 ${on ? "border-foreground" : "border-border"}`}>{on && <span className="h-2.5 w-2.5 rounded-full bg-foreground" />}</span>
-                  <span className="min-w-0 flex-1"><span className="block text-[15px] font-medium text-foreground">{title}</span><span className="block text-sm text-muted-foreground">{sub}</span></span>
-                  <span className="inline-flex items-center gap-1 text-sm text-muted-foreground"><img src={creditCoinIcon} alt="" className="h-4 w-4" />{cost}</span>
-                </button>
-              );
-            })}
-          </div>
-        </fieldset>
 
-        <div className="mt-6 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end">
+        <div className="mt-8 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end">
           {!ready && <span className="text-sm text-muted-foreground">{why}</span>}
           <button type="button" onClick={guardedGenerate} disabled={busy || !ready}
             className="flex h-12 items-center justify-center gap-2.5 bg-[hsl(var(--formanova-hero-accent))] px-10 font-display text-base uppercase tracking-wide text-background transition-opacity hover:opacity-90 disabled:bg-muted disabled:text-muted-foreground disabled:hover:opacity-100">
-            {count === 4 ? "Make 4 designs" : "Make my design"}
-            <span className="inline-flex items-center gap-1"><img src={creditCoinIcon} alt="" className="h-5 w-5" /><span className="font-mono text-sm font-semibold">{count === 4 ? 20 : 5}</span></span>
+            Make my design
+            <span className="inline-flex items-center gap-1"><img src={creditCoinIcon} alt="" className="h-5 w-5" /><span className="font-mono text-sm font-semibold">5</span></span>
           </button>
         </div>
 

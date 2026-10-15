@@ -32,40 +32,25 @@ function renderFlow(jewelryType: 'ring' | null = 'ring', variant: 'idea' | 'insp
 }
 
 describe('DesignToCadFlow', () => {
-  it('starts with describe or draw, and 4 designs or just 1', () => {
+  it('starts with describe or draw, one design straight to the editor', () => {
     renderFlow();
     expect(screen.getByRole('tab', { name: /describe it/i })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('tab', { name: /draw it/i })).toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: /mix pictures/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: /4 to choose from/i })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByRole('button', { name: /make 4 designs/i })).toBeDisabled();
+    expect(screen.queryByRole('radio', { name: /4 to choose from/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /make my design/i })).toBeDisabled();
   }, 15000);
 
-  it('makes 4 designs from the description and shows them to pick from', async () => {
-    mockGenerate.mockImplementation(async (requests: unknown[] = [], opts: { onOutcome?: (i: number, o: unknown) => void } = {}) => {
-      requests.forEach((_, i) => opts.onOutcome?.(i, READY));
-      return requests.map(() => READY);
-    });
-    renderFlow();
-    fireEvent.change(screen.getByLabelText(/describe your ring/i), { target: { value: 'signet ring with a ruby' } });
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /make 4 designs/i })); });
-    expect(mockGenerate).toHaveBeenCalledTimes(1);
-    const [requests] = mockGenerate.mock.calls[0];
-    expect(requests).toHaveLength(4);
-    expect(requests[0]).toMatchObject({ prompt: 'signet ring with a ruby', jewelryType: 'ring' });
-    expect(await screen.findByRole('heading', { name: /pick the closest/i })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getAllByRole('button', { name: /use design/i })).toHaveLength(4));
-  });
 
   it('Inspiration makes designs from a single picture', async () => {
     mockGenerate.mockResolvedValue(null);
     const { container } = renderFlow('ring', 'inspiration');
     expect(screen.queryByRole('tab')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /make 4 designs/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /make my design/i })).toBeDisabled();
     const input = container.querySelector('input[type="file"][accept*="image"]') as HTMLInputElement;
     const web = new File(['x'], 'spider-web.png', { type: 'image/png' });
     fireEvent.change(input, { target: { files: [web] } });
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /make 4 designs/i })); });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /make my design/i })); });
     await waitFor(() => expect(mockGenerate).toHaveBeenCalledTimes(1));
     const [requests] = mockGenerate.mock.calls[0];
     expect(requests[0]).toMatchObject({ prompt: 'Design a ring inspired by this picture.' });
@@ -75,18 +60,17 @@ describe('DesignToCadFlow', () => {
   it('asks for the piece before making designs', () => {
     renderFlow(null);
     fireEvent.change(screen.getByLabelText(/describe your/i), { target: { value: 'something' } });
-    fireEvent.click(screen.getByRole('button', { name: /make 4 designs/i }));
+    fireEvent.click(screen.getByRole('button', { name: /make my design/i }));
     expect(mockGenerate).not.toHaveBeenCalled();
     expect(screen.getByRole('alert').textContent).toMatch(/choose what you are making/i);
   });
 
-  it('Just 1 opens the editor as soon as the design is ready', async () => {
+  it('opens the editor as soon as the design is ready', async () => {
     mockGenerate.mockImplementation(async (_requests: unknown[] = [], opts: { onOutcome?: (i: number, o: unknown) => void } = {}) => {
       opts.onOutcome?.(0, READY);
       return [READY];
     });
     renderFlow();
-    fireEvent.click(screen.getByRole('radio', { name: /just 1/i }));
     fireEvent.change(screen.getByLabelText(/describe your ring/i), { target: { value: 'band ring' } });
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /make my design/i })); });
     expect(mockGenerate.mock.calls[0][0]).toHaveLength(1);
@@ -94,10 +78,10 @@ describe('DesignToCadFlow', () => {
   });
 
   it('goes back to the start screen with the description kept', async () => {
-    mockGenerate.mockResolvedValue([READY, READY, READY, READY]);
+    mockGenerate.mockResolvedValue([READY]);
     renderFlow();
     fireEvent.change(screen.getByLabelText(/describe your ring/i), { target: { value: 'kept text' } });
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /make 4 designs/i })); });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /make my design/i })); });
     fireEvent.click(screen.getByRole('button', { name: /^back$/i }));
     expect(screen.getByLabelText(/describe your ring/i)).toHaveValue('kept text');
   });
