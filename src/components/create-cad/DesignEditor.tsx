@@ -332,6 +332,14 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
                   onSelect={(i) => { setSelected(i); if (i !== null) setTool("select"); }}
                   disabled={busy}
                   overlay={busyOverlay}
+                  bottom={results.length > 1 && (
+                    // Browsing versions sits on the picture it switches, like a carousel.
+                    <div className="flex items-center rounded-full border border-border/60 bg-background/90 px-1 text-xs text-foreground shadow-sm backdrop-blur">
+                      <button type="button" onClick={() => showResult(resultIndex - 1)} disabled={busy || resultIndex === 0} aria-label="Previous version" className="flex h-7 w-7 items-center justify-center disabled:opacity-30"><ChevronLeft className="h-4 w-4" strokeWidth={1.5} /></button>
+                      <span aria-live="polite" className="min-w-[2.25rem] text-center tabular-nums">{resultIndex + 1} / {results.length}</span>
+                      <button type="button" onClick={() => showResult(resultIndex + 1)} disabled={busy || resultIndex === results.length - 1} aria-label="Next version" className="flex h-7 w-7 items-center justify-center disabled:opacity-30"><ChevronRight className="h-4 w-4" strokeWidth={1.5} /></button>
+                    </div>
+                  )}
                   toolbar={
                     <MarkupToolPanel
                         tool={tool}
@@ -352,19 +360,9 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
                 />
               </div>
 
-              {/* Result bar under the picture: step through results on the left,
-                  try again or accept on the right (accept is the main action). */}
+              {/* Decisions under the picture: try again, or accept (the main action). */}
               {edited && (
                 <div className="flex flex-shrink-0 flex-wrap items-center justify-center gap-3 px-4 py-2.5 sm:px-6">
-                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                    {results.length > 1 && (
-                      <>
-                        <button type="button" onClick={() => showResult(resultIndex - 1)} disabled={busy || resultIndex === 0} aria-label="Previous result" className="flex h-8 w-8 items-center justify-center hover:text-foreground disabled:opacity-30"><ChevronLeft className="h-4 w-4" strokeWidth={1.5} /></button>
-                        <span aria-live="polite" className="min-w-[2.5rem] text-center tabular-nums">{resultIndex + 1} / {results.length}</span>
-                        <button type="button" onClick={() => showResult(resultIndex + 1)} disabled={busy || resultIndex === results.length - 1} aria-label="Next result" className="flex h-8 w-8 items-center justify-center hover:text-foreground disabled:opacity-30"><ChevronRight className="h-4 w-4" strokeWidth={1.5} /></button>
-                      </>
-                    )}
-                  </div>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
