@@ -87,7 +87,7 @@ const cadWorkflows: Workflow[] = [
     route: '/text-to-cad',
     icon: TextToCadIcon,
     wideIcon: true,
-    story: { inputLabel: 'Your idea', input: { kind: 'prompt', text: 'Solitaire engagement ring, round diamond in a six-prong crown, pavé band' }, cad: { shade: solitaireShade, metal: solitaireMetal, gems: solitaireGems } },
+    story: { inputLabel: 'Your idea', input: { kind: 'prompt', text: 'Solitaire ring, round diamond, pavé band…' }, cad: { shade: solitaireShade, metal: solitaireMetal, gems: solitaireGems } },
   },
   {
     title: 'CAD from Inspiration',

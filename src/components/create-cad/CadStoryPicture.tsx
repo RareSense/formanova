@@ -20,7 +20,7 @@ export default function CadStoryPicture({ story }: { story: CadStory }) {
         {input.kind === "photo" ? (
           <img src={input.src} alt="" draggable={false} className={`h-full w-full ${input.cover ? "object-cover" : "object-contain p-2 pt-5"}`} />
         ) : (
-          <p className="px-2 pt-6 font-mono text-[9px] leading-snug text-zinc-800 sm:text-[11px]">
+          <p className="line-clamp-4 px-2 pt-6 font-mono text-[9px] leading-snug text-zinc-800 sm:text-[11px]">
             {input.text}<span className="ml-0.5 inline-block h-[1em] w-px translate-y-[2px] bg-[hsl(var(--formanova-hero-accent))]" />
           </p>
         )}
