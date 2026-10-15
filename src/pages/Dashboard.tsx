@@ -26,9 +26,9 @@ import ladybugPhoto from '@/assets/cad-cards/story/ladybug-photo.webp';
 import earringShade from '@/assets/cad-cards/story/earring-shade.webp';
 import earringMetal from '@/assets/cad-cards/story/earring-metal.webp';
 import earringGems from '@/assets/cad-cards/story/earring-gems.webp';
-import ringShade from '@/assets/cad-cards/story/ring-shade.webp';
-import ringMetal from '@/assets/cad-cards/story/ring-metal.webp';
-import ringGems from '@/assets/cad-cards/story/ring-gems.webp';
+import solitaireShade from '@/assets/cad-cards/story/solitaire-shade.webp';
+import solitaireMetal from '@/assets/cad-cards/story/solitaire-metal.webp';
+import solitaireGems from '@/assets/cad-cards/story/solitaire-gems.webp';
 import ladybugShade from '@/assets/cad-cards/story/ladybug-shade.webp';
 import ladybugMetal from '@/assets/cad-cards/story/ladybug-metal.webp';
 import ladybugGems from '@/assets/cad-cards/story/ladybug-gems.webp';
@@ -87,7 +87,7 @@ const cadWorkflows: Workflow[] = [
     route: '/text-to-cad',
     icon: TextToCadIcon,
     wideIcon: true,
-    story: { inputLabel: 'Your idea', input: { kind: 'prompt', text: "Men's signet ring, cushion centre stone with a halo, engraved crest on both shoulders" }, cad: { shade: ringShade, metal: ringMetal, gems: ringGems } },
+    story: { inputLabel: 'Your idea', input: { kind: 'prompt', text: 'Solitaire engagement ring, round diamond in a six-prong crown, pavé band' }, cad: { shade: solitaireShade, metal: solitaireMetal, gems: solitaireGems } },
   },
   {
     title: 'CAD from Inspiration',
