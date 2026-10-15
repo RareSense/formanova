@@ -7,7 +7,7 @@ import { DESIGN_IMAGE_CREDITS, type DesignImageStartParams } from "@/lib/design-
 import type { CadJewelryType, ImageInput } from "@/lib/ring-cad-nurbs-api";
 import { useDesignImageRun } from "@/hooks/useDesignImageRun";
 import MarkupCanvas, { type MarkupTool } from "./MarkupCanvas";
-import MarkupToolPanel from "./MarkupToolPanel";
+import MarkupToolPanel, { MarkupToolOptions } from "./MarkupToolPanel";
 import { MARKUP_TOOLS } from "./markup-tools";
 import { useMarkupHistory } from "./useMarkupHistory";
 import ViewsRow from "./ViewsRow";
@@ -319,7 +319,7 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
           {stage === "edit" && (
             <div className="flex min-h-0 flex-1 flex-col">
               {/* The design is the hero; the tools float over its left edge. */}
-              <div className="relative min-h-[300px] flex-1 bg-muted/20 py-4 pl-16 pr-4 sm:pr-16">
+              <div className="relative min-h-[300px] flex-1 bg-muted/20 pb-4 pl-16 pr-4 pt-14 sm:pr-16">
                 <MarkupCanvas
                   src={picture?.display ?? null}
                   alt={edited ? "Your edited design" : "Your original picture"}
@@ -334,12 +334,13 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
                   overlay={busyOverlay}
                   bottom={results.length > 1 && (
                     // Browsing versions sits on the picture it switches, like a carousel.
-                    <div className="flex items-center rounded-full border border-border/60 bg-background/90 px-1 text-xs text-foreground shadow-sm backdrop-blur">
+                    <div className="flex items-center border border-border/60 bg-background/90 px-1 text-xs text-foreground shadow-sm backdrop-blur">
                       <button type="button" onClick={() => showResult(resultIndex - 1)} disabled={busy || resultIndex === 0} aria-label="Previous version" className="flex h-7 w-7 items-center justify-center disabled:opacity-30"><ChevronLeft className="h-4 w-4" strokeWidth={1.5} /></button>
                       <span aria-live="polite" className="min-w-[2.25rem] text-center tabular-nums">{resultIndex + 1} / {results.length}</span>
                       <button type="button" onClick={() => showResult(resultIndex + 1)} disabled={busy || resultIndex === results.length - 1} aria-label="Next version" className="flex h-7 w-7 items-center justify-center disabled:opacity-30"><ChevronRight className="h-4 w-4" strokeWidth={1.5} /></button>
                     </div>
                   )}
+                  topbar={<MarkupToolOptions tool={tool} brush={brush} onBrush={setBrush} colour={colour} onColour={setColour} disabled={busy} />}
                   toolbar={
                     <MarkupToolPanel
                         tool={tool}
@@ -390,7 +391,7 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
                 <div className="mx-auto max-w-[760px]">
                   {/* Like ChatGPT's composer: a rounded box that grows as you type,
                       a small round send button inside it, bottom right. */}
-                  <div className="flex items-end gap-2 rounded-2xl border border-border/70 bg-background py-2 pl-4 pr-2 transition-colors focus-within:border-foreground/40">
+                  <div className="flex items-end gap-2 border border-border/70 bg-background py-2 pl-4 pr-2 transition-colors focus-within:border-foreground/40">
                     <label htmlFor="design-editor-change" className="sr-only">Describe any change</label>
                     <textarea
                       id="design-editor-change"

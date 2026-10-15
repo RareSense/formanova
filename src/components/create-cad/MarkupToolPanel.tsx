@@ -63,43 +63,54 @@ export default function MarkupToolPanel({ tool, onTool, brush, onBrush, colour, 
         <button type="button" onClick={onClear} disabled={disabled || !canClear} title="Clear all marks" aria-label="Clear all marks" className={quietBtn}>
           <Trash2 className="h-4 w-4" strokeWidth={1} />
         </button>
-        {/* Colour and size in the same column, so nothing sits on the picture. */}
-        {painting && (
-          <>
-            <span className="my-1 h-px w-6 bg-border" aria-hidden="true" />
-            <div role="radiogroup" aria-label="Mark colour" className="flex flex-col items-center gap-1.5 py-1">
-              {MARK_COLOURS.map((c) => (
-                <button
-                  key={c.value}
-                  type="button"
-                  role="radio"
-                  aria-checked={colour === c.value}
-                  aria-label={c.name}
-                  title={c.name}
-                  disabled={disabled}
-                  onClick={() => onColour(c.value)}
-                  className={`h-4 w-4 rounded-full border border-border transition-transform hover:scale-110 ${colour === c.value ? "ring-1 ring-foreground ring-offset-2 ring-offset-background" : ""}`}
-                  style={{ background: c.value }}
-                />
-              ))}
-            </div>
-          </>
-        )}
-        {sized && (
-          <label className="flex flex-col items-center gap-1 py-1" title={tool === "erase" ? "Eraser size" : "Brush size"}>
-            <input
-              type="range"
-              min={MIN_BRUSH}
-              max={MAX_BRUSH}
-              value={brush}
-              onChange={(e) => onBrush(Number(e.target.value))}
-              aria-label={tool === "erase" ? "Eraser size" : "Brush size"}
-              className="h-16 w-1.5 accent-[hsl(var(--formanova-hero-accent))] [direction:rtl] [writing-mode:vertical-lr]"
-            />
-          </label>
-        )}
       </div>
 
+    </div>
+  );
+}
+
+/**
+ * Colour and size for the active tool, as a slim bar like the sketch pad's.
+ * It sits above the picture, so nothing covers the design.
+ */
+export function MarkupToolOptions({ tool, brush, onBrush, colour, onColour, disabled }: Pick<MarkupToolPanelProps, "tool" | "brush" | "onBrush" | "colour" | "onColour" | "disabled">) {
+  const sized = tool === "brush" || tool === "erase";
+  const painting = tool === "brush" || tool === "box" || tool === "arrow";
+  if (!sized && !painting) return null;
+  return (
+    <div className="flex items-center gap-4 border border-border/60 bg-background/95 px-3 py-1.5 backdrop-blur">
+      {painting && (
+        <div role="radiogroup" aria-label="Mark colour" className="flex items-center gap-2">
+          {MARK_COLOURS.map((c) => (
+            <button
+              key={c.value}
+              type="button"
+              role="radio"
+              aria-checked={colour === c.value}
+              aria-label={c.name}
+              title={c.name}
+              disabled={disabled}
+              onClick={() => onColour(c.value)}
+              className={`h-5 w-5 rounded-full border border-border transition-transform hover:scale-110 ${colour === c.value ? "ring-1 ring-foreground ring-offset-2 ring-offset-background" : ""}`}
+              style={{ background: c.value }}
+            />
+          ))}
+        </div>
+      )}
+      {sized && (
+        <label className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Size</span>
+          <input
+            type="range"
+            min={MIN_BRUSH}
+            max={MAX_BRUSH}
+            value={brush}
+            onChange={(e) => onBrush(Number(e.target.value))}
+            aria-label={tool === "erase" ? "Eraser size" : "Brush size"}
+            className="h-1 w-24 accent-[hsl(var(--formanova-hero-accent))]"
+          />
+        </label>
+      )}
     </div>
   );
 }

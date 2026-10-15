@@ -42,6 +42,8 @@ interface MarkupCanvasProps {
   toolbar?: React.ReactNode;
   /** A small control on the picture's bottom edge (e.g. version arrows). */
   bottom?: React.ReactNode;
+  /** Tool options shown just above the picture. */
+  topbar?: React.ReactNode;
 }
 
 type Drag =
@@ -55,7 +57,7 @@ type Drag =
  * the numbered badges are plain elements on top so they stay crisp and
  * clickable. Pointer events cover mouse, pen and touch alike.
  */
-export default function MarkupCanvas({ src, alt, marks, onCommit, tool, brush, colour = MARK_COLOUR, selected, onSelect, disabled, overlay, hint, toolbar, bottom }: MarkupCanvasProps) {
+export default function MarkupCanvas({ src, alt, marks, onCommit, tool, brush, colour = MARK_COLOUR, selected, onSelect, disabled, overlay, hint, toolbar, bottom, topbar }: MarkupCanvasProps) {
   const layerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dragRef = useRef<Drag | null>(null);
@@ -255,6 +257,7 @@ export default function MarkupCanvas({ src, alt, marks, onCommit, tool, brush, c
         )}
       </div>
       {toolbar && <div className="absolute right-full top-0 z-20 mr-2">{toolbar}</div>}
+      {topbar && <div className="absolute bottom-full left-0 z-20 mb-2">{topbar}</div>}
       {bottom && <div className="absolute bottom-2 left-1/2 z-20 -translate-x-1/2">{bottom}</div>}
     </div>
       {numbered.length === 0 && !overlay && hint}
