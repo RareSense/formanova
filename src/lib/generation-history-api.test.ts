@@ -47,6 +47,16 @@ describe('generation-history-api URL shapes', () => {
     expect(workflows.map(workflow => workflow.source_type)).toEqual(['text_to_cad', 'image_to_cad']);
   });
 
+  it('reads back the CAD flow that started the run (client_flow), ignoring unknown values', async () => {
+    mockAuthFetch.mockReturnValueOnce(okJson({ workflows: [
+      { workflow_id: 'a', name: 'jewelry_cad_generate', status: 'completed', input: { reference_image_count: 1, client_flow: 'inspiration' } },
+      { workflow_id: 'b', name: 'jewelry_cad_generate', status: 'completed', input: { reference_image_count: 1, client_flow: 'nope' } },
+      { workflow_id: 'c', name: 'jewelry_cad_generate', status: 'completed', input: { reference_image_count: 1 } },
+    ] }));
+    const workflows = await listMyWorkflows();
+    expect(workflows.map(workflow => workflow.client_flow)).toEqual(['inspiration', null, null]);
+  });
+
   it('keeps regular generation families and maps cad_render_v1', async () => {
     mockAuthFetch.mockReturnValueOnce(okJson({ workflows: [
       { workflow_id: 'model', name: 'jewelry_photoshoots_generator', status: 'completed', source_type: 'model_shot' },

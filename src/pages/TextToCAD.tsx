@@ -126,6 +126,7 @@ export default function TextToCAD({ variant = "idea" }: { variant?: DesignStartV
   });
 
   const workflow = useImageToCADWorkflow({
+    clientFlow: variant,
     model,
     prompt,
     referenceImages,

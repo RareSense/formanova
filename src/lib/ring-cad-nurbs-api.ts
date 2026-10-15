@@ -209,7 +209,12 @@ export interface ArtifactRef {
  */
 export type ImageInput = string | ArtifactRef | CadReferenceItem;
 
+/** Which CAD flow started the run; stored with the run and read back by history. */
+export type CadClientFlow = 'image' | 'idea' | 'inspiration';
+
 export interface RingCadStartParams {
+  /** Stored in the payload as client_flow (no node reads it). */
+  clientFlow?: CadClientFlow;
   /** Ordered; index 0 is IMAGE 1 and wins every conflict. 0 to 5 entries. */
   referenceImages: ImageInput[];
   /** Required when there are no images; optional but always used otherwise. */
@@ -299,6 +304,7 @@ export function buildRingCadStartBody({
   tier = RING_CAD_DEFAULT_TIER,
   jewelryType = DEFAULT_CAD_JEWELRY_TYPE,
   material = null,
+  clientFlow,
 }: RingCadStartParams): RingCadStartBody {
   const images = [...referenceImages];
   const description = (userDescription ?? '').trim();
@@ -349,6 +355,7 @@ export function buildRingCadStartBody({
     };
   }
 
+  if (clientFlow) payload.client_flow = clientFlow;
   return { payload };
 }
 

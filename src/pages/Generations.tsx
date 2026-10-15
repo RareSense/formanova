@@ -75,6 +75,7 @@ export default function Generations() {
   const [productShotPage, setProductShotPage] = useState(1);
   const [textCadPage, setTextCadPage] = useState(1);
   const [imageCadPage, setImageCadPage] = useState(1);
+  const [inspirationCadPage, setInspirationCadPage] = useState(1);
 
   // Track enriched IDs + their data for sessionStorage persistence
   const enrichedRef = useRef<Record<string, Partial<WorkflowSummary>>>({});
@@ -205,7 +206,7 @@ export default function Generations() {
 
   // ── Pagination helper ─────────────────────────────────────────────
     const getSection = useCallback(
-    (source: SourceType, page: number, requireImage = false): SectionState => {
+    (source: SourceType, page: number, requireImage = false, all = false): SectionState => {
       const isCadSource = source === 'text_to_cad' || source === 'image_to_cad';
       const filtered = allWorkflows.filter((w) => {
         if (w.source_type !== source || !isVisibleGeneration(w)) return false;
@@ -218,7 +219,7 @@ export default function Generations() {
       const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
       const start = (page - 1) * PER_PAGE;
       return {
-        workflows: filtered.slice(start, start + PER_PAGE),
+        workflows: all ? filtered : filtered.slice(start, start + PER_PAGE),
         page,
         totalPages,
         loading: globalLoading,
@@ -394,8 +395,18 @@ export default function Generations() {
 
   const photoSection = getSection('photo', photoPage, true);
   const productShotSection = getSection('product_shot', productShotPage, true);
-  const textCadSection = getSection('text_to_cad', textCadPage);
-  const imageCadSection = getSection('image_to_cad', imageCadPage);
+  // CAD runs carry the flow that started them; older runs fall back to their inputs.
+  const cadFlow = (w: WorkflowSummary) => w.client_flow ?? (w.source_type === 'text_to_cad' ? 'idea' : 'image');
+  const getCadSection = (flow: 'image' | 'idea' | 'inspiration', page: number): SectionState => {
+    const cad = [...getSection('text_to_cad', 1, false, true).workflows, ...getSection('image_to_cad', 1, false, true).workflows]
+      .filter((w) => cadFlow(w) === flow)
+      .sort((a, b) => (b.created_at > a.created_at ? 1 : -1));
+    const totalPages = Math.max(1, Math.ceil(cad.length / PER_PAGE));
+    return { workflows: cad.slice((page - 1) * PER_PAGE, page * PER_PAGE), page, totalPages, loading: globalLoading };
+  };
+  const textCadSection = getCadSection('idea', textCadPage);
+  const imageCadSection = getCadSection('image', imageCadPage);
+  const inspirationCadSection = getCadSection('inspiration', inspirationCadPage);
 
   return (
     <>
@@ -483,12 +494,12 @@ export default function Generations() {
             <CADRuntimeErrorBoundary
               title="CAD Previews Unavailable"
               description="The 3D preview grid hit a rendering problem. Your generation history is still available."
-              resetKeys={[textCadPage, imageCadPage]}
+              resetKeys={[textCadPage, imageCadPage, inspirationCadPage]}
             >
               <ScissorGLBGrid>
                 <WorkflowSection
-                  title="Text to CAD"
-                  subtitle="CAD models generated from text"
+                  title="CAD from Idea"
+                  subtitle="CAD models from your words or sketches"
                   icon={SectionIcons.textToCad}
                   workflows={textCadSection.workflows}
                   loading={textCadSection.loading}
@@ -501,8 +512,8 @@ export default function Generations() {
                 />
                 {imageCadSection && (
                   <WorkflowSection
-                    title="Image to CAD"
-                    subtitle="CAD models generated from reference images"
+                    title="CAD from Image"
+                    subtitle="CAD models from photos of a piece"
                     icon={SectionIcons.imageToCad}
                     workflows={imageCadSection.workflows}
                     loading={imageCadSection.loading}
@@ -511,6 +522,21 @@ export default function Generations() {
                     columns={3}
                     indexOffset={(imageCadPage - 1) * PER_PAGE}
                     onPageChange={setImageCadPage}
+                    onWorkflowClick={() => {}}
+                  />
+                )}
+                {inspirationCadSection.workflows.length > 0 && (
+                  <WorkflowSection
+                    title="CAD from Inspiration"
+                    subtitle="CAD models inspired by your pictures"
+                    icon={SectionIcons.imageToCad}
+                    workflows={inspirationCadSection.workflows}
+                    loading={inspirationCadSection.loading}
+                    currentPage={inspirationCadSection.page}
+                    totalPages={inspirationCadSection.totalPages}
+                    columns={3}
+                    indexOffset={(inspirationCadPage - 1) * PER_PAGE}
+                    onPageChange={setInspirationCadPage}
                     onWorkflowClick={() => {}}
                   />
                 )}

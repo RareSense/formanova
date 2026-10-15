@@ -110,6 +110,7 @@ export default function ImageToCAD() {
   );
 
   const workflow = useImageToCADWorkflow({
+    clientFlow: "image",
     model,
     prompt,
     referenceImages,

@@ -50,6 +50,8 @@ export interface WorkflowSummary {
   prompt?: string | null;
   /** Reference images the user uploaded for this run, resolved to same-origin artifact-proxy URLs. Empty for text_to_cad. */
   reference_image_urls?: string[];
+  /** The CAD flow that started the run (stored in the payload as client_flow). */
+  client_flow?: "image" | "idea" | "inspiration" | null;
 }
 
 export interface WorkflowStep {
@@ -183,6 +185,7 @@ export async function listMyWorkflows(
       output_asset_name: extractOutputAssetName(w),
       prompt,
       reference_image_urls: referenceImageUrls,
+      client_flow: ["image", "idea", "inspiration"].includes(w.input?.client_flow) ? w.input.client_flow : null,
     };
   });
   if (__DEV__) {
