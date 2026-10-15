@@ -96,6 +96,15 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
         <div ref={cardsRef} className="mt-4">
           <CadJewelryTypeCards value={jewelryType} onChange={setJewelryType} disabled={busy} error={typeError} />
         </div>
+        {onGlbUpload && (
+          <p className="mt-3 text-sm text-muted-foreground">
+            <input ref={glbInputRef} type="file" accept=".glb,.gltf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onGlbUpload(f); }} />
+            Already have a CAD file?{" "}
+            <button type="button" onClick={() => glbInputRef.current?.click()} className="text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground">
+              Upload a .glb
+            </button>
+          </p>
+        )}
 
         <span className="marta-label mb-1 mt-10 block">{flowName} &middot; Step 2</span>
         <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">{inspiration ? "Add your inspiration" : "How do you want to start?"}</h3>
@@ -171,20 +180,12 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
         <div className="mt-6 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end">
           {!ready && <span className="text-sm text-muted-foreground">{why}</span>}
           <button type="button" onClick={guardedGenerate} disabled={busy || !ready}
-            className="flex h-12 items-center justify-center gap-2.5 bg-[hsl(var(--formanova-hero-accent))] px-10 font-display text-base uppercase tracking-wide text-background transition-opacity hover:opacity-90 disabled:opacity-60">
+            className="flex h-12 items-center justify-center gap-2.5 bg-[hsl(var(--formanova-hero-accent))] px-10 font-display text-base uppercase tracking-wide text-background transition-opacity hover:opacity-90 disabled:bg-muted disabled:text-muted-foreground disabled:hover:opacity-100">
             {count === 4 ? "Make 4 designs" : "Make my design"}
             <span className="inline-flex items-center gap-1"><img src={creditCoinIcon} alt="" className="h-5 w-5" /><span className="font-mono text-sm font-semibold">{count === 4 ? 20 : 5}</span></span>
           </button>
         </div>
 
-        {onGlbUpload && (
-          <div className="mt-6 text-center">
-            <input ref={glbInputRef} type="file" accept=".glb,.gltf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onGlbUpload(f); }} />
-            <button type="button" onClick={() => glbInputRef.current?.click()} className="font-mono text-[11px] uppercase tracking-[0.15em] text-muted-foreground underline decoration-border underline-offset-4 hover:text-foreground">
-              Or upload a CAD file (.glb)
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );

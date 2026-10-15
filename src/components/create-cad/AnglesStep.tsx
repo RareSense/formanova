@@ -17,6 +17,8 @@ interface Slot {
   /** The customer's own words for this angle (optional), sent with it. */
   extra: string;
   status: SlotStatus;
+  /** The customer said this view looks right (uploads are accepted as they are). */
+  accepted: boolean;
   picture?: EditorPicture;
   /** Why it doesn't match, or why it failed. */
   note?: string;
@@ -35,7 +37,6 @@ interface AnglesStepProps {
 }
 
 const goldBtn = "flex h-12 items-center justify-center gap-3 whitespace-nowrap bg-[hsl(var(--formanova-hero-accent))] px-5 font-display text-[15px] uppercase tracking-[0.06em] text-background transition-opacity hover:opacity-90 disabled:opacity-50";
-const smallBtn = "flex h-7 items-center gap-1 px-1.5 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50";
 const linkBtn = "text-sm text-muted-foreground underline decoration-border underline-offset-4 hover:text-foreground disabled:no-underline disabled:opacity-50";
 
 function Spinner() {
@@ -72,11 +73,11 @@ export default function AnglesStep({ approved, resolveBase, jewelryType, toObjec
     setSlots((s) => (s.length < MAX_ANGLES ? [...s, slot] : s));
     setChoosing(false);
   };
-  const addSuggested = (view: string, shows: string) => add({ view, shows, source: "make", extra: "", status: "idle" });
+  const addSuggested = (view: string, shows: string) => add({ view, shows, source: "make", extra: "", status: "idle", accepted: false });
   const addCustom = () => {
     const view = custom.trim();
     if (!view) return;
-    add({ view, shows: "Your view", source: "make", extra: "", status: "idle" });
+    add({ view, shows: "Your view", source: "make", extra: "", status: "idle", accepted: false });
     setCustom("");
   };
   const addUploads = (files: FileList | null) => {
@@ -85,14 +86,14 @@ export default function AnglesStep({ approved, resolveBase, jewelryType, toObjec
     const added = picked.map((f) => {
       const display = URL.createObjectURL(f);
       uploadUrls.current.push(display);
-      return { view: "Your picture", shows: f.name, source: "upload" as const, extra: "", status: "ready" as const, picture: { display, input: null, label: "Your picture" } };
+      return { view: "Your picture", shows: f.name, source: "upload" as const, extra: "", status: "ready" as const, accepted: true, picture: { display, input: null, label: "Your picture" } };
     });
     if (added.length) setSlots((s) => [...s, ...added].slice(0, MAX_ANGLES));
     setChoosing(false);
   };
   const fillSuggested = () => setSlots((s) => {
     const free = suggestions.filter((a) => !s.some((x) => x.source === "make" && x.view === a.view));
-    return [...s, ...free.map((a) => ({ ...a, source: "make" as const, extra: "", status: "idle" as const }))].slice(0, MAX_ANGLES);
+    return [...s, ...free.map((a) => ({ ...a, source: "make" as const, extra: "", status: "idle" as const, accepted: false }))].slice(0, MAX_ANGLES);
   });
 
   const land = useCallback(async (index: number, outcome: DesignImageOutcome) => {
@@ -105,6 +106,7 @@ export default function AnglesStep({ approved, resolveBase, jewelryType, toObjec
       const picture: EditorPicture = { display, input: outcome.result.image, label: "" };
       const mismatch = outcome.result.consistent === false;
       update(index, {
+        accepted: false,
         status: mismatch ? "mismatch" : "ready",
         picture,
         note: mismatch ? outcome.result.drift[0] ?? "It doesn't match the approved design." : undefined,
@@ -126,23 +128,18 @@ export default function AnglesStep({ approved, resolveBase, jewelryType, toObjec
   }, [resolveBase, slots, jewelryType, generate, land]);
 
   const toMake = slots.map((s, i) => (s.source === "make" && (s.status === "idle" || s.status === "failed") ? i : -1)).filter((i) => i >= 0);
+  const toReview = slots.filter((s) => (s.status === "ready" || s.status === "mismatch") && !s.accepted).length;
   const making = slots.some((s) => s.status === "making");
-  const mismatched = slots.some((s) => s.status === "mismatch");
   const ready = slots.filter((s) => s.status === "ready" && s.picture).map((s) => ({ ...s.picture!, label: s.view }));
 
   // Tell the editor what is ready, and move on by itself once every view has
   // been made and matches.
   const readyKey = ready.map((r) => r.display).join("|");
   useEffect(() => { onReady(ready); }, [readyKey]); // eslint-disable-line react-hooks/exhaustive-deps -- keyed on the pictures, not the array identity
-  const wasMaking = useRef(false);
-  useEffect(() => {
-    if (wasMaking.current && !making && toMake.length === 0 && !mismatched && ready.length > 0) onContinue(ready);
-    wasMaking.current = making;
-  }, [making]); // eslint-disable-line react-hooks/exhaustive-deps -- only on a batch finishing
 
   const note = making
     ? "Making your views…"
-    : mismatched ? "Redo or remove the view that doesn't match"
+    : toReview ? `Check ${toReview === 1 ? "the new view" : `the ${toReview} new views`}: Looks right or Regenerate`
     : `${slots.length + 1} of ${MAX_ANGLES + 1} pictures`;
 
   return (
@@ -158,16 +155,16 @@ export default function AnglesStep({ approved, resolveBase, jewelryType, toObjec
           </button>
         </div>
 
-        <ol className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+        <ol className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-5">
           <li className="flex flex-col border border-foreground/30">
             <div className="flex aspect-square items-center justify-center overflow-hidden bg-muted/20">
               <img src={approved.display} alt="Your design" className="h-full w-full object-contain" />
             </div>
-            <span className="border-t border-border/60 px-2.5 py-2 text-sm font-medium text-foreground">Your design</span>
+            <span className="border-t border-border/60 px-3 py-3 text-sm font-medium text-foreground">Your design</span>
           </li>
 
           {slots.map((slot, i) => {
-            const editable = slot.source === "make" && (slot.status === "idle" || slot.status === "failed");
+            const editable = slot.source === "make" && (slot.status === "idle" || slot.status === "failed" || (slot.status !== "making" && !slot.accepted));
             return (
               <li key={i} className={`flex flex-col border ${slot.status === "mismatch" ? "border-amber-600/60" : "border-[hsl(var(--formanova-hero-accent))]"}`}>
                 <div className="relative flex aspect-square items-center justify-center overflow-hidden bg-muted/20">
@@ -192,7 +189,7 @@ export default function AnglesStep({ approved, resolveBase, jewelryType, toObjec
                     </button>
                   )}
                 </div>
-                <div className="flex flex-col gap-1.5 border-t border-border/60 px-2.5 py-2">
+                <div className="flex flex-col gap-2 border-t border-border/60 px-3 py-3">
                   <span className="text-sm font-medium leading-snug text-foreground">{slot.view}</span>
                   {editable && (
                     <input
@@ -200,14 +197,23 @@ export default function AnglesStep({ approved, resolveBase, jewelryType, toObjec
                       onChange={(e) => update(i, { extra: e.target.value.slice(0, MAX_DESIGN_VIEW_CHARS) })}
                       aria-label={`Anything specific for the ${slot.view} view (optional)`}
                       placeholder="Anything specific? (optional)"
-                      className="h-8 w-full border border-border bg-background px-2 text-xs text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-foreground/60"
+                      className="h-9 w-full border border-border bg-background px-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-foreground/60"
                     />
                   )}
                   {slot.note && <p className={`text-xs leading-snug ${slot.status === "failed" ? "text-destructive" : "text-amber-700"}`}>{slot.note}</p>}
                   {slot.source === "make" && (slot.status === "mismatch" || slot.status === "ready") && (
-                    <button type="button" onClick={() => void make([i])} disabled={making} className={`${smallBtn} -ml-1.5 self-start`} title={`Make it again · ${DESIGN_IMAGE_CREDITS} credits`}>
-                      <RotateCcw className="h-3 w-3" strokeWidth={1} /> Redo
-                    </button>
+                    slot.accepted ? (
+                      <span className="flex items-center gap-1.5 text-sm text-emerald-700"><Check className="h-3 w-3" strokeWidth={1.5} /> Looks right</span>
+                    ) : (
+                      <div className="flex flex-col gap-2 pt-1">
+                        <button type="button" onClick={() => void make([i])} disabled={making} className="flex h-9 w-full items-center justify-center gap-1.5 border border-border text-sm text-foreground hover:border-foreground/40 disabled:opacity-50" title={`Make it again · ${DESIGN_IMAGE_CREDITS} credits`}>
+                          <RotateCcw className="h-3 w-3" strokeWidth={1} /> Regenerate
+                        </button>
+                        <button type="button" onClick={() => update(i, { accepted: true })} disabled={making} className="flex h-9 w-full items-center justify-center gap-1.5 bg-foreground text-sm text-background hover:opacity-90 disabled:opacity-50">
+                          <Check className="h-3 w-3" strokeWidth={1.5} /> Looks right
+                        </button>
+                      </div>
+                    )
                   )}
                 </div>
               </li>
@@ -282,7 +288,7 @@ export default function AnglesStep({ approved, resolveBase, jewelryType, toObjec
             <CreditTag value={toMake.length * DESIGN_IMAGE_CREDITS} />
           </button>
         ) : (
-          <button type="button" onClick={() => onContinue(ready)} disabled={making || mismatched || ready.length === 0} className={goldBtn}>
+          <button type="button" onClick={() => onContinue(ready)} disabled={making || toReview > 0 || ready.length === 0} className={goldBtn}>
             Continue <ArrowRight className="h-4 w-4" strokeWidth={1} />
           </button>
         )}

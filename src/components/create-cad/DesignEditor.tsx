@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { ArrowRight, Box, Check, ChevronLeft, Diamond, Ruler, X } from "lucide-react";
+import { ArrowRight, Box, Check, ChevronLeft, Diamond, RotateCcw, Ruler, X } from "lucide-react";
 import { flattenMarkup, MARK_COLOUR, MIN_BRUSH, MAX_BRUSH } from "@/lib/design-markup";
 import { blobToDataUrl } from "@/lib/design-image-run";
-import { DESIGN_IMAGE_CREDITS } from "@/lib/design-image-api";
+import { DESIGN_IMAGE_CREDITS, type DesignImageStartParams } from "@/lib/design-image-api";
 import type { CadJewelryType, ImageInput } from "@/lib/ring-cad-nurbs-api";
 import { useDesignImageRun } from "@/hooks/useDesignImageRun";
 import MarkupCanvas, { type MarkupTool } from "./MarkupCanvas";
@@ -140,18 +140,17 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
   const canApprove = !!picture && edited && !busy && !hasChange;
   const isDirty = edited || history.marks.length > 0 || hasChange;
 
-  const send = useCallback(async () => {
-    if (!picture || busy || !hasChange) return;
+  /** The last change sent, so Regenerate can ask for it again from the same starting picture. */
+  const lastRequest = useRef<{ prompt: string; images: DesignImageStartParams["images"] } | null>(null);
+
+  const run = useCallback(async (prompt: string, buildImages: () => Promise<DesignImageStartParams["images"]>) => {
     setBusy(true);
     setError(null);
     setSelected(null);
     try {
-      const base = picture.input ?? (source ? await blobToDataUrl(source) : null);
-      if (!base) throw new Error("The picture is not ready yet");
-      const images = history.marks.length > 0
-        ? [{ role: "markup" as const, image: await blobToDataUrl(await flattenMarkup(await loadImage(picture.display), history.marks)) }]
-        : [{ role: "base" as const, image: base }];
-      const outcomes = await generate([{ prompt: instruction, images, jewelryType }]);
+      const images = await buildImages();
+      lastRequest.current = { prompt, images };
+      const outcomes = await generate([{ prompt, images, jewelryType }]);
       if (!outcomes) return; // credits page opened, or the editor closed
       const outcome = outcomes[0];
       if (!("result" in outcome)) { setError("message" in outcome ? outcome.message : "We couldn't make that change. Please try again."); return; }
@@ -167,7 +166,25 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
     } finally {
       setBusy(false);
     }
-  }, [picture, busy, hasChange, source, history, instruction, jewelryType, generate]);
+  }, [history, jewelryType, generate]);
+
+  const send = useCallback(async () => {
+    if (!picture || busy || !hasChange) return;
+    await run(instruction, async () => {
+      const base = picture.input ?? (source ? await blobToDataUrl(source) : null);
+      if (!base) throw new Error("The picture is not ready yet");
+      return history.marks.length > 0
+        ? [{ role: "markup" as const, image: await blobToDataUrl(await flattenMarkup(await loadImage(picture.display), history.marks)) }]
+        : [{ role: "base" as const, image: base }];
+    });
+  }, [picture, busy, hasChange, source, history, instruction, run]);
+
+  /** Regenerate: the same change again, from the same starting picture. */
+  const regenerate = useCallback(async () => {
+    const last = lastRequest.current;
+    if (!last || busy) return;
+    await run(last.prompt, async () => last.images);
+  }, [busy, run]);
 
   /** "Looks right": the picture showing becomes the approved design. */
   const looksRight = useCallback(() => {
@@ -280,6 +297,16 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
               {/* Like Done / Next in an image editor: the way forward sits top
                   right, once there is an edited picture to approve. */}
               {stage === "edit" && edited && (
+                <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void regenerate()}
+                  disabled={busy}
+                  title="Make the same change again"
+                  className="flex h-9 items-center gap-2 border border-border px-3 text-sm text-foreground transition-colors hover:border-foreground/40 disabled:opacity-40"
+                >
+                  <RotateCcw className="h-4 w-4" strokeWidth={1} /> Regenerate <CreditTag value={DESIGN_IMAGE_CREDITS} />
+                </button>
                 <button
                   type="button"
                   onClick={looksRight}
@@ -289,6 +316,7 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
                 >
                   <Check className="h-4 w-4" strokeWidth={1.5} /> Looks right
                 </button>
+                </div>
               )}
               {stage !== "edit" && (
                 <button type="button" onClick={requestClose} className="flex h-10 items-center gap-1.5 px-1 text-sm text-muted-foreground hover:text-foreground">
