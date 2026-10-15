@@ -20,7 +20,7 @@ export default function ThemedCadPicture({ shade, metal, gems, className = "" }:
     mixBlendMode: "color",
   });
   return (
-    <div className={`relative isolate ${className}`} aria-hidden="true">
+    <div className={`isolate ${/babsoluteb/.test(className) ? "" : "relative"} ${className}`} aria-hidden="true">
       <img src={shade} alt="" draggable={false} className="absolute inset-0 h-full w-full object-contain" />
       <div className="absolute inset-0" style={layer(metal, "hsl(var(--muted-foreground))")} />
       <div className="absolute inset-0" style={layer(gems, "hsl(var(--formanova-hero-accent))")} />
