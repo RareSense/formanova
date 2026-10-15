@@ -141,11 +141,14 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
                 referenceImagePreviewUrls={mixPreviews}
                 onAddReferenceImages={addMix}
                 onRemoveReferenceImage={removeMix}
-                primaryLabel={`Drop 1 to ${MAX_DESIGN_IMAGES} pictures, e.g. a spider web, a flower, other jewelry`}
+                primaryLabel={`Drop 1–${MAX_DESIGN_IMAGES} pictures`}
+                primaryHint="A spider web, a flower, a building, other jewelry"
                 browseLabel="Browse files"
+                maxImages={MAX_DESIGN_IMAGES}
                 canvasClassName="h-[160px] sm:h-[180px]"
               />
-              {mixFiles.length > 1 && <p className="mb-2 mt-1.5 text-xs text-muted-foreground">Pictures are lettered left to right: {mixFiles.map((_, i) => String.fromCharCode(65 + i)).join(", ")}</p>}
+              {mixFiles.length > 1 && <p className="mt-2 text-xs text-muted-foreground">Pictures are lettered left to right: {mixFiles.map((_, i) => String.fromCharCode(65 + i)).join(", ")}</p>}
+              <label htmlFor="design-start-text" className="mb-2 mt-6 block text-sm font-medium text-foreground">What to take from {mixFiles.length > 1 ? "them" : "it"} <span className="font-normal text-muted-foreground">(optional)</span></label>
               {textBox(2, mixFiles.length > 1 ? "What to take from each, e.g. the stone from A, the band from B" : "What to take from it, e.g. the web pattern as an openwork band", "What to take from the pictures")}
             </>
           )}

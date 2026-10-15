@@ -19,10 +19,19 @@ import type { EffortLevel } from '@/components/studio/EffortToggle';
 
 import modelShotImg from '@/assets/jewelry/model-shot-card.webp';
 import productShotImg from '@/assets/cad-studio/product-shot-card.webp';
-// Real Rhino captures (Shaded, isocurves on) of models we built.
-import cadFromImageImg from '@/assets/cad-cards/cad-from-image.webp';
-import cadFromIdeaImg from '@/assets/cad-cards/cad-from-idea.webp';
-import cadFromInspirationImg from '@/assets/cad-cards/cad-from-inspiration.webp';
+import CadStoryPicture, { type CadStory } from '@/components/create-cad/CadStoryPicture';
+// Real Rhino captures of models we built, as theme-coloured layers.
+import fireflyPhoto from '@/assets/cad-cards/story/firefly-photo.webp';
+import ladybugPhoto from '@/assets/cad-cards/story/ladybug-photo.webp';
+import earringShade from '@/assets/cad-cards/story/earring-shade.webp';
+import earringMetal from '@/assets/cad-cards/story/earring-metal.webp';
+import earringGems from '@/assets/cad-cards/story/earring-gems.webp';
+import ringShade from '@/assets/cad-cards/story/ring-shade.webp';
+import ringMetal from '@/assets/cad-cards/story/ring-metal.webp';
+import ringGems from '@/assets/cad-cards/story/ring-gems.webp';
+import ladybugShade from '@/assets/cad-cards/story/ladybug-shade.webp';
+import ladybugMetal from '@/assets/cad-cards/story/ladybug-metal.webp';
+import ladybugGems from '@/assets/cad-cards/story/ladybug-gems.webp';
 
 type Workflow = {
   title: string;
@@ -30,7 +39,9 @@ type Workflow = {
   /** Existing destination, unchanged from the Photo Studio / CAD Studio pages. */
   route: string;
   icon: React.ComponentType<{ className?: string }>;
-  image: string;
+  image?: string;
+  /** CAD cards: what goes in and the CAD it becomes, drawn in theme colours. */
+  story?: CadStory;
   /** Photography still passes through the first-run effort chooser. */
   usesEffortIntro?: boolean;
   /** PostHog value, identical to what the Photo Studio page sent. */
@@ -38,8 +49,6 @@ type Workflow = {
   /** Wide marks (200x128) size by height so their ring matches the square
    *  marks. Square marks size both axes. */
   wideIcon?: boolean;
-  /** Show the whole picture (CAD captures), not a cropped fill. */
-  fitImage?: boolean;
 };
 
 const photographyWorkflows: Workflow[] = [
@@ -70,8 +79,7 @@ const cadWorkflows: Workflow[] = [
     route: '/image-to-cad',
     icon: ImageToCadIcon,
     wideIcon: true,
-    image: cadFromImageImg,
-    fitImage: true,
+    story: { inputLabel: 'Your photo', input: { kind: 'photo', src: fireflyPhoto }, cad: { shade: earringShade, metal: earringMetal, gems: earringGems } },
   },
   {
     title: 'CAD from Idea',
@@ -79,8 +87,7 @@ const cadWorkflows: Workflow[] = [
     route: '/text-to-cad',
     icon: TextToCadIcon,
     wideIcon: true,
-    image: cadFromIdeaImg,
-    fitImage: true,
+    story: { inputLabel: 'Your idea', input: { kind: 'prompt', text: "Men's signet ring, cushion centre stone with a halo, engraved crest on both shoulders" }, cad: { shade: ringShade, metal: ringMetal, gems: ringGems } },
   },
   {
     title: 'CAD from Inspiration',
@@ -88,8 +95,7 @@ const cadWorkflows: Workflow[] = [
     route: '/inspiration-to-cad',
     icon: ImageToCadIcon,
     wideIcon: true,
-    image: cadFromInspirationImg,
-    fitImage: true,
+    story: { inputLabel: 'Inspiration', input: { kind: 'photo', src: ladybugPhoto, cover: true }, cad: { shade: ladybugShade, metal: ladybugMetal, gems: ladybugGems } },
   },
 ];
 
@@ -192,14 +198,18 @@ function WorkflowCard({
       className={`${CARD_FRAME} flex flex-col ${className}`}
     >
       {/* Image */}
-      <div className={`relative aspect-[4/3] overflow-hidden ${workflow.fitImage ? 'bg-muted/20' : ''}`}>
-        <img
-          src={workflow.image}
-          alt={workflow.title}
-          loading="lazy"
-          decoding="async"
-          className={`absolute inset-0 w-full h-full transition-transform duration-500 group-hover:scale-105 ${workflow.fitImage ? 'object-contain p-2 sm:p-3' : 'object-cover'}`}
-        />
+      <div className="relative aspect-[4/3] overflow-hidden">
+        {workflow.story ? (
+          <CadStoryPicture story={workflow.story} />
+        ) : (
+          <img
+            src={workflow.image}
+            alt={workflow.title}
+            loading="lazy"
+            decoding="async"
+            className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        )}
       </div>
 
       {/* Content */}

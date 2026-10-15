@@ -18,6 +18,8 @@ interface ReferenceImageUploaderProps {
   canvasClassName?: string;
   /** Uses Photo Studio's full-size empty drop affordance. */
   photoStudioEmptyState?: boolean;
+  /** Most pictures this upload takes; defaults to the CAD reference limit. */
+  maxImages?: number;
 }
 
 /**
@@ -36,6 +38,7 @@ export default function ReferenceImageUploader({
   primaryHint = "Drag & drop · click to browse · paste (Ctrl+V)",
   canvasClassName = "h-[150px] sm:h-[170px]",
   photoStudioEmptyState = false,
+  maxImages = MAX_RING_CAD_REFERENCE_IMAGES,
 }: ReferenceImageUploaderProps) {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const extraInputRef = useRef<HTMLInputElement>(null);
@@ -44,18 +47,18 @@ export default function ReferenceImageUploader({
 
   const primaryPreviewUrl = referenceImagePreviewUrls[0] ?? null;
   const imageCount = referenceImagePreviewUrls.length;
-  const remainingSlots = MAX_RING_CAD_REFERENCE_IMAGES - imageCount;
+  const remainingSlots = maxImages - imageCount;
 
   /** Filters to images and clamps to the remaining slots, telling the user when it clamps. */
   const acceptFiles = useCallback((fileList: FileList | File[] | null) => {
     const images = Array.from(fileList ?? []).filter(f => f.type.startsWith("image/"));
     if (images.length === 0) return;
     if (remainingSlots <= 0) {
-      toast.error(`You can use up to ${MAX_RING_CAD_REFERENCE_IMAGES} inspiration images`);
+      toast.error(`You can use up to ${maxImages} inspiration images`);
       return;
     }
     if (images.length > remainingSlots) {
-      toast.error(`Only ${remainingSlots} more ${remainingSlots === 1 ? 'image' : 'images'} can be added (max ${MAX_RING_CAD_REFERENCE_IMAGES})`);
+      toast.error(`Only ${remainingSlots} more ${remainingSlots === 1 ? 'image' : 'images'} can be added (max ${maxImages})`);
     }
     onAddReferenceImages(images.slice(0, remainingSlots));
   }, [remainingSlots, onAddReferenceImages]);
@@ -104,7 +107,7 @@ export default function ReferenceImageUploader({
       {primaryPreviewUrl && (
         <div className="mb-2 flex items-baseline justify-end">
           <span className="font-mono text-[10px] tracking-[0.15em] text-muted-foreground/60 tabular-nums">
-            {imageCount}/{MAX_RING_CAD_REFERENCE_IMAGES}
+            {imageCount}/{maxImages}
           </span>
         </div>
       )}
@@ -144,7 +147,7 @@ export default function ReferenceImageUploader({
         <div className={`${canvasClassName} overflow-hidden border border-border/30`}>
           <div
             className="grid h-full min-h-0 gap-2 p-2"
-            style={{ gridTemplateColumns: `repeat(${primaryPreviewUrl ? MAX_RING_CAD_REFERENCE_IMAGES : 1}, minmax(0, 1fr))` }}
+            style={{ gridTemplateColumns: `repeat(${primaryPreviewUrl ? maxImages : 1}, minmax(0, 1fr))` }}
           >
             {!primaryPreviewUrl ? (
               <div
@@ -173,7 +176,7 @@ export default function ReferenceImageUploader({
                   <p className="text-xs text-muted-foreground">{primaryHint}</p>
                 </div>
               </div>
-            ) : Array.from({ length: MAX_RING_CAD_REFERENCE_IMAGES }, (_, index) => {
+            ) : Array.from({ length: maxImages }, (_, index) => {
               const url = referenceImagePreviewUrls[index];
 
               if (url) {
