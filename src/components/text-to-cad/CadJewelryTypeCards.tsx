@@ -14,17 +14,14 @@ import { Check } from 'lucide-react';
 
 import { CAD_JEWELRY_TYPES, type CadJewelryType } from '@/lib/ring-cad-nurbs-api';
 import { cn } from '@/lib/utils';
-import ringImage from '@/assets/cad-jewelry-types/ring.webp';
-import necklaceImage from '@/assets/cad-jewelry-types/necklace.webp';
-import braceletImage from '@/assets/cad-jewelry-types/bracelet.webp';
-import earringImage from '@/assets/cad-jewelry-types/earring.webp';
-import otherImage from '@/assets/cad-jewelry-types/other.webp';
+import ThemedCadPicture from '@/components/create-cad/ThemedCadPicture';
 
-const CARD_IMAGES: Partial<Record<CadJewelryType, string>> = {
-  ring: ringImage,
-  necklace: necklaceImage,
-  bracelet: braceletImage,
-  earring: earringImage,
+// Real Rhino captures as theme-coloured layers: grey shading plus metal and gem masks.
+const layers = import.meta.glob('@/assets/cad-jewelry-types/*-{shade,metal,gems}.webp', { eager: true, import: 'default' }) as Record<string, string>;
+const pick = (type: string, part: string) => Object.entries(layers).find(([k]) => k.endsWith(`/${type}-${part}.webp`))?.[1];
+const picture = (type: string) => {
+  const shade = pick(type, 'shade'), metal = pick(type, 'metal'), gems = pick(type, 'gems');
+  return shade && metal && gems ? { shade, metal, gems } : undefined;
 };
 
 interface CadJewelryTypeCardsProps {
@@ -63,7 +60,7 @@ export default function CadJewelryTypeCards({ value, onChange, disabled, error }
       >
         {CAD_JEWELRY_TYPES.map((type, index) => {
           const selected = type.value === value;
-          const image = CARD_IMAGES[type.value];
+          const image = picture(type.value);
           return (
             <button
               key={type.value}
@@ -90,12 +87,12 @@ export default function CadJewelryTypeCards({ value, onChange, disabled, error }
               {/* The renders share one grey backdrop; Other uses the same grey so
                   all five squares read as one set. */}
               <div className="relative aspect-square w-full overflow-hidden bg-muted/30">
-                {image ? (
-                  <img src={image} alt="" draggable={false} className="h-full w-full object-cover" />
+                {type.value !== 'other' && image ? (
+                  <ThemedCadPicture {...image} className="h-full w-full" />
                 ) : (
                   // Other: a faint tiara behind the words, so it reads as one of the set.
                   <>
-                    <img src={otherImage} alt="" draggable={false} className="absolute inset-0 h-full w-full object-cover opacity-30" />
+                    {image && <ThemedCadPicture {...image} className="absolute inset-0 h-full w-full opacity-30" />}
                     <div className="relative flex h-full items-center justify-center px-3 text-center">
                       <span id={otherHintId} className="text-xs font-medium leading-snug text-foreground">Brooches, tiaras, watches &amp; more</span>
                     </div>
