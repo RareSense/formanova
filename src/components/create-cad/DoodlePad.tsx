@@ -131,7 +131,7 @@ const DoodlePad = forwardRef<DoodlePadHandle, { onInkChange: (hasInk: boolean) =
 
     // Same look as the Edit design toolbar: floating column, active tool in gold.
     const toolBtn = (on: boolean) => `flex h-9 w-9 items-center justify-center transition-colors disabled:opacity-40 ${on ? "bg-[hsl(var(--formanova-hero-accent)/0.12)] text-[hsl(var(--formanova-hero-accent))]" : "text-foreground hover:bg-muted"}`;
-    const quietBtn = "flex h-8 w-9 items-center justify-center text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30 disabled:hover:text-muted-foreground";
+    const quietBtn = "flex h-8 w-9 items-center justify-center text-foreground transition-colors hover:bg-muted disabled:text-muted-foreground disabled:opacity-30 disabled:hover:bg-transparent";
     const inking = tool !== "eraser";
 
     return (
@@ -156,7 +156,7 @@ const DoodlePad = forwardRef<DoodlePadHandle, { onInkChange: (hasInk: boolean) =
               <div role="radiogroup" aria-label="Ink colour" className="flex items-center gap-2">
                 {INKS.map((c) => (
                   <button key={c.value} type="button" role="radio" aria-checked={colour === c.value} aria-label={c.name} title={c.name} disabled={disabled} onClick={() => setColour(c.value)}
-                    className={`h-5 w-5 rounded-full transition-transform hover:scale-110 ${colour === c.value ? "ring-1 ring-foreground ring-offset-2 ring-offset-background" : ""}`}
+                    className={`h-5 w-5 rounded-full border border-border transition-transform hover:scale-110 ${colour === c.value ? "ring-1 ring-foreground ring-offset-2 ring-offset-background" : ""}`}
                     style={{ background: c.value }} />
                 ))}
               </div>

@@ -21,7 +21,7 @@ interface MarkupToolPanelProps {
 }
 
 const toolBtn = "flex h-9 w-9 items-center justify-center transition-colors disabled:opacity-40";
-const quietBtn = "flex h-8 w-9 items-center justify-center text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30 disabled:hover:text-muted-foreground";
+const quietBtn = "flex h-8 w-9 items-center justify-center text-foreground transition-colors hover:bg-muted disabled:text-muted-foreground disabled:opacity-30 disabled:hover:bg-transparent";
 
 /**
  * The optional markup tools as a small floating column inside the canvas,
@@ -79,7 +79,7 @@ export default function MarkupToolPanel({ tool, onTool, brush, onBrush, colour, 
                   title={c.name}
                   disabled={disabled}
                   onClick={() => onColour(c.value)}
-                  className={`h-5 w-5 rounded-full transition-transform hover:scale-110 ${colour === c.value ? "ring-1 ring-foreground ring-offset-2 ring-offset-background" : ""}`}
+                  className={`h-5 w-5 rounded-full border border-border transition-transform hover:scale-110 ${colour === c.value ? "ring-1 ring-foreground ring-offset-2 ring-offset-background" : ""}`}
                   style={{ background: c.value }}
                 />
               ))}
