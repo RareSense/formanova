@@ -96,7 +96,7 @@ describe('DesignEditor', () => {
     looksRight();
     expect(screen.getByRole('heading', { name: /ready for cad/i })).toBeInTheDocument();
     expect(screen.getByAltText(/your approved design/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/dimensions/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/sizes/i)).toBeInTheDocument();
     const create = screen.getByRole('button', { name: /^create cad/i });
     expect(create).toHaveTextContent('140');
     fireEvent.click(create);
@@ -174,7 +174,7 @@ describe('DesignEditor', () => {
     fireEvent.change(screen.getByLabelText(/describe any change/i), { target: { value: 'oval' } });
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
     expect(onCancel).not.toHaveBeenCalled();
-    expect(screen.getByRole('alertdialog')).toHaveTextContent(/discard your edits/i);
+    expect(screen.getByRole('alertdialog')).toHaveTextContent(/discard edits/i);
     fireEvent.click(screen.getByRole('button', { name: /discard/i }));
     await waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1));
   });

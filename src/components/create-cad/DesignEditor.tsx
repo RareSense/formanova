@@ -572,12 +572,12 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
           )}
           {confirmClose && (
             <div role="alertdialog" aria-modal="true" aria-labelledby="discard-title" className="absolute inset-0 z-30 flex items-center justify-center bg-background/60 p-4">
-              <div className="w-full max-w-sm border border-border bg-background p-5 shadow-lg">
-                <h2 id="discard-title" className="font-display text-xl uppercase tracking-wide text-foreground">Discard your edits?</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Your changes and marks will be lost. Your uploaded picture stays as it was.</p>
-                <div className="mt-4 flex justify-end gap-2">
-                  <button type="button" autoFocus onClick={() => setConfirmClose(false)} className="h-10 border border-border px-4 text-sm text-foreground hover:border-foreground/40">Keep editing</button>
-                  <button type="button" onClick={() => { setConfirmClose(false); onCancel(); }} className="h-10 bg-foreground px-4 text-sm text-background hover:opacity-90">Discard</button>
+              <div className="w-full max-w-xs border border-border bg-background p-6 text-center shadow-lg">
+                <h2 id="discard-title" className="font-display text-xl uppercase tracking-wide text-foreground">Discard edits?</h2>
+                <p className="mt-1.5 text-sm text-muted-foreground">Your photo stays as it was.</p>
+                <div className="mt-5 grid grid-cols-2 gap-2">
+                  <button type="button" autoFocus onClick={() => setConfirmClose(false)} className="h-10 border border-border text-sm text-foreground hover:border-foreground/40">Keep editing</button>
+                  <button type="button" onClick={() => { setConfirmClose(false); onCancel(); }} className="h-10 bg-foreground text-sm text-background hover:opacity-90">Discard</button>
                 </div>
               </div>
             </div>
