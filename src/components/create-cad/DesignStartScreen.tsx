@@ -173,7 +173,7 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
                   <label htmlFor="design-start-text" className="mb-2 mt-6 block text-sm font-medium text-foreground">
                     How should {mixFiles.length > 1 ? "they" : "it"} show in your piece? <span className="font-normal text-muted-foreground">(optional)</span>
                   </label>
-                  {textBox(2, mixFiles.length > 1 ? "e.g. the petals from A as the setting, the shell curve from B as the band" : "e.g. the web as an openwork band, the dew drops as small diamonds", "How it should show in your piece")}
+                  {textBox(2, mixFiles.length > 1 ? "e.g. the petals from A around the top, the curve from B as the band" : "e.g. use the web pattern as the band", "How it should show in your piece")}
                 </>
               )}
             </>
