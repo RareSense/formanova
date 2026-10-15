@@ -168,8 +168,13 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
                 </div>
               </div>
               {mixFiles.length > 1 && <p className="mt-2 text-xs text-muted-foreground">Pictures are lettered left to right: {mixFiles.map((_, i) => String.fromCharCode(65 + i)).join(", ")}</p>}
+              {/* Asked only once there is a picture to take from. */}
+              {mixFiles.length > 0 && (
+                <>
               <label htmlFor="design-start-text" className="mb-2 mt-6 block text-sm font-medium text-foreground">What to take from {mixFiles.length > 1 ? "them" : "it"} <span className="font-normal text-muted-foreground">(optional)</span></label>
               {textBox(2, mixFiles.length > 1 ? "What to take from each, e.g. the stone from A, the band from B" : "What to take from it, e.g. the web pattern as an openwork band", "What to take from the pictures")}
+                </>
+              )}
             </>
           )}
         </div>
