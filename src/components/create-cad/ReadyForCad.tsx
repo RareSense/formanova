@@ -36,22 +36,16 @@ interface ReadyForCadProps {
  */
 export default function ReadyForCad({ approved, views, jewelryType, dimensions, onDimensions, cost, costLoading, onGenerate, generating, waiting, modelPicker }: ReadyForCadProps) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-4 sm:p-6 lg:flex-row lg:gap-10">
-      <div className="min-w-0 flex-1">
-        <div className="flex aspect-[4/3] max-h-[340px] w-full items-center justify-center bg-muted/20">
+    <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto p-4 sm:p-6">
+      <div className="flex w-full max-w-[460px] flex-col items-center gap-4">
+        <div className="flex aspect-[4/3] w-full items-center justify-center bg-muted/20">
           <img src={approved.display} alt="Your approved design" className="h-full w-full object-contain" />
         </div>
-        {views && <div className="mt-4">{views}</div>}
-      </div>
-
-      <aside className="flex flex-shrink-0 flex-col justify-center gap-5 lg:w-[300px]">
-        <div>
-          <p className="flex items-center gap-1.5 text-sm text-emerald-700"><Check className="h-4 w-4" strokeWidth={1.5} /> Design ready</p>
-          <h2 className="mt-1 font-display text-2xl uppercase tracking-[0.02em] text-foreground">Create your CAD</h2>
-        </div>
-        <div>
+        {views}
+        <p className="flex items-center gap-1.5 text-sm text-emerald-700"><Check className="h-4 w-4" strokeWidth={1.5} /> Design ready</p>
+        <div className="w-full">
           <label htmlFor="ready-dimensions" className="block text-sm font-medium text-foreground">
-            Sizes <span className="font-normal text-muted-foreground">(optional)</span>
+            Dimensions <span className="font-normal text-muted-foreground">(optional)</span>
           </label>
           <input
             id="ready-dimensions"
@@ -61,24 +55,22 @@ export default function ReadyForCad({ approved, views, jewelryType, dimensions, 
             className="mt-1.5 h-11 w-full border border-border bg-background px-3 text-[14px] text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-foreground/60"
           />
         </div>
-        <div className="flex flex-col gap-2">
-          <button
-            type="button"
-            onClick={onGenerate}
-            disabled={generating || waiting}
-            className="flex h-12 items-center justify-center gap-3 bg-[hsl(var(--formanova-hero-accent))] px-6 font-display text-base uppercase tracking-[0.08em] text-background transition-opacity hover:opacity-90 disabled:bg-muted disabled:text-muted-foreground"
-          >
-            {generating ? "Starting…" : <>Create CAD <ArrowRight className="h-4 w-4" strokeWidth={1.5} /><CreditTag value={costLoading ? "…" : cost ?? "—"} /></>}
-          </button>
-          <span className="text-center text-xs text-muted-foreground">Ready in 30–40 min · Rhino 3DM, STL, STEP</span>
-        </div>
+        <button
+          type="button"
+          onClick={onGenerate}
+          disabled={generating || waiting}
+          className="flex h-12 w-full items-center justify-center gap-3 bg-[hsl(var(--formanova-hero-accent))] px-6 font-display text-base uppercase tracking-[0.08em] text-background transition-opacity hover:opacity-90 disabled:bg-muted disabled:text-muted-foreground"
+        >
+          {generating ? "Starting…" : <>Create CAD <ArrowRight className="h-4 w-4" strokeWidth={1.5} /><CreditTag value={costLoading ? "…" : cost ?? "—"} /></>}
+        </button>
+        <span className="text-xs text-muted-foreground">Ready in 30–40 min · Rhino 3DM, STL, STEP</span>
         {modelPicker && (
-          <details className="text-xs text-muted-foreground">
-            <summary className="cursor-pointer select-none">Admin</summary>
+          <details className="w-full text-xs text-muted-foreground">
+            <summary className="cursor-pointer select-none text-center">Admin</summary>
             <div className="mt-2">{modelPicker}</div>
           </details>
         )}
-      </aside>
+      </div>
     </div>
   );
 }

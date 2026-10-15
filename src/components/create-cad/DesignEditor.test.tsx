@@ -96,7 +96,7 @@ describe('DesignEditor', () => {
     looksRight();
     expect(screen.getByRole('heading', { name: /ready for cad/i })).toBeInTheDocument();
     expect(screen.getByAltText(/your approved design/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/sizes/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/dimensions/i)).toBeInTheDocument();
     const create = screen.getByRole('button', { name: /^create cad/i });
     expect(create).toHaveTextContent('140');
     fireEvent.click(create);
