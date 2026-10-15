@@ -156,15 +156,16 @@ describe('ImagePromptScreen', () => {
       expect(onGenerate).toHaveBeenCalledTimes(1);
     });
 
-    it('hides dimensions in edit mode and opens the editor instead of generating', () => {
+    it('choosing Edit before CAD opens the editor at once; Edit design reopens it', () => {
       const onGenerate = vi.fn();
       const onEditFirst = vi.fn();
       renderScreen('ring', { onGenerate, onEditFirst, previews: ['blob:one'] });
       fireEvent.click(screen.getByRole('radio', { name: /edit before cad/i }));
+      expect(onEditFirst).toHaveBeenCalledTimes(1);
       expect(screen.queryByRole('textbox', { name: /dimensions/i })).toBeNull();
       expect(screen.queryByRole('button', { name: /generate cad/i })).toBeNull();
       fireEvent.click(screen.getByRole('button', { name: /edit design/i }));
-      expect(onEditFirst).toHaveBeenCalledTimes(1);
+      expect(onEditFirst).toHaveBeenCalledTimes(2);
       expect(onGenerate).not.toHaveBeenCalled();
     });
 

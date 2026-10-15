@@ -114,6 +114,7 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
     setPicture({ display: url, input: null });
     setEdited(false);
     setInstruction("");
+    setLastSent("");
     setError(null);
     setTool("select");
     setSelected(null);
@@ -135,7 +136,9 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
     box.style.height = `${Math.min(box.scrollHeight, 160)}px`;
   }, [instruction]);
 
-  const hasChange = instruction.trim().length > 0;
+  /** The prompt last sent: it stays in the box so it can be tweaked and sent again. */
+  const [lastSent, setLastSent] = useState("");
+  const hasChange = instruction.trim().length > 0 && instruction.trim() !== lastSent.trim();
   // "Looks right" only once a change has been made: the editor is for changing.
   const canApprove = !!picture && edited && !busy && !hasChange;
   const isDirty = edited || history.marks.length > 0 || hasChange;
@@ -158,7 +161,8 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
       objectUrls.current.push(display);
       setPicture({ display, input: outcome.result.image });
       setEdited(true);
-      setInstruction("");
+      setInstruction(prompt);
+      setLastSent(prompt);
       history.reset();
       setTool("select");
     } catch (err) {
@@ -294,30 +298,6 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
             <DialogPrimitive.Title className="font-display text-xl uppercase tracking-[0.06em] text-foreground">{TITLES[stage]}</DialogPrimitive.Title>
             <div className="flex justify-end">
               {stage === "edit" && !edited && <span className="bg-muted px-2 py-0.5 text-xs text-muted-foreground">Original</span>}
-              {/* Like Done / Next in an image editor: the way forward sits top
-                  right, once there is an edited picture to approve. */}
-              {stage === "edit" && edited && (
-                <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => void regenerate()}
-                  disabled={busy}
-                  title="Make the same change again"
-                  className="flex h-9 items-center gap-2 border border-border px-3 text-sm text-foreground transition-colors hover:border-foreground/40 disabled:opacity-40"
-                >
-                  <RotateCcw className="h-4 w-4" strokeWidth={1} /> Regenerate <CreditTag value={DESIGN_IMAGE_CREDITS} />
-                </button>
-                <button
-                  type="button"
-                  onClick={looksRight}
-                  disabled={!canApprove}
-                  title={hasChange ? "Send your change first" : "Use this design (Ctrl Enter)"}
-                  className="flex h-9 items-center gap-2 bg-foreground px-4 text-sm text-background transition-opacity hover:opacity-90 disabled:opacity-40"
-                >
-                  <Check className="h-4 w-4" strokeWidth={1.5} /> Looks right
-                </button>
-                </div>
-              )}
               {stage !== "edit" && (
                 <button type="button" onClick={requestClose} className="flex h-10 items-center gap-1.5 px-1 text-sm text-muted-foreground hover:text-foreground">
                   Close <X className="h-4 w-4" strokeWidth={1.5} />
@@ -343,6 +323,29 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
                   disabled={busy}
                   overlay={busyOverlay}
                 />
+                {/* Like Photoshop's generative results: accept or try again, on the picture itself. */}
+                {edited && (
+                  <div className="absolute bottom-4 right-4 z-20 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void regenerate()}
+                      disabled={busy}
+                      title="Same change, new try"
+                      className="flex h-9 items-center gap-2 border border-border bg-background/95 px-3 text-sm text-foreground shadow-sm backdrop-blur transition-colors hover:border-foreground/40 disabled:opacity-40"
+                    >
+                      <RotateCcw className="h-4 w-4" strokeWidth={1} /> Regenerate <CreditTag value={DESIGN_IMAGE_CREDITS} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={looksRight}
+                      disabled={!canApprove}
+                      title={hasChange ? "Send your change first" : "Use this design (Ctrl Enter)"}
+                      className="flex h-9 items-center gap-2 bg-foreground px-4 text-sm text-background shadow-sm transition-opacity hover:opacity-90 disabled:opacity-40"
+                    >
+                      <Check className="h-4 w-4" strokeWidth={1.5} /> Looks right
+                    </button>
+                  </div>
+                )}
                 <div className="absolute left-3 top-4 z-20">
                   <MarkupToolPanel
                     tool={tool}

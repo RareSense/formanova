@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState, type ReactNode } from "react";
+import { useEffect, useRef, useCallback, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
@@ -153,6 +153,19 @@ export default function ImagePromptScreen({
   // One piece-type check for whichever main action is showing: Generate CAD or Edit design.
   const { cardsRef, guardedGenerate, typeError } = useJewelryTypeGate(jewelryType, editing && onEditFirst ? onEditFirst : onGenerate);
 
+  // Choosing "Edit before CAD" opens the editor straight away (after the
+  // piece-type check); the Edit design button stays to reopen it.
+  const openOnEdit = useRef(false);
+  const chooseDesignUse = (use: DesignUse) => {
+    setDesignUse(use);
+    if (use === "edit") openOnEdit.current = true;
+  };
+  useEffect(() => {
+    if (!openOnEdit.current || !editing) return;
+    openOnEdit.current = false;
+    guardedGenerate();
+  }, [editing, guardedGenerate]);
+
   return (
     <div className="w-full flex items-start justify-center bg-background">
       <motion.div
@@ -202,7 +215,7 @@ export default function ImagePromptScreen({
               />
 
               {onEditFirst && imageCount > 0 && !editApproved && (
-                <DesignUseChoice value={designUse} onChange={setDesignUse} disabled={isGenerating} />
+                <DesignUseChoice value={designUse} onChange={chooseDesignUse} disabled={isGenerating} />
               )}
               {onEditFirst && imageCount > 0 && editApproved && (
                 <p className="flex flex-wrap items-center gap-x-1.5 text-sm text-foreground">
