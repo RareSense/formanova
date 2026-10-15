@@ -8,6 +8,12 @@ import { CAD_EXAMPLE_PROMPTS } from "@/components/text-to-cad/cad-examples";
 import { MAX_DESIGN_IMAGES } from "@/lib/design-image-api";
 import { cadJewelryNoun, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
 import DoodlePad, { type DoodlePadHandle } from "./DoodlePad";
+import ladybugExample from "@/assets/inspiration-examples/ladybug.webp";
+import flowerExample from "@/assets/inspiration-examples/flower.webp";
+import teddyExample from "@/assets/inspiration-examples/teddy-bear.webp";
+import seashellsExample from "@/assets/inspiration-examples/seashells.webp";
+
+const INSPIRATION_EXAMPLES: [string, string][] = [["Ladybug", ladybugExample], ["Flower", flowerExample], ["Teddy bear", teddyExample], ["Seashells", seashellsExample]];
 
 export type StartMode = "describe" | "draw" | "mix";
 
@@ -143,11 +149,24 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
                 onAddReferenceImages={addMix}
                 onRemoveReferenceImage={removeMix}
                 primaryLabel={`Drop 1–${MAX_DESIGN_IMAGES} pictures`}
-                primaryHint="A spider web, a flower, a building, other jewelry"
+                primaryHint="A ladybug, a flower, a shell, other jewelry"
                 browseLabel="Browse files"
                 maxImages={MAX_DESIGN_IMAGES}
                 canvasClassName="h-[160px] sm:h-[180px]"
               />
+              <div className="mt-5">
+                <h4 className="text-sm font-medium text-foreground">Try an example</h4>
+                <div className="mt-2 grid grid-cols-4 gap-2">
+                  {INSPIRATION_EXAMPLES.map(([name, src]) => (
+                    <button key={name} type="button" disabled={busy || mixFiles.length >= MAX_DESIGN_IMAGES} aria-label={`Use the ${name.toLowerCase()} example`}
+                      onClick={async () => { const blob = await (await fetch(src)).blob(); addMix([new File([blob], `${name.toLowerCase().replace(/ /g, "-")}.webp`, { type: "image/webp" })]); }}
+                      className="group relative aspect-square overflow-hidden border border-border/40 transition-colors hover:border-foreground/40 disabled:opacity-50">
+                      <img src={src} alt="" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
+                      <span className="absolute inset-x-0 bottom-0 bg-background/85 px-1.5 py-1 text-[11px] text-foreground">{name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
               {mixFiles.length > 1 && <p className="mt-2 text-xs text-muted-foreground">Pictures are lettered left to right: {mixFiles.map((_, i) => String.fromCharCode(65 + i)).join(", ")}</p>}
               <label htmlFor="design-start-text" className="mb-2 mt-6 block text-sm font-medium text-foreground">What to take from {mixFiles.length > 1 ? "them" : "it"} <span className="font-normal text-muted-foreground">(optional)</span></label>
               {textBox(2, mixFiles.length > 1 ? "What to take from each, e.g. the stone from A, the band from B" : "What to take from it, e.g. the web pattern as an openwork band", "What to take from the pictures")}
