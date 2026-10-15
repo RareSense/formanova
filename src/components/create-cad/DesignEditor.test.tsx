@@ -57,7 +57,7 @@ describe('DesignEditor', () => {
       expect(screen.getByRole('button', { name: new RegExp(`^${name}$`) })).toBeInTheDocument();
     }
     expect(screen.getByPlaceholderText(/describe any change/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /send · 10 credits/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /send/i })).toHaveTextContent('10');
   }, 15000); // first render of the dialog is slow on a loaded machine
 
   it('each change replaces the picture: no versions are shown', async () => {

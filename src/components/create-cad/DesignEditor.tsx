@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { ArrowRight, ArrowUp, Box, Check, ChevronLeft, ChevronRight, Diamond, RotateCcw, Ruler, X } from "lucide-react";
+import { ArrowRight, Box, Check, ChevronLeft, ChevronRight, Diamond, RotateCcw, Ruler, X } from "lucide-react";
 import { flattenMarkup, MARK_COLOUR, MIN_BRUSH, MAX_BRUSH } from "@/lib/design-markup";
 import { blobToDataUrl } from "@/lib/design-image-run";
 import { DESIGN_IMAGE_CREDITS, type DesignImageStartParams } from "@/lib/design-image-api";
@@ -169,7 +169,7 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
       setPicture(next);
       setResults((r) => { setResultIndex(r.length); return [...r, next]; });
       setEdited(true);
-      setInstruction(prompt);
+      setInstruction("");
       setLastSent(prompt);
       history.reset();
       setTool("select");
@@ -319,7 +319,7 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
           {stage === "edit" && (
             <div className="flex min-h-0 flex-1 flex-col">
               {/* The design is the hero; the tools float over its left edge. */}
-              <div className="relative min-h-[300px] flex-1 bg-muted/20 py-4 pl-16 pr-4 sm:pr-16">
+              <div className="relative min-h-[300px] flex-1 bg-muted/20 p-4">
                 <MarkupCanvas
                   src={picture?.display ?? null}
                   alt={edited ? "Your edited design" : "Your original picture"}
@@ -332,24 +332,24 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
                   onSelect={(i) => { setSelected(i); if (i !== null) setTool("select"); }}
                   disabled={busy}
                   overlay={busyOverlay}
+                  toolbar={
+                    <MarkupToolPanel
+                        tool={tool}
+                        onTool={(t) => { setTool(t); if (t !== "select") setSelected(null); }}
+                        brush={brush}
+                        onBrush={setBrush}
+                        colour={colour}
+                        onColour={setColour}
+                        canUndo={history.canUndo}
+                        canRedo={history.canRedo}
+                        canClear={marks > 0}
+                        onUndo={() => { history.undo(); setSelected(null); }}
+                        onRedo={() => { history.redo(); setSelected(null); }}
+                        onClear={() => { history.commit([]); setSelected(null); }}
+                        disabled={busy}
+                      />
+                  }
                 />
-                <div className="absolute left-3 top-4 z-20">
-                  <MarkupToolPanel
-                    tool={tool}
-                    onTool={(t) => { setTool(t); if (t !== "select") setSelected(null); }}
-                    brush={brush}
-                    onBrush={setBrush}
-                    colour={colour}
-                    onColour={setColour}
-                    canUndo={history.canUndo}
-                    canRedo={history.canRedo}
-                    canClear={marks > 0}
-                    onUndo={() => { history.undo(); setSelected(null); }}
-                    onRedo={() => { history.redo(); setSelected(null); }}
-                    onClear={() => { history.commit([]); setSelected(null); }}
-                    disabled={busy}
-                  />
-                </div>
               </div>
 
               {/* Result bar under the picture: step through results on the left,
@@ -405,21 +405,16 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
                       placeholder={marks ? "Describe the change in the marked area…" : "Describe any change…"}
                       className="max-h-[200px] min-h-[32px] flex-1 resize-none overflow-y-auto bg-transparent py-1.5 text-[15px] leading-snug text-foreground outline-none placeholder:text-muted-foreground/60 disabled:opacity-60"
                     />
-                    <span className="mb-2 flex-shrink-0 text-xs text-muted-foreground" title={`${DESIGN_IMAGE_CREDITS} credits per change`}>{DESIGN_IMAGE_CREDITS}</span>
                     <button
                       type="button"
                       onClick={() => void send()}
                       disabled={busy || !hasChange}
-                      aria-label={`Send · ${DESIGN_IMAGE_CREDITS} credits`}
                       title="Send (Enter)"
-                      className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-foreground text-background transition-opacity hover:opacity-85 disabled:bg-muted disabled:text-muted-foreground"
+                      className="flex h-9 flex-shrink-0 items-center gap-2 bg-[hsl(var(--formanova-hero-accent))] px-3.5 font-display text-[15px] uppercase tracking-[0.06em] text-background transition-opacity hover:opacity-90 disabled:bg-muted disabled:text-muted-foreground"
                     >
-                      <ArrowUp className="h-4 w-4" strokeWidth={2} />
+                      Send <ArrowRight className="h-4 w-4" strokeWidth={1.5} /> <CreditTag value={DESIGN_IMAGE_CREDITS} />
                     </button>
                   </div>
-                  {edited && !busy && !hasChange && instruction.trim() && (
-                    <p className="mt-2 text-xs text-muted-foreground">Change the text to send it again, or use Regenerate.</p>
-                  )}
                   {marks > 0 && <p className="mt-2 text-xs text-muted-foreground">{marks} mark{marks > 1 ? "s" : ""} on the picture</p>}
                   {error && <p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}
                 </div>
