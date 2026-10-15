@@ -167,7 +167,9 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
 
   /** The prompt last sent: it stays in the box so it can be tweaked and sent again. */
   const [lastSent, setLastSent] = useState("");
-  const hasChange = instruction.trim().length > 0 && instruction.trim() !== lastSent.trim();
+  const hasChange = instruction.trim().length > 0 && (instruction.trim() !== lastSent.trim() || history.marks.length > 0);
+  /** Same words, no new marks: the box's button redoes the last change. */
+  const canRegenerate = edited && !hasChange && instruction.trim().length > 0;
   // "Looks right" only once a change has been made: the editor is for changing.
   const canApprove = !!picture && !busy && !hasChange && (edited || slots.current.some((sl) => sl.edited));
   const isDirty = edited || history.marks.length > 0 || hasChange;
@@ -192,7 +194,8 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
       setPicture(next);
       setResults((r) => { setResultIndex(r.length); return [...r, next]; });
       setEdited(true);
-      setInstruction("");
+      // Like Midjourney's Remix: the prompt stays, ready to tweak and redo.
+      setInstruction(prompt);
       setLastSent(prompt);
       history.reset();
       setTool("select");
@@ -474,15 +477,6 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
               {anyEdited && (
                 <div className="flex flex-shrink-0 flex-wrap items-center justify-center gap-3 px-4 py-2.5 sm:px-6">
                   <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => void regenerate()}
-                      disabled={busy || !edited}
-                      title="Same change, new try"
-                      className="flex h-9 items-center gap-2 border border-border px-3 text-sm text-foreground transition-colors hover:border-foreground/40 disabled:opacity-40"
-                    >
-                      <RotateCcw className="h-4 w-4" strokeWidth={1} /> Regenerate <CreditTag value={DESIGN_IMAGE_CREDITS} />
-                    </button>
                     {files.length > 1 && edited && (
                       <button
                         type="button"
@@ -518,22 +512,24 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
                       ref={promptRef}
                       value={instruction}
                       onChange={(e) => setInstruction(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) { e.preventDefault(); void send(); } }}
+                      onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) { e.preventDefault(); void (canRegenerate ? regenerate() : send()); } }}
                       rows={1}
                       placeholder={busy ? "Type your next change while this one is made…" : marks ? "Describe the change in the marked area…" : "Describe any change…"}
                       className="max-h-[200px] min-h-[32px] flex-1 resize-none overflow-y-auto bg-transparent py-1.5 text-[15px] leading-snug text-foreground outline-none placeholder:text-muted-foreground/60 disabled:opacity-60"
                     />
                     <button
                       type="button"
-                      onClick={() => void send()}
-                      disabled={busy || !hasChange}
-                      title="Send (Enter)"
+                      onClick={() => void (canRegenerate ? regenerate() : send())}
+                      disabled={busy || (!hasChange && !canRegenerate)}
+                      title={canRegenerate ? "Same prompt, new try (Enter)" : "Send (Enter)"}
                       className="flex h-9 flex-shrink-0 items-center gap-2 bg-[hsl(var(--formanova-hero-accent))] px-3.5 font-display text-[15px] uppercase tracking-[0.06em] text-background transition-opacity hover:opacity-90 disabled:bg-muted disabled:text-muted-foreground"
                     >
                       {busy ? (
                         <><span aria-hidden="true" className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" /> Working…</>
                       ) : (
-                        <>Send <ArrowRight className="h-4 w-4" strokeWidth={1.5} /> <CreditTag value={DESIGN_IMAGE_CREDITS} /></>
+                        canRegenerate
+                          ? <><RotateCcw className="h-4 w-4" strokeWidth={1.5} /> Regenerate <CreditTag value={DESIGN_IMAGE_CREDITS} /></>
+                          : <>Send <ArrowRight className="h-4 w-4" strokeWidth={1.5} /> <CreditTag value={DESIGN_IMAGE_CREDITS} /></>
                       )}
                     </button>
                   </div>

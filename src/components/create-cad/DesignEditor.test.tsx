@@ -151,6 +151,18 @@ describe('DesignEditor', () => {
     expect(screen.getByRole('button', { name: /generate 2 angles/i })).toHaveTextContent('20');
   });
 
+  it('after a result the prompt stays; unchanged it regenerates, edited it sends (Midjourney Remix)', async () => {
+    renderEditor();
+    await makeChange();
+    const box = screen.getByLabelText(/describe any change/i);
+    expect(box).toHaveValue('make the stone oval');
+    expect(screen.getByRole('button', { name: /regenerate/i })).toHaveTextContent('10');
+    expect(screen.queryByRole('button', { name: /^send/i })).toBeNull();
+    fireEvent.change(box, { target: { value: 'make the stone round' } });
+    expect(screen.getByRole('button', { name: /send/i })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: /regenerate/i })).toBeNull();
+  });
+
   it('closing after approval keeps the approved pictures on the page', async () => {
     const { onKeep, onCancel } = renderEditor();
     await makeChange();

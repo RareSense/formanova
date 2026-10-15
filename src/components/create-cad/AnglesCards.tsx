@@ -89,9 +89,8 @@ export default function AnglesCards({ approved, resolveBase, jewelryType, toObje
                 {c.picture ? (
                   <img src={c.picture.display} alt={`${c.view} view`} className="h-full w-full object-contain" />
                 ) : (
-                  <div className="flex h-full flex-col items-center justify-center gap-1.5 px-2 text-center">
+                  <div className="flex h-full items-center justify-center">
                     <AngleGlyph view={c.view} className="h-10 w-10 text-foreground/60" />
-                    <span className="text-[11px] leading-tight text-muted-foreground">{c.shows}</span>
                   </div>
                 )}
                 {c.status === "making" && (
