@@ -59,8 +59,7 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
   const doodleRef = useRef<DoodlePadHandle>(null);
   const glbInputRef = useRef<HTMLInputElement>(null);
 
-  const ready = mode === "describe" ? !!text.trim() : mode === "draw" ? hasInk : mixFiles.length >= 1 || !!text.trim();
-  const why = mode === "describe" ? "Describe the piece to continue" : mode === "draw" ? "Draw something to continue" : "Add a picture or describe your inspiration";
+  const ready = mode === "describe" ? !!text.trim() : mode === "draw" ? hasInk : mixFiles.length >= 1;
 
   const make = async () => {
     const images = mode === "draw" ? [await doodleRef.current?.toFile()].filter((f): f is File => !!f) : mode === "mix" ? mixFiles : [];
@@ -168,19 +167,21 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
                 </div>
               </div>
               {mixFiles.length > 1 && <p className="mt-2 text-xs text-muted-foreground">Pictures are lettered left to right: {mixFiles.map((_, i) => String.fromCharCode(65 + i)).join(", ")}</p>}
-              {/* Words alone are an inspiration too; once there is a picture, the
-                  same box asks what to take from it. */}
-              <label htmlFor="design-start-text" className="mb-2 mt-6 block text-sm font-medium text-foreground">
-                {mixFiles.length === 0 ? <>Or describe your inspiration and how it should show</> : <>How should {mixFiles.length > 1 ? "they" : "it"} show in your piece? <span className="font-normal text-muted-foreground">(optional)</span></>}
-              </label>
-              {textBox(2, mixFiles.length === 0 ? "e.g. the ocean at night: waves along the band, a dark blue centre stone" : mixFiles.length > 1 ? "e.g. the petals from A as the setting, the shell curve from B as the band" : "e.g. the web as an openwork band, the dew drops as small diamonds", "Your inspiration")}
+              {/* Asked only once there is a picture to take from. */}
+              {mixFiles.length > 0 && (
+                <>
+                  <label htmlFor="design-start-text" className="mb-2 mt-6 block text-sm font-medium text-foreground">
+                    How should {mixFiles.length > 1 ? "they" : "it"} show in your piece? <span className="font-normal text-muted-foreground">(optional)</span>
+                  </label>
+                  {textBox(2, mixFiles.length > 1 ? "e.g. the petals from A as the setting, the shell curve from B as the band" : "e.g. the web as an openwork band, the dew drops as small diamonds", "How it should show in your piece")}
+                </>
+              )}
             </>
           )}
         </div>
 
 
         <div className="mt-8 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end">
-          {!ready && <span className="text-sm text-muted-foreground">{why}</span>}
           <button type="button" onClick={guardedGenerate} disabled={busy || !ready}
             className="flex h-12 items-center justify-center gap-2.5 bg-[hsl(var(--formanova-hero-accent))] px-10 font-display text-base uppercase tracking-wide text-background transition-opacity hover:opacity-90 disabled:bg-muted disabled:text-muted-foreground disabled:hover:opacity-100">
             Make my design
