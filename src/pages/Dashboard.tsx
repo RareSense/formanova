@@ -192,7 +192,7 @@ function WorkflowCard({
       className={`${CARD_FRAME} flex flex-col ${className}`}
     >
       {/* Image */}
-      <div className={`relative aspect-[4/3] overflow-hidden ${workflow.fitImage ? 'bg-[#F6F3EE]' : ''}`}>
+      <div className={`relative aspect-[4/3] overflow-hidden ${workflow.fitImage ? 'bg-muted/20' : ''}`}>
         <img
           src={workflow.image}
           alt={workflow.title}

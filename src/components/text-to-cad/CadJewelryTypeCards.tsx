@@ -88,7 +88,7 @@ export default function CadJewelryTypeCards({ value, onChange, disabled, error }
             >
               {/* The renders share one grey backdrop; Other uses the same grey so
                   all five squares read as one set. */}
-              <div className="relative aspect-square w-full overflow-hidden bg-[#dfdedf]">
+              <div className="relative aspect-square w-full overflow-hidden bg-muted/30">
                 {image ? (
                   <img src={image} alt="" draggable={false} className="h-full w-full object-cover" />
                 ) : (

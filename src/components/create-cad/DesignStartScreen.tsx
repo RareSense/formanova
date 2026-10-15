@@ -96,15 +96,6 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
         <div ref={cardsRef} className="mt-4">
           <CadJewelryTypeCards value={jewelryType} onChange={setJewelryType} disabled={busy} error={typeError} />
         </div>
-        {onGlbUpload && (
-          <p className="mt-3 text-sm text-muted-foreground">
-            <input ref={glbInputRef} type="file" accept=".glb,.gltf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onGlbUpload(f); }} />
-            Already have a CAD file?{" "}
-            <button type="button" onClick={() => glbInputRef.current?.click()} className="text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground">
-              Upload a .glb
-            </button>
-          </p>
-        )}
 
         <span className="marta-label mb-1 mt-10 block">{flowName} &middot; Step 2</span>
         <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">{inspiration ? "Add your inspiration" : "How do you want to start?"}</h3>
@@ -186,6 +177,14 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
           </button>
         </div>
 
+        {onGlbUpload && (
+          <div className="mt-6 text-center">
+            <input ref={glbInputRef} type="file" accept=".glb,.gltf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onGlbUpload(f); }} />
+            <button type="button" onClick={() => glbInputRef.current?.click()} className="font-mono text-[11px] uppercase tracking-[0.15em] text-muted-foreground underline decoration-border underline-offset-4 hover:text-foreground">
+              Or upload a CAD file (.glb)
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
