@@ -37,6 +37,8 @@ async function requestFor(brief: DesignBrief, jewelryType: CadJewelryType | null
     : brief.mode === "mix"
       ? brief.images.length > 1 ? `Combine these pictures into one ${noun} design.` : `Design a ${noun} inspired by this picture.`
       : "";
+  // Inspiration in words only: a creative piece of the chosen kind.
+  if (brief.mode === "mix" && images.length === 0) return { prompt: `Design a creative ${noun} inspired by: ${brief.text}`, images, jewelryType };
   return { prompt: brief.text || fallback, images, jewelryType };
 }
 

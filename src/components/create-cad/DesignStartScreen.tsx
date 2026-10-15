@@ -59,8 +59,8 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
   const doodleRef = useRef<DoodlePadHandle>(null);
   const glbInputRef = useRef<HTMLInputElement>(null);
 
-  const ready = mode === "describe" ? !!text.trim() : mode === "draw" ? hasInk : mixFiles.length >= 1;
-  const why = mode === "describe" ? "Describe the piece to continue" : mode === "draw" ? "Draw something to continue" : "Add a picture to continue";
+  const ready = mode === "describe" ? !!text.trim() : mode === "draw" ? hasInk : mixFiles.length >= 1 || !!text.trim();
+  const why = mode === "describe" ? "Describe the piece to continue" : mode === "draw" ? "Draw something to continue" : "Add a picture or describe your inspiration";
 
   const make = async () => {
     const images = mode === "draw" ? [await doodleRef.current?.toFile()].filter((f): f is File => !!f) : mode === "mix" ? mixFiles : [];
@@ -168,13 +168,12 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
                 </div>
               </div>
               {mixFiles.length > 1 && <p className="mt-2 text-xs text-muted-foreground">Pictures are lettered left to right: {mixFiles.map((_, i) => String.fromCharCode(65 + i)).join(", ")}</p>}
-              {/* Asked only once there is a picture to take from. */}
-              {mixFiles.length > 0 && (
-                <>
-              <label htmlFor="design-start-text" className="mb-2 mt-6 block text-sm font-medium text-foreground">What to take from {mixFiles.length > 1 ? "them" : "it"} <span className="font-normal text-muted-foreground">(optional)</span></label>
-              {textBox(2, mixFiles.length > 1 ? "What to take from each, e.g. the stone from A, the band from B" : "What to take from it, e.g. the web pattern as an openwork band", "What to take from the pictures")}
-                </>
-              )}
+              {/* Words alone are an inspiration too; once there is a picture, the
+                  same box asks what to take from it. */}
+              <label htmlFor="design-start-text" className="mb-2 mt-6 block text-sm font-medium text-foreground">
+                {mixFiles.length === 0 ? <>Or describe your inspiration</> : <>What to take from {mixFiles.length > 1 ? "them" : "it"} <span className="font-normal text-muted-foreground">(optional)</span></>}
+              </label>
+              {textBox(2, mixFiles.length === 0 ? "e.g. the ocean at night, Art Deco Paris, autumn leaves" : mixFiles.length > 1 ? "What to take from each, e.g. the stone from A, the band from B" : "What to take from it, e.g. the web pattern as an openwork band", "Your inspiration")}
             </>
           )}
         </div>
