@@ -241,6 +241,44 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
     setError(null);
   };
   const anyEdited = edited || slots.current.some((sl, i) => i !== cur && sl.edited);
+  const [, redraw] = useState(0);
+
+  /**
+   * Like Lightroom's Sync: the open photo's last change, applied to every
+   * other photo (the words only; marks belong to one picture's spots).
+   */
+  const applyToAll = useCallback(async () => {
+    const last = lastRequest.current;
+    if (!last || busy || files.length < 2) return;
+    saveSlot();
+    const others = slots.current.map((_, i) => i).filter((i) => i !== cur);
+    setBusy(true);
+    setError(null);
+    try {
+      const requests = await Promise.all(others.map(async (i) => {
+        const sl = slots.current[i];
+        const base = sl.picture.input ?? await blobToDataUrl(files[i]);
+        return { prompt: last.prompt, images: [{ role: "base" as const, image: base }], jewelryType };
+      }));
+      const outcomes = await generate(requests);
+      if (!outcomes) return;
+      let failed = 0;
+      await Promise.all(outcomes.map(async (outcome, k) => {
+        if (!("result" in outcome)) { failed++; return; }
+        const display = await toObjectUrl(outcome.result.image.url);
+        objectUrls.current.push(display);
+        const next = { display, input: outcome.result.image };
+        const sl = slots.current[others[k]];
+        Object.assign(sl, { picture: next, results: [...sl.results, next], resultIndex: sl.results.length, edited: true, lastSent: last.prompt, lastRequest: { prompt: last.prompt, images: requests[k].images } });
+      }));
+      if (failed) setError(`${failed} photo${failed > 1 ? "s" : ""} couldn't be changed. Open ${failed > 1 ? "them" : "it"} and try again.`);
+      redraw((n) => n + 1);
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : "We couldn't apply the change to all photos.");
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, files, cur, jewelryType, generate]); // eslint-disable-line react-hooks/exhaustive-deps -- saveSlot reads current state
 
   /** "Looks right": every photo as it is now (edited or not) goes to the CAD. */
   const looksRight = useCallback(() => {
@@ -431,6 +469,17 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
                     >
                       <RotateCcw className="h-4 w-4" strokeWidth={1} /> Regenerate <CreditTag value={DESIGN_IMAGE_CREDITS} />
                     </button>
+                    {files.length > 1 && edited && (
+                      <button
+                        type="button"
+                        onClick={() => void applyToAll()}
+                        disabled={busy}
+                        title="Apply this change to your other photos"
+                        className="flex h-9 items-center gap-2 border border-border px-3 text-sm text-foreground transition-colors hover:border-foreground/40 disabled:opacity-40"
+                      >
+                        Apply to all photos <CreditTag value={DESIGN_IMAGE_CREDITS * (files.length - 1)} />
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={looksRight}

@@ -121,6 +121,22 @@ describe('DesignEditor', () => {
     expect(onCreateCad.mock.calls[0][0]).toHaveLength(2);
   });
 
+  it('Apply to all photos sends the same change to the other photos (Lightroom-style sync)', async () => {
+    const extra = new File(['y'], 'side.png', { type: 'image/png' });
+    renderEditor({ extras: [extra] });
+    expect(screen.queryByRole('button', { name: /apply to all photos/i })).toBeNull();
+    await makeChange();
+    mockGenerate.mockResolvedValueOnce(NEW_VERSION);
+    const apply = screen.getByRole('button', { name: /apply to all photos/i });
+    expect(apply).toHaveTextContent('10');
+    await act(async () => { fireEvent.click(apply); });
+    await waitFor(() => expect(mockGenerate).toHaveBeenCalledTimes(2));
+    const [requests] = mockGenerate.mock.calls[1];
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({ prompt: 'make the stone oval' });
+    await waitFor(() => expect(screen.getByRole('tab', { name: /photo 2 \(edited\)/i })).toBeInTheDocument());
+  });
+
   it('closing after approval keeps the approved pictures on the page', async () => {
     const { onKeep, onCancel } = renderEditor();
     await makeChange();
