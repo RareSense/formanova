@@ -115,7 +115,7 @@ describe('ImagePromptScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: /generate cad/i }));
 
     expect(onGenerate).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert').textContent).toMatch(/choose what you are making/i);
+    expect(screen.getByRole('alert').textContent).toMatch(/select what you're making/i);
   });
 
   it('generates once a piece is chosen', () => {
@@ -205,7 +205,7 @@ describe('ImagePromptScreen', () => {
       fireEvent.click(screen.getByRole('radio', { name: /edit before cad/i }));
       fireEvent.click(screen.getByRole('button', { name: /edit design/i }));
       expect(onEditFirst).not.toHaveBeenCalled();
-      expect(screen.getByRole('alert').textContent).toMatch(/choose what you are making/i);
+      expect(screen.getByRole('alert').textContent).toMatch(/select what you're making/i);
     });
   });
 });

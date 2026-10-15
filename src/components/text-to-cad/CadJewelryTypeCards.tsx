@@ -50,13 +50,19 @@ export default function CadJewelryTypeCards({ value, onChange, disabled, error }
 
   return (
     <div>
+      {error && (
+        <p id={errorId} role="alert" className="mb-2 flex items-center gap-1.5 text-sm font-medium text-destructive">
+          <span aria-hidden="true" className="flex h-4 w-4 animate-pulse items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-background">!</span>
+          {error}
+        </p>
+      )}
       <div
         role="radiogroup"
         aria-label="Jewelry type"
         aria-required="true"
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errorId : undefined}
-        className="grid grid-cols-3 gap-3 sm:grid-cols-5"
+        className={cn("grid grid-cols-3 gap-3 sm:grid-cols-5", error && "bg-destructive/5 outline outline-1 outline-offset-4 outline-destructive")}
       >
         {CAD_JEWELRY_TYPES.map((type, index) => {
           const selected = type.value === value;
@@ -111,11 +117,6 @@ export default function CadJewelryTypeCards({ value, onChange, disabled, error }
           );
         })}
       </div>
-      {error && (
-        <p id={errorId} role="alert" className="mt-2 font-mono text-[11px] text-destructive">
-          {error}
-        </p>
-      )}
     </div>
   );
 }

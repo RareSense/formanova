@@ -62,7 +62,7 @@ describe('DesignToCadFlow', () => {
     fireEvent.change(screen.getByLabelText(/describe your/i), { target: { value: 'something' } });
     fireEvent.click(screen.getByRole('button', { name: /make my design/i }));
     expect(mockGenerate).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert').textContent).toMatch(/choose what you are making/i);
+    expect(screen.getByRole('alert').textContent).toMatch(/select what you're making/i);
   });
 
   it('opens the editor as soon as the design is ready', async () => {
