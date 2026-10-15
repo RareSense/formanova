@@ -116,7 +116,7 @@ export default function ViewsRow({ approved, resolveBase, jewelryType, toObjectU
       </div>
       {hasOld && <p className="mt-1 text-xs text-muted-foreground">Your other photos show the design before your change. Update them to match, or remove them. Old photos aren't used.</p>}
 
-      <ol className="mt-3 grid grid-cols-4 gap-2.5">
+      <ol className="mt-3 grid grid-cols-[repeat(4,minmax(0,104px))] gap-2.5">
         {views.map((v) => (
           <li key={v.id} className="flex flex-col">
             <div className={`relative aspect-square overflow-hidden border bg-muted/20 ${v.status === "review" ? "border-[hsl(var(--formanova-hero-accent))]" : "border-border/70"}`}>
@@ -175,7 +175,7 @@ export default function ViewsRow({ approved, resolveBase, jewelryType, toObjectU
                   <label htmlFor="views-custom" className="sr-only">Describe your own view</label>
                   <input id="views-custom" value={custom} onChange={(e) => setCustom(e.target.value.slice(0, MAX_DESIGN_VIEW_CHARS))}
                     onKeyDown={(e) => { if (e.key === "Enter" && custom.trim()) { e.preventDefault(); addMade(custom.trim()); setCustom(""); } }}
-                    placeholder="Your own view, e.g. underside" className="min-w-0 flex-1 bg-transparent px-2 py-1.5 text-sm outline-none placeholder:text-muted-foreground/60" />
+                    placeholder="Your own view…" className="min-w-0 flex-1 bg-transparent px-2 py-1.5 text-sm outline-none placeholder:text-muted-foreground/60" />
                   <button type="button" disabled={!custom.trim()} onClick={() => { addMade(custom.trim()); setCustom(""); }} className="px-2 text-sm text-foreground disabled:opacity-40">Add</button>
                 </div>
                 <button type="button" role="menuitem" onClick={() => fileRef.current?.click()} className="mt-1 flex w-full items-center gap-2.5 border-t border-border/60 px-2 py-2 text-left hover:bg-muted/50">

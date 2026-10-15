@@ -38,7 +38,7 @@ export default function ReadyForCad({ approved, views, jewelryType, dimensions, 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-4 sm:p-6 lg:flex-row lg:gap-8">
       <div className="min-w-0 flex-1">
-        <div className="flex aspect-[4/3] max-h-[340px] w-full items-center justify-center border border-[hsl(var(--formanova-hero-accent))] bg-muted/20">
+        <div className="flex aspect-[4/3] max-h-[300px] w-full items-center justify-center border border-[hsl(var(--formanova-hero-accent))] bg-muted/20">
           <img src={approved.display} alt="Your approved design" className="h-full w-full object-contain" />
         </div>
         <div className="mt-5">{views}</div>
