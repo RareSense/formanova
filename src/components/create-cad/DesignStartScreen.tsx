@@ -10,10 +10,10 @@ import { cadJewelryNoun, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
 import DoodlePad, { type DoodlePadHandle } from "./DoodlePad";
 import ladybugExample from "@/assets/inspiration-examples/ladybug.webp";
 import flowerExample from "@/assets/inspiration-examples/flower.webp";
-import teddyExample from "@/assets/inspiration-examples/teddy-bear.webp";
+import spiderWebExample from "@/assets/inspiration-examples/spider-web.webp";
 import seashellsExample from "@/assets/inspiration-examples/seashells.webp";
 
-const INSPIRATION_EXAMPLES: [string, string][] = [["Ladybug", ladybugExample], ["Flower", flowerExample], ["Teddy bear", teddyExample], ["Seashells", seashellsExample]];
+const INSPIRATION_EXAMPLES: [string, string][] = [["Ladybug", ladybugExample], ["Flower", flowerExample], ["Spider web", spiderWebExample], ["Seashells", seashellsExample]];
 
 export type StartMode = "describe" | "draw" | "mix";
 
@@ -149,7 +149,7 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
                 onAddReferenceImages={addMix}
                 onRemoveReferenceImage={removeMix}
                 primaryLabel={`Drop 1–${MAX_DESIGN_IMAGES} pictures`}
-                primaryHint="A ladybug, a flower, a shell, other jewelry"
+                primaryHint="A spider web, a flower, a shell, other jewelry"
                 browseLabel="Browse files"
                 maxImages={MAX_DESIGN_IMAGES}
                 canvasClassName="h-[160px] sm:h-[180px]"
