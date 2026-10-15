@@ -171,9 +171,9 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
               {/* Words alone are an inspiration too; once there is a picture, the
                   same box asks what to take from it. */}
               <label htmlFor="design-start-text" className="mb-2 mt-6 block text-sm font-medium text-foreground">
-                {mixFiles.length === 0 ? <>Or describe your inspiration</> : <>What to take from {mixFiles.length > 1 ? "them" : "it"} <span className="font-normal text-muted-foreground">(optional)</span></>}
+                {mixFiles.length === 0 ? <>Or describe your inspiration and how it should show</> : <>How should {mixFiles.length > 1 ? "they" : "it"} show in your piece? <span className="font-normal text-muted-foreground">(optional)</span></>}
               </label>
-              {textBox(2, mixFiles.length === 0 ? "e.g. the ocean at night, Art Deco Paris, autumn leaves" : mixFiles.length > 1 ? "What to take from each, e.g. the stone from A, the band from B" : "What to take from it, e.g. the web pattern as an openwork band", "Your inspiration")}
+              {textBox(2, mixFiles.length === 0 ? "e.g. the ocean at night: waves along the band, a dark blue centre stone" : mixFiles.length > 1 ? "e.g. the petals from A as the setting, the shell curve from B as the band" : "e.g. the web as an openwork band, the dew drops as small diamonds", "Your inspiration")}
             </>
           )}
         </div>
