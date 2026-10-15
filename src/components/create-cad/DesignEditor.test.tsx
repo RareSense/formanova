@@ -97,7 +97,6 @@ describe('DesignEditor', () => {
     expect(screen.getByRole('heading', { name: /ready for cad/i })).toBeInTheDocument();
     expect(screen.getByAltText(/your approved design/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/dimensions/i)).toBeInTheDocument();
-    expect(screen.getByText(/1 of 5 pictures/i)).toBeInTheDocument();
     const create = screen.getByRole('button', { name: /^create cad/i });
     expect(create).toHaveTextContent('140');
     fireEvent.click(create);
@@ -105,26 +104,21 @@ describe('DesignEditor', () => {
     expect(onCreateCad.mock.calls[0][0]).toHaveLength(1);
   });
 
-  it('Add view offers suggested views, your own words or your own picture', async () => {
-    renderEditor();
-    await makeChange();
-    looksRight();
-    fireEvent.click(screen.getByRole('button', { name: /add view/i }));
-    expect(screen.getByRole('menuitem', { name: /^side/i })).toBeInTheDocument();
-    expect(screen.getByLabelText(/describe your own view/i)).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: /upload a picture/i })).toBeInTheDocument();
-  });
 
-  it('other uploads come in as the old design: update to match or remove', async () => {
+
+  it('with several photos, thumbnails switch photos and each keeps its own edit', async () => {
     const extra = new File(['y'], 'side.png', { type: 'image/png' });
-    renderEditor({ extras: [extra] });
+    const { onCreateCad } = renderEditor({ extras: [extra] });
+    expect(screen.getAllByRole('tab', { name: /photo/i })).toHaveLength(2);
     await makeChange();
+    expect(screen.getByRole('tab', { name: /photo 1 \(edited\)/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: /photo 2/i }));
+    expect(screen.getByRole('tab', { name: /photo 2/i })).toHaveAttribute('aria-selected', 'true');
     looksRight();
-    expect(screen.getByText(/old design/i)).toBeInTheDocument();
-    expect(screen.getByText(/2 of 5 pictures/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /update · 10/i })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /remove your photo 2/i }));
-    expect(screen.getByText(/1 of 5 pictures/i)).toBeInTheDocument();
+    expect(screen.getByText(/photos sent to the cad/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^create cad/i }));
+    await waitFor(() => expect(onCreateCad).toHaveBeenCalledTimes(1));
+    expect(onCreateCad.mock.calls[0][0]).toHaveLength(2);
   });
 
   it('closing after approval keeps the approved pictures on the page', async () => {

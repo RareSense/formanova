@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { ArrowRight, Box, Check, ChevronLeft, ChevronRight, Diamond, RotateCcw, Ruler, X } from "lucide-react";
-import { flattenMarkup, MARK_COLOUR, MIN_BRUSH, MAX_BRUSH } from "@/lib/design-markup";
+import { flattenMarkup, MARK_COLOUR, MIN_BRUSH, MAX_BRUSH, type Mark } from "@/lib/design-markup";
 import { blobToDataUrl } from "@/lib/design-image-run";
 import { DESIGN_IMAGE_CREDITS, type DesignImageStartParams } from "@/lib/design-image-api";
 import type { CadJewelryType, ImageInput } from "@/lib/ring-cad-nurbs-api";
@@ -10,7 +10,6 @@ import MarkupCanvas, { type MarkupTool } from "./MarkupCanvas";
 import MarkupToolPanel, { MarkupToolOptions } from "./MarkupToolPanel";
 import { MARKUP_TOOLS } from "./markup-tools";
 import { useMarkupHistory } from "./useMarkupHistory";
-import ViewsRow from "./ViewsRow";
 import ReadyForCad from "./ReadyForCad";
 import CreditTag from "./CreditTag";
 import type { EditorPicture } from "./angle-suggestions";
@@ -21,6 +20,19 @@ interface Picture {
   display: string;
   /** What is sent as the base for the next change: a data: URL or the run's artifact; null for the upload until needed. */
   input: ImageInput | null;
+}
+
+/** One uploaded photo's own editing state. */
+interface Slot {
+  picture: Picture;
+  original: string;
+  edited: boolean;
+  results: Picture[];
+  resultIndex: number;
+  instruction: string;
+  lastSent: string;
+  lastRequest: { prompt: string; images: DesignImageStartParams["images"] } | null;
+  marks: Mark[];
 }
 
 type Stage = "edit" | "ready";
@@ -105,17 +117,24 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
   const [angles, setAngles] = useState<EditorPicture[]>([]);
   /** A new approval starts the angles over. */
   const [approvalKey, setApprovalKey] = useState(0);
-  const [viewsBusy, setViewsBusy] = useState(false);
   const history = useMarkupHistory();
   const promptRef = useRef<HTMLTextAreaElement>(null);
+  /** Every uploaded photo can be edited on its own; the thumbnails switch between them. */
+  const files = source ? [source, ...extras] : [];
+  const [cur, setCur] = useState(0);
+  const slots = useRef<Slot[]>([]);
   const objectUrls = useRef<string[]>([]);
 
   // A fresh session for each picture opened.
   useEffect(() => {
     if (!open || !source) return;
-    const url = URL.createObjectURL(source);
-    objectUrls.current.push(url);
-    setPicture({ display: url, input: null });
+    slots.current = [source, ...extras].map((f) => {
+      const display = URL.createObjectURL(f);
+      objectUrls.current.push(display);
+      return { picture: { display, input: null }, original: display, edited: false, results: [], resultIndex: 0, instruction: "", lastSent: "", lastRequest: null, marks: [] };
+    });
+    setCur(0);
+    setPicture(slots.current[0].picture);
     setEdited(false);
     setResults([]);
     setResultIndex(0);
@@ -127,7 +146,6 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
     setStage("edit");
     setApproved(null);
     setAngles([]);
-    setViewsBusy(false);
     history.reset();
   }, [open, source]); // eslint-disable-line react-hooks/exhaustive-deps -- history.reset is stable; re-running on it would wipe a session mid-edit
 
@@ -146,7 +164,7 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
   const [lastSent, setLastSent] = useState("");
   const hasChange = instruction.trim().length > 0 && instruction.trim() !== lastSent.trim();
   // "Looks right" only once a change has been made: the editor is for changing.
-  const canApprove = !!picture && edited && !busy && !hasChange;
+  const canApprove = !!picture && !busy && !hasChange && (edited || slots.current.some((sl) => sl.edited));
   const isDirty = edited || history.marks.length > 0 || hasChange;
 
   /** The last change sent, so Regenerate can ask for it again from the same starting picture. */
@@ -183,13 +201,14 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
   const send = useCallback(async () => {
     if (!picture || busy || !hasChange) return;
     await run(instruction, async () => {
-      const base = picture.input ?? (source ? await blobToDataUrl(source) : null);
+      const file = files[cur];
+      const base = picture.input ?? (file ? await blobToDataUrl(file) : null);
       if (!base) throw new Error("The picture is not ready yet");
       return history.marks.length > 0
         ? [{ role: "markup" as const, image: await blobToDataUrl(await flattenMarkup(await loadImage(picture.display), history.marks)) }]
         : [{ role: "base" as const, image: base }];
     });
-  }, [picture, busy, hasChange, source, history, instruction, run]);
+  }, [picture, busy, hasChange, files, cur, history, instruction, run]);
 
   /** Regenerate: the same change again, from the same starting picture. */
   const regenerate = useCallback(async () => {
@@ -198,15 +217,42 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
     await run(last.prompt, async () => last.images);
   }, [busy, run]);
 
-  /** "Looks right": the picture showing becomes the approved design. */
+  /** Keep the open photo's edits, so switching photos loses nothing. */
+  const saveSlot = () => {
+    const sl = slots.current[cur];
+    if (!sl || !picture) return;
+    Object.assign(sl, { picture, edited, results, resultIndex, instruction, lastSent, lastRequest: lastRequest.current, marks: history.marks });
+  };
+  const openSlot = (i: number) => {
+    if (i === cur || busy || !slots.current[i]) return;
+    saveSlot();
+    const sl = slots.current[i];
+    setCur(i);
+    setPicture(sl.picture);
+    setEdited(sl.edited);
+    setResults(sl.results);
+    setResultIndex(sl.resultIndex);
+    setInstruction(sl.instruction);
+    setLastSent(sl.lastSent);
+    lastRequest.current = sl.lastRequest;
+    history.reset();
+    if (sl.marks.length) history.commit(sl.marks);
+    setSelected(null);
+    setError(null);
+  };
+  const anyEdited = edited || slots.current.some((sl, i) => i !== cur && sl.edited);
+
+  /** "Looks right": every photo as it is now (edited or not) goes to the CAD. */
   const looksRight = useCallback(() => {
     if (!canApprove || !picture) return;
-    setApproved({ display: picture.display, input: picture.input, label: "Main" });
-    setAngles([]);
+    saveSlot();
+    const all = slots.current.map((sl, i) => ({ display: sl.picture.display, input: sl.picture.input, label: i === 0 ? "Main" : `Photo ${i + 1}` }));
+    setApproved(all[0]);
+    setAngles(all.slice(1));
     setApprovalKey((k) => k + 1);
     setSelected(null);
     setStage("ready");
-  }, [canApprove, picture]);
+  }, [canApprove, picture, edited, results, resultIndex, instruction, lastSent, history, cur]); // eslint-disable-line react-hooks/exhaustive-deps -- saveSlot reads these
 
   const showResult = (i: number) => {
     const r = results[i];
@@ -216,12 +262,6 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
     history.reset();
     setSelected(null);
   };
-
-  const resolveApprovedBase = useCallback(async (): Promise<ImageInput> => {
-    if (approved?.input) return approved.input;
-    if (source) return blobToDataUrl(source);
-    throw new Error("The picture is not ready yet");
-  }, [approved, source]);
 
   const approvedPictures = approved ? [approved, ...angles] : [];
 
@@ -361,14 +401,31 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
                 />
               </div>
 
+              {/* All uploaded photos: click one to edit it; each keeps its own edits. */}
+              {files.length > 1 && (
+                <div role="tablist" aria-label="Your photos" className="flex flex-shrink-0 items-center justify-center gap-2 px-4 pt-3">
+                  {slots.current.map((sl, i) => {
+                    const shown = i === cur ? picture?.display ?? sl.picture.display : sl.picture.display;
+                    const changed = i === cur ? edited : sl.edited;
+                    return (
+                      <button key={i} type="button" role="tab" aria-selected={i === cur} aria-label={`Photo ${i + 1}${changed ? " (edited)" : ""}`} disabled={busy} onClick={() => openSlot(i)}
+                        className={`relative h-12 w-12 overflow-hidden border bg-muted/20 transition-colors disabled:opacity-50 ${i === cur ? "border-[hsl(var(--formanova-hero-accent))] ring-1 ring-[hsl(var(--formanova-hero-accent))]" : "border-border/60 hover:border-foreground/40"}`}>
+                        <img src={shown} alt="" className="h-full w-full object-contain" />
+                        {changed && <span aria-hidden="true" className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-[hsl(var(--formanova-hero-accent))]" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
               {/* Decisions under the picture: try again, or accept (the main action). */}
-              {edited && (
+              {anyEdited && (
                 <div className="flex flex-shrink-0 flex-wrap items-center justify-center gap-3 px-4 py-2.5 sm:px-6">
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => void regenerate()}
-                      disabled={busy}
+                      disabled={busy || !edited}
                       title="Same change, new try"
                       className="flex h-9 items-center gap-2 border border-border px-3 text-sm text-foreground transition-colors hover:border-foreground/40 disabled:opacity-40"
                     >
@@ -427,25 +484,22 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
           {stage === "ready" && approved && (
             <ReadyForCad
               approved={approved}
-              views={
-                <ViewsRow
-                  key={approvalKey}
-                  approved={approved}
-                  resolveBase={resolveApprovedBase}
-                  jewelryType={jewelryType}
-                  extras={extras}
-                  toObjectUrl={async (url) => { const u = await toObjectUrl(url); objectUrls.current.push(u); return u; }}
-                  onChange={setAngles}
-                  onBusy={setViewsBusy}
-                />
-              }
+              views={angles.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-medium text-foreground">Photos sent to the CAD</h3>
+                  <div className="mt-2 flex gap-2">
+                    {approvedPictures.map((p) => (
+                      <img key={p.display} src={p.display} alt={p.label} className="h-14 w-14 border border-border/60 bg-muted/20 object-contain" />
+                    ))}
+                  </div>
+                </div>
+              )}
               jewelryType={jewelryType}
               dimensions={dimensions}
               onDimensions={onDimensions}
               cost={cadCost}
               costLoading={cadCostLoading}
               generating={creatingCad}
-              waiting={viewsBusy}
               modelPicker={modelPicker}
               onGenerate={() => void picturesToFiles(approvedPictures).then(onCreateCad)}
             />
