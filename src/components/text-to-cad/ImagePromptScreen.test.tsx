@@ -169,6 +169,19 @@ describe('ImagePromptScreen', () => {
       expect(onGenerate).not.toHaveBeenCalled();
     });
 
+    it('opens the editor by itself once the piece is chosen after picking Edit', () => {
+      const onEditFirst = vi.fn();
+      const { rerender } = renderScreen(null, { onEditFirst, previews: ['blob:one'] });
+      fireEvent.click(screen.getByRole('radio', { name: /edit before cad/i }));
+      expect(onEditFirst).not.toHaveBeenCalled();
+      rerender(
+        <ImagePromptScreen model="gemini" tier="claude_opus_5_openrouter" prompt="" setPrompt={vi.fn()} jewelryType="ring" setJewelryType={vi.fn()}
+          isGenerating={false} onGenerate={vi.fn()} referenceImagePreviewUrls={['blob:one']} onAddReferenceImages={vi.fn()} onRemoveReferenceImage={vi.fn()}
+          onEditFirst={onEditFirst} designUse="edit" />,
+      );
+      expect(onEditFirst).toHaveBeenCalledTimes(1);
+    });
+
     it('brings dimensions back when switching back to Use as is', () => {
       renderScreen('ring', { onEditFirst: vi.fn(), previews: ['blob:one'] });
       fireEvent.click(screen.getByRole('radio', { name: /edit before cad/i }));

@@ -153,18 +153,24 @@ export default function ImagePromptScreen({
   // One piece-type check for whichever main action is showing: Generate CAD or Edit design.
   const { cardsRef, guardedGenerate, typeError } = useJewelryTypeGate(jewelryType, editing && onEditFirst ? onEditFirst : onGenerate);
 
-  // Choosing "Edit before CAD" opens the editor straight away (after the
-  // piece-type check); the Edit design button stays to reopen it.
-  const openOnEdit = useRef(false);
+  // "Edit before CAD" opens the editor by itself as soon as it can: a picture
+  // is there and the piece is chosen (asked for first if missing). Once per
+  // picture; the Edit design button reopens it after closing.
+  const autoOpenedFor = useRef<string | null>(null);
+  const askedForType = useRef(false);
   const chooseDesignUse = (use: DesignUse) => {
     setDesignUse(use);
-    if (use === "edit") openOnEdit.current = true;
+    if (use === "edit") { autoOpenedFor.current = null; askedForType.current = false; }
   };
   useEffect(() => {
-    if (!openOnEdit.current || !editing) return;
-    openOnEdit.current = false;
-    guardedGenerate();
-  }, [editing, guardedGenerate]);
+    if (!editing || !onEditFirst || !primaryPreviewUrl || autoOpenedFor.current === primaryPreviewUrl) return;
+    if (!jewelryType) {
+      if (!askedForType.current) { askedForType.current = true; guardedGenerate(); }
+      return;
+    }
+    autoOpenedFor.current = primaryPreviewUrl;
+    onEditFirst();
+  }, [editing, jewelryType, primaryPreviewUrl, onEditFirst, guardedGenerate]);
 
   return (
     <div className="w-full flex items-start justify-center bg-background">
