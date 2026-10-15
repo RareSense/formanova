@@ -37,8 +37,8 @@ interface ReadyForCadProps {
 export default function ReadyForCad({ approved, views, jewelryType, dimensions, onDimensions, cost, costLoading, onGenerate, generating, waiting, modelPicker }: ReadyForCadProps) {
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto p-4 sm:p-6">
-      <div className="flex w-full max-w-[460px] flex-col items-center gap-4">
-        <div className="flex aspect-[4/3] w-full items-center justify-center bg-muted/20">
+      <div className="flex w-full max-w-[460px] flex-col items-center gap-3">
+        <div className="flex h-[min(38vh,300px)] w-full items-center justify-center bg-muted/20">
           <img src={approved.display} alt="Your approved design" className="h-full w-full object-contain" />
         </div>
         {views}
