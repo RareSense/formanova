@@ -138,7 +138,7 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
             <>
               <DoodlePad ref={doodleRef} onInkChange={setHasInk} disabled={busy} />
               <p className="mb-2 mt-1.5 text-xs text-muted-foreground">A rough shape is enough.</p>
-              {textBox(2, "A few words (optional), e.g. white gold, emerald centre stone", "A few words about your drawing")}
+              {textBox(2, "Tell us about your drawing (optional), e.g. this is the top view of a ring, the circles are stones", "About your drawing")}
             </>
           )}
           {mode === "mix" && (
