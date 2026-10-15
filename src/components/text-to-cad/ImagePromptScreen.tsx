@@ -164,7 +164,7 @@ export default function ImagePromptScreen({
         {/* Step 1: which piece. Above the two-column grid so the upload box
             and the right-hand panel still start and end on the same lines. */}
         <div className="mb-8 max-w-[680px]">
-          <span className="marta-label block mb-1">Image to CAD &middot; Step 1</span>
+          <span className="marta-label block mb-1">CAD from Image &middot; Step 1</span>
           <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">What are you making?</h3>
           <div className="mt-4">
             <div ref={cardsRef}>
@@ -177,15 +177,15 @@ export default function ImagePromptScreen({
           <div className="lg:col-span-2">
               <div className="mb-2 flex items-start justify-between gap-3">
                 <div>
-                  <span className="marta-label block mb-1">Image to CAD &middot; Step 2</span>
+                  <span className="marta-label block mb-1">CAD from Image &middot; Step 2</span>
                   <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">Upload your {noun} images</h3>
                   {/* Sets the expectation before the upload, not after the
                       result. Weight and colour carry the emphasis rather than
                       a warning colour: this is how the tool works, not a
                       caution. */}
                   <p className="mt-1.5 text-sm text-muted-foreground">
-                    Upload 1&ndash;5 reference images. We&rsquo;ll use them as{" "}
-                    <span className="font-medium text-foreground">inspiration, not recreate the design exactly.</span>
+                    Upload 1&ndash;5 photos of the{" "}
+                    <span className="font-medium text-foreground">same piece</span>. We&rsquo;ll build the CAD from them.
                   </p>
                 </div>
               </div>

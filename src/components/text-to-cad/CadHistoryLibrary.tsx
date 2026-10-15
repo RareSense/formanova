@@ -226,7 +226,7 @@ export default function CadHistoryLibrary({ variant, onSelectPrompt, onSelectIma
   if (isLoading || !hasHistory) return null;
 
   const title = variant === "prompts" ? "My Prompts" : "My Pieces";
-  const subtitle = variant === "prompts" ? "Reuse a past design brief" : "Reuse a past upload as inspiration";
+  const subtitle = variant === "prompts" ? "Reuse a past design brief" : "Reuse a past upload";
 
   return (
     <div className="flex h-full flex-col">

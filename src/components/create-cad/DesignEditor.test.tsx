@@ -56,7 +56,7 @@ describe('DesignEditor', () => {
     for (const name of ['Select', 'Brush', 'Rectangle', 'Arrow', 'Erase']) {
       expect(screen.getByRole('button', { name: new RegExp(`^${name}$`) })).toBeInTheDocument();
     }
-    expect(screen.getByText(/mark an area if needed/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/mark an area on the picture first/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /send/i })).toHaveTextContent('10');
   }, 15000); // first render of the dialog is slow on a loaded machine
 
@@ -111,28 +111,32 @@ describe('DesignEditor', () => {
     expect(onCreateCad.mock.calls[0][0]).toHaveLength(1);
   });
 
-  it('Add more angles suggests four views for the piece, none ticked, with the price inside Generate', async () => {
+  it('Add views shows the design plus four empty slots; a slot offers suggested views, your own words or your own picture', async () => {
     renderEditor();
     await makeChange();
     looksRight();
     fireEvent.click(screen.getByRole('button', { name: /add more angles/i }));
-    const boxes = screen.getAllByRole('checkbox');
-    expect(boxes).toHaveLength(4);
-    expect(boxes.filter((b) => (b as HTMLInputElement).checked)).toHaveLength(0);
-    fireEvent.click(boxes[0]);
-    fireEvent.click(boxes[1]);
+    expect(screen.getByText('Your design')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /add view/i })).toHaveLength(4);
+    fireEvent.click(screen.getAllByRole('button', { name: /add view/i })[0]);
+    expect(screen.getByRole('region', { name: /choose a view/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/describe your own view/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /upload your own picture/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^side/i }));
+    fireEvent.click(screen.getAllByRole('button', { name: /add view/i })[0]);
+    fireEvent.click(screen.getByRole('button', { name: /^top/i }));
     expect(screen.getAllByPlaceholderText(/anything specific/i)).toHaveLength(2);
-    expect(screen.getByRole('button', { name: /generate 2 angles/i })).toHaveTextContent('20');
+    expect(screen.getByRole('button', { name: /make 2 views/i })).toHaveTextContent('20');
   });
 
-  it('allows five pictures in total: the design and four angles', async () => {
+  it('allows five pictures in total: the design and four views', async () => {
     renderEditor();
     await makeChange();
     looksRight();
     fireEvent.click(screen.getByRole('button', { name: /add more angles/i }));
-    fireEvent.click(screen.getByRole('button', { name: /select all angles/i }));
-    expect(screen.getAllByRole('checkbox').filter((b) => (b as HTMLInputElement).checked)).toHaveLength(4);
-    expect(screen.getByLabelText(/custom angle/i)).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: /fill with suggested views/i }));
+    expect(screen.queryByRole('button', { name: /add view/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/5 of 5 pictures/i)).toBeInTheDocument();
   });
 
   it('closing after approval keeps the approved pictures on the page', async () => {

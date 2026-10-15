@@ -49,19 +49,19 @@ export default function MarkupToolPanel({ tool, onTool, brush, onBrush, colour, 
               title={`${name}: ${hint} (${key})`}
               className={`${toolBtn} ${active ? "bg-[hsl(var(--formanova-hero-accent)/0.12)] text-[hsl(var(--formanova-hero-accent))]" : "text-foreground hover:bg-muted"}`}
             >
-              <Icon className="h-[18px] w-[18px]" strokeWidth={1.5} />
+              <Icon className="h-[18px] w-[18px]" strokeWidth={1} />
             </button>
           );
         })}
         <span className="my-1 h-px w-6 bg-border" aria-hidden="true" />
         <button type="button" onClick={onUndo} disabled={disabled || !canUndo} title="Undo (Ctrl Z)" aria-label="Undo" className={quietBtn}>
-          <Undo2 className="h-4 w-4" strokeWidth={1.5} />
+          <Undo2 className="h-4 w-4" strokeWidth={1} />
         </button>
         <button type="button" onClick={onRedo} disabled={disabled || !canRedo} title="Redo (Ctrl Shift Z)" aria-label="Redo" className={quietBtn}>
-          <Redo2 className="h-4 w-4" strokeWidth={1.5} />
+          <Redo2 className="h-4 w-4" strokeWidth={1} />
         </button>
         <button type="button" onClick={onClear} disabled={disabled || !canClear} title="Clear all marks" aria-label="Clear all marks" className={quietBtn}>
-          <Trash2 className="h-4 w-4" strokeWidth={1.5} />
+          <Trash2 className="h-4 w-4" strokeWidth={1} />
         </button>
       </div>
 

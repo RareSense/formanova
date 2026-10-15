@@ -19,8 +19,10 @@ import type { EffortLevel } from '@/components/studio/EffortToggle';
 
 import modelShotImg from '@/assets/jewelry/model-shot-card.webp';
 import productShotImg from '@/assets/cad-studio/product-shot-card.webp';
-import textToCadImg from '@/assets/text-to-cad-thumb.webp';
-import imageToCadImg from '@/assets/image-to-cad-thumb.webp';
+// Real Rhino captures (Shaded, isocurves on) of models we built.
+import cadFromImageImg from '@/assets/cad-cards/cad-from-image.webp';
+import cadFromIdeaImg from '@/assets/cad-cards/cad-from-idea.webp';
+import cadFromInspirationImg from '@/assets/cad-cards/cad-from-inspiration.webp';
 
 type Workflow = {
   title: string;
@@ -36,6 +38,8 @@ type Workflow = {
   /** Wide marks (200x128) size by height so their ring matches the square
    *  marks. Square marks size both axes. */
   wideIcon?: boolean;
+  /** Show the whole picture (CAD captures), not a cropped fill. */
+  fitImage?: boolean;
 };
 
 const photographyWorkflows: Workflow[] = [
@@ -61,20 +65,31 @@ const photographyWorkflows: Workflow[] = [
 
 const cadWorkflows: Workflow[] = [
   {
-    title: 'Text to CAD',
-    description: 'Describe your jewelry and generate a CAD model.',
-    route: '/text-to-cad',
-    icon: TextToCadIcon,
-    wideIcon: true,
-    image: textToCadImg,
-  },
-  {
-    title: 'Image to CAD',
-    description: 'Turn jewelry inspiration images into a CAD model.',
+    title: 'CAD from Image',
+    description: 'Recreate the jewelry in your photo.',
     route: '/image-to-cad',
     icon: ImageToCadIcon,
     wideIcon: true,
-    image: imageToCadImg,
+    image: cadFromImageImg,
+    fitImage: true,
+  },
+  {
+    title: 'CAD from Idea',
+    description: 'Describe or sketch a new design.',
+    route: '/text-to-cad',
+    icon: TextToCadIcon,
+    wideIcon: true,
+    image: cadFromIdeaImg,
+    fitImage: true,
+  },
+  {
+    title: 'CAD from Inspiration',
+    description: 'Turn any picture into a new design.',
+    route: '/inspiration-to-cad',
+    icon: ImageToCadIcon,
+    wideIcon: true,
+    image: cadFromInspirationImg,
+    fitImage: true,
   },
 ];
 
@@ -159,9 +174,12 @@ const CONTINUE_BUTTON =
 function WorkflowCard({
   workflow,
   onSelect,
+  className = '',
 }: {
   workflow: Workflow;
   onSelect: (workflow: Workflow) => void;
+  /** Grid placement only. */
+  className?: string;
 }) {
   const Icon = workflow.icon;
 
@@ -171,16 +189,16 @@ function WorkflowCard({
       whileHover={{ scale: 1.01 }}
       whileTap={{ scale: 0.99 }}
       onClick={() => onSelect(workflow)}
-      className={`${CARD_FRAME} flex flex-col`}
+      className={`${CARD_FRAME} flex flex-col ${className}`}
     >
       {/* Image */}
-      <div className="relative aspect-[4/3] overflow-hidden">
+      <div className={`relative aspect-[4/3] overflow-hidden ${workflow.fitImage ? 'bg-[#F6F3EE]' : ''}`}>
         <img
           src={workflow.image}
           alt={workflow.title}
           loading="lazy"
           decoding="async"
-          className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          className={`absolute inset-0 w-full h-full transition-transform duration-500 group-hover:scale-105 ${workflow.fitImage ? 'object-contain p-2 sm:p-3' : 'object-cover'}`}
         />
       </div>
 
@@ -282,29 +300,40 @@ export default function Dashboard() {
           </p>
         </motion.div>
 
-        {/* Photography and CAD as adjacent column groups, four cards across.
-            Chosen over the two 2x2 alternatives that were trialled here. */}
-        
+        {/* Every card is the same size on every screen, so no workflow looks
+            more important. Laptop: all five in one line (2 + 3). Tablet: one
+            section per row, three columns, Photography's two centred. Phone:
+            two columns, the third CAD card centred under the other two. */}
           <motion.div
-              variants={containerVariants}
+            variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className="w-full max-w-[1400px] grid md:grid-cols-2 gap-x-4 lg:gap-x-6 xl:gap-x-8 gap-y-2 sm:gap-y-6 pb-0 sm:pb-4"
+            className="w-full max-w-[1400px] grid lg:grid-cols-[2fr_3fr] gap-x-4 lg:gap-x-6 xl:gap-x-8 gap-y-2 sm:gap-y-6 pb-0 sm:pb-4"
           >
             <section aria-labelledby="dashboard-photography" className="flex flex-col">
               <CategoryDivider id="dashboard-photography" label="Photography" />
-              <div className="grid grid-cols-2 gap-2 sm:gap-4 md:gap-5 flex-1">
-                {photographyWorkflows.map((workflow) => (
-                  <WorkflowCard key={workflow.title} workflow={workflow} onSelect={handleSelect} />
+              <div className="grid grid-cols-2 sm:grid-cols-6 lg:grid-cols-2 gap-2 sm:gap-4 md:gap-5 flex-1">
+                {photographyWorkflows.map((workflow, i) => (
+                  <WorkflowCard
+                    key={workflow.title}
+                    workflow={workflow}
+                    onSelect={handleSelect}
+                    className={`sm:col-span-2 lg:col-span-1 ${i === 0 ? 'sm:col-start-2 lg:col-start-auto' : ''}`}
+                  />
                 ))}
               </div>
             </section>
 
             <section aria-labelledby="dashboard-cad" className="flex flex-col">
               <CategoryDivider id="dashboard-cad" label="CAD" tag={<RhinoTag />} />
-              <div className="grid grid-cols-2 gap-2 sm:gap-4 md:gap-5 flex-1">
-                {cadWorkflows.map((workflow) => (
-                  <WorkflowCard key={workflow.title} workflow={workflow} onSelect={handleSelect} />
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4 md:gap-5 flex-1">
+                {cadWorkflows.map((workflow, i) => (
+                  <WorkflowCard
+                    key={workflow.title}
+                    workflow={workflow}
+                    onSelect={handleSelect}
+                    className={i === cadWorkflows.length - 1 ? 'col-span-2 w-[calc(50%-4px)] justify-self-center sm:col-span-1 sm:w-auto sm:justify-self-stretch' : ''}
+                  />
                 ))}
               </div>
             </section>

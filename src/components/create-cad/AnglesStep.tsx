@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowRight, Check, Diamond, Plus, RotateCcw, X } from "lucide-react";
+import { ArrowRight, Check, Diamond, ImagePlus, Plus, RotateCcw, X } from "lucide-react";
 import { useDesignImageRun, type DesignImageOutcome } from "@/hooks/useDesignImageRun";
 import type { CadJewelryType, ImageInput } from "@/lib/ring-cad-nurbs-api";
 import { DESIGN_IMAGE_CREDITS, MAX_DESIGN_VIEW_CHARS } from "@/lib/design-image-api";
 import { ANGLE_SUGGESTIONS, MAX_ANGLES, type EditorPicture } from "./angle-suggestions";
+import AngleGlyph from "./AngleGlyph";
 import CreditTag from "./CreditTag";
 
 type SlotStatus = "idle" | "making" | "ready" | "mismatch" | "failed";
@@ -11,7 +12,8 @@ type SlotStatus = "idle" | "making" | "ready" | "mismatch" | "failed";
 interface Slot {
   view: string;
   shows: string;
-  ticked: boolean;
+  /** "make": we draw it from the design (paid). "upload": the customer's own picture (free). */
+  source: "make" | "upload";
   /** The customer's own words for this angle (optional), sent with it. */
   extra: string;
   status: SlotStatus;
@@ -28,42 +30,74 @@ interface AnglesStepProps {
   toObjectUrl: (url: string) => Promise<string>;
   /** The angles that are ready, whenever that changes. */
   onReady: (angles: EditorPicture[]) => void;
-  /** Every ticked angle is made and matches: on to Create CAD. */
+  /** Every angle is ready and matches: on to Create CAD. */
   onContinue: (angles: EditorPicture[]) => void;
 }
 
 const goldBtn = "flex h-12 items-center justify-center gap-3 whitespace-nowrap bg-[hsl(var(--formanova-hero-accent))] px-5 font-display text-[15px] uppercase tracking-[0.06em] text-background transition-opacity hover:opacity-90 disabled:opacity-50";
-const lineBtn = "flex h-11 items-center justify-center gap-2 border border-border px-5 text-sm text-foreground hover:border-foreground/40 disabled:opacity-50";
 const smallBtn = "flex h-7 items-center gap-1 px-1.5 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50";
+const linkBtn = "text-sm text-muted-foreground underline decoration-border underline-offset-4 hover:text-foreground disabled:no-underline disabled:opacity-50";
 
 function Spinner() {
   return (
     <div className="relative h-10 w-10" aria-hidden="true">
       <div className="h-full w-full animate-spin rounded-full border-[3px] border-border/40 border-t-[hsl(var(--formanova-hero-accent))]" />
-      <Diamond className="absolute inset-0 m-auto h-1/3 w-1/3 text-foreground" strokeWidth={1.5} />
+      <Diamond className="absolute inset-0 m-auto h-1/3 w-1/3 text-foreground" strokeWidth={1} />
     </div>
   );
 }
 
 /**
- * Add reference angles: the approved design from other sides, so the CAD gets
- * hidden parts right. Four suggested views for the piece (none ticked), each
- * with optional words of its own, plus the customer's own angle. Five
- * pictures in total at most: the design and four angles. Each angle is made
- * from the approved picture and checked against it.
+ * Add views: the same five-slot row as the upload step. Slot one is the
+ * approved design; each empty slot opens a chooser (a suggested view for the
+ * piece, the customer's own described view, or their own picture such as a
+ * technical drawing). Described and suggested views are drawn from the design
+ * and checked against it; uploaded pictures are used as they are, for free.
  */
 export default function AnglesStep({ approved, resolveBase, jewelryType, toObjectUrl, onReady, onContinue }: AnglesStepProps) {
   const { generate } = useDesignImageRun();
-  const [slots, setSlots] = useState<Slot[]>(() =>
-    ANGLE_SUGGESTIONS[jewelryType ?? "ring"].map((a) => ({ ...a, ticked: false, extra: "", status: "idle" as const })),
-  );
+  const suggestions = ANGLE_SUGGESTIONS[jewelryType ?? "ring"];
+  const [slots, setSlots] = useState<Slot[]>([]);
+  const [choosing, setChoosing] = useState(false);
   const [custom, setCustom] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+  const uploadUrls = useRef<string[]>([]);
+  useEffect(() => () => { uploadUrls.current.forEach((u) => URL.revokeObjectURL(u)); }, []);
 
   const update = (index: number, patch: Partial<Slot>) => setSlots((s) => s.map((x, i) => (i === index ? { ...x, ...patch } : x)));
+  const roomLeft = slots.length < MAX_ANGLES;
+  const unused = suggestions.filter((a) => !slots.some((s) => s.source === "make" && s.view === a.view));
+
+  const add = (slot: Slot) => {
+    setSlots((s) => (s.length < MAX_ANGLES ? [...s, slot] : s));
+    setChoosing(false);
+  };
+  const addSuggested = (view: string, shows: string) => add({ view, shows, source: "make", extra: "", status: "idle" });
+  const addCustom = () => {
+    const view = custom.trim();
+    if (!view) return;
+    add({ view, shows: "Your view", source: "make", extra: "", status: "idle" });
+    setCustom("");
+  };
+  const addUploads = (files: FileList | null) => {
+    const room = MAX_ANGLES - slots.length;
+    const picked = Array.from(files ?? []).filter((f) => f.type.startsWith("image/")).slice(0, room);
+    const added = picked.map((f) => {
+      const display = URL.createObjectURL(f);
+      uploadUrls.current.push(display);
+      return { view: "Your picture", shows: f.name, source: "upload" as const, extra: "", status: "ready" as const, picture: { display, input: null, label: "Your picture" } };
+    });
+    if (added.length) setSlots((s) => [...s, ...added].slice(0, MAX_ANGLES));
+    setChoosing(false);
+  };
+  const fillSuggested = () => setSlots((s) => {
+    const free = suggestions.filter((a) => !s.some((x) => x.source === "make" && x.view === a.view));
+    return [...s, ...free.map((a) => ({ ...a, source: "make" as const, extra: "", status: "idle" as const }))].slice(0, MAX_ANGLES);
+  });
 
   const land = useCallback(async (index: number, outcome: DesignImageOutcome) => {
     if (!("result" in outcome)) {
-      update(index, { status: "failed", note: "message" in outcome ? outcome.message : "Couldn't make this angle." });
+      update(index, { status: "failed", note: "message" in outcome ? outcome.message : "Couldn't make this view." });
       return;
     }
     try {
@@ -76,7 +110,7 @@ export default function AnglesStep({ approved, resolveBase, jewelryType, toObjec
         note: mismatch ? outcome.result.drift[0] ?? "It doesn't match the approved design." : undefined,
       });
     } catch {
-      update(index, { status: "failed", note: "Couldn't load this angle." });
+      update(index, { status: "failed", note: "Couldn't load this view." });
     }
   }, [toObjectUrl]);
 
@@ -91,29 +125,13 @@ export default function AnglesStep({ approved, resolveBase, jewelryType, toObjec
     if (outcomes === null) setSlots((s) => s.map((x, i) => (indexes.includes(i) && x.status === "making" ? { ...x, status: "idle" } : x)));
   }, [resolveBase, slots, jewelryType, generate, land]);
 
-  const tickedCount = slots.filter((s) => s.ticked).length;
-  const roomLeft = tickedCount < MAX_ANGLES;
-
-  const addCustom = () => {
-    const view = custom.trim();
-    if (!view || !roomLeft) return;
-    setSlots((s) => [...s, { view, shows: "Your angle", ticked: true, extra: "", status: "idle" }]);
-    setCustom("");
-  };
-
-  const selectAll = () => setSlots((s) => {
-    let room = MAX_ANGLES - s.filter((x) => x.ticked).length;
-    return s.map((x) => (!x.ticked && x.status === "idle" && room > 0 ? (room--, { ...x, ticked: true }) : x));
-  });
-
-  const toMake = slots.map((s, i) => (s.ticked && (s.status === "idle" || s.status === "failed") ? i : -1)).filter((i) => i >= 0);
+  const toMake = slots.map((s, i) => (s.source === "make" && (s.status === "idle" || s.status === "failed") ? i : -1)).filter((i) => i >= 0);
   const making = slots.some((s) => s.status === "making");
-  const mismatched = slots.some((s) => s.ticked && s.status === "mismatch");
-  const ready = slots.filter((s) => s.ticked && s.status === "ready" && s.picture).map((s) => ({ ...s.picture!, label: s.view }));
-  const allSelected = !slots.some((s) => !s.ticked && s.status === "idle") || !roomLeft;
+  const mismatched = slots.some((s) => s.status === "mismatch");
+  const ready = slots.filter((s) => s.status === "ready" && s.picture).map((s) => ({ ...s.picture!, label: s.view }));
 
-  // Tell the editor what is ready, and move on by itself once every ticked
-  // angle has been made and matches.
+  // Tell the editor what is ready, and move on by itself once every view has
+  // been made and matches.
   const readyKey = ready.map((r) => r.display).join("|");
   useEffect(() => { onReady(ready); }, [readyKey]); // eslint-disable-line react-hooks/exhaustive-deps -- keyed on the pictures, not the array identity
   const wasMaking = useRef(false);
@@ -123,105 +141,152 @@ export default function AnglesStep({ approved, resolveBase, jewelryType, toObjec
   }, [making]); // eslint-disable-line react-hooks/exhaustive-deps -- only on a batch finishing
 
   const note = making
-    ? "Making your angles…"
-    : mismatched ? "Redo or remove the angle that doesn't match"
-    : toMake.length ? `${toMake.length} selected · ${tickedCount + 1} of ${MAX_ANGLES + 1} pictures with your design`
-    : ready.length ? `${ready.length} angle${ready.length > 1 ? "s" : ""} ready`
-    : "Pick one, several or all";
+    ? "Making your views…"
+    : mismatched ? "Redo or remove the view that doesn't match"
+    : `${slots.length + 1} of ${MAX_ANGLES + 1} pictures`;
 
   return (
-    <>
-      <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-4 sm:p-6 lg:flex-row lg:gap-8">
-        <section className="min-w-0 flex-1">
-          <h2 className="font-display text-lg uppercase tracking-[0.06em] text-foreground">Choose angles to make</h2>
-          <p className="mt-1 text-sm text-muted-foreground">More views help the CAD get the hidden parts right.</p>
-          <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-            {slots.map((slot, i) => {
-              const editable = slot.status === "idle" || slot.status === "failed";
-              const canTick = slot.ticked || roomLeft;
-              return (
-                <div key={i} className={`flex flex-col border transition-colors ${slot.status === "mismatch" ? "border-amber-600/60" : slot.ticked ? "border-[hsl(var(--formanova-hero-accent))]" : "border-border/60"}`}>
-                  <div className="relative flex aspect-square items-center justify-center overflow-hidden bg-muted/20">
-                    {slot.picture ? (
-                      <img src={slot.picture.display} alt={`${slot.view} view`} className={`h-full w-full object-contain ${slot.status === "mismatch" ? "opacity-60" : ""}`} />
-                    ) : (
-                      <img src={approved.display} alt="" aria-hidden="true" className="h-full w-full object-contain opacity-15 grayscale" />
-                    )}
-                    {!slot.picture && slot.status !== "making" && <span className="absolute inset-x-2 bottom-2 text-center text-[11px] leading-tight text-muted-foreground">{slot.shows}</span>}
-                    {slot.status === "making" && (
-                      <div role="status" className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-background/40 text-center backdrop-blur-sm">
-                        <Spinner />
-                        <p className="text-xs text-muted-foreground">Making {slot.view}</p>
-                      </div>
-                    )}
-                    {slot.status === "ready" && <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center bg-emerald-700 text-white" title="Matches your design"><Check className="h-3 w-3" strokeWidth={2} /></span>}
-                  </div>
-                  <div className="flex flex-col gap-1.5 border-t border-border/60 px-2.5 py-2">
-                    {editable ? (
-                      <label className={`flex items-center gap-2 text-sm font-medium text-foreground ${canTick ? "" : "opacity-50"}`}>
-                        <input type="checkbox" checked={slot.ticked} disabled={!canTick || making} onChange={(e) => update(i, { ticked: e.target.checked })} className="h-4 w-4 accent-[hsl(var(--formanova-hero-accent))]" />
-                        <span className="truncate">{slot.view}</span>
-                      </label>
-                    ) : (
-                      <span className="truncate text-sm font-medium text-foreground">{slot.view}</span>
-                    )}
-                    {editable && slot.ticked && (
-                      <input
-                        value={slot.extra}
-                        onChange={(e) => update(i, { extra: e.target.value.slice(0, MAX_DESIGN_VIEW_CHARS) })}
-                        aria-label={`Anything specific for the ${slot.view} view (optional)`}
-                        placeholder="Anything specific?"
-                        className="h-8 w-full border border-border bg-background px-2 text-xs text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-foreground/60"
-                      />
-                    )}
-                    {slot.note && <p className={`text-xs leading-snug ${slot.status === "failed" ? "text-destructive" : "text-amber-700"}`}>{slot.note}</p>}
-                    {(slot.status === "mismatch" || slot.status === "ready") && (
-                      <div className="-ml-1.5 flex gap-1">
-                        <button type="button" onClick={() => void make([i])} disabled={making} className={smallBtn} title={`Make it again · ${DESIGN_IMAGE_CREDITS} credits`}><RotateCcw className="h-3 w-3" strokeWidth={1.5} /> Redo</button>
-                        <button type="button" onClick={() => update(i, { status: "idle", picture: undefined, note: undefined, ticked: false })} disabled={making} className={smallBtn}><X className="h-3 w-3" strokeWidth={1.5} /> Remove</button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        <aside className="flex flex-shrink-0 flex-col gap-3 lg:w-[280px] lg:border-l lg:border-border/60 lg:pl-8">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+        <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
           <div>
-            <h3 className="text-sm font-medium text-foreground">Custom angle <span className="font-normal text-muted-foreground">(optional)</span></h3>
-            <p className="mt-0.5 text-xs text-muted-foreground">Describe any other view you need.</p>
+            <h2 className="font-display text-lg uppercase tracking-[0.06em] text-foreground">Add views</h2>
+            <p className="mt-1 text-sm text-muted-foreground">More views help the CAD get the hidden parts right. Optional.</p>
           </div>
-          <label htmlFor="custom-angle" className="sr-only">Custom angle</label>
-          <textarea
-            id="custom-angle"
-            value={custom}
-            onChange={(e) => setCustom(e.target.value.slice(0, MAX_DESIGN_VIEW_CHARS))}
-            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); addCustom(); } }}
-            disabled={!roomLeft || making}
-            rows={3}
-            placeholder={roomLeft ? "e.g. the back, the underside, a close-up of the setting" : `Up to ${MAX_ANGLES} angles (${MAX_ANGLES + 1} pictures with your design). Untick one to add your own.`}
-            className="w-full resize-none border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-foreground/60 disabled:opacity-60"
-          />
-          <button type="button" onClick={addCustom} disabled={!roomLeft || !custom.trim() || making} className={lineBtn}><Plus className="h-4 w-4" strokeWidth={1.5} /> Add angle</button>
-          <button type="button" onClick={selectAll} disabled={allSelected || making} className={lineBtn}>Select all angles</button>
+          <button type="button" onClick={fillSuggested} disabled={!roomLeft || unused.length === 0 || making} className={linkBtn}>
+            Fill with suggested views
+          </button>
+        </div>
 
-          <div className="flex flex-col gap-2 pt-3">
-        <span className="text-xs text-muted-foreground" aria-live="polite">{note}</span>
+        <ol className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+          <li className="flex flex-col border border-foreground/30">
+            <div className="flex aspect-square items-center justify-center overflow-hidden bg-muted/20">
+              <img src={approved.display} alt="Your design" className="h-full w-full object-contain" />
+            </div>
+            <span className="border-t border-border/60 px-2.5 py-2 text-sm font-medium text-foreground">Your design</span>
+          </li>
+
+          {slots.map((slot, i) => {
+            const editable = slot.source === "make" && (slot.status === "idle" || slot.status === "failed");
+            return (
+              <li key={i} className={`flex flex-col border ${slot.status === "mismatch" ? "border-amber-600/60" : "border-[hsl(var(--formanova-hero-accent))]"}`}>
+                <div className="relative flex aspect-square items-center justify-center overflow-hidden bg-muted/20">
+                  {slot.picture ? (
+                    <img src={slot.picture.display} alt={`${slot.view} view`} className={`h-full w-full object-contain ${slot.status === "mismatch" ? "opacity-60" : ""}`} />
+                  ) : (
+                    <div className="flex flex-col items-center gap-2 px-3 text-center">
+                      <AngleGlyph view={slot.view} className="h-12 w-12 text-foreground/70" />
+                      <span className="text-[11px] leading-tight text-muted-foreground">{slot.shows}</span>
+                    </div>
+                  )}
+                  {slot.status === "making" && (
+                    <div role="status" className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-background/40 text-center backdrop-blur-sm">
+                      <Spinner />
+                      <p className="text-xs text-muted-foreground">Making {slot.view}</p>
+                    </div>
+                  )}
+                  {slot.status === "ready" && slot.source === "make" && <span className="absolute left-1.5 top-1.5 flex h-5 w-5 items-center justify-center bg-emerald-700 text-white" title="Matches your design"><Check className="h-3 w-3" strokeWidth={2} /></span>}
+                  {!making && (
+                    <button type="button" onClick={() => setSlots((s) => s.filter((_, k) => k !== i))} aria-label={`Remove ${slot.view}`} className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center border border-border/60 bg-background/90 text-muted-foreground hover:text-foreground">
+                      <X className="h-3.5 w-3.5" strokeWidth={1} />
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-col gap-1.5 border-t border-border/60 px-2.5 py-2">
+                  <span className="text-sm font-medium leading-snug text-foreground">{slot.view}</span>
+                  {editable && (
+                    <input
+                      value={slot.extra}
+                      onChange={(e) => update(i, { extra: e.target.value.slice(0, MAX_DESIGN_VIEW_CHARS) })}
+                      aria-label={`Anything specific for the ${slot.view} view (optional)`}
+                      placeholder="Anything specific? (optional)"
+                      className="h-8 w-full border border-border bg-background px-2 text-xs text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-foreground/60"
+                    />
+                  )}
+                  {slot.note && <p className={`text-xs leading-snug ${slot.status === "failed" ? "text-destructive" : "text-amber-700"}`}>{slot.note}</p>}
+                  {slot.source === "make" && (slot.status === "mismatch" || slot.status === "ready") && (
+                    <button type="button" onClick={() => void make([i])} disabled={making} className={`${smallBtn} -ml-1.5 self-start`} title={`Make it again · ${DESIGN_IMAGE_CREDITS} credits`}>
+                      <RotateCcw className="h-3 w-3" strokeWidth={1} /> Redo
+                    </button>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+
+          {Array.from({ length: MAX_ANGLES - slots.length }, (_, k) => (
+            <li key={`empty-${k}`}>
+              <button
+                type="button"
+                onClick={() => setChoosing(true)}
+                disabled={making}
+                aria-expanded={k === 0 ? choosing : undefined}
+                className={`flex aspect-square w-full flex-col items-center justify-center gap-2 border border-dashed text-sm transition-colors disabled:opacity-50 ${k === 0 && choosing ? "border-[hsl(var(--formanova-hero-accent))] text-foreground" : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground"}`}
+              >
+                <Plus className="h-5 w-5" strokeWidth={1} /> Add view
+              </button>
+            </li>
+          ))}
+        </ol>
+
+        {choosing && roomLeft && (
+          <section aria-label="Choose a view" className="mt-4 border border-border/70 p-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium text-foreground">Choose a view</h3>
+              <button type="button" onClick={() => setChoosing(false)} aria-label="Close" className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" strokeWidth={1} /></button>
+            </div>
+            {unused.length > 0 && (
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                {unused.map((a) => (
+                  <button key={a.view} type="button" onClick={() => addSuggested(a.view, a.shows)} className="flex items-center gap-3 border border-border/70 px-3 py-2.5 text-left hover:border-foreground/40">
+                    <AngleGlyph view={a.view} className="h-8 w-8 flex-shrink-0 text-foreground/70" />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium text-foreground">{a.view}</span>
+                      <span className="block text-xs leading-snug text-muted-foreground">{a.shows}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+              <div className="flex items-stretch border border-border/70 focus-within:border-foreground/40">
+                <label htmlFor="custom-angle" className="sr-only">Describe your own view</label>
+                <input
+                  id="custom-angle"
+                  value={custom}
+                  onChange={(e) => setCustom(e.target.value.slice(0, MAX_DESIGN_VIEW_CHARS))}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustom(); } }}
+                  placeholder="Describe your own view, e.g. the underside"
+                  className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground/60"
+                />
+                <button type="button" onClick={addCustom} disabled={!custom.trim()} className="border-l border-border/70 px-4 text-sm text-foreground disabled:opacity-40">Add</button>
+              </div>
+              <button type="button" onClick={() => fileRef.current?.click()} className="flex items-center gap-3 border border-border/70 px-3 py-2.5 text-left hover:border-foreground/40">
+                <ImagePlus className="h-5 w-5 flex-shrink-0 text-foreground/70" strokeWidth={1} />
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium text-foreground">Upload your own picture <span className="font-normal text-muted-foreground">· free</span></span>
+                  <span className="block text-xs leading-snug text-muted-foreground">A technical drawing with sizes, a sketch or another photo</span>
+                </span>
+              </button>
+              <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => { addUploads(e.target.files); e.target.value = ""; }} />
+            </div>
+          </section>
+        )}
+      </div>
+
+      <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-3 border-t border-border/60 px-4 py-3 sm:px-6">
+        <span className="text-sm text-muted-foreground" aria-live="polite">{note}</span>
         {toMake.length > 0 ? (
           <button type="button" onClick={() => void make(toMake)} disabled={making} className={goldBtn}>
-            Generate {toMake.length === 1 ? "1 angle" : `${toMake.length} angles`} <ArrowRight className="h-4 w-4" strokeWidth={1.5} />
+            Make {toMake.length === 1 ? "1 view" : `${toMake.length} views`} <ArrowRight className="h-4 w-4" strokeWidth={1} />
             <CreditTag value={toMake.length * DESIGN_IMAGE_CREDITS} />
           </button>
-        ) : ready.length > 0 && (
-          <button type="button" onClick={() => onContinue(ready)} disabled={making || mismatched} className={goldBtn}>
-            Continue <ArrowRight className="h-4 w-4" strokeWidth={1.5} />
+        ) : (
+          <button type="button" onClick={() => onContinue(ready)} disabled={making || mismatched || ready.length === 0} className={goldBtn}>
+            Continue <ArrowRight className="h-4 w-4" strokeWidth={1} />
           </button>
         )}
-          </div>
-        </aside>
       </div>
-    </>
+    </div>
   );
 }

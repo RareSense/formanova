@@ -68,7 +68,7 @@ describe('ImagePromptScreen', () => {
   it('asks what is being made first, as Step 1, with the picture cards', () => {
     renderScreen();
 
-    expect(screen.getByText(/image to cad · step 1/i)).toBeTruthy();
+    expect(screen.getByText(/cad from image · step 1/i)).toBeTruthy();
     expect(screen.getByRole('heading', { name: /what are you making\?/i })).toBeTruthy();
     expect(screen.getByRole('radiogroup', { name: 'Jewelry type' })).toBeTruthy();
     expect(screen.queryByRole('combobox')).toBeNull();

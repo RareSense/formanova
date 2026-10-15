@@ -20,23 +20,23 @@ beforeEach(() => mockGenerate.mockReset());
 
 const READY = { ok: true, result: { image: { uri: 'u', url: 'https://x/d.png', type: 'image/png', bytes: 1, sha256: 's' }, consistent: null, drift: [], view: null } };
 
-function renderFlow(jewelryType: 'ring' | null = 'ring') {
+function renderFlow(jewelryType: 'ring' | null = 'ring', variant: 'idea' | 'inspiration' = 'idea') {
   const onCreateCad = vi.fn();
-  render(
+  const view = render(
     <DesignToCadFlow
       jewelryType={jewelryType} setJewelryType={vi.fn()} dimensions="" onDimensions={vi.fn()}
-      cadCost={140} cadCostLoading={false} creatingCad={false} onCreateCad={onCreateCad}
+      cadCost={140} cadCostLoading={false} creatingCad={false} onCreateCad={onCreateCad} variant={variant}
     />,
   );
-  return { onCreateCad };
+  return { onCreateCad, container: view.container };
 }
 
 describe('DesignToCadFlow', () => {
-  it('starts with describe, draw or mix, and 4 designs or just 1', () => {
+  it('starts with describe or draw, and 4 designs or just 1', () => {
     renderFlow();
     expect(screen.getByRole('tab', { name: /describe it/i })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('tab', { name: /draw it/i })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /mix pictures/i })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /mix pictures/i })).not.toBeInTheDocument();
     expect(screen.getByRole('radio', { name: /4 to choose from/i })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('button', { name: /make 4 designs/i })).toBeDisabled();
   }, 15000);
@@ -55,6 +55,21 @@ describe('DesignToCadFlow', () => {
     expect(requests[0]).toMatchObject({ prompt: 'signet ring with a ruby', jewelryType: 'ring' });
     expect(await screen.findByRole('heading', { name: /pick the closest/i })).toBeInTheDocument();
     await waitFor(() => expect(screen.getAllByRole('button', { name: /use design/i })).toHaveLength(4));
+  });
+
+  it('Inspiration makes designs from a single picture', async () => {
+    mockGenerate.mockResolvedValue(null);
+    const { container } = renderFlow('ring', 'inspiration');
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /make 4 designs/i })).toBeDisabled();
+    const input = container.querySelector('input[type="file"][accept*="image"]') as HTMLInputElement;
+    const web = new File(['x'], 'spider-web.png', { type: 'image/png' });
+    fireEvent.change(input, { target: { files: [web] } });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /make 4 designs/i })); });
+    await waitFor(() => expect(mockGenerate).toHaveBeenCalledTimes(1));
+    const [requests] = mockGenerate.mock.calls[0];
+    expect(requests[0]).toMatchObject({ prompt: 'Design a ring inspired by this picture.' });
+    expect(requests[0].images).toHaveLength(1);
   });
 
   it('asks for the piece before making designs', () => {

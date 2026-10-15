@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Layers, Shapes, Type } from "lucide-react";
+import { Shapes, Type } from "lucide-react";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import CadJewelryTypeCards from "@/components/text-to-cad/CadJewelryTypeCards";
 import ReferenceImageUploader from "@/components/text-to-cad/ReferenceImageUploader";
@@ -26,18 +26,24 @@ interface DesignStartScreenProps {
   busy: boolean;
   onMake: (brief: DesignBrief) => void;
   onGlbUpload?: (file: File) => void;
+  /** Idea: describe or draw. Inspiration: one or more pictures. */
+  variant?: DesignStartVariant;
 }
 
-const MODES: [StartMode, string, typeof Type][] = [["describe", "Describe it", Type], ["draw", "Draw it", Shapes], ["mix", "Mix pictures", Layers]];
+export type DesignStartVariant = "idea" | "inspiration";
+
+const MODES: [StartMode, string, typeof Type][] = [["describe", "Describe it", Type], ["draw", "Draw it", Shapes]];
 
 /**
  * Text to CAD, step 1: what piece, and how to start the design (describe,
  * draw or mix pictures), then 4 designs to choose from or just 1. The CAD is
  * only made after the design picture is approved.
  */
-export default function DesignStartScreen({ jewelryType, setJewelryType, busy, onMake, onGlbUpload }: DesignStartScreenProps) {
+export default function DesignStartScreen({ jewelryType, setJewelryType, busy, onMake, onGlbUpload, variant = "idea" }: DesignStartScreenProps) {
   const noun = jewelryType ? cadJewelryNoun(jewelryType) : "jewelry";
-  const [mode, setMode] = useState<StartMode>("describe");
+  const inspiration = variant === "inspiration";
+  const flowName = inspiration ? "CAD from Inspiration" : "CAD from Idea";
+  const [mode, setMode] = useState<StartMode>(inspiration ? "mix" : "describe");
   const [text, setText] = useState("");
   const [hasInk, setHasInk] = useState(false);
   const [mixFiles, setMixFiles] = useState<File[]>([]);
@@ -46,8 +52,8 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
   const doodleRef = useRef<DoodlePadHandle>(null);
   const glbInputRef = useRef<HTMLInputElement>(null);
 
-  const ready = mode === "describe" ? !!text.trim() : mode === "draw" ? hasInk : mixFiles.length >= 2;
-  const why = mode === "describe" ? "Describe the piece to continue" : mode === "draw" ? "Draw something to continue" : "Add at least 2 pictures to continue";
+  const ready = mode === "describe" ? !!text.trim() : mode === "draw" ? hasInk : mixFiles.length >= 1;
+  const why = mode === "describe" ? "Describe the piece to continue" : mode === "draw" ? "Draw something to continue" : "Add a picture to continue";
 
   const make = async () => {
     const images = mode === "draw" ? [await doodleRef.current?.toFile()].filter((f): f is File => !!f) : mode === "mix" ? mixFiles : [];
@@ -85,24 +91,24 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
   return (
     <div className="flex w-full items-start justify-center bg-background">
       <div className="w-full max-w-[760px] px-4 pb-10 pt-16 sm:px-6">
-        <span className="marta-label mb-1 block">Text to CAD &middot; Step 1</span>
+        <span className="marta-label mb-1 block">{flowName} &middot; Step 1</span>
         <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">What are you making?</h3>
         <div ref={cardsRef} className="mt-4">
           <CadJewelryTypeCards value={jewelryType} onChange={setJewelryType} disabled={busy} error={typeError} />
         </div>
 
-        <span className="marta-label mb-1 mt-10 block">Text to CAD &middot; Step 2</span>
-        <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">How do you want to start?</h3>
+        <span className="marta-label mb-1 mt-10 block">{flowName} &middot; Step 2</span>
+        <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">{inspiration ? "Add your inspiration" : "How do you want to start?"}</h3>
         <p className="mt-1.5 text-sm text-muted-foreground">You'll see the design first. The CAD is only made once you're happy with it.</p>
 
-        <div role="tablist" aria-label="How do you want to start?" className="mt-4 grid grid-cols-3 border border-border">
+        {!inspiration && <div role="tablist" aria-label="How do you want to start?" className="mt-4 grid grid-cols-2 border border-border">
           {MODES.map(([id, title, Icon], i) => (
             <button key={id} type="button" role="tab" aria-selected={mode === id} onClick={() => setMode(id)} disabled={busy}
               className={`flex min-h-[48px] flex-col items-center justify-center gap-1 py-2.5 text-sm transition-colors sm:flex-row sm:gap-2 ${i > 0 ? "border-l border-border" : ""} ${mode === id ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"}`}>
               <Icon className="h-4 w-4" />{title}
             </button>
           ))}
-        </div>
+        </div>}
 
         <div className="mt-4">
           {mode === "describe" && (
@@ -135,12 +141,12 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
                 referenceImagePreviewUrls={mixPreviews}
                 onAddReferenceImages={addMix}
                 onRemoveReferenceImage={removeMix}
-                primaryLabel={`Drop 2 to ${MAX_DESIGN_IMAGES} pictures to mix`}
+                primaryLabel={`Drop 1 to ${MAX_DESIGN_IMAGES} pictures, e.g. a spider web, a flower, other jewelry`}
                 browseLabel="Browse files"
                 canvasClassName="h-[160px] sm:h-[180px]"
               />
-              {mixFiles.length > 0 && <p className="mb-2 mt-1.5 text-xs text-muted-foreground">Pictures are lettered left to right: {mixFiles.map((_, i) => String.fromCharCode(65 + i)).join(", ")}</p>}
-              {textBox(2, "What to take from each, e.g. the stone from A, the band from B", "What to take from each picture")}
+              {mixFiles.length > 1 && <p className="mb-2 mt-1.5 text-xs text-muted-foreground">Pictures are lettered left to right: {mixFiles.map((_, i) => String.fromCharCode(65 + i)).join(", ")}</p>}
+              {textBox(2, mixFiles.length > 1 ? "What to take from each, e.g. the stone from A, the band from B" : "What to take from it, e.g. the web pattern as an openwork band", "What to take from the pictures")}
             </>
           )}
         </div>

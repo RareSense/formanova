@@ -4,7 +4,7 @@ import { CAD_EXAMPLE_DESIGNS } from "@/components/text-to-cad/cad-examples";
 import { blobToDataUrl } from "@/lib/design-image-run";
 import { cadJewelryNoun, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
 import type { DesignImageStartParams } from "@/lib/design-image-api";
-import DesignStartScreen, { type DesignBrief } from "./DesignStartScreen";
+import DesignStartScreen, { type DesignBrief, type DesignStartVariant } from "./DesignStartScreen";
 import DesignPickScreen, { type PickSlot } from "./DesignPickScreen";
 import DesignEditor from "./DesignEditor";
 import { fileFromUrl, toObjectUrl } from "./picture-urls";
@@ -23,6 +23,8 @@ interface DesignToCadFlowProps {
   creatingCad: boolean;
   /** Generate CAD from the approved pictures (main first). */
   onCreateCad: (files: File[]) => void;
+  /** Idea (describe or draw) or Inspiration (pictures). */
+  variant?: DesignStartVariant;
 }
 
 /** What the toolkit is asked for, from the customer's brief. */
@@ -32,7 +34,9 @@ async function requestFor(brief: DesignBrief, jewelryType: CadJewelryType | null
   // The toolkit needs words when no design is being edited; Draw and Mix may have none.
   const fallback = brief.mode === "draw"
     ? `Turn this drawing into a realistic ${noun} design.`
-    : brief.mode === "mix" ? `Combine these pictures into one ${noun} design.` : "";
+    : brief.mode === "mix"
+      ? brief.images.length > 1 ? `Combine these pictures into one ${noun} design.` : `Design a ${noun} inspired by this picture.`
+      : "";
   return { prompt: brief.text || fallback, images, jewelryType };
 }
 
@@ -41,7 +45,7 @@ async function requestFor(brief: DesignBrief, jewelryType: CadJewelryType | null
  * pick from, then the same editor as Image to CAD (edit, angles, Ready for
  * CAD). Generate CAD hands the approved pictures to the page's normal CAD run.
  */
-export default function DesignToCadFlow({ jewelryType, setJewelryType, onGlbUpload, dimensions, onDimensions, cadCost, cadCostLoading, creatingCad, onCreateCad, modelPicker }: DesignToCadFlowProps) {
+export default function DesignToCadFlow({ jewelryType, setJewelryType, onGlbUpload, dimensions, onDimensions, cadCost, cadCostLoading, creatingCad, onCreateCad, modelPicker, variant }: DesignToCadFlowProps) {
   const { generate } = useDesignImageRun();
   const [stage, setStage] = useState<"start" | "pick">("start");
   const [brief, setBrief] = useState<DesignBrief | null>(null);
@@ -88,7 +92,7 @@ export default function DesignToCadFlow({ jewelryType, setJewelryType, onGlbUplo
     <>
       {/* Kept mounted while hidden, so Back finds the brief as it was left. */}
       <div className={stage === "start" ? "contents" : "hidden"}>
-        <DesignStartScreen jewelryType={jewelryType} setJewelryType={setJewelryType} busy={false} onMake={(b) => void make(b)} onGlbUpload={onGlbUpload} />
+        <DesignStartScreen jewelryType={jewelryType} setJewelryType={setJewelryType} busy={false} onMake={(b) => void make(b)} onGlbUpload={onGlbUpload} variant={variant} />
       </div>
       {stage === "pick" && (
         <DesignPickScreen

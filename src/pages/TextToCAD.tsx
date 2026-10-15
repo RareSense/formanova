@@ -9,6 +9,7 @@ import CadWorkspaceLayout from "@/components/text-to-cad/CadWorkspaceLayout";
 import { useCadBreakpoint, useCadCanHover } from "@/hooks/use-cad-breakpoint";
 
 import DesignToCadFlow from "@/components/create-cad/DesignToCadFlow";
+import type { DesignStartVariant } from "@/components/create-cad/DesignStartScreen";
 import { useReferenceImages } from "@/hooks/useReferenceImages";
 import { useEstimatedCost } from "@/hooks/use-estimated-cost";
 import LeftPanel from "@/components/text-to-cad/LeftPanel";
@@ -47,7 +48,7 @@ import { useCadRestoreFromUrl } from "@/hooks/useCadRestoreFromUrl";
 /** Touch gizmos are too fiddly on a phone: the view only orbits there. */
 const PHONE_TRANSFORM_MODES = ["orbit"] as const;
 
-export default function TextToCAD() {
+export default function TextToCAD({ variant = "idea" }: { variant?: DesignStartVariant }) {
   // Counts towards which studio this user lands in after sign-in. The
   // workspaces are counted rather than the hub pages so both sides are
   // measured the same way: where the work happens, not where you browse.
@@ -291,6 +292,7 @@ export default function TextToCAD() {
     return (
       <div className="min-h-[calc(100vh-5rem)] flex bg-background" tabIndex={0}>
         <DesignToCadFlow
+          variant={variant}
           jewelryType={jewelryType}
           setJewelryType={setJewelryType}
           onGlbUpload={showCadUpload ? handleGlbUpload : undefined}

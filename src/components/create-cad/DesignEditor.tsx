@@ -126,6 +126,15 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
 
   useEffect(() => () => { objectUrls.current.forEach((u) => URL.revokeObjectURL(u)); }, []);
 
+  // The change box grows with what is typed (up to ~6 lines, then scrolls),
+  // so nothing the customer writes is hidden.
+  useEffect(() => {
+    const box = promptRef.current;
+    if (!box) return;
+    box.style.height = "auto";
+    box.style.height = `${Math.min(box.scrollHeight, 160)}px`;
+  }, [instruction]);
+
   const hasChange = instruction.trim().length > 0;
   // "Looks right" only once a change has been made: the editor is for changing.
   const canApprove = !!picture && edited && !busy && !hasChange;
@@ -268,6 +277,19 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
             <DialogPrimitive.Title className="font-display text-xl uppercase tracking-[0.06em] text-foreground">{TITLES[stage]}</DialogPrimitive.Title>
             <div className="flex justify-end">
               {stage === "edit" && !edited && <span className="bg-muted px-2 py-0.5 text-xs text-muted-foreground">Original</span>}
+              {/* Like Done / Next in an image editor: the way forward sits top
+                  right, once there is an edited picture to approve. */}
+              {stage === "edit" && edited && (
+                <button
+                  type="button"
+                  onClick={looksRight}
+                  disabled={!canApprove}
+                  title={hasChange ? "Send your change first" : "Use this design (Ctrl Enter)"}
+                  className="flex h-9 items-center gap-2 bg-foreground px-4 text-sm text-background transition-opacity hover:opacity-90 disabled:opacity-40"
+                >
+                  <Check className="h-4 w-4" strokeWidth={1.5} /> Looks right
+                </button>
+              )}
               {stage !== "edit" && (
                 <button type="button" onClick={requestClose} className="flex h-10 items-center gap-1.5 px-1 text-sm text-muted-foreground hover:text-foreground">
                   Close <X className="h-4 w-4" strokeWidth={1.5} />
@@ -312,10 +334,7 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
                 </div>
               </div>
 
-              <div className="flex-shrink-0 border-t border-border/60 px-3 pb-4 pt-2 sm:px-5">
-                <p className="mb-2 text-center text-xs text-muted-foreground">
-                  {marks > 0 ? `${marks} mark${marks > 1 ? "s" : ""} on the picture · describe the change below` : "Mark an area if needed"}
-                </p>
+              <div className="flex-shrink-0 border-t border-border/60 px-3 pb-4 pt-4 sm:px-5">
                 <div className="mx-auto max-w-[760px]">
                   <div className="flex items-stretch border border-border/70 bg-background transition-colors focus-within:border-foreground/40">
                     <label htmlFor="design-editor-change" className="sr-only">Describe what to change</label>
@@ -327,28 +346,16 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
                       onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) { e.preventDefault(); void send(); } }}
                       rows={1}
                       disabled={busy}
-                      placeholder={marks ? "Describe the change in the marked area, e.g. make it an oval sapphire" : "Describe what you'd like to change…"}
-                      className="min-h-[52px] flex-1 resize-none bg-transparent px-4 py-3.5 text-[15px] leading-snug text-foreground outline-none placeholder:text-muted-foreground/60 disabled:opacity-60"
+                      placeholder={marks ? "Describe the change in the marked area, e.g. make it an oval sapphire" : "Describe what you'd like to change. You can mark an area on the picture first."}
+                      className="min-h-[52px] max-h-[160px] flex-1 resize-none overflow-y-auto bg-transparent px-4 py-3.5 text-[15px] leading-snug text-foreground outline-none placeholder:text-muted-foreground/60 disabled:opacity-60"
                     />
                     <button type="button" onClick={() => void send()} disabled={busy || !hasChange} className={`${goldBtn} m-1 h-auto px-5`}>
                       Send <ArrowRight className="h-4 w-4" strokeWidth={1.5} />
                       <CreditTag value={DESIGN_IMAGE_CREDITS} />
                     </button>
                   </div>
+                  {marks > 0 && <p className="mt-2 text-xs text-muted-foreground">{marks} mark{marks > 1 ? "s" : ""} on the picture</p>}
                   {error && <p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}
-                  {edited && (
-                  <div className="mt-3 flex justify-center">
-                    <button
-                      type="button"
-                      onClick={looksRight}
-                      disabled={!canApprove}
-                      title={hasChange ? "Send your change first" : "Use this design (Ctrl Enter)"}
-                      className="flex h-11 items-center gap-2 border border-border px-8 font-display text-base uppercase tracking-[0.08em] text-foreground transition-colors hover:border-[hsl(var(--formanova-hero-accent))] hover:text-[hsl(var(--formanova-hero-accent))] disabled:opacity-40"
-                    >
-                      <Check className="h-4 w-4" strokeWidth={1.5} /> Looks right
-                    </button>
-                  </div>
-                  )}
                 </div>
               </div>
             </div>

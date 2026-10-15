@@ -306,7 +306,7 @@ export default function ImageToCAD() {
   return (
     <>
       <Helmet>
-        <title>Image to CAD | FormaNova</title>
+        <title>CAD from Image | FormaNova</title>
         <meta name="description" content="Upload a sketch or reference image and convert it into a 3D CAD model with AI-powered accuracy. Works for rings, necklaces, bracelets, earrings and more." />
         <link rel="canonical" href="/image-to-cad" />
         <meta name="robots" content="noindex, nofollow" />
@@ -332,7 +332,7 @@ export default function ImageToCAD() {
                 else canvasRef.current?.removeAllTextures();
               }}
               onReset={workflow.hasModel ? handleReset : undefined}
-              pageTitle="Image to CAD"
+              pageTitle="CAD from Image"
               referenceImagePreviewUrls={panelReferenceUrls}
               versions={workflow.versions}
               selectedVersionId={workflow.selectedVersionId}

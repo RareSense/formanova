@@ -238,7 +238,8 @@ const MainApp = () => (
                   {/* PRESERVED: Batch upload route - uncomment to restore batch workflow */}
                   {/* <Route path="/studio/:type" element={<ProtectedRoute><CategoryUploadStudio /></ProtectedRoute>} /> */}
                   <Route path="/studio-cad" element={<Navigate to="/dashboard" replace />} />
-                  <Route path="/text-to-cad" element={<ProtectedRoute><CADGate><TextToCAD /></CADGate></ProtectedRoute>} />
+                  <Route path="/text-to-cad" element={<ProtectedRoute><CADGate><TextToCAD key="idea" /></CADGate></ProtectedRoute>} />
+                  <Route path="/inspiration-to-cad" element={<ProtectedRoute><CADGate><TextToCAD key="inspiration" variant="inspiration" /></CADGate></ProtectedRoute>} />
                   <Route path="/image-to-cad" element={<ProtectedRoute><CADGate><ImageToCAD /></CADGate></ProtectedRoute>} />
                   
                   {/* Admin routes */}
