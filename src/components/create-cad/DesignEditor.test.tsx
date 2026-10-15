@@ -39,7 +39,7 @@ const NEW_VERSION = [{ ok: true, result: { image: { uri: 'u', url: 'https://x/v2
 
 async function makeChange() {
   mockGenerate.mockResolvedValueOnce(NEW_VERSION);
-  fireEvent.change(screen.getByLabelText(/describe what to change/i), { target: { value: 'make the stone oval' } });
+  fireEvent.change(screen.getByLabelText(/describe any change/i), { target: { value: 'make the stone oval' } });
   fireEvent.click(screen.getByRole('button', { name: /send/i }));
   await waitFor(() => expect(screen.queryByText('Original')).toBeNull());
 }
@@ -56,8 +56,8 @@ describe('DesignEditor', () => {
     for (const name of ['Select', 'Brush', 'Rectangle', 'Arrow', 'Erase']) {
       expect(screen.getByRole('button', { name: new RegExp(`^${name}$`) })).toBeInTheDocument();
     }
-    expect(screen.getByPlaceholderText(/describe the change/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /send/i })).toHaveTextContent('10');
+    expect(screen.getByPlaceholderText(/describe any change/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /send · 10 credits/i })).toBeInTheDocument();
   }, 15000); // first render of the dialog is slow on a loaded machine
 
   it('each change replaces the picture: no versions are shown', async () => {
@@ -145,7 +145,7 @@ describe('DesignEditor', () => {
     let resolve: (v: unknown) => void = () => {};
     mockGenerate.mockReturnValue(new Promise((r) => { resolve = r; }));
     renderEditor();
-    fireEvent.change(screen.getByLabelText(/describe what to change/i), { target: { value: 'make the stone oval' } });
+    fireEvent.change(screen.getByLabelText(/describe any change/i), { target: { value: 'make the stone oval' } });
     fireEvent.click(screen.getByRole('button', { name: /send/i }));
     expect(await screen.findByText(/making your change/i)).toBeInTheDocument();
     expect(screen.getByText(/takes a few seconds/i)).toBeInTheDocument();
@@ -161,7 +161,7 @@ describe('DesignEditor', () => {
 
   it('asks before throwing away a typed change', async () => {
     const { onCancel } = renderEditor();
-    fireEvent.change(screen.getByLabelText(/describe what to change/i), { target: { value: 'oval' } });
+    fireEvent.change(screen.getByLabelText(/describe any change/i), { target: { value: 'oval' } });
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
     expect(onCancel).not.toHaveBeenCalled();
     expect(screen.getByRole('alertdialog')).toHaveTextContent(/discard your edits/i);

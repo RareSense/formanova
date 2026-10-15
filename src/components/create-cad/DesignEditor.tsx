@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { ArrowRight, Box, Check, ChevronLeft, ChevronRight, Diamond, RotateCcw, Ruler, X } from "lucide-react";
+import { ArrowRight, ArrowUp, Box, Check, ChevronLeft, ChevronRight, Diamond, RotateCcw, Ruler, X } from "lucide-react";
 import { flattenMarkup, MARK_COLOUR, MIN_BRUSH, MAX_BRUSH } from "@/lib/design-markup";
 import { blobToDataUrl } from "@/lib/design-image-run";
 import { DESIGN_IMAGE_CREDITS, type DesignImageStartParams } from "@/lib/design-image-api";
@@ -139,7 +139,7 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
     const box = promptRef.current;
     if (!box) return;
     box.style.height = "auto";
-    box.style.height = `${Math.min(box.scrollHeight, 160)}px`;
+    box.style.height = `${Math.min(box.scrollHeight, 200)}px`;
   }, [instruction]);
 
   /** The prompt last sent: it stays in the box so it can be tweaked and sent again. */
@@ -390,10 +390,10 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
 
               <div className="flex-shrink-0 border-t border-border/60 px-3 pb-4 pt-3 sm:px-5">
                 <div className="mx-auto max-w-[760px]">
-                  {/* One line that grows (and can be dragged taller from its corner);
-                      Send keeps its size, pinned bottom right, like a chat box. */}
-                  <div className="flex items-end gap-2 border border-border/70 bg-background p-1.5 pl-3 transition-colors focus-within:border-foreground/40">
-                    <label htmlFor="design-editor-change" className="sr-only">Describe what to change</label>
+                  {/* Like ChatGPT's composer: a rounded box that grows as you type,
+                      a small round send button inside it, bottom right. */}
+                  <div className="flex items-end gap-2 rounded-2xl border border-border/70 bg-background py-2 pl-4 pr-2 transition-colors focus-within:border-foreground/40">
+                    <label htmlFor="design-editor-change" className="sr-only">Describe any change</label>
                     <textarea
                       id="design-editor-change"
                       ref={promptRef}
@@ -402,16 +402,19 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
                       onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) { e.preventDefault(); void send(); } }}
                       rows={1}
                       disabled={busy}
-                      placeholder={marks ? "Describe the change in the marked area…" : "Describe the change…"}
-                      className="min-h-[36px] max-h-[240px] flex-1 resize-y overflow-y-auto bg-transparent py-2 text-[15px] leading-snug text-foreground outline-none placeholder:text-muted-foreground/60 disabled:opacity-60"
+                      placeholder={marks ? "Describe the change in the marked area…" : "Describe any change…"}
+                      className="max-h-[200px] min-h-[32px] flex-1 resize-none overflow-y-auto bg-transparent py-1.5 text-[15px] leading-snug text-foreground outline-none placeholder:text-muted-foreground/60 disabled:opacity-60"
                     />
+                    <span className="mb-2 flex-shrink-0 text-xs text-muted-foreground" title={`${DESIGN_IMAGE_CREDITS} credits per change`}>{DESIGN_IMAGE_CREDITS}</span>
                     <button
                       type="button"
                       onClick={() => void send()}
                       disabled={busy || !hasChange}
-                      className="flex h-9 flex-shrink-0 items-center gap-2 bg-[hsl(var(--formanova-hero-accent))] px-4 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:bg-muted disabled:text-muted-foreground"
+                      aria-label={`Send · ${DESIGN_IMAGE_CREDITS} credits`}
+                      title="Send (Enter)"
+                      className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-foreground text-background transition-opacity hover:opacity-85 disabled:bg-muted disabled:text-muted-foreground"
                     >
-                      Send <ArrowRight className="h-4 w-4" strokeWidth={1.5} /> <CreditTag value={DESIGN_IMAGE_CREDITS} />
+                      <ArrowUp className="h-4 w-4" strokeWidth={2} />
                     </button>
                   </div>
                   {edited && !busy && !hasChange && instruction.trim() && (

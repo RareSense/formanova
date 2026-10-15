@@ -177,7 +177,7 @@ describe('ImagePromptScreen', () => {
       rerender(
         <ImagePromptScreen model="gemini" tier="claude_opus_5_openrouter" prompt="" setPrompt={vi.fn()} jewelryType="ring" setJewelryType={vi.fn()}
           isGenerating={false} onGenerate={vi.fn()} referenceImagePreviewUrls={['blob:one']} onAddReferenceImages={vi.fn()} onRemoveReferenceImage={vi.fn()}
-          onEditFirst={onEditFirst} designUse="edit" />,
+          onReplaceReferenceImages={vi.fn()} onEditFirst={onEditFirst} designUse="edit" />,
       );
       expect(onEditFirst).toHaveBeenCalledTimes(1);
     });
