@@ -64,6 +64,7 @@ export function useEditBeforeCad({ model, tier, referenceImages, replaceReferenc
     editorProps: {
       open: editorOpen,
       source: referenceImages[0] ?? null,
+      extras: referenceImages.slice(1),
       onCancel: () => setEditorOpen(false),
       onKeep: (files: File[]) => { void applyApproved(files).then(() => setEditorOpen(false)); },
       onCreateCad: (files: File[]) => { void applyApproved(files).then(() => setPendingCad(true)); },

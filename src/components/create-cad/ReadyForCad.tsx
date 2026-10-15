@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
-import { ArrowRight, Plus } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import type { CadJewelryType } from "@/lib/ring-cad-nurbs-api";
-import { MAX_ANGLES, type EditorPicture } from "./angle-suggestions";
+import type { EditorPicture } from "./angle-suggestions";
 import CreditTag from "./CreditTag";
 
 const DIMENSION_EXAMPLE: Record<CadJewelryType, string> = {
@@ -13,88 +13,66 @@ const DIMENSION_EXAMPLE: Record<CadJewelryType, string> = {
 };
 
 interface ReadyForCadProps {
-  /** Main picture first, then the angles. */
-  pictures: EditorPicture[];
+  approved: EditorPicture;
+  /** The extra views row (optional views, other uploads). */
+  views: ReactNode;
   jewelryType: CadJewelryType | null;
   dimensions: string;
   onDimensions: (text: string) => void;
   /** The CAD price from the backend estimate; null while unknown. */
   cost: number | null;
   costLoading: boolean;
-  /** Open the angles step to add another view. */
-  onAddAngle: () => void;
   onGenerate: () => void;
   generating: boolean;
+  /** Views are still being made: wait before starting the CAD. */
+  waiting?: boolean;
   /** Admin-only model choice, shown beside Create CAD. */
   modelPicker?: ReactNode;
 }
 
 /**
- * The last step in the editor window: the reference pictures (the design and
- * any angles, five at most), optional dimensions, and Create CAD, which starts
- * the normal Image to CAD run.
+ * One screen after "Looks right": the approved design with optional extra
+ * views under it, and on the right optional dimensions and Create CAD.
  */
-export default function ReadyForCad({ pictures, jewelryType, dimensions, onDimensions, cost, costLoading, onAddAngle, onGenerate, generating, modelPicker }: ReadyForCadProps) {
-  const canAddAngle = pictures.length < MAX_ANGLES + 1;
-
+export default function ReadyForCad({ approved, views, jewelryType, dimensions, onDimensions, cost, costLoading, onGenerate, generating, waiting, modelPicker }: ReadyForCadProps) {
   return (
-    <>
-      <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-4 sm:p-6">
-        <section>
-          <h2 className="font-display text-lg uppercase tracking-[0.06em] text-foreground">Reference images</h2>
-          <p className="mt-1 text-sm text-muted-foreground">These will be used to create your CAD.</p>
-          <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-5">
-            {pictures.map((p, i) => (
-              <figure key={p.display} className={`relative border ${i === 0 ? "border-[hsl(var(--formanova-hero-accent))]" : "border-border/60"}`}>
-                <img src={p.display} alt={i === 0 ? "Your approved design" : `${p.label} view`} className="aspect-square w-full bg-muted/20 object-contain" />
-                <figcaption className="truncate border-t border-border/60 px-2 py-1.5 text-xs text-foreground">{i === 0 ? "Main design" : p.label}</figcaption>
-              </figure>
-            ))}
-            {canAddAngle && (
-              <button
-                type="button"
-                onClick={onAddAngle}
-                disabled={generating}
-                className="flex aspect-square flex-col items-center justify-center gap-2 border border-dashed border-border text-sm text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground disabled:opacity-50"
-              >
-                <Plus className="h-5 w-5" strokeWidth={1.5} />
-                Add another angle
-              </button>
-            )}
-          </div>
-        </section>
+    <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-4 sm:p-6 lg:flex-row lg:gap-8">
+      <div className="min-w-0 flex-1">
+        <div className="flex aspect-[4/3] max-h-[340px] w-full items-center justify-center border border-[hsl(var(--formanova-hero-accent))] bg-muted/20">
+          <img src={approved.display} alt="Your approved design" className="h-full w-full object-contain" />
+        </div>
+        <div className="mt-5">{views}</div>
+      </div>
 
-        <section>
+      <aside className="flex flex-shrink-0 flex-col gap-5 lg:w-[300px] lg:border-l lg:border-border/60 lg:pl-8">
+        <div>
           <label htmlFor="ready-dimensions" className="block text-sm font-medium text-foreground">
             Dimensions <span className="font-normal text-muted-foreground">(optional)</span>
           </label>
-          <p id="ready-dimensions-hint" className="mb-2 mt-0.5 text-sm text-muted-foreground">
-            Add any measurements you want us to follow. Don't know them? That's okay.
-          </p>
+          <p id="ready-dimensions-hint" className="mb-2 mt-0.5 text-sm text-muted-foreground">Any sizes you want us to follow.</p>
           <textarea
             id="ready-dimensions"
             aria-describedby="ready-dimensions-hint"
             value={dimensions}
             onChange={(e) => onDimensions(e.target.value)}
-            rows={2}
+            rows={3}
             placeholder={DIMENSION_EXAMPLE[jewelryType ?? "ring"]}
-            className="w-full resize-y border border-border bg-background px-4 py-3 text-[14px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-foreground/60"
+            className="w-full resize-y border border-border bg-background px-3 py-2.5 text-[14px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-foreground/60"
           />
-        </section>
-
-        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
-        <span className="flex-1 text-center text-xs text-muted-foreground sm:text-left">Ready in 30–40 min · Rhino 3DM, STL, STEP</span>
-        {modelPicker}
-        <button
-          type="button"
-          onClick={onGenerate}
-          disabled={generating}
-          className="flex h-12 items-center justify-center gap-3 bg-[hsl(var(--formanova-hero-accent))] px-8 font-display text-base uppercase tracking-[0.08em] text-background transition-opacity hover:opacity-90 disabled:opacity-60"
-        >
-          {generating ? "Starting…" : <>Create CAD <ArrowRight className="h-4 w-4" strokeWidth={1.5} /><CreditTag value={costLoading ? "…" : cost ?? "—"} /></>}
-        </button>
         </div>
-      </div>
-    </>
+        <div className="mt-auto flex flex-col gap-3">
+          {modelPicker}
+          <button
+            type="button"
+            onClick={onGenerate}
+            disabled={generating || waiting}
+            className="flex h-12 items-center justify-center gap-3 bg-[hsl(var(--formanova-hero-accent))] px-6 font-display text-base uppercase tracking-[0.08em] text-background transition-opacity hover:opacity-90 disabled:bg-muted disabled:text-muted-foreground"
+          >
+            {generating ? "Starting…" : <>Create CAD <ArrowRight className="h-4 w-4" strokeWidth={1.5} /><CreditTag value={costLoading ? "…" : cost ?? "—"} /></>}
+          </button>
+          <span className="text-center text-xs text-muted-foreground">{waiting ? "Waiting for your views…" : "Ready in 30–40 min · Rhino 3DM, STL, STEP"}</span>
+        </div>
+      </aside>
+    </div>
   );
 }

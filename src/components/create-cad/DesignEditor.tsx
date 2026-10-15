@@ -10,7 +10,7 @@ import MarkupCanvas, { type MarkupTool } from "./MarkupCanvas";
 import MarkupToolPanel from "./MarkupToolPanel";
 import { MARKUP_TOOLS } from "./markup-tools";
 import { useMarkupHistory } from "./useMarkupHistory";
-import AnglesStep from "./AnglesStep";
+import ViewsRow from "./ViewsRow";
 import ReadyForCad from "./ReadyForCad";
 import CreditTag from "./CreditTag";
 import type { EditorPicture } from "./angle-suggestions";
@@ -23,14 +23,16 @@ interface Picture {
   input: ImageInput | null;
 }
 
-type Stage = "edit" | "next" | "angles" | "ready";
+type Stage = "edit" | "ready";
 
-const TITLES: Record<Stage, string> = { edit: "Edit design", next: "Design ready", angles: "Add reference angles", ready: "Create CAD" };
+const TITLES: Record<Stage, string> = { edit: "Edit design", ready: "Ready for CAD" };
 
 interface DesignEditorProps {
   open: boolean;
   /** The uploaded picture to start from. */
   source: File | null;
+  /** The customer's other uploads of the same piece. */
+  extras?: File[];
   jewelryType: CadJewelryType | null;
   /** Closed before approving: the page keeps its upload as it was. */
   onCancel: () => void;
@@ -79,11 +81,10 @@ function loadImage(src: string): Promise<HTMLImageElement> {
  *  edit   - the design, an optional markup toolbar and one composer. Each
  *           change replaces the picture (no version history). "Looks right"
  *           approves it.
- *  next   - add more angles (optional) or create CAD directly.
- *  angles - pick the views to make; up to five pictures in total.
- *  ready  - the reference pictures, optional dimensions, Create CAD.
+ *  ready  - the approved design, optional extra views (other uploads
+ *           come in marked as the old design), optional dimensions, Create CAD.
  */
-export default function DesignEditor({ open, source, jewelryType, onCancel, onKeep, onCreateCad, dimensions, onDimensions, cadCost, cadCostLoading, creatingCad, modelPicker }: DesignEditorProps) {
+export default function DesignEditor({ open, source, extras = [], jewelryType, onCancel, onKeep, onCreateCad, dimensions, onDimensions, cadCost, cadCostLoading, creatingCad, modelPicker }: DesignEditorProps) {
   const { generate } = useDesignImageRun();
   const [picture, setPicture] = useState<Picture | null>(null);
   const [edited, setEdited] = useState(false);
@@ -104,7 +105,7 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
   const [angles, setAngles] = useState<EditorPicture[]>([]);
   /** A new approval starts the angles over. */
   const [approvalKey, setApprovalKey] = useState(0);
-  const [anglesOpened, setAnglesOpened] = useState(false);
+  const [viewsBusy, setViewsBusy] = useState(false);
   const history = useMarkupHistory();
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const objectUrls = useRef<string[]>([]);
@@ -126,7 +127,7 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
     setStage("edit");
     setApproved(null);
     setAngles([]);
-    setAnglesOpened(false);
+    setViewsBusy(false);
     history.reset();
   }, [open, source]); // eslint-disable-line react-hooks/exhaustive-deps -- history.reset is stable; re-running on it would wipe a session mid-edit
 
@@ -202,10 +203,9 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
     if (!canApprove || !picture) return;
     setApproved({ display: picture.display, input: picture.input, label: "Main" });
     setAngles([]);
-    setAnglesOpened(false);
     setApprovalKey((k) => k + 1);
     setSelected(null);
-    setStage("next");
+    setStage("ready");
   }, [canApprove, picture]);
 
   const showResult = (i: number) => {
@@ -216,8 +216,6 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
     history.reset();
     setSelected(null);
   };
-
-  const openAngles = () => { setAnglesOpened(true); setStage("angles"); };
 
   const resolveApprovedBase = useCallback(async (): Promise<ImageInput> => {
     if (approved?.input) return approved.input;
@@ -233,11 +231,7 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
     if (isDirty) setConfirmClose(true); else onCancel();
   };
 
-  const goBack = () => {
-    if (stage === "next") setStage("edit");
-    else if (stage === "angles") setStage(angles.length ? "ready" : "next");
-    else if (stage === "ready") setStage(angles.length ? "angles" : "next");
-  };
+  const goBack = () => { if (stage === "ready") setStage("edit"); };
 
   // Keyboard shortcuts, read through a ref so the listener never goes stale.
   const keys = useRef<(e: KeyboardEvent) => void>(() => {});
@@ -430,62 +424,29 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
             </div>
           )}
 
-          {stage === "next" && approved && (
-            <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-4 sm:p-8 lg:flex-row lg:items-center lg:gap-10 lg:p-10">
-              <div className="flex-shrink-0 bg-muted/20 lg:w-[44%]">
-                <img src={approved.display} alt="Your approved design" className="aspect-square w-full object-contain" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="flex items-center gap-1.5 text-sm text-emerald-700"><Check className="h-4 w-4" strokeWidth={1.5} /> Design ready</p>
-                <h2 className="mt-2 font-display text-3xl uppercase tracking-[0.02em] text-foreground">What would you like to do next?</h2>
-                <p className="mt-2 text-sm text-muted-foreground">More views and dimensions help the CAD follow your design more accurately.</p>
-                <div className="mt-6 flex flex-col gap-3">
-                  <button type="button" onClick={openAngles} className="group flex items-start gap-4 border border-border/60 p-5 text-left transition-colors hover:border-[hsl(var(--formanova-hero-accent))]">
-                    <Box className="mt-0.5 h-5 w-5 flex-shrink-0 text-foreground" strokeWidth={1.5} />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-base font-medium text-foreground">Add more angles</span>
-                      <span className="mt-1 block text-sm text-muted-foreground">Optional. Make extra views of this design, or describe your own angle.</span>
-                    </span>
-                    <ArrowRight className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" strokeWidth={1.5} />
-                  </button>
-                  <button type="button" onClick={() => setStage("ready")} className="group flex items-start gap-4 border border-border/60 p-5 text-left transition-colors hover:border-[hsl(var(--formanova-hero-accent))]">
-                    <Ruler className="mt-0.5 h-5 w-5 flex-shrink-0 text-foreground" strokeWidth={1.5} />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-base font-medium text-foreground">Create CAD directly</span>
-                      <span className="mt-1 block text-sm text-muted-foreground">Use this design as it is. You can add dimensions in the next step.</span>
-                    </span>
-                    <ArrowRight className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" strokeWidth={1.5} />
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Kept mounted once opened, so made angles survive a trip to Create CAD and back. */}
-          {approved && anglesOpened && (
-            <div className={stage === "angles" ? "flex min-h-0 flex-1 flex-col" : "hidden"}>
-              <AnglesStep
-                key={approvalKey}
-                approved={approved}
-                resolveBase={resolveApprovedBase}
-                jewelryType={jewelryType}
-                toObjectUrl={async (url) => { const u = await toObjectUrl(url); objectUrls.current.push(u); return u; }}
-                onReady={setAngles}
-                onContinue={(ready) => { setAngles(ready); setStage("ready"); }}
-              />
-            </div>
-          )}
           {stage === "ready" && approved && (
             <ReadyForCad
-              pictures={approvedPictures}
+              approved={approved}
+              views={
+                <ViewsRow
+                  key={approvalKey}
+                  approved={approved}
+                  resolveBase={resolveApprovedBase}
+                  jewelryType={jewelryType}
+                  extras={extras}
+                  toObjectUrl={async (url) => { const u = await toObjectUrl(url); objectUrls.current.push(u); return u; }}
+                  onChange={setAngles}
+                  onBusy={setViewsBusy}
+                />
+              }
               jewelryType={jewelryType}
               dimensions={dimensions}
               onDimensions={onDimensions}
               cost={cadCost}
               costLoading={cadCostLoading}
               generating={creatingCad}
+              waiting={viewsBusy}
               modelPicker={modelPicker}
-              onAddAngle={openAngles}
               onGenerate={() => void picturesToFiles(approvedPictures).then(onCreateCad)}
             />
           )}

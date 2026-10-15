@@ -68,14 +68,6 @@ describe('DesignEditor', () => {
     expect(screen.getByAltText(/your edited design/i)).toBeInTheDocument();
   });
 
-  it('Looks right leads to the next step: add more angles or create CAD directly', async () => {
-    renderEditor();
-    await makeChange();
-    looksRight();
-    expect(screen.getByText(/what would you like to do next/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /add more angles/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /create cad directly/i })).toBeInTheDocument();
-  });
 
   it('offers Looks right only once a change has been made', async () => {
     renderEditor();
@@ -95,15 +87,17 @@ describe('DesignEditor', () => {
     expect(screen.queryByRole('radiogroup', { name: /mark colour/i })).toBeNull();
   });
 
-  it('Create CAD directly shows the reference images and dimensions, and Create CAD hands over the approved picture', async () => {
+
+
+
+  it('Looks right opens Ready for CAD: the design, optional views and dimensions, and Create CAD', async () => {
     const { onCreateCad } = renderEditor();
     await makeChange();
     looksRight();
-    fireEvent.click(screen.getByRole('button', { name: /create cad directly/i }));
-    expect(screen.getByText(/reference images/i)).toBeInTheDocument();
-    expect(screen.getByText('Main design')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /add another angle/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /ready for cad/i })).toBeInTheDocument();
+    expect(screen.getByAltText(/your approved design/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/dimensions/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 of 5 pictures/i)).toBeInTheDocument();
     const create = screen.getByRole('button', { name: /^create cad/i });
     expect(create).toHaveTextContent('140');
     fireEvent.click(create);
@@ -111,32 +105,26 @@ describe('DesignEditor', () => {
     expect(onCreateCad.mock.calls[0][0]).toHaveLength(1);
   });
 
-  it('Add views shows the design plus four empty slots; a slot offers suggested views, your own words or your own picture', async () => {
+  it('Add view offers suggested views, your own words or your own picture', async () => {
     renderEditor();
     await makeChange();
     looksRight();
-    fireEvent.click(screen.getByRole('button', { name: /add more angles/i }));
-    expect(screen.getByText('Your design')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: /add view/i })).toHaveLength(4);
-    fireEvent.click(screen.getAllByRole('button', { name: /add view/i })[0]);
-    expect(screen.getByRole('region', { name: /choose a view/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /add view/i }));
+    expect(screen.getByRole('menuitem', { name: /^side/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/describe your own view/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /upload your own picture/i })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /^side/i }));
-    fireEvent.click(screen.getAllByRole('button', { name: /add view/i })[0]);
-    fireEvent.click(screen.getByRole('button', { name: /^top/i }));
-    expect(screen.getAllByPlaceholderText(/anything specific/i)).toHaveLength(2);
-    expect(screen.getByRole('button', { name: /make 2 views/i })).toHaveTextContent('20');
+    expect(screen.getByRole('menuitem', { name: /upload a picture/i })).toBeInTheDocument();
   });
 
-  it('allows five pictures in total: the design and four views', async () => {
-    renderEditor();
+  it('other uploads come in as the old design: update to match or remove', async () => {
+    const extra = new File(['y'], 'side.png', { type: 'image/png' });
+    renderEditor({ extras: [extra] });
     await makeChange();
     looksRight();
-    fireEvent.click(screen.getByRole('button', { name: /add more angles/i }));
-    fireEvent.click(screen.getByRole('button', { name: /fill with suggested views/i }));
-    expect(screen.queryByRole('button', { name: /add view/i })).not.toBeInTheDocument();
-    expect(screen.getByText(/5 of 5 pictures/i)).toBeInTheDocument();
+    expect(screen.getByText(/old design/i)).toBeInTheDocument();
+    expect(screen.getByText(/2 of 5 pictures/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /update · 10/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /remove your photo 2/i }));
+    expect(screen.getByText(/1 of 5 pictures/i)).toBeInTheDocument();
   });
 
   it('closing after approval keeps the approved pictures on the page', async () => {
