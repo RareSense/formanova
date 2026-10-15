@@ -24,6 +24,8 @@ interface ReadyForCadProps {
   costLoading: boolean;
   onGenerate: () => void;
   generating: boolean;
+  /** The angle cards are open: they show the design, so the big picture steps aside. */
+  anglesOpen?: boolean;
   /** Views are still being made: wait before starting the CAD. */
   waiting?: boolean;
   /** Admin-only model choice, shown beside Create CAD. */
@@ -34,16 +36,18 @@ interface ReadyForCadProps {
  * One screen after "Looks right": the approved design with optional extra
  * views under it, and on the right optional dimensions and Create CAD.
  */
-export default function ReadyForCad({ approved, views, jewelryType, dimensions, onDimensions, cost, costLoading, onGenerate, generating, waiting, modelPicker }: ReadyForCadProps) {
+export default function ReadyForCad({ approved, views, jewelryType, dimensions, onDimensions, cost, costLoading, onGenerate, generating, waiting, anglesOpen, modelPicker }: ReadyForCadProps) {
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto p-4 sm:p-6">
-      <div className="flex w-full max-w-[460px] flex-col items-center gap-3">
-        <div className="flex h-[min(38vh,300px)] w-full items-center justify-center bg-muted/20">
-          <img src={approved.display} alt="Your approved design" className="h-full w-full object-contain" />
-        </div>
+      <div className={`flex w-full flex-col items-center gap-3 ${anglesOpen ? "max-w-[820px]" : "max-w-[460px]"}`}>
+        {!anglesOpen && (
+          <div className="flex h-[min(38vh,300px)] w-full items-center justify-center bg-muted/20">
+            <img src={approved.display} alt="Your approved design" className="h-full w-full object-contain" />
+          </div>
+        )}
         {views}
         <p className="flex items-center gap-1.5 text-sm text-emerald-700"><Check className="h-4 w-4" strokeWidth={1.5} /> Design ready</p>
-        <div className="w-full">
+        <div className="w-full max-w-[460px]">
           <label htmlFor="ready-dimensions" className="block text-sm font-medium text-foreground">
             Dimensions <span className="font-normal text-muted-foreground">(optional)</span>
           </label>
@@ -59,13 +63,13 @@ export default function ReadyForCad({ approved, views, jewelryType, dimensions, 
           type="button"
           onClick={onGenerate}
           disabled={generating || waiting}
-          className="flex h-12 w-full items-center justify-center gap-3 bg-[hsl(var(--formanova-hero-accent))] px-6 font-display text-base uppercase tracking-[0.08em] text-background transition-opacity hover:opacity-90 disabled:bg-muted disabled:text-muted-foreground"
+          className="flex h-12 w-full max-w-[460px] items-center justify-center gap-3 bg-[hsl(var(--formanova-hero-accent))] px-6 font-display text-base uppercase tracking-[0.08em] text-background transition-opacity hover:opacity-90 disabled:bg-muted disabled:text-muted-foreground"
         >
           {generating ? "Starting…" : <>Create CAD <ArrowRight className="h-4 w-4" strokeWidth={1.5} /><CreditTag value={costLoading ? "…" : cost ?? "—"} /></>}
         </button>
-        <span className="text-xs text-muted-foreground">Ready in 30–40 min · Rhino 3DM, STL, STEP</span>
+        <span className="text-xs text-muted-foreground">{waiting ? "Waiting for your angles…" : "Ready in 30–40 min · Rhino 3DM, STL, STEP"}</span>
         {modelPicker && (
-          <details className="w-full text-xs text-muted-foreground">
+          <details className="w-full max-w-[460px] text-xs text-muted-foreground">
             <summary className="cursor-pointer select-none text-center">Admin</summary>
             <div className="mt-2">{modelPicker}</div>
           </details>

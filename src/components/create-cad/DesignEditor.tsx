@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { ArrowRight, Box, Check, ChevronLeft, ChevronRight, Diamond, RotateCcw, Ruler, X } from "lucide-react";
+import { ArrowRight, Box, Check, ChevronLeft, ChevronRight, Diamond, Plus, RotateCcw, Ruler, X } from "lucide-react";
 import { flattenMarkup, MARK_COLOUR, MIN_BRUSH, MAX_BRUSH, type Mark } from "@/lib/design-markup";
 import { blobToDataUrl } from "@/lib/design-image-run";
 import { DESIGN_IMAGE_CREDITS, type DesignImageStartParams } from "@/lib/design-image-api";
@@ -11,6 +11,7 @@ import MarkupToolPanel, { MarkupToolOptions } from "./MarkupToolPanel";
 import { MARKUP_TOOLS } from "./markup-tools";
 import { useMarkupHistory } from "./useMarkupHistory";
 import ReadyForCad from "./ReadyForCad";
+import AnglesCards from "./AnglesCards";
 import CreditTag from "./CreditTag";
 import type { EditorPicture } from "./angle-suggestions";
 import { toObjectUrl } from "./picture-urls";
@@ -115,6 +116,10 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
   const [stage, setStage] = useState<Stage>("edit");
   const [approved, setApproved] = useState<EditorPicture | null>(null);
   const [angles, setAngles] = useState<EditorPicture[]>([]);
+  /** Optional angles made on the Ready step, and whether their row is open. */
+  const [madeAngles, setMadeAngles] = useState<EditorPicture[]>([]);
+  const [anglesOpen, setAnglesOpen] = useState(false);
+  const [anglesBusy, setAnglesBusy] = useState(false);
   /** A new approval starts the angles over. */
   const [approvalKey, setApprovalKey] = useState(0);
   const history = useMarkupHistory();
@@ -287,6 +292,8 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
     const all = slots.current.map((sl, i) => ({ display: sl.picture.display, input: sl.picture.input, label: i === 0 ? "Main" : `Photo ${i + 1}` }));
     setApproved(all[0]);
     setAngles(all.slice(1));
+    setMadeAngles([]);
+    setAnglesOpen(false);
     setApprovalKey((k) => k + 1);
     setSelected(null);
     setStage("ready");
@@ -301,7 +308,14 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
     setSelected(null);
   };
 
-  const approvedPictures = approved ? [approved, ...angles] : [];
+  const approvedPictures = approved ? [approved, ...angles, ...madeAngles] : [];
+  const angleRoom = 4 - angles.length;
+
+  const resolveApprovedBase = useCallback(async (): Promise<ImageInput> => {
+    if (approved?.input) return approved.input;
+    if (source) return blobToDataUrl(source);
+    throw new Error("The picture is not ready yet");
+  }, [approved, source]);
 
   const requestClose = () => {
     // After approving, closing keeps the approved pictures on the page.
@@ -533,14 +547,33 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
           {stage === "ready" && approved && (
             <ReadyForCad
               approved={approved}
-              views={angles.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-medium text-foreground">Photos sent to the CAD</h3>
-                  <div className="mt-2 flex gap-2">
-                    {approvedPictures.map((p) => (
-                      <img key={p.display} src={p.display} alt={p.label} className="h-14 w-14 border border-border/60 bg-muted/20 object-contain" />
-                    ))}
-                  </div>
+              anglesOpen={anglesOpen}
+              waiting={anglesBusy}
+              views={anglesOpen ? (
+                <AnglesCards
+                  key={approvalKey}
+                  approved={approved}
+                  resolveBase={resolveApprovedBase}
+                  jewelryType={jewelryType}
+                  room={angleRoom}
+                  toObjectUrl={async (url) => { const u = await toObjectUrl(url); objectUrls.current.push(u); return u; }}
+                  onChange={setMadeAngles}
+                  onBusy={setAnglesBusy}
+                />
+              ) : (
+                <div className="flex flex-col items-center gap-2">
+                  {angles.length > 0 && (
+                    <div className="flex gap-2">
+                      {[approved, ...angles].map((p) => (
+                        <img key={p.display} src={p.display} alt={p.label} className="h-12 w-12 border border-border/60 bg-muted/20 object-contain" />
+                      ))}
+                    </div>
+                  )}
+                  {angleRoom > 0 && (
+                    <button type="button" onClick={() => setAnglesOpen(true)} className="flex h-8 items-center gap-1.5 rounded-full border border-border px-3.5 text-xs text-foreground transition-colors hover:border-foreground/40">
+                      <Plus className="h-3.5 w-3.5" strokeWidth={1.5} /> Add angles <span className="text-muted-foreground">(optional)</span>
+                    </button>
+                  )}
                 </div>
               )}
               jewelryType={jewelryType}

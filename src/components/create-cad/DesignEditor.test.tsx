@@ -115,7 +115,7 @@ describe('DesignEditor', () => {
     fireEvent.click(screen.getByRole('tab', { name: /photo 2/i }));
     expect(screen.getByRole('tab', { name: /photo 2/i })).toHaveAttribute('aria-selected', 'true');
     looksRight();
-    expect(screen.getByText(/photos sent to the cad/i)).toBeInTheDocument();
+    expect(screen.getByAltText('Photo 2')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^create cad/i }));
     await waitFor(() => expect(onCreateCad).toHaveBeenCalledTimes(1));
     expect(onCreateCad.mock.calls[0][0]).toHaveLength(2);
@@ -135,6 +135,20 @@ describe('DesignEditor', () => {
     expect(requests).toHaveLength(1);
     expect(requests[0]).toMatchObject({ prompt: 'make the stone oval' });
     await waitFor(() => expect(screen.getByRole('tab', { name: /photo 2 \(edited\)/i })).toBeInTheDocument());
+  });
+
+  it('Add angles opens equal cards: the design first, then angles to tick with their own words', async () => {
+    renderEditor();
+    await makeChange();
+    looksRight();
+    fireEvent.click(screen.getByRole('button', { name: /add angles/i }));
+    expect(screen.getByAltText('Your design')).toBeInTheDocument();
+    const boxes = screen.getAllByRole('checkbox');
+    expect(boxes).toHaveLength(4);
+    fireEvent.click(boxes[0]);
+    fireEvent.click(boxes[1]);
+    expect(screen.getAllByPlaceholderText(/anything specific/i)).toHaveLength(2);
+    expect(screen.getByRole('button', { name: /generate 2 angles/i })).toHaveTextContent('20');
   });
 
   it('closing after approval keeps the approved pictures on the page', async () => {
