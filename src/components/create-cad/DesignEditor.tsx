@@ -319,7 +319,7 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
           {stage === "edit" && (
             <div className="flex min-h-0 flex-1 flex-col">
               {/* The design is the hero; the tools float over its left edge. */}
-              <div className="relative min-h-[300px] flex-1 bg-muted/20 p-4">
+              <div className="relative min-h-[300px] flex-1 bg-muted/20 py-4 pl-16 pr-4 sm:pr-16">
                 <MarkupCanvas
                   src={picture?.display ?? null}
                   alt={edited ? "Your edited design" : "Your original picture"}
@@ -399,8 +399,7 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
                       onChange={(e) => setInstruction(e.target.value)}
                       onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) { e.preventDefault(); void send(); } }}
                       rows={1}
-                      disabled={busy}
-                      placeholder={marks ? "Describe the change in the marked area…" : "Describe any change…"}
+                      placeholder={busy ? "Type your next change while this one is made…" : marks ? "Describe the change in the marked area…" : "Describe any change…"}
                       className="max-h-[200px] min-h-[32px] flex-1 resize-none overflow-y-auto bg-transparent py-1.5 text-[15px] leading-snug text-foreground outline-none placeholder:text-muted-foreground/60 disabled:opacity-60"
                     />
                     <button
@@ -410,7 +409,11 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
                       title="Send (Enter)"
                       className="flex h-9 flex-shrink-0 items-center gap-2 bg-[hsl(var(--formanova-hero-accent))] px-3.5 font-display text-[15px] uppercase tracking-[0.06em] text-background transition-opacity hover:opacity-90 disabled:bg-muted disabled:text-muted-foreground"
                     >
-                      Send <ArrowRight className="h-4 w-4" strokeWidth={1.5} /> <CreditTag value={DESIGN_IMAGE_CREDITS} />
+                      {busy ? (
+                        <><span aria-hidden="true" className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" /> Working…</>
+                      ) : (
+                        <>Send <ArrowRight className="h-4 w-4" strokeWidth={1.5} /> <CreditTag value={DESIGN_IMAGE_CREDITS} /></>
+                      )}
                     </button>
                   </div>
                   {marks > 0 && <p className="mt-2 text-xs text-muted-foreground">{marks} mark{marks > 1 ? "s" : ""} on the picture</p>}

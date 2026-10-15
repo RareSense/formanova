@@ -180,7 +180,7 @@ export default function MarkupCanvas({ src, alt, marks, onCommit, tool, brush, c
   const cursorClass = disabled ? "" : tool === "brush" || tool === "erase" ? "cursor-none" : tool === "select" ? "cursor-default" : "cursor-crosshair";
 
   return (
-    <div ref={outerRef} className="relative flex h-full w-full items-center justify-center overflow-hidden bg-muted/20">
+    <div ref={outerRef} className="relative flex h-full w-full items-center justify-center bg-muted/20">
     <div className="relative" style={{ width: frame.w || "100%", height: frame.h || "100%" }}>
       {src && (
         <img
@@ -254,7 +254,7 @@ export default function MarkupCanvas({ src, alt, marks, onCommit, tool, brush, c
           />
         )}
       </div>
-      {toolbar && <div className="absolute left-2 top-2 z-20">{toolbar}</div>}
+      {toolbar && <div className="absolute right-full top-0 z-20 mr-2">{toolbar}</div>}
       {bottom && <div className="absolute bottom-2 left-1/2 z-20 -translate-x-1/2">{bottom}</div>}
     </div>
       {numbered.length === 0 && !overlay && hint}
