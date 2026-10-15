@@ -8,9 +8,18 @@ export interface DoodlePadHandle {
 
 type Tool = "pencil" | "eraser" | "line" | "circle";
 type Point = readonly [number, number];
-type Stroke = { tool: Tool; size: number; points: Point[]; mirror: boolean };
+type Stroke = { tool: Tool; size: number; colour: string; points: Point[]; mirror: boolean };
 
-const W = 1000, H = 560, INK = "#1a1a1a";
+const W = 1000, H = 560;
+/** Sketch inks: pencil grey-black first, then metal and stone colours. */
+const INKS = [
+  { name: "Black", value: "#1a1a1a" },
+  { name: "Grey", value: "#8a8a8a" },
+  { name: "Gold", value: "#b5850f" },
+  { name: "Red", value: "#c0392b" },
+  { name: "Blue", value: "#2563eb" },
+  { name: "Green", value: "#15803d" },
+];
 const TOOLS: [Tool, string, typeof Pencil, string][] = [
   ["pencil", "Pencil", Pencil, "P"],
   ["eraser", "Eraser", Eraser, "E"],
@@ -21,7 +30,7 @@ const TOOLS: [Tool, string, typeof Pencil, string][] = [
 function drawStroke(ctx: CanvasRenderingContext2D, s: Stroke) {
   const paths = s.mirror ? [s.points, s.points.map(([x, y]) => [W - x, y] as const)] : [s.points];
   ctx.lineWidth = s.size;
-  ctx.strokeStyle = s.tool === "eraser" ? "#fff" : INK;
+  ctx.strokeStyle = s.tool === "eraser" ? "#fff" : s.colour;
   for (const pts of paths) {
     if (pts.length === 0) continue;
     ctx.beginPath();
@@ -61,6 +70,7 @@ const DoodlePad = forwardRef<DoodlePadHandle, { onInkChange: (hasInk: boolean) =
     const [tool, setTool] = useState<Tool>("pencil");
     const [size, setSize] = useState(4);
     const [mirror, setMirror] = useState(false);
+    const [colour, setColour] = useState(INKS[0].value);
     const live = useRef<Stroke | null>(null);
 
     const paint = useCallback(() => {
@@ -119,40 +129,54 @@ const DoodlePad = forwardRef<DoodlePadHandle, { onInkChange: (hasInk: boolean) =
       return () => window.removeEventListener("keydown", onKey);
     }, [disabled]); // eslint-disable-line react-hooks/exhaustive-deps -- undo/redo use functional updates
 
-    const btn = (on: boolean) => `flex h-9 w-9 items-center justify-center transition-colors disabled:opacity-40 ${on ? "bg-[hsl(var(--formanova-hero-accent)/0.15)] text-foreground" : "text-muted-foreground hover:text-foreground"}`;
+    // Same look as the Edit design toolbar: floating column, active tool in gold.
+    const toolBtn = (on: boolean) => `flex h-9 w-9 items-center justify-center transition-colors disabled:opacity-40 ${on ? "bg-[hsl(var(--formanova-hero-accent)/0.12)] text-[hsl(var(--formanova-hero-accent))]" : "text-foreground hover:bg-muted"}`;
+    const quietBtn = "flex h-8 w-9 items-center justify-center text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30 disabled:hover:text-muted-foreground";
+    const inking = tool !== "eraser";
 
     return (
-      <div className="flex gap-2">
-        <div role="toolbar" aria-label="Drawing tools" aria-orientation="vertical" className="flex flex-col items-center gap-0.5 self-start border border-border/60 bg-background p-1">
-          {TOOLS.map(([id, name, Icon, key]) => (
-            <button key={id} type="button" aria-label={name} aria-pressed={tool === id} title={`${name} (${key})`} disabled={disabled} onClick={() => setTool(id)} className={btn(tool === id)}>
-              <Icon className="h-[18px] w-[18px]" strokeWidth={1} />
+      <div className="relative">
+        <div className="absolute left-2 top-2 z-10 flex items-start gap-2">
+          <div role="toolbar" aria-label="Drawing tools" aria-orientation="vertical" className="flex flex-col items-center border border-border/60 bg-background/95 p-1 backdrop-blur">
+            {TOOLS.map(([id, name, Icon, key]) => (
+              <button key={id} type="button" aria-label={name} aria-pressed={tool === id} title={`${name} (${key})`} disabled={disabled} onClick={() => setTool(id)} className={toolBtn(tool === id)}>
+                <Icon className="h-[18px] w-[18px]" strokeWidth={1} />
+              </button>
+            ))}
+            <button type="button" aria-label="Mirror" aria-pressed={mirror} title="Mirror: draw one half (M)" disabled={disabled} onClick={() => setMirror((m) => !m)} className={toolBtn(mirror)}>
+              <FlipHorizontal2 className="h-[18px] w-[18px]" strokeWidth={1} />
             </button>
-          ))}
-          <button type="button" aria-label="Mirror" aria-pressed={mirror} title="Mirror: draw one half (M)" disabled={disabled} onClick={() => setMirror((m) => !m)} className={btn(mirror)}>
-            <FlipHorizontal2 className="h-[18px] w-[18px]" strokeWidth={1} />
-          </button>
-          <span className="my-1 h-px w-6 bg-border" />
-          <button type="button" aria-label="Undo" title="Undo (Ctrl Z)" disabled={disabled || !strokes.length} onClick={undo} className={btn(false)}><Undo2 className="h-4 w-4" strokeWidth={1} /></button>
-          <button type="button" aria-label="Redo" title="Redo (Ctrl Shift Z)" disabled={disabled || !undone.length} onClick={redo} className={btn(false)}><Redo2 className="h-4 w-4" strokeWidth={1} /></button>
-          <button type="button" aria-label="Clear drawing" title="Clear" disabled={disabled || !strokes.length} onClick={clear} className={btn(false)}><Trash2 className="h-4 w-4" strokeWidth={1} /></button>
-          <span className="my-1 h-px w-6 bg-border" />
-          <label className="flex flex-col items-center gap-1.5 py-1" title="Size">
-            <span aria-hidden="true" className="rounded-full bg-foreground" style={{ width: Math.max(3, size / 2), height: Math.max(3, size / 2) }} />
-            <input type="range" min={1} max={24} value={size} disabled={disabled} onChange={(e) => setSize(+e.target.value)} aria-label="Size"
-              className="h-16 w-1.5 accent-[hsl(var(--formanova-hero-accent))] [direction:rtl] [writing-mode:vertical-lr]" />
-          </label>
+            <span className="my-1 h-px w-6 bg-border" aria-hidden="true" />
+            <button type="button" aria-label="Undo" title="Undo (Ctrl Z)" disabled={disabled || !strokes.length} onClick={undo} className={quietBtn}><Undo2 className="h-4 w-4" strokeWidth={1} /></button>
+            <button type="button" aria-label="Redo" title="Redo (Ctrl Shift Z)" disabled={disabled || !undone.length} onClick={redo} className={quietBtn}><Redo2 className="h-4 w-4" strokeWidth={1} /></button>
+            <button type="button" aria-label="Clear drawing" title="Clear" disabled={disabled || !strokes.length} onClick={clear} className={quietBtn}><Trash2 className="h-4 w-4" strokeWidth={1} /></button>
+          </div>
+          <div className="flex flex-col gap-2 border border-border/60 bg-background/95 px-3 py-2 backdrop-blur">
+            {inking && (
+              <div role="radiogroup" aria-label="Ink colour" className="flex items-center gap-2">
+                {INKS.map((c) => (
+                  <button key={c.value} type="button" role="radio" aria-checked={colour === c.value} aria-label={c.name} title={c.name} disabled={disabled} onClick={() => setColour(c.value)}
+                    className={`h-5 w-5 rounded-full transition-transform hover:scale-110 ${colour === c.value ? "ring-1 ring-foreground ring-offset-2 ring-offset-background" : ""}`}
+                    style={{ background: c.value }} />
+                ))}
+              </div>
+            )}
+            <label className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Size</span>
+              <input type="range" min={1} max={24} value={size} disabled={disabled} onChange={(e) => setSize(+e.target.value)} aria-label={tool === "eraser" ? "Eraser size" : "Size"} className="h-1 w-24 accent-[hsl(var(--formanova-hero-accent))]" />
+            </label>
+          </div>
         </div>
         <canvas
           ref={canvasRef}
           width={W}
           height={H}
           aria-label="Drawing area"
-          className={`aspect-[25/14] min-w-0 flex-1 touch-none border border-border bg-white ${disabled ? "opacity-60" : "cursor-crosshair"}`}
+          className={`aspect-[25/14] w-full touch-none border border-border bg-white ${disabled ? "opacity-60" : "cursor-crosshair"}`}
           onPointerDown={(e) => {
             if (disabled) return;
             try { canvasRef.current?.setPointerCapture(e.pointerId); } catch { /* not every pointer can be captured */ }
-            live.current = { tool, size: tool === "eraser" ? size * 3 : size, points: [at(e)], mirror };
+            live.current = { tool, size: tool === "eraser" ? size * 3 : size, colour, points: [at(e)], mirror };
             paint();
           }}
           onPointerMove={(e) => {
