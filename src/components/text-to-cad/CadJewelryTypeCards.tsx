@@ -10,7 +10,7 @@
  */
 
 import { useId, useRef, type KeyboardEvent } from 'react';
-import { Check, Sparkles } from 'lucide-react';
+import { Check } from 'lucide-react';
 
 import { CAD_JEWELRY_TYPES, type CadJewelryType } from '@/lib/ring-cad-nurbs-api';
 import { cn } from '@/lib/utils';
@@ -18,6 +18,7 @@ import ringImage from '@/assets/cad-jewelry-types/ring.webp';
 import necklaceImage from '@/assets/cad-jewelry-types/necklace.webp';
 import braceletImage from '@/assets/cad-jewelry-types/bracelet.webp';
 import earringImage from '@/assets/cad-jewelry-types/earring.webp';
+import otherImage from '@/assets/cad-jewelry-types/other.webp';
 
 const CARD_IMAGES: Partial<Record<CadJewelryType, string>> = {
   ring: ringImage,
@@ -92,10 +93,13 @@ export default function CadJewelryTypeCards({ value, onChange, disabled, error }
                 {image ? (
                   <img src={image} alt="" draggable={false} className="h-full w-full object-cover" />
                 ) : (
-                  <div className="flex h-full flex-col items-center justify-center gap-2 px-2 text-center">
-                    <Sparkles aria-hidden="true" strokeWidth={1.5} className="h-6 w-6 text-zinc-700" />
-                    <span id={otherHintId} className="hidden text-[11px] leading-snug text-zinc-700 sm:block">Brooches, tiaras, watches &amp; more</span>
-                  </div>
+                  // Other: a faint tiara behind the words, so it reads as one of the set.
+                  <>
+                    <img src={otherImage} alt="" draggable={false} className="absolute inset-0 h-full w-full object-cover opacity-30" />
+                    <div className="relative flex h-full items-center justify-center px-3 text-center">
+                      <span id={otherHintId} className="text-xs font-medium leading-snug text-foreground">Brooches, tiaras, watches &amp; more</span>
+                    </div>
+                  </>
                 )}
                 {selected && (
                   <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center bg-formanova-hero-accent">
