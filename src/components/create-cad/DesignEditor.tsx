@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { ArrowRight, Box, Check, ChevronLeft, Diamond, RotateCcw, Ruler, X } from "lucide-react";
+import { ArrowRight, Box, Check, ChevronLeft, ChevronRight, Diamond, RotateCcw, Ruler, X } from "lucide-react";
 import { flattenMarkup, MARK_COLOUR, MIN_BRUSH, MAX_BRUSH } from "@/lib/design-markup";
 import { blobToDataUrl } from "@/lib/design-image-run";
 import { DESIGN_IMAGE_CREDITS, type DesignImageStartParams } from "@/lib/design-image-api";
@@ -87,6 +87,9 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
   const { generate } = useDesignImageRun();
   const [picture, setPicture] = useState<Picture | null>(null);
   const [edited, setEdited] = useState(false);
+  /** Every result made in this session, so ‹ › can step back to an earlier one. */
+  const [results, setResults] = useState<Picture[]>([]);
+  const [resultIndex, setResultIndex] = useState(0);
   const [instruction, setInstruction] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -113,6 +116,8 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
     objectUrls.current.push(url);
     setPicture({ display: url, input: null });
     setEdited(false);
+    setResults([]);
+    setResultIndex(0);
     setInstruction("");
     setLastSent("");
     setError(null);
@@ -159,7 +164,9 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
       if (!("result" in outcome)) { setError("message" in outcome ? outcome.message : "We couldn't make that change. Please try again."); return; }
       const display = await toObjectUrl(outcome.result.image.url);
       objectUrls.current.push(display);
-      setPicture({ display, input: outcome.result.image });
+      const next = { display, input: outcome.result.image };
+      setPicture(next);
+      setResults((r) => { setResultIndex(r.length); return [...r, next]; });
       setEdited(true);
       setInstruction(prompt);
       setLastSent(prompt);
@@ -200,6 +207,15 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
     setSelected(null);
     setStage("next");
   }, [canApprove, picture]);
+
+  const showResult = (i: number) => {
+    const r = results[i];
+    if (!r || busy) return;
+    setResultIndex(i);
+    setPicture(r);
+    history.reset();
+    setSelected(null);
+  };
 
   const openAngles = () => { setAnglesOpened(true); setStage("angles"); };
 
@@ -323,29 +339,6 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
                   disabled={busy}
                   overlay={busyOverlay}
                 />
-                {/* Like Photoshop's generative results: accept or try again, on the picture itself. */}
-                {edited && (
-                  <div className="absolute bottom-4 right-4 z-20 flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => void regenerate()}
-                      disabled={busy}
-                      title="Same change, new try"
-                      className="flex h-9 items-center gap-2 border border-border bg-background/95 px-3 text-sm text-foreground shadow-sm backdrop-blur transition-colors hover:border-foreground/40 disabled:opacity-40"
-                    >
-                      <RotateCcw className="h-4 w-4" strokeWidth={1} /> Regenerate <CreditTag value={DESIGN_IMAGE_CREDITS} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={looksRight}
-                      disabled={!canApprove}
-                      title={hasChange ? "Send your change first" : "Use this design (Ctrl Enter)"}
-                      className="flex h-9 items-center gap-2 bg-foreground px-4 text-sm text-background shadow-sm transition-opacity hover:opacity-90 disabled:opacity-40"
-                    >
-                      <Check className="h-4 w-4" strokeWidth={1.5} /> Looks right
-                    </button>
-                  </div>
-                )}
                 <div className="absolute left-3 top-4 z-20">
                   <MarkupToolPanel
                     tool={tool}
@@ -365,9 +358,47 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
                 </div>
               </div>
 
-              <div className="flex-shrink-0 border-t border-border/60 px-3 pb-4 pt-4 sm:px-5">
+              {/* Result bar under the picture: step through results on the left,
+                  try again or accept on the right (accept is the main action). */}
+              {edited && (
+                <div className="flex flex-shrink-0 flex-wrap items-center justify-center gap-3 px-4 py-2.5 sm:px-6">
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    {results.length > 1 && (
+                      <>
+                        <button type="button" onClick={() => showResult(resultIndex - 1)} disabled={busy || resultIndex === 0} aria-label="Previous result" className="flex h-8 w-8 items-center justify-center hover:text-foreground disabled:opacity-30"><ChevronLeft className="h-4 w-4" strokeWidth={1.5} /></button>
+                        <span aria-live="polite" className="min-w-[2.5rem] text-center tabular-nums">{resultIndex + 1} / {results.length}</span>
+                        <button type="button" onClick={() => showResult(resultIndex + 1)} disabled={busy || resultIndex === results.length - 1} aria-label="Next result" className="flex h-8 w-8 items-center justify-center hover:text-foreground disabled:opacity-30"><ChevronRight className="h-4 w-4" strokeWidth={1.5} /></button>
+                      </>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void regenerate()}
+                      disabled={busy}
+                      title="Same change, new try"
+                      className="flex h-9 items-center gap-2 border border-border px-3 text-sm text-foreground transition-colors hover:border-foreground/40 disabled:opacity-40"
+                    >
+                      <RotateCcw className="h-4 w-4" strokeWidth={1} /> Regenerate <CreditTag value={DESIGN_IMAGE_CREDITS} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={looksRight}
+                      disabled={!canApprove}
+                      title={hasChange ? "Send your change first" : "Use this design (Ctrl Enter)"}
+                      className="flex h-9 items-center gap-2 bg-foreground px-5 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-40"
+                    >
+                      <Check className="h-4 w-4" strokeWidth={1.5} /> Looks right
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex-shrink-0 border-t border-border/60 px-3 pb-4 pt-3 sm:px-5">
                 <div className="mx-auto max-w-[760px]">
-                  <div className="flex items-stretch border border-border/70 bg-background transition-colors focus-within:border-foreground/40">
+                  {/* One line that grows (and can be dragged taller from its corner);
+                      Send keeps its size, pinned bottom right, like a chat box. */}
+                  <div className="flex items-end gap-2 border border-border/70 bg-background p-1.5 pl-3 transition-colors focus-within:border-foreground/40">
                     <label htmlFor="design-editor-change" className="sr-only">Describe what to change</label>
                     <textarea
                       id="design-editor-change"
@@ -377,14 +408,21 @@ export default function DesignEditor({ open, source, jewelryType, onCancel, onKe
                       onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) { e.preventDefault(); void send(); } }}
                       rows={1}
                       disabled={busy}
-                      placeholder={marks ? "Describe the change in the marked area, e.g. make it an oval sapphire" : "Describe what you'd like to change. You can mark an area on the picture first."}
-                      className="min-h-[52px] max-h-[160px] flex-1 resize-none overflow-y-auto bg-transparent px-4 py-3.5 text-[15px] leading-snug text-foreground outline-none placeholder:text-muted-foreground/60 disabled:opacity-60"
+                      placeholder={marks ? "Describe the change in the marked area…" : "Describe the change…"}
+                      className="min-h-[36px] max-h-[240px] flex-1 resize-y overflow-y-auto bg-transparent py-2 text-[15px] leading-snug text-foreground outline-none placeholder:text-muted-foreground/60 disabled:opacity-60"
                     />
-                    <button type="button" onClick={() => void send()} disabled={busy || !hasChange} className={`${goldBtn} m-1 h-auto px-5`}>
-                      Send <ArrowRight className="h-4 w-4" strokeWidth={1.5} />
-                      <CreditTag value={DESIGN_IMAGE_CREDITS} />
+                    <button
+                      type="button"
+                      onClick={() => void send()}
+                      disabled={busy || !hasChange}
+                      className="flex h-9 flex-shrink-0 items-center gap-2 bg-[hsl(var(--formanova-hero-accent))] px-4 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:bg-muted disabled:text-muted-foreground"
+                    >
+                      Send <ArrowRight className="h-4 w-4" strokeWidth={1.5} /> <CreditTag value={DESIGN_IMAGE_CREDITS} />
                     </button>
                   </div>
+                  {edited && !busy && !hasChange && instruction.trim() && (
+                    <p className="mt-2 text-xs text-muted-foreground">Change the text to send it again, or use Regenerate.</p>
+                  )}
                   {marks > 0 && <p className="mt-2 text-xs text-muted-foreground">{marks} mark{marks > 1 ? "s" : ""} on the picture</p>}
                   {error && <p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}
                 </div>

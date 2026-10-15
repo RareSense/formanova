@@ -56,7 +56,7 @@ describe('DesignEditor', () => {
     for (const name of ['Select', 'Brush', 'Rectangle', 'Arrow', 'Erase']) {
       expect(screen.getByRole('button', { name: new RegExp(`^${name}$`) })).toBeInTheDocument();
     }
-    expect(screen.getByPlaceholderText(/mark an area on the picture first/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/describe the change/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /send/i })).toHaveTextContent('10');
   }, 15000); // first render of the dialog is slow on a loaded machine
 
