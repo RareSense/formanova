@@ -41,13 +41,13 @@ describe('CreditPlanGrid', () => {
 
   it('shows Plus on a direct visit', () => {
     renderGrid();
-    expect(screen.getByText('Plus')).toBeInTheDocument();
+    expect(screen.getByText('Essential')).toBeInTheDocument();
     expect(screen.getByText('$14')).toBeInTheDocument();
   });
 
   it('keeps Plus off the photo shortfall view even though the backend returns it', () => {
     renderGrid(TIERS, false, undefined, vi.fn(), true);
-    expect(screen.queryByText('Plus')).not.toBeInTheDocument();
+    expect(screen.queryByText('Essential')).not.toBeInTheDocument();
     expect(screen.queryByText('$14')).not.toBeInTheDocument();
     expect(screen.getByText('One-time offer')).toBeInTheDocument();
   });
@@ -74,7 +74,7 @@ describe('CreditPlanGrid', () => {
     expect(screen.queryByText('$9')).not.toBeInTheDocument();
     expect(screen.queryByText('One-time offer')).not.toBeInTheDocument();
     expect(screen.queryByText('Not suitable for CAD')).not.toBeInTheDocument();
-    expect(screen.getByText('Plus')).toBeInTheDocument();
+    expect(screen.getByText('Essential')).toBeInTheDocument();
     expect(screen.getByText('160 credits')).toBeInTheDocument();
     expect(screen.getByText(/^Up to 20 standard photos\s*or 1 CAD generation$/)).toBeInTheDocument();
   });
