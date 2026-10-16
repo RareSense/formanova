@@ -151,6 +151,22 @@ describe('DesignEditor', () => {
     expect(screen.getByRole('button', { name: /generate 2 angles/i })).toHaveTextContent('28');
   });
 
+  it('a made angle keeps its note box, so it can be redone with the customer words', async () => {
+    renderEditor();
+    await makeChange();
+    looksRight();
+    fireEvent.click(screen.getByRole('button', { name: /add angles/i }));
+    fireEvent.click(screen.getAllByRole('checkbox')[0]);
+    mockGenerate.mockImplementationOnce(async (_r: unknown[] = [], opts: { onOutcome?: (i: number, o: unknown) => void } = {}) => { opts.onOutcome?.(0, NEW_VERSION[0]); return NEW_VERSION; });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /generate 1 angle/i })); });
+    const note = await screen.findByPlaceholderText(/what to fix/i);
+    fireEvent.change(note, { target: { value: 'show the band edge-on' } });
+    mockGenerate.mockResolvedValueOnce(null);
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /^regenerate side/i })); });
+    const [requests] = mockGenerate.mock.calls.at(-1)!;
+    expect(requests[0]).toMatchObject({ prompt: 'show the band edge-on', view: 'Side' });
+  });
+
   it('after a result the prompt stays; unchanged it regenerates, edited it sends (Midjourney Remix)', async () => {
     renderEditor();
     await makeChange();

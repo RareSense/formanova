@@ -108,10 +108,11 @@ export default function AnglesCards({ approved, resolveBase, jewelryType, toObje
               ) : (
                 <span className="mt-2 text-sm font-medium text-foreground">{c.view}</span>
               )}
-              {editable && c.ticked && (
+              {/* Also under a made angle, so ↻ can redo it with the customer's words. */}
+              {((editable && c.ticked) || c.status === "review") && (
                 <textarea value={c.extra} rows={1}
                   onChange={(e) => { patch(i, { extra: e.target.value.slice(0, MAX_DESIGN_VIEW_CHARS) }); const t = e.currentTarget; t.style.height = "auto"; t.style.height = `${Math.min(t.scrollHeight, 112)}px`; }}
-                  aria-label={`Anything specific for the ${c.view} angle (optional)`} placeholder="Anything specific?"
+                  aria-label={`Anything specific for the ${c.view} angle (optional)`} placeholder={c.status === "review" ? "What to fix? Then ↻" : "Anything specific?"}
                   className="mt-1.5 max-h-28 min-h-[32px] w-full resize-none overflow-y-auto border border-border bg-background px-2 py-1.5 text-xs leading-snug text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-foreground/60" />
               )}
               {c.status === "review" && (

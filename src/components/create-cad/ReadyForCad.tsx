@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ArrowRight, Check } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import type { CadJewelryType } from "@/lib/ring-cad-nurbs-api";
 import type { EditorPicture } from "./angle-suggestions";
 import CreditTag from "./CreditTag";
@@ -46,7 +46,6 @@ export default function ReadyForCad({ approved, views, jewelryType, dimensions, 
           </div>
         )}
         {views}
-        <p className="flex items-center gap-1.5 text-sm text-emerald-700"><Check className="h-4 w-4" strokeWidth={1.5} /> Design ready</p>
         <div className="w-full max-w-[460px]">
           <label htmlFor="ready-dimensions" className="block text-sm font-medium text-foreground">
             Dimensions <span className="font-normal text-muted-foreground">(optional)</span>

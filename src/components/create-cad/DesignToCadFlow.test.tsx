@@ -85,8 +85,24 @@ describe('DesignToCadFlow', () => {
     expect(await screen.findByRole('heading', { name: /edit design/i })).toBeInTheDocument();
   });
 
+  it('while the design is made, shows the Photo Studio generating screen with the input picture', async () => {
+    let finish: (v: unknown) => void = () => {};
+    mockGenerate.mockReturnValue(new Promise((r) => { finish = r; }));
+    const { container } = renderFlow('ring', 'inspiration');
+    const input = container.querySelector('input[type="file"][accept*="image"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File(['x'], 'shell.png', { type: 'image/png' })] } });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /make my design/i })); });
+    expect(screen.getByRole('heading', { name: /generating/i })).toBeInTheDocument();
+    expect(screen.getByText(/studying your inspiration/i)).toBeInTheDocument();
+    expect(screen.getByText(/up to 90 seconds/i)).toBeInTheDocument();
+    expect(screen.getByAltText('Your picture')).toBeInTheDocument();
+    await act(async () => { finish(null); });
+  });
+
   it('goes back to the start screen with the description kept', async () => {
-    mockGenerate.mockResolvedValue([READY]);
+    // A failed design leaves the screen with Back.
+    const FAILED = { ok: false, message: 'Busy, try again.', retryable: true };
+    mockGenerate.mockImplementation(async (_r: unknown[] = [], opts: { onOutcome?: (i: number, o: unknown) => void } = {}) => { opts.onOutcome?.(0, FAILED); return [FAILED]; });
     renderFlow();
     fireEvent.change(screen.getByLabelText(/describe your ring/i), { target: { value: 'kept text' } });
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /make my design/i })); });

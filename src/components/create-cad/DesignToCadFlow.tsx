@@ -5,6 +5,7 @@ import { cadJewelryNoun, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
 import type { DesignImageStartParams } from "@/lib/design-image-api";
 import DesignStartScreen, { type DesignBrief, type DesignStartVariant } from "./DesignStartScreen";
 import DesignPickScreen, { type PickSlot } from "./DesignPickScreen";
+import DesignGenerating from "./DesignGenerating";
 import DesignEditor from "./DesignEditor";
 import { fileFromUrl, toObjectUrl } from "./picture-urls";
 
@@ -83,6 +84,15 @@ export default function DesignToCadFlow({ jewelryType, setJewelryType, onGlbUplo
     if (outcomes === null) { setStage("start"); setSlots([]); }
   }, [generate, jewelryType]);
 
+  // One design on its way: the Photo Studio generating screen, with the inputs.
+  const waiting = slots.length === 1 && slots[0].status === "making";
+  const [inputUrls, setInputUrls] = useState<string[]>([]);
+  useEffect(() => {
+    const urls = (brief?.images ?? []).map((f) => URL.createObjectURL(f));
+    setInputUrls(urls);
+    return () => urls.forEach((u) => URL.revokeObjectURL(u));
+  }, [brief]);
+
   const pick = (i: number) => {
     const display = slots[i]?.display;
     if (display) void fileFromUrl(display, `design-${i + 1}.png`).then(setEditorSource);
@@ -94,7 +104,13 @@ export default function DesignToCadFlow({ jewelryType, setJewelryType, onGlbUplo
       <div className={stage === "start" ? "contents" : "hidden"}>
         <DesignStartScreen jewelryType={jewelryType} setJewelryType={setJewelryType} busy={false} onMake={(b) => void make(b)} onGlbUpload={onGlbUpload} variant={variant} />
       </div>
-      {stage === "pick" && (
+      {stage === "pick" && waiting && (
+        <DesignGenerating
+          firstMessage={brief?.mode === "draw" ? "Reading your drawing..." : brief?.mode === "mix" ? "Studying your inspiration..." : "Reading your description..."}
+          inputs={inputUrls}
+        />
+      )}
+      {stage === "pick" && !waiting && (
         <DesignPickScreen
           slots={slots}
           onPick={pick}
