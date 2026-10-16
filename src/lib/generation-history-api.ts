@@ -111,6 +111,25 @@ function extractOutputAssetName(workflow: any): string | null {
 
 // ─── API Functions ──────────────────────────────────────────────────
 
+/** Backend caps one page of /history/workflows/me at 100. */
+const HISTORY_PAGE_LIMIT = 100;
+/** Safety stop so a misbehaving backend can't loop forever (100 × 100 = 10k runs). */
+const HISTORY_MAX_PAGES = 100;
+
+/**
+ * List ALL of the authenticated user's workflows, newest first, by walking
+ * the backend's pages until a short page comes back.
+ */
+export async function listAllMyWorkflows(): Promise<WorkflowSummary[]> {
+  const all: WorkflowSummary[] = [];
+  for (let page = 0; page < HISTORY_MAX_PAGES; page++) {
+    const batch = await listMyWorkflows(HISTORY_PAGE_LIMIT, page * HISTORY_PAGE_LIMIT);
+    all.push(...batch);
+    if (batch.length < HISTORY_PAGE_LIMIT) break;
+  }
+  return all;
+}
+
 /**
  * List the authenticated user's workflows.
  * Backend: GET /history/workflows/me?limit=N&offset=M
