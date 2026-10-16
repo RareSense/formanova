@@ -11,11 +11,12 @@ const TIERS = [
   { tier_id: 'tier_a80444ac', name: 'Pro', type: 'subscription', credits: 1500 },
 ];
 
-function renderGrid(tiers = TIERS, isINR = false, cadRequiredCredits?: number, onCheckout = vi.fn()) {
+function renderGrid(tiers = TIERS, isINR = false, cadRequiredCredits?: number, onCheckout = vi.fn(), photoShortfall = false) {
   render(
     <CreditPlanGrid
       tiers={tiers}
       cadRequiredCredits={cadRequiredCredits}
+      photoShortfall={photoShortfall}
       isINR={isINR}
       symbol={isINR ? '₹' : '$'}
       currency={isINR ? 'INR' : 'USD'}
@@ -34,12 +35,18 @@ describe('CreditPlanGrid', () => {
       expect(screen.getByText(price)).toBeInTheDocument();
     }
     expect(screen.getByText('One-time offer')).toBeInTheDocument();
-    expect(screen.getByText('Not enough for 1 CAD generation')).toBeInTheDocument();
+    expect(screen.getAllByText('Not suitable for CAD')).toHaveLength(2);
     expect(screen.getByRole('button', { name: 'Buy 50 Credits' })).toBeInTheDocument();
   });
 
-  it('keeps Plus off the normal view even though the backend returns it', () => {
+  it('shows Plus on a direct visit', () => {
     renderGrid();
+    expect(screen.getByText('Plus')).toBeInTheDocument();
+    expect(screen.getByText('$14')).toBeInTheDocument();
+  });
+
+  it('keeps Plus off the photo shortfall view even though the backend returns it', () => {
+    renderGrid(TIERS, false, undefined, vi.fn(), true);
     expect(screen.queryByText('Plus')).not.toBeInTheDocument();
     expect(screen.queryByText('$14')).not.toBeInTheDocument();
     expect(screen.getByText('One-time offer')).toBeInTheDocument();
@@ -55,9 +62,9 @@ describe('CreditPlanGrid', () => {
 
   it('shows photo and CAD capacity per plan', () => {
     renderGrid();
-    expect(screen.getByText(/^Up to 12 standard photos\s*or 1 CAD generation$/)).toBeInTheDocument();
-    expect(screen.getByText(/or 5 CAD generations/)).toBeInTheDocument();
-    expect(screen.getByText(/or 15 CAD generations/)).toBeInTheDocument();
+    expect(screen.getByText(/^Up to 12 standard photos$/)).toBeInTheDocument();
+    expect(screen.getByText(/or 3 CAD generations/)).toBeInTheDocument();
+    expect(screen.getByText(/or 10 CAD generations/)).toBeInTheDocument();
   });
 
   it('CAD shortfall of 140: shows Plus, Standard and Pro only, with Plus as a general package', () => {
@@ -66,7 +73,7 @@ describe('CreditPlanGrid', () => {
     expect(screen.queryByText('$2')).not.toBeInTheDocument();
     expect(screen.queryByText('$9')).not.toBeInTheDocument();
     expect(screen.queryByText('One-time offer')).not.toBeInTheDocument();
-    expect(screen.queryByText('Not enough for 1 CAD generation')).not.toBeInTheDocument();
+    expect(screen.queryByText('Not suitable for CAD')).not.toBeInTheDocument();
     expect(screen.getByText('Plus')).toBeInTheDocument();
     expect(screen.getByText('160 credits')).toBeInTheDocument();
     expect(screen.getByText(/^Up to 20 standard photos\s*or 1 CAD generation$/)).toBeInTheDocument();

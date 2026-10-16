@@ -105,7 +105,7 @@ export default function Pricing() {
   // 4 cards when the backend still returns the one-time Starter tier (user never
   // bought it), otherwise the 3 standard plans. Counted after the grid's own
   // filtering, since the backend list also carries packages that are not shown.
-  const maxWidthClass = resolveGridTiers(tiers).length === 4 ? 'max-w-7xl' : 'max-w-5xl';
+  const maxWidthClass = resolveGridTiers(tiers).length >= 4 ? 'max-w-7xl' : 'max-w-5xl';
 
   return (
     <>

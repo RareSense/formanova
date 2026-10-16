@@ -13,6 +13,8 @@ interface CreditPlanGridProps {
   tiers: BillingTier[];
   /** Set on the CAD shortfall view: the credits the blocked run needs. */
   cadRequiredCredits?: number;
+  /** Set when a photo run was blocked on credits: hides the CAD-sized Plus package. */
+  photoShortfall?: boolean;
   isINR: boolean;
   symbol: string;
   currency: string;
@@ -25,6 +27,7 @@ interface CreditPlanGridProps {
 export function CreditPlanGrid({
   tiers,
   cadRequiredCredits,
+  photoShortfall = false,
   isINR,
   symbol,
   currency,
@@ -33,8 +36,10 @@ export function CreditPlanGrid({
   errorTier,
   onCheckout,
 }: CreditPlanGridProps) {
-  const gridTiers = resolveGridTiers(tiers, cadRequiredCredits);
-  const colsClass = gridTiers.length === 4 ? 'xl:grid-cols-4' : 'md:grid-cols-3';
+  const gridTiers = resolveGridTiers(tiers, cadRequiredCredits, photoShortfall);
+  const colsClass = gridTiers.length >= 5
+    ? 'lg:grid-cols-3 xl:grid-cols-5'
+    : gridTiers.length === 4 ? 'xl:grid-cols-4' : 'md:grid-cols-3';
   const formatPrice = (usd: number, inr: number) =>
     isINR ? `${symbol}${inr.toLocaleString('en-IN')}` : `$${usd}`;
 
@@ -48,6 +53,8 @@ export function CreditPlanGrid({
 
           const credits = starter ? STARTER_OFFER.credits : plan.credits;
           const photos = starter ? STARTER_OFFER.photos : plan.photos;
+          // A CAD run costs more than these packages hold.
+          const noCad = starter || plan.cads === 0;
           const price = starter
             ? formatPrice(STARTER_OFFER.price, STARTER_OFFER.inrPrice)
             : formatPrice(plan.price, plan.inrPrice);
@@ -91,17 +98,17 @@ export function CreditPlanGrid({
                 </p>
                 <p className="mt-2 font-mono text-sm leading-relaxed text-muted-foreground">
                   Up to {photos} standard photos
-                  {!starter && (
+                  {!noCad && (
                     <>
                       <br />
                       or {plan.cads} CAD {plan.cads === 1 ? 'generation' : 'generations'}
                     </>
                   )}
                 </p>
-                {starter && (
+                {noCad && (
                   <div className="mt-5 flex items-start gap-3 rounded-md bg-[hsl(var(--formanova-hero-accent))]/15 px-4 py-3 text-[hsl(var(--formanova-hero-accent))]">
                     <Info className="mt-0.5 h-5 w-5 shrink-0" />
-                    <p className="text-sm leading-snug">Not enough for 1 CAD generation</p>
+                    <p className="text-sm leading-snug">Not suitable for CAD</p>
                   </div>
                 )}
               </div>
