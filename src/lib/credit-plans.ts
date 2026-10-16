@@ -6,7 +6,7 @@
 
 import { isStarterTier, type BillingTier } from '@/lib/starter-pack';
 
-/** Backend tier ID of the Plus package (160 credits). Shown only in the CAD shortfall view. */
+/** Backend tier ID of the Plus package (160 credits). Hidden only in the photo shortfall view. */
 export const PLUS_TIER_ID = 'tier_a15d8b06';
 
 export const CREDIT_PLANS = [
@@ -23,16 +23,21 @@ export const PLAN_BY_CREDITS = Object.fromEntries(CREDIT_PLANS.map(p => [p.credi
   (typeof CREDIT_PLANS)[number]
 >;
 
-/** True for CAD workflows (generate / improve), which cost far more than a photo. */
+/**
+ * True for CAD Studio workflows: CAD runs (generate / improve), and the design
+ * pictures made before CAD in CAD from Idea / Inspiration (design_image_v1).
+ */
 export function isCadWorkflow(workflowName: string | undefined): boolean {
-  return !!workflowName && /(^|_)cad(_|$)/.test(workflowName);
+  return !!workflowName && (/(^|_)cad(_|$)/.test(workflowName) || workflowName.startsWith('design_image'));
 }
 
 /**
  * Tiers to render, in display order (Starter, then by credits).
  *
- * Normal visits: Starter when the backend returns it, Basic, Standard, Pro.
- * Plus is deliberately not shown there yet (display-only; it stays buyable).
+ * Normal visits (no blocked run): every known package, Plus included.
+ *
+ * Photo shortfall view (`photoShortfall`): the same minus Plus, which is pitched
+ * at CAD (display-only; it stays buyable).
  *
  * CAD shortfall view (`cadRequiredCredits` set): only packages that can fund the
  * run on their own, Plus included, so Starter and Basic drop out once the
@@ -43,7 +48,11 @@ export function isCadWorkflow(workflowName: string | undefined): boolean {
  * Tiers that are neither Starter nor a known plan are never rendered, so an
  * unfamiliar tier can never be mistaken for Starter.
  */
-export function resolveGridTiers(tiers: BillingTier[], cadRequiredCredits?: number): BillingTier[] {
+export function resolveGridTiers(
+  tiers: BillingTier[],
+  cadRequiredCredits?: number,
+  photoShortfall = false,
+): BillingTier[] {
   const source =
     tiers.length > 0
       ? tiers
@@ -54,8 +63,10 @@ export function resolveGridTiers(tiers: BillingTier[], cadRequiredCredits?: numb
   if (typeof cadRequiredCredits === 'number') {
     const fundable = known.filter(t => t.credits >= cadRequiredCredits);
     shown = fundable.length > 0 ? fundable : known;
-  } else {
+  } else if (photoShortfall) {
     shown = known.filter(t => t.tier_id !== PLUS_TIER_ID);
+  } else {
+    shown = known;
   }
   return [...shown].sort((a, b) => Number(isStarterTier(b)) - Number(isStarterTier(a)) || a.credits - b.credits);
 }

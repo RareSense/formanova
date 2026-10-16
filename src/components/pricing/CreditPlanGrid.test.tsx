@@ -11,11 +11,12 @@ const TIERS = [
   { tier_id: 'tier_a80444ac', name: 'Pro', type: 'subscription', credits: 1500 },
 ];
 
-function renderGrid(tiers = TIERS, isINR = false, cadRequiredCredits?: number, onCheckout = vi.fn()) {
+function renderGrid(tiers = TIERS, isINR = false, cadRequiredCredits?: number, onCheckout = vi.fn(), photoShortfall = false) {
   render(
     <CreditPlanGrid
       tiers={tiers}
       cadRequiredCredits={cadRequiredCredits}
+      photoShortfall={photoShortfall}
       isINR={isINR}
       symbol={isINR ? '₹' : '$'}
       currency={isINR ? 'INR' : 'USD'}
@@ -38,8 +39,14 @@ describe('CreditPlanGrid', () => {
     expect(screen.getByRole('button', { name: 'Buy 50 Credits' })).toBeInTheDocument();
   });
 
-  it('keeps Plus off the normal view even though the backend returns it', () => {
+  it('shows Plus on a direct visit', () => {
     renderGrid();
+    expect(screen.getByText('Plus')).toBeInTheDocument();
+    expect(screen.getByText('$14')).toBeInTheDocument();
+  });
+
+  it('keeps Plus off the photo shortfall view even though the backend returns it', () => {
+    renderGrid(TIERS, false, undefined, vi.fn(), true);
     expect(screen.queryByText('Plus')).not.toBeInTheDocument();
     expect(screen.queryByText('$14')).not.toBeInTheDocument();
     expect(screen.getByText('One-time offer')).toBeInTheDocument();

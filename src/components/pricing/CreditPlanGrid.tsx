@@ -13,6 +13,8 @@ interface CreditPlanGridProps {
   tiers: BillingTier[];
   /** Set on the CAD shortfall view: the credits the blocked run needs. */
   cadRequiredCredits?: number;
+  /** Set when a photo run was blocked on credits: hides the CAD-sized Plus package. */
+  photoShortfall?: boolean;
   isINR: boolean;
   symbol: string;
   currency: string;
@@ -25,6 +27,7 @@ interface CreditPlanGridProps {
 export function CreditPlanGrid({
   tiers,
   cadRequiredCredits,
+  photoShortfall = false,
   isINR,
   symbol,
   currency,
@@ -33,8 +36,10 @@ export function CreditPlanGrid({
   errorTier,
   onCheckout,
 }: CreditPlanGridProps) {
-  const gridTiers = resolveGridTiers(tiers, cadRequiredCredits);
-  const colsClass = gridTiers.length === 4 ? 'xl:grid-cols-4' : 'md:grid-cols-3';
+  const gridTiers = resolveGridTiers(tiers, cadRequiredCredits, photoShortfall);
+  const colsClass = gridTiers.length >= 5
+    ? 'lg:grid-cols-3 xl:grid-cols-5'
+    : gridTiers.length === 4 ? 'xl:grid-cols-4' : 'md:grid-cols-3';
   const formatPrice = (usd: number, inr: number) =>
     isINR ? `${symbol}${inr.toLocaleString('en-IN')}` : `$${usd}`;
 
