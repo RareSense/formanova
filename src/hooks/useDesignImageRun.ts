@@ -16,7 +16,6 @@ import { useCreditPreflight } from '@/hooks/use-credit-preflight';
 import { useCredits } from '@/contexts/CreditsContext';
 import { DESIGN_IMAGE_WORKFLOW, type DesignImageResult, type DesignImageStartParams } from '@/lib/design-image-api';
 import { DesignImageRunError, runDesignImage } from '@/lib/design-image-run';
-import { DESIGN_IMAGE_BACKEND_LIVE, previewDesignImage } from '@/lib/design-image-preview';
 
 export type DesignImageOutcome =
   | { ok: true; result: DesignImageResult }
@@ -37,8 +36,6 @@ export interface UseDesignImageRun {
 
 interface GenerateOptions {
   onOutcome?: (index: number, outcome: DesignImageOutcome) => void;
-  /** Preview mode only (backend not live): a picture to show for request i when it has none. */
-  previewFallbacks?: (string | null)[];
 }
 
 const GENERIC = "We couldn't make that picture. Please try again.";
@@ -62,14 +59,8 @@ export function useDesignImageRun(): UseDesignImageRun {
     options: GenerateOptions = {},
   ): Promise<DesignImageOutcome[] | null> => {
     if (requests.length === 0) return [];
-    // Preview mode: no backend call and no credits until design_image_v1 is live.
-    const run = DESIGN_IMAGE_BACKEND_LIVE
-      ? (r: DesignImageStartParams, _i: number, signal: AbortSignal) => runDesignImage(r, signal)
-      : (r: DesignImageStartParams, i: number, signal: AbortSignal) => previewDesignImage(r, options.previewFallbacks?.[i] ?? null, signal);
-    if (DESIGN_IMAGE_BACKEND_LIVE) {
-      const approved = await checkCredits(DESIGN_IMAGE_WORKFLOW, requests.length);
-      if (!approved) return null;
-    }
+    const approved = await checkCredits(DESIGN_IMAGE_WORKFLOW, requests.length);
+    if (!approved) return null;
 
     const ctrl = new AbortController();
     controllers.current.add(ctrl);
@@ -86,7 +77,7 @@ export function useDesignImageRun(): UseDesignImageRun {
       };
       // Each picture is reported as soon as it lands, so slots can fill one by one.
       const settled = await Promise.allSettled(requests.map(async (r, i) => {
-        const result = await run(r, i, ctrl.signal).then(
+        const result = await runDesignImage(r, ctrl.signal).then(
           (value) => ({ status: 'fulfilled', value }) as const,
           (reason) => ({ status: 'rejected', reason }) as const,
         );
@@ -100,7 +91,7 @@ export function useDesignImageRun(): UseDesignImageRun {
       controllers.current.delete(ctrl);
       if (!ctrl.signal.aborted) {
         setInFlight((n) => Math.max(0, n - 1));
-        if (DESIGN_IMAGE_BACKEND_LIVE) refreshCredits().catch(() => {});
+        refreshCredits().catch(() => {});
       }
     }
   }, [checkCredits, refreshCredits]);

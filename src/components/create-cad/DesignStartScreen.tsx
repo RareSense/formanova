@@ -11,9 +11,9 @@ import DoodlePad, { type DoodlePadHandle } from "./DoodlePad";
 import ladybugExample from "@/assets/inspiration-examples/ladybug.webp";
 import flowerExample from "@/assets/inspiration-examples/flower.webp";
 import spiderWebExample from "@/assets/inspiration-examples/spider-web.webp";
-import seashellsExample from "@/assets/inspiration-examples/seashells.webp";
+import teddyExample from "@/assets/inspiration-examples/teddy-bear.webp";
 
-const INSPIRATION_EXAMPLES: [string, string][] = [["Ladybug", ladybugExample], ["Flower", flowerExample], ["Spider web", spiderWebExample], ["Seashells", seashellsExample]];
+const INSPIRATION_EXAMPLES: [string, string][] = [["Ladybug", ladybugExample], ["Flower", flowerExample], ["Spider web", spiderWebExample], ["Teddy bear", teddyExample]];
 
 export type StartMode = "describe" | "draw" | "mix";
 
@@ -148,7 +148,7 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
                 onAddReferenceImages={addMix}
                 onRemoveReferenceImage={removeMix}
                 primaryLabel={`Drop 1–${MAX_DESIGN_IMAGES} pictures`}
-                primaryHint="A spider web, a flower, a shell, other jewelry"
+                primaryHint="A spider web, a flower, a toy, other jewelry"
                 browseLabel="Browse files"
                 maxImages={MAX_DESIGN_IMAGES}
                 canvasClassName="h-[160px] sm:h-[180px]"

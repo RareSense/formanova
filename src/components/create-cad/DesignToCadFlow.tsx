@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useDesignImageRun } from "@/hooks/useDesignImageRun";
-import { CAD_EXAMPLE_DESIGNS } from "@/components/text-to-cad/cad-examples";
 import { blobToDataUrl } from "@/lib/design-image-run";
 import { cadJewelryNoun, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
 import type { DesignImageStartParams } from "@/lib/design-image-api";
@@ -62,10 +61,7 @@ export default function DesignToCadFlow({ jewelryType, setJewelryType, onGlbUplo
     setStage("pick");
     setSlots(Array.from({ length: next.count }, () => ({ status: "making" as const })));
     const request = await requestFor(next, jewelryType);
-    const examples = CAD_EXAMPLE_DESIGNS[jewelryType ?? "ring"];
     const outcomes = await generate(Array.from({ length: next.count }, () => request), {
-      // Preview mode only: describe-only briefs have no picture of their own to show.
-      previewFallbacks: next.images.length ? undefined : Array.from({ length: next.count }, (_, i) => examples[i % examples.length]?.image ?? null),
       onOutcome: (i, outcome) => {
         if (!("result" in outcome)) {
           setSlots((s) => s.map((x, k) => (k === i ? { status: "failed", message: "message" in outcome ? outcome.message : undefined } : x)));
