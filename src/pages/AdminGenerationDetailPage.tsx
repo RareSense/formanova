@@ -569,6 +569,18 @@ function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
         label: jewelryInputUrls.length > 1 ? `Jewelry Input ${i + 1}` : 'Jewelry Input',
       }))
     : [{ url: null, label: 'Jewelry Input' }];
+  // Older CAD workflows keep the prompt and pictures under other keys; the
+  // previous finders still apply whenever the studio reader comes back empty.
+  const cadInputs = isCadModel && studioInputs
+    ? {
+        ...studioInputs,
+        prompt: studioInputs.prompt
+          ?? findText(detail.input_payload, ['prompt', 'description', 'ring_description', 'text_input', 'input_text', 'text', 'query', 'user_description']),
+        images: studioInputs.images.length
+          ? studioInputs.images
+          : jewelryInputUrls.map((url, index) => ({ url, label: `Uploaded Image ${index + 1}` })),
+      }
+    : null;
   const visualSummaryImages = [
     ...jewelryEntries,
     ...(referenceImage ? [referenceImage] : []),
@@ -619,7 +631,7 @@ function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
 
           {isCadModel ? (
             <div className="space-y-4">
-              {studioInputs && <StudioInputs inputs={studioInputs} />}
+              {cadInputs && <StudioInputs inputs={cadInputs} />}
               <div className="space-y-2">
                 <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">3D Preview (Output)</p>
                 {cadGlbUrl ? (
