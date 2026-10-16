@@ -31,7 +31,7 @@ export const MAX_DESIGN_IMAGES = 4;
 export const MAX_DESIGN_VIEW_CHARS = 200;
 
 /** Credits for one picture (a design change or one angle), shown before sending. */
-export const DESIGN_IMAGE_CREDITS = 12;
+export const DESIGN_IMAGE_CREDITS = 14;
 export const MAX_DESIGN_PROMPT_CHARS = 4000;
 
 /** Status polling for one picture. Typical runs finish in 20-60 s. */

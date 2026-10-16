@@ -9,6 +9,8 @@ import { useJewelryTypeGate } from "@/components/text-to-cad/useJewelryTypeGate"
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import ReferenceImageUploader from "./ReferenceImageUploader";
 import CadHistoryLibrary from "./CadHistoryLibrary";
+import type { CadLibraryEntry } from "@/hooks/useCadHistoryLibrary";
+import { findReusedDimensions } from "@/lib/cad-reuse-dimensions";
 import { CAD_EXAMPLE_DESIGNS, type CadExampleDesign } from "./cad-examples";
 import DesignUseChoice, { type DesignUse } from "./DesignUseChoice";
 import { ArrowRight, Check, Ruler } from "lucide-react";
@@ -91,6 +93,8 @@ export default function ImagePromptScreen({
 }: ImagePromptScreenProps) {
   const glbInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const promptRef = useRef(prompt);
+  promptRef.current = prompt;
   const noun = jewelryType ? cadJewelryNoun(jewelryType) : "jewelry";
   const [hasImageHistory, setHasImageHistory] = useState(false);
 
@@ -123,7 +127,14 @@ export default function ImagePromptScreen({
   // unlike the bundled example assets above. A multi-angle entry reuses as a
   // whole set in one call, so all its images land together (respecting the
   // existing 5-image cap in useReferenceImages).
-  const handleLibraryImageSelect = useCallback(async (urls: string[]) => {
+  const handleLibraryImageSelect = useCallback(async (urls: string[], entry?: CadLibraryEntry) => {
+    // An empty dimensions box takes what was used with these images last time.
+    // Never overwrites the customer's own words, even typed while this loads.
+    if (entry && !promptRef.current.trim()) {
+      findReusedDimensions(entry)
+        .then((dims) => { if (dims && !promptRef.current.trim()) setPrompt(dims); })
+        .catch(() => { /* no past run found: the box stays empty */ });
+    }
     try {
       const files = await Promise.all(urls.map(async (url, index) => {
         const res = await authenticatedFetch(url);
@@ -135,7 +146,7 @@ export default function ImagePromptScreen({
     } catch {
       // reuse failed -- silently no-op, same as the example-click failure path
     }
-  }, [onAddReferenceImages]);
+  }, [onAddReferenceImages, setPrompt]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {

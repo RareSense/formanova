@@ -70,7 +70,7 @@ describe('CadHistoryLibrary', () => {
     render(<CadHistoryLibrary variant="images" onSelectImages={onSelectImages} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Reuse this inspiration image' }));
-    expect(onSelectImages).toHaveBeenCalledWith(['/api/artifacts/abc']);
+    expect(onSelectImages).toHaveBeenCalledWith(['/api/artifacts/abc'], expect.objectContaining({ id: 'wf-2' }));
   });
 
   it('calls past uploads "My Pieces", since CAD covers every kind of jewelry', () => {
@@ -122,7 +122,7 @@ describe('CadHistoryLibrary', () => {
 
     // One card per set, not one tile per image.
     fireEvent.click(screen.getByRole('button', { name: 'Reuse these 3 inspiration images' }));
-    expect(onSelectImages).toHaveBeenCalledWith(urls);
+    expect(onSelectImages).toHaveBeenCalledWith(urls, expect.objectContaining({ id: 'set-multi' }));
     expect(screen.getByRole('button', { name: 'Reuse this inspiration image' })).toBeTruthy();
 
     // Every angle is still reachable, via the strip below the cover.
