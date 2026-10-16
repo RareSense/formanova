@@ -99,6 +99,22 @@ describe('DesignToCadFlow', () => {
     await act(async () => { finish(null); });
   });
 
+  it('one design goes straight into the editor (no Use this one step); closing it returns to the start', async () => {
+    mockGenerate.mockImplementation(async (_requests: unknown[] = [], opts: { onOutcome?: (i: number, o: unknown) => void } = {}) => {
+      opts.onOutcome?.(0, READY);
+      return [READY];
+    });
+    renderFlow();
+    fireEvent.change(screen.getByLabelText(/describe your ring/i), { target: { value: 'band ring' } });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /make my design/i })); });
+    expect(await screen.findByRole('heading', { name: /edit design/i })).toBeInTheDocument();
+    expect(screen.queryByText(/use this one/i)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+    await waitFor(() => expect(screen.getByLabelText(/describe your ring/i)).toBeVisible());
+    expect(screen.getByLabelText(/describe your ring/i)).toHaveValue('band ring');
+    expect(screen.queryByText(/use this one/i)).toBeNull();
+  });
+
   it('goes back to the start screen with the description kept', async () => {
     // A failed design leaves the screen with Back.
     const FAILED = { ok: false, message: 'Busy, try again.', retryable: true };

@@ -84,8 +84,10 @@ export default function DesignToCadFlow({ jewelryType, setJewelryType, onGlbUplo
     if (outcomes === null) { setStage("start"); setSlots([]); }
   }, [generate, jewelryType]);
 
-  // One design on its way: the Photo Studio generating screen, with the inputs.
-  const waiting = slots.length === 1 && slots[0].status === "making";
+  // One design: the Photo Studio generating screen, then straight into the
+  // editor (no "Use this one" step in between).
+  const single = slots.length === 1;
+  const waiting = single && (slots[0].status === "making" || (slots[0].status === "ready" && !editorSource));
   const [inputUrls, setInputUrls] = useState<string[]>([]);
   useEffect(() => {
     const urls = (brief?.images ?? []).map((f) => URL.createObjectURL(f));
@@ -110,7 +112,7 @@ export default function DesignToCadFlow({ jewelryType, setJewelryType, onGlbUplo
           inputs={inputUrls}
         />
       )}
-      {stage === "pick" && !waiting && (
+      {stage === "pick" && !waiting && !(single && slots[0].status === "ready") && (
         <DesignPickScreen
           slots={slots}
           onPick={pick}
@@ -122,9 +124,9 @@ export default function DesignToCadFlow({ jewelryType, setJewelryType, onGlbUplo
         open={!!editorSource}
         source={editorSource}
         jewelryType={jewelryType}
-        // Closing, before or after approving, returns to the designs to pick from.
-        onCancel={() => setEditorSource(null)}
-        onKeep={() => setEditorSource(null)}
+        // Closing returns to the designs to pick from, or with one design, to the start with the brief kept.
+        onCancel={() => { setEditorSource(null); if (single) { setStage("start"); setSlots([]); } }}
+        onKeep={() => { setEditorSource(null); if (single) { setStage("start"); setSlots([]); } }}
         onCreateCad={(files) => onCreateCad(files)}
         dimensions={dimensions}
         onDimensions={onDimensions}
