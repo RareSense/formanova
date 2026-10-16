@@ -34,6 +34,8 @@ interface Slot {
   lastSent: string;
   lastRequest: { prompt: string; images: DesignImageStartParams["images"] } | null;
   marks: Mark[];
+  /** Changed by Auto Sync, not by hand: later syncs may change it again. */
+  synced?: boolean;
 }
 
 type Stage = "edit" | "ready";
@@ -122,6 +124,8 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
   const [anglesBusy, setAnglesBusy] = useState(false);
   /** A new approval starts the angles over. */
   const [approvalKey, setApprovalKey] = useState(0);
+  /** Lightroom-style Auto Sync: each change also goes to the other photos. */
+  const [autoSync, setAutoSync] = useState(false);
   const history = useMarkupHistory();
   const promptRef = useRef<HTMLTextAreaElement>(null);
   /** Every uploaded photo can be edited on its own; the thumbnails switch between them. */
@@ -185,13 +189,14 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
       const images = await buildImages();
       lastRequest.current = { prompt, images };
       const outcomes = await generate([{ prompt, images, jewelryType }]);
-      if (!outcomes) return; // credits page opened, or the editor closed
+      if (!outcomes) return null; // credits page opened, or the editor closed
       const outcome = outcomes[0];
-      if (!("result" in outcome)) { setError("message" in outcome ? outcome.message : "We couldn't make that change. Please try again."); return; }
+      if (!("result" in outcome)) { setError("message" in outcome ? outcome.message : "We couldn't make that change. Please try again."); return null; }
       const display = await toObjectUrl(outcome.result.image.url);
       objectUrls.current.push(display);
       const next = { display, input: outcome.result.image };
       setPicture(next);
+      if (slots.current[cur]) slots.current[cur].synced = false;
       setResults((r) => { setResultIndex(r.length); return [...r, next]; });
       setEdited(true);
       // Like Midjourney's Remix: the prompt stays, ready to tweak and redo.
@@ -199,16 +204,18 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
       setLastSent(prompt);
       history.reset();
       setTool("select");
+      return next;
     } catch (err) {
       setError(err instanceof Error && err.message ? err.message : "We couldn't make that change. Please try again.");
+      return null;
     } finally {
       setBusy(false);
     }
-  }, [history, jewelryType, generate]);
+  }, [history, jewelryType, generate, cur]);
 
   const send = useCallback(async () => {
     if (!picture || busy || !hasChange) return;
-    await run(instruction, async () => {
+    const next = await run(instruction, async () => {
       const file = files[cur];
       const base = picture.input ?? (file ? await blobToDataUrl(file) : null);
       if (!base) throw new Error("The picture is not ready yet");
@@ -216,14 +223,16 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
         ? [{ role: "markup" as const, image: await blobToDataUrl(await flattenMarkup(await loadImage(picture.display), history.marks)) }]
         : [{ role: "base" as const, image: base }];
     });
-  }, [picture, busy, hasChange, files, cur, history, instruction, run]);
+    if (next && autoSync) await syncOthers(instruction);
+  }, [picture, busy, hasChange, files, cur, history, instruction, run, autoSync]); // eslint-disable-line react-hooks/exhaustive-deps -- syncOthers reads current slots
 
   /** Regenerate: the same change again, from the same starting picture. */
   const regenerate = useCallback(async () => {
     const last = lastRequest.current;
     if (!last || busy) return;
-    await run(last.prompt, async () => last.images);
-  }, [busy, run]);
+    const next = await run(last.prompt, async () => last.images);
+    if (next && autoSync) await syncOthers(last.prompt);
+  }, [busy, run, autoSync]); // eslint-disable-line react-hooks/exhaustive-deps -- syncOthers reads current slots
 
   /** Keep the open photo's edits, so switching photos loses nothing. */
   const saveSlot = () => {
@@ -252,21 +261,21 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
   const [, redraw] = useState(0);
 
   /**
-   * Like Lightroom's Sync: the open photo's last change, applied to every
-   * other photo (the words only; marks belong to one picture's spots).
+   * Like Lightroom Classic's Auto Sync: with it on, each change made to the
+   * open photo is also made to the other photos the customer has not edited
+   * themselves (their own edits are never overwritten). Only the words go:
+   * marks point at spots on one picture, so they stay with that photo.
    */
-  const applyToAll = useCallback(async () => {
-    const last = lastRequest.current;
-    if (!last || busy || files.length < 2) return;
-    saveSlot();
-    const others = slots.current.map((_, i) => i).filter((i) => i !== cur);
+  const syncOthers = async (words: string) => {
+    const targets = slots.current.map((sl, i) => (i !== cur && (!sl.edited || sl.synced) ? i : -1)).filter((i) => i >= 0);
+    const prompt = words.trim();
+    if (!targets.length || !prompt) return;
     setBusy(true);
     setError(null);
     try {
-      const requests = await Promise.all(others.map(async (i) => {
-        const sl = slots.current[i];
-        const base = sl.picture.input ?? await blobToDataUrl(files[i]);
-        return { prompt: last.prompt, images: [{ role: "base" as const, image: base }], jewelryType };
+      const requests = await Promise.all(targets.map(async (i) => {
+        const base = slots.current[i].picture.input ?? await blobToDataUrl(files[i]);
+        return { prompt, images: [{ role: "base" as const, image: base }], jewelryType };
       }));
       const outcomes = await generate(requests);
       if (!outcomes) return;
@@ -276,17 +285,19 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
         const display = await toObjectUrl(outcome.result.image.url);
         objectUrls.current.push(display);
         const next = { display, input: outcome.result.image };
-        const sl = slots.current[others[k]];
-        Object.assign(sl, { picture: next, results: [...sl.results, next], resultIndex: sl.results.length, edited: true, lastSent: last.prompt, lastRequest: { prompt: last.prompt, images: requests[k].images } });
+        const sl = slots.current[targets[k]];
+        Object.assign(sl, { picture: next, results: [...sl.results, next], resultIndex: sl.results.length, edited: true, synced: true, instruction: prompt, lastSent: prompt, lastRequest: { prompt, images: requests[k].images } });
       }));
-      if (failed) setError(`${failed} photo${failed > 1 ? "s" : ""} couldn't be changed. Open ${failed > 1 ? "them" : "it"} and try again.`);
+      if (failed) setError(`${failed} photo${failed > 1 ? "s" : ""} couldn't be synced. Open ${failed > 1 ? "them" : "it"} and try again.`);
       redraw((n) => n + 1);
     } catch (err) {
-      setError(err instanceof Error && err.message ? err.message : "We couldn't apply the change to all photos.");
+      setError(err instanceof Error && err.message ? err.message : "We couldn't sync the other photos.");
     } finally {
       setBusy(false);
     }
-  }, [busy, files, cur, jewelryType, generate]); // eslint-disable-line react-hooks/exhaustive-deps -- saveSlot reads current state
+  };
+  /** Other photos Auto Sync would change: the ones not edited by hand. */
+  const syncCount = files.length > 1 ? slots.current.filter((sl, i) => i !== cur && (!sl.edited || sl.synced)).length : 0;
 
   /** "Looks right": every photo as it is now (edited or not) goes to the CAD. */
   const looksRight = useCallback(() => {
@@ -495,17 +506,6 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
               {anyEdited && (
                 <div className="flex flex-shrink-0 flex-wrap items-center justify-center gap-3 px-4 py-2.5 sm:px-6">
                   <div className="flex items-center gap-2">
-                    {files.length > 1 && edited && (
-                      <button
-                        type="button"
-                        onClick={() => void applyToAll()}
-                        disabled={busy}
-                        title="Apply this change to your other photos"
-                        className="flex h-9 items-center gap-2 border border-border px-3 text-sm text-foreground transition-colors hover:border-foreground/40 disabled:opacity-40"
-                      >
-                        Apply to all photos <CreditTag value={DESIGN_IMAGE_CREDITS * (files.length - 1)} />
-                      </button>
-                    )}
                     <button
                       type="button"
                       onClick={looksRight}
@@ -546,11 +546,20 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
                         <><span aria-hidden="true" className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" /> Working…</>
                       ) : (
                         canRegenerate
-                          ? <><RotateCcw className="h-4 w-4" strokeWidth={1.5} /> Regenerate <CreditTag value={DESIGN_IMAGE_CREDITS} /></>
-                          : <>Send <ArrowRight className="h-4 w-4" strokeWidth={1.5} /> <CreditTag value={DESIGN_IMAGE_CREDITS} /></>
+                          ? <><RotateCcw className="h-4 w-4" strokeWidth={1.5} /> Regenerate <CreditTag value={DESIGN_IMAGE_CREDITS * (1 + (autoSync ? syncCount : 0))} /></>
+                          : <>Send <ArrowRight className="h-4 w-4" strokeWidth={1.5} /> <CreditTag value={DESIGN_IMAGE_CREDITS * (1 + (autoSync ? syncCount : 0))} /></>
                       )}
                     </button>
                   </div>
+                  {syncCount > 0 && (
+                    <label className="mt-2 flex w-fit cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                      <button type="button" role="switch" aria-checked={autoSync} aria-label="Auto Sync" disabled={busy} onClick={() => setAutoSync((v) => !v)}
+                        className={`relative h-4 w-7 flex-shrink-0 rounded-full transition-colors disabled:opacity-50 ${autoSync ? "bg-[hsl(var(--formanova-hero-accent))]" : "bg-muted-foreground/30"}`}>
+                        <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-background transition-transform ${autoSync ? "translate-x-3.5" : "translate-x-0.5"}`} />
+                      </button>
+                      <span><span className="font-medium text-foreground">Auto Sync</span> &middot; apply your words to your other {syncCount === 1 ? "photo" : `${syncCount} photos`} too, +{DESIGN_IMAGE_CREDITS} each (marks stay on this photo)</span>
+                    </label>
+                  )}
                   {marks > 0 && <p className="mt-2 text-xs text-muted-foreground">{marks} mark{marks > 1 ? "s" : ""} on the picture</p>}
                   {error && <p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}
                 </div>

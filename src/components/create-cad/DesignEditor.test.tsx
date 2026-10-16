@@ -121,20 +121,31 @@ describe('DesignEditor', () => {
     expect(onCreateCad.mock.calls[0][0]).toHaveLength(2);
   });
 
-  it('Apply to all photos sends the same change to the other photos (Lightroom-style sync)', async () => {
+  it('Auto Sync (Lightroom) sends the words, not the marks, to the other photos; Send shows the full price', async () => {
     const extra = new File(['y'], 'side.png', { type: 'image/png' });
     renderEditor({ extras: [extra] });
-    expect(screen.queryByRole('button', { name: /apply to all photos/i })).toBeNull();
-    await makeChange();
-    mockGenerate.mockResolvedValueOnce(NEW_VERSION);
-    const apply = screen.getByRole('button', { name: /apply to all photos/i });
-    expect(apply).toHaveTextContent('14');
-    await act(async () => { fireEvent.click(apply); });
+    const sync = screen.getByRole('switch', { name: /auto sync/i });
+    expect(sync).toHaveAttribute('aria-checked', 'false');
+    fireEvent.click(sync);
+    fireEvent.change(screen.getByLabelText(/describe any change/i), { target: { value: 'make the stone oval' } });
+    expect(screen.getByRole('button', { name: /send/i })).toHaveTextContent('28');
+    mockGenerate.mockResolvedValueOnce(NEW_VERSION).mockResolvedValueOnce(NEW_VERSION);
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /send/i })); });
     await waitFor(() => expect(mockGenerate).toHaveBeenCalledTimes(2));
     const [requests] = mockGenerate.mock.calls[1];
     expect(requests).toHaveLength(1);
-    expect(requests[0]).toMatchObject({ prompt: 'make the stone oval' });
+    expect(requests[0].prompt).toBe('make the stone oval');
+    expect(requests[0].images.map((i: { role: string }) => i.role)).toEqual(['base']);
     await waitFor(() => expect(screen.getByRole('tab', { name: /photo 2 \(edited\)/i })).toBeInTheDocument());
+  });
+
+  it('Auto Sync never overwrites a photo the customer edited by hand', async () => {
+    const extra = new File(['y'], 'side.png', { type: 'image/png' });
+    renderEditor({ extras: [extra] });
+    fireEvent.click(screen.getByRole('tab', { name: /photo 2/i }));
+    await makeChange();
+    fireEvent.click(screen.getByRole('tab', { name: /photo 1/i }));
+    expect(screen.queryByRole('switch', { name: /auto sync/i })).toBeNull();
   });
 
   it('Add angles opens equal cards: the design first, then angles to tick with their own words', async () => {
