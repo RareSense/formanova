@@ -5,7 +5,7 @@ import CadJewelryTypeCards from "@/components/text-to-cad/CadJewelryTypeCards";
 import ReferenceImageUploader from "@/components/text-to-cad/ReferenceImageUploader";
 import { useJewelryTypeGate } from "@/components/text-to-cad/useJewelryTypeGate";
 import { CAD_EXAMPLE_PROMPTS } from "@/components/text-to-cad/cad-examples";
-import { MAX_DESIGN_IMAGES } from "@/lib/design-image-api";
+import { DESIGN_IMAGE_CREDITS, MAX_DESIGN_IMAGES } from "@/lib/design-image-api";
 import { cadJewelryNoun, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
 import DoodlePad, { type DoodlePadHandle } from "./DoodlePad";
 import ladybugExample from "@/assets/inspiration-examples/ladybug.webp";
@@ -185,7 +185,7 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
           <button type="button" onClick={guardedGenerate} disabled={busy || !ready}
             className="flex h-12 items-center justify-center gap-2.5 bg-[hsl(var(--formanova-hero-accent))] px-10 font-display text-base uppercase tracking-wide text-background transition-opacity hover:opacity-90 disabled:bg-muted disabled:text-muted-foreground disabled:hover:opacity-100">
             Make my design
-            <span className="inline-flex items-center gap-1"><img src={creditCoinIcon} alt="" className="h-5 w-5" /><span className="font-mono text-sm font-semibold">5</span></span>
+            <span className="inline-flex items-center gap-1"><img src={creditCoinIcon} alt="" className="h-5 w-5" /><span className="font-mono text-sm font-semibold">{DESIGN_IMAGE_CREDITS}</span></span>
           </button>
         </div>
 

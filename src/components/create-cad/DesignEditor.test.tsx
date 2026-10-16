@@ -57,7 +57,7 @@ describe('DesignEditor', () => {
       expect(screen.getByRole('button', { name: new RegExp(`^${name}$`) })).toBeInTheDocument();
     }
     expect(screen.getByPlaceholderText(/describe any change/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /send/i })).toHaveTextContent('10');
+    expect(screen.getByRole('button', { name: /send/i })).toHaveTextContent('12');
   }, 15000); // first render of the dialog is slow on a loaded machine
 
   it('each change replaces the picture: no versions are shown', async () => {
@@ -128,7 +128,7 @@ describe('DesignEditor', () => {
     await makeChange();
     mockGenerate.mockResolvedValueOnce(NEW_VERSION);
     const apply = screen.getByRole('button', { name: /apply to all photos/i });
-    expect(apply).toHaveTextContent('10');
+    expect(apply).toHaveTextContent('12');
     await act(async () => { fireEvent.click(apply); });
     await waitFor(() => expect(mockGenerate).toHaveBeenCalledTimes(2));
     const [requests] = mockGenerate.mock.calls[1];
@@ -148,7 +148,7 @@ describe('DesignEditor', () => {
     fireEvent.click(boxes[0]);
     fireEvent.click(boxes[1]);
     expect(screen.getAllByPlaceholderText(/anything specific/i)).toHaveLength(2);
-    expect(screen.getByRole('button', { name: /generate 2 angles/i })).toHaveTextContent('20');
+    expect(screen.getByRole('button', { name: /generate 2 angles/i })).toHaveTextContent('24');
   });
 
   it('after a result the prompt stays; unchanged it regenerates, edited it sends (Midjourney Remix)', async () => {
@@ -156,7 +156,7 @@ describe('DesignEditor', () => {
     await makeChange();
     const box = screen.getByLabelText(/describe any change/i);
     expect(box).toHaveValue('make the stone oval');
-    expect(screen.getByRole('button', { name: /regenerate/i })).toHaveTextContent('10');
+    expect(screen.getByRole('button', { name: /regenerate/i })).toHaveTextContent('12');
     expect(screen.queryByRole('button', { name: /^send/i })).toBeNull();
     fireEvent.change(box, { target: { value: 'make the stone round' } });
     expect(screen.getByRole('button', { name: /send/i })).toBeEnabled();
