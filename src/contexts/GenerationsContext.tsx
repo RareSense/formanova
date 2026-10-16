@@ -19,6 +19,7 @@ import type { Resolution } from '@/components/studio/OutputSettingsPills';
 import { getWorkflowDetails } from '@/lib/generation-history-api';
 import { fetchImproveOutcome } from '@/lib/cad-versions-api';
 import { cadStatusNotice } from '@/lib/cad-status-copy';
+import { castingBodyUrls } from '@/lib/casting-body-artifacts';
 import {
   RING_CAD_POLL_TIMEOUT_MS,
   isRingCadRepairing,
@@ -175,6 +176,9 @@ export interface TrackedGeneration {
   stlUrls?: string[];
   /** CAD only: optional postprocessed neutral exchange files. */
   stepUrls?: string[];
+  /** CAD only: metal fused into one solid per alloy, stones excluded. */
+  castingStepUrls?: string[];
+  castingStlUrls?: string[];
   /** CAD only: validated volume multiplied by the user-selected alloy density. */
   estimatedMetalMassG?: number | null;
   /** CAD only: label for the completion toast. */
@@ -707,6 +711,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
               threedmUrl: parsed.threedmArtifact?.url ?? null,
               stlUrls: parsed.stlArtifacts.map(artifact => artifact.url),
               stepUrls: parsed.stepArtifacts.map(artifact => artifact.url),
+              ...castingBodyUrls(parsed.castingBodyArtifacts),
               estimatedMetalMassG: parsed.estimatedMetalMassG,
               notAllSolid: parsed.notAllSolid,
             }
@@ -837,6 +842,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
                   threedmUrl: parsed?.threedmArtifact?.url ?? null,
                   stlUrls: parsed?.stlArtifacts.map(artifact => artifact.url) ?? [],
                   stepUrls: parsed?.stepArtifacts.map(artifact => artifact.url) ?? [],
+                  ...castingBodyUrls(parsed?.castingBodyArtifacts),
                   estimatedMetalMassG: parsed?.estimatedMetalMassG ?? null,
                   notAllSolid: parsed?.notAllSolid ?? false,
                 }
@@ -964,13 +970,17 @@ export function GenerationsContextProvider({ children }: { children: React.React
 
         // Only check for activity errors when no images were produced.
         // Prefer targeted key lookup; only fall back to scanning all values when those keys are absent.
+        const isErrorItem = (item: unknown) => {
+          const i = item as { action?: unknown; status?: unknown } | null;
+          return i?.action === 'error' || i?.status === 'failed';
+        };
         const hasActivityError = resultImages.length === 0 && (() => {
           const generateItems = (result['generate'] ?? result['generate_image'] ?? []) as unknown[];
           if (Array.isArray(generateItems) && generateItems.length > 0) {
-            return generateItems.some((i: any) => i?.action === 'error' || i?.status === 'failed');
+            return generateItems.some(isErrorItem);
           }
           return Object.values(result).some(
-            (items) => Array.isArray(items) && items.some((i: any) => i?.action === 'error' || i?.status === 'failed')
+            (items) => Array.isArray(items) && items.some(isErrorItem)
           );
         })();
 

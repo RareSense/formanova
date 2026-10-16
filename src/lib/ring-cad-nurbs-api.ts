@@ -1,5 +1,6 @@
 import { azureUriToUrl } from '@/lib/azure-utils';
 import type { CadReferenceItem } from '@/lib/microservices-api';
+import { parseCastingBody, type CastingBodyArtifact } from '@/lib/casting-body-artifacts';
 
 /**
  * ring-cad-nurbs-api.ts
@@ -385,6 +386,8 @@ export interface RingCadResult {
   stlArtifacts: ArtifactRef[];
   /** Neutral CAD exchange files emitted by the optional postprocessor. */
   stepArtifacts: ArtifactRef[];
+  /** Metal fused into one closed solid per alloy, stones excluded; empty unless completed. */
+  castingBodyArtifacts: CastingBodyArtifact[];
   /** Calculated from validated solid volume and the explicitly selected alloy density. */
   estimatedMetalMassG: number | null;
   validationStatus: RingCadValidationStatus | null;
@@ -560,6 +563,10 @@ export function parseRingCadResult(data: unknown): RingCadResult {
   const glbArtifact = glb.artifact;
   const stlArtifacts = readArtifactList(d, 'stl_artifacts', 'stl_artifact');
   const stepArtifacts = readArtifactList(d, 'step_artifacts', 'step_artifact');
+  const castingBodyArtifacts = parseCastingBody(
+    d.casting_body ?? findKeyDeep(root, (key) => key === 'casting_body'),
+    readArtifact,
+  );
   const massRaw = d.estimated_metal_mass_g
     ?? findKeyDeep(root, (key) => key === 'estimated_metal_mass_g');
   const estimatedMetalMassG = typeof massRaw === 'number' && Number.isFinite(massRaw) && massRaw >= 0
@@ -602,6 +609,7 @@ export function parseRingCadResult(data: unknown): RingCadResult {
     glbUrl: glbArtifact?.url ?? null,
     stlArtifacts,
     stepArtifacts,
+    castingBodyArtifacts,
     estimatedMetalMassG,
     validationStatus,
     diagnostics,

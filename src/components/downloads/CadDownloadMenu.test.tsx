@@ -82,6 +82,41 @@ describe('CadDownloadMenu', () => {
     expect(menuRows()).toEqual(['3DMRhino, editable', 'GLB3D preview']);
   });
 
+  it('lists the casting body after STEP and STL, with what it is', async () => {
+    const onDownloadCastingStep = vi.fn();
+    const onDownloadCastingStl = vi.fn();
+    render(
+      <CadDownloadMenu
+        onDownloadThreedm={noop}
+        onDownloadStep={noop}
+        onDownloadStl={noop}
+        onDownloadCastingStep={onDownloadCastingStep}
+        onDownloadCastingStl={onDownloadCastingStl}
+      />,
+    );
+
+    openMenu();
+    await screen.findByText('Rhino, editable');
+    const hint = 'Metal joined into one solid, stones excluded';
+    expect(menuRows()).toEqual([
+      '3DMRhino, editable',
+      'STEPOther CAD software',
+      'STL3D printing',
+      `Casting body (STEP)${hint}`,
+      `Casting body (STL)${hint}`,
+    ]);
+    fireEvent.click(screen.getByText('Casting body (STL)'));
+    expect(onDownloadCastingStl).toHaveBeenCalledTimes(1);
+    expect(onDownloadCastingStep).not.toHaveBeenCalled();
+  });
+
+  it('hides the casting body when the run has none', async () => {
+    render(<CadDownloadMenu onDownloadThreedm={noop} onDownloadStl={noop} />);
+    openMenu();
+    await screen.findByText('Rhino, editable');
+    expect(screen.queryByText(/casting body/i)).toBeNull();
+  });
+
   it('offers the edited export only once there is an edit', async () => {
     const onExportEdited = vi.fn();
     const { unmount } = render(<CadDownloadMenu onDownloadThreedm={noop} onDownloadGlb={noop} />);

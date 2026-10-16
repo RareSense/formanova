@@ -93,6 +93,26 @@ describe('useCadArtifactDownloads', () => {
     });
   });
 
+  it('saves the casting body under its own name and reports casting_body_<format>', async () => {
+    const { result } = setup({
+      castingStepUrls: ['https://api/artifacts/ddd'],
+      castingStlUrls: ['https://api/artifacts/eee'],
+    });
+    await act(async () => { await result.current.downloadCastingStep(); });
+    await act(async () => { await result.current.downloadCastingStl(); });
+
+    const calls = mockDownloadCadArtifact.mock.calls;
+    expect(calls.map(([url, , kind]) => [url, kind])).toEqual([
+      ['https://api/artifacts/ddd', 'step'],
+      ['https://api/artifacts/eee', 'stl'],
+    ]);
+    expect(calls[0][1]).toMatch(/-casting-body\.step$/);
+    expect(mockTrackDownloadClicked.mock.calls.map(([props]) => props.file_type)).toEqual([
+      'casting_body_step',
+      'casting_body_stl',
+    ]);
+  });
+
   it('does nothing when the artifact is missing', async () => {
     const { result } = setup({ threedmUrl: null });
     await act(async () => { await result.current.downloadThreedm(); });
