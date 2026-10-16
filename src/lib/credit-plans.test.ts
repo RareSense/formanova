@@ -71,17 +71,17 @@ describe('display data', () => {
     expect(STARTER_OFFER).toMatchObject({ price: 2, inrPrice: 200, credits: 50 });
     expect(CREDIT_PLANS.map(p => [p.name, p.price, p.inrPrice, p.credits])).toEqual([
       ['Basic', 9, 999, 100],
-      ['Plus', 14, 1349, 160],
+      ['Essential', 14, 1349, 160],
       ['Standard', 39, 3499, 500],
       ['Pro', 99, 8999, 1500],
     ]);
-    expect(CREDIT_PLANS.find(p => p.name === 'Plus')?.photos).toBe(20);
+    expect(CREDIT_PLANS.find(p => p.name === 'Essential')?.photos).toBe(20);
   });
 
   it('counts photos at 8 credits and CAD runs at 140 credits each', () => {
     expect(CREDIT_PLANS.map(p => [p.name, p.photos, p.cads])).toEqual([
       ['Basic', 12, 0],
-      ['Plus', 20, 1],
+      ['Essential', 20, 1],
       ['Standard', 62, 3],
       ['Pro', 187, 10],
     ]);
