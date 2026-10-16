@@ -6,7 +6,7 @@ const mockGenerate = vi.hoisted(() => vi.fn());
 vi.mock('@/hooks/useDesignImageRun', () => ({ useDesignImageRun: () => ({ generate: mockGenerate, running: false }) }));
 vi.mock('@/hooks/use-estimated-cost', () => ({ useEstimatedCost: () => ({ cost: 140, loading: false }) }));
 
-import DesignToCadFlow from './DesignToCadFlow';
+import DesignToCadFlow, { requestFor } from './DesignToCadFlow';
 
 beforeAll(() => {
   globalThis.ResizeObserver = class { observe() {} disconnect() {} unobserve() {} } as unknown as typeof ResizeObserver;
@@ -55,6 +55,14 @@ describe('DesignToCadFlow', () => {
     const [requests] = mockGenerate.mock.calls[0];
     expect(requests[0]).toMatchObject({ prompt: 'Design a ring inspired by this picture.' });
     expect(requests[0].images).toHaveLength(1);
+    expect(requests[0].images[0].role).toBe('reference');
+  });
+
+  it('sends a drawing as the piece itself (built as drawn), not as an inspiration', async () => {
+    const doodle = new File(['x'], 'doodle.png', { type: 'image/png' });
+    const req = await requestFor({ mode: 'draw', text: '', images: [doodle], count: 1 }, 'ring');
+    expect(req.images.map((i) => i.role)).toEqual(['drawing']);
+    expect(req.prompt).toBe('Turn this drawing into a realistic ring design.');
   });
 
   it('asks for the piece before making designs', () => {

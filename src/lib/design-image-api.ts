@@ -13,7 +13,8 @@
  * app/toolkit/tools/design_image/schemas.py):
  * - images carry a role: `base` is the design being edited (the source of
  *   truth), `markup` is that design with the customer's pen marks flattened
- *   onto it, `reference` is anything to borrow from. At most one base OR markup.
+ *   onto it, `reference` is anything to borrow from, `drawing` is the customer's
+ *   own drawing of the piece (built as drawn). At most one base OR markup.
  * - `view` is free text ("top", "looking at the crest side"); null keeps the
  *   camera where the base image has it.
  * - the result reports `consistent` / `drift` when there was a design to check
@@ -38,7 +39,7 @@ export const MAX_DESIGN_PROMPT_CHARS = 4000;
 export const DESIGN_IMAGE_POLL_INTERVAL_MS = 2000;
 export const DESIGN_IMAGE_POLL_TIMEOUT_MS = 4 * 60 * 1000;
 
-export type DesignImageRole = 'base' | 'markup' | 'reference';
+export type DesignImageRole = 'base' | 'markup' | 'reference' | 'drawing';
 export type DesignImageOutput = 'render' | 'sketch';
 
 export interface DesignImageAttachment {

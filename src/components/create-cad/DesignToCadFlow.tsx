@@ -27,9 +27,11 @@ interface DesignToCadFlowProps {
 }
 
 /** What the toolkit is asked for, from the customer's brief. */
-async function requestFor(brief: DesignBrief, jewelryType: CadJewelryType | null): Promise<DesignImageStartParams> {
+export async function requestFor(brief: DesignBrief, jewelryType: CadJewelryType | null): Promise<DesignImageStartParams> {
   const noun = jewelryType ? cadJewelryNoun(jewelryType) : "piece";
-  const images = await Promise.all(brief.images.map(async (f) => ({ role: "reference" as const, image: await blobToDataUrl(f) })));
+  // A drawing is the piece itself, built as drawn; Inspiration pictures are translated.
+  const role = brief.mode === "draw" ? "drawing" as const : "reference" as const;
+  const images = await Promise.all(brief.images.map(async (f) => ({ role, image: await blobToDataUrl(f) })));
   // The toolkit needs words when no design is being edited; Draw and Mix may have none.
   const fallback = brief.mode === "draw"
     ? `Turn this drawing into a realistic ${noun} design.`
