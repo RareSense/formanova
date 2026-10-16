@@ -21,6 +21,7 @@ import {
 } from '@/lib/admin-generations-api';
 import { fetchCadResult, resolveSourceType } from '@/lib/generation-history-api';
 import { parseRingCadResult } from '@/lib/ring-cad-nurbs-api';
+import { cadFlowLabel, isDesignImageWorkflow, readCadStudioInputs, type AdminRunInputs } from '@/lib/admin-generation-inputs';
 import type { AdminGenerationStep } from '@/lib/admin-generations-api';
 import { ScissorGLBGrid, GLBPreviewSlot } from '@/components/generations/ScissorGLBGrid';
 import { Badge } from '@/components/ui/badge';
@@ -360,6 +361,37 @@ function ImagePreview({ url, label }: { url: string | null; label: string }) {
   );
 }
 
+/** What the customer sent: prompt, details and every picture with its role. */
+function StudioInputs({ inputs }: { inputs: AdminRunInputs }) {
+  return (
+    <div className="space-y-4">
+      {inputs.prompt && (
+        <div className="space-y-2">
+          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Prompt (Input)</p>
+          <div className="rounded-md border border-border bg-muted/20 px-4 py-3">
+            <p className="whitespace-pre-wrap text-sm leading-relaxed">{inputs.prompt}</p>
+          </div>
+        </div>
+      )}
+      {inputs.details.length > 0 && (
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {inputs.details.map((d) => <MetaItem key={d.label} label={d.label} value={d.value} />)}
+        </div>
+      )}
+      {inputs.images.length > 0 && (
+        <div className="space-y-2">
+          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Images (Input)</p>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {inputs.images.map((image, index) => (
+              <ImagePreview key={`${image.url}-${index}`} url={image.url} label={image.label} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function NotAuthorizedState() {
   return (
     <Card>
@@ -427,18 +459,19 @@ function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
     retry: 1,
   });
   const [downloading3dm, setDownloading3dm] = useState(false);
-  const textPrompt = isCadModel
-    ? findText(detail.input_payload, ['prompt', 'description', 'ring_description', 'text_input', 'input_text', 'text', 'query', 'user_description'])
-    : null;
+  // CAD studio runs (design pictures, and CAD from Image / Idea / Inspiration)
+  // keep their inputs in shapes the generic finders below don't read.
+  const studioInputs = readCadStudioInputs(detail.workflow_name, detail.input_payload, isCadModel);
+  const isDesignImage = isDesignImageWorkflow(detail.workflow_name);
   const cadGlbUrl = isCadModel
     ? cadResultQuery.data?.glb_url ?? extractGlbFromSteps(detail.steps)
     : null;
   const cadThreedmUrl = isCadModel ? cadResultQuery.data?.threedm_url ?? null : null;
-  const cadSourceLabel = cadSourceType === 'text_to_cad'
+  const cadSourceLabel = !isCadModel ? null : cadFlowLabel(detail.input_payload) ?? (cadSourceType === 'text_to_cad'
     ? 'Text to CAD'
     : cadSourceType === 'image_to_cad'
       ? 'Image to CAD'
-      : null;
+      : null);
 
   async function handleDownload3dm() {
     if (!cadThreedmUrl || downloading3dm) return;
@@ -536,6 +569,18 @@ function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
         label: jewelryInputUrls.length > 1 ? `Jewelry Input ${i + 1}` : 'Jewelry Input',
       }))
     : [{ url: null, label: 'Jewelry Input' }];
+  // Older CAD workflows keep the prompt and pictures under other keys; the
+  // previous finders still apply whenever the studio reader comes back empty.
+  const cadInputs = isCadModel && studioInputs
+    ? {
+        ...studioInputs,
+        prompt: studioInputs.prompt
+          ?? findText(detail.input_payload, ['prompt', 'description', 'ring_description', 'text_input', 'input_text', 'text', 'query', 'user_description']),
+        images: studioInputs.images.length
+          ? studioInputs.images
+          : jewelryInputUrls.map((url, index) => ({ url, label: `Uploaded Image ${index + 1}` })),
+      }
+    : null;
   const visualSummaryImages = [
     ...jewelryEntries,
     ...(referenceImage ? [referenceImage] : []),
@@ -586,24 +631,7 @@ function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
 
           {isCadModel ? (
             <div className="space-y-4">
-              {textPrompt && (
-                <div className="space-y-2">
-                  <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Text Prompt (Input)</p>
-                  <div className="rounded-md border border-border bg-muted/20 px-4 py-3">
-                    <p className="text-sm leading-relaxed">{textPrompt}</p>
-                  </div>
-                </div>
-              )}
-              {jewelryInputUrls.length > 0 && (
-                <div className="space-y-2">
-                  <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Uploaded Reference Images (Input)</p>
-                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    {jewelryInputUrls.map((url, index) => (
-                      <ImagePreview key={`${url}-${index}`} url={url} label={`Uploaded Image ${index + 1}`} />
-                    ))}
-                  </div>
-                </div>
-              )}
+              {cadInputs && <StudioInputs inputs={cadInputs} />}
               <div className="space-y-2">
                 <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">3D Preview (Output)</p>
                 {cadGlbUrl ? (
@@ -643,6 +671,13 @@ function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
                     Download 3DM
                   </Button>
                 )}
+              </div>
+            </div>
+          ) : isDesignImage && studioInputs ? (
+            <div className="space-y-4">
+              <StudioInputs inputs={studioInputs} />
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <ImagePreview url={outputImageUrl} label="Output Image" />
               </div>
             </div>
           ) : (
