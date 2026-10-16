@@ -12,12 +12,16 @@ const all = [pro, plus, starter, standard, basic];
 const credits = (tiers: BillingTier[]) => tiers.map(x => x.credits);
 
 describe('resolveGridTiers', () => {
-  it('normal view: Starter, Basic, Standard, Pro in order, no Plus', () => {
-    expect(credits(resolveGridTiers(all))).toEqual([50, 100, 500, 1500]);
+  it('direct visit: every package in order, Plus included', () => {
+    expect(credits(resolveGridTiers(all))).toEqual([50, 100, 160, 500, 1500]);
   });
 
-  it('normal view without Starter (already bought): Basic, Standard, Pro', () => {
-    expect(credits(resolveGridTiers([basic, plus, standard, pro]))).toEqual([100, 500, 1500]);
+  it('direct visit without Starter (already bought): Basic, Plus, Standard, Pro', () => {
+    expect(credits(resolveGridTiers([basic, plus, standard, pro]))).toEqual([100, 160, 500, 1500]);
+  });
+
+  it('photo shortfall: everything except Plus', () => {
+    expect(credits(resolveGridTiers(all, undefined, true))).toEqual([50, 100, 500, 1500]);
   });
 
   it('CAD shortfall of 140: Plus, Standard, Pro (Starter and Basic cannot fund it)', () => {
@@ -36,8 +40,9 @@ describe('resolveGridTiers', () => {
     expect(credits(resolveGridTiers(all, 99999))).toEqual([50, 100, 160, 500, 1500]);
   });
 
-  it('fallback when /billing/tiers failed: normal view has no Plus, CAD view has it', () => {
-    expect(credits(resolveGridTiers([]))).toEqual([100, 500, 1500]);
+  it('fallback when /billing/tiers failed: photo view has no Plus, direct and CAD views have it', () => {
+    expect(credits(resolveGridTiers([], undefined, true))).toEqual([100, 500, 1500]);
+    expect(credits(resolveGridTiers([]))).toEqual([100, 160, 500, 1500]);
     expect(credits(resolveGridTiers([], 140))).toEqual([160, 500, 1500]);
   });
 
@@ -72,6 +77,16 @@ describe('display data', () => {
     ]);
     expect(CREDIT_PLANS.find(p => p.name === 'Plus')?.photos).toBe(20);
   });
+
+  it('counts photos at 8 credits and CAD runs at 140 credits each', () => {
+    expect(CREDIT_PLANS.map(p => [p.name, p.photos, p.cads])).toEqual([
+      ['Basic', 12, 0],
+      ['Plus', 20, 1],
+      ['Standard', 62, 3],
+      ['Pro', 187, 10],
+    ]);
+    expect([STARTER_OFFER.photos, STARTER_OFFER.cads]).toEqual([6, 0]);
+  });
 });
 
 describe('isCadWorkflow', () => {
@@ -79,6 +94,7 @@ describe('isCadWorkflow', () => {
     expect(isCadWorkflow('ring_cad_generate')).toBe(true);
     expect(isCadWorkflow('ring_cad_improve')).toBe(true);
     expect(isCadWorkflow('ring_cad_nurbs_v1')).toBe(true);
+    expect(isCadWorkflow('design_image_v1')).toBe(true);
     expect(isCadWorkflow('photoshoot')).toBe(false);
     expect(isCadWorkflow(undefined)).toBe(false);
   });
