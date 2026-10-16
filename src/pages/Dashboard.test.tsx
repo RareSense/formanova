@@ -92,9 +92,9 @@ describe('Dashboard as the merged studio hub', () => {
   it('uses the agreed CAD copy', () => {
     const el = renderDashboard();
 
-    expect(el.textContent).toContain('Recreate the jewelry in your photo.');
-    expect(el.textContent).toContain('Describe or sketch a new design.');
-    expect(el.textContent).toContain('Turn any picture into a new design.');
+    expect(el.textContent).toContain('Turn your jewelry photo into a CAD model.');
+    expect(el.textContent).toContain('Turn your idea into a CAD model.');
+    expect(el.textContent).toContain('Turn your inspiration into a CAD model.');
   });
 
   // The note describes both CAD workflows, so it belongs to the category
