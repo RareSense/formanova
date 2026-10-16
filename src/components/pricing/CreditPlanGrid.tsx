@@ -53,6 +53,8 @@ export function CreditPlanGrid({
 
           const credits = starter ? STARTER_OFFER.credits : plan.credits;
           const photos = starter ? STARTER_OFFER.photos : plan.photos;
+          // A CAD run costs more than these packages hold.
+          const noCad = starter || plan.cads === 0;
           const price = starter
             ? formatPrice(STARTER_OFFER.price, STARTER_OFFER.inrPrice)
             : formatPrice(plan.price, plan.inrPrice);
@@ -96,17 +98,17 @@ export function CreditPlanGrid({
                 </p>
                 <p className="mt-2 font-mono text-sm leading-relaxed text-muted-foreground">
                   Up to {photos} standard photos
-                  {!starter && (
+                  {!noCad && (
                     <>
                       <br />
                       or {plan.cads} CAD {plan.cads === 1 ? 'generation' : 'generations'}
                     </>
                   )}
                 </p>
-                {starter && (
+                {noCad && (
                   <div className="mt-5 flex items-start gap-3 rounded-md bg-[hsl(var(--formanova-hero-accent))]/15 px-4 py-3 text-[hsl(var(--formanova-hero-accent))]">
                     <Info className="mt-0.5 h-5 w-5 shrink-0" />
-                    <p className="text-sm leading-snug">Not enough for 1 CAD generation</p>
+                    <p className="text-sm leading-snug">Not suitable for CAD</p>
                   </div>
                 )}
               </div>

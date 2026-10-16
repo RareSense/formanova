@@ -9,14 +9,23 @@ import { isStarterTier, type BillingTier } from '@/lib/starter-pack';
 /** Backend tier ID of the Plus package (160 credits). Hidden only in the photo shortfall view. */
 export const PLUS_TIER_ID = 'tier_a15d8b06';
 
+/** Credits per standard (1K) photo and per CAD run, used for the "up to" counts on each card. */
+export const STANDARD_PHOTO_CREDITS = 8;
+export const CAD_RUN_CREDITS = 140;
+
+const capacity = (credits: number) => ({
+  photos: Math.floor(credits / STANDARD_PHOTO_CREDITS),
+  cads: Math.floor(credits / CAD_RUN_CREDITS),
+});
+
 export const CREDIT_PLANS = [
-  { tierId: 'tier_5e6c6184', name: 'Basic', price: 9, inrPrice: 999, credits: 100, photos: 12, cads: 1 },
-  { tierId: PLUS_TIER_ID, name: 'Plus', price: 14, inrPrice: 1349, credits: 160, photos: 20, cads: 1 },
-  { tierId: 'tier_6867e598', name: 'Standard', price: 39, inrPrice: 3499, credits: 500, photos: 62, cads: 5 },
-  { tierId: 'tier_a80444ac', name: 'Pro', price: 99, inrPrice: 8999, credits: 1500, photos: 187, cads: 15 },
+  { tierId: 'tier_5e6c6184', name: 'Basic', price: 9, inrPrice: 999, credits: 100, ...capacity(100) },
+  { tierId: PLUS_TIER_ID, name: 'Plus', price: 14, inrPrice: 1349, credits: 160, ...capacity(160) },
+  { tierId: 'tier_6867e598', name: 'Standard', price: 39, inrPrice: 3499, credits: 500, ...capacity(500) },
+  { tierId: 'tier_a80444ac', name: 'Pro', price: 99, inrPrice: 8999, credits: 1500, ...capacity(1500) },
 ];
 
-export const STARTER_OFFER = { price: 2, inrPrice: 200, credits: 50, photos: 6 };
+export const STARTER_OFFER = { price: 2, inrPrice: 200, credits: 50, ...capacity(50) };
 
 export const PLAN_BY_CREDITS = Object.fromEntries(CREDIT_PLANS.map(p => [p.credits, p])) as Record<
   number,

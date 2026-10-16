@@ -77,6 +77,16 @@ describe('display data', () => {
     ]);
     expect(CREDIT_PLANS.find(p => p.name === 'Plus')?.photos).toBe(20);
   });
+
+  it('counts photos at 8 credits and CAD runs at 140 credits each', () => {
+    expect(CREDIT_PLANS.map(p => [p.name, p.photos, p.cads])).toEqual([
+      ['Basic', 12, 0],
+      ['Plus', 20, 1],
+      ['Standard', 62, 3],
+      ['Pro', 187, 10],
+    ]);
+    expect([STARTER_OFFER.photos, STARTER_OFFER.cads]).toEqual([6, 0]);
+  });
 });
 
 describe('isCadWorkflow', () => {
