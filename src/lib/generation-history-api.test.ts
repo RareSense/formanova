@@ -6,7 +6,7 @@ import { extractWorkflowCredits, inferSourceType, resolveSourceType } from './ge
 const mockAuthFetch = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/authenticated-fetch', () => ({ authenticatedFetch: mockAuthFetch }));
 
-import { listMyWorkflows, getWorkflowDetails, fetchCadResult, fetchWorkflowCreditAudit } from './generation-history-api';
+import { listMyWorkflows, listAllMyWorkflows, getWorkflowDetails, fetchCadResult, fetchWorkflowCreditAudit } from './generation-history-api';
 
 function okJson(body: unknown) {
   return Promise.resolve({
@@ -35,6 +35,31 @@ describe('generation-history-api URL shapes', () => {
     const [url] = mockAuthFetch.mock.calls[0];
     expect(url).toMatch(/^\/history\//);
     expect(url).not.toContain('formanova.ai');
+  });
+
+  it('listAllMyWorkflows walks every page until a short page, so runs past the first 100 still show', async () => {
+    const page = (start: number, n: number) => Array.from({ length: n }, (_, i) => (
+      { workflow_id: `w${start + i}`, name: 'jewelry_photoshoots_generator', status: 'completed' }
+    ));
+    mockAuthFetch
+      .mockReturnValueOnce(okJson(page(0, 100)))
+      .mockReturnValueOnce(okJson(page(100, 100)))
+      .mockReturnValueOnce(okJson(page(200, 58)));
+
+    const workflows = await listAllMyWorkflows();
+    expect(workflows).toHaveLength(258);
+    expect(workflows[257].workflow_id).toBe('w257');
+    expect(mockAuthFetch.mock.calls.map(([url]) => url)).toEqual([
+      '/history/workflows/me?limit=100&offset=0',
+      '/history/workflows/me?limit=100&offset=100',
+      '/history/workflows/me?limit=100&offset=200',
+    ]);
+  });
+
+  it('listAllMyWorkflows stops after one request when the user has fewer than 100 runs', async () => {
+    mockAuthFetch.mockReturnValueOnce(okJson([]));
+    expect(await listAllMyWorkflows()).toEqual([]);
+    expect(mockAuthFetch).toHaveBeenCalledTimes(1);
   });
 
   it('classifies the consolidated ring workflow from its reference image count', async () => {

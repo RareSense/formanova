@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { reloadPreservingSession } from '@/lib/reload-utils';
 import {
-  listMyWorkflows,
+  listAllMyWorkflows,
   getWorkflowDetails,
   fetchWorkflowCreditAudit,
   fetchCadResult,
@@ -143,7 +143,7 @@ export default function Generations() {
     (async () => {
       try {
         if (!cached) setGlobalLoading(true);
-        const rawWorkflows = await listMyWorkflows(100, 0);
+        const rawWorkflows = await listAllMyWorkflows();
         const visible = rawWorkflows.filter(w => w.source_type !== 'unknown' && isVisibleGeneration(w));
         // A ring and its improvements are separate runs, so they filled a row
         // each while all showing the same ring. The vault knows which belong
