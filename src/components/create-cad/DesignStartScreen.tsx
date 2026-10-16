@@ -15,6 +15,9 @@ import teddyExample from "@/assets/inspiration-examples/teddy-bear.webp";
 
 const INSPIRATION_EXAMPLES: [string, string][] = [["Ladybug", ladybugExample], ["Flower", flowerExample], ["Spider web", spiderWebExample], ["Teddy bear", teddyExample]];
 
+// Same panel height as CAD from Image, so the upload box and the examples share a top and bottom edge.
+const PANEL_H = "h-[500px] md:h-[640px]";
+
 export type StartMode = "describe" | "draw" | "mix";
 
 export interface DesignBrief {
@@ -96,14 +99,19 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
 
   return (
     <div className="flex w-full items-start justify-center bg-background">
-      <div className="w-full max-w-[760px] px-4 pb-10 pt-16 sm:px-6">
+      <div className={inspiration ? "w-full px-3 pb-6 pt-20 sm:px-6 lg:px-3" : "w-full max-w-[760px] px-4 pb-10 pt-16 sm:px-6"}>
+        <div className={inspiration ? "mb-8 max-w-[680px]" : ""}>
         <span className="marta-label mb-1 block">{flowName} &middot; Step 1</span>
         <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">What are you making?</h3>
         <div ref={cardsRef} className="mt-4">
           <CadJewelryTypeCards value={jewelryType} onChange={setJewelryType} disabled={busy} error={typeError} />
         </div>
+        </div>
 
-        <span className="marta-label mb-1 mt-10 block">{flowName} &middot; Step 2</span>
+        {/* Inspiration lays out like CAD from Image: upload on the left, examples on the right. */}
+        <div className={inspiration ? "grid gap-8 lg:grid-cols-3 lg:gap-10" : ""}>
+        <div className={inspiration ? "lg:col-span-2" : ""}>
+        <span className={`marta-label mb-1 block ${inspiration ? "" : "mt-10"}`}>{flowName} &middot; Step 2</span>
         <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">{inspiration ? "Add your inspiration" : "How do you want to start?"}</h3>
         <p className="mt-1.5 text-sm text-muted-foreground">You'll see the design first. The CAD is only made once you're happy with it.</p>
 
@@ -116,7 +124,7 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
           ))}
         </div>}
 
-        <div className="mt-4">
+        <div className={inspiration ? "mt-2" : "mt-4"}>
           {mode === "describe" && (
             <>
               {textBox(5, jewelryType === "ring"
@@ -151,21 +159,9 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
                 primaryHint="A spider web, a flower, a toy, other jewelry"
                 browseLabel="Browse files"
                 maxImages={MAX_DESIGN_IMAGES}
-                canvasClassName="h-[160px] sm:h-[180px]"
+                canvasClassName={PANEL_H}
+                photoStudioEmptyState
               />
-              <div className="mt-5">
-                <h4 className="text-sm font-medium text-foreground">Try an example</h4>
-                <div className="mt-2 grid grid-cols-4 gap-2">
-                  {INSPIRATION_EXAMPLES.map(([name, src]) => (
-                    <button key={name} type="button" disabled={busy || mixFiles.length >= MAX_DESIGN_IMAGES} aria-label={`Use the ${name.toLowerCase()} example`}
-                      onClick={async () => { const blob = await (await fetch(src)).blob(); addMix([new File([blob], `${name.toLowerCase().replace(/ /g, "-")}.webp`, { type: "image/webp" })]); }}
-                      className="group relative aspect-square overflow-hidden border border-border/40 transition-colors hover:border-foreground/40 disabled:opacity-50">
-                      <img src={src} alt="" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
-                      <span className="absolute inset-x-0 bottom-0 bg-background/85 px-1.5 py-1 text-[11px] text-foreground">{name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
               {mixFiles.length > 1 && <p className="mt-2 text-xs text-muted-foreground">Pictures are lettered left to right: {mixFiles.map((_, i) => String.fromCharCode(65 + i)).join(", ")}</p>}
               {/* Asked only once there is a picture to take from. */}
               {mixFiles.length > 0 && (
@@ -197,6 +193,28 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
             </button>
           </div>
         )}
+        </div>
+
+        {inspiration && (
+          <div>
+            <div className="mb-2">
+              <span className="marta-label invisible mb-1 block" aria-hidden="true">Step 2</span>
+              <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">Try an Example</h3>
+              <p className="mt-1.5 text-sm text-muted-foreground">Choose one to load its picture</p>
+            </div>
+            <div className={`grid grid-cols-2 gap-3 overflow-hidden border border-border/30 p-3 ${PANEL_H}`}>
+              {INSPIRATION_EXAMPLES.map(([name, src]) => (
+                <button key={name} type="button" disabled={busy || mixFiles.length >= MAX_DESIGN_IMAGES} aria-label={`Use the ${name.toLowerCase()} example`}
+                  onClick={async () => { const blob = await (await fetch(src)).blob(); addMix([new File([blob], `${name.toLowerCase().replace(/ /g, "-")}.webp`, { type: "image/webp" })]); }}
+                  className="group relative min-h-0 overflow-hidden border border-border/20 bg-muted/10 transition-colors hover:border-foreground/30 disabled:opacity-50">
+                  <img src={src} alt="" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
+                  <span className="absolute inset-x-0 bottom-0 bg-background/85 px-2 py-1.5 text-xs text-foreground">{name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        </div>
       </div>
     </div>
   );
