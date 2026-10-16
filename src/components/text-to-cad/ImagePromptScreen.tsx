@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState } from "react";
+import { useEffect, useRef, useCallback, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
@@ -9,7 +9,11 @@ import { useJewelryTypeGate } from "@/components/text-to-cad/useJewelryTypeGate"
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import ReferenceImageUploader from "./ReferenceImageUploader";
 import CadHistoryLibrary from "./CadHistoryLibrary";
+import type { CadLibraryEntry } from "@/hooks/useCadHistoryLibrary";
+import { findReusedDimensions } from "@/lib/cad-reuse-dimensions";
 import { CAD_EXAMPLE_DESIGNS, type CadExampleDesign } from "./cad-examples";
+import DesignUseChoice, { type DesignUse } from "./DesignUseChoice";
+import { ArrowRight, Check, Ruler } from "lucide-react";
 
 // Shared fixed height for the upload workspace box and the "My Pieces" panel,
 // so the two columns frame identically — same top edge (both start right
@@ -17,8 +21,14 @@ import { CAD_EXAMPLE_DESIGNS, type CadExampleDesign } from "./cad-examples";
 // CANVAS_H technique (StudioVaultUploadStep.tsx).
 const PANEL_H = "h-[500px] md:h-[640px]";
 
-// The box asks for the spec only: no examples, no promise about the result.
-const DIMENSION_PLACEHOLDER = "Sizes, widths and stone sizes in mm";
+// The box asks for the spec only: an example of the sizes for the chosen piece.
+const DIMENSION_PLACEHOLDER: Record<CadJewelryType, string> = {
+  ring: "e.g. ring size US 7, band 2 mm wide, centre stone 9 × 7 mm",
+  necklace: "e.g. pendant 22 mm tall, chain 1.5 mm, centre stone 8 × 6 mm",
+  bracelet: "e.g. 17 cm inner length, 5 mm wide, stones 3 mm",
+  earring: "e.g. 24 mm long, centre stone 7 × 5 mm",
+  other: "e.g. 30 mm tall, 20 mm wide, stones 3 mm",
+};
 
 function ReferenceExamples({ examples, noun, onSelect }: { examples: CadExampleDesign[]; noun: string; onSelect: (example: CadExampleDesign) => void }) {
   return (
@@ -31,10 +41,7 @@ function ReferenceExamples({ examples, noun, onSelect }: { examples: CadExampleD
           className="group relative min-h-0 overflow-hidden border border-border/20 bg-muted/10 transition-colors hover:border-foreground/30"
           aria-label={`Use ${noun} example ${index + 1}`}
         >
-          <img src={example.image} alt={`${noun} example ${index + 1}`} className="h-full w-full object-cover" />
-          <div className="absolute inset-0 flex items-center justify-center bg-background/85 p-4 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
-            <p className="text-center font-mono text-[10px] leading-[1.6] text-foreground/80">{example.prompt}</p>
-          </div>
+          <img src={example.image} alt={`${noun} example ${index + 1}`} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
         </button>
       ))}
     </div>
@@ -44,6 +51,8 @@ function ReferenceExamples({ examples, noun, onSelect }: { examples: CadExampleD
 interface ImagePromptScreenProps {
   model: string;
   tier: string;
+  /** Admin-only model choice, shown beside Generate CAD. */
+  modelPicker?: ReactNode;
   prompt: string;
   setPrompt: (p: string) => void;
   jewelryType: CadJewelryType | null;
@@ -58,19 +67,35 @@ interface ImagePromptScreenProps {
   /** Replaces the whole set (used by the example designs). */
   onReplaceReferenceImages: (files: File[]) => void;
   onGlbUpload?: (file: File) => void;
+  /**
+   * Opens the design editor with the uploaded pictures. When provided, a
+   * "Use as is / Edit before CAD" choice appears once a picture is uploaded;
+   * when omitted the screen is exactly the plain upload-and-generate flow.
+   */
+  onEditFirst?: () => void;
+  /** Optional control of the choice, so the page can return to Use as is after an edit is approved. */
+  designUse?: DesignUse;
+  onDesignUseChange?: (use: DesignUse) => void;
+  /** The pictures are an approved edit: show that instead of asking again, with Edit again. */
+  editApproved?: boolean;
 }
 
 export default function ImagePromptScreen({
-  model, tier, prompt, setPrompt, jewelryType, setJewelryType,
+  model, tier, modelPicker, prompt, setPrompt, jewelryType, setJewelryType,
   isGenerating, onGenerate,
   referenceImagePreviewUrls,
   onAddReferenceImages, onRemoveReferenceImage, onReplaceReferenceImages,
   onGlbUpload,
+  onEditFirst,
+  designUse: designUseProp,
+  onDesignUseChange,
+  editApproved = false,
 }: ImagePromptScreenProps) {
   const glbInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const promptRef = useRef(prompt);
+  promptRef.current = prompt;
   const noun = jewelryType ? cadJewelryNoun(jewelryType) : "jewelry";
-  const { cardsRef, guardedGenerate, typeError } = useJewelryTypeGate(jewelryType, onGenerate);
   const [hasImageHistory, setHasImageHistory] = useState(false);
 
   const primaryPreviewUrl = referenceImagePreviewUrls[0] ?? null;
@@ -84,24 +109,32 @@ export default function ImagePromptScreen({
     pricingContext: { llm_tier: tier },
   });
 
+  // Loads only the picture: the description stays the customer's own.
   const handleExampleClick = useCallback(async (example: CadExampleDesign) => {
-    setPrompt(example.prompt);
+    if (!jewelryType) setJewelryType("ring");
     try {
       const res = await fetch(example.image);
       const blob = await res.blob();
       const file = new File([blob], `example-${jewelryType ?? "piece"}.webp`, { type: "image/webp" });
       onReplaceReferenceImages([file]);
     } catch {
-      // image load failed -- just set prompt
+      // image load failed -- nothing to load
     }
-  }, [setPrompt, onReplaceReferenceImages, jewelryType]);
+  }, [onReplaceReferenceImages, jewelryType, setJewelryType]);
 
   // "My Pieces" reuse — urls are same-origin, auth-gated /api/artifacts proxy
   // URLs (see useCadHistoryLibrary), so these must go through authenticatedFetch,
   // unlike the bundled example assets above. A multi-angle entry reuses as a
   // whole set in one call, so all its images land together (respecting the
   // existing 5-image cap in useReferenceImages).
-  const handleLibraryImageSelect = useCallback(async (urls: string[]) => {
+  const handleLibraryImageSelect = useCallback(async (urls: string[], entry?: CadLibraryEntry) => {
+    // An empty dimensions box takes what was used with these images last time.
+    // Never overwrites the customer's own words, even typed while this loads.
+    if (entry && !promptRef.current.trim()) {
+      findReusedDimensions(entry)
+        .then((dims) => { if (dims && !promptRef.current.trim()) setPrompt(dims); })
+        .catch(() => { /* no past run found: the box stays empty */ });
+    }
     try {
       const files = await Promise.all(urls.map(async (url, index) => {
         const res = await authenticatedFetch(url);
@@ -113,7 +146,7 @@ export default function ImagePromptScreen({
     } catch {
       // reuse failed -- silently no-op, same as the example-click failure path
     }
-  }, [onAddReferenceImages]);
+  }, [onAddReferenceImages, setPrompt]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -123,6 +156,32 @@ export default function ImagePromptScreen({
   };
 
   const canGenerate = imageCount > 0;
+  const [designUseLocal, setDesignUseLocal] = useState<DesignUse>("as_is");
+  const designUse = designUseProp ?? designUseLocal;
+  const setDesignUse = (use: DesignUse) => { setDesignUseLocal(use); onDesignUseChange?.(use); };
+  // Editing only applies once there is a picture to edit.
+  const editing = !!onEditFirst && imageCount > 0 && !editApproved && designUse === "edit";
+  // One piece-type check for whichever main action is showing: Generate CAD or Edit design.
+  const { cardsRef, guardedGenerate, typeError } = useJewelryTypeGate(jewelryType, editing && onEditFirst ? onEditFirst : onGenerate);
+
+  // "Edit before CAD" opens the editor by itself as soon as it can: a picture
+  // is there and the piece is chosen (asked for first if missing). Once per
+  // picture; the Edit design button reopens it after closing.
+  const autoOpenedFor = useRef<string | null>(null);
+  const askedForType = useRef(false);
+  const chooseDesignUse = (use: DesignUse) => {
+    setDesignUse(use);
+    if (use === "edit") { autoOpenedFor.current = null; askedForType.current = false; }
+  };
+  useEffect(() => {
+    if (!editing || !onEditFirst || !primaryPreviewUrl || autoOpenedFor.current === primaryPreviewUrl) return;
+    if (!jewelryType) {
+      if (!askedForType.current) { askedForType.current = true; guardedGenerate(); }
+      return;
+    }
+    autoOpenedFor.current = primaryPreviewUrl;
+    onEditFirst();
+  }, [editing, jewelryType, primaryPreviewUrl, onEditFirst, guardedGenerate]);
 
   return (
     <div className="w-full flex items-start justify-center bg-background">
@@ -135,7 +194,7 @@ export default function ImagePromptScreen({
         {/* Step 1: which piece. Above the two-column grid so the upload box
             and the right-hand panel still start and end on the same lines. */}
         <div className="mb-8 max-w-[680px]">
-          <span className="marta-label block mb-1">Image to CAD &middot; Step 1</span>
+          <span className="marta-label block mb-1">CAD from Image &middot; Step 1</span>
           <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">What are you making?</h3>
           <div className="mt-4">
             <div ref={cardsRef}>
@@ -148,15 +207,15 @@ export default function ImagePromptScreen({
           <div className="lg:col-span-2">
               <div className="mb-2 flex items-start justify-between gap-3">
                 <div>
-                  <span className="marta-label block mb-1">Image to CAD &middot; Step 2</span>
+                  <span className="marta-label block mb-1">CAD from Image &middot; Step 2</span>
                   <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">Upload your {noun} images</h3>
                   {/* Sets the expectation before the upload, not after the
                       result. Weight and colour carry the emphasis rather than
                       a warning colour: this is how the tool works, not a
                       caution. */}
                   <p className="mt-1.5 text-sm text-muted-foreground">
-                    Upload 1&ndash;5 reference images. We&rsquo;ll use them as{" "}
-                    <span className="font-medium text-foreground">inspiration, not recreate the design exactly.</span>
+                    Upload 1&ndash;5 photos of the{" "}
+                    <span className="font-medium text-foreground">same piece</span>. We&rsquo;ll build the CAD from them.
                   </p>
                 </div>
               </div>
@@ -172,44 +231,77 @@ export default function ImagePromptScreen({
                 photoStudioEmptyState
               />
 
+              {onEditFirst && imageCount > 0 && !editApproved && (
+                <DesignUseChoice value={designUse} onChange={chooseDesignUse} disabled={isGenerating} />
+              )}
+              {onEditFirst && imageCount > 0 && editApproved && (
+                <p className="flex flex-wrap items-center gap-x-1.5 text-sm text-foreground">
+                  <Check className="h-4 w-4 text-emerald-700" aria-hidden="true" />
+                  Edited design approved
+                  <span className="text-muted-foreground" aria-hidden="true">&middot;</span>
+                  <button type="button" onClick={onEditFirst} disabled={isGenerating} className="underline underline-offset-2 hover:text-muted-foreground disabled:opacity-60">
+                    Edit again
+                  </button>
+                </p>
+              )}
+
               {/* Text prompt — secondary. The ask for dimensions is a visible
                   label, not placeholder text: a placeholder vanishes on the
                   first keystroke. The copy names what to enter and nothing
                   else. Same weight-and-colour emphasis as the upload note. */}
+              {!editing && (
               <div className="relative flex-shrink-0">
-                <label htmlFor="image-to-cad-details" className="mb-1.5 flex flex-wrap items-baseline gap-x-2 text-sm">
-                  <span className="font-medium text-foreground">Provide dimensions</span>
-                  <span className="text-muted-foreground">(optional)</span>
-                  <span className="text-muted-foreground">&middot; sizes, widths and stone sizes in mm</span>
+                <label htmlFor="image-to-cad-details" className="block text-[15px] font-medium text-foreground">
+                  Dimensions <span className="font-normal">(optional)</span>
                 </label>
+                <p id="image-to-cad-details-hint" className="mb-2 mt-0.5 text-sm text-muted-foreground">
+                  Provide sizes, widths and stone sizes in mm. Leave empty for standard proportions.
+                </p>
+                <div className="relative">
+                <Ruler aria-hidden="true" className="pointer-events-none absolute left-4 top-4 h-4 w-4 text-muted-foreground" />
                 <textarea
+                  aria-describedby="image-to-cad-details-hint"
                   id="image-to-cad-details"
                   ref={textareaRef}
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder={DIMENSION_PLACEHOLDER}
-                  rows={3}
+                  placeholder={DIMENSION_PLACEHOLDER[jewelryType ?? "ring"]}
+                  rows={1}
                   /* Full-strength border, not a faded one: this is an input and
                      needs to read as an editable field at a glance. */
-                  className="min-h-[96px] max-h-[240px] w-full resize-y overflow-y-auto border border-border bg-background px-5 py-3 pb-7 font-body text-[14px] leading-relaxed text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-foreground/60 focus:ring-1 focus:ring-border"
+                  className="min-h-[72px] sm:min-h-[48px] max-h-[240px] w-full resize-y overflow-y-auto border border-border bg-background py-3 pl-11 pr-20 font-body text-[14px] leading-relaxed text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-foreground/60 focus:ring-1 focus:ring-border"
                 />
                 {prompt.length > 0 && (
                   <button
                     onClick={() => { setPrompt(""); textareaRef.current?.focus(); }}
-                    className="absolute bottom-2.5 right-8 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground/60 hover:text-foreground transition-colors duration-150 cursor-pointer z-10"
+                    className="absolute right-4 top-3.5 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground/60 hover:text-foreground transition-colors duration-150 cursor-pointer z-10"
                   >
                     Clear
                   </button>
                 )}
+                </div>
               </div>
+              )}
 
             </div>
 
             {/* Action area — matches Photo Studio's Next button exactly:
                 right-aligned below the canvas, gold gradient, size="lg". */}
             {(
-              <div className="mt-3 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end">
+              <div className="mt-3 flex flex-col items-stretch gap-3 sm:flex-row sm:items-end sm:justify-end">
+                {!editing && modelPicker}
+                {editing ? (
+                <Button
+                  size="lg"
+                  onClick={guardedGenerate}
+                  disabled={isGenerating}
+                  className="gap-2.5 border-0 bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] px-10 font-display text-base uppercase tracking-wide text-background transition-opacity hover:opacity-90 disabled:opacity-60"
+                >
+                  Edit design
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+                ) : (
                 <Button
                   size="lg"
                   onClick={guardedGenerate}
@@ -219,6 +311,7 @@ export default function ImagePromptScreen({
                   {isGenerating ? "Generating…" : (
                     <>
                       Generate CAD
+                      <ArrowRight className="h-4 w-4" />
                       <span className="inline-flex items-center gap-1 opacity-90">
                         <img src={creditCoinIcon} alt="" className="w-5 h-5" />
                         <span className="font-mono text-sm font-semibold">{costLoading ? '…' : (estimatedCost !== null ? estimatedCost : '—')}</span>
@@ -226,6 +319,7 @@ export default function ImagePromptScreen({
                     </>
                   )}
                 </Button>
+                )}
               </div>
             )}
 
@@ -245,15 +339,10 @@ export default function ImagePromptScreen({
                 <div className="mb-2">
                   <span className="marta-label block mb-1 invisible" aria-hidden="true">Step 2</span>
                   <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">Try an Example</h3>
-                  <p className="mt-1.5 text-sm text-muted-foreground">Choose one to load its image and prompt</p>
+                  <p className="mt-1.5 text-sm text-muted-foreground">Choose one to load its picture</p>
                 </div>
-                {jewelryType ? (
-                  <ReferenceExamples examples={CAD_EXAMPLE_DESIGNS[jewelryType]} noun={noun} onSelect={handleExampleClick} />
-                ) : (
-                  <div className={`flex items-center justify-center border border-border/30 p-6 text-center text-sm text-muted-foreground ${PANEL_H}`}>
-                    Choose what you are making to see examples
-                  </div>
-                )}
+                {/* Rings until they pick another kind of piece. */}
+                <ReferenceExamples examples={CAD_EXAMPLE_DESIGNS[jewelryType ?? "ring"]} noun={jewelryType ? noun : "ring"} onSelect={handleExampleClick} />
                 {/* Below the panel, not in the header: the header must stay the
                     same height as the upload column's, so both panels share a
                     top and bottom edge. First run only: this whole block is

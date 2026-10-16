@@ -29,6 +29,11 @@ describe('ring_cad_nurbs_v1 start body', () => {
     expect(payload).not.toHaveProperty('reference_image_artifacts');
   });
 
+  it('stores the CAD flow as client_flow when given, and leaves it out otherwise', () => {
+    expect(buildRingCadStartBody({ referenceImages: [IMG(1)], clientFlow: 'inspiration' }).payload.client_flow).toBe('inspiration');
+    expect('client_flow' in buildRingCadStartBody({ referenceImages: [IMG(1)] }).payload).toBe(false);
+  });
+
   it('single-image mode sends the same picture in BOTH slots', () => {
     const { payload } = buildRingCadStartBody({ referenceImages: [IMG(1)] });
     expect(payload.reference_image_count).toBe(1);

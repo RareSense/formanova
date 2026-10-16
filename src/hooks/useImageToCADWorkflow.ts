@@ -52,6 +52,8 @@ import { cadStatusNotice, type CadStatusNotice } from '@/lib/cad-status-copy';
 
 
 interface WorkflowParams {
+  /** Which CAD flow this run comes from, for history. */
+  clientFlow?: import('@/lib/ring-cad-nurbs-api').CadClientFlow;
   model: string;
   prompt: string;
   /** Ordered reference set, 0..5 images. Index 0 is IMAGE 1 and wins every conflict. */
@@ -81,6 +83,7 @@ export function useImageToCADWorkflow({
   tier = RING_CAD_DEFAULT_TIER,
   jewelryType = DEFAULT_CAD_JEWELRY_TYPE,
   material = null,
+  clientFlow,
   cadRoute,
   restoringFromUrl = false,
   onWorkspaceActivate,
@@ -605,6 +608,7 @@ export function useImageToCADWorkflow({
         tier,
         jewelryType,
         material,
+        clientFlow,
       });
 
       // JWT only - the tenant API key and on-behalf-of header are applied by the

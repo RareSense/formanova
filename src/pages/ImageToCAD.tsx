@@ -20,6 +20,8 @@ import { trackCadStudioOpen, trackCadReferenceUploaded } from "@/lib/posthog-eve
 import { useCADKeyboardShortcuts } from "@/hooks/use-cad-keyboard-shortcuts";
 
 import ImagePromptScreen from "@/components/text-to-cad/ImagePromptScreen";
+import DesignEditor from "@/components/create-cad/DesignEditor";
+import { useEditBeforeCad } from "@/hooks/useEditBeforeCad";
 import LeftPanel from "@/components/text-to-cad/LeftPanel";
 import MeshPanel from "@/components/text-to-cad/MeshPanel";
 import CADCanvas from "@/components/text-to-cad/CADCanvas";
@@ -32,6 +34,8 @@ import { ViewportToolbar, ViewportSideTools } from "@/components/text-to-cad/Vie
 import GemToggle from "@/components/text-to-cad/QualityToggle";
 import type { GemMode } from "@/components/text-to-cad/CADCanvas";
 import { RING_CAD_DEFAULT_TIER, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
+import CadModelPicker from "@/components/create-cad/CadModelPicker";
+import { useCadModelChoice } from "@/hooks/useCadModelChoice";
 import { recordStudioVisit } from '@/lib/studio-preference';
 import { useCadRestoreFromUrl } from "@/hooks/useCadRestoreFromUrl";
 
@@ -51,8 +55,9 @@ export default function ImageToCAD() {
   const showCadUpload = isCadUploadEnabled(user?.email);
 
   const [model] = useState("gemini");
-  // Every run uses the customer default: GPT-6 Astra, OpenAI direct.
-  const activeTier = RING_CAD_DEFAULT_TIER;
+  // Customers always run the default (GPT-6 Astra, OpenAI direct); admins pick the model.
+  const modelChoice = useCadModelChoice(RING_CAD_DEFAULT_TIER);
+  const activeTier = modelChoice.tier;
   const {
     referenceImages,
     referenceImagePreviewUrls,
@@ -105,6 +110,7 @@ export default function ImageToCAD() {
   );
 
   const workflow = useImageToCADWorkflow({
+    clientFlow: "image",
     model,
     prompt,
     referenceImages,
@@ -115,6 +121,19 @@ export default function ImageToCAD() {
     // paints the loading state instead of an empty workspace.
     restoringFromUrl: isRestoringFromUrl,
     onWorkspaceActivate: activateWorkspace,
+  });
+  const modelPicker = modelChoice.isAdmin
+    ? <CadModelPicker value={modelChoice.tier} onChange={modelChoice.setTier} disabled={workflow.isGenerating} />
+    : null;
+
+  // Edit before CAD: the choice under the upload and the editor window.
+  const editBeforeCad = useEditBeforeCad({
+    model,
+    tier: activeTier,
+    referenceImages,
+    replaceReferenceImages,
+    startCad: workflow.simulateGeneration,
+    isGenerating: workflow.isGenerating,
   });
 
   // A new model starts assembled.
@@ -243,6 +262,7 @@ export default function ImageToCAD() {
         <ImagePromptScreen
           model={model}
           tier={activeTier}
+          modelPicker={modelPicker}
           prompt={prompt}
           setPrompt={setPrompt}
           jewelryType={jewelryType}
@@ -250,9 +270,13 @@ export default function ImageToCAD() {
           isGenerating={workflow.isGenerating}
           onGenerate={workflow.simulateGeneration}
           referenceImagePreviewUrls={panelReferenceUrls}
-          onAddReferenceImages={addReferenceImages}
-          onRemoveReferenceImage={removeReferenceImage}
+          onAddReferenceImages={(files) => { editBeforeCad.picturesChanged(); addReferenceImages(files); }}
+          onRemoveReferenceImage={(index) => { editBeforeCad.picturesChanged(); removeReferenceImage(index); }}
           onReplaceReferenceImages={replaceReferenceImages}
+          onEditFirst={editBeforeCad.openEditor}
+          designUse={editBeforeCad.designUse}
+          onDesignUseChange={editBeforeCad.setDesignUse}
+          editApproved={editBeforeCad.editApproved}
           onGlbUpload={showCadUpload ? (file) => {
             setWorkspaceActive(true);
             workflow.setHasModel(true);
@@ -268,6 +292,13 @@ export default function ImageToCAD() {
             }
           } : undefined}
         />
+        <DesignEditor
+          {...editBeforeCad.editorProps}
+          jewelryType={jewelryType}
+          dimensions={prompt}
+          onDimensions={setPrompt}
+          modelPicker={modelPicker}
+        />
       </div>
     );
   }
@@ -276,7 +307,7 @@ export default function ImageToCAD() {
   return (
     <>
       <Helmet>
-        <title>Image to CAD | FormaNova</title>
+        <title>CAD from Image | FormaNova</title>
         <meta name="description" content="Upload a sketch or reference image and convert it into a 3D CAD model with AI-powered accuracy. Works for rings, necklaces, bracelets, earrings and more." />
         <link rel="canonical" href="/image-to-cad" />
         <meta name="robots" content="noindex, nofollow" />
@@ -302,7 +333,7 @@ export default function ImageToCAD() {
                 else canvasRef.current?.removeAllTextures();
               }}
               onReset={workflow.hasModel ? handleReset : undefined}
-              pageTitle="Image to CAD"
+              pageTitle="CAD from Image"
               referenceImagePreviewUrls={panelReferenceUrls}
               versions={workflow.versions}
               selectedVersionId={workflow.selectedVersionId}

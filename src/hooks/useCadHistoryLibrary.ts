@@ -14,6 +14,8 @@ export interface CadLibraryEntry {
   referenceImageUrls: string[];
   /** Asset ids, index-parallel to referenceImageUrls. */
   assetIds: string[];
+  /** Content hashes of those images, where known; matches them to past runs. */
+  sha256s?: string[];
   /** Cover asset id — what rename targets. Null for prompt entries. */
   assetId: string | null;
   /** Cover's user-given name, if any — image entries only. */
@@ -52,6 +54,7 @@ function groupBySet(assets: UserAsset[]): CadLibraryEntry[] {
       prompt: null,
       referenceImageUrls: members.map((m) => m.thumbnail_url),
       assetIds: members.map((m) => m.id),
+      sha256s: members.map((m) => m.artifact_sha256 ?? m.sha256).filter((s): s is string => Boolean(s)),
       assetId: cover.id,
       name: getAssetDisplayName(cover) || null,
     };

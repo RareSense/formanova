@@ -18,7 +18,7 @@ import ImagePromptScreen from './ImagePromptScreen';
 
 function renderScreen(
   jewelryType: 'ring' | 'necklace' | 'bracelet' | 'earring' | 'other' | null = 'ring',
-  { onGenerate = vi.fn(), previews = [] as string[] } = {},
+  { onGenerate = vi.fn(), previews = [] as string[], onEditFirst = undefined as (() => void) | undefined, editApproved = false } = {},
 ) {
   return render(
     <ImagePromptScreen
@@ -34,6 +34,8 @@ function renderScreen(
       onAddReferenceImages={vi.fn()}
       onRemoveReferenceImage={vi.fn()}
       onReplaceReferenceImages={vi.fn()}
+      onEditFirst={onEditFirst}
+      editApproved={editApproved}
     />,
   );
 }
@@ -66,7 +68,7 @@ describe('ImagePromptScreen', () => {
   it('asks what is being made first, as Step 1, with the picture cards', () => {
     renderScreen();
 
-    expect(screen.getByText(/image to cad · step 1/i)).toBeTruthy();
+    expect(screen.getByText(/cad from image · step 1/i)).toBeTruthy();
     expect(screen.getByRole('heading', { name: /what are you making\?/i })).toBeTruthy();
     expect(screen.getByRole('radiogroup', { name: 'Jewelry type' })).toBeTruthy();
     expect(screen.queryByRole('combobox')).toBeNull();
@@ -85,19 +87,19 @@ describe('ImagePromptScreen', () => {
     expect(screen.getByRole('heading', { name: /upload your piece images/i })).toBeTruthy();
   });
 
-  it('asks for the spec only in the prompt box, whatever the piece', () => {
+  it('shows an example of the sizes for the chosen piece in the box', () => {
     renderScreen('bracelet');
 
-    expect(screen.getByPlaceholderText('Sizes, widths and stone sizes in mm')).toBeTruthy();
+    expect(screen.getByPlaceholderText(/17 cm inner length/)).toBeTruthy();
   });
 
   it('asks plainly for dimensions above the prompt box, marked optional, and labels the box with it', () => {
     renderScreen('ring');
 
     // The ask is a visible label, not placeholder text that disappears on the first keystroke.
-    expect(screen.getByText('Provide dimensions')).toBeTruthy();
     expect(screen.getByText('(optional)')).toBeTruthy();
-    expect(screen.getByRole('textbox', { name: /provide dimensions/i })).toBeTruthy();
+    expect(screen.getByText(/leave empty for standard proportions/i)).toBeTruthy();
+    expect(screen.getByRole('textbox', { name: /dimensions/i })).toBeTruthy();
   });
 
   it('shows examples for the chosen piece', () => {
@@ -113,7 +115,7 @@ describe('ImagePromptScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: /generate cad/i }));
 
     expect(onGenerate).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert').textContent).toMatch(/choose what you are making/i);
+    expect(screen.getByRole('alert').textContent).toMatch(/select what you're making/i);
   });
 
   it('generates once a piece is chosen', () => {
@@ -125,10 +127,85 @@ describe('ImagePromptScreen', () => {
     expect(onGenerate).toHaveBeenCalledTimes(1);
   });
 
-  it('asks for a piece instead of showing examples while none is chosen', () => {
+  it('shows ring examples until another piece is chosen, and loads only the picture', () => {
     renderScreen(null);
 
-    expect(screen.getByText(/choose what you are making to see examples/i)).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /example 1/i })).toBeNull();
+    expect(screen.queryByText(/choose what you are making to see examples/i)).toBeNull();
+    expect(screen.getByText(/choose one to load its picture/i)).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: /ring example/i }).length).toBeGreaterThan(0);
+  });
+
+  describe('use as is / edit before CAD', () => {
+    it('is not offered unless the page supports editing, so the plain flow is unchanged', () => {
+      renderScreen('ring', { previews: ['blob:one'] });
+      expect(screen.queryByRole('radiogroup', { name: /how should we use this design/i })).toBeNull();
+      expect(screen.getByRole('textbox', { name: /dimensions/i })).toBeTruthy();
+    });
+
+    it('appears only once a picture is uploaded', () => {
+      renderScreen('ring', { onEditFirst: vi.fn() });
+      expect(screen.queryByRole('radiogroup', { name: /how should we use this design/i })).toBeNull();
+    });
+
+    it('starts on Use as is, with dimensions and Generate CAD as today', () => {
+      const onGenerate = vi.fn();
+      renderScreen('ring', { onGenerate, onEditFirst: vi.fn(), previews: ['blob:one'] });
+      expect(screen.getByRole('radio', { name: /use as is/i }).getAttribute('aria-checked')).toBe('true');
+      expect(screen.getByRole('textbox', { name: /dimensions/i })).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: /generate cad/i }));
+      expect(onGenerate).toHaveBeenCalledTimes(1);
+    });
+
+    it('choosing Edit before CAD opens the editor at once; Edit design reopens it', () => {
+      const onGenerate = vi.fn();
+      const onEditFirst = vi.fn();
+      renderScreen('ring', { onGenerate, onEditFirst, previews: ['blob:one'] });
+      fireEvent.click(screen.getByRole('radio', { name: /edit before cad/i }));
+      expect(onEditFirst).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole('textbox', { name: /dimensions/i })).toBeNull();
+      expect(screen.queryByRole('button', { name: /generate cad/i })).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: /edit design/i }));
+      expect(onEditFirst).toHaveBeenCalledTimes(2);
+      expect(onGenerate).not.toHaveBeenCalled();
+    });
+
+    it('opens the editor by itself once the piece is chosen after picking Edit', () => {
+      const onEditFirst = vi.fn();
+      const { rerender } = renderScreen(null, { onEditFirst, previews: ['blob:one'] });
+      fireEvent.click(screen.getByRole('radio', { name: /edit before cad/i }));
+      expect(onEditFirst).not.toHaveBeenCalled();
+      rerender(
+        <ImagePromptScreen model="gemini" tier="claude_opus_5_openrouter" prompt="" setPrompt={vi.fn()} jewelryType="ring" setJewelryType={vi.fn()}
+          isGenerating={false} onGenerate={vi.fn()} referenceImagePreviewUrls={['blob:one']} onAddReferenceImages={vi.fn()} onRemoveReferenceImage={vi.fn()}
+          onReplaceReferenceImages={vi.fn()} onEditFirst={onEditFirst} designUse="edit" />,
+      );
+      expect(onEditFirst).toHaveBeenCalledTimes(1);
+    });
+
+    it('brings dimensions back when switching back to Use as is', () => {
+      renderScreen('ring', { onEditFirst: vi.fn(), previews: ['blob:one'] });
+      fireEvent.click(screen.getByRole('radio', { name: /edit before cad/i }));
+      fireEvent.click(screen.getByRole('radio', { name: /use as is/i }));
+      expect(screen.getByRole('textbox', { name: /dimensions/i })).toBeTruthy();
+    });
+  
+    it('does not ask again once an edited design is approved, and offers Edit again', () => {
+      const onEditFirst = vi.fn();
+      renderScreen('ring', { onEditFirst, previews: ['blob:one'], editApproved: true });
+      expect(screen.queryByRole('radiogroup', { name: /how should we use this design/i })).toBeNull();
+      expect(screen.getByText(/edited design approved/i)).toBeTruthy();
+      expect(screen.getByRole('textbox', { name: /dimensions/i })).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: /edit again/i }));
+      expect(onEditFirst).toHaveBeenCalledTimes(1);
+    });
+
+    it('asks what is being made before opening the editor', () => {
+      const onEditFirst = vi.fn();
+      renderScreen(null, { onEditFirst, previews: ['blob:one'] });
+      fireEvent.click(screen.getByRole('radio', { name: /edit before cad/i }));
+      fireEvent.click(screen.getByRole('button', { name: /edit design/i }));
+      expect(onEditFirst).not.toHaveBeenCalled();
+      expect(screen.getByRole('alert').textContent).toMatch(/select what you're making/i);
+    });
   });
 });

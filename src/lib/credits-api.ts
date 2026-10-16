@@ -1,6 +1,7 @@
 // Credits API client — relative paths only
 
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
+import { DESIGN_IMAGE_CREDITS } from '@/lib/design-image-api';
 
 // Client-side fallback costs used by performCreditPreflight when the backend
 // /api/credits/estimate call fails or returns a non-positive value.
@@ -36,6 +37,9 @@ export const TOOL_COSTS: Record<string, number> = {
   // used if /credits/estimate fails, so keep it at the highest current hold instead
   // of the removed legacy static 10/13/18 table.
   human_fix_photoshoot: 44,
+  // One design picture (new design, edit, regenerate or angle); the backend
+  // policy design_image_v1 charges the same fixed amount.
+  design_image_v1: DESIGN_IMAGE_CREDITS,
   cad_generation: 85,
   ring_full_pipeline: 85,
   ring_generate_v1: 85,

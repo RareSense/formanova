@@ -50,6 +50,10 @@ export interface WorkflowSummary {
   prompt?: string | null;
   /** Reference images the user uploaded for this run, resolved to same-origin artifact-proxy URLs. Empty for text_to_cad. */
   reference_image_urls?: string[];
+  /** Asset ids and content hashes of those reference images, to find the run a reused image came from. */
+  reference_image_keys?: string[];
+  /** The CAD flow that started the run (stored in the payload as client_flow). */
+  client_flow?: "image" | "idea" | "inspiration" | null;
 }
 
 export interface WorkflowStep {
@@ -144,7 +148,7 @@ export async function listMyWorkflows(
     // temporal-agentic-pipeline's tests/unit/test_workflow_helpers.py).
     // reference_images never matched real data; kept as a defensive fallback
     // only in case an older/alternate response shape used that name instead.
-    const referenceImageArtifacts: Array<{ uri?: string }> = Array.isArray(w.input?.reference_image_artifacts)
+    const referenceImageArtifacts: Array<{ uri?: string; sha256?: string; asset_id?: string }> =Array.isArray(w.input?.reference_image_artifacts)
       ? w.input.reference_image_artifacts
       : Array.isArray(w.input?.reference_images)
         ? w.input.reference_images
@@ -168,6 +172,10 @@ export async function listMyWorkflows(
     const referenceImageUrls = referenceImageArtifacts
       .map((artifact) => azureUriToUrl(artifact?.uri))
       .filter((url): url is string => Boolean(url));
+    // Stored blobs are content-addressed, so the hash is also in the uri.
+    const referenceImageKeys = referenceImageArtifacts
+      .flatMap((artifact) => [artifact?.asset_id, artifact?.sha256, artifact?.uri?.match(/[a-f0-9]{64}/i)?.[0]])
+      .filter((key): key is string => typeof key === 'string' && key.length > 0);
     return {
       workflow_id: w.workflow_id ?? w.id,
       name,
@@ -183,6 +191,8 @@ export async function listMyWorkflows(
       output_asset_name: extractOutputAssetName(w),
       prompt,
       reference_image_urls: referenceImageUrls,
+      reference_image_keys: referenceImageKeys,
+      client_flow: ["image", "idea", "inspiration"].includes(w.input?.client_flow) ? w.input.client_flow : null,
     };
   });
   if (__DEV__) {

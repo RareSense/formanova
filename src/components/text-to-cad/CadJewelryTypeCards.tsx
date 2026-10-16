@@ -10,20 +10,18 @@
  */
 
 import { useId, useRef, type KeyboardEvent } from 'react';
-import { Check, Sparkles } from 'lucide-react';
+import { Check } from 'lucide-react';
 
 import { CAD_JEWELRY_TYPES, type CadJewelryType } from '@/lib/ring-cad-nurbs-api';
 import { cn } from '@/lib/utils';
-import ringImage from '@/assets/cad-jewelry-types/ring.webp';
-import necklaceImage from '@/assets/cad-jewelry-types/necklace.webp';
-import braceletImage from '@/assets/cad-jewelry-types/bracelet.webp';
-import earringImage from '@/assets/cad-jewelry-types/earring.webp';
+import ThemedCadPicture from '@/components/create-cad/ThemedCadPicture';
 
-const CARD_IMAGES: Partial<Record<CadJewelryType, string>> = {
-  ring: ringImage,
-  necklace: necklaceImage,
-  bracelet: braceletImage,
-  earring: earringImage,
+// Real Rhino captures as theme-coloured layers: grey shading plus metal and gem masks.
+const layers = import.meta.glob('@/assets/cad-jewelry-types/*-{shade,metal,gems}.webp', { eager: true, import: 'default' }) as Record<string, string>;
+const pick = (type: string, part: string) => Object.entries(layers).find(([k]) => k.endsWith(`/${type}-${part}.webp`))?.[1];
+const picture = (type: string) => {
+  const shade = pick(type, 'shade'), metal = pick(type, 'metal'), gems = pick(type, 'gems');
+  return shade && metal && gems ? { shade, metal, gems } : undefined;
 };
 
 interface CadJewelryTypeCardsProps {
@@ -52,17 +50,23 @@ export default function CadJewelryTypeCards({ value, onChange, disabled, error }
 
   return (
     <div>
+      {error && (
+        <p id={errorId} role="alert" className="mb-2 flex items-center gap-1.5 text-sm font-medium text-destructive">
+          <span aria-hidden="true" className="flex h-4 w-4 animate-pulse items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-background">!</span>
+          {error}
+        </p>
+      )}
       <div
         role="radiogroup"
         aria-label="Jewelry type"
         aria-required="true"
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errorId : undefined}
-        className="grid grid-cols-3 gap-3 sm:grid-cols-5"
+        className={cn("grid grid-cols-3 gap-3 sm:grid-cols-5", error && "bg-destructive/5 outline outline-1 outline-offset-4 outline-destructive")}
       >
         {CAD_JEWELRY_TYPES.map((type, index) => {
           const selected = type.value === value;
-          const image = CARD_IMAGES[type.value];
+          const image = picture(type.value);
           return (
             <button
               key={type.value}
@@ -88,14 +92,17 @@ export default function CadJewelryTypeCards({ value, onChange, disabled, error }
             >
               {/* The renders share one grey backdrop; Other uses the same grey so
                   all five squares read as one set. */}
-              <div className="relative aspect-square w-full overflow-hidden bg-[#dfdedf]">
-                {image ? (
-                  <img src={image} alt="" draggable={false} className="h-full w-full object-cover" />
+              <div className="relative aspect-square w-full overflow-hidden bg-muted/30">
+                {type.value !== 'other' && image ? (
+                  <ThemedCadPicture {...image} className="h-full w-full" />
                 ) : (
-                  <div className="flex h-full flex-col items-center justify-center gap-2 px-2 text-center">
-                    <Sparkles aria-hidden="true" strokeWidth={1.5} className="h-6 w-6 text-zinc-700" />
-                    <span id={otherHintId} className="hidden text-[11px] leading-snug text-zinc-700 sm:block">Brooches, tiaras, watches &amp; more</span>
-                  </div>
+                  // Other: a faint tiara behind the words, so it reads as one of the set.
+                  <>
+                    {image && <ThemedCadPicture {...image} className="absolute inset-0 h-full w-full opacity-30" />}
+                    <div className="relative flex h-full items-center justify-center px-3 text-center">
+                      <span id={otherHintId} className="text-xs font-medium leading-snug text-foreground">Brooches, tiaras, watches &amp; more</span>
+                    </div>
+                  </>
                 )}
                 {selected && (
                   <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center bg-formanova-hero-accent">
@@ -110,11 +117,6 @@ export default function CadJewelryTypeCards({ value, onChange, disabled, error }
           );
         })}
       </div>
-      {error && (
-        <p id={errorId} role="alert" className="mt-2 font-mono text-[11px] text-destructive">
-          {error}
-        </p>
-      )}
     </div>
   );
 }

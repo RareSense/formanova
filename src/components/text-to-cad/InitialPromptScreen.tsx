@@ -138,10 +138,11 @@ export default function InitialPromptScreen({
                   Try an example
                 </h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {(jewelryType ? CAD_EXAMPLE_PROMPTS[jewelryType] : []).map((ex) => (
+                  {/* Rings until they pick another kind of piece. */}
+                  {CAD_EXAMPLE_PROMPTS[jewelryType ?? "ring"].map((ex) => (
                     <button
                       key={ex}
-                      onClick={() => setPrompt(ex)}
+                      onClick={() => { setPrompt(ex); if (!jewelryType) setJewelryType("ring"); }}
                       className="px-3 py-2.5 text-[12px] font-body text-muted-foreground hover:text-foreground border border-border hover:border-foreground/20 hover:bg-accent/30 transition-all duration-150 cursor-pointer text-left"
                     >
                       {ex}

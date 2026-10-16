@@ -19,8 +19,19 @@ import type { EffortLevel } from '@/components/studio/EffortToggle';
 
 import modelShotImg from '@/assets/jewelry/model-shot-card.webp';
 import productShotImg from '@/assets/cad-studio/product-shot-card.webp';
-import textToCadImg from '@/assets/text-to-cad-thumb.webp';
-import imageToCadImg from '@/assets/image-to-cad-thumb.webp';
+import CadStoryPicture, { type CadStory } from '@/components/create-cad/CadStoryPicture';
+// Real Rhino captures of models we built, as theme-coloured layers.
+import fireflyPhoto from '@/assets/cad-cards/story/firefly-photo.webp';
+import ladybugPhoto from '@/assets/cad-cards/story/ladybug-photo.webp';
+import earringShade from '@/assets/cad-cards/story/earring-shade.webp';
+import earringMetal from '@/assets/cad-cards/story/earring-metal.webp';
+import earringGems from '@/assets/cad-cards/story/earring-gems.webp';
+import solitaireShade from '@/assets/cad-cards/story/solitaire-shade.webp';
+import solitaireMetal from '@/assets/cad-cards/story/solitaire-metal.webp';
+import solitaireGems from '@/assets/cad-cards/story/solitaire-gems.webp';
+import ladybugShade from '@/assets/cad-cards/story/ladybug-shade.webp';
+import ladybugMetal from '@/assets/cad-cards/story/ladybug-metal.webp';
+import ladybugGems from '@/assets/cad-cards/story/ladybug-gems.webp';
 
 type Workflow = {
   title: string;
@@ -28,7 +39,9 @@ type Workflow = {
   /** Existing destination, unchanged from the Photo Studio / CAD Studio pages. */
   route: string;
   icon: React.ComponentType<{ className?: string }>;
-  image: string;
+  image?: string;
+  /** CAD cards: what goes in and the CAD it becomes, drawn in theme colours. */
+  story?: CadStory;
   /** Photography still passes through the first-run effort chooser. */
   usesEffortIntro?: boolean;
   /** PostHog value, identical to what the Photo Studio page sent. */
@@ -61,20 +74,28 @@ const photographyWorkflows: Workflow[] = [
 
 const cadWorkflows: Workflow[] = [
   {
-    title: 'Text to CAD',
-    description: 'Describe your jewelry and generate a CAD model.',
-    route: '/text-to-cad',
-    icon: TextToCadIcon,
-    wideIcon: true,
-    image: textToCadImg,
-  },
-  {
-    title: 'Image to CAD',
-    description: 'Turn jewelry inspiration images into a CAD model.',
+    title: 'CAD from Image',
+    description: 'Turn your jewelry photo into a CAD model.',
     route: '/image-to-cad',
     icon: ImageToCadIcon,
     wideIcon: true,
-    image: imageToCadImg,
+    story: { inputLabel: 'Your photo', input: { kind: 'photo', src: fireflyPhoto }, cad: { shade: earringShade, metal: earringMetal, gems: earringGems } },
+  },
+  {
+    title: 'CAD from Idea',
+    description: 'Turn your idea into a CAD model.',
+    route: '/text-to-cad',
+    icon: TextToCadIcon,
+    wideIcon: true,
+    story: { inputLabel: 'Your idea', input: { kind: 'prompt', text: 'Solitaire ring, round diamond, pavé band…' }, cad: { shade: solitaireShade, metal: solitaireMetal, gems: solitaireGems } },
+  },
+  {
+    title: 'CAD from Inspiration',
+    description: 'Turn your inspiration into a CAD model.',
+    route: '/inspiration-to-cad',
+    icon: ImageToCadIcon,
+    wideIcon: true,
+    story: { inputLabel: 'Inspiration', input: { kind: 'photo', src: ladybugPhoto, cover: true }, cad: { shade: ladybugShade, metal: ladybugMetal, gems: ladybugGems } },
   },
 ];
 
@@ -159,9 +180,12 @@ const CONTINUE_BUTTON =
 function WorkflowCard({
   workflow,
   onSelect,
+  className = '',
 }: {
   workflow: Workflow;
   onSelect: (workflow: Workflow) => void;
+  /** Grid placement only. */
+  className?: string;
 }) {
   const Icon = workflow.icon;
 
@@ -171,17 +195,21 @@ function WorkflowCard({
       whileHover={{ scale: 1.01 }}
       whileTap={{ scale: 0.99 }}
       onClick={() => onSelect(workflow)}
-      className={`${CARD_FRAME} flex flex-col`}
+      className={`${CARD_FRAME} flex flex-col ${className}`}
     >
       {/* Image */}
       <div className="relative aspect-[4/3] overflow-hidden">
-        <img
-          src={workflow.image}
-          alt={workflow.title}
-          loading="lazy"
-          decoding="async"
-          className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-        />
+        {workflow.story ? (
+          <CadStoryPicture story={workflow.story} />
+        ) : (
+          <img
+            src={workflow.image}
+            alt={workflow.title}
+            loading="lazy"
+            decoding="async"
+            className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        )}
       </div>
 
       {/* Content */}
@@ -282,29 +310,40 @@ export default function Dashboard() {
           </p>
         </motion.div>
 
-        {/* Photography and CAD as adjacent column groups, four cards across.
-            Chosen over the two 2x2 alternatives that were trialled here. */}
-        
+        {/* Every card is the same size on every screen, so no workflow looks
+            more important. Laptop: all five in one line (2 + 3). Tablet: one
+            section per row, three columns, Photography's two centred. Phone:
+            two columns, the third CAD card centred under the other two. */}
           <motion.div
-              variants={containerVariants}
+            variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className="w-full max-w-[1400px] grid md:grid-cols-2 gap-x-4 lg:gap-x-6 xl:gap-x-8 gap-y-2 sm:gap-y-6 pb-0 sm:pb-4"
+            className="w-full max-w-[1400px] grid lg:grid-cols-[2fr_3fr] gap-x-4 lg:gap-x-6 xl:gap-x-8 gap-y-2 sm:gap-y-6 pb-0 sm:pb-4"
           >
             <section aria-labelledby="dashboard-photography" className="flex flex-col">
               <CategoryDivider id="dashboard-photography" label="Photography" />
-              <div className="grid grid-cols-2 gap-2 sm:gap-4 md:gap-5 flex-1">
-                {photographyWorkflows.map((workflow) => (
-                  <WorkflowCard key={workflow.title} workflow={workflow} onSelect={handleSelect} />
+              <div className="grid grid-cols-2 sm:grid-cols-6 lg:grid-cols-2 gap-2 sm:gap-4 md:gap-5 flex-1">
+                {photographyWorkflows.map((workflow, i) => (
+                  <WorkflowCard
+                    key={workflow.title}
+                    workflow={workflow}
+                    onSelect={handleSelect}
+                    className={`sm:col-span-2 lg:col-span-1 ${i === 0 ? 'sm:col-start-2 lg:col-start-auto' : ''}`}
+                  />
                 ))}
               </div>
             </section>
 
             <section aria-labelledby="dashboard-cad" className="flex flex-col">
               <CategoryDivider id="dashboard-cad" label="CAD" tag={<RhinoTag />} />
-              <div className="grid grid-cols-2 gap-2 sm:gap-4 md:gap-5 flex-1">
-                {cadWorkflows.map((workflow) => (
-                  <WorkflowCard key={workflow.title} workflow={workflow} onSelect={handleSelect} />
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4 md:gap-5 flex-1">
+                {cadWorkflows.map((workflow, i) => (
+                  <WorkflowCard
+                    key={workflow.title}
+                    workflow={workflow}
+                    onSelect={handleSelect}
+                    className={i === cadWorkflows.length - 1 ? 'col-span-2 w-[calc(50%-4px)] justify-self-center sm:col-span-1 sm:w-auto sm:justify-self-stretch' : ''}
+                  />
                 ))}
               </div>
             </section>

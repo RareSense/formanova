@@ -52,6 +52,11 @@ export const RING_CAD_TIERS = {
   GEMINI_3_8_FLASH_OPENROUTER: 'gemini_3_8_flash_openrouter',
   GEMINI_4_ARGON_GOOGLE: 'gemini_4_argon_google',
   GEMINI_4_ARGON_OPENROUTER: 'gemini_4_argon_openrouter',
+  // Run on the Claude or ChatGPT subscription connected to the toolkit, not an API key.
+  CLAUDE_FABLE_5_1_SUBSCRIPTION: 'claude_fable_5_1_subscription',
+  CLAUDE_OPUS_5_5_SUBSCRIPTION: 'claude_opus_5_5_subscription',
+  GPT_6_ASTRA_CHATGPT_SUBSCRIPTION: 'gpt_6_astra_chatgpt_subscription',
+  GPT_5_6_SOL_CHATGPT_SUBSCRIPTION: 'gpt_5_6_sol_chatgpt_subscription',
 } as const;
 
 export type RingCadTier = (typeof RING_CAD_TIERS)[keyof typeof RING_CAD_TIERS];
@@ -204,7 +209,12 @@ export interface ArtifactRef {
  */
 export type ImageInput = string | ArtifactRef | CadReferenceItem;
 
+/** Which CAD flow started the run; stored with the run and read back by history. */
+export type CadClientFlow = 'image' | 'idea' | 'inspiration';
+
 export interface RingCadStartParams {
+  /** Stored in the payload as client_flow (no node reads it). */
+  clientFlow?: CadClientFlow;
   /** Ordered; index 0 is IMAGE 1 and wins every conflict. 0 to 5 entries. */
   referenceImages: ImageInput[];
   /** Required when there are no images; optional but always used otherwise. */
@@ -294,6 +304,7 @@ export function buildRingCadStartBody({
   tier = RING_CAD_DEFAULT_TIER,
   jewelryType = DEFAULT_CAD_JEWELRY_TYPE,
   material = null,
+  clientFlow,
 }: RingCadStartParams): RingCadStartBody {
   const images = [...referenceImages];
   const description = (userDescription ?? '').trim();
@@ -344,6 +355,7 @@ export function buildRingCadStartBody({
     };
   }
 
+  if (clientFlow) payload.client_flow = clientFlow;
   return { payload };
 }
 
@@ -404,7 +416,7 @@ export interface RingCadFailure {
   retryable: boolean;
 }
 
-function readArtifact(value: unknown): ArtifactRef | null {
+export function readArtifact(value: unknown): ArtifactRef | null {
   if (!value || typeof value !== 'object') return null;
   const a = value as Partial<ArtifactRef>;
   const signedUrl = typeof a.url === 'string' && a.url ? a.url : '';

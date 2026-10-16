@@ -67,7 +67,7 @@ describe('InitialPromptScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: /generate cad/i }));
 
     expect(onGenerate).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert').textContent).toMatch(/choose what you are making/i);
+    expect(screen.getByRole('alert').textContent).toMatch(/select what you're making/i);
   });
 
   it('generates once a piece is chosen', () => {

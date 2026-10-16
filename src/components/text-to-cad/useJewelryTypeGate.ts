@@ -9,7 +9,7 @@ import { useCallback, useRef, useState } from 'react';
 
 import type { CadJewelryType } from '@/lib/ring-cad-nurbs-api';
 
-export const JEWELRY_TYPE_REQUIRED = 'Choose what you are making to continue.';
+export const JEWELRY_TYPE_REQUIRED = "Select what you're making.";
 
 export function useJewelryTypeGate(jewelryType: CadJewelryType | null, onGenerate: () => void) {
   const [attempted, setAttempted] = useState(false);

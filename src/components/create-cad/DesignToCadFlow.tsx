@@ -1,0 +1,140 @@
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useDesignImageRun } from "@/hooks/useDesignImageRun";
+import { blobToDataUrl } from "@/lib/design-image-run";
+import { cadJewelryNoun, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
+import type { DesignImageStartParams } from "@/lib/design-image-api";
+import DesignStartScreen, { type DesignBrief, type DesignStartVariant } from "./DesignStartScreen";
+import DesignPickScreen, { type PickSlot } from "./DesignPickScreen";
+import DesignGenerating from "./DesignGenerating";
+import DesignEditor from "./DesignEditor";
+import { fileFromUrl, toObjectUrl } from "./picture-urls";
+
+interface DesignToCadFlowProps {
+  jewelryType: CadJewelryType | null;
+  setJewelryType: (t: CadJewelryType) => void;
+  onGlbUpload?: (file: File) => void;
+  /** Dimensions for the CAD (the page's prompt). */
+  dimensions: string;
+  onDimensions: (text: string) => void;
+  cadCost: number | null;
+  cadCostLoading: boolean;
+  /** Admin-only model choice, shown beside Generate CAD. */
+  modelPicker?: ReactNode;
+  creatingCad: boolean;
+  /** Generate CAD from the approved pictures (main first). */
+  onCreateCad: (files: File[]) => void;
+  /** Idea (describe or draw) or Inspiration (pictures). */
+  variant?: DesignStartVariant;
+}
+
+/** What the toolkit is asked for, from the customer's brief. */
+export async function requestFor(brief: DesignBrief, jewelryType: CadJewelryType | null): Promise<DesignImageStartParams> {
+  const noun = jewelryType ? cadJewelryNoun(jewelryType) : "piece";
+  // A drawing is the piece itself, built as drawn; Inspiration pictures are translated.
+  const role = brief.mode === "draw" ? "drawing" as const : "reference" as const;
+  const images = await Promise.all(brief.images.map(async (f) => ({ role, image: await blobToDataUrl(f) })));
+  // The toolkit needs words when no design is being edited; Draw and Mix may have none.
+  const fallback = brief.mode === "draw"
+    ? `Turn this drawing into a realistic ${noun} design.`
+    : brief.mode === "mix"
+      ? brief.images.length > 1 ? `Combine these pictures into one ${noun} design.` : `Design a ${noun} inspired by this picture.`
+      : "";
+  // Inspiration in words only: a creative piece of the chosen kind.
+  if (brief.mode === "mix" && images.length === 0) return { prompt: `Design a creative ${noun} inspired by: ${brief.text}`, images, jewelryType };
+  return { prompt: brief.text || fallback, images, jewelryType };
+}
+
+/**
+ * Text to CAD as design first: start (describe, draw or mix), the designs to
+ * pick from, then the same editor as Image to CAD (edit, angles, Ready for
+ * CAD). Generate CAD hands the approved pictures to the page's normal CAD run.
+ */
+export default function DesignToCadFlow({ jewelryType, setJewelryType, onGlbUpload, dimensions, onDimensions, cadCost, cadCostLoading, creatingCad, onCreateCad, modelPicker, variant }: DesignToCadFlowProps) {
+  const { generate } = useDesignImageRun();
+  const [stage, setStage] = useState<"start" | "pick">("start");
+  const [brief, setBrief] = useState<DesignBrief | null>(null);
+  const [slots, setSlots] = useState<PickSlot[]>([]);
+  const [editorSource, setEditorSource] = useState<File | null>(null);
+  const objectUrls = useRef<string[]>([]);
+
+  useEffect(() => () => { objectUrls.current.forEach((u) => URL.revokeObjectURL(u)); }, []);
+
+  const make = useCallback(async (next: DesignBrief) => {
+    setBrief(next);
+    setStage("pick");
+    setSlots(Array.from({ length: next.count }, () => ({ status: "making" as const })));
+    const request = await requestFor(next, jewelryType);
+    const outcomes = await generate(Array.from({ length: next.count }, () => request), {
+      onOutcome: (i, outcome) => {
+        if (!("result" in outcome)) {
+          setSlots((s) => s.map((x, k) => (k === i ? { status: "failed", message: "message" in outcome ? outcome.message : undefined } : x)));
+          return;
+        }
+        void toObjectUrl(outcome.result.image.url).then(
+          (display) => {
+            objectUrls.current.push(display);
+            setSlots((s) => s.map((x, k) => (k === i ? { status: "ready", display } : x)));
+            // Just 1: straight into the editor.
+            if (next.count === 1) void fileFromUrl(display, "design.png").then(setEditorSource);
+          },
+          () => setSlots((s) => s.map((x, k) => (k === i ? { status: "failed", message: "Couldn't load this design." } : x))),
+        );
+      },
+    });
+    if (outcomes === null) { setStage("start"); setSlots([]); }
+  }, [generate, jewelryType]);
+
+  // One design: the Photo Studio generating screen, then straight into the
+  // editor (no "Use this one" step in between).
+  const single = slots.length === 1;
+  const waiting = single && (slots[0].status === "making" || (slots[0].status === "ready" && !editorSource));
+  const [inputUrls, setInputUrls] = useState<string[]>([]);
+  useEffect(() => {
+    const urls = (brief?.images ?? []).map((f) => URL.createObjectURL(f));
+    setInputUrls(urls);
+    return () => urls.forEach((u) => URL.revokeObjectURL(u));
+  }, [brief]);
+
+  const pick = (i: number) => {
+    const display = slots[i]?.display;
+    if (display) void fileFromUrl(display, `design-${i + 1}.png`).then(setEditorSource);
+  };
+
+  return (
+    <>
+      {/* Kept mounted while hidden, so Back finds the brief as it was left. */}
+      <div className={stage === "start" ? "contents" : "hidden"}>
+        <DesignStartScreen jewelryType={jewelryType} setJewelryType={setJewelryType} busy={false} onMake={(b) => void make(b)} onGlbUpload={onGlbUpload} variant={variant} />
+      </div>
+      {stage === "pick" && waiting && (
+        <DesignGenerating
+          firstMessage={brief?.mode === "draw" ? "Reading your drawing..." : brief?.mode === "mix" ? "Studying your inspiration..." : "Reading your description..."}
+          inputs={inputUrls}
+        />
+      )}
+      {stage === "pick" && !waiting && !(single && slots[0].status === "ready") && (
+        <DesignPickScreen
+          slots={slots}
+          onPick={pick}
+          onMakeMore={() => { if (brief) void make({ ...brief, count: 4 }); }}
+          onBack={() => setStage("start")}
+        />
+      )}
+      <DesignEditor
+        open={!!editorSource}
+        source={editorSource}
+        jewelryType={jewelryType}
+        // Closing returns to the designs to pick from, or with one design, to the start with the brief kept.
+        onCancel={() => { setEditorSource(null); if (single) { setStage("start"); setSlots([]); } }}
+        onKeep={() => { setEditorSource(null); if (single) { setStage("start"); setSlots([]); } }}
+        onCreateCad={(files) => onCreateCad(files)}
+        dimensions={dimensions}
+        onDimensions={onDimensions}
+        cadCost={cadCost}
+        cadCostLoading={cadCostLoading}
+        creatingCad={creatingCad}
+        modelPicker={modelPicker}
+      />
+    </>
+  );
+}

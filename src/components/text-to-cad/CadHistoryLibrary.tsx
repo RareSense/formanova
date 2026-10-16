@@ -32,8 +32,8 @@ function stripMarkdownEmphasis(text: string): string {
 interface CadHistoryLibraryProps {
   variant: "prompts" | "images";
   onSelectPrompt?: (prompt: string) => void;
-  /** Fires with the one reference image URL that was clicked. */
-  onSelectImages?: (urls: string[]) => void;
+  /** Fires with the set's image URLs, and the entry they came from. */
+  onSelectImages?: (urls: string[], entry: CadLibraryEntry) => void;
   /** Fires once loading settles, so the caller can swap "Try an example" for
    * this panel without fetching the history twice. */
   onHasHistoryChange?: (hasHistory: boolean) => void;
@@ -226,7 +226,7 @@ export default function CadHistoryLibrary({ variant, onSelectPrompt, onSelectIma
   if (isLoading || !hasHistory) return null;
 
   const title = variant === "prompts" ? "My Prompts" : "My Pieces";
-  const subtitle = variant === "prompts" ? "Reuse a past design brief" : "Reuse a past upload as inspiration";
+  const subtitle = variant === "prompts" ? "Reuse a past design brief" : "Reuse a past upload";
 
   return (
     <div className="flex h-full flex-col">
@@ -286,7 +286,7 @@ export default function CadHistoryLibrary({ variant, onSelectPrompt, onSelectIma
                 <RingCard
                   key={entry.id}
                   entry={entry}
-                  onSelect={(urls) => onSelectImages?.(urls)}
+                  onSelect={(urls) => onSelectImages?.(urls, entry)}
                   onRename={renameEntry}
                 />
               ))}

@@ -84,15 +84,17 @@ describe('Dashboard as the merged studio hub', () => {
 
     expect(el.textContent).toContain('Model Shot');
     expect(el.textContent).toContain('Product Shot');
-    expect(el.textContent).toContain('Text to CAD');
-    expect(el.textContent).toContain('Image to CAD');
+    expect(el.textContent).toContain('CAD from Image');
+    expect(el.textContent).toContain('CAD from Idea');
+    expect(el.textContent).toContain('CAD from Inspiration');
   });
 
   it('uses the agreed CAD copy', () => {
     const el = renderDashboard();
 
-    expect(el.textContent).toContain('Describe your jewelry and generate a CAD model.');
-    expect(el.textContent).toContain('Turn jewelry inspiration images into a CAD model.');
+    expect(el.textContent).toContain('Turn your jewelry photo into a CAD model.');
+    expect(el.textContent).toContain('Turn your idea into a CAD model.');
+    expect(el.textContent).toContain('Turn your inspiration into a CAD model.');
   });
 
   // The note describes both CAD workflows, so it belongs to the category
@@ -124,6 +126,6 @@ describe('Dashboard as the merged studio hub', () => {
     const continueButtons = Array.from(el.querySelectorAll('button')).filter((node) =>
       node.textContent?.includes('Continue'),
     );
-    expect(continueButtons).toHaveLength(4);
+    expect(continueButtons).toHaveLength(5);
   });
 });
