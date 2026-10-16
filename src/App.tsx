@@ -72,6 +72,7 @@ const BrandDetails = lazyWithRetry(() => import("./pages/BrandDetails"));
 const Pricing = lazyWithRetry(() => import("./pages/Pricing"));
 const PaymentSuccess = lazyWithRetry(() => import("./pages/PaymentSuccess"));
 const PaymentCancel = lazyWithRetry(() => import("./pages/PaymentCancel"));
+const ConnectRhino = lazyWithRetry(() => import("./pages/ConnectRhino"));
 import { AdminLayout } from './components/admin/AdminLayout';
 import { PresetLibraryLayout } from './components/admin/PresetLibraryLayout';
 const PromoAdminPage = lazyWithRetry(() => import("./pages/PromoAdminPage"));
@@ -227,6 +228,7 @@ const MainApp = () => (
                   <Route path="/payment-success" element={<ProtectedRoute><PaymentSuccess /></ProtectedRoute>} />
                   <Route path="/success" element={<ProtectedRoute><PaymentSuccess /></ProtectedRoute>} />
                   <Route path="/cancel" element={<ProtectedRoute><PaymentCancel /></ProtectedRoute>} />
+                  <Route path="/connect-rhino" element={<ProtectedRoute><ConnectRhino /></ProtectedRoute>} />
                   {/* Photo Studio and CAD Studio merged into the dashboard; the old entry
                       paths still resolve so saved links and post-payment returns keep working. */}
                   <Route path="/studio" element={<Navigate to="/dashboard" replace />} />
