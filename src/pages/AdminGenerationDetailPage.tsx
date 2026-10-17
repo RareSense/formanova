@@ -17,6 +17,7 @@ import { azureUriToUrl } from '@/lib/azure-utils';
 import {
   AdminGenerationsApiError,
   getAdminGenerationDetail,
+  listAdminGenerations,
   type AdminGenerationDetail,
 } from '@/lib/admin-generations-api';
 import { fetchCadResult, resolveSourceType } from '@/lib/generation-history-api';
@@ -24,7 +25,7 @@ import { parseRingCadResult } from '@/lib/ring-cad-nurbs-api';
 import { cadFlowLabel, isDesignImageWorkflow, readCadStudioInputs, type AdminRunInputs } from '@/lib/admin-generation-inputs';
 import {
   cadDesignArtifact,
-  designRunIdFromArtifact,
+  mayHaveDesignHistory,
   designStepLabel,
   startedFromDoodle,
   traceDesignHistory,
@@ -543,8 +544,13 @@ function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
   const designArtifact = isCadModel ? cadDesignArtifact(detail.input_payload) : null;
   const designHistoryQuery = useQuery({
     queryKey: ['admin-design-history', detail.workflow_id],
-    queryFn: () => traceDesignHistory(designArtifact, getAdminGenerationDetail),
-    enabled: Boolean(designRunIdFromArtifact(designArtifact)),
+    queryFn: () => traceDesignHistory(designArtifact, detail.created_at || null, {
+      fetchRun: getAdminGenerationDetail,
+      // The customer's own design pictures, to match the CAD's picture against.
+      listRuns: async () => !detail.user_email ? [] : (await listAdminGenerations({ user_email: detail.user_email, workflow_name: 'design_image_v1', limit: 100 }))
+        .items.filter((item) => isDesignImageWorkflow(item.workflow_name)),
+    }),
+    enabled: isCadModel && mayHaveDesignHistory(detail.input_payload),
     staleTime: Infinity,
     retry: false,
   });
