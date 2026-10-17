@@ -66,14 +66,14 @@ export type RingCadTier = (typeof RING_CAD_TIERS)[keyof typeof RING_CAD_TIERS];
  * consistent with CAD_MODEL_SELECTOR_ENABLED being false. This selects the
  * model, not the price: what it costs is backend's to decide.
  *
- * GPT-6 Astra through direct OpenAI. Backend fallback policy is unchanged.
+ * Claude Opus 5.5 through the connected Claude subscription. Backend fallback policy is unchanged.
  * Explicit tier overrides remain supported; do not send a separate llm_model.
  *
  * The tier must exist in the toolkit that serves the environment: it does in
  * FormaNova_cad_toolkit_v2 (staging); production's toolkit needs it before this
  * default ships there.
  */
-export const RING_CAD_DEFAULT_TIER: RingCadTier = RING_CAD_TIERS.GPT_6_ASTRA_OPENAI;
+export const RING_CAD_DEFAULT_TIER: RingCadTier = RING_CAD_TIERS.CLAUDE_OPUS_5_5_SUBSCRIPTION;
 
 /**
  * Price is not defined here on purpose. It is set by backend per llm_tier and
