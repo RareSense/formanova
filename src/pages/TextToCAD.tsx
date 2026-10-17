@@ -9,7 +9,8 @@ import CadWorkspaceLayout from "@/components/text-to-cad/CadWorkspaceLayout";
 import { useCadBreakpoint, useCadCanHover } from "@/hooks/use-cad-breakpoint";
 
 import DesignToCadFlow from "@/components/create-cad/DesignToCadFlow";
-import type { DesignStartVariant } from "@/components/create-cad/DesignStartScreen";
+import type { DesignStartVariant, StartMode } from "@/components/create-cad/DesignStartScreen";
+import CadFlowSteps, { cadFlowStepLabels } from "@/components/create-cad/CadFlowSteps";
 import { useReferenceImages } from "@/hooks/useReferenceImages";
 import { useEstimatedCost } from "@/hooks/use-estimated-cost";
 import LeftPanel from "@/components/text-to-cad/LeftPanel";
@@ -118,7 +119,8 @@ export default function TextToCAD({ variant = "idea" }: { variant?: DesignStartV
   // Text to CAD is design first: the CAD is made from the approved design
   // pictures (main first) plus the dimensions typed in Ready for CAD.
   const { referenceImages, replaceReferenceImages } = useReferenceImages();
-  const [pendingCad, setPendingCad] = useState(false);
+  /** How the design was started (describe, draw, inspiration): names step 1 of the step bar. */
+  const [startMode, setStartMode] = useState<StartMode>(variant === "inspiration" ? "mix" : "describe");
   const { cost: cadCost, loading: cadCostLoading } = useEstimatedCost({
     workflowName: RING_CAD_NURBS_WORKFLOW,
     model,
@@ -139,12 +141,19 @@ export default function TextToCAD({ variant = "idea" }: { variant?: DesignStartV
     onWorkspaceActivate: activateWorkspace,
   });
 
-  // Start the CAD on the render after the approved pictures are in place.
-  useEffect(() => {
-    if (!pendingCad) return;
-    setPendingCad(false);
-    workflow.simulateGeneration();
-  }, [pendingCad, referenceImages]); // eslint-disable-line react-hooks/exhaustive-deps -- fires once per Generate CAD; workflow changes identity every render and must not re-trigger a paid run
+  /**
+   * Create CAD from the design editor: the approved pictures (main first) go
+   * straight into the start call. They are also kept as the page's reference
+   * set (shown in the workspace and used by Retry), but the run does not wait
+   * a render for that state: it used to, through a pending flag cleared before
+   * the credit check answered, which left the button idle with nothing
+   * visibly happening. Resolves false when the run never started, so the
+   * editor can let the customer try again.
+   */
+  const createCadFromDesign = useCallback(async (files: File[]): Promise<boolean> => {
+    const kept = await replaceReferenceImages(files);
+    return workflow.simulateGeneration(kept);
+  }, [replaceReferenceImages, workflow.simulateGeneration]); // eslint-disable-line react-hooks/exhaustive-deps -- workflow is a fresh literal every render; simulateGeneration is the stable part
 
   // A new model starts assembled.
   useEffect(() => { setExploded(false); }, [workflow.glbUrl]);
@@ -301,9 +310,10 @@ export default function TextToCAD({ variant = "idea" }: { variant?: DesignStartV
           onDimensions={setPrompt}
           cadCost={cadCost}
           cadCostLoading={cadCostLoading}
-          creatingCad={pendingCad || workflow.isGenerating}
-          onCreateCad={(files) => { void Promise.resolve(replaceReferenceImages(files)).then(() => setPendingCad(true)); }}
-          modelPicker={modelChoice.isAdmin ? <CadModelPicker value={modelChoice.tier} onChange={modelChoice.setTier} disabled={pendingCad || workflow.isGenerating} /> : null}
+          creatingCad={workflow.isStarting || workflow.isGenerating}
+          onCreateCad={createCadFromDesign}
+          onStartMode={setStartMode}
+          modelPicker={modelChoice.isAdmin ? <CadModelPicker value={modelChoice.tier} onChange={modelChoice.setTier} disabled={workflow.isStarting || workflow.isGenerating} /> : null}
         />
       </div>
     );
@@ -487,6 +497,7 @@ export default function TextToCAD({ variant = "idea" }: { variant?: DesignStartV
               notificationEmailSaving={notificationEmail.isSaving}
               notificationEmailError={notificationEmail.error}
               onSaveNotificationEmail={notificationEmail.saveNotificationEmail}
+              steps={<CadFlowSteps labels={cadFlowStepLabels(startMode)} current={2} />}
               onKeepCreating={() => {
                 workflow.handleKeepCreating();
                 setPrompt("");

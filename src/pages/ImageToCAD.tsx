@@ -133,7 +133,7 @@ export default function ImageToCAD() {
     referenceImages,
     replaceReferenceImages,
     startCad: workflow.simulateGeneration,
-    isGenerating: workflow.isGenerating,
+    isGenerating: workflow.isGenerating || workflow.isStarting,
   });
 
   // A new model starts assembled.

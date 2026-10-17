@@ -8,6 +8,7 @@ import { CAD_EXAMPLE_PROMPTS } from "@/components/text-to-cad/cad-examples";
 import { DESIGN_IMAGE_CREDITS, MAX_DESIGN_IMAGES } from "@/lib/design-image-api";
 import { cadJewelryNoun, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
 import DoodlePad, { type DoodlePadHandle } from "./DoodlePad";
+import CadFlowSteps, { cadFlowStepLabels } from "./CadFlowSteps";
 import ladybugExample from "@/assets/inspiration-examples/ladybug.webp";
 import flowerExample from "@/assets/inspiration-examples/flower.webp";
 import spiderWebExample from "@/assets/inspiration-examples/spider-web.webp";
@@ -100,8 +101,9 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
   return (
     <div className="flex w-full items-start justify-center bg-background">
       <div className={inspiration ? "w-full px-3 pb-6 pt-20 sm:px-6 lg:px-3" : "w-full max-w-[760px] px-4 pb-10 pt-16 sm:px-6"}>
+        <CadFlowSteps labels={cadFlowStepLabels(mode)} current={0} className="mb-8" />
         <div className={inspiration ? "mb-8 max-w-[680px]" : ""}>
-        <span className="marta-label mb-1 block">{flowName} &middot; Step 1</span>
+        <span className="marta-label mb-1 block">{flowName}</span>
         <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">What are you making?</h3>
         <div ref={cardsRef} className="mt-4">
           <CadJewelryTypeCards value={jewelryType} onChange={setJewelryType} disabled={busy} error={typeError} />
@@ -111,7 +113,7 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
         {/* Inspiration lays out like CAD from Image: upload on the left, examples on the right. */}
         <div className={inspiration ? "grid gap-8 lg:grid-cols-3 lg:gap-10" : ""}>
         <div className={inspiration ? "lg:col-span-2" : ""}>
-        <span className={`marta-label mb-1 block ${inspiration ? "" : "mt-10"}`}>{flowName} &middot; Step 2</span>
+        <span className={`marta-label mb-1 block ${inspiration ? "" : "mt-10"}`}>{flowName}</span>
         <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">{inspiration ? "Add your inspiration" : "How do you want to start?"}</h3>
         <p className="mt-1.5 text-sm text-muted-foreground">You'll see the design first. The CAD is only made once you're happy with it.</p>
 

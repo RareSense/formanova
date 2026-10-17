@@ -1,4 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useCredits } from "@/contexts/CreditsContext";
+import { savePostPurchaseReturn } from "@/lib/post-purchase-return";
+import { DESIGN_IMAGE_CREDITS } from "@/lib/design-image-api";
 import { useDesignImageRun } from "@/hooks/useDesignImageRun";
 import { blobToDataUrl } from "@/lib/design-image-run";
 import { cadJewelryNoun, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
@@ -8,6 +16,7 @@ import DesignPickScreen, { type PickSlot } from "./DesignPickScreen";
 import DesignGenerating from "./DesignGenerating";
 import DesignEditor from "./DesignEditor";
 import { fileFromUrl, toObjectUrl } from "./picture-urls";
+import CadFlowSteps, { cadFlowStepLabels } from "./CadFlowSteps";
 
 interface DesignToCadFlowProps {
   jewelryType: CadJewelryType | null;
@@ -21,10 +30,12 @@ interface DesignToCadFlowProps {
   /** Admin-only model choice, shown beside Generate CAD. */
   modelPicker?: ReactNode;
   creatingCad: boolean;
-  /** Generate CAD from the approved pictures (main first). */
-  onCreateCad: (files: File[]) => void;
+  /** Generate CAD from the approved pictures (main first); may resolve false when the run did not start. */
+  onCreateCad: (files: File[]) => Promise<boolean | void> | void;
   /** Idea (describe or draw) or Inspiration (pictures). */
   variant?: DesignStartVariant;
+  /** How the current design was started, for the step bar shown after this flow hands over. */
+  onStartMode?: (mode: DesignBrief["mode"]) => void;
 }
 
 /** What the toolkit is asked for, from the customer's brief. */
@@ -45,12 +56,30 @@ export async function requestFor(brief: DesignBrief, jewelryType: CadJewelryType
 }
 
 /**
+ * Credits left after a design, when that is no longer enough for a CAD; null
+ * when the warning is not needed (enough left, or a figure is unknown). A
+ * balance below the design's own price is left to the normal credit check,
+ * which sends the customer to buy credits.
+ */
+export function lowCreditsAfterDesign(balance: number | null, designCost: number, cadCost: number | null): number | null {
+  if (balance === null || cadCost === null || cadCost <= 0) return null;
+  if (balance < designCost) return null;
+  const left = balance - designCost;
+  return left < cadCost ? left : null;
+}
+
+/**
  * Text to CAD as design first: start (describe, draw or mix), the designs to
  * pick from, then the same editor as Image to CAD (edit, angles, Ready for
  * CAD). Generate CAD hands the approved pictures to the page's normal CAD run.
  */
-export default function DesignToCadFlow({ jewelryType, setJewelryType, onGlbUpload, dimensions, onDimensions, cadCost, cadCostLoading, creatingCad, onCreateCad, modelPicker, variant }: DesignToCadFlowProps) {
+export default function DesignToCadFlow({ jewelryType, setJewelryType, onGlbUpload, dimensions, onDimensions, cadCost, cadCostLoading, creatingCad, onCreateCad, modelPicker, variant, onStartMode }: DesignToCadFlowProps) {
   const { generate } = useDesignImageRun();
+  const { credits } = useCredits();
+  const navigate = useNavigate();
+  const location = useLocation();
+  /** A design waiting on the low-credit question, and what would be left after it. */
+  const [lowCredit, setLowCredit] = useState<{ brief: DesignBrief; left: number } | null>(null);
   const [stage, setStage] = useState<"start" | "pick">("start");
   const [brief, setBrief] = useState<DesignBrief | null>(null);
   const [slots, setSlots] = useState<PickSlot[]>([]);
@@ -61,6 +90,7 @@ export default function DesignToCadFlow({ jewelryType, setJewelryType, onGlbUplo
 
   const make = useCallback(async (next: DesignBrief) => {
     setBrief(next);
+    onStartMode?.(next.mode);
     setStage("pick");
     setSlots(Array.from({ length: next.count }, () => ({ status: "making" as const })));
     const request = await requestFor(next, jewelryType);
@@ -82,7 +112,19 @@ export default function DesignToCadFlow({ jewelryType, setJewelryType, onGlbUplo
       },
     });
     if (outcomes === null) { setStage("start"); setSlots([]); }
-  }, [generate, jewelryType]);
+  }, [generate, jewelryType, onStartMode]);
+
+  /** Every new design goes through here: warn first when it would leave too little for the CAD. */
+  const requestMake = (next: DesignBrief) => {
+    const left = lowCreditsAfterDesign(credits, DESIGN_IMAGE_CREDITS * next.count, cadCost);
+    if (left !== null) { setLowCredit({ brief: next, left }); return; }
+    void make(next);
+  };
+  const buyCredits = () => {
+    savePostPurchaseReturn(`${location.pathname}${location.search}`);
+    setLowCredit(null);
+    navigate("/credits", { state: { requiredCredits: cadCost } });
+  };
 
   // One design: the Photo Studio generating screen, then straight into the
   // editor (no "Use this one" step in between).
@@ -100,25 +142,32 @@ export default function DesignToCadFlow({ jewelryType, setJewelryType, onGlbUplo
     if (display) void fileFromUrl(display, `design-${i + 1}.png`).then(setEditorSource);
   };
 
+  const stepLabels = cadFlowStepLabels(brief?.mode ?? (variant === "inspiration" ? "mix" : "describe"));
+
   return (
     <>
       {/* Kept mounted while hidden, so Back finds the brief as it was left. */}
       <div className={stage === "start" ? "contents" : "hidden"}>
-        <DesignStartScreen jewelryType={jewelryType} setJewelryType={setJewelryType} busy={false} onMake={(b) => void make(b)} onGlbUpload={onGlbUpload} variant={variant} />
+        <DesignStartScreen jewelryType={jewelryType} setJewelryType={setJewelryType} busy={false} onMake={requestMake} onGlbUpload={onGlbUpload} variant={variant} />
       </div>
-      {stage === "pick" && waiting && (
-        <DesignGenerating
-          firstMessage={brief?.mode === "draw" ? "Reading your drawing..." : brief?.mode === "mix" ? "Studying your inspiration..." : "Reading your description..."}
-          inputs={inputUrls}
-        />
-      )}
-      {stage === "pick" && !waiting && !(single && slots[0].status === "ready") && (
-        <DesignPickScreen
-          slots={slots}
-          onPick={pick}
-          onMakeMore={() => { if (brief) void make({ ...brief, count: 4 }); }}
-          onBack={() => setStage("start")}
-        />
+      {stage === "pick" && (
+        <div className="flex w-full flex-col">
+          <CadFlowSteps labels={stepLabels} current={1} className="px-4 pt-10" />
+          {waiting && (
+            <DesignGenerating
+              firstMessage={brief?.mode === "draw" ? "Reading your drawing..." : brief?.mode === "mix" ? "Studying your inspiration..." : "Reading your description..."}
+              inputs={inputUrls}
+            />
+          )}
+          {!waiting && !(single && slots[0].status === "ready") && (
+            <DesignPickScreen
+              slots={slots}
+              onPick={pick}
+              onMakeMore={() => { if (brief) requestMake({ ...brief, count: 4 }); }}
+              onBack={() => setStage("start")}
+            />
+          )}
+        </div>
       )}
       <DesignEditor
         open={!!editorSource}
@@ -127,7 +176,10 @@ export default function DesignToCadFlow({ jewelryType, setJewelryType, onGlbUplo
         // Closing returns to the designs to pick from, or with one design, to the start with the brief kept.
         onCancel={() => { setEditorSource(null); if (single) { setStage("start"); setSlots([]); } }}
         onKeep={() => { setEditorSource(null); if (single) { setStage("start"); setSlots([]); } }}
-        onCreateCad={(files) => onCreateCad(files)}
+        onCreateCad={onCreateCad}
+        // A design made here is already a design: no edit needed before Create CAD.
+        approveWithoutEdit
+        steps={(editorStage) => <CadFlowSteps labels={stepLabels} current={editorStage === "edit" ? 1 : 2} />}
         dimensions={dimensions}
         onDimensions={onDimensions}
         cadCost={cadCost}
@@ -135,6 +187,20 @@ export default function DesignToCadFlow({ jewelryType, setJewelryType, onGlbUplo
         creatingCad={creatingCad}
         modelPicker={modelPicker}
       />
+      <AlertDialog open={!!lowCredit} onOpenChange={(open) => { if (!open) setLowCredit(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Low on credits</AlertDialogTitle>
+            <AlertDialogDescription>
+              After this design you'll have {lowCredit?.left} credits — not enough for a CAD ({cadCost}). Continue anyway?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={buyCredits}>Buy credits</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { const next = lowCredit?.brief; setLowCredit(null); if (next) void make(next); }}>Generate anyway</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

@@ -529,13 +529,21 @@ export function useImageToCADWorkflow({
     return true;
   }, [onWorkspaceActivate, cadSource]);
 
-  const startGeneration = useCallback(async () => {
-    if (isGenerating) return;
-    const imageCount = referenceImages.length;
+  /**
+   * Resolves true once the run has been handed a workflow id (or failed in
+   * the workspace with its own message), false when it never started (credit
+   * check failed or blocked). `files`, when given, is the picture set to send
+   * now: Create CAD from the design editor passes the approved pictures
+   * directly, so the run never waits a render for referenceImages to catch up.
+   */
+  const startGeneration = useCallback(async (files?: File[]): Promise<boolean> => {
+    if (isGenerating) return false;
+    const images = files ?? referenceImages;
+    const imageCount = images.length;
     const hasPrompt = !!prompt.trim();
     if (imageCount === 0 && !hasPrompt) {
       toast.error("Upload an image or describe your ring first");
-      return;
+      return false;
     }
 
     // Same gate every paid workflow uses. checkCredits owns the comparison, the
@@ -543,12 +551,21 @@ export function useImageToCADWorkflow({
     // any of it. The tier price is backend's to set and it moves, so no
     // fallback figure is written here; when the estimate is unavailable the
     // start call below is the authority and rejects with 402.
-    const approved = (import.meta.env.VITE_DEMO_NO_AUTH === 'true' && import.meta.env.VITE_DEMO_GLB_URL) ? true : await checkCredits(RING_CAD_NURBS_WORKFLOW, 1, {
-      pricingContext: { llm_tier: tier },
-    });
+    let approved: boolean;
+    try {
+      approved = (import.meta.env.VITE_DEMO_NO_AUTH === 'true' && import.meta.env.VITE_DEMO_GLB_URL) ? true : await checkCredits(RING_CAD_NURBS_WORKFLOW, 1, {
+        pricingContext: { llm_tier: tier },
+      });
+    } catch (err) {
+      // The balance could not be read (network, 5xx). Used to reject out of
+      // here unhandled: no message, and Create CAD looked like it did nothing.
+      console.error("CAD credit check failed:", err);
+      toast.error("We couldn't check your credits. Please try again.");
+      return false;
+    }
     if (!approved) {
       trackPaywallHit({ category: 'ring', steps_completed: 1, source: cadSource });
-      return;
+      return false;
     }
 
     // Local demo recording build only (.env.local): play the real progress screen, then load a
@@ -568,7 +585,7 @@ export function useImageToCADWorkflow({
       setRing({ set_id: 'demo-ring', name: 'Rose ring', family: 'ring', versions: [{ asset_id: 'demo-v1', position: 0,
         source_workflow_id: 'demo', improvable: true, glb_url: demoGlb, threedm_url: demo3dm ?? null }] } as CadRing);
       setProgressStep('_loading'); setIsModelLoading(true); setHasModel(true);
-      return;
+      return true;
     }
 
     const cadGenStartTime = Date.now();
@@ -603,7 +620,7 @@ export function useImageToCADWorkflow({
 
     try {
       const requestBody = buildRingCadStartBody({
-        referenceImages: await buildReferenceInputs(referenceImages),
+        referenceImages: await buildReferenceInputs(images),
         userDescription: prompt,
         tier,
         jewelryType,
@@ -633,7 +650,7 @@ export function useImageToCADWorkflow({
       // funnel and depressing the conversion rate.
       startedFirstEverRef.current = consumeFirstCadGeneration();
       const cadAnalytics = {
-        ...buildCadGenerationProps({ cadRoute, prompt, referenceImageCount: referenceImages.length, tier }),
+        ...buildCadGenerationProps({ cadRoute, prompt, referenceImageCount: imageCount, tier }),
         is_first_ever: startedFirstEverRef.current,
         operation: 'generate' as const,
       };
@@ -677,6 +694,7 @@ export function useImageToCADWorkflow({
       setProgressStep("failed_final");
       setGenerationFailed(true);
     }
+    return true;
   }, [prompt, referenceImages, tier, jewelryType, material, cadRoute, cadSource, isGenerating, onWorkspaceActivate, trackCadGeneration, checkCredits]);
 
   /**
@@ -686,13 +704,19 @@ export function useImageToCADWorkflow({
    * press and cleared however the start ends, so the button never sticks.
    */
   const startInFlightRef = useRef(false);
-  const simulateGeneration = useCallback(async () => {
-    if (startInFlightRef.current) return;
+  /** True from the press until the start settles, so the button can say "Starting..." throughout. */
+  const [isStarting, setIsStarting] = useState(false);
+  const simulateGeneration = useCallback(async (files?: unknown): Promise<boolean> => {
+    if (startInFlightRef.current) return false;
     startInFlightRef.current = true;
+    setIsStarting(true);
     try {
-      await startGeneration();
+      // Also wired straight to onClick, which passes the click event: only a
+      // real picture list overrides referenceImages.
+      return await startGeneration(Array.isArray(files) ? files as File[] : undefined);
     } finally {
       startInFlightRef.current = false;
+      setIsStarting(false);
     }
   }, [startGeneration]);
 
@@ -728,7 +752,7 @@ export function useImageToCADWorkflow({
   }, []);
 
   return {
-    isGenerating, hasModel, setHasModel,
+    isGenerating, isStarting, hasModel, setHasModel,
     isModelLoading, setIsModelLoading,
     progressStep, setProgressStep,
     retryAttempt,

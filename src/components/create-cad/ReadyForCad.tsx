@@ -30,13 +30,15 @@ interface ReadyForCadProps {
   waiting?: boolean;
   /** Admin-only model choice, shown beside Create CAD. */
   modelPicker?: ReactNode;
+  /** Why the last Create CAD press did not start a run. */
+  error?: string | null;
 }
 
 /**
  * One screen after "Looks right": the approved design with optional extra
  * views under it, and on the right optional dimensions and Create CAD.
  */
-export default function ReadyForCad({ approved, views, jewelryType, dimensions, onDimensions, cost, costLoading, onGenerate, generating, waiting, anglesOpen, modelPicker }: ReadyForCadProps) {
+export default function ReadyForCad({ approved, views, jewelryType, dimensions, onDimensions, cost, costLoading, onGenerate, generating, waiting, anglesOpen, modelPicker, error }: ReadyForCadProps) {
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto p-4 sm:p-6">
       <div className={`flex w-full flex-col items-center gap-3 ${anglesOpen ? "max-w-[820px]" : "max-w-[460px]"}`}>
@@ -66,6 +68,7 @@ export default function ReadyForCad({ approved, views, jewelryType, dimensions, 
         >
           {generating ? "Starting…" : <>Create CAD <ArrowRight className="h-4 w-4" strokeWidth={1.5} /><CreditTag value={costLoading ? "…" : cost ?? "—"} /></>}
         </button>
+        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         <span className="text-xs text-muted-foreground">{waiting ? "Waiting for your angles…" : "Ready in 30–40 min · Rhino 3DM, STL, STEP"}</span>
         {modelPicker && (
           <details className="w-full max-w-[460px] text-xs text-muted-foreground">
