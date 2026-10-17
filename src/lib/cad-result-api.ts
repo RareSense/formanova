@@ -6,7 +6,7 @@
  */
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { azureUriToUrl } from '@/lib/azure-utils';
-import { parseRingCadResult } from '@/lib/ring-cad-nurbs-api';
+import { parseRingCadResult, type CadCastingInfo } from '@/lib/ring-cad-nurbs-api';
 
 const __DEV__ = import.meta.env.DEV;
 
@@ -45,6 +45,11 @@ export async function fetchCadResult(
    * old run shows an alarm nobody can act on.
    */
   not_all_solid: boolean;
+  /**
+   * The casting STL and stone list for the manufacturer, read from the same
+   * /result body. Null for legacy workflows and runs without cad_postprocess.
+   */
+  casting: CadCastingInfo | null;
 }> {
   function extractArtifactUri(results: Record<string, unknown>, nodeKey: string, artifactKey: string): string | null {
     const node = results[nodeKey];
@@ -65,7 +70,7 @@ export async function fetchCadResult(
     const res = await authenticatedFetch(
       `/api/result/${workflowId}`,
     );
-    if (!res.ok) return { glb_url: null, threedm_url: null, azure_source: null, not_all_solid: false };
+    if (!res.ok) return { glb_url: null, threedm_url: null, azure_source: null, not_all_solid: false, casting: null };
 
     const data = await res.json() as Record<string, unknown>;
 
@@ -85,6 +90,7 @@ export async function fetchCadResult(
           threedm_url: flat.threedmArtifact?.url ?? null,
           azure_source: flat.sourceStage,
           not_all_solid: flat.notAllSolid,
+          casting: flat.casting,
         };
       } catch {
         // Not a ring_cad_nurbs_v1 result — fall through to the legacy nested shape.
@@ -95,13 +101,13 @@ export async function fetchCadResult(
     const finalUri = extractArtifactUri(data, 'success_final', 'glb_artifact')
       || extractArtifactUri(data, 'success_final', 'original_glb_artifact');
     if (finalUri) {
-      return { glb_url: resolveUrl(finalUri), threedm_url: null, azure_source: 'success_final', not_all_solid: false };
+      return { glb_url: resolveUrl(finalUri), threedm_url: null, azure_source: 'success_final', not_all_solid: false, casting: null };
     }
 
     // 2. success_original_glb: use original_glb_artifact only
     const originalUri = extractArtifactUri(data, 'success_original_glb', 'original_glb_artifact');
     if (originalUri) {
-      return { glb_url: resolveUrl(originalUri), threedm_url: null, azure_source: 'success_original_glb', not_all_solid: false };
+      return { glb_url: resolveUrl(originalUri), threedm_url: null, azure_source: 'success_original_glb', not_all_solid: false, casting: null };
     }
 
     // 3. failed_final: only build_initial is allowed as fallback
@@ -110,9 +116,9 @@ export async function fetchCadResult(
       const failedInitialUri = extractArtifactUri(data, 'build_initial', 'glb_artifact')
         || extractArtifactUri(data, 'build_initial', 'original_glb_artifact');
       if (failedInitialUri) {
-        return { glb_url: resolveUrl(failedInitialUri), threedm_url: null, azure_source: 'build_initial', not_all_solid: false };
+        return { glb_url: resolveUrl(failedInitialUri), threedm_url: null, azure_source: 'build_initial', not_all_solid: false, casting: null };
       }
-      return { glb_url: null, threedm_url: null, azure_source: 'failed_final', not_all_solid: false };
+      return { glb_url: null, threedm_url: null, azure_source: 'failed_final', not_all_solid: false, casting: null };
     }
 
     // 4. ring_edit_v1 currently returns build nodes rather than success sinks.
@@ -121,13 +127,13 @@ export async function fetchCadResult(
       || extractArtifactUri(data, 'build_initial', 'glb_artifact')
       || extractArtifactUri(data, 'build_initial', 'original_glb_artifact');
     if (buildUri) {
-      return { glb_url: resolveUrl(buildUri), threedm_url: null, azure_source: 'build_retry', not_all_solid: false };
+      return { glb_url: resolveUrl(buildUri), threedm_url: null, azure_source: 'build_retry', not_all_solid: false, casting: null };
     }
 
-    return { glb_url: null, threedm_url: null, azure_source: null, not_all_solid: false };
+    return { glb_url: null, threedm_url: null, azure_source: null, not_all_solid: false, casting: null };
   } catch (e) {
     if (__DEV__) console.warn('[HistoryAPI] fetchCadResult error:', workflowId, e);
-    return { glb_url: null, threedm_url: null, azure_source: null, not_all_solid: false };
+    return { glb_url: null, threedm_url: null, azure_source: null, not_all_solid: false, casting: null };
   }
 }
 

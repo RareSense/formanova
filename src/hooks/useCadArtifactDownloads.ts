@@ -15,6 +15,10 @@ interface UseCadArtifactDownloadsInput {
   glbUrl?: string | null;
   stlUrls?: string[];
   stepUrls?: string[];
+  /** The single casting mesh for the manufacturer, or null when the run has none. */
+  castingStlUrl?: string | null;
+  /** The casting stone list (JSON), or null when the run has none. */
+  stonesUrl?: string | null;
   /**
    * Produces a GLB of the live scene including the user's edits. Supplied only
    * by the workspaces, which have a canvas; history has no scene to export.
@@ -49,6 +53,8 @@ export function useCadArtifactDownloads({
   glbUrl,
   stlUrls = [],
   stepUrls = [],
+  castingStlUrl,
+  stonesUrl,
   exportEditedBlob,
   source,
 }: UseCadArtifactDownloadsInput) {
@@ -57,7 +63,7 @@ export function useCadArtifactDownloads({
   const save = useCallback(async (
     url: string | null | undefined,
     filename: string,
-    kind: '3dm' | 'glb' | 'stl' | 'step',
+    kind: '3dm' | 'glb' | 'stl' | 'step' | 'json',
   ) => {
     if (!url) {
       toast.error(`No ${kind.toUpperCase()} file is available for this model.`);
@@ -118,6 +124,16 @@ export function useCadArtifactDownloads({
     }
   }, [isBusy, source]);
 
+  const downloadCastingStl = useCallback(
+    () => save(castingStlUrl, `model-${stamp()}-casting.stl`, 'stl'),
+    [save, castingStlUrl],
+  );
+
+  const downloadStones = useCallback(
+    () => save(stonesUrl, `model-${stamp()}-stones.json`, 'json'),
+    [save, stonesUrl],
+  );
+
   const downloadStl = useCallback(() => saveMany(stlUrls, 'stl'), [saveMany, stlUrls]);
   const downloadStep = useCallback(() => saveMany(stepUrls, 'step'), [saveMany, stepUrls]);
 
@@ -149,5 +165,8 @@ export function useCadArtifactDownloads({
     }
   }, [exportEditedBlob, isBusy, source]);
 
-  return { downloadThreedm, downloadViewerThreedm, downloadGlb, downloadStl, downloadStep, exportEdited, isBusy };
+  return {
+    downloadThreedm, downloadViewerThreedm, downloadGlb, downloadStl, downloadStep,
+    downloadCastingStl, downloadStones, exportEdited, isBusy,
+  };
 }

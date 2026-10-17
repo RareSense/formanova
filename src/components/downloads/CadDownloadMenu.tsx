@@ -30,6 +30,12 @@ export interface CadDownloadMenuProps {
   onDownloadGlb?: () => void;
   onDownloadStl?: () => void;
   onDownloadStep?: () => void;
+  /** The single casting mesh for the manufacturer. Omit when the run has none. */
+  onDownloadCastingStl?: () => void;
+  /** Calm advice shown under the Casting STL item, e.g. from castingCheckNote. Never blocks the download. */
+  castingNote?: string | null;
+  /** The stones to set after casting. Omit when the run has no stone list. */
+  onDownloadStones?: () => void;
   estimatedMetalMassG?: number | null;
   /**
    * Omit when the version has no viewing copy. A mesh-only 3DM for generic
@@ -122,12 +128,28 @@ function FormatItem({ format, hint, onSelect }: FormatRow) {
   );
 }
 
+/** Two-line item for the manufacturing files: the names are too long for the format column. */
+function ManufacturingItem({ label, hint, note, onSelect }: { label: string; hint: string; note?: string | null; onSelect: () => void }) {
+  return (
+    <DropdownMenuItem onSelect={onSelect} className="flex-col items-start gap-0.5 py-2">
+      <span className="flex items-baseline gap-3">
+        <span className="font-mono text-[11px] font-semibold uppercase tracking-wider">{label}</span>
+        <span className="text-[12px] text-muted-foreground">{hint}</span>
+      </span>
+      {note && <span className="max-w-[16rem] whitespace-normal text-[11px] leading-snug text-muted-foreground">{note}</span>}
+    </DropdownMenuItem>
+  );
+}
+
 export function CadDownloadMenu({
   onDownloadThreedm,
   onDownloadGlb,
   onDownloadViewerThreedm,
   onDownloadStl,
   onDownloadStep,
+  onDownloadCastingStl,
+  castingNote,
+  onDownloadStones,
   estimatedMetalMassG,
   onExportEdited,
   isBusy = false,
@@ -174,6 +196,17 @@ export function CadDownloadMenu({
         {formats.map((row) => (
           <FormatItem key={`${row.format}-${row.hint}`} {...row} />
         ))}
+        {(onDownloadCastingStl || onDownloadStones) && (
+          <>
+            <DropdownMenuSeparator />
+            {onDownloadCastingStl && (
+              <ManufacturingItem label="Casting STL" hint="For your manufacturer" note={castingNote} onSelect={onDownloadCastingStl} />
+            )}
+            {onDownloadStones && (
+              <ManufacturingItem label="Stone list" hint="Stones to set after casting" onSelect={onDownloadStones} />
+            )}
+          </>
+        )}
         {onExportEdited && (
           <>
             <DropdownMenuSeparator />

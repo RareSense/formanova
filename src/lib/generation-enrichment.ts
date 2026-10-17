@@ -3,7 +3,7 @@
  * Used by both the Generations page and the prefetch hook.
  */
 import { azureUriToUrl } from '@/lib/azure-utils';
-import { parseRingCadResult } from '@/lib/ring-cad-nurbs-api';
+import { parseCastingInfo, parseRingCadResult, type CadCastingInfo } from '@/lib/ring-cad-nurbs-api';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -199,6 +199,14 @@ export function extractCadTextData(steps: any[]) {
     if (glb_url && screenshots.length > 0) break;
   }
 
+  // The casting STL and stone list come from cad_postprocess, a later step
+  // than the export, so they are scanned for separately.
+  let casting: CadCastingInfo | null = null;
+  for (const step of [...steps].reverse()) {
+    casting = parseCastingInfo(unwrapResult(getOutput(step)));
+    if (casting) break;
+  }
+
   const blenderStep = steps.find(
     (s: any) => {
       const out = getOutput(s);
@@ -294,5 +302,9 @@ export function extractCadTextData(steps: any[]) {
   }
 
   const front = screenshots[0];
-  return { thumbnail_url: front?.url ?? '', screenshots, glb_url, glb_filename, threedm_url, ai_model };
+  return {
+    thumbnail_url: front?.url ?? '', screenshots, glb_url, glb_filename, threedm_url, ai_model,
+    // Only present when found, so runs without casting files keep their exact shape.
+    ...(casting ? { casting } : {}),
+  };
 }

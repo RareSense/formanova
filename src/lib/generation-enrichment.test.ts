@@ -303,3 +303,29 @@ describe('extractProductShotThumbnail', () => {
     expect(extractProductShotThumbnail(steps)).toBe('https://cdn.example.com/container/output/real-result.jpg');
   });
 });
+
+describe('extractCadTextData casting files', () => {
+  it('reads the casting STL and stone list from the cad_postprocess step', () => {
+    const steps = [
+      { tool: 'cad_export', output: { result: { glb_artifact: { uri: 'azure://bucket/ring.glb' } } } },
+      {
+        tool: 'cad_postprocess',
+        output: {
+          result: {
+            casting_stl_artifact: { uri: 'azure://bucket/ring_casting.stl', type: 'model/stl' },
+            stones_artifact: { uri: 'azure://bucket/ring_stones.json', type: 'application/json' },
+            derivatives: { casting_stl: { status: 'ready', flags: [] } },
+          },
+        },
+      },
+    ];
+    const result = extractCadTextData(steps);
+    expect(result.casting?.castingStlUrl).toContain('ring_casting.stl');
+    expect(result.casting?.stonesUrl).toContain('ring_stones.json');
+    expect(result.casting?.status).toBe('ready');
+  });
+
+  it('leaves casting out for runs without it', () => {
+    expect(extractCadTextData([])).not.toHaveProperty('casting');
+  });
+});

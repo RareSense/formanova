@@ -126,3 +126,68 @@ describe('CadDownloadMenu', () => {
     expect(screen.queryByRole('menuitem')).toBeNull();
   });
 });
+
+describe('CadDownloadMenu casting files', () => {
+  it('hides Casting STL and Stone list when the run has neither', async () => {
+    render(<CadDownloadMenu onDownloadThreedm={noop} onDownloadGlb={noop} onDownloadStl={noop} />);
+
+    openMenu();
+    await screen.findByText('Rhino, editable');
+    expect(screen.queryByText('Casting STL')).toBeNull();
+    expect(screen.queryByText('Stone list')).toBeNull();
+  });
+
+  it('adds Casting STL and Stone list after the existing formats, which stay unchanged', async () => {
+    render(
+      <CadDownloadMenu
+        onDownloadThreedm={noop}
+        onDownloadGlb={noop}
+        onDownloadStep={noop}
+        onDownloadStl={noop}
+        onDownloadCastingStl={noop}
+        onDownloadStones={noop}
+      />,
+    );
+
+    openMenu();
+    await screen.findByText('Rhino, editable');
+    expect(menuRows()).toEqual([
+      '3DMRhino, editable',
+      'GLB3D preview',
+      'STEPOther CAD software',
+      'STL3D printing',
+      'Casting STLFor your manufacturer',
+      'Stone listStones to set after casting',
+    ]);
+  });
+
+  it('shows Casting STL without a Stone list when there are no stones', async () => {
+    render(<CadDownloadMenu onDownloadGlb={noop} onDownloadCastingStl={noop} />);
+
+    openMenu();
+    await screen.findByText('For your manufacturer');
+    expect(screen.queryByText('Stone list')).toBeNull();
+  });
+
+  it('shows the check note under Casting STL and still downloads it', async () => {
+    const onDownloadCastingStl = vi.fn();
+    const onDownloadStones = vi.fn();
+    render(
+      <CadDownloadMenu
+        onDownloadGlb={noop}
+        onDownloadCastingStl={onDownloadCastingStl}
+        castingNote="Your manufacturer may want to check: some walls are thin."
+        onDownloadStones={onDownloadStones}
+      />,
+    );
+
+    openMenu();
+    const note = await screen.findByText('Your manufacturer may want to check: some walls are thin.');
+    fireEvent.click(note);
+    expect(onDownloadCastingStl).toHaveBeenCalledTimes(1);
+
+    openMenu();
+    fireEvent.click(await screen.findByText('Stones to set after casting'));
+    expect(onDownloadStones).toHaveBeenCalledTimes(1);
+  });
+});

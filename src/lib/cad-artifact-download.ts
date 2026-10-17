@@ -1,6 +1,7 @@
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 
-export type CadArtifactKind = 'glb' | '3dm' | 'stl' | 'step';
+/** 'json' is the casting stone list, the only non-model file offered. */
+export type CadArtifactKind = 'glb' | '3dm' | 'stl' | 'step' | 'json';
 
 interface CadArtifactUrls {
   glb_url?: string | null;
@@ -36,6 +37,11 @@ export async function isExpectedCadArtifact(blob: Blob, kind: CadArtifactKind): 
       && header[3] === 0x46
       && view.getUint32(4, true) === 2
       && view.getUint32(8, true) === blob.size;
+  }
+
+  if (kind === 'json') {
+    const text = new TextDecoder('utf-8').decode(header).trimStart();
+    return text.startsWith('{') || text.startsWith('[');
   }
 
   if (kind === 'step') {

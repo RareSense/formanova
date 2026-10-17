@@ -314,6 +314,7 @@ export default function Generations() {
                     ...stepData,
                     glb_url: cadResult.glb_url,
                     threedm_url: cadResult.threedm_url,
+                    ...(cadResult.casting ? { casting: cadResult.casting } : {}),
                   });
                 }
               }
