@@ -96,21 +96,21 @@ describe('ring_cad_nurbs_v1 start body', () => {
     expect(payload).not.toHaveProperty('llm_model');
   });
 
-  it('defaults to GPT-6 Astra through direct OpenAI', () => {
+  it('defaults to Claude Opus 5.5 through the Claude subscription', () => {
     const { payload } = buildRingCadStartBody({ referenceImages: [IMG(1)] });
     expect(payload.llm_tier).toBe(RING_CAD_DEFAULT_TIER);
-    expect(RING_CAD_DEFAULT_TIER).toBe('gpt_6_astra_openai');
-    expect(payload.analysis_tier).toBe('gpt_6_astra_openai');
+    expect(RING_CAD_DEFAULT_TIER).toBe('claude_opus_5_5_subscription');
+    expect(payload.analysis_tier).toBe('claude_opus_5_5_subscription');
   });
 
-  it('uses direct OpenAI for coding and analysis across jewelry categories and input modes', () => {
+  it('uses the Claude subscription for coding and analysis across jewelry categories and input modes', () => {
     for (const { value: jewelryType } of CAD_JEWELRY_TYPES) {
       for (const referenceImages of [[], [IMG(1)], [IMG(1), IMG(2)]]) {
         const { payload } = buildRingCadStartBody({
           jewelryType, referenceImages, userDescription: 'A jewelry design',
         });
-        expect(payload.llm_tier).toBe('gpt_6_astra_openai');
-        expect(payload.analysis_tier).toBe('gpt_6_astra_openai');
+        expect(payload.llm_tier).toBe('claude_opus_5_5_subscription');
+        expect(payload.analysis_tier).toBe('claude_opus_5_5_subscription');
         expect(payload).not.toHaveProperty('llm_model');
       }
     }
