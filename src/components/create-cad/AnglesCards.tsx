@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowRight, Check, Diamond, RotateCcw, X } from "lucide-react";
 import { useDesignImageRun, type DesignImageOutcome } from "@/hooks/useDesignImageRun";
 import type { CadJewelryType, ImageInput } from "@/lib/ring-cad-nurbs-api";
@@ -30,6 +30,10 @@ interface AnglesCardsProps {
   /** Accepted angles, whenever that changes. */
   onChange: (angles: EditorPicture[]) => void;
   onBusy?: (busy: boolean) => void;
+  /** How many angles are ticked but not made, or made but not checked (not part of the CAD yet). */
+  onPending?: (count: number) => void;
+  /** Each change unticks those angles (Create CAD was pressed). */
+  clearToken?: number;
 }
 
 const smallBtn = "flex h-8 items-center justify-center gap-1 border border-border px-2 text-xs text-foreground transition-colors hover:border-foreground/40 disabled:opacity-40";
@@ -39,7 +43,7 @@ const smallBtn = "flex h-8 items-center justify-center gap-1 border border-borde
  * angle has a tick box and its own optional words; Generate makes the ticked
  * ones, and each result is checked on its card (Looks right or ↻).
  */
-export default function AnglesCards({ approved, resolveBase, jewelryType, toObjectUrl, room, onChange, onBusy }: AnglesCardsProps) {
+export default function AnglesCards({ approved, resolveBase, jewelryType, toObjectUrl, room, onChange, onBusy, onPending, clearToken = 0 }: AnglesCardsProps) {
   const { generate } = useDesignImageRun();
   const [cards, setCards] = useState<Card[]>(() =>
     ANGLE_SUGGESTIONS[jewelryType ?? "ring"].slice(0, Math.max(0, room)).map((a) => ({ ...a, ticked: false, extra: "", status: "idle" as const })),
@@ -57,10 +61,21 @@ export default function AnglesCards({ approved, resolveBase, jewelryType, toObje
   const make = useCallback(async (indexes: number[]) => {
     if (!indexes.length) return;
     let base: ImageInput;
-    try { base = await resolveBase(); } catch { return; }
+    try { base = await resolveBase(); } catch {
+      setCards((c) => c.map((x, k) => (indexes.includes(k) ? { ...x, status: "failed", note: "Your design isn't ready yet. Please try again." } : x)));
+      return;
+    }
     setCards((c) => c.map((x, k) => (indexes.includes(k) ? { ...x, status: "making", note: undefined } : x)));
     const requests = indexes.map((k) => ({ prompt: cards[k].extra.trim(), images: [{ role: "base" as const, image: base }], view: cards[k].view, jewelryType }));
-    const outcomes = await generate(requests, { onOutcome: (n, o) => void land(indexes[n], o) });
+    let outcomes: DesignImageOutcome[] | null;
+    try {
+      outcomes = await generate(requests, { onOutcome: (n, o) => void land(indexes[n], o) });
+    } catch {
+      // The credit check itself failed: without this the cards stayed
+      // "making" forever, and Create CAD waited for them forever.
+      setCards((c) => c.map((x, k) => (indexes.includes(k) && x.status === "making" ? { ...x, status: "failed", note: "We couldn't check your credits. Please try again." } : x)));
+      return;
+    }
     if (outcomes === null) setCards((c) => c.map((x, k) => (indexes.includes(k) && x.status === "making" ? { ...x, status: "idle" } : x)));
   }, [resolveBase, cards, jewelryType, generate, land]);
 
@@ -70,6 +85,17 @@ export default function AnglesCards({ approved, resolveBase, jewelryType, toObje
   const key = accepted.map((a) => a.display).join("|");
   useEffect(() => { onChange(accepted); }, [key]); // eslint-disable-line react-hooks/exhaustive-deps -- keyed on the pictures
   useEffect(() => { onBusy?.(busy); }, [busy]); // eslint-disable-line react-hooks/exhaustive-deps -- report changes only
+  const pending = cards.filter((c) => (c.ticked && (c.status === "idle" || c.status === "failed")) || c.status === "review").length;
+  useEffect(() => { onPending?.(pending); }, [pending]); // eslint-disable-line react-hooks/exhaustive-deps -- report changes only
+  // Gone mid-make (Back, or a new approval): the editor must not keep waiting for these cards.
+  const reporters = useRef({ onBusy, onPending });
+  reporters.current = { onBusy, onPending };
+  useEffect(() => () => { reporters.current.onBusy?.(false); reporters.current.onPending?.(0); }, []);
+  // Create CAD unticks what is not part of the CAD; accepted angles stay.
+  useEffect(() => {
+    if (!clearToken) return;
+    setCards((c) => c.map((x) => (x.status === "review" ? { ...x, status: "idle", picture: undefined, ticked: false, note: undefined } : x.status === "idle" || x.status === "failed" ? { ...x, ticked: false } : x)));
+  }, [clearToken]);
 
   return (
     <section aria-label="Angles" className="w-full">

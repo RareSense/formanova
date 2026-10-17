@@ -19,7 +19,7 @@ interface UseEditBeforeCadOptions {
   model: string;
   tier: string;
   referenceImages: File[];
-  replaceReferenceImages: (files: File[]) => Promise<void> | void;
+  replaceReferenceImages: (files: File[]) => Promise<unknown> | void;
   /** Starts the page's normal CAD run with the current pictures and dimensions. */
   startCad: () => void;
   isGenerating: boolean;

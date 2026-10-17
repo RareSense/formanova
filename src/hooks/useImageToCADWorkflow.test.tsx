@@ -10,7 +10,8 @@ vi.mock('@/lib/authenticated-fetch', () => ({
   authenticatedFetch: vi.fn(),
   AuthExpiredError: class AuthExpiredError extends Error {},
 }));
-vi.mock('@/lib/cad-reference-upload', () => ({ buildReferenceInputs: vi.fn(async () => []) }));
+const buildReferenceInputs = vi.hoisted(() => vi.fn(async (_files: File[]) => [] as unknown[]));
+vi.mock('@/lib/cad-reference-upload', () => ({ buildReferenceInputs }));
 vi.mock('@/lib/posthog-events', () => ({
   trackPaywallHit: vi.fn(),
   trackCadGenerationStarted: vi.fn(),
@@ -18,7 +19,8 @@ vi.mock('@/lib/posthog-events', () => ({
   trackCadImproveRequested: vi.fn(),
   trackCadResultRestored: vi.fn(),
 }));
-vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn(), info: vi.fn() } }));
+const toastError = vi.hoisted(() => vi.fn());
+vi.mock('sonner', () => ({ toast: { error: toastError, success: vi.fn(), info: vi.fn() } }));
 
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { useImageToCADWorkflow } from '@/hooks/useImageToCADWorkflow';
@@ -49,7 +51,7 @@ describe('useImageToCADWorkflow start', () => {
     checkCredits.mockReturnValue(new Promise<boolean>((resolve) => { answer = resolve; }));
     const { result } = renderWorkflow();
 
-    let first: Promise<void>, second: Promise<void>;
+    let first: Promise<boolean>, second: Promise<boolean>;
     await act(async () => {
       first = result.current.simulateGeneration();
       second = result.current.simulateGeneration();
@@ -73,6 +75,50 @@ describe('useImageToCADWorkflow start', () => {
     await act(async () => { await result.current.simulateGeneration(); });
     expect(checkCredits).toHaveBeenCalledTimes(2);
     expect(startCalls()).toHaveLength(1);
+  });
+
+  it('a failed credit check is reported and resolves false instead of rejecting silently', async () => {
+    toastError.mockReset();
+    checkCredits.mockRejectedValueOnce(new Error('Balance fetch failed (500)'));
+    const { result } = renderWorkflow();
+    let started: boolean | undefined;
+    await act(async () => { started = await result.current.simulateGeneration(); });
+    expect(started).toBe(false);
+    expect(toastError).toHaveBeenCalledWith("We couldn't check your credits. Please try again.");
+    expect(startCalls()).toHaveLength(0);
+    expect(result.current.isStarting).toBe(false);
+  });
+
+  it('is Starting from the press until the start settles', async () => {
+    let answer: (approved: boolean) => void = () => {};
+    checkCredits.mockReturnValue(new Promise<boolean>((resolve) => { answer = resolve; }));
+    const { result } = renderWorkflow();
+    let run: Promise<boolean> = Promise.resolve(false);
+    act(() => { run = result.current.simulateGeneration(); });
+    expect(result.current.isStarting).toBe(true);
+    await act(async () => { answer(true); await run; });
+    expect(result.current.isStarting).toBe(false);
+    expect(startCalls()).toHaveLength(1);
+  });
+
+  it('sends the pictures handed to it (the approved design), not the stale reference set', async () => {
+    checkCredits.mockResolvedValue(true);
+    buildReferenceInputs.mockClear();
+    const { result } = renderWorkflow(); // referenceImages: []
+    const design = new File(['x'], 'edited-design.png', { type: 'image/png' });
+    let started: boolean | undefined;
+    await act(async () => { started = await result.current.simulateGeneration([design]); });
+    expect(started).toBe(true);
+    expect(buildReferenceInputs).toHaveBeenCalledWith([design]);
+    expect(startCalls()).toHaveLength(1);
+  });
+
+  it('ignores a click event passed as the argument', async () => {
+    checkCredits.mockResolvedValue(true);
+    buildReferenceInputs.mockClear();
+    const { result } = renderWorkflow();
+    await act(async () => { await result.current.simulateGeneration({ type: 'click' } as unknown); });
+    expect(buildReferenceInputs).toHaveBeenCalledWith([]);
   });
 });
 

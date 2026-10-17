@@ -4,6 +4,8 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockGenerate = vi.hoisted(() => vi.fn());
 vi.mock('@/hooks/useDesignImageRun', () => ({ useDesignImageRun: () => ({ generate: mockGenerate, running: false }) }));
+const mockToast = vi.hoisted(() => vi.fn());
+vi.mock('sonner', () => ({ toast: mockToast }));
 
 import DesignEditor from './DesignEditor';
 
@@ -17,7 +19,7 @@ beforeAll(() => {
   globalThis.fetch = vi.fn(async () => ({ ok: true, status: 200, blob: async () => new Blob(['x'], { type: 'image/png' }) })) as never;
 });
 
-beforeEach(() => mockGenerate.mockReset());
+beforeEach(() => { mockGenerate.mockReset(); mockToast.mockReset(); });
 
 const source = new File(['x'], 'ring.png', { type: 'image/png' });
 
@@ -238,5 +240,99 @@ describe('DesignEditor', () => {
     expect(screen.getByRole('button', { name: /^brush$/i })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.keyDown(window, { key: 'r' });
     expect(screen.getByRole('button', { name: /^rectangle$/i })).toHaveAttribute('aria-pressed', 'true');
+  });
+  describe('Create CAD never freezes', () => {
+    /** A design flow (Idea, Doodle, Inspiration): approve without an edit, straight to Ready for CAD. */
+    function toReady(props: Partial<React.ComponentProps<typeof DesignEditor>> = {}) {
+      const handles = renderEditor({ approveWithoutEdit: true, ...props });
+      looksRight();
+      return handles;
+    }
+    const createButton = () => screen.getByRole('button', { name: /^create cad|starting/i });
+
+    it('a design flow offers Looks right at once; Image to CAD still needs a change first', () => {
+      renderEditor({ approveWithoutEdit: true });
+      expect(screen.getByRole('button', { name: /looks right/i })).toBeEnabled();
+    });
+
+    it('says Starting... on the press itself and keeps saying it until the run has started', async () => {
+      let started: (v: boolean) => void = () => {};
+      const onCreateCad = vi.fn(() => new Promise<boolean>((r) => { started = r; }));
+      toReady({ onCreateCad });
+      fireEvent.click(createButton());
+      expect(createButton()).toHaveTextContent(/starting/i);
+      expect(createButton()).toBeDisabled();
+      await waitFor(() => expect(onCreateCad).toHaveBeenCalledTimes(1));
+      expect(createButton()).toHaveTextContent(/starting/i);
+      await act(async () => { started(true); });
+    });
+
+    it('a run that did not start shows why and Create CAD can be pressed again', async () => {
+      const onCreateCad = vi.fn(async () => false);
+      toReady({ onCreateCad });
+      await act(async () => { fireEvent.click(createButton()); });
+      expect(await screen.findByRole('alert')).toHaveTextContent(/didn't start/i);
+      expect(createButton()).toBeEnabled();
+    });
+
+    it('an error before the run starts is shown, not swallowed', async () => {
+      const onCreateCad = vi.fn(async () => { throw new Error('boom'); });
+      toReady({ onCreateCad });
+      await act(async () => { fireEvent.click(createButton()); });
+      expect(await screen.findByRole('alert')).toHaveTextContent(/couldn't start your cad/i);
+      expect(createButton()).toBeEnabled();
+    });
+
+    it('ticked angles that were not made are unticked, the CAD goes on, and the customer is told', async () => {
+      const { onCreateCad } = toReady();
+      fireEvent.click(screen.getByRole('button', { name: /add angles/i }));
+      fireEvent.click(screen.getAllByRole('checkbox')[0]);
+      await act(async () => { fireEvent.click(createButton()); });
+      await waitFor(() => expect(onCreateCad).toHaveBeenCalledTimes(1));
+      expect(onCreateCad.mock.calls[0][0]).toHaveLength(1);
+      expect(mockToast).toHaveBeenCalledWith('Selection cleared');
+      expect(screen.getAllByRole('checkbox')[0]).not.toBeChecked();
+    });
+
+    it('a made angle not yet checked is cleared too; an accepted angle goes with the CAD', async () => {
+      const { onCreateCad } = toReady();
+      fireEvent.click(screen.getByRole('button', { name: /add angles/i }));
+      fireEvent.click(screen.getAllByRole('checkbox')[0]);
+      fireEvent.click(screen.getAllByRole('checkbox')[1]);
+      mockGenerate.mockImplementationOnce(async (_r: unknown[] = [], opts: { onOutcome?: (i: number, o: unknown) => void } = {}) => {
+        opts.onOutcome?.(0, NEW_VERSION[0]); opts.onOutcome?.(1, NEW_VERSION[0]); return [NEW_VERSION[0], NEW_VERSION[0]];
+      });
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: /generate 2 angles/i })); });
+      const [accept] = await screen.findAllByRole('button', { name: /^looks right$/i });
+      fireEvent.click(accept); // Side accepted; Top left in review
+      await act(async () => { fireEvent.click(createButton()); });
+      await waitFor(() => expect(onCreateCad).toHaveBeenCalledTimes(1));
+      expect(onCreateCad.mock.calls[0][0]).toHaveLength(2); // design + the accepted angle
+      expect(mockToast).toHaveBeenCalledWith('Selection cleared');
+    });
+
+    it('leaving while an angle is being made does not leave Create CAD waiting forever', async () => {
+      toReady();
+      fireEvent.click(screen.getByRole('button', { name: /add angles/i }));
+      fireEvent.click(screen.getAllByRole('checkbox')[0]);
+      mockGenerate.mockReturnValueOnce(new Promise(() => {})); // never answers
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: /generate 1 angle/i })); });
+      await waitFor(() => expect(createButton()).toBeDisabled());
+      expect(screen.getByText(/waiting for your angles/i)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /back/i }));
+      looksRight();
+      expect(createButton()).toBeEnabled();
+      expect(screen.queryByText(/waiting for your angles/i)).toBeNull();
+    });
+
+    it('an angle whose credit check fails is marked failed instead of spinning forever', async () => {
+      toReady();
+      fireEvent.click(screen.getByRole('button', { name: /add angles/i }));
+      fireEvent.click(screen.getAllByRole('checkbox')[0]);
+      mockGenerate.mockRejectedValueOnce(new Error('Balance fetch failed (500)'));
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: /generate 1 angle/i })); });
+      expect(await screen.findByText(/couldn't check your credits/i, undefined, { timeout: 3000 })).toBeInTheDocument();
+      expect(createButton()).toBeEnabled();
+    });
   });
 });
