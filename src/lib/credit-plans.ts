@@ -20,7 +20,7 @@ const capacity = (credits: number) => ({
 
 export const CREDIT_PLANS = [
   { tierId: 'tier_5e6c6184', name: 'Basic', price: 9, inrPrice: 999, credits: 100, ...capacity(100) },
-  { tierId: PLUS_TIER_ID, name: 'Plus', price: 14, inrPrice: 1349, credits: 160, ...capacity(160) },
+  { tierId: PLUS_TIER_ID, name: 'Essential', price: 14, inrPrice: 1349, credits: 160, ...capacity(160) },
   { tierId: 'tier_6867e598', name: 'Standard', price: 39, inrPrice: 3499, credits: 500, ...capacity(500) },
   { tierId: 'tier_a80444ac', name: 'Pro', price: 99, inrPrice: 8999, credits: 1500, ...capacity(1500) },
 ];

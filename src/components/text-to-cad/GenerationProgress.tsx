@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, Diamond, Mail, Pencil } from "lucide-react";
 import { isValidNotificationEmail } from "@/lib/notification-email-api";
@@ -38,6 +38,8 @@ interface GenerationProgressProps {
   notificationEmailError?: string | null;
   onSaveNotificationEmail?: (email: string) => Promise<boolean>;
   onKeepCreating?: () => void;
+  /** Optional flow steps shown above the progress (the design flows' step 3). */
+  steps?: ReactNode;
 }
 
 export default function GenerationProgress({
@@ -55,6 +57,7 @@ export default function GenerationProgress({
   notificationEmailError,
   onSaveNotificationEmail,
   onKeepCreating,
+  steps,
 }: GenerationProgressProps) {
   const [isEditingEmail, setIsEditingEmail] = useState(false);
   const [emailDraft, setEmailDraft] = useState(storedNotificationEmail ?? "");
@@ -132,6 +135,7 @@ export default function GenerationProgress({
         className="w-full max-w-[560px] px-2 py-5 text-center outline-none sm:px-8"
         aria-labelledby="cad-generation-heading"
       >
+        {steps && <div className="mb-8">{steps}</div>}
         <div
           role={isFailed ? "alert" : "status"}
           aria-live={isFailed ? "assertive" : "polite"}

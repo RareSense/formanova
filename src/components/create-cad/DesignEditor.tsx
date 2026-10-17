@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { toast } from "sonner";
 import { ArrowRight, Box, Check, ChevronLeft, ChevronRight, Diamond, Plus, RotateCcw, Ruler, X } from "lucide-react";
 import { flattenMarkup, MARK_COLOUR, MIN_BRUSH, MAX_BRUSH, type Mark } from "@/lib/design-markup";
 import { blobToDataUrl } from "@/lib/design-image-run";
@@ -53,8 +54,12 @@ interface DesignEditorProps {
   onCancel: () => void;
   /** Closed after approving: the page keeps the approved pictures (main first). */
   onKeep: (files: File[]) => void;
-  /** Generate CAD from the approved pictures (main first) and the dimensions. */
-  onCreateCad: (files: File[]) => void;
+  /**
+   * Generate CAD from the approved pictures (main first) and the dimensions.
+   * May resolve false when the run did not start (credit check failed or
+   * blocked), so Create CAD can be pressed again.
+   */
+  onCreateCad: (files: File[]) => Promise<boolean | void> | void;
   dimensions: string;
   onDimensions: (text: string) => void;
   cadCost: number | null;
@@ -62,6 +67,15 @@ interface DesignEditorProps {
   /** Admin-only model choice, shown beside Create CAD. */
   modelPicker?: ReactNode;
   creatingCad: boolean;
+  /**
+   * The picture is already a design made for the customer (Idea, Doodle,
+   * Inspiration): "Looks right" is offered at once, no edit needed. Image to
+   * CAD leaves this off: there the customer's own photo can go to CAD from
+   * the upload screen, so the editor is only for changing it.
+   */
+  approveWithoutEdit?: boolean;
+  /** Replaces the header's Design / CAD steps, e.g. the three-step bar of the design flows. */
+  steps?: (stage: "edit" | "ready") => ReactNode;
 }
 
 async function picturesToFiles(pictures: EditorPicture[]): Promise<File[]> {
@@ -99,7 +113,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
  *  ready  - the approved design, optional extra views (other uploads
  *           come in marked as the old design), optional dimensions, Create CAD.
  */
-export default function DesignEditor({ open, source, extras = [], jewelryType, onCancel, onKeep, onCreateCad, dimensions, onDimensions, cadCost, cadCostLoading, creatingCad, modelPicker }: DesignEditorProps) {
+export default function DesignEditor({ open, source, extras = [], jewelryType, onCancel, onKeep, onCreateCad, dimensions, onDimensions, cadCost, cadCostLoading, creatingCad, modelPicker, approveWithoutEdit = false, steps }: DesignEditorProps) {
   const { generate } = useDesignImageRun();
   const [picture, setPicture] = useState<Picture | null>(null);
   const [edited, setEdited] = useState(false);
@@ -122,6 +136,12 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
   const [madeAngles, setMadeAngles] = useState<EditorPicture[]>([]);
   const [anglesOpen, setAnglesOpen] = useState(false);
   const [anglesBusy, setAnglesBusy] = useState(false);
+  /** Angles ticked but not made, or made but not checked: cleared when Create CAD is pressed. */
+  const [pendingAngles, setPendingAngles] = useState(0);
+  const [clearAnglesToken, setClearAnglesToken] = useState(0);
+  /** Create CAD was pressed and the run has not started yet: "Starting..." from the first frame. */
+  const [startingCad, setStartingCad] = useState(false);
+  const [cadError, setCadError] = useState<string | null>(null);
   /** A new approval starts the angles over. */
   const [approvalKey, setApprovalKey] = useState(0);
   /** Lightroom-style Auto Sync: each change also goes to the other photos. */
@@ -175,7 +195,7 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
   /** Same words, no new marks: the box's button redoes the last change. */
   const canRegenerate = edited && !hasChange && instruction.trim().length > 0;
   // "Looks right" only once a change has been made: the editor is for changing.
-  const canApprove = !!picture && !busy && !hasChange && (edited || slots.current.some((sl) => sl.edited));
+  const canApprove = !!picture && !busy && !hasChange && (approveWithoutEdit || edited || slots.current.some((sl) => sl.edited));
   const isDirty = edited || history.marks.length > 0 || hasChange;
 
   /** The last change sent, so Regenerate can ask for it again from the same starting picture. */
@@ -308,6 +328,9 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
     setAngles(all.slice(1));
     setMadeAngles([]);
     setAnglesOpen(false);
+    setAnglesBusy(false);
+    setPendingAngles(0);
+    setCadError(null);
     setApprovalKey((k) => k + 1);
     setSelected(null);
     setStage("ready");
@@ -330,6 +353,32 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
     if (source) return blobToDataUrl(source);
     throw new Error("The picture is not ready yet");
   }, [approved, source]);
+
+  /**
+   * Create CAD: "Starting..." at once, then the page's start. Angle tick boxes
+   * only choose angles to make; anything ticked but not made (or made but not
+   * checked) is not part of the CAD, so it is unticked and the run goes on.
+   * Every way out either starts the run or shows why it did not.
+   */
+  const createCad = async () => {
+    if (startingCad || creatingCad || anglesBusy) return;
+    setStartingCad(true);
+    setCadError(null);
+    if (pendingAngles > 0) {
+      setClearAnglesToken((t) => t + 1);
+      toast("Selection cleared");
+    }
+    try {
+      const files = await picturesToFiles(approvedPictures);
+      const started = await onCreateCad(files);
+      if (started === false) setCadError("Your CAD didn't start. Please try again.");
+    } catch (err) {
+      console.error("Create CAD failed before the run started:", err);
+      setCadError("We couldn't start your CAD. Please try again.");
+    } finally {
+      setStartingCad(false);
+    }
+  };
 
   const requestClose = () => {
     // After approving, closing keeps the approved pictures on the page.
@@ -399,7 +448,7 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
           className="fixed inset-0 z-[121] flex flex-col bg-background outline-none lg:inset-auto lg:left-1/2 lg:top-1/2 lg:h-[min(700px,calc(100vh-48px))] lg:w-[min(1000px,calc(100vw-48px))] lg:-translate-x-1/2 lg:-translate-y-1/2 lg:border lg:border-border/60 lg:shadow-xl"
         >
           {/* Header: Cancel / Back left, title centre, Original or Close right */}
-          <header className="grid h-14 flex-shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b border-border/60 px-3 sm:px-5">
+          <header className={`grid h-14 flex-shrink-0 items-center border-b border-border/60 px-3 sm:px-5 ${steps ? "grid-cols-[auto_minmax(0,1fr)_auto] gap-2 sm:grid-cols-[1fr_auto_1fr]" : "grid-cols-[1fr_auto_1fr]"}`}>
             <div>
               {stage === "edit" ? (
                 <button type="button" onClick={requestClose} className="flex h-10 items-center gap-1.5 px-1 text-sm text-foreground hover:text-muted-foreground">
@@ -412,9 +461,9 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
               )}
             </div>
             {/* Where you are, like a checkout stepper: the picture is step 1, the CAD comes next. */}
-            <div className="flex flex-col items-center">
+            <div className="flex min-w-0 flex-col items-center">
               <DialogPrimitive.Title className="sr-only">{TITLES[stage]}</DialogPrimitive.Title>
-              <ol aria-label="Steps" className="flex items-center gap-2 text-sm">
+              {steps ? steps(stage) : <ol aria-label="Steps" className="flex items-center gap-2 text-sm">
                 {(["Design", "CAD"] as const).map((name, i) => {
                   const current = (stage === "edit" ? 0 : 1) === i;
                   const done = stage !== "edit" && i === 0;
@@ -428,10 +477,10 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
                     </li>
                   );
                 })}
-              </ol>
+              </ol>}
             </div>
             <div className="flex justify-end">
-              {stage === "edit" && !edited && <span className="bg-muted px-2 py-0.5 text-xs text-muted-foreground">Original</span>}
+              {stage === "edit" && !edited && <span className={`bg-muted px-2 py-0.5 text-xs text-muted-foreground ${steps ? "hidden sm:inline" : ""}`}>Original</span>}
               {stage !== "edit" && (
                 <button type="button" onClick={requestClose} className="flex h-10 items-center gap-1.5 px-1 text-sm text-muted-foreground hover:text-foreground">
                   Close <X className="h-4 w-4" strokeWidth={1.5} />
@@ -503,7 +552,7 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
               )}
 
               {/* Decisions under the picture: try again, or accept (the main action). */}
-              {anyEdited && (
+              {(approveWithoutEdit || anyEdited) && (
                 <div className="flex flex-shrink-0 flex-wrap items-center justify-center gap-3 px-4 py-2.5 sm:px-6">
                   <div className="flex items-center gap-2">
                     <button
@@ -582,6 +631,8 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
                   toObjectUrl={async (url) => { const u = await toObjectUrl(url); objectUrls.current.push(u); return u; }}
                   onChange={setMadeAngles}
                   onBusy={setAnglesBusy}
+                  onPending={setPendingAngles}
+                  clearToken={clearAnglesToken}
                 />
               ) : (
                 <div className="flex flex-col items-center gap-2">
@@ -604,9 +655,10 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
               onDimensions={onDimensions}
               cost={cadCost}
               costLoading={cadCostLoading}
-              generating={creatingCad}
+              generating={creatingCad || startingCad}
               modelPicker={modelPicker}
-              onGenerate={() => void picturesToFiles(approvedPictures).then(onCreateCad)}
+              error={cadError}
+              onGenerate={() => void createCad()}
             />
           )}
 

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { reloadPreservingSession } from '@/lib/reload-utils';
 import {
-  listMyWorkflows,
+  listAllMyWorkflows,
   getWorkflowDetails,
   fetchWorkflowCreditAudit,
   fetchCadResult,
@@ -143,7 +143,7 @@ export default function Generations() {
     (async () => {
       try {
         if (!cached) setGlobalLoading(true);
-        const rawWorkflows = await listMyWorkflows(100, 0);
+        const rawWorkflows = await listAllMyWorkflows();
         const visible = rawWorkflows.filter(w => w.source_type !== 'unknown' && isVisibleGeneration(w));
         // A ring and its improvements are separate runs, so they filled a row
         // each while all showing the same ring. The vault knows which belong
@@ -228,20 +228,46 @@ export default function Generations() {
     [allWorkflows, globalLoading],
   );
 
+  const photoSection = getSection('photo', photoPage, true);
+  const productShotSection = getSection('product_shot', productShotPage, true);
+  // CAD runs carry the flow that started them; older runs fall back to their inputs.
+  const cadFlow = (w: WorkflowSummary) => w.client_flow ?? (w.source_type === 'text_to_cad' ? 'idea' : 'image');
+  const getCadSection = (flow: 'image' | 'idea' | 'inspiration', page: number): SectionState => {
+    const cad = [...getSection('text_to_cad', 1, false, true).workflows, ...getSection('image_to_cad', 1, false, true).workflows]
+      .filter((w) => cadFlow(w) === flow)
+      .sort((a, b) => (b.created_at > a.created_at ? 1 : -1));
+    const totalPages = Math.max(1, Math.ceil(cad.length / PER_PAGE));
+    return { workflows: cad.slice((page - 1) * PER_PAGE, page * PER_PAGE), page, totalPages, loading: globalLoading };
+  };
+  const textCadSection = getCadSection('idea', textCadPage);
+  const imageCadSection = getCadSection('image', imageCadPage);
+  const inspirationCadSection = getCadSection('inspiration', inspirationCadPage);
+
+  // Only the cards on the pages being shown are enriched and audited. History
+  // now holds every run, so walking all of them first left the shown cards
+  // waiting behind hundreds of hidden ones.
+  const shownIdsKey = [photoSection, productShotSection, textCadSection, imageCadSection, inspirationCadSection]
+    .flatMap(s => s.workflows.map(w => w.workflow_id))
+    .join(',');
+
   // ── Step 2: Enrich workflows with throttled concurrency ──────────
   useEffect(() => {
     if (globalLoading || allWorkflows.length === 0) return;
 
+    const shownIds = new Set(shownIdsKey.split(','));
     const allUnenriched = allWorkflows.filter(
-      w => w.thumbnail_url === undefined && !enrichedRef.current[w.workflow_id] &&
+      w => shownIds.has(w.workflow_id) &&
+           w.thumbnail_url === undefined && !enrichedRef.current[w.workflow_id] &&
            isVisibleGeneration(w)
     );
 
     if (allUnenriched.length === 0) return;
 
-    // Mark immediately to prevent duplicate fetches
+    // Mark immediately to prevent duplicate fetches. A page change cancels this
+    // run, so cards still holding this marker are released to be fetched again.
+    const pending: Partial<WorkflowSummary> = {};
     allUnenriched.forEach(w => {
-      enrichedRef.current[w.workflow_id] = {};
+      enrichedRef.current[w.workflow_id] = pending;
     });
 
     let cancelled = false;
@@ -331,8 +357,13 @@ export default function Generations() {
       }
     })();
 
-    return () => { cancelled = true; };
-  }, [allWorkflows.length, globalLoading, resolveGeneratedAssetName]);
+    return () => {
+      cancelled = true;
+      allUnenriched.forEach(w => {
+        if (enrichedRef.current[w.workflow_id] === pending) delete enrichedRef.current[w.workflow_id];
+      });
+    };
+  }, [allWorkflows.length, shownIdsKey, globalLoading, resolveGeneratedAssetName]);
 
   // ── Step 3: Fetch credit audit — throttled, only visible page items first
   const auditFetchedRef = useRef<Set<string>>(new Set());
@@ -340,8 +371,10 @@ export default function Generations() {
   useEffect(() => {
     if (globalLoading || allWorkflows.length === 0) return;
 
+    const shownIds = new Set(shownIdsKey.split(','));
     const needsAudit = allWorkflows.filter(
-      w => w.credits_spent === undefined &&
+      w => shownIds.has(w.workflow_id) &&
+           w.credits_spent === undefined &&
            !auditFetchedRef.current.has(w.workflow_id) &&
            isVisibleGeneration(w)
     );
@@ -349,6 +382,8 @@ export default function Generations() {
     if (needsAudit.length === 0) return;
 
     needsAudit.forEach(w => auditFetchedRef.current.add(w.workflow_id));
+    // A page change cancels this run; cards not yet audited are released.
+    const audited = new Set<string>();
 
     let cancelled = false;
 
@@ -368,6 +403,7 @@ export default function Generations() {
         );
 
         if (cancelled) return;
+        batch.forEach(wf => audited.add(wf.workflow_id));
 
         const updates: Record<string, number | null> = {};
         for (const r of results) {
@@ -390,23 +426,13 @@ export default function Generations() {
       }
     })();
 
-    return () => { cancelled = true; };
-  }, [allWorkflows.length, globalLoading]);
-
-  const photoSection = getSection('photo', photoPage, true);
-  const productShotSection = getSection('product_shot', productShotPage, true);
-  // CAD runs carry the flow that started them; older runs fall back to their inputs.
-  const cadFlow = (w: WorkflowSummary) => w.client_flow ?? (w.source_type === 'text_to_cad' ? 'idea' : 'image');
-  const getCadSection = (flow: 'image' | 'idea' | 'inspiration', page: number): SectionState => {
-    const cad = [...getSection('text_to_cad', 1, false, true).workflows, ...getSection('image_to_cad', 1, false, true).workflows]
-      .filter((w) => cadFlow(w) === flow)
-      .sort((a, b) => (b.created_at > a.created_at ? 1 : -1));
-    const totalPages = Math.max(1, Math.ceil(cad.length / PER_PAGE));
-    return { workflows: cad.slice((page - 1) * PER_PAGE, page * PER_PAGE), page, totalPages, loading: globalLoading };
-  };
-  const textCadSection = getCadSection('idea', textCadPage);
-  const imageCadSection = getCadSection('image', imageCadPage);
-  const inspirationCadSection = getCadSection('inspiration', inspirationCadPage);
+    return () => {
+      cancelled = true;
+      needsAudit.forEach(w => {
+        if (!audited.has(w.workflow_id)) auditFetchedRef.current.delete(w.workflow_id);
+      });
+    };
+  }, [allWorkflows.length, shownIdsKey, globalLoading]);
 
   return (
     <>

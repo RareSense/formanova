@@ -68,7 +68,8 @@ export function useReferenceImages() {
     });
   }, []);
 
-  const replaceReferenceImages = useCallback(async (files: File[]) => {
+  /** Replaces the set; resolves with the normalized files actually kept. */
+  const replaceReferenceImages = useCallback(async (files: File[]): Promise<File[]> => {
     const normalized = await normalizeImageFiles(files.slice(0, MAX_RING_CAD_REFERENCE_IMAGES));
     const added = normalized.map((file): ReferenceEntry => ({
       file,
@@ -80,6 +81,7 @@ export function useReferenceImages() {
       return added;
     });
     entriesRef.current = added;
+    return normalized;
   }, []);
 
   const clearReferenceImages = useCallback(() => {
