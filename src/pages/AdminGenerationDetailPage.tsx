@@ -17,17 +17,27 @@ import { azureUriToUrl } from '@/lib/azure-utils';
 import {
   AdminGenerationsApiError,
   getAdminGenerationDetail,
+  listAdminGenerations,
   type AdminGenerationDetail,
 } from '@/lib/admin-generations-api';
 import { fetchCadResult, resolveSourceType } from '@/lib/generation-history-api';
 import { parseRingCadResult } from '@/lib/ring-cad-nurbs-api';
 import { cadFlowLabel, isDesignImageWorkflow, readCadStudioInputs, type AdminRunInputs } from '@/lib/admin-generation-inputs';
+import {
+  cadDesignArtifact,
+  mayHaveDesignHistory,
+  designStepLabel,
+  startedFromDoodle,
+  traceDesignHistory,
+  type DesignHistory,
+} from '@/lib/admin-design-history';
 import type { AdminGenerationStep } from '@/lib/admin-generations-api';
 import { ScissorGLBGrid, GLBPreviewSlot } from '@/components/generations/ScissorGLBGrid';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 
 function formatDateTime(value: string | null): string {
@@ -336,8 +346,9 @@ function CollapsibleCardSection({
   );
 }
 
-function ImagePreview({ url, label }: { url: string | null; label: string }) {
+function ImagePreview({ url, label, zoomable = false }: { url: string | null; label: string; zoomable?: boolean }) {
   const resolvedUrl = useAuthenticatedImage(url);
+  const [open, setOpen] = useState(false);
 
   return (
     <div className="space-y-2">
@@ -345,7 +356,21 @@ function ImagePreview({ url, label }: { url: string | null; label: string }) {
       <div className="overflow-hidden rounded-md border border-border bg-muted/20">
         {url ? (
           resolvedUrl ? (
-            <img src={resolvedUrl} alt={label} className="max-h-72 w-full object-contain" />
+            zoomable ? (
+              <>
+                <button type="button" className="block w-full cursor-zoom-in" onClick={() => setOpen(true)} aria-label={`Open ${label} full size`}>
+                  <img src={resolvedUrl} alt={label} className="max-h-72 w-full object-contain" />
+                </button>
+                <Dialog open={open} onOpenChange={setOpen}>
+                  <DialogContent className="max-w-[min(96vw,1400px)] p-3 sm:p-4">
+                    <DialogTitle className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{label}</DialogTitle>
+                    <img src={resolvedUrl} alt={label} className="max-h-[85vh] w-full object-contain" />
+                  </DialogContent>
+                </Dialog>
+              </>
+            ) : (
+              <img src={resolvedUrl} alt={label} className="max-h-72 w-full object-contain" />
+            )
           ) : (
             <div className="flex h-40 items-center justify-center">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -383,11 +408,64 @@ function StudioInputs({ inputs }: { inputs: AdminRunInputs }) {
           <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Images (Input)</p>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {inputs.images.map((image, index) => (
-              <ImagePreview key={`${image.url}-${index}`} url={image.url} label={image.label} />
+              <ImagePreview key={`${image.url}-${index}`} url={image.url} label={image.label} zoomable />
             ))}
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * The design pictures behind a CAD from Idea / Doodle / Inspiration: what the
+ * customer drew or sent, what they wrote, and each change made in the design
+ * editor (with the marked-up picture), earliest first.
+ */
+function DesignHistorySection({ history }: { history: DesignHistory }) {
+  return (
+    <div className="space-y-3">
+      <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Design steps (Input)</p>
+      {history.brokenAtMarkup && (
+        <p className="text-xs text-muted-foreground">
+          Earlier steps are not linked: the design editor does not record which design was marked up.
+        </p>
+      )}
+      <ol className="space-y-3">
+        {history.steps.map((step, index) => (
+          <li key={step.workflowId} className="space-y-3 rounded-md border border-border p-3 sm:p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-medium">{index + 1}. {designStepLabel(step.kind)}{step.view ? ` (${step.view})` : ''}</p>
+              <Link
+                to={`/admin/generations/${encodeURIComponent(step.workflowId)}`}
+                className="break-all font-mono text-[10px] uppercase tracking-widest text-muted-foreground underline-offset-2 hover:underline"
+              >
+                {step.workflowId}
+              </Link>
+            </div>
+            <div className="space-y-2">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                {step.kind === 'doodle' ? 'About the drawing' : step.kind === 'edit' || step.kind === 'annotated_edit' ? 'Change asked' : 'Customer text'}
+              </p>
+              <div className="rounded-md border border-border bg-muted/20 px-4 py-3">
+                {step.text ? (
+                  <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{step.text}</p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Nothing written{step.defaultText ? ` (sent: "${step.defaultText}")` : ''}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {step.images.map((image, i) => (
+                <ImagePreview key={`${image.url}-${i}`} url={image.url} label={image.label} zoomable />
+              ))}
+              {step.outputUrl && <ImagePreview url={step.outputUrl} label="Design made" zoomable />}
+            </div>
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }
@@ -461,13 +539,33 @@ function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
   const [downloading3dm, setDownloading3dm] = useState(false);
   // CAD studio runs (design pictures, and CAD from Image / Idea / Inspiration)
   // keep their inputs in shapes the generic finders below don't read.
-  const studioInputs = readCadStudioInputs(detail.workflow_name, detail.input_payload, isCadModel);
+  const studioInputsRaw = readCadStudioInputs(detail.workflow_name, detail.input_payload, isCadModel);
+  // A CAD from a design picture: walk back to the doodle / words / edits behind it.
+  const designArtifact = isCadModel ? cadDesignArtifact(detail.input_payload) : null;
+  const designHistoryQuery = useQuery({
+    queryKey: ['admin-design-history', detail.workflow_id],
+    queryFn: () => traceDesignHistory(designArtifact, detail.created_at || null, {
+      fetchRun: getAdminGenerationDetail,
+      // The customer's own design pictures, to match the CAD's picture against.
+      listRuns: async () => !detail.user_email ? [] : (await listAdminGenerations({ user_email: detail.user_email, workflow_name: 'design_image_v1', limit: 100 }))
+        .items.filter((item) => isDesignImageWorkflow(item.workflow_name)),
+    }),
+    enabled: isCadModel && mayHaveDesignHistory(detail.input_payload),
+    staleTime: Infinity,
+    retry: false,
+  });
+  const designHistory = designHistoryQuery.data ?? null;
+  const fromDoodle = startedFromDoodle(designHistory);
+  // The CAD payload says "idea" for both words and drawings; the trail tells them apart.
+  const studioInputs = studioInputsRaw && fromDoodle
+    ? { ...studioInputsRaw, details: studioInputsRaw.details.map((d) => (d.label === 'Flow' ? { ...d, value: 'CAD from Doodle' } : d)) }
+    : studioInputsRaw;
   const isDesignImage = isDesignImageWorkflow(detail.workflow_name);
   const cadGlbUrl = isCadModel
     ? cadResultQuery.data?.glb_url ?? extractGlbFromSteps(detail.steps)
     : null;
   const cadThreedmUrl = isCadModel ? cadResultQuery.data?.threedm_url ?? null : null;
-  const cadSourceLabel = !isCadModel ? null : cadFlowLabel(detail.input_payload) ?? (cadSourceType === 'text_to_cad'
+  const cadSourceLabel = !isCadModel ? null : fromDoodle ? 'CAD from Doodle' : cadFlowLabel(detail.input_payload) ?? (cadSourceType === 'text_to_cad'
     ? 'Text to CAD'
     : cadSourceType === 'image_to_cad'
       ? 'Image to CAD'
@@ -631,6 +729,13 @@ function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
 
           {isCadModel ? (
             <div className="space-y-4">
+              {designHistory ? (
+                <DesignHistorySection history={designHistory} />
+              ) : designHistoryQuery.isLoading ? (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Loading design steps
+                </div>
+              ) : null}
               {cadInputs && <StudioInputs inputs={cadInputs} />}
               <div className="space-y-2">
                 <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">3D Preview (Output)</p>
