@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
-import { Shapes, Type } from "lucide-react";
+import { Loader2, Shapes, Type } from "lucide-react";
+import { toast } from "sonner";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import CadJewelryTypeCards from "@/components/text-to-cad/CadJewelryTypeCards";
 import ReferenceImageUploader from "@/components/text-to-cad/ReferenceImageUploader";
@@ -7,6 +8,7 @@ import { useJewelryTypeGate } from "@/components/text-to-cad/useJewelryTypeGate"
 import { CAD_EXAMPLE_PROMPTS } from "@/components/text-to-cad/cad-examples";
 import { DESIGN_IMAGE_CREDITS, MAX_DESIGN_IMAGES } from "@/lib/design-image-api";
 import { cadJewelryNoun, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
+import { loadExampleImage, revealElement } from "@/lib/example-image";
 import DoodlePad, { type DoodlePadHandle } from "./DoodlePad";
 import CadFlowSteps, { cadFlowStepLabels } from "./CadFlowSteps";
 import ladybugExample from "@/assets/inspiration-examples/ladybug.webp";
@@ -61,6 +63,11 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
   // One design, straight to the editor; Regenerate there covers "another".
   const count = 1 as const;
   const doodleRef = useRef<DoodlePadHandle>(null);
+  const mixCanvasRef = useRef<HTMLDivElement>(null);
+  // Pictures already in, counted now: several quick example clicks resolve
+  // after one render, so the state value alone would let them overfill.
+  const mixCountRef = useRef(0);
+  const [loadingExample, setLoadingExample] = useState<string | null>(null);
   const glbInputRef = useRef<HTMLInputElement>(null);
 
   const ready = mode === "describe" ? !!text.trim() : mode === "draw" ? hasInk : mixFiles.length >= 1;
@@ -72,13 +79,39 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
   const { cardsRef, guardedGenerate, typeError } = useJewelryTypeGate(jewelryType, () => { void make(); });
 
   const addMix = (files: File[]) => {
-    const room = MAX_DESIGN_IMAGES - mixFiles.length;
+    const room = MAX_DESIGN_IMAGES - mixCountRef.current;
     const accepted = files.slice(0, Math.max(0, room));
+    if (accepted.length === 0) return 0;
+    mixCountRef.current += accepted.length;
     setMixFiles((f) => [...f, ...accepted]);
     setMixPreviews((p) => [...p, ...accepted.map((f) => URL.createObjectURL(f))]);
+    return accepted.length;
+  };
+  const mixFull = mixFiles.length >= MAX_DESIGN_IMAGES;
+  // An example goes in exactly like an uploaded picture, then the canvas is
+  // brought into view (on phones the examples sit below it).
+  const addExample = async (name: string, src: string) => {
+    if (mixCountRef.current >= MAX_DESIGN_IMAGES) {
+      toast.error(`You can use up to ${MAX_DESIGN_IMAGES} pictures. Remove one to add the ${name.toLowerCase()}.`);
+      return;
+    }
+    setLoadingExample(name);
+    try {
+      const file = await loadExampleImage(src, `${name.toLowerCase().replace(/ /g, "-")}.webp`);
+      if (addMix([file]) === 0) {
+        toast.error(`You can use up to ${MAX_DESIGN_IMAGES} pictures. Remove one to add the ${name.toLowerCase()}.`);
+        return;
+      }
+      requestAnimationFrame(() => revealElement(mixCanvasRef.current));
+    } catch {
+      toast.error(`Couldn't load the ${name.toLowerCase()} example. Try again, or upload your own picture.`);
+    } finally {
+      setLoadingExample((cur) => (cur === name ? null : cur));
+    }
   };
   const removeMix = (i: number) => {
     URL.revokeObjectURL(mixPreviews[i]);
+    mixCountRef.current = Math.max(0, mixCountRef.current - 1);
     setMixFiles((f) => f.filter((_, k) => k !== i));
     setMixPreviews((p) => p.filter((_, k) => k !== i));
   };
@@ -153,6 +186,7 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
           )}
           {mode === "mix" && (
             <>
+              <div ref={mixCanvasRef}>
               <ReferenceImageUploader
                 referenceImagePreviewUrls={mixPreviews}
                 onAddReferenceImages={addMix}
@@ -164,6 +198,7 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
                 canvasClassName={PANEL_H}
                 photoStudioEmptyState
               />
+              </div>
               {mixFiles.length > 1 && <p className="mt-2 text-xs text-muted-foreground">Pictures are lettered left to right: {mixFiles.map((_, i) => String.fromCharCode(65 + i)).join(", ")}</p>}
               {/* Asked only once there is a picture to take from. */}
               {mixFiles.length > 0 && (
@@ -202,14 +237,19 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
             <div className="mb-2">
               <span className="marta-label invisible mb-1 block" aria-hidden="true">Step 2</span>
               <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">Try an Example</h3>
-              <p className="mt-1.5 text-sm text-muted-foreground">Choose one to load its picture</p>
+              <p id="inspiration-examples-hint" className={`mt-1.5 text-sm ${mixFull ? "text-foreground" : "text-muted-foreground"}`} aria-live="polite">
+                {mixFull ? `You have ${MAX_DESIGN_IMAGES} pictures, the most you can use. Remove one to add an example.` : "Choose one to load its picture"}
+              </p>
             </div>
             <div className={`grid grid-cols-2 gap-3 overflow-hidden border border-border/30 p-3 ${PANEL_H}`}>
               {INSPIRATION_EXAMPLES.map(([name, src]) => (
-                <button key={name} type="button" disabled={busy || mixFiles.length >= MAX_DESIGN_IMAGES} aria-label={`Use the ${name.toLowerCase()} example`}
-                  onClick={async () => { const blob = await (await fetch(src)).blob(); addMix([new File([blob], `${name.toLowerCase().replace(/ /g, "-")}.webp`, { type: "image/webp" })]); }}
-                  className="group relative min-h-0 overflow-hidden border border-border/20 bg-muted/10 transition-colors hover:border-foreground/30 disabled:opacity-50">
+                <button key={name} type="button" disabled={busy || mixFull || loadingExample === name} aria-label={`Use the ${name.toLowerCase()} example`}
+                  aria-describedby="inspiration-examples-hint" aria-busy={loadingExample === name}
+                  onClick={() => { void addExample(name, src); }}
+                  title={mixFull ? `Up to ${MAX_DESIGN_IMAGES} pictures. Remove one to add an example.` : undefined}
+                  className="group relative min-h-0 overflow-hidden border border-border/20 bg-muted/10 transition-colors hover:border-foreground/30 disabled:cursor-not-allowed disabled:opacity-50">
                   <img src={src} alt="" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
+                  {loadingExample === name && <span className="absolute inset-0 flex items-center justify-center bg-background/40"><Loader2 className="h-6 w-6 animate-spin text-foreground" /></span>}
                   <span className="absolute inset-x-0 bottom-0 bg-background/85 px-2 py-1.5 text-xs text-foreground">{name}</span>
                 </button>
               ))}

@@ -7,6 +7,8 @@ import { RING_CAD_NURBS_WORKFLOW, cadJewelryNoun, type CadJewelryType } from "@/
 import CadJewelryTypeCards from "@/components/text-to-cad/CadJewelryTypeCards";
 import { useJewelryTypeGate } from "@/components/text-to-cad/useJewelryTypeGate";
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
+import { loadExampleImage, revealElement } from "@/lib/example-image";
+import { toast } from "sonner";
 import ReferenceImageUploader from "./ReferenceImageUploader";
 import CadHistoryLibrary from "./CadHistoryLibrary";
 import type { CadLibraryEntry } from "@/hooks/useCadHistoryLibrary";
@@ -93,6 +95,7 @@ export default function ImagePromptScreen({
 }: ImagePromptScreenProps) {
   const glbInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const uploadCanvasRef = useRef<HTMLDivElement>(null);
   const promptRef = useRef(prompt);
   promptRef.current = prompt;
   const noun = jewelryType ? cadJewelryNoun(jewelryType) : "jewelry";
@@ -113,12 +116,12 @@ export default function ImagePromptScreen({
   const handleExampleClick = useCallback(async (example: CadExampleDesign) => {
     if (!jewelryType) setJewelryType("ring");
     try {
-      const res = await fetch(example.image);
-      const blob = await res.blob();
-      const file = new File([blob], `example-${jewelryType ?? "piece"}.webp`, { type: "image/webp" });
+      const file = await loadExampleImage(example.image, `example-${jewelryType ?? "piece"}.webp`);
       onReplaceReferenceImages([file]);
+      // On phones the examples sit below the canvas: show where it went.
+      requestAnimationFrame(() => revealElement(uploadCanvasRef.current));
     } catch {
-      // image load failed -- nothing to load
+      toast.error("Couldn't load that example. Try again, or upload your own picture.");
     }
   }, [onReplaceReferenceImages, jewelryType, setJewelryType]);
 
@@ -221,6 +224,7 @@ export default function ImagePromptScreen({
               </div>
 
             <div className="flex flex-col gap-3">
+              <div ref={uploadCanvasRef}>
               <ReferenceImageUploader
                 referenceImagePreviewUrls={referenceImagePreviewUrls}
                 onAddReferenceImages={onAddReferenceImages}
@@ -230,6 +234,7 @@ export default function ImagePromptScreen({
                 canvasClassName={PANEL_H}
                 photoStudioEmptyState
               />
+              </div>
 
               {onEditFirst && imageCount > 0 && !editApproved && (
                 <DesignUseChoice value={designUse} onChange={chooseDesignUse} disabled={isGenerating} />
