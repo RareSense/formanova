@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 // The real library fetches; we only care that it gets MOUNTED, since that is
 // what reports whether any history exists.
@@ -10,6 +10,8 @@ vi.mock('./CadHistoryLibrary', () => ({
     return <div data-testid="cad-history-library" />;
   },
 }));
+const mockToast = vi.hoisted(() => ({ error: vi.fn(), success: vi.fn() }));
+vi.mock('sonner', () => ({ toast: mockToast }));
 vi.mock('@/hooks/use-estimated-cost', () => ({
   useEstimatedCost: () => ({ cost: 70, loading: false }),
 }));
@@ -133,6 +135,41 @@ describe('ImagePromptScreen', () => {
     expect(screen.queryByText(/choose what you are making to see examples/i)).toBeNull();
     expect(screen.getByText(/choose one to load its picture/i)).toBeTruthy();
     expect(screen.getAllByRole('button', { name: /ring example/i }).length).toBeGreaterThan(0);
+  });
+
+  describe('example click', () => {
+    const realFetch = globalThis.fetch;
+    afterEach(() => { globalThis.fetch = realFetch; mockToast.error.mockReset(); });
+
+    function renderWithReplace() {
+      const onReplace = vi.fn();
+      render(
+        <ImagePromptScreen
+          model="gemini" tier="claude_opus_5_openrouter" prompt="" setPrompt={vi.fn()}
+          jewelryType="ring" setJewelryType={vi.fn()} isGenerating={false} onGenerate={vi.fn()}
+          referenceImagePreviewUrls={[]} onAddReferenceImages={vi.fn()} onRemoveReferenceImage={vi.fn()}
+          onReplaceReferenceImages={onReplace}
+        />,
+      );
+      return onReplace;
+    }
+
+    it('loads the example picture onto the canvas', async () => {
+      globalThis.fetch = vi.fn(async () => ({ ok: true, status: 200, blob: async () => new Blob(['x'], { type: 'image/webp' }) })) as never;
+      const onReplace = renderWithReplace();
+      fireEvent.click(screen.getByRole('button', { name: 'Use ring example 1' }));
+      await waitFor(() => expect(onReplace).toHaveBeenCalledTimes(1));
+      expect((onReplace.mock.calls[0][0] as File[])[0].type).toBe('image/webp');
+      expect(mockToast.error).not.toHaveBeenCalled();
+    });
+
+    it('says so when the example cannot be loaded, instead of doing nothing', async () => {
+      globalThis.fetch = vi.fn(async () => ({ ok: false, status: 404, blob: async () => new Blob(['x'], { type: 'text/html' }) })) as never;
+      const onReplace = renderWithReplace();
+      fireEvent.click(screen.getByRole('button', { name: 'Use ring example 1' }));
+      await waitFor(() => expect(mockToast.error).toHaveBeenCalledWith(expect.stringMatching(/couldn't load that example/i)));
+      expect(onReplace).not.toHaveBeenCalled();
+    });
   });
 
   describe('use as is / edit before CAD', () => {
