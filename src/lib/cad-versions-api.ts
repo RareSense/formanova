@@ -21,6 +21,7 @@
  */
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { azureUriToUrl } from '@/lib/azure-utils';
+import { blockIfCadDown, CadServiceDownError } from '@/lib/cad-service-status';
 
 /** How the backend labels an improve outcome, e.g. "Looks better". */
 export interface CadVersionLabel {
@@ -266,6 +267,7 @@ export async function fetchCadRingBySetId(setId: string): Promise<CadRing | null
 
 /** Starts one repair pass on a version. The backend builds the payload. */
 export async function startImproveFromVersion(assetId: string): Promise<CadImproveStarted> {
+  if (blockIfCadDown()) throw new CadServiceDownError();
   const response = await authenticatedFetch(`/api/cad/versions/${assetId}/improve`, { method: 'POST' });
   if (response.ok) return (await response.json()) as CadImproveStarted;
 

@@ -48,6 +48,7 @@ import {
   type CadRestoreSeed,
 } from "@/lib/cad-versions-api";
 import { cadStatusNotice, type CadStatusNotice } from '@/lib/cad-status-copy';
+import { blockIfCadDown } from '@/lib/cad-service-status';
 
 
 
@@ -367,7 +368,7 @@ export function useImageToCADWorkflow({
     // path, shows the balance against the price, and sends the user to
     // /credits. Reaching the endpoint's own 402 instead would swap that
     // shared flow for a toast that says less and leads nowhere.
-    const approved = await checkCredits(improveWorkflowFor({ family: ring?.family }), 1);
+    const approved = !blockIfCadDown() && await checkCredits(improveWorkflowFor({ family: ring?.family }), 1);
     if (!approved) {
       improvePressRef.current = false;
       setImproveLocked(false);
@@ -538,6 +539,7 @@ export function useImageToCADWorkflow({
    */
   const startGeneration = useCallback(async (files?: File[]): Promise<boolean> => {
     if (isGenerating) return false;
+    if (blockIfCadDown()) return false;
     const images = files ?? referenceImages;
     const imageCount = images.length;
     const hasPrompt = !!prompt.trim();
