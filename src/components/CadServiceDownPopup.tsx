@@ -33,7 +33,7 @@ export function CadServiceDownPopup() {
 export function CadServiceDownNotice() {
   return (
     <div role="status" className="w-full border-b border-border bg-muted/60 px-5 py-3 md:px-8">
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto max-w-3xl text-center">
         <p className="font-display text-sm uppercase tracking-wider text-foreground">{CAD_DOWN_TITLE}</p>
         <p className="text-xs text-muted-foreground md:text-sm">{CAD_DOWN_MESSAGE}</p>
       </div>

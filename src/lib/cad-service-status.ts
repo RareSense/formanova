@@ -18,9 +18,8 @@ export function setCadServiceDownForTests(down: boolean): void {
   serviceDown = down;
 }
 
-export const CAD_DOWN_TITLE = 'CAD services are temporarily down';
-export const CAD_DOWN_MESSAGE =
-  "We're working on our CAD service right now, so new CAD generations can't start. Please don't try again for now. Your credits are untouched, and your existing designs and downloads are still available.";
+export const CAD_DOWN_TITLE = 'CAD is temporarily unavailable';
+export const CAD_DOWN_MESSAGE = 'New CAD generations are paused for now. Your credits and designs are safe.';
 
 const EVENT = 'formanova:cad-service-down';
 
