@@ -16,6 +16,7 @@ import { useCreditPreflight } from '@/hooks/use-credit-preflight';
 import { useCredits } from '@/contexts/CreditsContext';
 import { DESIGN_IMAGE_WORKFLOW, type DesignImageResult, type DesignImageStartParams } from '@/lib/design-image-api';
 import { DesignImageRunError, runDesignImage } from '@/lib/design-image-run';
+import { blockIfCadDown } from '@/lib/cad-service-status';
 
 export type DesignImageOutcome =
   | { ok: true; result: DesignImageResult }
@@ -59,6 +60,7 @@ export function useDesignImageRun(): UseDesignImageRun {
     options: GenerateOptions = {},
   ): Promise<DesignImageOutcome[] | null> => {
     if (requests.length === 0) return [];
+    if (blockIfCadDown()) return null;
     const approved = await checkCredits(DESIGN_IMAGE_WORKFLOW, requests.length);
     if (!approved) return null;
 
