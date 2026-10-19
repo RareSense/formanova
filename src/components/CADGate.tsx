@@ -1,8 +1,8 @@
 import { CadServiceDownNotice, CadServiceDownPopup } from '@/components/CadServiceDownPopup';
-import { CAD_SERVICE_DOWN } from '@/lib/cad-service-status';
+import { isCadServiceDown } from '@/lib/cad-service-status';
 
 export function CADGate({ children }: { children: React.ReactNode }) {
-  if (!CAD_SERVICE_DOWN) return <>{children}</>;
+  if (!isCadServiceDown()) return <>{children}</>;
   return (
     <>
       <CadServiceDownNotice />
