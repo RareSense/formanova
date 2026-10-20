@@ -5,7 +5,7 @@
  *
  * To remove: set CAD_SERVICE_DOWN to false (or revert the PR that added this file).
  */
-export const CAD_SERVICE_DOWN = false;
+export const CAD_SERVICE_DOWN = true;
 
 let serviceDown = CAD_SERVICE_DOWN;
 
