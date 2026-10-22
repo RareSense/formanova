@@ -14,6 +14,7 @@ import {
   ringCadProgressFraction,
   isRingCadRepairing,
   type ArtifactRef,
+  type CadCastingInfo,
   type CadJewelryType,
   type CadMaterialProfile,
 } from "@/lib/ring-cad-nurbs-api";
@@ -105,6 +106,8 @@ export function useImageToCADWorkflow({
   const [stlArtifacts, setStlArtifacts] = useState<ArtifactRef[]>([]);
   const [stepArtifacts, setStepArtifacts] = useState<ArtifactRef[]>([]);
   const [estimatedMetalMassG, setEstimatedMetalMassG] = useState<number | null>(null);
+  /** The casting STL and stone list for the manufacturer, when the run has them. */
+  const [casting, setCasting] = useState<CadCastingInfo | null>(null);
   /** Backend-authored failure copy, safe to show the user directly. */
   const [failureMessage, setFailureMessage] = useState<string | null>(null);
   /** Exports fine but some part is not a closed solid - flag before manufacture. */
@@ -231,6 +234,7 @@ export function useImageToCADWorkflow({
       setStlArtifacts((trackedRun.stlUrls ?? []).map(url => ({ uri: url, url, type: 'model/stl', bytes: 0, sha256: '' })));
       setStepArtifacts((trackedRun.stepUrls ?? []).map(url => ({ uri: url, url, type: 'model/step', bytes: 0, sha256: '' })));
       setEstimatedMetalMassG(trackedRun.estimatedMetalMassG ?? null);
+      setCasting(trackedRun.casting ?? null);
       // cad_generation_completed is NOT emitted here. This effect does not run
       // once the page unmounts and bails out early on hasNavigatedAway, so
       // every run finishing after the user left was never counted.
@@ -481,6 +485,7 @@ export function useImageToCADWorkflow({
     setStlArtifacts([]);
     setStepArtifacts([]);
     setEstimatedMetalMassG(null);
+    setCasting(null);
     setIsModelLoading(true);
     setProgressStep('_loading');
 
@@ -509,6 +514,8 @@ export function useImageToCADWorkflow({
     }
 
     if (resolvedGlbUrl !== fallbackGlbUrl) seedGlb(resolvedGlbUrl);
+    // The manufacturing files survive a reopen from history; STL/STEP do not yet.
+    setCasting(result?.casting ?? null);
     if (result?.threedm_url) {
       setThreedmArtifact({
         uri: result.threedm_url,
@@ -607,6 +614,7 @@ export function useImageToCADWorkflow({
     setStlArtifacts([]);
     setStepArtifacts([]);
     setEstimatedMetalMassG(null);
+    setCasting(null);
     // Clear the previous ring's solidity result: a stale warning on a new run
     // is worse than none, because it trains people to ignore it.
     setNotAllSolid(false);
@@ -763,7 +771,7 @@ export function useImageToCADWorkflow({
     sourceWorkflowId, setSourceWorkflowId,
     threedmArtifact, setThreedmArtifact,
     viewerThreedmUrl,
-    stlArtifacts, stepArtifacts, estimatedMetalMassG,
+    stlArtifacts, stepArtifacts, estimatedMetalMassG, casting,
     failureMessage, notAllSolid,
     statusNotice,
     dismissStatusNotice: () => {

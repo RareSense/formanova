@@ -13,6 +13,7 @@ import { useCADMeshEditor } from "@/hooks/useCADMeshEditor";
 import { useReferenceImages } from "@/hooks/useReferenceImages";
 import { useNotificationEmail } from "@/hooks/useNotificationEmail";
 import { useCadArtifactDownloads } from "@/hooks/useCadArtifactDownloads";
+import { castingDownloadOffer } from "@/lib/casting-check-note";
 import { useCadAutoRotate } from "@/hooks/useCadAutoRotate";
 import CadResultActions from "@/components/text-to-cad/CadResultActions";
 import CadStatusDialog from '@/components/text-to-cad/CadStatusDialog';
@@ -203,12 +204,15 @@ export default function ImageToCAD() {
    * scene export now happens only through exportEdited, which the menu offers
    * only once the user has actually edited something.
    */
+  const castingOffer = castingDownloadOffer(workflow.casting);
   const downloads = useCadArtifactDownloads({
     threedmUrl: workflow.threedmArtifact?.url,
     viewerThreedmUrl: workflow.viewerThreedmUrl,
     glbUrl: workflow.glbUrl,
     stlUrls: workflow.stlArtifacts.map(artifact => artifact.url),
     stepUrls: workflow.stepArtifacts.map(artifact => artifact.url),
+    castingStlUrl: castingOffer.castingStlUrl,
+    stonesUrl: castingOffer.stonesUrl,
     exportEditedBlob: () => canvasRef.current?.exportSceneBlob() ?? Promise.resolve(undefined),
     source: 'image-to-cad',
   });
@@ -228,6 +232,9 @@ export default function ImageToCAD() {
       onDownloadViewerThreedm={workflow.viewerThreedmUrl ? downloads.downloadViewerThreedm : undefined}
       onDownloadStl={workflow.stlArtifacts.length ? downloads.downloadStl : undefined}
       onDownloadStep={workflow.stepArtifacts.length ? downloads.downloadStep : undefined}
+      onDownloadCastingStl={castingOffer.castingStlUrl ? downloads.downloadCastingStl : undefined}
+      castingNote={castingOffer.note}
+      onDownloadStones={castingOffer.stonesUrl ? downloads.downloadStones : undefined}
       estimatedMetalMassG={workflow.estimatedMetalMassG}
       onExportEdited={hasEdits ? downloads.exportEdited : undefined}
       latestVersionLabel={workflow.latestVersionLabel}

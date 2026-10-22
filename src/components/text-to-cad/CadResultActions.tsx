@@ -26,6 +26,9 @@ export interface CadResultActionsProps {
   onDownloadViewerThreedm?: () => void;
   onDownloadStl?: () => void;
   onDownloadStep?: () => void;
+  onDownloadCastingStl?: () => void;
+  castingNote?: string | null;
+  onDownloadStones?: () => void;
   estimatedMetalMassG?: number | null;
   /** Omit unless the user has actually edited the model. */
   onExportEdited?: () => void;
@@ -79,6 +82,9 @@ export function CadResultActions({
   onDownloadViewerThreedm,
   onDownloadStl,
   onDownloadStep,
+  onDownloadCastingStl,
+  castingNote,
+  onDownloadStones,
   estimatedMetalMassG,
   onExportEdited,
   isBusy = false,
@@ -116,6 +122,9 @@ export function CadResultActions({
           onDownloadViewerThreedm={onDownloadViewerThreedm}
           onDownloadStl={onDownloadStl}
           onDownloadStep={onDownloadStep}
+          onDownloadCastingStl={onDownloadCastingStl}
+          castingNote={castingNote}
+          onDownloadStones={onDownloadStones}
           estimatedMetalMassG={estimatedMetalMassG}
           onExportEdited={onExportEdited}
         />
@@ -149,6 +158,9 @@ export function CadResultActions({
         onDownloadViewerThreedm={onDownloadViewerThreedm}
         onDownloadStl={onDownloadStl}
         onDownloadStep={onDownloadStep}
+        onDownloadCastingStl={onDownloadCastingStl}
+        castingNote={castingNote}
+        onDownloadStones={onDownloadStones}
         estimatedMetalMassG={estimatedMetalMassG}
         onExportEdited={onExportEdited}
       />

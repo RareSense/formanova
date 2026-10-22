@@ -36,6 +36,7 @@ beforeEach(() => {
     threedm_url: '/fresh/manufacturing-3dm',
     azure_source: null,
     not_all_solid: false,
+    casting: null,
   });
 });
 
@@ -315,6 +316,40 @@ describe('CAD generation history card', () => {
 
     await waitFor(() => expect(downloadCadArtifact).toHaveBeenCalledWith('/api/artifacts/3dm', 'ring.3dm', '3dm'));
     expect(downloadCadArtifact).toHaveBeenNthCalledWith(1, '/fresh/manufacturing-3dm', 'ring.3dm', '3dm');
+  });
+
+  it('offers no casting files for a run that has none', async () => {
+    render(
+      <MemoryRouter>
+        <WorkflowCard workflow={cadWorkflow} index={1} onClick={() => {}} />
+      </MemoryRouter>,
+    );
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Download' }), { key: 'Enter' });
+    await screen.findByText('Rhino, editable');
+    expect(screen.queryByText('For your manufacturer')).toBeNull();
+    expect(screen.queryByText('Stones to set after casting')).toBeNull();
+  });
+
+  it('offers the casting STL and stone list from history, named after the design', async () => {
+    const casting = {
+      castingStlUrl: '/api/artifacts/casting',
+      stonesUrl: '/api/artifacts/stones',
+      status: 'flagged' as const,
+      flags: ['thin_walls'],
+    };
+    render(
+      <MemoryRouter>
+        <WorkflowCard workflow={{ ...cadWorkflow, casting }} index={1} onClick={() => {}} />
+      </MemoryRouter>,
+    );
+
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Download' }), { key: 'Enter' });
+    expect(await screen.findByText('Your manufacturer may want to check: some walls are thin.')).toBeTruthy();
+    fireEvent.click(screen.getByText('For your manufacturer'));
+    await waitFor(() => expect(downloadCadArtifact).toHaveBeenCalledWith('/api/artifacts/casting', 'ring-casting.stl', 'stl'));
+
+    await chooseDownload('Stones to set after casting');
+    await waitFor(() => expect(downloadCadArtifact).toHaveBeenCalledWith('/api/artifacts/stones', 'ring-stones.json', 'json'));
   });
 
   it('shows the figure alone, and still announces it in full', () => {

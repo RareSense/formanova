@@ -29,6 +29,7 @@ import {
   type CadArtifactKind,
 } from '@/lib/cad-artifact-download';
 import { CadDownloadMenu } from '@/components/downloads/CadDownloadMenu';
+import { castingDownloadOffer } from '@/lib/casting-check-note';
 import type { CadRestoreSeed } from '@/lib/cad-versions-api';
 
 const CAD_RENAMES_KEY = 'formanova_cad_renames';
@@ -140,6 +141,9 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
   const viewerThreedmUrl = (groupedWorkflow.cad_restore_seed?.ring?.versions ?? [])
     .find((version) => version.asset_id === shownVersionId)?.viewer_threedm_url ?? null;
   const viewerThreedmFilename = `${shownBaseName}-viewing-copy.3dm`;
+  // The casting files belong to this run, so another version shown on the
+  // card does not offer them.
+  const castingOffer = castingDownloadOffer(selectedWorkflowId === workflow.workflow_id ? workflow.casting : null);
   const renameInputId = `cad-design-name-${workflow.workflow_id}`;
 
   const handleStartRename = (e: React.MouseEvent) => {
@@ -228,6 +232,36 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
     } catch (err) {
       console.error('[WorkflowCard] viewing copy download error:', err);
       toast.error(err instanceof Error ? err.message : 'Could not download the 3DM viewing copy.');
+    } finally {
+      setIsDownloading(null);
+    }
+  };
+
+  /**
+   * The casting STL or stone list, saved exactly as the backend returned it.
+   * Re-read from /result at click time like the other formats, falling back to
+   * the url the history enrichment found.
+   */
+  const downloadCastingFile = async (file: 'casting' | 'stones') => {
+    if (isDownloading) return;
+    const kind: CadArtifactKind = file === 'casting' ? 'stl' : 'json';
+    const filename = file === 'casting' ? `${shownBaseName}-casting.stl` : `${shownBaseName}-stones.json`;
+    const cachedUrl = file === 'casting' ? castingOffer.castingStlUrl : castingOffer.stonesUrl;
+    setIsDownloading(kind);
+    try {
+      const fresh = castingDownloadOffer((await withTimeout(fetchCadResult(selectedWorkflowId), 5000))?.casting);
+      const url = (file === 'casting' ? fresh.castingStlUrl : fresh.stonesUrl) ?? cachedUrl;
+      if (!url) throw new Error('This file is not available for this design.');
+      await downloadCadArtifact(url, filename, kind);
+      import('@/lib/posthog-events').then(m => m.trackDownloadClicked({
+        file_name: filename,
+        file_type: file === 'casting' ? 'stl-casting' : 'stones-json',
+        context: 'generations',
+        source: cadSourceFromSourceType(workflow.source_type),
+      }));
+    } catch (err) {
+      console.error(`[WorkflowCard] ${file} download error:`, err);
+      toast.error(err instanceof Error ? err.message : 'Could not download the file.');
     } finally {
       setIsDownloading(null);
     }
@@ -395,6 +429,9 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
                   onDownloadThreedm={supportsThreedm ? () => downloadArtifact('3dm') : undefined}
                   onDownloadGlb={previewGlbUrl ? () => downloadArtifact('glb') : undefined}
                   onDownloadViewerThreedm={viewerThreedmUrl ? downloadViewerThreedm : undefined}
+                  onDownloadCastingStl={castingOffer.castingStlUrl ? () => downloadCastingFile('casting') : undefined}
+                  castingNote={castingOffer.note}
+                  onDownloadStones={castingOffer.stonesUrl ? () => downloadCastingFile('stones') : undefined}
                 />
                 <Button
                   size="sm"

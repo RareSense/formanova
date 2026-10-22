@@ -6,6 +6,7 @@ import {
   DEFAULT_CAD_JEWELRY_TYPE,
   isRingCadSuccess,
   parseRingCadFailure,
+  parseCastingInfo,
   parseRingCadResult,
   ringCadProgressFraction,
   isRingCadRepairing,
@@ -482,5 +483,101 @@ describe('jewelry_cad_generate', () => {
     expect(
       buildRingCadStartBody({ referenceImages: [], userDescription: 'pendant', jewelryType: 'necklace' }).payload.jewelry_type,
     ).toBe('necklace');
+  });
+});
+
+describe('casting STL and stone list parsing', () => {
+  const CASTING_SHA = 'c'.repeat(64);
+  const STONES_SHA = 'd'.repeat(64);
+  const castingArtifact = {
+    uri: `azure://a/${CASTING_SHA}/ring_casting.stl`,
+    url: 'https://signed.example/ring_casting.stl?sig=1',
+    sha256: CASTING_SHA,
+    type: 'model/stl',
+    bytes: 5000,
+  };
+  const stonesArtifact = {
+    uri: `azure://a/${STONES_SHA}/ring_stones.json`,
+    sha256: STONES_SHA,
+    type: 'application/json',
+    bytes: 300,
+  };
+  const BASE = {
+    ok: true,
+    status: 'completed',
+    glb_artifact: { uri: 'azure://a/ring.glb', type: 'model/gltf-binary', bytes: 34, sha256: 'y' },
+  };
+
+  it('returns null when the run has no casting files', () => {
+    expect(parseCastingInfo(BASE)).toBeNull();
+    expect(parseCastingInfo(null)).toBeNull();
+    expect(parseRingCadResult(BASE).casting).toBeNull();
+  });
+
+  it('reads the flat fields with status and flags from derivatives', () => {
+    const casting = parseRingCadResult({
+      ...BASE,
+      casting_stl_artifact: castingArtifact,
+      stones_artifact: stonesArtifact,
+      derivatives: { casting_stl: { status: 'flagged', flags: ['thin_walls', 'separate_pieces'], shell_count: 2 } },
+    }).casting;
+    expect(casting).toEqual({
+      castingStlUrl: 'https://signed.example/ring_casting.stl?sig=1',
+      stonesUrl: expect.stringContaining(STONES_SHA),
+      status: 'flagged',
+      flags: ['thin_walls', 'separate_pieces'],
+    });
+  });
+
+  it('finds the fields nested under a sink node', () => {
+    const casting = parseCastingInfo({
+      final_validated: [{
+        ...BASE,
+        cad_postprocess: {
+          result: {
+            casting_stl_artifact: castingArtifact,
+            derivatives: { casting_stl: { status: 'ready', flags: [] } },
+          },
+        },
+      }],
+    });
+    expect(casting?.castingStlUrl).toBe('https://signed.example/ring_casting.stl?sig=1');
+    expect(casting?.stonesUrl).toBeNull();
+    expect(casting?.status).toBe('ready');
+  });
+
+  it('falls back to derivatives.casting_stl.file/stones artifacts', () => {
+    const casting = parseCastingInfo({
+      ...BASE,
+      derivatives: {
+        casting_stl: {
+          status: 'ready',
+          file: { name: 'ring_casting.stl', artifact: castingArtifact },
+          stones: { name: 'ring_stones.json', artifact: stonesArtifact },
+        },
+      },
+    });
+    expect(casting?.castingStlUrl).toBe('https://signed.example/ring_casting.stl?sig=1');
+    expect(casting?.stonesUrl).toContain(STONES_SHA);
+  });
+
+  it('tolerates a missing or odd status and flags', () => {
+    const casting = parseCastingInfo({
+      ...BASE,
+      stones_artifact: stonesArtifact,
+      derivatives: { casting_stl: { status: 'weird', flags: ['thin_walls', 3, null, ''] } },
+    });
+    expect(casting).toEqual({
+      castingStlUrl: null,
+      stonesUrl: expect.stringContaining(STONES_SHA),
+      status: null,
+      flags: ['thin_walls'],
+    });
+    expect(parseCastingInfo({ ...BASE, casting_stl_artifact: castingArtifact })?.flags).toEqual([]);
+  });
+
+  it('leaves the plain STL list alone', () => {
+    const r = parseRingCadResult({ ...BASE, casting_stl_artifact: castingArtifact });
+    expect(r.stlArtifacts).toEqual([]);
   });
 });

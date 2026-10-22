@@ -387,6 +387,8 @@ export interface RingCadResult {
   stepArtifacts: ArtifactRef[];
   /** Calculated from validated solid volume and the explicitly selected alloy density. */
   estimatedMetalMassG: number | null;
+  /** The single casting mesh and stone list from cad_postprocess, or null when the run has neither. */
+  casting: CadCastingInfo | null;
   validationStatus: RingCadValidationStatus | null;
   diagnostics: RingCadDiagnostics;
   notAllSolid: boolean;
@@ -397,6 +399,22 @@ export interface RingCadResult {
   usedFallbackStage: boolean;
   /** Which result field the returned model actually came from. */
   sourceStage: string | null;
+}
+
+export type CastingStlStatus = 'ready' | 'flagged' | 'failed';
+
+/**
+ * The manufacturing hand-off from cad_postprocess: one casting STL for the
+ * caster, plus the list of stones to set after casting. Urls are browser-ready
+ * (see ArtifactRef.url); either may be null when the run produced only the other.
+ */
+export interface CadCastingInfo {
+  castingStlUrl: string | null;
+  stonesUrl: string | null;
+  /** derivatives.casting_stl.status; null when the backend sent none. */
+  status: CastingStlStatus | null;
+  /** Raw flag codes, e.g. "thin_walls". Shown through castingCheckNote, never raw. */
+  flags: string[];
 }
 
 export type RingCadFailurePhase =
@@ -475,6 +493,37 @@ function findKeyDeep(
     if (found !== undefined) return found;
   }
   return undefined;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+/**
+ * Reads the casting STL, the stone list and their status from a run result.
+ *
+ * Flat keys first (`casting_stl_artifact`, `stones_artifact`), then
+ * `derivatives.casting_stl.file/stones.artifact`, each also searched deep
+ * because the result may be sink-node-keyed. Returns null when the run has
+ * neither file, so older runs read exactly as before.
+ */
+export function parseCastingInfo(data: unknown): CadCastingInfo | null {
+  const root = asRecord(data);
+  if (!root) return null;
+  const derivatives = asRecord(root.derivatives ?? findKeyDeep(root, (key) => key === 'derivatives'));
+  const derivative = asRecord(derivatives?.casting_stl)
+    ?? asRecord(findKeyDeep(root, (key) => key === 'casting_stl'));
+  const castingStl = readArtifact(root.casting_stl_artifact ?? findKeyDeep(root, (key) => key === 'casting_stl_artifact'))
+    ?? readArtifact(asRecord(derivative?.file)?.artifact);
+  const stones = readArtifact(root.stones_artifact ?? findKeyDeep(root, (key) => key === 'stones_artifact'))
+    ?? readArtifact(asRecord(derivative?.stones)?.artifact);
+  if (!castingStl && !stones) return null;
+  const rawStatus = derivative?.status;
+  const status = rawStatus === 'ready' || rawStatus === 'flagged' || rawStatus === 'failed' ? rawStatus : null;
+  const flags = Array.isArray(derivative?.flags)
+    ? derivative.flags.filter((flag): flag is string => typeof flag === 'string' && flag.length > 0)
+    : [];
+  return { castingStlUrl: castingStl?.url ?? null, stonesUrl: stones?.url ?? null, status, flags };
 }
 
 /** True for the three terminal states that produced a usable ring. */
@@ -603,6 +652,7 @@ export function parseRingCadResult(data: unknown): RingCadResult {
     stlArtifacts,
     stepArtifacts,
     estimatedMetalMassG,
+    casting: parseCastingInfo(root),
     validationStatus,
     diagnostics,
     notAllSolid: diagnostics.not_all_solid === true,

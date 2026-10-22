@@ -84,3 +84,24 @@ describe('fetchCadResult solidity reporting', () => {
     expect(result.not_all_solid).toBe(false);
   });
 });
+
+describe('fetchCadResult casting files', () => {
+  it('returns the casting STL, stone list and status from the run result', async () => {
+    respondWith({
+      ...nurbsResult(false),
+      casting_stl_artifact: artifact('c'.repeat(64), 'model/stl'),
+      stones_artifact: artifact('d'.repeat(64), 'application/json'),
+      derivatives: { casting_stl: { status: 'flagged', flags: ['thin_walls'] } },
+    });
+    const result = await fetchCadResult('wf-1');
+    expect(result.casting?.castingStlUrl).toContain('c'.repeat(64));
+    expect(result.casting?.stonesUrl).toContain('d'.repeat(64));
+    expect(result.casting?.status).toBe('flagged');
+    expect(result.casting?.flags).toEqual(['thin_walls']);
+  });
+
+  it('returns null casting for a run without them', async () => {
+    respondWith(nurbsResult(false));
+    expect((await fetchCadResult('wf-1')).casting).toBeNull();
+  });
+});

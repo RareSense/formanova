@@ -25,6 +25,7 @@ import {
   parseRingCadFailure,
   parseRingCadResult,
   ringCadProgressFraction,
+  type CadCastingInfo,
 } from '@/lib/ring-cad-nurbs-api';
 import { extractPhotoThumbnail, extractProductShotThumbnail } from '@/lib/generation-enrichment';
 
@@ -177,6 +178,8 @@ export interface TrackedGeneration {
   stepUrls?: string[];
   /** CAD only: validated volume multiplied by the user-selected alloy density. */
   estimatedMetalMassG?: number | null;
+  /** CAD only: the casting STL and stone list for the manufacturer, when the run has them. */
+  casting?: CadCastingInfo | null;
   /** CAD only: label for the completion toast. */
   label?: string;
   /** CAD only: structured fail-step code, used for clear workspace copy. */
@@ -708,6 +711,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
               stlUrls: parsed.stlArtifacts.map(artifact => artifact.url),
               stepUrls: parsed.stepArtifacts.map(artifact => artifact.url),
               estimatedMetalMassG: parsed.estimatedMetalMassG,
+              casting: parsed.casting,
               notAllSolid: parsed.notAllSolid,
             }
           : g
@@ -838,6 +842,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
                   stlUrls: parsed?.stlArtifacts.map(artifact => artifact.url) ?? [],
                   stepUrls: parsed?.stepArtifacts.map(artifact => artifact.url) ?? [],
                   estimatedMetalMassG: parsed?.estimatedMetalMassG ?? null,
+                  casting: parsed?.casting ?? null,
                   notAllSolid: parsed?.notAllSolid ?? false,
                 }
               : g

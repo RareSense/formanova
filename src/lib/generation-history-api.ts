@@ -7,6 +7,7 @@
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { azureUriToUrl } from '@/lib/azure-utils';
 import { fetchCadResult } from '@/lib/cad-result-api';
+import type { CadCastingInfo } from '@/lib/ring-cad-nurbs-api';
 const __DEV__ = import.meta.env.DEV;
 
 // Re-exported so existing imports (WorkflowCard.tsx, useImageToCADWorkflow.ts,
@@ -36,6 +37,8 @@ export interface WorkflowSummary {
   glb_filename?: string | null;
   /** Machinable Rhino file returned by ring_cad_nurbs_v1 */
   threedm_url?: string | null;
+  /** Casting STL and stone list from cad_postprocess (populated client-side), when the run has them */
+  casting?: CadCastingInfo | null;
   /** AI model tier used (e.g. 'gemini', 'claude-sonnet', 'claude-opus') — populated client-side */
   ai_model?: string | null;
   /** Mode from workflow input (e.g. 'lite', 'standard', 'premium') — available in list response */

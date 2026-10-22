@@ -97,6 +97,7 @@ export function usePrefetchGenerations() {
                   ...stepData,
                   glb_url: stepData.glb_url ?? cadResult.glb_url,
                   threedm_url: stepData.threedm_url ?? cadResult.threedm_url,
+                  casting: stepData.casting ?? cadResult.casting,
                 };
               }
               const thumb = extractPhotoThumbnail(details.steps ?? []);
