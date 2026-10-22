@@ -4,12 +4,10 @@
  * Supported formats (pass-through): JPEG, PNG, WEBP
  * Unsupported formats (auto-converted to JPEG): AVIF, HEIC/HEIF, BMP, TIFF, etc.
  *
- * HEIC/HEIF files are converted via the heic2any library before canvas decoding.
+ * HEIC/HEIF files are converted via the heic-to library before canvas decoding.
  * Users are never blocked from uploading — unsupported formats are silently
  * converted to JPEG via an offscreen canvas before use.
  */
-
-import heic2any from 'heic2any';
 
 const SUPPORTED_TYPES = new Set([
   'image/jpeg',
@@ -57,26 +55,44 @@ function isHeicFile(file: File): boolean {
   return ext === 'heic' || ext === 'heif';
 }
 
+// Brands an iPhone/HEIF photo carries in its "ftyp" box (bytes 4-11).
+const HEIC_BRANDS = new Set(['heic', 'heix', 'heim', 'heis', 'hevc', 'hevx', 'hevm', 'hevs', 'mif1', 'msf1']);
+
+/**
+ * True if the file's bytes are HEIC, whatever its name or MIME type says.
+ * Some apps and transfers hand over iPhone photos named .jpg or typed
+ * image/jpeg; trusting the label let those through unconverted.
+ */
+async function hasHeicBytes(file: File): Promise<boolean> {
+  const head = await readHead(file, 12);
+  const ascii = String.fromCharCode(...head);
+  return ascii.slice(4, 8) === 'ftyp' && HEIC_BRANDS.has(ascii.slice(8, 12));
+}
+
 /**
  * Normalise an image file to a supported format.
  *
  * - If the file is already JPG/PNG/WEBP it is returned as-is.
- * - HEIC/HEIF files are converted via heic2any first.
+ * - HEIC/HEIF files (by type, name or bytes) are converted via heic-to first.
  * - Other unsupported formats are decoded on an offscreen canvas and re-encoded as JPEG.
  *
  * The returned File has the same name (with .jpg extension) and a correct
  * MIME type so downstream code can treat every file identically.
  */
 export async function normalizeImageFile(file: File): Promise<File> {
-  if (isSupportedImageFormat(file)) return file;
+  const heic = isHeicFile(file) || (await hasHeicBytes(file));
+  if (!heic && isSupportedImageFormat(file)) return file;
 
   const baseName = file.name.replace(/\.[^.]+$/, '') || 'image';
 
-  // HEIC/HEIF: convert to JPEG blob via heic2any, then return as File
-  if (isHeicFile(file)) {
+  // HEIC/HEIF: convert to JPEG blob via heic-to, then return as File
+  if (heic) {
     try {
-      const result = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 });
-      const blob = Array.isArray(result) ? result[0] : result;
+      // heic-to bundles a current libheif; heic2any's 2020 build rejects photos
+      // from recent iPhones with "ERR_LIBHEIF format not supported". Loaded on
+      // demand: it is ~700 KB gzipped and only HEIC uploads need it.
+      const { heicTo } = await import('heic-to');
+      const blob = await heicTo({ blob: file, type: 'image/jpeg', quality: 0.92 });
       return new File([blob], `${baseName}.jpg`, { type: 'image/jpeg' });
     } catch (e) {
       console.warn(`HEIC conversion failed for ${file.name}, attempting canvas fallback`, e);
@@ -119,6 +135,16 @@ export async function normalizeImageFiles(files: File[]): Promise<File[]> {
 /* ------------------------------------------------------------------ */
 /*  Internal helpers                                                   */
 /* ------------------------------------------------------------------ */
+
+function readHead(file: File, length: number): Promise<Uint8Array> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(new Uint8Array(reader.result as ArrayBuffer));
+    // An unreadable header just means "not HEIC"; the label-based path still runs.
+    reader.onerror = () => resolve(new Uint8Array(0));
+    reader.readAsArrayBuffer(file.slice(0, length));
+  });
+}
 
 function createImageBitmapFromFile(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {

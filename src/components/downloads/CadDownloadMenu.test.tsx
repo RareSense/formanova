@@ -50,7 +50,15 @@ describe('CadDownloadMenu', () => {
     ]);
   });
 
-  it('downloads the format that was chosen', async () => {
+  // One case per format: opening the menu five times in a single test ran past
+  // the 5 s test limit on a loaded machine.
+  it.each([
+    ['Rhino, editable', 'onDownloadThreedm'],
+    ['3D preview', 'onDownloadGlb'],
+    ['Viewer only (mesh)', 'onDownloadViewerThreedm'],
+    ['Other CAD software', 'onDownloadStep'],
+    ['3D printing', 'onDownloadStl'],
+  ] as const)('downloads the format that was chosen: %s', async (hint, handler) => {
     const handlers = {
       onDownloadThreedm: vi.fn(),
       onDownloadGlb: vi.fn(),
@@ -60,17 +68,11 @@ describe('CadDownloadMenu', () => {
     };
     render(<CadDownloadMenu {...handlers} />);
 
-    const cases: [string, keyof typeof handlers][] = [
-      ['Rhino, editable', 'onDownloadThreedm'],
-      ['3D preview', 'onDownloadGlb'],
-      ['Viewer only (mesh)', 'onDownloadViewerThreedm'],
-      ['Other CAD software', 'onDownloadStep'],
-      ['3D printing', 'onDownloadStl'],
-    ];
-    for (const [hint, handler] of cases) {
-      openMenu();
-      fireEvent.click(await screen.findByText(hint));
-      expect(handlers[handler]).toHaveBeenCalledTimes(1);
+    openMenu();
+    fireEvent.click(await screen.findByText(hint));
+
+    for (const [name, fn] of Object.entries(handlers)) {
+      expect(fn).toHaveBeenCalledTimes(name === handler ? 1 : 0);
     }
   });
 

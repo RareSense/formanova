@@ -31,6 +31,7 @@ import {
   type DesignImageResult,
   type DesignImageStartParams,
 } from '@/lib/design-image-api';
+import { blockIfCadDown, CadServiceDownError } from '@/lib/cad-service-status';
 
 /** A run that ended without a picture. `message` is safe to show the customer. */
 export class DesignImageRunError extends Error {
@@ -50,6 +51,7 @@ export function blobToDataUrl(blob: Blob): Promise<string> {
 }
 
 export async function startDesignImage(params: DesignImageStartParams, signal?: AbortSignal): Promise<string> {
+  if (blockIfCadDown()) throw new CadServiceDownError();
   const body = buildDesignImageStartBody(params);
   const res = await authenticatedFetch(`/api/run/state/${DESIGN_IMAGE_WORKFLOW}`, {
     method: 'POST',
