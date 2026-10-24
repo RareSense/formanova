@@ -64,7 +64,7 @@ function renderPage() {
   );
 }
 
-const IGNORED = ['Back to CAD Queue', 'Refresh', 'Add note', 'Choose file', 'Replace file', 'Remove', 'What will be sent', 'Send replacement', 'Download 3DM', 'History', 'Details', 'More files', 'Copy', 'Copied'];
+const IGNORED = ['Back to CAD Queue', 'Refresh', 'Add note', 'Choose file', 'Replace file', 'Remove', 'What will be sent', 'Send replacement', 'Download 3DM', 'History', 'Details', 'More files', 'Copy run ID', 'Copied'];
 function actionButtonNames(): string[] {
   return screen.getAllByRole('button')
     .map((button) => button.textContent?.trim() ?? '')
@@ -238,11 +238,11 @@ describe('AdminCadQueueDetailPage', () => {
     const id = screen.getByText('wf-1');
     expect(id.closest('[aria-expanded="false"]')).toBeNull();
     expect(screen.getByRole('button', { name: 'Details' }).getAttribute('aria-expanded')).toBe('false');
-    fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Copy run ID' }));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith('wf-1'));
     expect(await screen.findByRole('button', { name: 'Copied' })).toBeTruthy();
     await act(async () => { await vi.advanceTimersByTimeAsync(2100); });
-    expect(screen.getByRole('button', { name: 'Copy' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Copy run ID' })).toBeTruthy();
     view.unmount();
     vi.useRealTimers();
   });

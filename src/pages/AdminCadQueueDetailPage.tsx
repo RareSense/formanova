@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, ArrowLeft, ChevronDown, Loader2, MessageSquareWarning, RefreshCw } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Check, ChevronDown, Copy, Loader2, MessageSquareWarning, RefreshCw } from 'lucide-react';
 
 import {
   AlertDialog,
@@ -204,14 +204,14 @@ function EventsList({ events }: { events: Array<Record<string, unknown>> }) {
 
 /** The run id QC sends to the backend: small, always visible, one press to copy. */
 function RunIdLine({ workflowId }: { workflowId: string }) {
-  const [label, setLabel] = useState<'Copy' | 'Copied' | 'Copy failed'>('Copy');
+  const [label, setLabel] = useState<'Copy run ID' | 'Copied' | 'Copy failed'>('Copy run ID');
   const timer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => () => clearTimeout(timer.current), []);
 
   function show(next: 'Copied' | 'Copy failed') {
     setLabel(next);
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => setLabel('Copy'), 2000);
+    timer.current = setTimeout(() => setLabel('Copy run ID'), 2000);
   }
 
   async function copy() {
@@ -224,9 +224,14 @@ function RunIdLine({ workflowId }: { workflowId: string }) {
   }
 
   return (
-    <div className="flex min-w-0 items-center gap-2">
-      <span className="min-w-0 break-all font-mono text-xs text-muted-foreground">{workflowId}</span>
-      <Button variant="outline" size="sm" className="h-7 w-28 shrink-0 px-4 text-xs" onClick={() => void copy()}>
+    // QC sends this ID to the backend for every test, so it stands out with its own labelled box.
+    <div className="flex flex-col gap-2 border border-border bg-muted/40 p-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <span className="block font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">Run ID</span>
+        <span className="block break-all font-mono text-sm text-foreground">{workflowId}</span>
+      </div>
+      <Button size="sm" className="h-9 w-full shrink-0 gap-1.5 px-4 sm:w-36" onClick={() => void copy()}>
+        {label === 'Copied' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
         {label}
       </Button>
     </div>
