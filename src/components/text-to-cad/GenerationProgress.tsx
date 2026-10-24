@@ -22,11 +22,15 @@ const NODE_LABELS: Record<string, string> = {
   repairing: "Fixing the model",
 };
 
+const QUEUED_ESTIMATE = "up to 24 hours";
+
 interface GenerationProgressProps {
   visible: boolean;
   currentStep: string;
   onRetry?: () => void;
   estimateText?: string;
+  /** A supervised run: it waits in a queue and is reviewed before delivery. */
+  queued?: boolean;
   failureMessage?: string | null;
   notificationEmail?: string | null;
   /** The raw saved override. Null means unset, so the input opens empty. */
@@ -47,6 +51,7 @@ export default function GenerationProgress({
   currentStep,
   onRetry,
   estimateText = "up to 1 hour",
+  queued = false,
   failureMessage,
   notificationEmail,
   storedNotificationEmail,
@@ -173,9 +178,14 @@ export default function GenerationProgress({
                 <>
                   {/* The duration is the one thing worth colouring: it is what
                       the user is actually deciding around. */}
-                  <p className="mt-3 text-sm leading-6 text-muted-foreground sm:text-[15px]">
+                  {queued && (
+                    <p className="mt-3 text-sm font-semibold leading-6 text-foreground sm:text-[15px]">
+                      You&rsquo;re in the queue
+                    </p>
+                  )}
+                  <p className={`${queued ? "mt-1" : "mt-3"} text-sm leading-6 text-muted-foreground sm:text-[15px]`}>
                     Estimated time:{" "}
-                    <span className="font-semibold text-[hsl(var(--formanova-hero-accent))]">{estimateText}</span>
+                    <span className="font-semibold text-[hsl(var(--formanova-hero-accent))]">{queued ? QUEUED_ESTIMATE : estimateText}</span>
                   </p>
                   <p className="mt-2 text-xs leading-5 text-muted-foreground">
                     You can leave this page. We&rsquo;ll email you when your CAD is ready.

@@ -19,11 +19,11 @@ import type { Resolution } from '@/components/studio/OutputSettingsPills';
 import { getWorkflowDetails } from '@/lib/generation-history-api';
 import { fetchImproveOutcome } from '@/lib/cad-versions-api';
 import { cadStatusNotice } from '@/lib/cad-status-copy';
+import { resolveCadModel } from '@/lib/cad-result-api';
 import {
   RING_CAD_POLL_TIMEOUT_MS,
   isRingCadRepairing,
   parseRingCadFailure,
-  parseRingCadResult,
   ringCadProgressFraction,
 } from '@/lib/ring-cad-nurbs-api';
 import { extractPhotoThumbnail, extractProductShotThumbnail } from '@/lib/generation-enrichment';
@@ -37,6 +37,8 @@ const STUDIO_RESULT_MAX_RETRIES = 100;
 const DEFAULT_POLL_TIMEOUT_MS = 720_000;
 const CAD_TRACKING_STORAGE_KEY = 'formanova_running_cad_v1';
 const CAD_TRACKING_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+/** Supervised runs wait in a queue and for review: "a day or more" (backend, 2026-10-24). */
+const SUPERVISED_CAD_TRACKING_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 interface PersistedCadGeneration {
   workflowId: string;
@@ -46,6 +48,8 @@ interface PersistedCadGeneration {
   /** Carried across a refresh so the completion event keeps its properties.
    *  Only scalars -- the prompt's length, never the prompt itself. */
   cadAnalytics?: CadGenerationAnalytics;
+  /** Supervised runs wait in a queue for review; carried so a reload still says so. */
+  supervised?: boolean;
 }
 
 function loadPersistedCadGenerations(): TrackedGeneration[] {
@@ -60,7 +64,7 @@ function loadPersistedCadGenerations(): TrackedGeneration[] {
       .filter(row =>
         typeof row?.workflowId === 'string' &&
         typeof row?.startedAt === 'number' &&
-        now - row.startedAt < CAD_TRACKING_MAX_AGE_MS
+        now - row.startedAt < (row.supervised ? SUPERVISED_CAD_TRACKING_MAX_AGE_MS : CAD_TRACKING_MAX_AGE_MS)
       )
       .map(row => ({
         kind: 'cad' as const,
@@ -83,6 +87,7 @@ function loadPersistedCadGenerations(): TrackedGeneration[] {
         cadRoute: row.cadRoute ?? '/image-to-cad',
         timeoutMs: row.timeoutMs ?? RING_CAD_POLL_TIMEOUT_MS,
         ...(row.cadAnalytics ? { cadAnalytics: row.cadAnalytics } : {}),
+        ...(row.supervised ? { supervised: true } : {}),
       }));
   } catch {
     try { localStorage.removeItem(CAD_TRACKING_STORAGE_KEY); } catch { /* unavailable storage */ }
@@ -194,6 +199,8 @@ export interface TrackedGeneration {
   notAllSolid?: boolean;
   /** CAD only: which page started this run, so restore paths return to the right one. */
   cadRoute?: '/text-to-cad' | '/image-to-cad';
+  /** CAD only: an admin starts and reviews this run before the user gets it (start reply's "supervised"). */
+  supervised?: boolean;
 }
 
 export type GenerationKind = 'photoshoot' | 'cad';
@@ -256,6 +263,8 @@ export interface TrackCadGenerationParams {
   cadRoute?: '/text-to-cad' | '/image-to-cad';
   /** Completion-event properties, captured now and emitted when the run settles. */
   analytics?: CadGenerationAnalytics;
+  /** True when the start reply said "supervised": true. */
+  supervised?: boolean;
 }
 
 export interface GenerationsContextValue {
@@ -398,6 +407,19 @@ async function fallbackResultImagesFromHistory(
 
 // ── Provider ─────────────────────────────────────────────────────────────
 
+/**
+ * The poll stopped for this tab's own reasons, not because the backend ended the
+ * run: its deadline passed, or /status kept failing (offline, a deploy). Neither
+ * is an outcome; a supervised run waits for hours. The 30 s /status check
+ * (reconcileCadGenerations) settles the run when the backend really ends it.
+ * A backend-reported failure ("Workflow failed", a terminal state) and repeated
+ * 404s ("Workflow not found") still end the run as before.
+ */
+function isPollStoppedWithoutOutcome(err: unknown): boolean {
+  return err instanceof Error
+    && (err.message.startsWith('Workflow timed out after') || err.message.startsWith('Status polling failed '));
+}
+
 export function GenerationsContextProvider({ children }: { children: React.ReactNode }) {
   const [generations, setGenerations] = useState<TrackedGeneration[]>(loadPersistedCadGenerations);
   const generationsRef = useRef<TrackedGeneration[]>(generations);
@@ -466,6 +488,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
         cadRoute: params.cadRoute ?? '/image-to-cad',
         timeoutMs: params.timeoutMs ?? RING_CAD_POLL_TIMEOUT_MS,
         ...(params.analytics ? { cadAnalytics: params.analytics } : {}),
+        ...(params.supervised ? { supervised: true } : {}),
       };
       return [...prev.filter(g => g.workflowId !== params.workflowId), next];
     });
@@ -662,7 +685,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
       maxPollErrors: 10,
       maxResultRetries: 1,
       signal: ctrl.signal,
-    }).then(pollResult => {
+    }).then(async pollResult => {
       clearInterval(ticker);
       if (pollResult.status === 'cancelled') return;
       if (settledCadIds.current.has(gen.workflowId)) return;
@@ -671,16 +694,11 @@ export function GenerationsContextProvider({ children }: { children: React.React
 
       const raw = pollResult.result;
 
-      // /status already reported runtime.state "completed" - pollWorkflow only
-      // resolves here on that signal (a "failed" state throws and is caught
-      // below instead). The /result body's own ok/status fields are not part
-      // of the documented contract, so the real success check is whether a
-      // model artifact is actually present - falling back through whatever
-      // stage did produce one, same as parseRingCadResult already does.
-      let parsed: ReturnType<typeof parseRingCadResult>;
-      try {
-        parsed = parseRingCadResult(raw);
-      } catch {
+      // /status already reported runtime.state "completed". The model comes
+      // from the /result body or, for a hand-made replacement whose body has
+      // no model fields, from the CAD vault. No model anywhere is a failure.
+      const model = await resolveCadModel(gen.workflowId, raw);
+      if (!model) {
         const failure = parseRingCadFailure(raw);
         setGenerations(prev => prev.map(g =>
           g.workflowId === gen.workflowId ? { ...g, status: 'failed', progress: 100 } : g
@@ -703,12 +721,12 @@ export function GenerationsContextProvider({ children }: { children: React.React
               ...g,
               status: 'completed',
               progress: 100,
-              glbUrl: parsed.glbUrl,
-              threedmUrl: parsed.threedmArtifact?.url ?? null,
-              stlUrls: parsed.stlArtifacts.map(artifact => artifact.url),
-              stepUrls: parsed.stepArtifacts.map(artifact => artifact.url),
-              estimatedMetalMassG: parsed.estimatedMetalMassG,
-              notAllSolid: parsed.notAllSolid,
+              glbUrl: model.glbUrl,
+              threedmUrl: model.threedmUrl,
+              stlUrls: model.stlUrls,
+              stepUrls: model.stepUrls,
+              estimatedMetalMassG: model.estimatedMetalMassG,
+              notAllSolid: model.notAllSolid,
             }
           : g
       ));
@@ -726,7 +744,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
         action: (
           <ToastAction
             altText="View Result"
-            onClick={() => navigate(buildCadRestorePath(gen.workflowId, parsed.glbUrl, gen.cadRoute, 'toast'))}
+            onClick={() => navigate(buildCadRestorePath(gen.workflowId, model.glbUrl, gen.cadRoute, 'toast'))}
           >
             View Result
           </ToastAction>
@@ -736,6 +754,14 @@ export function GenerationsContextProvider({ children }: { children: React.React
       clearInterval(ticker);
       controllers.current.delete(gen.workflowId);
       if (ctrl.signal.aborted) return;
+      if (isPollStoppedWithoutOutcome(err)) {
+        // Still running as far as anyone knows. The 30 s /status check below
+        // (reconcileCadGenerations) settles it when the backend ends it.
+        setGenerations(prev => prev.map(g =>
+          g.workflowId === gen.workflowId ? { ...g, generationStep: 'Still in progress...' } : g
+        ));
+        return;
+      }
       console.error('[GenerationsContext] CAD poll failed:', err);
       // The focus check may reach the same failure while /result is awaited.
       if (settledCadIds.current.has(gen.workflowId)) return;
@@ -760,6 +786,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
         cadRoute: g.cadRoute ?? '/image-to-cad',
         timeoutMs: g.timeoutMs ?? RING_CAD_POLL_TIMEOUT_MS,
         ...(g.cadAnalytics ? { cadAnalytics: g.cadAnalytics } : {}),
+        ...(g.supervised ? { supervised: true } : {}),
       })),
   );
 
@@ -807,7 +834,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
           emitCadCompleted(gen);
           refreshCredits();
 
-          let parsed: ReturnType<typeof parseRingCadResult> | null = null;
+          let model: Awaited<ReturnType<typeof resolveCadModel>> = null;
           let rawResult: unknown = null;
           const resultController = new AbortController();
           const resultTimeout = window.setTimeout(() => resultController.abort(), 15_000);
@@ -815,10 +842,8 @@ export function GenerationsContextProvider({ children }: { children: React.React
             const resultResponse = await authenticatedFetch(`/api/result/${gen.workflowId}`, {
               signal: resultController.signal,
             });
-            if (resultResponse.ok) {
-              rawResult = await resultResponse.json();
-              parsed = parseRingCadResult(rawResult);
-            }
+            if (resultResponse.ok) rawResult = await resultResponse.json();
+            model = await resolveCadModel(gen.workflowId, rawResult);
           } catch {
             // Completion is still terminal. The restore link will retry result loading.
           } finally {
@@ -832,25 +857,25 @@ export function GenerationsContextProvider({ children }: { children: React.React
                   ...g,
                   status: 'completed',
                   progress: 100,
-                  generationStep: parsed ? 'Completed' : 'Completed — result unavailable',
-                  glbUrl: parsed?.glbUrl ?? null,
-                  threedmUrl: parsed?.threedmArtifact?.url ?? null,
-                  stlUrls: parsed?.stlArtifacts.map(artifact => artifact.url) ?? [],
-                  stepUrls: parsed?.stepArtifacts.map(artifact => artifact.url) ?? [],
-                  estimatedMetalMassG: parsed?.estimatedMetalMassG ?? null,
-                  notAllSolid: parsed?.notAllSolid ?? false,
+                  generationStep: model ? 'Completed' : 'Completed — result unavailable',
+                  glbUrl: model?.glbUrl ?? null,
+                  threedmUrl: model?.threedmUrl ?? null,
+                  stlUrls: model?.stlUrls ?? [],
+                  stepUrls: model?.stepUrls ?? [],
+                  estimatedMetalMassG: model?.estimatedMetalMassG ?? null,
+                  notAllSolid: model?.notAllSolid ?? false,
                 }
               : g
           ));
           toast({
-            title: parsed ? 'Your CAD is ready' : 'Your CAD finished',
-            description: parsed
+            title: model ? 'Your CAD is ready' : 'Your CAD finished',
+            description: model
               ? (gen.label ?? 'Open the completed CAD result')
               : 'The result could not be loaded yet. Open it to retry.',
             action: (
               <ToastAction
                 altText="View Result"
-                onClick={() => navigate(buildCadRestorePath(gen.workflowId, parsed?.glbUrl ?? null, gen.cadRoute, 'toast'))}
+                onClick={() => navigate(buildCadRestorePath(gen.workflowId, model?.glbUrl ?? null, gen.cadRoute, 'toast'))}
               >
                 View Result
               </ToastAction>

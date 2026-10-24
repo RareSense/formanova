@@ -212,6 +212,7 @@ describe('generation-history-api URL shapes', () => {
       threedm_url: null,
       azure_source: 'build_retry',
       not_all_solid: false,
+      pending: false,
     });
   });
 
@@ -227,6 +228,7 @@ describe('generation-history-api URL shapes', () => {
       threedm_url: null,
       azure_source: 'build_initial',
       not_all_solid: false,
+      pending: false,
     });
   });
 
@@ -242,6 +244,7 @@ describe('generation-history-api URL shapes', () => {
       threedm_url: null,
       azure_source: 'success_final',
       not_all_solid: false,
+      pending: false,
     });
   });
 
@@ -258,6 +261,7 @@ describe('generation-history-api URL shapes', () => {
       threedm_url: `/api/artifacts/${threedmSha}`,
       azure_source: 'threedm_artifact',
       not_all_solid: false,
+      pending: false,
     });
   });
 
@@ -271,6 +275,7 @@ describe('generation-history-api URL shapes', () => {
       threedm_url: null,
       azure_source: 'success_final',
       not_all_solid: false,
+      pending: false,
     });
   });
 
