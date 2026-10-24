@@ -4,7 +4,7 @@
 
 **Goal:** CAD runs that wait for human review (hours) or are delivered as a hand-made replacement show as "in progress" and then the right model, never as a false failure.
 
-**Architecture:** One model resolver in `src/lib/cad-result-api.ts` reads the `/result` body first and falls back to the CAD vault (`GET /cad/models`, matched by `version.source_workflow_id`). GenerationsContext uses it on both settle paths and treats its own poll deadline as "still running". The CAD page shows the existing `CadStatusDialog` for "in the queue" and "still in progress".
+**Architecture:** One model resolver in `src/lib/cad-result-api.ts` reads the `/result` body first and falls back to the CAD vault (`GET /cad/models`): the version whose `asset_id` equals the body's top-level `output_asset_id` (backend's stated contract, 2026-10-24), else the version whose `source_workflow_id` is the run. GenerationsContext uses it on both settle paths and treats its own poll deadline as "still running". The CAD page shows the existing `CadStatusDialog` for "in the queue" (when the submit reply has `"supervised": true`), "still in progress" (a 409 on restore) and an admin Fail (`reason_code: "failed_by_admin"`).
 
 **Tech Stack:** React 18 + TypeScript, Vitest + Testing Library. Run everything in the worktree `C:\Users\Clubinternet\OneDrive\Desktop\frontend\fn_wt_supervised` (branch `feat/supervised-cad-runs`).
 
@@ -15,6 +15,8 @@
 - Photoshoot polling stays byte-for-byte unchanged.
 - Queue copy, verbatim: title "You're in the queue", message "Your CAD starts as soon as the queue clears, and you'll have the result within 24 hours."
 - In-progress copy, verbatim: title "Still in progress", message "We're still working on this CAD. You'll have the result within 24 hours."
+- Admin-fail copy, verbatim (reason_code `failed_by_admin`): tone 'error', title "We couldn't make this design", message "We couldn't produce a result for this design. Your credits have been returned."
+- The queue notice shows only when the start reply carries `supervised === true` (generate start JSON and `POST /cad/versions/{asset_id}/improve` JSON). No frontend switch.
 - Commits: plain ASCII messages, no Co-Authored-By line (FormaNova repo rule). Never push to `main`.
 - Tests: `npx vitest run <file>`. Before finishing: full `npx vitest run`, `npx tsc --noEmit -p tsconfig.app.json`, `npm run build`.
 
@@ -30,15 +32,15 @@
 - Produces:
   - `export interface CadModelUrls { glbUrl: string | null; threedmUrl: string | null; stlUrls: string[]; stepUrls: string[]; estimatedMetalMassG: number | null; notAllSolid: boolean }`
   - `export function isExplicitCadFailure(raw: unknown): boolean`
-  - `export async function findVaultModelForWorkflow(workflowId: string): Promise<{ glbUrl: string | null; threedmUrl: string | null } | null>`
+  - `export async function findVaultModelForWorkflow(workflowId: string, outputAssetId?: string | null): Promise<{ glbUrl: string | null; threedmUrl: string | null } | null>`
   - `export async function resolveCadModel(workflowId: string, raw: unknown): Promise<CadModelUrls | null>`
   - `fetchCadResult` return type gains `pending: boolean` (true only for HTTP 409).
 
 - [ ] **Step 1: Write the failing tests.** Add the vault mock under the existing `authenticated-fetch` mock at the top of `src/lib/cad-result-api.test.ts`:
 
 ```ts
-const mockFindRingForWorkflow = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/cad-versions-api', () => ({ findRingForWorkflow: mockFindRingForWorkflow }));
+const mockFetchCadRings = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/cad-versions-api', () => ({ fetchCadRings: mockFetchCadRings }));
 ```
 
 Change the import line to:
@@ -50,13 +52,15 @@ import { fetchCadResult, resolveCadModel } from './cad-result-api';
 Append:
 
 ```ts
-const vaultRing = (workflowId: string) => ({
+// One model with an older version made by another run and the delivered one.
+// The delivered version's asset_id is what /result's output_asset_id names.
+const vault = (workflowId: string) => [{
   set_id: 'set-1',
   versions: [
     { asset_id: 'v0', position: 0, source_workflow_id: 'other', glb_url: '/old.glb', threedm_url: '/old.3dm' },
     { asset_id: 'v1', position: 1, source_workflow_id: workflowId, glb_url: '/rep.glb', threedm_url: '/rep.3dm' },
   ],
-});
+}];
 
 describe('supervised runs', () => {
   it('reads a 409 as still in progress and does not look anywhere else', async () => {
@@ -68,7 +72,7 @@ describe('supervised runs', () => {
     const result = await fetchCadResult('wf-q');
     expect(result.pending).toBe(true);
     expect(result.glb_url).toBeNull();
-    expect(mockFindRingForWorkflow).not.toHaveBeenCalled();
+    expect(mockFetchCadRings).not.toHaveBeenCalled();
   });
 
   it('is not pending for an ordinary result', async () => {
@@ -76,20 +80,19 @@ describe('supervised runs', () => {
     expect((await fetchCadResult('wf-1')).pending).toBe(false);
   });
 
-  it('finds a hand-made replacement in the CAD vault when /result has no model', async () => {
-    respondWith({ supervised_delivery: [{ note: 'replacement' }] });
-    mockFindRingForWorkflow.mockResolvedValue(vaultRing('wf-r'));
+  it('finds a hand-made replacement in the CAD vault by output_asset_id', async () => {
+    respondWith({ supervised_delivery: [{ note: 'replacement' }], output_asset_id: 'v1' });
+    mockFetchCadRings.mockResolvedValue(vault('some-other-run'));
     const result = await fetchCadResult('wf-r');
     expect(result.glb_url).toBe('/rep.glb');
     expect(result.threedm_url).toBe('/rep.3dm');
-    expect(mockFindRingForWorkflow).toHaveBeenCalledWith('wf-r', { attempts: 1 });
   });
 
   it('never asks the vault about a run that says it failed', async () => {
     respondWith({ ok: false, status: 'failed', phase: 'cad_export' });
     const result = await fetchCadResult('wf-f');
     expect(result.glb_url).toBeNull();
-    expect(mockFindRingForWorkflow).not.toHaveBeenCalled();
+    expect(mockFetchCadRings).not.toHaveBeenCalled();
   });
 });
 
@@ -99,26 +102,37 @@ describe('resolveCadModel', () => {
     expect(model?.glbUrl).toContain('a'.repeat(64));
     expect(model?.threedmUrl).toContain('b'.repeat(64));
     expect(model?.notAllSolid).toBe(true);
-    expect(mockFindRingForWorkflow).not.toHaveBeenCalled();
+    expect(mockFetchCadRings).not.toHaveBeenCalled();
   });
 
-  it('falls back to the vault version this run produced', async () => {
-    mockFindRingForWorkflow.mockResolvedValue(vaultRing('wf-r'));
-    const model = await resolveCadModel('wf-r', { supervised_delivery: [] });
+  it('falls back to the vault version named by output_asset_id', async () => {
+    mockFetchCadRings.mockResolvedValue(vault('some-other-run'));
+    const model = await resolveCadModel('wf-r', { supervised_delivery: [], output_asset_id: 'v1' });
     expect(model).toEqual({
       glbUrl: '/rep.glb', threedmUrl: '/rep.3dm', stlUrls: [], stepUrls: [],
       estimatedMetalMassG: null, notAllSolid: false,
     });
   });
 
+  it('without output_asset_id, falls back to the version this run produced', async () => {
+    mockFetchCadRings.mockResolvedValue(vault('wf-r'));
+    const model = await resolveCadModel('wf-r', null);
+    expect(model?.glbUrl).toBe('/rep.glb');
+  });
+
   it('is null when neither /result nor the vault has a model', async () => {
-    mockFindRingForWorkflow.mockResolvedValue(null);
+    mockFetchCadRings.mockResolvedValue([]);
     expect(await resolveCadModel('wf-x', { supervised_delivery: [] })).toBeNull();
+  });
+
+  it('is null when the vault cannot be read', async () => {
+    mockFetchCadRings.mockRejectedValue(new Error('Could not load your rings (500)'));
+    expect(await resolveCadModel('wf-x', { supervised_delivery: [], output_asset_id: 'v1' })).toBeNull();
   });
 
   it('is null for an explicit failure, without a vault lookup', async () => {
     expect(await resolveCadModel('wf-f', { ok: false, status: 'failed' })).toBeNull();
-    expect(mockFindRingForWorkflow).not.toHaveBeenCalled();
+    expect(mockFetchCadRings).not.toHaveBeenCalled();
   });
 });
 ```
@@ -130,7 +144,7 @@ Expected: the new tests FAIL (`resolveCadModel` is not exported, `pending` is un
 - [ ] **Step 3: Implement.** In `src/lib/cad-result-api.ts` add the import under the existing ones:
 
 ```ts
-import { findRingForWorkflow } from '@/lib/cad-versions-api';
+import { fetchCadRings } from '@/lib/cad-versions-api';
 ```
 
 Add `pending: boolean;` to the `fetchCadResult` return type, after `not_all_solid: boolean;`, with this doc comment:
@@ -163,7 +177,7 @@ In the `if (!isLegacyShape)` block, replace the `catch` body with:
         // No model in the body. A delivered hand-made replacement answers
         // {"supervised_delivery": [...]}; its model is in the vault instead.
         if (!isExplicitCadFailure(data)) {
-          const vault = await findVaultModelForWorkflow(workflowId);
+          const vault = await findVaultModelForWorkflow(workflowId, outputAssetIdOf(data));
           if (vault) {
             return { glb_url: vault.glbUrl, threedm_url: vault.threedmUrl, azure_source: 'cad_models', not_all_solid: false, pending: false };
           }
@@ -192,18 +206,35 @@ export function isExplicitCadFailure(raw: unknown): boolean {
   return d.ok === false || (typeof d.status === 'string' && d.status.toLowerCase() === 'failed');
 }
 
+/** The top-level output_asset_id of a /result body: the delivered version's asset_id. */
+function outputAssetIdOf(raw: unknown): string | null {
+  const id = (raw as Record<string, unknown> | null)?.output_asset_id;
+  return typeof id === 'string' && id ? id : null;
+}
+
 /**
- * The model the CAD vault (GET /cad/models) holds for this run's version.
+ * The model the CAD vault (GET /cad/models) holds for this run.
  *
  * The vault is right for every run, including a supervised one the CAD team
- * replaced by hand, whose /result has no model fields. Called once /result has
- * answered, when the version row is already written, so one attempt is enough.
+ * replaced by hand, whose /result has no model fields. Backend contract
+ * (2026-10-24): /result's output_asset_id is the delivered version's asset_id,
+ * and /result answers only after that version is saved, so one read is enough.
+ * Without an output_asset_id, the version this run produced is used. The
+ * delivered version is among the newest, so the first page is enough.
  */
 export async function findVaultModelForWorkflow(
   workflowId: string,
+  outputAssetId: string | null = null,
 ): Promise<{ glbUrl: string | null; threedmUrl: string | null } | null> {
-  const ring = await findRingForWorkflow(workflowId, { attempts: 1 });
-  const version = ring?.versions?.find((v) => v.source_workflow_id === workflowId);
+  let rings: Awaited<ReturnType<typeof fetchCadRings>>;
+  try {
+    rings = await fetchCadRings();
+  } catch {
+    return null;
+  }
+  const versions = rings.flatMap((ring) => ring.versions ?? []);
+  const version = (outputAssetId ? versions.find((v) => v.asset_id === outputAssetId) : undefined)
+    ?? versions.find((v) => v.source_workflow_id === workflowId);
   if (!version || (!version.glb_url && !version.threedm_url)) return null;
   return { glbUrl: version.glb_url ?? null, threedmUrl: version.threedm_url ?? null };
 }
@@ -225,7 +256,7 @@ export async function resolveCadModel(workflowId: string, raw: unknown): Promise
     };
   } catch {
     if (isExplicitCadFailure(raw)) return null;
-    const vault = await findVaultModelForWorkflow(workflowId);
+    const vault = await findVaultModelForWorkflow(workflowId, outputAssetIdOf(raw));
     return vault ? { ...vault, stlUrls: [], stepUrls: [], estimatedMetalMassG: null, notAllSolid: false } : null;
   }
 }
@@ -256,17 +287,17 @@ git commit -m "CAD results: a 409 is in progress, and a model missing from /resu
 - [ ] **Step 1: Write the failing tests.** In `src/contexts/GenerationsContext.test.tsx` change the cad-versions-api mock and add one for cad-result-api:
 
 ```ts
-vi.mock('@/lib/cad-versions-api', () => ({ fetchImproveOutcome: vi.fn(), findRingForWorkflow: vi.fn() }));
+vi.mock('@/lib/cad-versions-api', () => ({ fetchImproveOutcome: vi.fn(), fetchCadRings: vi.fn() }));
 ```
 
 Below the existing `import { fetchImproveOutcome } ...` line, add:
 
 ```ts
-import { findRingForWorkflow } from '@/lib/cad-versions-api';
-const mockFindRingForWorkflow = vi.mocked(findRingForWorkflow);
+import { fetchCadRings } from '@/lib/cad-versions-api';
+const mockFetchCadRings = vi.mocked(fetchCadRings);
 ```
 
-In the `describe('GenerationsContext - Image to 3D runs'` block's `beforeEach`, add `mockFindRingForWorkflow.mockResolvedValue(null);`. Then add these tests to that block:
+In the `describe('GenerationsContext - Image to 3D runs'` block's `beforeEach`, add `mockFetchCadRings.mockResolvedValue([]);`. Then add these tests to that block:
 
 ```ts
   it('keeps a cad run running when this tab reaches its own poll limit', async () => {
@@ -295,10 +326,12 @@ In the `describe('GenerationsContext - Image to 3D runs'` block's `beforeEach`, 
   });
 
   it('shows a hand-made replacement from the CAD vault', async () => {
-    mockPollWorkflow.mockResolvedValue({ status: 'completed', result: { supervised_delivery: [{}] } } as never);
-    mockFindRingForWorkflow.mockResolvedValue({
-      set_id: 's', versions: [{ asset_id: 'v', position: 0, source_workflow_id: 'cad-rep', glb_url: 'https://s/rep.glb', threedm_url: 'https://s/rep.3dm' }],
+    mockPollWorkflow.mockResolvedValue({
+      status: 'completed', result: { supervised_delivery: [{}], output_asset_id: 'v-rep' },
     } as never);
+    mockFetchCadRings.mockResolvedValue([{
+      set_id: 's', versions: [{ asset_id: 'v-rep', position: 0, source_workflow_id: 'cad-rep', glb_url: 'https://s/rep.glb', threedm_url: 'https://s/rep.3dm' }],
+    }] as never);
     const { result } = renderHook(() => useGenerations(), { wrapper });
     act(() => { result.current.trackCadGeneration({ workflowId: 'cad-rep' }); });
 
@@ -311,10 +344,10 @@ In the `describe('GenerationsContext - Image to 3D runs'` block's `beforeEach`, 
   it('shows a replacement found by the tab check from the CAD vault', async () => {
     mockAuthenticatedFetch
       .mockResolvedValueOnce(jsonResponse({ runtime: { state: 'completed' } }))
-      .mockResolvedValueOnce(jsonResponse({ supervised_delivery: [{}] }));
-    mockFindRingForWorkflow.mockResolvedValue({
-      set_id: 's', versions: [{ asset_id: 'v', position: 0, source_workflow_id: 'cad-rep2', glb_url: 'https://s/rep2.glb', threedm_url: null }],
-    } as never);
+      .mockResolvedValueOnce(jsonResponse({ supervised_delivery: [{}], output_asset_id: 'v-rep2' }));
+    mockFetchCadRings.mockResolvedValue([{
+      set_id: 's', versions: [{ asset_id: 'v-rep2', position: 0, source_workflow_id: 'cad-rep2', glb_url: 'https://s/rep2.glb', threedm_url: null }],
+    }] as never);
     const { result } = renderHook(() => useGenerations(), { wrapper });
     act(() => { result.current.trackCadGeneration({ workflowId: 'cad-rep2' }); });
 
@@ -450,23 +483,19 @@ git commit -m "CAD runs: only the backend ends a run; a replacement's model is r
 
 ---
 
-### Task 3: "In the queue" and "Still in progress" on the CAD page
+### Task 3: "In the queue", "Still in progress" and an admin Fail on the CAD page
 
 **Files:**
-- Create: `src/lib/cad-supervision.ts`
-- Modify: `src/lib/cad-status-copy.ts`, `src/hooks/useImageToCADWorkflow.ts` (restore around lines 498-508; generate start after `trackCadGeneration` around line 664; improve start after `trackCadGeneration` around line 402)
-- Test: `src/lib/cad-status-copy.test.ts` (create if missing), `src/hooks/useImageToCADWorkflow.test.tsx`
+- Modify: `src/lib/cad-status-copy.ts`, `src/lib/cad-versions-api.ts` (the `CadImproveStarted` interface only), `src/hooks/useImageToCADWorkflow.ts` (restore around lines 498-508; generate start around lines 645-675; improve start around lines 378-415)
+- Test: `src/lib/cad-status-copy.test.ts` (exists: add to it), `src/hooks/useImageToCADWorkflow.test.tsx`
 
 **Interfaces:**
 - Consumes: `fetchCadResult(...).pending` from Task 1.
-- Produces: `isCadSupervisedRuns(): boolean`, `cadQueuedNotice(): CadStatusNotice`, `cadInProgressNotice(): CadStatusNotice`.
+- Produces: `cadQueuedNotice(): CadStatusNotice`, `cadInProgressNotice(): CadStatusNotice`, a `failed_by_admin` case in `cadStatusNotice`, and `CadImproveStarted.supervised?: boolean`.
 
-- [ ] **Step 1: Write the failing tests.** Create or extend `src/lib/cad-status-copy.test.ts`:
+- [ ] **Step 1: Write the failing tests.** Add to `src/lib/cad-status-copy.test.ts`. Its existing import from `./cad-status-copy` must include `cadInProgressNotice, cadQueuedNotice, cadStatusNotice`, keeping whatever it already imports.
 
 ```ts
-import { describe, it, expect } from 'vitest';
-import { cadInProgressNotice, cadQueuedNotice } from './cad-status-copy';
-
 describe('supervised CAD copy', () => {
   it('says the run is queued and when the result arrives', () => {
     expect(cadQueuedNotice()).toEqual({
@@ -483,24 +512,24 @@ describe('supervised CAD copy', () => {
       message: "We're still working on this CAD. You'll have the result within 24 hours.",
     });
   });
+
+  it('tells the user an admin-failed run was refunded, not that AI is overwhelmed', () => {
+    expect(cadStatusNotice('failed_by_admin')).toEqual({
+      tone: 'error',
+      title: "We couldn't make this design",
+      message: "We couldn't produce a result for this design. Your credits have been returned.",
+    });
+  });
 });
 ```
 
-In `src/hooks/useImageToCADWorkflow.test.tsx`, add under the existing mocks:
-
-```ts
-const supervised = vi.hoisted(() => ({ on: false }));
-vi.mock('@/lib/cad-supervision', () => ({ isCadSupervisedRuns: () => supervised.on }));
-```
-
-and append:
+Append to `src/hooks/useImageToCADWorkflow.test.tsx`:
 
 ```ts
 describe('useImageToCADWorkflow supervised runs', () => {
   beforeEach(() => {
     checkCredits.mockReset();
     mockFetch.mockReset();
-    supervised.on = false;
   });
 
   it('opens a waiting run as still in progress, not as a failure', async () => {
@@ -518,18 +547,17 @@ describe('useImageToCADWorkflow supervised runs', () => {
     expect(result.current.statusNotice?.title).toBe('Still in progress');
   });
 
-  it('tells the user they are queued after Generate when supervision is on', async () => {
-    supervised.on = true;
+  it('tells the user they are queued when the start reply says the run is supervised', async () => {
     checkCredits.mockResolvedValue(true);
-    mockFetch.mockResolvedValue({ ok: true, json: async () => ({ workflow_id: 'state-1' }) } as Response);
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({ workflow_id: 'state-1', supervised: true }) } as Response);
     const { result } = renderWorkflow();
     await act(async () => { await result.current.simulateGeneration(); });
     expect(result.current.statusNotice?.title).toBe("You're in the queue");
   });
 
-  it('says nothing extra after Generate while supervision is off', async () => {
+  it('says nothing extra when the start reply is not supervised', async () => {
     checkCredits.mockResolvedValue(true);
-    mockFetch.mockResolvedValue({ ok: true, json: async () => ({ workflow_id: 'state-1' }) } as Response);
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({ workflow_id: 'state-1', supervised: false }) } as Response);
     const { result } = renderWorkflow();
     await act(async () => { await result.current.simulateGeneration(); });
     expect(result.current.statusNotice).toBeNull();
@@ -539,28 +567,23 @@ describe('useImageToCADWorkflow supervised runs', () => {
 
 - [ ] **Step 2: Run them and confirm they fail.**
 Run: `npx vitest run src/lib/cad-status-copy.test.ts src/hooks/useImageToCADWorkflow.test.tsx`
-Expected: the new tests FAIL (the functions and module don't exist; restore reports failure).
+Expected: the new tests FAIL (functions missing, `failed_by_admin` falls to the default, restore reports failure); existing tests PASS.
 
-- [ ] **Step 3: Implement.** Create `src/lib/cad-supervision.ts`:
+- [ ] **Step 3: Implement.** In `src/lib/cad-status-copy.ts`, add a case inside `cadStatusNotice`'s `switch`, before `default:`:
 
 ```ts
-/**
- * Supervised CAD runs (backend handoff 2026-10-24): a submitted CAD generate or
- * improve waits in a queue, an admin starts and reviews it, and the user gets
- * the result within 24 hours. The backend turns this on per environment; flip
- * this to true in the same environment when they tell us it is on.
- */
-export const CAD_SUPERVISED_RUNS = false;
-
-export function isCadSupervisedRuns(): boolean {
-  return CAD_SUPERVISED_RUNS;
-}
+    case 'failed_by_admin':
+      return {
+        tone: 'error',
+        title: "We couldn't make this design",
+        message: "We couldn't produce a result for this design. Your credits have been returned.",
+      };
 ```
 
-Append to `src/lib/cad-status-copy.ts`:
+and append:
 
 ```ts
-/** After submitting a CAD run while supervision is on. */
+/** After submitting a CAD run the backend reports as supervised. */
 export function cadQueuedNotice(): CadStatusNotice {
   return {
     tone: 'success',
@@ -579,13 +602,20 @@ export function cadInProgressNotice(): CadStatusNotice {
 }
 ```
 
+In `src/lib/cad-versions-api.ts`, add to `interface CadImproveStarted`, after `authorized_budget?: number;`:
+
+```ts
+  /** True when an admin starts and reviews this run before the user gets it. */
+  supervised?: boolean;
+```
+
 In `src/hooks/useImageToCADWorkflow.ts`, change the cad-status-copy import to
 
 ```ts
 import { cadInProgressNotice, cadQueuedNotice, cadStatusNotice, type CadStatusNotice } from '@/lib/cad-status-copy';
 ```
 
-and add `import { isCadSupervisedRuns } from '@/lib/cad-supervision';`. In `restoreCompletedWorkflow`, right after `const result = workflowId ? await fetchCadResult(workflowId) : null;`, insert:
+In `restoreCompletedWorkflow`, right after `const result = workflowId ? await fetchCadResult(workflowId) : null;`, insert:
 
 ```ts
     if (result?.pending) {
@@ -597,21 +627,27 @@ and add `import { isCadSupervisedRuns } from '@/lib/cad-supervision';`. In `rest
     }
 ```
 
-Immediately after each of the two `trackCadGeneration({ ... });` calls (generate start and improve start), insert:
+In the generate start, change `const { workflow_id } = await startRes.json();` to `const { workflow_id, supervised } = await startRes.json();`, and right after that path's `trackCadGeneration({ ... });` call insert:
 
 ```ts
-      if (isCadSupervisedRuns()) setStatusNotice(cadQueuedNotice());
+      if (supervised === true) setStatusNotice(cadQueuedNotice());
+```
+
+In the improve start, right after that path's `trackCadGeneration({ ... });` call insert:
+
+```ts
+      if (started.supervised === true) setStatusNotice(cadQueuedNotice());
 ```
 
 - [ ] **Step 4: Run the tests and confirm they pass.**
-Run: `npx vitest run src/lib/cad-status-copy.test.ts src/hooks/useImageToCADWorkflow.test.tsx src/components/text-to-cad/CadStatusDialog.test.tsx`
+Run: `npx vitest run src/lib/cad-status-copy.test.ts src/hooks/useImageToCADWorkflow.test.tsx src/components/text-to-cad/CadStatusDialog.test.tsx src/lib/cad-versions-api.test.ts`
 Expected: all PASS.
 
 - [ ] **Step 5: Commit.**
 
 ```bash
-git add src/lib/cad-supervision.ts src/lib/cad-status-copy.ts src/lib/cad-status-copy.test.ts src/hooks/useImageToCADWorkflow.ts src/hooks/useImageToCADWorkflow.test.tsx
-git commit -m "CAD page: queued and still-in-progress notices for supervised runs, behind CAD_SUPERVISED_RUNS"
+git add src/lib/cad-status-copy.ts src/lib/cad-status-copy.test.ts src/lib/cad-versions-api.ts src/hooks/useImageToCADWorkflow.ts src/hooks/useImageToCADWorkflow.test.tsx
+git commit -m "CAD page: queued, still-in-progress and admin-fail notices for supervised runs"
 ```
 
 ---
@@ -624,5 +660,5 @@ git commit -m "CAD page: queued and still-in-progress notices for supervised run
 - [ ] **Step 2:** `npx tsc --noEmit -p tsconfig.app.json`. Expected: no errors.
 - [ ] **Step 3:** `npm run lint -- src/lib/cad-result-api.ts src/lib/cad-supervision.ts src/lib/cad-status-copy.ts src/contexts/GenerationsContext.tsx src/hooks/useImageToCADWorkflow.ts`. Expected: no new errors.
 - [ ] **Step 4:** `npm run build`. Expected: build succeeds.
-- [ ] **Step 5:** Browser check with the dev server (`npm run dev`, port 8080). Open `/text-to-cad` and `/image-to-cad`; no console errors. Render `CadStatusDialog` with `cadQueuedNotice()` once by temporarily setting `CAD_SUPERVISED_RUNS = true` locally (never committed), check it looks right at 390 px and 1440 px, then set it back.
+- [ ] **Step 5:** Browser check with the dev server (`npm run dev`, port 8080). Open `/text-to-cad` and `/image-to-cad`; no console errors. Check the new notices in `CadStatusDialog` by temporarily calling `setStatusNotice(cadQueuedNotice())` locally (never committed), at 390 px and 1440 px, then revert.
 - [ ] **Step 6:** `git diff origin/main --stat` and confirm only the files named in Tasks 1-3 plus the spec and plan changed.
