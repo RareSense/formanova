@@ -64,7 +64,7 @@ function renderPage() {
   );
 }
 
-const IGNORED = ['Back to CAD Queue', 'Refresh', 'Add note', 'Choose file', 'Replace file', 'Remove', 'What will be sent', 'Send replacement', 'Download 3DM', 'History', 'Details', 'More files'];
+const IGNORED = ['Back to CAD Queue', 'Refresh', 'Add note', 'Choose file', 'Replace file', 'Remove', 'What will be sent', 'Send replacement', 'Download 3DM', 'History', 'Details', 'More files', 'Copy', 'Copied'];
 function actionButtonNames(): string[] {
   return screen.getAllByRole('button')
     .map((button) => button.textContent?.trim() ?? '')
@@ -207,7 +207,26 @@ describe('AdminCadQueueDetailPage', () => {
     await loaded();
     openSection('Details');
     expect(await screen.findByText('run detail')).toBeTruthy();
-    expect(screen.getByText('wf-1')).toBeTruthy();
+  });
+
+  it('shows the run id at the top, always, and copies it', async () => {
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    api.getSupervisedRun.mockResolvedValue(detail('running'));
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const view = renderPage();
+    await loaded();
+    // Visible with every section folded.
+    const id = screen.getByText('wf-1');
+    expect(id.closest('[aria-expanded="false"]')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Details' }).getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('wf-1'));
+    expect(await screen.findByRole('button', { name: 'Copied' })).toBeTruthy();
+    await act(async () => { await vi.advanceTimersByTimeAsync(2100); });
+    expect(screen.getByRole('button', { name: 'Copy' })).toBeTruthy();
+    view.unmount();
+    vi.useRealTimers();
   });
 
   it.each(Object.entries(GUIDANCE))('tells the admin what to do when the run is %s', async (phase, sentence) => {

@@ -13,6 +13,8 @@ import {
   MAX_SINGLE_PUT_BYTES,
   SupervisedRunsApiError,
   UPLOAD_ROLES,
+  getSupervisedRun,
+  isUncertainCheckFailure,
   removeSupervisedUpload,
   sameNames,
   sendSupervisedReplacement,
@@ -50,7 +52,12 @@ interface Props {
   onBusyChange?: (busy: boolean) => void;
 }
 
-type Transfer = { stage: 'uploading' | 'checking'; progress: number };
+// 'waiting': complete failed without an answer (proxy timeout); the page polls for the result.
+type Transfer = { stage: 'uploading' | 'checking' | 'waiting'; progress: number };
+
+const CHECK_POLL_MS = 5000;
+const CHECK_WAIT_MS = 3 * 60 * 1000;
+const CHECK_TIMEOUT_COPY = 'The check is taking long. Refresh in a minute to see if it finished.';
 
 const KiB = 1024;
 const MiB = 1024 * KiB;
@@ -184,7 +191,7 @@ function RoleRow({ spec, upload, downloadUrl, transfer, error, removing, disable
         ) : (
           <p className="flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2 className="h-3 w-3 animate-spin" />
-            Checking...
+            {transfer.stage === 'waiting' ? 'Still checking...' : 'Checking...'}
           </p>
         )
       )}
@@ -272,6 +279,8 @@ export default function SupervisedReplacementPanel({
       return;
     }
     inFlight.current.add(spec.role);
+    // The file this role holds now: once the role shows a different verified upload, it is ours.
+    const previousId = (detail.uploads ?? []).find((u) => u.role === spec.role && isVerified(u))?.upload_id;
     setRole<Transfer>(setTransfers, spec.role, { stage: 'uploading', progress: 0 });
     try {
       await uploadReplacementFile(workflowId, spec.role, file, {
@@ -285,11 +294,41 @@ export default function SupervisedReplacementPanel({
       if (!mounted.current) return;
       onChanged();
     } catch (err) {
-      if (mounted.current) setRole(setErrors, spec.role, uploadErrorCopy(err));
+      if (!mounted.current) return;
+      if (isUncertainCheckFailure(err)) {
+        // The check may still pass behind the proxy timeout: wait for it, never upload again.
+        setRole<Transfer>(setTransfers, spec.role, { stage: 'waiting', progress: 1 });
+        const verifiedNow = await waitForCheck(spec.role, String(err.detail.upload_id), previousId);
+        if (!mounted.current) return;
+        if (verifiedNow) onChanged();
+        else setRole(setErrors, spec.role, CHECK_TIMEOUT_COPY);
+      } else {
+        setRole(setErrors, spec.role, uploadErrorCopy(err));
+      }
     } finally {
       inFlight.current.delete(spec.role);
       if (mounted.current) setRole<Transfer>(setTransfers, spec.role, undefined);
     }
+  }
+
+  /** Poll the run every 5 s for up to 3 minutes until this upload (or a new file in its role) is verified. */
+  async function waitForCheck(role: UploadRole, uploadId: string, previousId: string | undefined): Promise<boolean> {
+    const deadline = Date.now() + CHECK_WAIT_MS;
+    while (Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, CHECK_POLL_MS));
+      if (!mounted.current) return false;
+      try {
+        const fresh = await getSupervisedRun(workflowId);
+        const done = (fresh.uploads ?? []).some((u) => isVerified(u) && (
+          u.upload_id === uploadId || (u.role === role && u.upload_id !== previousId)
+        ));
+        if (done) return true;
+      } catch {
+        // A failed poll says nothing either; try again on the next tick.
+      }
+      if (!mounted.current) return false;
+    }
+    return false;
   }
 
   async function remove(role: UploadRole) {

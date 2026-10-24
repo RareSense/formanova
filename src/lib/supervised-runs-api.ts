@@ -293,5 +293,26 @@ export async function uploadReplacementFile(
     'POST', `${run(workflowId)}/uploads`, { role, filename: file.name, bytes: file.size },
   );
   await put(link.upload_url, file, { 'x-ms-blob-type': 'BlockBlob', ...(link.headers ?? {}) }, onProgress);
-  return request('POST', `${run(workflowId)}/uploads/${encodeURIComponent(link.upload_id)}/complete`, {});
+  try {
+    return await request('POST', `${run(workflowId)}/uploads/${encodeURIComponent(link.upload_id)}/complete`, {});
+  } catch (err) {
+    // The check can outlive the proxy (Cloudflare cuts at about 100 s): say which upload it was,
+    // so the caller can wait for it instead of uploading again.
+    if (err instanceof SupervisedRunsApiError) {
+      throw new SupervisedRunsApiError(err.status, err.code, { ...err.detail, upload_id: link.upload_id });
+    }
+    throw new SupervisedRunsApiError(0, 'network_error', { upload_id: link.upload_id });
+  }
+}
+
+/**
+ * True when `complete` failed in a way that says nothing about the check itself: no response
+ * (status 0) or a 5xx other than a coded signal_failed. The check may still pass, so wait for the
+ * upload to show as verified; never PUT or complete again.
+ */
+export function isUncertainCheckFailure(err: unknown): err is SupervisedRunsApiError {
+  if (!(err instanceof SupervisedRunsApiError)) return false;
+  if (typeof err.detail.upload_id !== 'string' || !err.detail.upload_id) return false;
+  if (err.status === 0) return true;
+  return err.status >= 500 && err.code !== 'signal_failed';
 }

@@ -196,8 +196,40 @@ function EventsList({ events }: { events: Array<Record<string, unknown>> }) {
   );
 }
 
-function RunHeader({ data, typeLabel, userEmail, refreshing, onRefresh }: {
+/** The run id QC sends to the backend: small, always visible, one press to copy. */
+function RunIdLine({ workflowId }: { workflowId: string }) {
+  const [label, setLabel] = useState<'Copy' | 'Copied' | 'Copy failed'>('Copy');
+  const timer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  function show(next: 'Copied' | 'Copy failed') {
+    setLabel(next);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setLabel('Copy'), 2000);
+  }
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(workflowId);
+      show('Copied');
+    } catch {
+      show('Copy failed');
+    }
+  }
+
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <span className="min-w-0 break-all font-mono text-xs text-muted-foreground">{workflowId}</span>
+      <Button variant="outline" size="sm" className="h-7 w-28 shrink-0 px-4 text-xs" onClick={() => void copy()}>
+        {label}
+      </Button>
+    </div>
+  );
+}
+
+function RunHeader({ data, workflowId, typeLabel, userEmail, refreshing, onRefresh }: {
   data: SupervisedRunDetail;
+  workflowId: string;
   typeLabel: string;
   userEmail: string;
   refreshing: boolean;
@@ -216,6 +248,7 @@ function RunHeader({ data, typeLabel, userEmail, refreshing, onRefresh }: {
             Refresh
           </Button>
         </div>
+        <RunIdLine workflowId={workflowId} />
         <p className="text-base">{GUIDANCE[s.phase]}</p>
         {s.last_error && (
           <div className="min-w-0 space-y-2">
@@ -560,6 +593,7 @@ export default function AdminCadQueueDetailPage() {
             )}
             <RunHeader
               data={data}
+              workflowId={workflowId}
               typeLabel={supervisedRunTypeLabel(runDetail?.workflow_name)}
               userEmail={runDetail?.user_email ?? ''}
               refreshing={query.isFetching}
@@ -620,7 +654,6 @@ export default function AdminCadQueueDetailPage() {
             </FoldSection>
 
             <FoldSection title="Details">
-              <p className="break-all font-mono text-xs text-muted-foreground">{workflowId}</p>
               {data.send_check && (
                 <p className="text-sm text-muted-foreground">
                   The run's own preview below can show an earlier loop. Review the model under What Send delivers.
