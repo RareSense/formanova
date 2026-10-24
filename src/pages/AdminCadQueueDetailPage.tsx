@@ -443,7 +443,7 @@ export default function AdminCadQueueDetailPage() {
         ) : data && phase ? (
           <div className="min-w-0 space-y-6">
             <div className="min-w-0 space-y-1">
-              <h1 className="font-display text-3xl tracking-wide">
+              <h1 className="font-display text-3xl tracking-wide [overflow-wrap:anywhere]">
                 {runDetail?.workflow_name || 'CAD Queue Run'}
               </h1>
               <p className="break-all font-mono text-xs text-muted-foreground">{workflowId}</p>
@@ -494,7 +494,11 @@ export default function AdminCadQueueDetailPage() {
 
             <section className="min-w-0 space-y-4">
               <h2 className="font-display text-2xl tracking-wide">The run</h2>
-              {runDetail && <DetailContent detail={runDetail} />}
+              {runDetail && (
+                <div className="min-w-0 [overflow-wrap:anywhere]">
+                  <DetailContent detail={runDetail} />
+                </div>
+              )}
             </section>
 
             <Dialog open={sendOpen} onOpenChange={setSendOpen}>
