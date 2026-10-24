@@ -3,11 +3,15 @@ import { describe, expect, it, vi } from 'vitest';
 import GenerationProgress from '@/components/text-to-cad/GenerationProgress';
 
 describe('GenerationProgress', () => {
-  it('tells a supervised run it is queued, with the 24-hour estimate', () => {
-    render(<GenerationProgress visible currentStep="building" queued />);
-    expect(screen.getByText("You’re in the queue")).toBeTruthy();
-    expect(screen.getByText('up to 24 hours')).toBeTruthy();
-    expect(screen.queryByText('up to 1 hour')).toBeNull();
+  it('shows a supervised run a calm queue state, with no spinner or generating text', () => {
+    const { container } = render(<GenerationProgress visible currentStep="building" queued />);
+    expect(screen.getByRole('heading', { name: "You’re in the queue" })).toBeTruthy();
+    expect(screen.getByText('Your CAD starts as soon as the queue clears. You’ll have it within 24 hours.')).toBeTruthy();
+    expect(screen.getByText('We’ll email you when it’s ready.')).toBeTruthy();
+    expect(screen.queryByText('Your CAD is generating')).toBeNull();
+    expect(screen.queryByText(/Estimated time/)).toBeNull();
+    expect(screen.queryByText(/You can leave this page/)).toBeNull();
+    expect(container.querySelector('.animate-spin')).toBeNull();
   });
 
   it('says nothing about a queue for an ordinary run', () => {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Diamond, Mail, Pencil } from "lucide-react";
+import { ArrowRight, Clock, Diamond, Mail, Pencil } from "lucide-react";
 import { isValidNotificationEmail } from "@/lib/notification-email-api";
 import { Switch } from "@/components/ui/switch";
 
@@ -21,8 +21,6 @@ const NODE_LABELS: Record<string, string> = {
   building: "Building your CAD",
   repairing: "Fixing the model",
 };
-
-const QUEUED_ESTIMATE = "up to 24 hours";
 
 interface GenerationProgressProps {
   visible: boolean;
@@ -148,7 +146,13 @@ export default function GenerationProgress({
         >
           {/* Neutral mark, accent reserved for the one moving arc: an
               all-accent spinner competed with the copy for attention. */}
-          {!isTerminal && (
+          {!isTerminal && queued && isActiveGeneration && (
+            <div className="relative mx-auto mb-8 h-24 w-24" aria-hidden="true">
+              <div className="h-24 w-24 rounded-full border-4 border-border/40" />
+              <Clock className="absolute inset-0 m-auto h-10 w-10 text-foreground" strokeWidth={1.8} />
+            </div>
+          )}
+          {!isTerminal && !(queued && isActiveGeneration) && (
             <div className="relative mx-auto mb-8 h-24 w-24" aria-hidden="true">
               <div className="h-24 w-24 animate-spin rounded-full border-4 border-border/40 border-t-[hsl(var(--formanova-hero-accent))]" />
               <Diamond className="absolute inset-0 m-auto h-10 w-10 text-foreground" strokeWidth={1.8} />
@@ -171,21 +175,27 @@ export default function GenerationProgress({
                   isFailed ? "text-destructive" : "text-foreground"
                 }`}
               >
-                {isActiveGeneration ? "Your CAD is generating" : label}
+                {isActiveGeneration ? (queued ? <>You&rsquo;re in the queue</> : "Your CAD is generating") : label}
               </h1>
 
-              {isActiveGeneration && (
+              {isActiveGeneration && queued && (
+                <>
+                  <p className="mt-3 text-sm leading-6 text-muted-foreground sm:text-[15px]">
+                    Your CAD starts as soon as the queue clears. You&rsquo;ll have it within 24 hours.
+                  </p>
+                  <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                    We&rsquo;ll email you when it&rsquo;s ready.
+                  </p>
+                </>
+              )}
+
+              {isActiveGeneration && !queued && (
                 <>
                   {/* The duration is the one thing worth colouring: it is what
                       the user is actually deciding around. */}
-                  {queued && (
-                    <p className="mt-3 text-sm font-semibold leading-6 text-foreground sm:text-[15px]">
-                      You&rsquo;re in the queue
-                    </p>
-                  )}
-                  <p className={`${queued ? "mt-1" : "mt-3"} text-sm leading-6 text-muted-foreground sm:text-[15px]`}>
+                  <p className="mt-3 text-sm leading-6 text-muted-foreground sm:text-[15px]">
                     Estimated time:{" "}
-                    <span className="font-semibold text-[hsl(var(--formanova-hero-accent))]">{queued ? QUEUED_ESTIMATE : estimateText}</span>
+                    <span className="font-semibold text-[hsl(var(--formanova-hero-accent))]">{estimateText}</span>
                   </p>
                   <p className="mt-2 text-xs leading-5 text-muted-foreground">
                     You can leave this page. We&rsquo;ll email you when your CAD is ready.

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { Button } from '@/components/ui/button';
-import { Menu, X, LogIn, LogOut, User, Image, BadgeCheck, ScanEye, Gem, Check } from 'lucide-react';
+import { Menu, X, LogIn, LogOut, User, Image, BadgeCheck, ScanEye, Gem, Check, Clock } from 'lucide-react';
 
 function ShopifyMenuIcon({ className }: { className?: string }) {
   return (
@@ -38,7 +38,7 @@ export function isNavLinkActivePath(pathname: string, link: Pick<NavLink, 'path'
   ));
 }
 
-function GenerationIndicator() {
+export function GenerationIndicator() {
   const { generations } = useGenerations();
   const navigate = useNavigate();
   const [showReady, setShowReady] = useState(false);
@@ -46,6 +46,8 @@ function GenerationIndicator() {
 
   const runningGenerations = generations.filter(g => g.status === 'running');
   const runningCount = runningGenerations.length;
+  // Supervised CAD runs only wait for an admin: calm clock, no spinner.
+  const allQueued = runningCount > 0 && runningGenerations.every(g => g.kind === 'cad' && g.supervised === true);
   const completedGenerations = generations.filter(g => g.status === 'completed');
 
   // Show "Ready" flash when running count drops to zero and we have completed items
@@ -111,9 +113,16 @@ function GenerationIndicator() {
     <button
       onClick={handleClick}
       className="flex items-center gap-1.5 mr-3"
-      aria-label={runningCount > 0 ? 'Generation in progress' : 'Generation ready'}
+      aria-label={allQueued ? 'In queue' : runningCount > 0 ? 'Generation in progress' : 'Generation ready'}
     >
-      {runningCount > 0 ? (
+      {allQueued ? (
+        <>
+          <Clock className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+          <span className="font-mono text-[10px] tracking-[0.15em] text-muted-foreground uppercase hidden sm:inline">
+            {runningCount > 1 ? `${runningCount} in queue` : 'In queue'}
+          </span>
+        </>
+      ) : runningCount > 0 ? (
         <>
           <Gem className="h-3.5 w-3.5 text-primary animate-spin flex-shrink-0" />
           <span className="font-mono text-[10px] tracking-[0.15em] text-muted-foreground uppercase hidden sm:inline">
