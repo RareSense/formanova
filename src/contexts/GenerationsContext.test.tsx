@@ -473,6 +473,37 @@ describe('GenerationsContext - Image to 3D runs', () => {
     glb_artifact: { uri: 'azure://a/r.glb', url: 'https://s/r.glb', type: '', bytes: 1, sha256: '' },
   };
 
+  it('keeps a cad run running when /status keeps failing (offline, a deploy)', async () => {
+    mockPollWorkflow.mockRejectedValueOnce(new Error('Status polling failed 10 times (last status: 502)'));
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    act(() => { result.current.trackCadGeneration({ workflowId: 'cad-offline' }); });
+    await waitFor(() => expect(mockPollWorkflow).toHaveBeenCalled());
+    await act(async () => {});
+
+    expect(result.current.generations[0].status).toBe('running');
+    expect(mockMarkFailed).not.toHaveBeenCalled();
+    expect(mockFetchImproveOutcome).not.toHaveBeenCalled();
+  });
+
+  it('still fails a cad run the backend reports failed', async () => {
+    mockPollWorkflow.mockRejectedValueOnce(new Error('Workflow failed'));
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    act(() => { result.current.trackCadGeneration({ workflowId: 'cad-real-fail', cadRoute: '/image-to-cad' }); });
+
+    await waitFor(() => expect(result.current.generations[0].status).toBe('failed'));
+    expect(mockMarkFailed).toHaveBeenCalledTimes(1);
+  });
+
+  it('restores a supervised run that has waited more than a day, but not an ordinary one', () => {
+    const twoDaysAgo = Date.now() - 2 * 24 * 60 * 60 * 1000;
+    localStorage.setItem('formanova_running_cad_v1', JSON.stringify([
+      { workflowId: 'cad-old-sup', startedAt: twoDaysAgo, cadRoute: '/text-to-cad', timeoutMs: 60_000, supervised: true },
+      { workflowId: 'cad-old-plain', startedAt: twoDaysAgo, cadRoute: '/text-to-cad', timeoutMs: 60_000 },
+    ]));
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    expect(result.current.generations.map(g => g.workflowId)).toEqual(['cad-old-sup']);
+  });
+
   it('keeps a cad run running when this tab reaches its own poll limit', async () => {
     mockPollWorkflow.mockRejectedValueOnce(new Error('Workflow timed out after 5400000ms'));
     const { result } = renderHook(() => useGenerations(), { wrapper });

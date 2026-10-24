@@ -197,6 +197,24 @@ describe('useImageToCADWorkflow supervised runs', () => {
     expect(result.current.isQueued).toBe(true);
   });
 
+  it('hands a supervised improve start to the tracker with the flag', async () => {
+    checkCredits.mockResolvedValue(true);
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({ workflow_id: 'state-imp', supervised: true }) } as Response);
+    const ring = {
+      set_id: 'set-1',
+      versions: [{ asset_id: 'v1', position: 0, glb_url: '/v1.glb', viewer_threedm_url: '/v1.viewer.3dm', improvable: true }],
+    };
+    const { result } = renderWorkflow();
+    await act(async () => {
+      await result.current.restoreCompletedWorkflow('state-r', '/v1.glb', { ring, selectedVersionId: 'v1' });
+    });
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({ workflow_id: 'state-imp', supervised: true }) } as Response);
+    await act(async () => { await result.current.improveFromLatestVersion(); });
+
+    expect(mockFetch).toHaveBeenCalledWith('/api/cad/versions/v1/improve', expect.objectContaining({ method: 'POST' }));
+    expect(trackCadGenerationMock).toHaveBeenCalledWith(expect.objectContaining({ workflowId: 'state-imp', supervised: true }));
+  });
+
   it('says nothing extra when the start reply is not supervised', async () => {
     checkCredits.mockResolvedValue(true);
     mockFetch.mockResolvedValue({ ok: true, json: async () => ({ workflow_id: 'state-1', supervised: false }) } as Response);

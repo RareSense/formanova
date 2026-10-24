@@ -109,6 +109,25 @@ describe('pollWorkflow - status-then-result mode', () => {
     expect(fetchResult).not.toHaveBeenCalled();
   });
 
+  it('client deadline rejects with a "Workflow timed out after" message', async () => {
+    const fetchStatus = vi.fn().mockResolvedValue(okJson({ state: 'running' }));
+    const fetchResult = vi.fn();
+
+    await expect(
+      pollWorkflow({ ...statusOpts(fetchStatus, fetchResult), timeoutMs: 30, intervalMs: 5 }),
+    ).rejects.toThrow(/^Workflow timed out after /);
+  });
+
+  it('repeated /status errors reject with a "Status polling failed " message', async () => {
+    const fetchStatus = vi.fn().mockResolvedValue(notOk(502));
+    const fetchResult = vi.fn();
+
+    await expect(
+      pollWorkflow({ ...statusOpts(fetchStatus, fetchResult), maxPollErrors: 2 }),
+    ).rejects.toThrow(/^Status polling failed 2 times \(last status: 502\)/);
+    expect(fetchResult).not.toHaveBeenCalled();
+  });
+
   it('test 3: status 404 over budget -> throws', async () => {
     // max404s default is 3; three 404s should throw
     const fetchStatus = vi.fn().mockResolvedValue(r404());

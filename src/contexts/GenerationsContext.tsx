@@ -37,6 +37,8 @@ const STUDIO_RESULT_MAX_RETRIES = 100;
 const DEFAULT_POLL_TIMEOUT_MS = 720_000;
 const CAD_TRACKING_STORAGE_KEY = 'formanova_running_cad_v1';
 const CAD_TRACKING_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+/** Supervised runs wait in a queue and for review: "a day or more" (backend, 2026-10-24). */
+const SUPERVISED_CAD_TRACKING_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 interface PersistedCadGeneration {
   workflowId: string;
@@ -62,7 +64,7 @@ function loadPersistedCadGenerations(): TrackedGeneration[] {
       .filter(row =>
         typeof row?.workflowId === 'string' &&
         typeof row?.startedAt === 'number' &&
-        now - row.startedAt < CAD_TRACKING_MAX_AGE_MS
+        now - row.startedAt < (row.supervised ? SUPERVISED_CAD_TRACKING_MAX_AGE_MS : CAD_TRACKING_MAX_AGE_MS)
       )
       .map(row => ({
         kind: 'cad' as const,
@@ -406,12 +408,16 @@ async function fallbackResultImagesFromHistory(
 // ── Provider ─────────────────────────────────────────────────────────────
 
 /**
- * This tab's own CAD poll deadline (poll-workflow's timeout error). It is not
- * a run outcome: a supervised run waits in the queue and for review for hours
- * while /status says "running". Only /status ends a run.
+ * The poll stopped for this tab's own reasons, not because the backend ended the
+ * run: its deadline passed, or /status kept failing (offline, a deploy). Neither
+ * is an outcome; a supervised run waits for hours. The 30 s /status check
+ * (reconcileCadGenerations) settles the run when the backend really ends it.
+ * A backend-reported failure ("Workflow failed", a terminal state) and repeated
+ * 404s ("Workflow not found") still end the run as before.
  */
-function isClientPollTimeout(err: unknown): boolean {
-  return err instanceof Error && err.message.startsWith('Workflow timed out after');
+function isPollStoppedWithoutOutcome(err: unknown): boolean {
+  return err instanceof Error
+    && (err.message.startsWith('Workflow timed out after') || err.message.startsWith('Status polling failed '));
 }
 
 export function GenerationsContextProvider({ children }: { children: React.ReactNode }) {
@@ -748,7 +754,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
       clearInterval(ticker);
       controllers.current.delete(gen.workflowId);
       if (ctrl.signal.aborted) return;
-      if (isClientPollTimeout(err)) {
+      if (isPollStoppedWithoutOutcome(err)) {
         // Still running as far as anyone knows. The 30 s /status check below
         // (reconcileCadGenerations) settles it when the backend ends it.
         setGenerations(prev => prev.map(g =>
