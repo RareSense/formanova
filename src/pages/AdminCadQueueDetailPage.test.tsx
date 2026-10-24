@@ -64,12 +64,32 @@ function renderPage() {
   );
 }
 
-const IGNORED = ['Back to CAD Queue', 'Refresh', 'Add note', 'Choose file', 'Replace file', 'Remove', 'What will be sent', 'Send replacement', 'Download 3DM'];
+const IGNORED = ['Back to CAD Queue', 'Refresh', 'Add note', 'Choose file', 'Replace file', 'Remove', 'What will be sent', 'Send replacement', 'Download 3DM', 'History', 'Details', 'More files'];
 function actionButtonNames(): string[] {
   return screen.getAllByRole('button')
     .map((button) => button.textContent?.trim() ?? '')
-    .filter((name) => !IGNORED.includes(name));
+    .filter((name) => !IGNORED.includes(name) && !/^Notes \(\d+\)$/.test(name));
 }
+
+/** The run has loaded: its Refresh button sits beside the status. */
+function loaded() {
+  return screen.findByRole('button', { name: 'Refresh' });
+}
+
+function openSection(name: string | RegExp) {
+  fireEvent.click(screen.getByRole('button', { name }));
+}
+
+const GUIDANCE: Record<SupervisedPhase, string> = {
+  queued: 'Press Start to run it.',
+  errored: 'It broke. Press Start to try again, or Fail to refund the user.',
+  running: 'Running. This page updates by itself.',
+  finalizing: 'Running. This page updates by itself.',
+  awaiting_review: 'Check the model, then Send it, or Reject it to upload your own.',
+  rejected: 'Upload your files below, then press Send replacement.',
+  delivered: 'Delivered to the user.',
+  failed: 'Failed. The user was refunded.',
+};
 
 beforeEach(() => {
   vi.useRealTimers();
@@ -81,19 +101,19 @@ describe('AdminCadQueueDetailPage', () => {
   it('shows only the actions the phase allows', async () => {
     api.getSupervisedRun.mockResolvedValue(detail('queued'));
     const first = renderPage();
-    await screen.findByText('Attempt 1');
+    await loaded();
     expect(actionButtonNames()).toEqual(['Start', 'Reject', 'Fail']);
     first.unmount();
 
     api.getSupervisedRun.mockResolvedValue(detail('awaiting_review'));
     const second = renderPage();
-    await screen.findByText('Attempt 1');
+    await loaded();
     expect(actionButtonNames()).toEqual(['Send', 'Reject', 'Fail']);
     second.unmount();
 
     api.getSupervisedRun.mockResolvedValue(detail('running'));
     renderPage();
-    expect(await screen.findByText('Working: no actions until this finishes.')).toBeTruthy();
+    expect(await screen.findByText('Running. This page updates by itself.')).toBeTruthy();
     expect(actionButtonNames()).toEqual([]);
   });
 
@@ -168,6 +188,8 @@ describe('AdminCadQueueDetailPage', () => {
     api.getSupervisedRun.mockResolvedValue(detail('queued'));
     api.addSupervisedRunNote.mockResolvedValue({ id: 'n1', author_email: 'a@x.com', body: 'checked the prongs', created_at: '2026-10-24T11:00:00Z' });
     renderPage();
+    await loaded();
+    openSection('Notes (0)');
     expect(await screen.findByText("Notes can't be edited or deleted.")).toBeTruthy();
     const add = screen.getByRole('button', { name: 'Add note' });
     expect(add.hasAttribute('disabled')).toBe(true);
@@ -182,8 +204,64 @@ describe('AdminCadQueueDetailPage', () => {
   it('shows the run through the reused detail view', async () => {
     api.getSupervisedRun.mockResolvedValue(detail('queued'));
     renderPage();
+    await loaded();
+    openSection('Details');
     expect(await screen.findByText('run detail')).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'The run' })).toBeTruthy();
+    expect(screen.getByText('wf-1')).toBeTruthy();
+  });
+
+  it.each(Object.entries(GUIDANCE))('tells the admin what to do when the run is %s', async (phase, sentence) => {
+    api.getSupervisedRun.mockResolvedValue(detail(phase as SupervisedPhase));
+    renderPage();
+    expect(await screen.findByText(sentence)).toBeTruthy();
+  });
+
+  it('heads the page with the status, the run type and the user', async () => {
+    api.getSupervisedRun.mockResolvedValue(detail('errored', {
+      run: { workflow_id: 'wf-1', workflow_name: 'jewelry_cad_improve', user_email: 'buyer@x.com', steps: [] },
+      supervision: { ...detail('errored').supervision, attempt: 2, last_error: 'provider credit exhausted\nTraceback: deep' },
+    }));
+    renderPage();
+    expect(await screen.findByText('Errored (attempt 2)')).toBeTruthy();
+    expect(screen.getByText('Improve')).toBeTruthy();
+    expect(screen.getByText('buyer@x.com')).toBeTruthy();
+    const error = screen.getByText(/provider credit exhausted/);
+    expect(error.tagName).toBe('PRE');
+    expect(error.textContent).toBe('provider credit exhausted\nTraceback: deep');
+  });
+
+  it('puts What Send delivers above the Send button', async () => {
+    api.getSupervisedRun.mockResolvedValue(detail('awaiting_review', {
+      send_check: { has_model: true, missing: [], glb_url: 'https://blob.example/m.glb' },
+    }));
+    renderPage();
+    const viewer = await screen.findByTestId('glb');
+    const send = screen.getByRole('button', { name: 'Send' });
+    expect(viewer.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('folds Notes, History and Details away until opened', async () => {
+    api.getSupervisedRun.mockResolvedValue(detail('queued', {
+      notes: [{ id: 'n1', author_email: 'a@x.com', body: 'checked the prongs', created_at: '2026-10-24T11:00:00Z' }],
+    }));
+    renderPage();
+    await loaded();
+    expect(screen.queryByText('checked the prongs')).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'New note' })).toBeNull();
+    expect(screen.queryByText('Attempt 1')).toBeNull();
+    expect(screen.queryByText('run detail')).toBeNull();
+    for (const name of ['Notes (1)', 'History', 'Details']) {
+      expect(screen.getByRole('button', { name }).getAttribute('aria-expanded')).toBe('false');
+    }
+
+    openSection('Notes (1)');
+    expect(await screen.findByText('checked the prongs')).toBeTruthy();
+    expect(screen.getByRole('textbox', { name: 'New note' })).toBeTruthy();
+    openSection('History');
+    expect(await screen.findByText('Attempt 1')).toBeTruthy();
+    expect(screen.getByText('No events yet.')).toBeTruthy();
+    openSection('Details');
+    expect(await screen.findByText('run detail')).toBeTruthy();
   });
   it('polls every 5 s after an accepted action, stops after 2 minutes and on unmount', async () => {
     // awaiting_review: a phase with no background refresh of its own, so the stop is visible.
@@ -223,7 +301,7 @@ describe('AdminCadQueueDetailPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Start' }));
     await screen.findByText('Done. Waiting for the run to move...');
     api.getSupervisedRun.mockResolvedValue(detail('running'));
-    expect(await screen.findByText('Working: no actions until this finishes.', {}, { timeout: 7000 })).toBeTruthy();
+    expect(await screen.findByText('Running. This page updates by itself.', {}, { timeout: 7000 })).toBeTruthy();
     expect(screen.queryByText('Done. Waiting for the run to move...')).toBeNull();
   }, 15000);
   it('calls Fail once for a double confirm press and a Fail press while waiting', async () => {
@@ -250,7 +328,7 @@ describe('AdminCadQueueDetailPage', () => {
   it('shows Fail as the only action for a rejected run', async () => {
     api.getSupervisedRun.mockResolvedValue(detail('rejected'));
     renderPage();
-    await screen.findByText('Attempt 1');
+    await loaded();
     expect(actionButtonNames()).toEqual(['Fail']);
   });
 
@@ -353,7 +431,7 @@ describe('AdminCadQueueDetailPage', () => {
     api.getSupervisedRun.mockResolvedValue(detail('running'));
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const view = renderPage();
-    await screen.findByText('Working: no actions until this finishes.');
+    await screen.findByText('Running. This page updates by itself.');
     const before = api.getSupervisedRun.mock.calls.length;
     await act(async () => { await vi.advanceTimersByTimeAsync(15000); });
     const afterTick = api.getSupervisedRun.mock.calls.length;
@@ -368,7 +446,7 @@ describe('AdminCadQueueDetailPage', () => {
     api.getSupervisedRun.mockResolvedValue(detail('awaiting_review'));
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const view = renderPage();
-    await screen.findByText('Attempt 1');
+    await loaded();
     const before = api.getSupervisedRun.mock.calls.length;
     await act(async () => { await vi.advanceTimersByTimeAsync(31000); });
     expect(api.getSupervisedRun.mock.calls.length).toBe(before);
@@ -411,7 +489,8 @@ describe('AdminCadQueueDetailPage', () => {
       renderPage();
       expect(await screen.findByText('What Send delivers')).toBeTruthy();
       expect(screen.getByTestId('glb').textContent).toBe(azureUriToUrl(raw) || raw);
-      expect(screen.getByText(/can show an earlier loop/)).toBeTruthy();
+      openSection('Details');
+      expect(await screen.findByText(/can show an earlier loop/)).toBeTruthy();
     });
 
     it('says there is no model to send when glb_url is null', async () => {

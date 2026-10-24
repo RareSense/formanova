@@ -40,6 +40,8 @@ import {
   sameNames,
   sendSupervisedRun,
   startSupervisedRuns,
+  supervisedRunTypeLabel,
+  supervisedStatusLabel,
   type SupervisedPhase,
   type SupervisedRunDetail,
 } from '@/lib/supervised-runs-api';
@@ -57,8 +59,17 @@ const NOTE_MAX = 10000;
 type ButtonAction = 'start' | 'send' | 'reject' | 'fail';
 const BUTTON_LABELS: Record<ButtonAction, string> = { start: 'Start', send: 'Send', reject: 'Reject', fail: 'Fail' };
 const BUTTON_ACTIONS = Object.keys(BUTTON_LABELS) as ButtonAction[];
-const WORKING: SupervisedPhase[] = ['running', 'finalizing'];
-const FINISHED: SupervisedPhase[] = ['delivered', 'failed'];
+// One sentence per phase: what the admin should do now.
+const GUIDANCE: Record<SupervisedPhase, string> = {
+  queued: 'Press Start to run it.',
+  errored: 'It broke. Press Start to try again, or Fail to refund the user.',
+  running: 'Running. This page updates by itself.',
+  finalizing: 'Running. This page updates by itself.',
+  awaiting_review: 'Check the model, then Send it, or Reject it to upload your own.',
+  rejected: 'Upload your files below, then press Send replacement.',
+  delivered: 'Delivered to the user.',
+  failed: 'Failed. The user was refunded.',
+};
 
 function formatDateTime(value: string | null | undefined): string {
   if (!value) return '-';
@@ -77,15 +88,35 @@ function phaseLabel(phase: string): string {
   return phase.replace(/_/g, ' ');
 }
 
-function PhaseBadge({ phase }: { phase: SupervisedPhase }) {
+function StatusBadge({ phase, attempt }: { phase: SupervisedPhase; attempt: number }) {
   const variant =
     phase === 'delivered' ? 'default'
       : phase === 'errored' || phase === 'failed' ? 'destructive'
         : 'secondary';
   return (
-    <Badge variant={variant} className="capitalize whitespace-nowrap">
-      {phaseLabel(phase)}
+    <Badge variant={variant} className="whitespace-nowrap">
+      {supervisedStatusLabel(phase, attempt)}
     </Badge>
+  );
+}
+
+/** A Card folded shut by default; the title is the trigger. */
+function FoldSection({ title, children }: { title: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Card>
+      <Collapsible open={open} onOpenChange={setOpen}>
+        <CollapsibleTrigger asChild>
+          <Button variant="ghost" className="h-14 w-full justify-between px-6 font-display text-2xl font-normal tracking-wide">
+            {title}
+            <ChevronDown className={`h-5 w-5 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <CardContent className="space-y-4 pt-2">{children}</CardContent>
+        </CollapsibleContent>
+      </Collapsible>
+    </Card>
   );
 }
 
@@ -165,28 +196,27 @@ function EventsList({ events }: { events: Array<Record<string, unknown>> }) {
   );
 }
 
-function SupervisionCard({ data, refreshing, onRefresh }: { data: SupervisedRunDetail; refreshing: boolean; onRefresh: () => void }) {
+function RunHeader({ data, typeLabel, userEmail, refreshing, onRefresh }: {
+  data: SupervisedRunDetail;
+  typeLabel: string;
+  userEmail: string;
+  refreshing: boolean;
+  onRefresh: () => void;
+}) {
   const s = data.supervision;
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="font-display text-2xl tracking-wide">Supervision</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-5">
+      <CardContent className="space-y-4 pt-6">
         <div className="flex flex-wrap items-center gap-3">
-          <PhaseBadge phase={s.phase} />
-          <span className="text-sm">Attempt {s.attempt}</span>
+          <StatusBadge phase={s.phase} attempt={s.attempt} />
+          <span className="text-sm font-medium">{typeLabel}</span>
+          {userEmail && <span className="min-w-0 break-all text-sm text-muted-foreground">{userEmail}</span>}
           <Button variant="outline" size="sm" className="gap-2 px-4" onClick={onRefresh}>
             <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
         </div>
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          <MetaItem label="Attempt Started" value={formatDateTime(s.attempt_started_at)} />
-          {s.decision && <MetaItem label="Decision" value={s.decision} />}
-          {s.decision && <MetaItem label="Decided By" value={s.decided_by_email || '-'} />}
-          {s.decision && <MetaItem label="Decided At" value={formatDateTime(s.decided_at)} />}
-        </div>
+        <p className="text-base">{GUIDANCE[s.phase]}</p>
         {s.last_error && (
           <div className="min-w-0 space-y-2">
             <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
@@ -197,13 +227,28 @@ function SupervisionCard({ data, refreshing, onRefresh }: { data: SupervisedRunD
             </pre>
           </div>
         )}
-        <EventsList events={s.events ?? []} />
       </CardContent>
     </Card>
   );
 }
 
-function NotesCard({ data, workflowId, onSaved }: { data: SupervisedRunDetail; workflowId: string; onSaved: () => void }) {
+function HistoryBody({ data }: { data: SupervisedRunDetail }) {
+  const s = data.supervision;
+  return (
+    <>
+      <p className="text-sm">Attempt {s.attempt}</p>
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <MetaItem label="Attempt Started" value={formatDateTime(s.attempt_started_at)} />
+        {s.decision && <MetaItem label="Decision" value={s.decision} />}
+        {s.decision && <MetaItem label="Decided By" value={s.decided_by_email || '-'} />}
+        {s.decision && <MetaItem label="Decided At" value={formatDateTime(s.decided_at)} />}
+      </div>
+      <EventsList events={s.events ?? []} />
+    </>
+  );
+}
+
+function NotesBody({ data, workflowId, onSaved }: { data: SupervisedRunDetail; workflowId: string; onSaved: () => void }) {
   const [body, setBody] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -229,44 +274,39 @@ function NotesCard({ data, workflowId, onSaved }: { data: SupervisedRunDetail; w
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="font-display text-2xl tracking-wide">Notes</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {data.notes.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No notes yet.</p>
-        ) : (
-          <ul className="space-y-3">
-            {data.notes.map((note) => (
-              <li key={note.id} className="min-w-0 border border-border p-3">
-                <p className="flex flex-wrap gap-x-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                  <span className="break-all normal-case">{note.author_email}</span>
-                  <span>{formatDateTime(note.created_at)}</span>
-                </p>
-                <p className="mt-2 whitespace-pre-wrap break-words text-sm [overflow-wrap:anywhere]">{note.body}</p>
-              </li>
-            ))}
-          </ul>
-        )}
-        <div className="space-y-2">
-          <Textarea
-            aria-label="New note"
-            value={body}
-            maxLength={NOTE_MAX}
-            onChange={(event) => setBody(event.target.value)}
-            placeholder="Write a note..."
-            className="min-h-24"
-          />
-          <p className="text-xs text-muted-foreground">Notes can't be edited or deleted.</p>
-          {error && <p className="break-words text-sm text-destructive" role="alert">{error}</p>}
-          <Button className="px-4" disabled={!body.trim() || saving} onClick={() => void save()}>
-            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Add note
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+    <>
+      {data.notes.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No notes yet.</p>
+      ) : (
+        <ul className="space-y-3">
+          {data.notes.map((note) => (
+            <li key={note.id} className="min-w-0 border border-border p-3">
+              <p className="flex flex-wrap gap-x-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                <span className="break-all normal-case">{note.author_email}</span>
+                <span>{formatDateTime(note.created_at)}</span>
+              </p>
+              <p className="mt-2 whitespace-pre-wrap break-words text-sm [overflow-wrap:anywhere]">{note.body}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="space-y-2">
+        <Textarea
+          aria-label="New note"
+          value={body}
+          maxLength={NOTE_MAX}
+          onChange={(event) => setBody(event.target.value)}
+          placeholder="Write a note..."
+          className="min-h-24"
+        />
+        <p className="text-xs text-muted-foreground">Notes can't be edited or deleted.</p>
+        {error && <p className="break-words text-sm text-destructive" role="alert">{error}</p>}
+        <Button className="px-4" disabled={!body.trim() || saving} onClick={() => void save()}>
+          {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Add note
+        </Button>
+      </div>
+    </>
   );
 }
 
@@ -518,41 +558,42 @@ export default function AdminCadQueueDetailPage() {
                 Couldn't refresh. Showing the last loaded run.
               </p>
             )}
-            <div className="min-w-0 space-y-1">
-              <h1 className="font-display text-3xl tracking-wide [overflow-wrap:anywhere]">
-                {runDetail?.workflow_name || 'CAD Queue Run'}
-              </h1>
-              <p className="break-all font-mono text-xs text-muted-foreground">{workflowId}</p>
-            </div>
+            <RunHeader
+              data={data}
+              typeLabel={supervisedRunTypeLabel(runDetail?.workflow_name)}
+              userEmail={runDetail?.user_email ?? ''}
+              refreshing={query.isFetching}
+              onRefresh={() => void query.refetch()}
+            />
 
-            <SupervisionCard data={data} refreshing={query.isFetching} onRefresh={() => void query.refetch()} />
+            {phase === 'awaiting_review' && data.send_check && (
+              <SendDeliversCard check={data.send_check} workflowId={workflowId} />
+            )}
 
-            <Card>
-              <CardContent className="space-y-3 pt-6">
-                {WORKING.includes(phase) ? (
-                  <p className="text-sm text-muted-foreground">Working: no actions until this finishes.</p>
-                ) : FINISHED.includes(phase) ? (
-                  <p className="text-sm text-muted-foreground">Finished.</p>
-                ) : allowed.length > 0 ? (
-                  <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
-                    {allowed.map((action) => (
-                      <Button
-                        key={action}
-                        variant={action === 'fail' ? 'destructive' : action === 'reject' ? 'outline' : 'default'}
-                        className="h-10 w-full px-4 sm:w-28"
-                        disabled={buttonsLocked}
-                        onClick={onPress[action]}
-                      >
-                        {BUTTON_LABELS[action]}
-                      </Button>
-                    ))}
-                  </div>
-                ) : null}
-                {message && messageFrom === 'buttons' && (
-                  <p className="break-words text-sm" aria-live="polite">{message}</p>
-                )}
-              </CardContent>
-            </Card>
+            {(allowed.length > 0 || (message && messageFrom === 'buttons')) && (
+              <Card>
+                <CardContent className="space-y-3 pt-6">
+                  {allowed.length > 0 && (
+                    <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
+                      {allowed.map((action) => (
+                        <Button
+                          key={action}
+                          variant={action === 'fail' ? 'destructive' : action === 'reject' ? 'outline' : 'default'}
+                          className="h-10 w-full px-4 sm:w-28"
+                          disabled={buttonsLocked}
+                          onClick={onPress[action]}
+                        >
+                          {BUTTON_LABELS[action]}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                  {message && messageFrom === 'buttons' && (
+                    <p className="break-words text-sm" aria-live="polite">{message}</p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {phase === 'rejected' && (
               <SupervisedReplacementPanel
@@ -566,12 +607,20 @@ export default function AdminCadQueueDetailPage() {
               />
             )}
 
-            {data.send_check && <SendDeliversCard check={data.send_check} workflowId={workflowId} />}
+            {phase !== 'awaiting_review' && data.send_check && (
+              <SendDeliversCard check={data.send_check} workflowId={workflowId} />
+            )}
 
-            <NotesCard data={data} workflowId={workflowId} onSaved={() => void query.refetch()} />
+            <FoldSection title={`Notes (${data.notes.length})`}>
+              <NotesBody data={data} workflowId={workflowId} onSaved={() => void query.refetch()} />
+            </FoldSection>
 
-            <section className="min-w-0 space-y-4">
-              <h2 className="font-display text-2xl tracking-wide">The run</h2>
+            <FoldSection title="History">
+              <HistoryBody data={data} />
+            </FoldSection>
+
+            <FoldSection title="Details">
+              <p className="break-all font-mono text-xs text-muted-foreground">{workflowId}</p>
               {data.send_check && (
                 <p className="text-sm text-muted-foreground">
                   The run's own preview below can show an earlier loop. Review the model under What Send delivers.
@@ -582,7 +631,7 @@ export default function AdminCadQueueDetailPage() {
                   <DetailContent detail={runDetail} />
                 </div>
               )}
-            </section>
+            </FoldSection>
 
             <Dialog open={sendOpen} onOpenChange={setSendOpen}>
               <DialogContent className="w-[calc(100%-2rem)] max-w-lg">

@@ -53,6 +53,10 @@ function pick(label: string, file: File) {
   fireEvent.change(screen.getByLabelText(`${label} file`), { target: { files: [file] } });
 }
 
+function openMoreFiles() {
+  fireEvent.click(screen.getByRole('button', { name: 'More files' }));
+}
+
 beforeAll(() => {
   // Radix Select needs these in jsdom.
   const proto = window.HTMLElement.prototype as unknown as Record<string, unknown>;
@@ -74,18 +78,57 @@ describe('SupervisedReplacementPanel', () => {
     const { unmount } = render(
       <SupervisedReplacementPanel detail={detail()} workflowId="wf-1" onChanged={vi.fn()} />,
     );
+    openMoreFiles();
     for (const label of labels) expect(screen.getByText(label)).toBeTruthy();
     expect(screen.getByText(GLB_HINT)).toBeTruthy();
     unmount();
 
     renderPanel(detail({}, 'jewelry_cad_improve'));
+    openMoreFiles();
     expect(screen.queryByText('Design contract')).toBeNull();
     expect(screen.queryByText('Reference manifest')).toBeNull();
     expect(screen.getByText('Full model STL')).toBeTruthy();
   });
 
+  it('shows the main files first and folds the rest under More files', () => {
+    renderPanel(detail());
+    for (const label of ['GLB model', 'Rhino 3DM', 'CAD code', 'Loop state', 'Design contract', 'Reference manifest']) {
+      expect(screen.getByText(label)).toBeTruthy();
+    }
+    const more = screen.getByRole('button', { name: 'More files' });
+    expect(more.getAttribute('aria-expanded')).toBe('false');
+    for (const label of ['Viewer 3DM (mesh only)', 'Thumbnail', 'Full model STL', 'Full model STEP', 'Casting STL', 'Stone list']) {
+      expect(screen.queryByText(label)).toBeNull();
+    }
+    fireEvent.click(more);
+    expect(screen.getByText('Casting STL')).toBeTruthy();
+    expect(screen.getByLabelText('Casting STL file')).toBeTruthy();
+  });
+
+  it('keeps a role that already has an upload in view while More files is closed', () => {
+    renderPanel(detail({
+      uploads: [{
+        upload_id: 'u2',
+        role: 'casting_stl',
+        filename: 'casting.stl',
+        status: 'verified',
+        bytes: 4096,
+        sha256: null,
+        uploaded_by_email: 'a@b.c',
+        created_at: '2026-10-24T10:00:00Z',
+        verified_at: '2026-10-24T10:01:00Z',
+      }],
+    }));
+    expect(screen.getByRole('button', { name: 'More files' }).getAttribute('aria-expanded')).toBe('false');
+    expect(screen.getByText('Casting STL')).toBeTruthy();
+    expect(screen.getByText('casting.stl')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Remove' })).toBeTruthy();
+    expect(screen.queryByText('Stone list')).toBeNull();
+  });
+
   it('refuses a file over 256 MB before any request', () => {
     renderPanel(detail());
+    openMoreFiles();
     pick('Full model STL', sizedFile('big.stl', 300_000_000));
     expect(screen.getByText("Files over 256 MB aren't supported yet.")).toBeTruthy();
     expect(api.uploadReplacementFile).not.toHaveBeenCalled();

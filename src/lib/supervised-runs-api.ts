@@ -153,6 +153,30 @@ export class SupervisedRunsApiError extends Error {
   }
 }
 
+const STATUS_WORDS: Record<SupervisedPhase, string> = {
+  queued: 'Queued',
+  running: 'Running',
+  finalizing: 'Finishing',
+  errored: 'Errored',
+  awaiting_review: 'Needs review',
+  rejected: 'Rejected',
+  delivered: 'Delivered',
+  failed: 'Failed',
+};
+
+/** A run's status in plain words; the attempt shows once it is a retry, and always on an error. */
+export function supervisedStatusLabel(phase: SupervisedPhase, attempt: number): string {
+  const word = STATUS_WORDS[phase] ?? String(phase).replace(/_/g, ' ');
+  return phase === 'errored' || attempt > 1 ? `${word} (attempt ${attempt})` : word;
+}
+
+/** "Generate" / "Improve" for the two CAD workflows, else the raw workflow name. */
+export function supervisedRunTypeLabel(workflowName: string | null | undefined): string {
+  if (workflowName === 'jewelry_cad_generate') return 'Generate';
+  if (workflowName === 'jewelry_cad_improve') return 'Improve';
+  return workflowName || '-';
+}
+
 /** acknowledge_missing must equal `missing` exactly: same names, no subset, no extras. */
 export function sameNames(a: string[], b: string[]): boolean {
   if (a.length !== b.length) return false;

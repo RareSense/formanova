@@ -24,6 +24,9 @@ import {
 } from '@/lib/supervised-runs-api';
 
 const JEWELRY_TYPES = ['ring', 'necklace', 'bracelet', 'earring', 'other'];
+// Shown first; the rest sit under "More files" (design contract and reference manifest are usually
+// the missing ones on a generate run, so they stay in view).
+const MAIN_ROLES: UploadRole[] = ['glb', 'threedm', 'code', 'loop_state', 'design_contract', 'reference_manifest'];
 const GLB_HINT = "Must differ from the pipeline's model. An identical GLB saves nothing and the user gets no model; use Send instead.";
 
 export type ActionResult = { accepted: boolean; code?: string };
@@ -199,6 +202,7 @@ export default function SupervisedReplacementPanel({
   const [ticked, setTicked] = useState<string[]>([]);
   const [jewelryType, setJewelryType] = useState('');
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [ownSending, setOwnSending] = useState(false);
   const [ownMessage, setOwnMessage] = useState<string | null>(null);
   // One upload at a time per role; state alone would let a same-tick second pick through.
@@ -340,6 +344,27 @@ export default function SupervisedReplacementPanel({
   }
   const shownMessage = message ?? ownMessage;
 
+  // A role with a file, an upload in flight or an error never hides inside the closed section.
+  const inView = (role: UploadRole) =>
+    MAIN_ROLES.includes(role) || verified.has(role) || Boolean(transfers[role]) || Boolean(removing[role]) || Boolean(errors[role]);
+  const mainRoles = roles.filter((spec) => inView(spec.role));
+  const moreRoles = roles.filter((spec) => !inView(spec.role));
+
+  const renderRow = (spec: UploadRoleSpec) => (
+    <RoleRow
+      key={spec.role}
+      spec={spec}
+      upload={verified.get(spec.role)}
+      downloadUrl={detail.download_urls?.[spec.role]}
+      transfer={transfers[spec.role]}
+      error={errors[spec.role]}
+      removing={Boolean(removing[spec.role])}
+      disabled={actionsLocked}
+      onPick={(file) => void pick(spec, file)}
+      onRemove={() => void remove(spec.role)}
+    />
+  );
+
   return (
     <Card>
       <CardHeader>
@@ -347,21 +372,24 @@ export default function SupervisedReplacementPanel({
       </CardHeader>
       <CardContent className="space-y-6">
         <ul className="space-y-3">
-          {roles.map((spec) => (
-            <RoleRow
-              key={spec.role}
-              spec={spec}
-              upload={verified.get(spec.role)}
-              downloadUrl={detail.download_urls?.[spec.role]}
-              transfer={transfers[spec.role]}
-              error={errors[spec.role]}
-              removing={Boolean(removing[spec.role])}
-              disabled={actionsLocked}
-              onPick={(file) => void pick(spec, file)}
-              onRemove={() => void remove(spec.role)}
-            />
-          ))}
+          {mainRoles.map(renderRow)}
         </ul>
+
+        {moreRoles.length > 0 && (
+          <Collapsible open={moreOpen} onOpenChange={setMoreOpen}>
+            <CollapsibleTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2 px-4">
+                More files
+                <ChevronDown className={`h-4 w-4 transition-transform ${moreOpen ? 'rotate-180' : ''}`} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <ul className="mt-3 space-y-3">
+                {moreRoles.map(renderRow)}
+              </ul>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
 
         <Collapsible open={previewOpen} onOpenChange={setPreviewOpen}>
           <CollapsibleTrigger asChild>
