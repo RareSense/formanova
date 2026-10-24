@@ -84,6 +84,7 @@ const AdminGenerationsPage = lazyWithRetry(() => import("./pages/AdminGeneration
 const AdminCadQueuePage = lazyWithRetry(() => import("./pages/AdminCadQueuePage"));
 const AdminBrandsPage = lazyWithRetry(() => import("./pages/AdminBrandsPage"));
 const AdminGenerationDetailPage = lazyWithRetry(() => import("./pages/AdminGenerationDetailPage"));
+const AdminCadQueueDetailPage = lazyWithRetry(() => import("./pages/AdminCadQueueDetailPage"));
 const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 const AIJewelryPhotoshoot = lazyWithRetry(() => import("./pages/AIJewelryPhotoshoot"));
 const AIJewelryCAD = lazyWithRetry(() => import("./pages/AIJewelryCAD"));
@@ -261,6 +262,7 @@ const MainApp = () => (
                     </Route>
                   </Route>
                   <Route path="/admin/generations/:workflowId" element={<AdminRouteGuard><AdminGenerationDetailPage /></AdminRouteGuard>} />
+                  <Route path="/admin/cad-queue/:workflowId" element={<AdminRouteGuard><AdminCadQueueDetailPage /></AdminRouteGuard>} />
                   
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
