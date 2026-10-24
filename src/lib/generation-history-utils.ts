@@ -142,15 +142,17 @@ export interface RingVersionRef {
  * passes through untouched, which is why this is safe to apply to the whole
  * list.
  */
-export function groupRingVersions<T extends { workflow_id: string }>(
+export function groupRingVersions<T extends { workflow_id: string; output_asset_id?: string | null }>(
   workflows: T[],
   rings: CadRing[],
 ): Array<T & { ring_versions?: RingVersionRef[]; cad_restore_seed?: CadRestoreSeed }> {
   const workflowById = new Map(workflows.map((workflow) => [workflow.workflow_id, workflow]));
   const newestOf = new Map<string, { versions: RingVersionRef[]; seed: CadRestoreSeed }>();
   const supersededIds = new Set<string>();
+  const ringByAssetId = new Map<string, CadRing>();
 
   for (const ring of rings) {
+    for (const version of ring.versions ?? []) ringByAssetId.set(version.asset_id, ring);
     const versions = [...(ring.versions ?? [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
     const withRuns = versions.filter((v) => v.source_workflow_id);
     if (withRuns.length < 1) continue;
@@ -185,7 +187,12 @@ export function groupRingVersions<T extends { workflow_id: string }>(
     .filter((w) => !supersededIds.has(w.workflow_id))
     .map((w) => {
       const grouped = newestOf.get(w.workflow_id);
-      if (!grouped) return w;
+      if (!grouped) {
+        // A hand-replaced delivery: its version carries the replacing run's
+        // id, so only the row's output_asset_id ties the two together.
+        const delivered = w.output_asset_id ? ringByAssetId.get(w.output_asset_id) : undefined;
+        return delivered ? { ...w, cad_restore_seed: { ring: delivered, selectedVersionId: w.output_asset_id } } : w;
+      }
       // One version is just a ring nobody has improved yet: no strip to show.
       return grouped.versions.length > 1
         ? { ...w, ring_versions: grouped.versions, cad_restore_seed: grouped.seed }

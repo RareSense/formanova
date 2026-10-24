@@ -137,8 +137,17 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
   // The mesh-only viewing copy of the version this card shows. It lives on the
   // vault's version rows, which the restore seed carries whole.
   const shownVersionId = selectedVersion?.assetId ?? groupedWorkflow.cad_restore_seed?.selectedVersionId ?? null;
-  const viewerThreedmUrl = (groupedWorkflow.cad_restore_seed?.ring?.versions ?? [])
-    .find((version) => version.asset_id === shownVersionId)?.viewer_threedm_url ?? null;
+  const shownVaultVersion = (groupedWorkflow.cad_restore_seed?.ring?.versions ?? [])
+    .find((version) => version.asset_id === shownVersionId);
+  const viewerThreedmUrl = shownVaultVersion?.viewer_threedm_url ?? null;
+  // The same version's complete files (STL, STEP, casting STL, stone list).
+  const versionDownloads = shownVaultVersion?.downloads?.length
+    ? {
+        assetId: shownVaultVersion.asset_id,
+        downloads: shownVaultVersion.downloads,
+        source: cadSourceFromSourceType(workflow.source_type),
+      }
+    : null;
   const viewerThreedmFilename = `${shownBaseName}-viewing-copy.3dm`;
   const renameInputId = `cad-design-name-${workflow.workflow_id}`;
 
@@ -395,6 +404,7 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
                   onDownloadThreedm={supportsThreedm ? () => downloadArtifact('3dm') : undefined}
                   onDownloadGlb={previewGlbUrl ? () => downloadArtifact('glb') : undefined}
                   onDownloadViewerThreedm={viewerThreedmUrl ? downloadViewerThreedm : undefined}
+                  versionDownloads={versionDownloads}
                 />
                 <Button
                   size="sm"

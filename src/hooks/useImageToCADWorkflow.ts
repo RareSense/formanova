@@ -261,15 +261,22 @@ export function useImageToCADWorkflow({
     // Only the re-read after a run of ours completed may lift the lock; the
     // render right after a press has no tracked run yet and must not.
     const runCompleted = trackedRun?.status === 'completed';
+    // The model on screen, for a hand-replaced delivery whose version carries
+    // another run's id. Read here, not a dependency: the lookup is driven by
+    // the run, and the GLB is already set by the time it is ready. A tracked
+    // run speaks only for itself: a new run never clears glbUrl, so falling
+    // back to it would tie a run with no GLB to the previous model's ring.
+    const shownGlbUrl = trackedRun ? (trackedRun.glbUrl ?? null) : (glbUrl ?? null);
     let cancelled = false;
-    findRingForWorkflow(sourceWorkflowId)
+    findRingForWorkflow(sourceWorkflowId, { glbUrl: shownGlbUrl })
       .then(async (found) => {
         if (cancelled) return;
-        setRing(found);
+        // Never wipe a ring seeded from history because the lookup missed it.
+        if (found) setRing(found);
         if (runCompleted) setImproveLocked(false);
         const producedVersion = (found?.versions ?? []).find(
           (version) => version.source_workflow_id === sourceWorkflowId,
-        );
+        ) ?? (shownGlbUrl ? (found?.versions ?? []).find((version) => version.glb_url === shownGlbUrl) : undefined);
         if (producedVersion) setSelectedVersionId(producedVersion.asset_id);
         // The photos and brief belong to the ring, not to the press: an
         // improve run's own inputs are the saved files it was handed, so
@@ -285,13 +292,12 @@ export function useImageToCADWorkflow({
       })
       .catch(() => {
         if (cancelled) return;
-        setRing(null);
         if (runCompleted) setImproveLocked(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [hasModel, trackedRun?.status, sourceWorkflowId]);
+  }, [hasModel, trackedRun?.status, sourceWorkflowId]); // eslint-disable-line react-hooks/exhaustive-deps -- trackedRun and glbUrl are read, not followed: the lookup re-runs on the run's transitions only, and the GLB on screen is already set when it does. Every new run and restore sets the ring itself first, so a missed lookup keeps the right one.
 
   /**
    * Re-reads the ring on screen after an Improve press failed.
@@ -329,6 +335,14 @@ export function useImageToCADWorkflow({
    */
   const viewerThreedmUrl = activeVersion?.viewer_threedm_url && activeVersion.glb_url === glbUrl
     ? activeVersion.viewer_threedm_url
+    : null;
+  /**
+   * The complete files the vault lists for the model on screen (STL, STEP,
+   * casting STL, stone list). Same rule as the viewing copy: offered only when
+   * the viewer really shows that version's GLB.
+   */
+  const versionDownloads = activeVersion?.downloads?.length && activeVersion.glb_url === glbUrl
+    ? { assetId: activeVersion.asset_id, downloads: activeVersion.downloads, source: cadSource }
     : null;
 
   /** Opens an earlier version in the viewer. Its files are already published. */
@@ -772,6 +786,7 @@ export function useImageToCADWorkflow({
     sourceWorkflowId, setSourceWorkflowId,
     threedmArtifact, setThreedmArtifact,
     viewerThreedmUrl,
+    versionDownloads,
     stlArtifacts, stepArtifacts, estimatedMetalMassG,
     failureMessage, notAllSolid,
     statusNotice,

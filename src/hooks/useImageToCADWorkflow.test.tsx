@@ -158,6 +158,134 @@ describe('useImageToCADWorkflow viewing copy', () => {
   });
 });
 
+describe('useImageToCADWorkflow version files', () => {
+  const downloads = [{ kind: 'casting_stl' as const, filename: 'c.stl', bytes: 1 }];
+  const ring = {
+    set_id: 'set-1',
+    versions: [
+      { asset_id: 'v1', position: 0, glb_url: '/v1.glb' },
+      { asset_id: 'v2', position: 1, glb_url: '/v2.glb', downloads },
+    ],
+  };
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValue({ ok: false, status: 404, json: async () => ({}) } as Response);
+  });
+
+  it('are the files of the version on screen, and only while the viewer shows it', async () => {
+    const { result } = renderWorkflow();
+    await act(async () => {
+      await result.current.restoreCompletedWorkflow('state-v2', '/v2.glb', { ring, selectedVersionId: 'v2' });
+    });
+    expect(result.current.versionDownloads).toMatchObject({ assetId: 'v2', downloads });
+
+    act(() => result.current.selectVersion('v1'));
+    expect(result.current.versionDownloads).toBeNull();
+  });
+
+  it('are withheld when the viewer shows a different model than the version', async () => {
+    const { result } = renderWorkflow();
+    await act(async () => {
+      await result.current.restoreCompletedWorkflow('state-x', '/other.glb', { ring, selectedVersionId: 'v2' });
+    });
+    expect(result.current.versionDownloads).toBeNull();
+  });
+});
+
+describe('useImageToCADWorkflow hand-replaced delivery', () => {
+  const downloads = [{ kind: 'casting_stl' as const, filename: 'c.stl', bytes: 1 }];
+  // The delivered version was made by another run, so only its GLB ties it to this one.
+  const delivered = {
+    set_id: 'set-r',
+    versions: [{ asset_id: 'v-del', position: 0, source_workflow_id: 'wf-admin', glb_url: '/api/artifacts/del', downloads }],
+  };
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('finds the delivered version by the GLB on screen and offers its files', async () => {
+    mockFetch.mockImplementation(async (url) => (String(url).startsWith('/api/cad/models')
+      ? { ok: true, status: 200, json: async () => ({ items: [delivered] }) }
+      : { ok: false, status: 404, json: async () => ({}) }) as Response);
+    const { result } = renderWorkflow();
+    await act(async () => {
+      await result.current.restoreCompletedWorkflow('wf-user', '/api/artifacts/del');
+    });
+    await vi.waitFor(() => expect(result.current.versionDownloads).toMatchObject({ assetId: 'v-del', downloads }));
+  });
+
+  it('keeps a seeded ring when the lookup finds nothing', async () => {
+    mockFetch.mockImplementation(async (url) => (String(url).startsWith('/api/cad/models')
+      ? { ok: true, status: 200, json: async () => ({ items: [] }) }
+      : { ok: false, status: 404, json: async () => ({}) }) as Response);
+    const { result } = renderWorkflow();
+    await act(async () => {
+      await result.current.restoreCompletedWorkflow('wf-user', '/api/artifacts/del', { ring: delivered, selectedVersionId: 'v-del' });
+    });
+    // The lookup gives up after its retries; the seeded ring must survive it.
+    await act(async () => { await new Promise((r) => setTimeout(r, 2600)); });
+    expect(mockFetch.mock.calls.some(([url]) => String(url).startsWith('/api/cad/models'))).toBe(true);
+    expect(result.current.versionDownloads).toMatchObject({ assetId: 'v-del' });
+  }, 10_000);
+});
+
+describe('useImageToCADWorkflow tracked run and the vault', () => {
+  const downloads = [{ kind: 'stones' as const, filename: 'stones.csv', bytes: 1 }];
+  const delivered = {
+    set_id: 'set-r',
+    versions: [{ asset_id: 'v-del', position: 0, source_workflow_id: 'wf-admin', glb_url: '/api/artifacts/del', downloads }],
+  };
+  const modelsCalls = () => mockFetch.mock.calls.filter(([url]) => String(url).startsWith('/api/cad/models'));
+
+  beforeEach(() => {
+    checkCredits.mockReset();
+    checkCredits.mockResolvedValue(true);
+    mockFetch.mockReset();
+    generationsState.generations = [];
+    mockFetch.mockImplementation(async (url) => {
+      const path = String(url);
+      if (path.startsWith('/api/run/state/')) return { ok: true, status: 200, json: async () => ({ workflow_id: 'state-new' }) } as Response;
+      if (path.startsWith('/api/cad/models')) return { ok: true, status: 200, json: async () => ({ items: [delivered] }) } as Response;
+      return { ok: false, status: 404, json: async () => ({}) } as Response;
+    });
+  });
+
+  function completeRun(glbUrl: string | null) {
+    generationsState.generations = [{
+      kind: 'cad', workflowId: 'state-new', status: 'completed', generationStep: '', glbUrl,
+      threedmUrl: null, stlUrls: [], stepUrls: [],
+    }];
+  }
+
+  it('offers the files of a hand-replaced version when the run completes with its GLB', async () => {
+    const { result, rerender } = renderWorkflow();
+    await act(async () => { await result.current.simulateGeneration(); });
+    completeRun('/api/artifacts/del');
+    rerender();
+    await vi.waitFor(() => expect(result.current.versionDownloads).toMatchObject({ assetId: 'v-del', downloads }));
+  });
+
+  it("never attaches the previous model's ring to a run that completed with no GLB", async () => {
+    const { result, rerender } = renderWorkflow();
+    // The previous model, still in the viewer, belongs to the delivered ring.
+    await act(async () => {
+      await result.current.restoreCompletedWorkflow('wf-old', '/api/artifacts/del');
+    });
+    await vi.waitFor(() => expect(result.current.versions).toHaveLength(1));
+
+    await act(async () => { await result.current.simulateGeneration(); });
+    expect(result.current.versions).toHaveLength(0);
+    const before = modelsCalls().length;
+    completeRun(null);
+    rerender();
+    await vi.waitFor(() => expect(modelsCalls().length).toBeGreaterThan(before));
+    await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
+    expect(result.current.versions).toHaveLength(0);
+  });
+});
+
 describe('useImageToCADWorkflow supervised runs', () => {
   beforeEach(() => {
     checkCredits.mockReset();

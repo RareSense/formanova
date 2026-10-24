@@ -270,6 +270,7 @@ export default function TextToCAD({ variant = "idea" }: { variant?: DesignStartV
       onDownloadStep={workflow.stepArtifacts.length ? downloads.downloadStep : undefined}
       estimatedMetalMassG={workflow.estimatedMetalMassG}
       onExportEdited={hasEdits ? downloads.exportEdited : undefined}
+      versionDownloads={workflow.versionDownloads}
       latestVersionLabel={workflow.latestVersionLabel}
       onImproveFromVersion={workflow.improveFromLatestVersion}
       improveDisabled={!workflow.canImproveLatestVersion}

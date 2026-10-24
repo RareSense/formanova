@@ -46,4 +46,24 @@ describe('groupRingVersions', () => {
     const odd = { set_id: 'set_odd', versions: [{ asset_id: 'a1', position: 0 }, { asset_id: 'a2', position: 1 }] };
     expect(groupRingVersions(rows, [odd])).toEqual(rows);
   });
+
+  it('seeds a row with the version its output_asset_id names, even when another run made it', () => {
+    // A hand-replaced delivery: the version carries the replacing run's id.
+    const replaced = {
+      set_id: 'set_r',
+      versions: [{ asset_id: 'a_del', position: 0, source_workflow_id: 'wf_admin', glb_url: 'g_del' }],
+    };
+    const grouped = groupRingVersions(
+      [{ workflow_id: 'wf_user', output_asset_id: 'a_del' }, { workflow_id: 'wf_plain', output_asset_id: null }],
+      [replaced],
+    );
+    expect(grouped[0].cad_restore_seed).toEqual({ ring: replaced, selectedVersionId: 'a_del' });
+    expect(grouped[0].ring_versions).toBeUndefined();
+    expect(grouped[1]).toEqual({ workflow_id: 'wf_plain', output_asset_id: null });
+  });
+
+  it('keeps the grouped seed when the row already has one', () => {
+    const grouped = groupRingVersions([{ workflow_id: 'wf_3', output_asset_id: 'a1' }], [ring]);
+    expect(grouped[0].cad_restore_seed?.selectedVersionId).toBe('a3');
+  });
 });

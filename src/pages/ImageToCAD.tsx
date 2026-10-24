@@ -230,6 +230,7 @@ export default function ImageToCAD() {
       onDownloadStep={workflow.stepArtifacts.length ? downloads.downloadStep : undefined}
       estimatedMetalMassG={workflow.estimatedMetalMassG}
       onExportEdited={hasEdits ? downloads.exportEdited : undefined}
+      versionDownloads={workflow.versionDownloads}
       latestVersionLabel={workflow.latestVersionLabel}
       onImproveFromVersion={workflow.improveFromLatestVersion}
       improveDisabled={!workflow.canImproveLatestVersion}
