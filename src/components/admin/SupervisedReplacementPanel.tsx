@@ -58,6 +58,8 @@ type Transfer = { stage: 'uploading' | 'checking' | 'waiting'; progress: number 
 const CHECK_POLL_MS = 5000;
 const CHECK_WAIT_MS = 3 * 60 * 1000;
 const CHECK_TIMEOUT_COPY = 'The check is taking long. Refresh in a minute to see if it finished.';
+// The backend marks an upload that failed its check as removed; after a cut-off the reason is lost.
+const CHECK_FAILED_COPY = 'This file failed the check. Upload it again.';
 
 const KiB = 1024;
 const MiB = 1024 * KiB;
@@ -298,10 +300,10 @@ export default function SupervisedReplacementPanel({
       if (isUncertainCheckFailure(err)) {
         // The check may still pass behind the proxy timeout: wait for it, never upload again.
         setRole<Transfer>(setTransfers, spec.role, { stage: 'waiting', progress: 1 });
-        const verifiedNow = await waitForCheck(spec.role, String(err.detail.upload_id), previousId);
+        const outcome = await waitForCheck(spec.role, String(err.detail.upload_id), previousId);
         if (!mounted.current) return;
-        if (verifiedNow) onChanged();
-        else setRole(setErrors, spec.role, CHECK_TIMEOUT_COPY);
+        if (outcome === 'verified') onChanged();
+        else setRole(setErrors, spec.role, outcome === 'removed' ? CHECK_FAILED_COPY : CHECK_TIMEOUT_COPY);
       } else {
         setRole(setErrors, spec.role, uploadErrorCopy(err));
       }
@@ -311,24 +313,32 @@ export default function SupervisedReplacementPanel({
     }
   }
 
-  /** Poll the run every 5 s for up to 3 minutes until this upload (or a new file in its role) is verified. */
-  async function waitForCheck(role: UploadRole, uploadId: string, previousId: string | undefined): Promise<boolean> {
+  /**
+   * Poll the run every 5 s for up to 3 minutes until this upload (or a new file in its role) is
+   * verified, or this exact upload is removed (it failed the check).
+   */
+  async function waitForCheck(
+    role: UploadRole,
+    uploadId: string,
+    previousId: string | undefined,
+  ): Promise<'verified' | 'removed' | 'timeout'> {
     const deadline = Date.now() + CHECK_WAIT_MS;
     while (Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, CHECK_POLL_MS));
-      if (!mounted.current) return false;
+      if (!mounted.current) return 'timeout';
       try {
-        const fresh = await getSupervisedRun(workflowId);
-        const done = (fresh.uploads ?? []).some((u) => isVerified(u) && (
+        const uploads = (await getSupervisedRun(workflowId)).uploads ?? [];
+        const done = uploads.some((u) => isVerified(u) && (
           u.upload_id === uploadId || (u.role === role && u.upload_id !== previousId)
         ));
-        if (done) return true;
+        if (done) return 'verified';
+        if (uploads.some((u) => u.upload_id === uploadId && u.status === 'removed')) return 'removed';
       } catch {
         // A failed poll says nothing either; try again on the next tick.
       }
-      if (!mounted.current) return false;
+      if (!mounted.current) return 'timeout';
     }
-    return false;
+    return 'timeout';
   }
 
   async function remove(role: UploadRole) {

@@ -319,7 +319,7 @@ export async function uploadReplacementFile(
 /**
  * True when `complete` failed in a way that says nothing about the check itself: no response
  * (status 0) or a 5xx other than a coded signal_failed. The check may still pass, so wait for the
- * upload to show as verified; never PUT or complete again.
+ * upload to show as verified or removed; never PUT or complete again.
  */
 export function isUncertainCheckFailure(err: unknown): err is SupervisedRunsApiError {
   if (!(err instanceof SupervisedRunsApiError)) return false;

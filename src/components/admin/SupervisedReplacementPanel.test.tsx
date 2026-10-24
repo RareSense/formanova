@@ -305,6 +305,52 @@ describe('SupervisedReplacementPanel', () => {
       expect(screen.getByText('Still checking...')).toBeTruthy();
     });
 
+    const removedGlb = (uploadId: string) => detail({
+      uploads: [{
+        upload_id: uploadId,
+        role: 'glb',
+        filename: 'ring.glb',
+        status: 'removed',
+        bytes: 1000,
+        sha256: null,
+        uploaded_by_email: 'a@b.c',
+        created_at: '2026-10-24T10:00:00Z',
+        verified_at: null,
+      }],
+    });
+
+    it('stops waiting as soon as this upload shows as removed, and asks for it again', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      api.uploadReplacementFile.mockRejectedValue(proxyTimeout());
+      api.getSupervisedRun.mockResolvedValue(removedGlb('u9'));
+      const onBusy = vi.fn();
+      const onChanged = vi.fn();
+      render(<SupervisedReplacementPanel detail={detail()} workflowId="wf-1" onChanged={onChanged} onBusyChange={onBusy} />);
+      pick('GLB model', sizedFile('ring.glb', 1000));
+      expect(await screen.findByText('Still checking...')).toBeTruthy();
+      await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+      expect(await screen.findByText('This file failed the check. Upload it again.')).toBeTruthy();
+      expect(screen.queryByText('Still checking...')).toBeNull();
+      expect(onBusy).toHaveBeenLastCalledWith(false);
+      expect(onChanged).not.toHaveBeenCalled();
+      expect(api.uploadReplacementFile).toHaveBeenCalledTimes(1);
+      const polls = api.getSupervisedRun.mock.calls.length;
+      await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+      expect(api.getSupervisedRun.mock.calls.length).toBe(polls);
+    });
+
+    it('does not stop for a different removed upload in the same role', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      api.uploadReplacementFile.mockRejectedValue(proxyTimeout());
+      api.getSupervisedRun.mockResolvedValue(removedGlb('u-old'));
+      render(<SupervisedReplacementPanel detail={detail()} workflowId="wf-1" onChanged={vi.fn()} />);
+      pick('GLB model', sizedFile('ring.glb', 1000));
+      expect(await screen.findByText('Still checking...')).toBeTruthy();
+      await act(async () => { await vi.advanceTimersByTimeAsync(15000); });
+      expect(screen.getByText('Still checking...')).toBeTruthy();
+      expect(screen.queryByText('This file failed the check. Upload it again.')).toBeNull();
+    });
+
     it('gives up after 3 minutes with a refresh hint and releases the busy state', async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
       api.uploadReplacementFile.mockRejectedValue(new SupervisedRunsApiError(0, 'network_error', { upload_id: 'u9' }));
