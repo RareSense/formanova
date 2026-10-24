@@ -155,3 +155,41 @@ describe('useImageToCADWorkflow viewing copy', () => {
     expect(result.current.viewerThreedmUrl).toBeNull();
   });
 });
+
+describe('useImageToCADWorkflow supervised runs', () => {
+  beforeEach(() => {
+    checkCredits.mockReset();
+    mockFetch.mockReset();
+  });
+
+  it('opens a waiting run as still in progress, not as a failure', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 409,
+      json: async () => ({ detail: { message: 'workflow is waiting for human input', pending_human_tasks: [] } }),
+    } as Response);
+    const { result } = renderWorkflow();
+    let restored: boolean | undefined;
+    await act(async () => { restored = await result.current.restoreCompletedWorkflow('state-q', null); });
+
+    expect(restored).toBe(true);
+    expect(result.current.generationFailed).toBe(false);
+    expect(result.current.statusNotice?.title).toBe('Still in progress');
+  });
+
+  it('tells the user they are queued when the start reply says the run is supervised', async () => {
+    checkCredits.mockResolvedValue(true);
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({ workflow_id: 'state-1', supervised: true }) } as Response);
+    const { result } = renderWorkflow();
+    await act(async () => { await result.current.simulateGeneration(); });
+    expect(result.current.statusNotice?.title).toBe("You're in the queue");
+  });
+
+  it('says nothing extra when the start reply is not supervised', async () => {
+    checkCredits.mockResolvedValue(true);
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({ workflow_id: 'state-1', supervised: false }) } as Response);
+    const { result } = renderWorkflow();
+    await act(async () => { await result.current.simulateGeneration(); });
+    expect(result.current.statusNotice).toBeNull();
+  });
+});

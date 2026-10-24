@@ -164,6 +164,8 @@ export interface CadImproveStarted {
   result_url?: string;
   projected_cost?: number;
   authorized_budget?: number;
+  /** True when an admin starts and reviews this run before the user gets it. */
+  supervised?: boolean;
 }
 
 /** How long a failed run's outcome is waited for before generic copy is shown. */

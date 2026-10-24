@@ -47,7 +47,7 @@ import {
   type CadRing,
   type CadRestoreSeed,
 } from "@/lib/cad-versions-api";
-import { cadStatusNotice, type CadStatusNotice } from '@/lib/cad-status-copy';
+import { cadInProgressNotice, cadQueuedNotice, cadStatusNotice, type CadStatusNotice } from '@/lib/cad-status-copy';
 import { blockIfCadDown } from '@/lib/cad-service-status';
 
 
@@ -412,6 +412,7 @@ export function useImageToCADWorkflow({
           ...(started.authorized_budget !== undefined ? { authorized_budget: started.authorized_budget } : {}),
         },
       });
+      if (started.supervised === true) setStatusNotice(cadQueuedNotice());
     } catch (error) {
       if (error instanceof CadImproveError && error.failure === 'insufficient_credits') {
         setImproveLocked(false);
@@ -497,6 +498,13 @@ export function useImageToCADWorkflow({
     if (fallbackGlbUrl) seedGlb(fallbackGlbUrl);
 
     const result = workflowId ? await fetchCadResult(workflowId) : null;
+    if (result?.pending) {
+      // A supervised run still in the queue or in review: nothing has failed.
+      setIsModelLoading(false);
+      setProgressStep('');
+      setStatusNotice(cadInProgressNotice());
+      return true;
+    }
     setNotAllSolid(result?.not_all_solid === true);
     const resolvedGlbUrl = result?.glb_url ?? fallbackGlbUrl ?? null;
     if (!resolvedGlbUrl) {
@@ -643,7 +651,7 @@ export function useImageToCADWorkflow({
         throw new Error(err.error || err.detail || `Failed to start generation (${startRes.status})`);
       }
 
-      const { workflow_id } = await startRes.json();
+      const { workflow_id, supervised } = await startRes.json();
       if (!workflow_id) throw new Error("No workflow_id returned");
       setSourceWorkflowId(workflow_id);
 
@@ -671,6 +679,7 @@ export function useImageToCADWorkflow({
         // and completion no longer depends on this page still being mounted.
         analytics: cadAnalytics,
       });
+      if (supervised === true) setStatusNotice(cadQueuedNotice());
 
       // Polling is now GenerationsContext's job. The effect below mirrors that
       // run's state into this hook so the on-page overlay still updates while

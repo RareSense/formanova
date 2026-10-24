@@ -27,6 +27,12 @@ export function cadStatusNotice(reasonCode?: string): CadStatusNotice {
         title: 'Details do not match',
         message: 'The description and reference images conflict. Update one and try again.',
       };
+    case 'failed_by_admin':
+      return {
+        tone: 'error',
+        title: "We couldn't make this design",
+        message: "We couldn't produce a result for this design. Your credits have been returned.",
+      };
     default:
       return {
         tone: 'error',
@@ -34,4 +40,22 @@ export function cadStatusNotice(reasonCode?: string): CadStatusNotice {
         message: 'There are many requests right now. Please try again in a few hours.',
       };
   }
+}
+
+/** After submitting a CAD run the backend reports as supervised. */
+export function cadQueuedNotice(): CadStatusNotice {
+  return {
+    tone: 'success',
+    title: "You're in the queue",
+    message: "Your CAD starts as soon as the queue clears, and you'll have the result within 24 hours.",
+  };
+}
+
+/** Opening a supervised run that is still queued or in review (/result 409). */
+export function cadInProgressNotice(): CadStatusNotice {
+  return {
+    tone: 'success',
+    title: 'Still in progress',
+    message: "We're still working on this CAD. You'll have the result within 24 hours.",
+  };
 }
