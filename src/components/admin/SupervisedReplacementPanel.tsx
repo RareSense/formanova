@@ -80,6 +80,8 @@ function uploadErrorCopy(err: unknown): string {
       return "Files over 256 MB aren't supported yet.";
     case 'invalid_phase':
       return 'This run is no longer rejected. Refresh the page.';
+    case 'no_verified_upload':
+      return 'That file was already removed. Refresh the page.';
     default:
       return err.code;
   }
@@ -368,14 +370,16 @@ export default function SupervisedReplacementPanel({
           </CollapsibleTrigger>
           <CollapsibleContent>
             <pre className="mt-3 max-h-96 max-w-full overflow-y-auto whitespace-pre-wrap break-words border border-border bg-muted/40 p-3 font-mono text-xs [overflow-wrap:anywhere]">
-              {JSON.stringify(check?.final_preview ?? null)}
+              {JSON.stringify(check?.final_preview ?? null, null, 2)}
             </pre>
           </CollapsibleContent>
         </Collapsible>
 
         {!hasModel ? (
           <p className="text-sm text-muted-foreground">Upload the GLB first.</p>
-        ) : missing.length > 0 && (
+        ) : missing.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nothing is missing.</p>
+        ) : (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
               Without these files the user can't improve this model later. Tick each one to confirm.

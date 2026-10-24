@@ -2,7 +2,7 @@ import React, { Suspense, useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { HelmetProvider } from "react-helmet-async";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation, useParams } from "react-router-dom";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CreditsProvider } from "@/contexts/CreditsContext";
@@ -100,6 +100,12 @@ const PageLoader = () => (
     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
   </div>
 );
+
+// Keyed by the run id so state, locks and dialogs never carry over from one run to the next.
+function AdminCadQueueDetailRoute() {
+  const { workflowId } = useParams();
+  return <AdminCadQueueDetailPage key={workflowId} />;
+}
 
 /** Handles post-reload redirect + success toast when returning from a chunk error during generation */
 function PostReloadHandler() {
@@ -262,7 +268,7 @@ const MainApp = () => (
                     </Route>
                   </Route>
                   <Route path="/admin/generations/:workflowId" element={<AdminRouteGuard><AdminGenerationDetailPage /></AdminRouteGuard>} />
-                  <Route path="/admin/cad-queue/:workflowId" element={<AdminRouteGuard><AdminCadQueueDetailPage /></AdminRouteGuard>} />
+                  <Route path="/admin/cad-queue/:workflowId" element={<AdminRouteGuard><AdminCadQueueDetailRoute /></AdminRouteGuard>} />
                   
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />

@@ -57,7 +57,7 @@ function renderPage() {
   );
 }
 
-const IGNORED = ['Back to CAD Queue', 'Add note', 'Choose file', 'Replace file', 'Remove', 'What will be sent', 'Send replacement'];
+const IGNORED = ['Back to CAD Queue', 'Refresh', 'Add note', 'Choose file', 'Replace file', 'Remove', 'What will be sent', 'Send replacement'];
 function actionButtonNames(): string[] {
   return screen.getAllByRole('button')
     .map((button) => button.textContent?.trim() ?? '')
@@ -178,8 +178,9 @@ describe('AdminCadQueueDetailPage', () => {
     expect(screen.getByRole('heading', { name: 'The run' })).toBeTruthy();
   });
   it('polls every 5 s after an accepted action, stops after 2 minutes and on unmount', async () => {
-    api.getSupervisedRun.mockResolvedValue(detail('queued'));
-    api.rejectSupervisedRun.mockResolvedValue({ accepted: true, phase: 'queued' });
+    // awaiting_review: a phase with no background refresh of its own, so the stop is visible.
+    api.getSupervisedRun.mockResolvedValue(detail('awaiting_review'));
+    api.rejectSupervisedRun.mockResolvedValue({ accepted: true, phase: 'awaiting_review' });
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const view = renderPage();
     fireEvent.click(await screen.findByRole('button', { name: 'Reject' }));
@@ -188,7 +189,7 @@ describe('AdminCadQueueDetailPage', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
     expect(api.getSupervisedRun.mock.calls.length).toBeGreaterThan(before);
     await act(async () => { await vi.advanceTimersByTimeAsync(2 * 60 * 1000); });
-    expect(screen.getByText('Still queued. Refresh to check again.')).toBeTruthy();
+    expect(screen.getByText('Still awaiting review. Refresh to check again.')).toBeTruthy();
     const stopped = api.getSupervisedRun.mock.calls.length;
     await act(async () => { await vi.advanceTimersByTimeAsync(30000); });
     expect(api.getSupervisedRun.mock.calls.length).toBe(stopped);
@@ -318,5 +319,76 @@ describe('AdminCadQueueDetailPage', () => {
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('There is no model to send.')).toBeTruthy();
     expect(within(dialog).getByRole('button', { name: 'Send' }).hasAttribute('disabled')).toBe(true);
+  });
+
+  it('keeps the run, its upload and its locks on a failed refresh, with a banner', async () => {
+    api.getSupervisedRun.mockResolvedValue(detail('rejected', {
+      replacement_check: { has_model: false, missing: [], final_preview: {} },
+    }));
+    api.uploadReplacementFile.mockReturnValue(new Promise(() => {}));
+    renderPage();
+    await screen.findByRole('button', { name: 'Fail' });
+    fireEvent.change(screen.getByLabelText('GLB model file'), { target: { files: [new File(['x'], 'ring.glb')] } });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Fail' }).hasAttribute('disabled')).toBe(true));
+    expect(screen.getByText('Uploading... 0%')).toBeTruthy();
+
+    api.getSupervisedRun.mockRejectedValue(new SupervisedRunsApiError(500, 'http_500', {}));
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    expect(await screen.findByText("Couldn't refresh. Showing the last loaded run.")).toBeTruthy();
+    expect(screen.getByText('Replacement')).toBeTruthy();
+    expect(screen.getByText('Uploading... 0%')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Fail' }).hasAttribute('disabled')).toBe(true);
+    expect(screen.queryByText(/Failed to load the run/)).toBeNull();
+  });
+
+  it('refreshes a working run every 15 s and on Refresh', async () => {
+    api.getSupervisedRun.mockResolvedValue(detail('running'));
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const view = renderPage();
+    await screen.findByText('Working: no actions until this finishes.');
+    const before = api.getSupervisedRun.mock.calls.length;
+    await act(async () => { await vi.advanceTimersByTimeAsync(15000); });
+    const afterTick = api.getSupervisedRun.mock.calls.length;
+    expect(afterTick).toBeGreaterThan(before);
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    await waitFor(() => expect(api.getSupervisedRun.mock.calls.length).toBeGreaterThan(afterTick));
+    view.unmount();
+    vi.useRealTimers();
+  });
+
+  it('does not refresh in the background while awaiting review', async () => {
+    api.getSupervisedRun.mockResolvedValue(detail('awaiting_review'));
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const view = renderPage();
+    await screen.findByText('Attempt 1');
+    const before = api.getSupervisedRun.mock.calls.length;
+    await act(async () => { await vi.advanceTimersByTimeAsync(31000); });
+    expect(api.getSupervisedRun.mock.calls.length).toBe(before);
+    view.unmount();
+    vi.useRealTimers();
+  });
+
+  it('says where the run is now when Send meets invalid_phase, and refetches', async () => {
+    api.getSupervisedRun.mockResolvedValue(detail('awaiting_review', {
+      send_check: { has_model: true, missing: [] },
+    }));
+    api.sendSupervisedRun.mockRejectedValue(new SupervisedRunsApiError(409, 'invalid_phase', { code: 'invalid_phase', phase: 'finalizing' }));
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Send' }));
+    const before = api.getSupervisedRun.mock.calls.length;
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Send' }));
+    expect(await screen.findByText('This run is now finalizing.')).toBeTruthy();
+    expect(api.getSupervisedRun.mock.calls.length).toBeGreaterThan(before);
+  });
+
+  it('asks to check again when Send meets acknowledgement_mismatch', async () => {
+    api.getSupervisedRun.mockResolvedValue(detail('awaiting_review', {
+      send_check: { has_model: true, missing: [] },
+    }));
+    api.sendSupervisedRun.mockRejectedValue(new SupervisedRunsApiError(409, 'acknowledgement_mismatch', { code: 'acknowledgement_mismatch' }));
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Send' }));
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Send' }));
+    expect(await screen.findByText('The missing list changed. Check it again.')).toBeTruthy();
   });
 });

@@ -198,8 +198,8 @@ export function getSupervisedRun(workflowId: string): Promise<SupervisedRunDetai
 }
 
 export async function startSupervisedRuns(workflowIds: string[]): Promise<StartResult[]> {
-  const data = await request<{ results: StartResult[] }>('POST', '/start', { workflow_ids: workflowIds });
-  return data.results ?? [];
+  const data = await request<{ results: StartResult[] } | null>('POST', '/start', { workflow_ids: workflowIds });
+  return data?.results ?? [];
 }
 
 export function sendSupervisedRun(workflowId: string, acknowledgeMissing: string[]) {

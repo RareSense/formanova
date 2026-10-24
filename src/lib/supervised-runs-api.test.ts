@@ -38,6 +38,11 @@ describe('supervised runs client', () => {
     expect(r[1]).toEqual({ workflow_id: 'b', accepted: false, code: 'invalid_phase' });
   });
 
+  it('returns no start results for a null body', async () => {
+    mockFetch.mockResolvedValue(ok(null));
+    await expect(startSupervisedRuns(['a'])).resolves.toEqual([]);
+  });
+
   it('sends with the acknowledged names', async () => {
     mockFetch.mockResolvedValue(ok({ accepted: true, phase: 'awaiting_review' }, 202));
     await sendSupervisedRun('a', ['code_artifact']);

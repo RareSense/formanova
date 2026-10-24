@@ -158,6 +158,31 @@ describe('SupervisedReplacementPanel', () => {
     expect(await screen.findByText('This run is no longer rejected. Refresh the page.')).toBeTruthy();
   });
 
+  it('says nothing is missing when the model is there and the missing list is empty', () => {
+    renderPanel(detail({ replacement_check: { has_model: true, missing: [], final_preview: {} } }));
+    expect(screen.getByText('Nothing is missing.')).toBeTruthy();
+    expect(screen.queryByRole('checkbox')).toBeNull();
+  });
+
+  it('says the file was already removed when Remove meets no_verified_upload', async () => {
+    api.removeSupervisedUpload.mockRejectedValue(new SupervisedRunsApiError(409, 'no_verified_upload', { code: 'no_verified_upload' }));
+    renderPanel(detail({
+      uploads: [{
+        upload_id: 'u1',
+        role: 'glb',
+        filename: 'ring-final.glb',
+        status: 'verified',
+        bytes: 2048,
+        sha256: null,
+        uploaded_by_email: 'a@b.c',
+        created_at: '2026-10-24T10:00:00Z',
+        verified_at: '2026-10-24T10:01:00Z',
+      }],
+    }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    expect(await screen.findByText('That file was already removed. Refresh the page.')).toBeTruthy();
+  });
+
   it('asks for the GLB first when there is no model', () => {
     renderPanel(detail({ replacement_check: { has_model: false, missing: [], final_preview: {} } }));
     expect(screen.getByText('Upload the GLB first.')).toBeTruthy();

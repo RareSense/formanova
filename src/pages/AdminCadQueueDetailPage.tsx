@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, ArrowLeft, ChevronDown, Loader2, MessageSquareWarning } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ChevronDown, Loader2, MessageSquareWarning, RefreshCw } from 'lucide-react';
 
 import {
   AlertDialog,
@@ -45,6 +45,9 @@ import {
 import { DetailContent } from '@/pages/AdminGenerationDetailPage';
 
 const POLL_MS = 5000;
+// A run that is queued or working can move on its own; check it now and then.
+const LIVE_POLL_MS = 15000;
+const LIVE: SupervisedPhase[] = ['queued', 'running', 'finalizing'];
 const POLL_LIMIT_MS = 2 * 60 * 1000;
 const NOTE_MAX = 10000;
 
@@ -159,7 +162,7 @@ function EventsList({ events }: { events: Array<Record<string, unknown>> }) {
   );
 }
 
-function SupervisionCard({ data }: { data: SupervisedRunDetail }) {
+function SupervisionCard({ data, refreshing, onRefresh }: { data: SupervisedRunDetail; refreshing: boolean; onRefresh: () => void }) {
   const s = data.supervision;
   return (
     <Card>
@@ -170,6 +173,10 @@ function SupervisionCard({ data }: { data: SupervisedRunDetail }) {
         <div className="flex flex-wrap items-center gap-3">
           <PhaseBadge phase={s.phase} />
           <span className="text-sm">Attempt {s.attempt}</span>
+          <Button variant="outline" size="sm" className="gap-2 px-4" onClick={onRefresh}>
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
         </div>
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           <MetaItem label="Attempt Started" value={formatDateTime(s.attempt_started_at)} />
@@ -289,7 +296,11 @@ export default function AdminCadQueueDetailPage() {
     queryFn: () => getSupervisedRun(workflowId),
     enabled: Boolean(workflowId),
     retry: false,
-    refetchInterval: waitingFrom ? POLL_MS : false,
+    refetchInterval: (q) => {
+      if (waitingFrom) return POLL_MS;
+      const now = q.state.data?.supervision.phase;
+      return now && LIVE.includes(now) ? LIVE_POLL_MS : false;
+    },
   });
 
   const data = query.data;
@@ -390,7 +401,9 @@ export default function AdminCadQueueDetailPage() {
     setTicked((prev) => (checked ? [...prev.filter((n) => n !== name), name] : prev.filter((n) => n !== name)));
   }
 
-  const error = query.error instanceof SupervisedRunsApiError ? query.error : null;
+  // A failed refetch keeps the last data: only a first load that failed replaces the page.
+  const loadError = data ? null : query.error;
+  const error = loadError instanceof SupervisedRunsApiError ? loadError : null;
   const allowed = phase ? BUTTON_ACTIONS.filter((a) => PHASE_ACTIONS[phase].includes(a)) : [];
   const missing = data?.send_check?.missing ?? [];
   const noModel = data?.send_check?.has_model === false;
@@ -432,7 +445,7 @@ export default function AdminCadQueueDetailPage() {
             title="Run Not Found"
             body="This run is not in the CAD queue."
           />
-        ) : query.error ? (
+        ) : loadError ? (
           <Card>
             <CardContent className="flex items-center justify-center px-6 py-16 text-center">
               <p className="break-words text-sm text-muted-foreground">
@@ -442,6 +455,11 @@ export default function AdminCadQueueDetailPage() {
           </Card>
         ) : data && phase ? (
           <div className="min-w-0 space-y-6">
+            {query.error && (
+              <p className="border border-border bg-muted px-3 py-2 text-sm text-muted-foreground" role="status">
+                Couldn't refresh. Showing the last loaded run.
+              </p>
+            )}
             <div className="min-w-0 space-y-1">
               <h1 className="font-display text-3xl tracking-wide [overflow-wrap:anywhere]">
                 {runDetail?.workflow_name || 'CAD Queue Run'}
@@ -449,7 +467,7 @@ export default function AdminCadQueueDetailPage() {
               <p className="break-all font-mono text-xs text-muted-foreground">{workflowId}</p>
             </div>
 
-            <SupervisionCard data={data} />
+            <SupervisionCard data={data} refreshing={query.isFetching} onRefresh={() => void query.refetch()} />
 
             <Card>
               <CardContent className="space-y-3 pt-6">
