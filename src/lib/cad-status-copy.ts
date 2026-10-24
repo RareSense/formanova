@@ -31,7 +31,7 @@ export function cadStatusNotice(reasonCode?: string): CadStatusNotice {
       return {
         tone: 'error',
         title: "We couldn't make this design",
-        message: "We couldn't produce a result for this design. Your credits have been returned.",
+        message: 'Your credits have been returned.',
       };
     default:
       return {

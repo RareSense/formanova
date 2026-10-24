@@ -171,3 +171,47 @@ describe('resolveCadModel', () => {
     expect(mockFetchCadRings).not.toHaveBeenCalled();
   });
 });
+
+describe('hand-made replacements', () => {
+  // The backend nests the replacement's files inside supervised_delivery. The
+  // whole-body search must not pick those: the delivered version is the one
+  // output_asset_id names in the CAD vault.
+  const nested = (outputAssetId: string | null) => ({
+    supervised_delivery: [{ glb_artifact: artifact('c'.repeat(64), 'model/gltf-binary') }],
+    output_asset_id: outputAssetId,
+  });
+
+  it('reads the vault version output_asset_id names, not the nested files', async () => {
+    mockFetchCadRings.mockResolvedValue(vault('some-other-run'));
+    const model = await resolveCadModel('wf-r', nested('v1'));
+    expect(model?.glbUrl).toBe('/rep.glb');
+    expect(model?.threedmUrl).toBe('/rep.3dm');
+  });
+
+  it('cannot load a replacement whose output_asset_id is null, and never guesses another version', async () => {
+    mockFetchCadRings.mockResolvedValue(vault('wf-r'));
+    expect(await resolveCadModel('wf-r', nested(null))).toBeNull();
+    expect(mockFetchCadRings).not.toHaveBeenCalled();
+  });
+
+  it('does not fall back to the run id when output_asset_id names no vault version', async () => {
+    mockFetchCadRings.mockResolvedValue(vault('wf-r'));
+    expect(await resolveCadModel('wf-r', nested('missing'))).toBeNull();
+  });
+
+  it('fetchCadResult shows the same vault version for a replacement', async () => {
+    respondWith(nested('v1'));
+    mockFetchCadRings.mockResolvedValue(vault('some-other-run'));
+    const result = await fetchCadResult('wf-r');
+    expect(result.glb_url).toBe('/rep.glb');
+    expect(result.threedm_url).toBe('/rep.3dm');
+    expect(result.pending).toBe(false);
+  });
+
+  it('fetchCadResult reports no model for a replacement with nothing saved', async () => {
+    respondWith(nested(null));
+    const result = await fetchCadResult('wf-r');
+    expect(result.glb_url).toBeNull();
+    expect(result.threedm_url).toBeNull();
+  });
+});

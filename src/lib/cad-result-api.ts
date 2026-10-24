@@ -85,6 +85,11 @@ export async function fetchCadResult(
     const LEGACY_SINK_KEYS = ['success_final', 'success_original_glb', 'failed_final', 'build_retry', 'build_initial'];
     const isLegacyShape = LEGACY_SINK_KEYS.some((key) => key in data);
     if (!isLegacyShape) {
+      if (isSupervisedReplacement(data)) {
+        const model = await resolveCadModel(workflowId, data);
+        return { glb_url: model?.glbUrl ?? null, threedm_url: model?.threedmUrl ?? null,
+          azure_source: model ? 'cad_models' : null, not_all_solid: false, pending: false };
+      }
       try {
         const flat = parseRingCadResult(data);
         return {
@@ -171,6 +176,15 @@ function outputAssetIdOf(raw: unknown): string | null {
 }
 
 /**
+ * A hand-made replacement's /result: {"supervised_delivery": [...], "output_asset_id": ...}.
+ * Its files sit inside supervised_delivery, where the whole-body search would
+ * find them; the delivered model is the vault version output_asset_id names.
+ */
+function isSupervisedReplacement(raw: unknown): boolean {
+  return Array.isArray((raw as Record<string, unknown> | null)?.supervised_delivery);
+}
+
+/**
  * The model the CAD vault (GET /cad/models) holds for this run.
  *
  * The vault is right for every run, including a supervised one the CAD team
@@ -179,9 +193,10 @@ function outputAssetIdOf(raw: unknown): string | null {
  * and /result answers only after that version is saved, so one read is enough.
  * Without an output_asset_id, the version this run produced is used. The
  * delivered version is among the newest, so the first page is enough.
+ * A null workflowId matches by output_asset_id only.
  */
 export async function findVaultModelForWorkflow(
-  workflowId: string,
+  workflowId: string | null,
   outputAssetId: string | null = null,
 ): Promise<{ glbUrl: string | null; threedmUrl: string | null } | null> {
   let rings: Awaited<ReturnType<typeof fetchCadRings>>;
@@ -192,7 +207,7 @@ export async function findVaultModelForWorkflow(
   }
   const versions = rings.flatMap((ring) => ring.versions ?? []);
   const version = (outputAssetId ? versions.find((v) => v.asset_id === outputAssetId) : undefined)
-    ?? versions.find((v) => v.source_workflow_id === workflowId);
+    ?? (workflowId ? versions.find((v) => v.source_workflow_id === workflowId) : undefined);
   if (!version || (!version.glb_url && !version.threedm_url)) return null;
   return { glbUrl: version.glb_url ?? null, threedmUrl: version.threedm_url ?? null };
 }
@@ -202,6 +217,12 @@ export async function findVaultModelForWorkflow(
  * else from the vault. Null only when neither has one, i.e. a real failure.
  */
 export async function resolveCadModel(workflowId: string, raw: unknown): Promise<CadModelUrls | null> {
+  if (isSupervisedReplacement(raw)) {
+    // Backend contract: output_asset_id is the delivered version; null means nothing was saved.
+    const assetId = outputAssetIdOf(raw);
+    const vault = assetId ? await findVaultModelForWorkflow(null, assetId) : null;
+    return vault ? { ...vault, stlUrls: [], stepUrls: [], estimatedMetalMassG: null, notAllSolid: false } : null;
+  }
   try {
     const parsed = parseRingCadResult(raw);
     return {
