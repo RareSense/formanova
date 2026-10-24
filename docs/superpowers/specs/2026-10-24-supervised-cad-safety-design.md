@@ -33,10 +33,16 @@ replacement's `/result` body is `{"supervised_delivery": [...]}`. Today's fronte
 3. **409 is "in progress".** `fetchCadResult` returns `pending: true` on 409. The restore path in
    `useImageToCADWorkflow` then shows "Still in progress. You'll have the result within
    24 hours." instead of the failure message.
-4. **Queue message behind our switch.** `src/lib/cad-supervision.ts` exports
-   `CAD_SUPERVISED_RUNS = false`. When true, a CAD generate or improve submission shows:
-   "You're in the queue. Your CAD starts as soon as the queue clears, and you'll have the
-   result within 24 hours." Flipped when the backend says supervision is on in that environment.
+4. **Queue message from the backend's flag.** The start reply (generate start and
+   `POST /cad/versions/{asset_id}/improve`) carries `"supervised": true | false` (backend,
+   2026-10-24). When true, the CAD page shows: "You're in the queue. Your CAD starts as soon as the
+   queue clears, and you'll have the result within 24 hours."
+5. **Admin Fail.** `/result` answers 404 with `reason_code: "failed_by_admin"`. `cadStatusNotice`
+   gets that case: "We couldn't make this design. We couldn't produce a result for this design.
+   Your credits have been returned." (today it would say "AI is overwhelmed").
+
+Update to 2: the vault lookup matches the version whose `asset_id` is `/result`'s top-level
+`output_asset_id` first (backend contract), then `source_workflow_id`.
 
 ## Not touched
 

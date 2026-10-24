@@ -658,7 +658,7 @@ git commit -m "CAD page: queued, still-in-progress and admin-fail notices for su
 
 - [ ] **Step 1:** `npx vitest run`. Expected: all pass, with the same count as `origin/main` plus the new tests. A failure in any file is diagnosed and fixed, never skipped.
 - [ ] **Step 2:** `npx tsc --noEmit -p tsconfig.app.json`. Expected: no errors.
-- [ ] **Step 3:** `npm run lint -- src/lib/cad-result-api.ts src/lib/cad-supervision.ts src/lib/cad-status-copy.ts src/contexts/GenerationsContext.tsx src/hooks/useImageToCADWorkflow.ts`. Expected: no new errors.
+- [ ] **Step 3:** `npm run lint -- src/lib/cad-result-api.ts src/lib/cad-versions-api.ts src/lib/cad-status-copy.ts src/contexts/GenerationsContext.tsx src/hooks/useImageToCADWorkflow.ts`. Expected: no new errors.
 - [ ] **Step 4:** `npm run build`. Expected: build succeeds.
 - [ ] **Step 5:** Browser check with the dev server (`npm run dev`, port 8080). Open `/text-to-cad` and `/image-to-cad`; no console errors. Check the new notices in `CadStatusDialog` by temporarily calling `setStatusNotice(cadQueuedNotice())` locally (never committed), at 390 px and 1440 px, then revert.
 - [ ] **Step 6:** `git diff origin/main --stat` and confirm only the files named in Tasks 1-3 plus the spec and plan changed.
