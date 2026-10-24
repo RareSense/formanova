@@ -461,6 +461,7 @@ export default function ImageToCAD() {
               visible={workflow.isGenerating || workflow.isModelLoading}
               currentStep={workflow.progressStep}
               queued={workflow.isQueued}
+              sending={workflow.isSending}
               onRetry={() => workflow.simulateGeneration()}
               failureMessage={workflow.failureMessage}
               notificationEmail={notificationEmail.notificationEmail}

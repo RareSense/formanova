@@ -14,6 +14,14 @@ describe('GenerationProgress', () => {
     expect(container.querySelector('.animate-spin')).toBeNull();
   });
 
+  it('shows a still sending state, not the generating spinner, before the start reply', () => {
+    const { container } = render(<GenerationProgress visible currentStep="analyzing" sending queued={false} />);
+    expect(screen.getByRole('heading', { name: 'Sending your design' })).toBeTruthy();
+    expect(screen.queryByText('Your CAD is generating')).toBeNull();
+    expect(screen.queryByText(/Estimated time/)).toBeNull();
+    expect(container.querySelector('.animate-spin')).toBeNull();
+  });
+
   it('says nothing about a queue for an ordinary run', () => {
     render(<GenerationProgress visible currentStep="building" />);
     expect(screen.queryByText("You’re in the queue")).toBeNull();

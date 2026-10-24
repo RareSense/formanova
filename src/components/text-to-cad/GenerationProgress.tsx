@@ -29,6 +29,8 @@ interface GenerationProgressProps {
   estimateText?: string;
   /** A supervised run: it waits in a queue and is reviewed before delivery. */
   queued?: boolean;
+  /** The run is being sent and its queue status isn't known yet: a still mark, no generating copy. */
+  sending?: boolean;
   failureMessage?: string | null;
   notificationEmail?: string | null;
   /** The raw saved override. Null means unset, so the input opens empty. */
@@ -50,6 +52,7 @@ export default function GenerationProgress({
   onRetry,
   estimateText = "up to 1 hour",
   queued = false,
+  sending = false,
   failureMessage,
   notificationEmail,
   storedNotificationEmail,
@@ -100,6 +103,9 @@ export default function GenerationProgress({
   const isLoadingModel = currentStep === "_loading";
   const isTerminal = isFailed || isDone;
   const isActiveGeneration = !isTerminal && !isLoadingModel;
+  // Sending wins over queued: the start reply that says "queued" hasn't arrived yet.
+  const isSending = sending && isActiveGeneration;
+  const isQueued = queued && isActiveGeneration && !isSending;
   const label = NODE_LABELS[currentStep] || "Preparing your design";
   const emailError = validationError ?? notificationEmailError;
 
@@ -146,13 +152,19 @@ export default function GenerationProgress({
         >
           {/* Neutral mark, accent reserved for the one moving arc: an
               all-accent spinner competed with the copy for attention. */}
-          {!isTerminal && queued && isActiveGeneration && (
+          {isSending && (
+            <div className="relative mx-auto mb-8 h-24 w-24" aria-hidden="true">
+              <div className="h-24 w-24 rounded-full border-4 border-border/40" />
+              <Diamond className="absolute inset-0 m-auto h-10 w-10 text-foreground" strokeWidth={1.8} />
+            </div>
+          )}
+          {isQueued && (
             <div className="relative mx-auto mb-8 h-24 w-24" aria-hidden="true">
               <div className="h-24 w-24 rounded-full border-4 border-border/40" />
               <Clock className="absolute inset-0 m-auto h-10 w-10 text-foreground" strokeWidth={1.8} />
             </div>
           )}
-          {!isTerminal && !(queued && isActiveGeneration) && (
+          {!isTerminal && !isQueued && !isSending && (
             <div className="relative mx-auto mb-8 h-24 w-24" aria-hidden="true">
               <div className="h-24 w-24 animate-spin rounded-full border-4 border-border/40 border-t-[hsl(var(--formanova-hero-accent))]" />
               <Diamond className="absolute inset-0 m-auto h-10 w-10 text-foreground" strokeWidth={1.8} />
@@ -175,10 +187,10 @@ export default function GenerationProgress({
                   isFailed ? "text-destructive" : "text-foreground"
                 }`}
               >
-                {isActiveGeneration ? (queued ? <>You&rsquo;re in the queue</> : "Your CAD is generating") : label}
+                {isSending ? "Sending your design" : isQueued ? <>You&rsquo;re in the queue</> : isActiveGeneration ? "Your CAD is generating" : label}
               </h1>
 
-              {isActiveGeneration && queued && (
+              {isQueued && (
                 <>
                   <p className="mt-3 text-sm leading-6 text-muted-foreground sm:text-[15px]">
                     Your CAD starts as soon as the queue clears. You&rsquo;ll have it within 24 hours.
@@ -189,7 +201,7 @@ export default function GenerationProgress({
                 </>
               )}
 
-              {isActiveGeneration && !queued && (
+              {isActiveGeneration && !isQueued && !isSending && (
                 <>
                   {/* The duration is the one thing worth colouring: it is what
                       the user is actually deciding around. */}
