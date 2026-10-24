@@ -307,7 +307,11 @@ export default function Generations() {
               const stepData = extractCadTextData(details.steps ?? []);
               if (!cancelled) applyEnrichment(wf.workflow_id, stepData);
 
-              if (!stepData.glb_url) {
+              // /result blocks until a run ends, so a run still in progress
+              // (a supervised one can take a day) is never asked. Only rows
+              // that have finished, either way, fall back to it.
+              const finished = wf.status === 'completed' || wf.status === 'failed';
+              if (!stepData.glb_url && finished) {
                 const cadResult = await withTimeout(fetchCadResult(wf.workflow_id), 5000);
                 if (!cancelled && cadResult && (cadResult.glb_url || cadResult.threedm_url)) {
                   applyEnrichment(wf.workflow_id, {
