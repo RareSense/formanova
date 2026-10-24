@@ -15,6 +15,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { PaginationBar } from '@/components/generations/PaginationBar';
+import CadTierSelect from '@/components/admin/CadTierSelect';
 import {
   SupervisedRunsApiError,
   listSupervisedRuns,
@@ -28,6 +29,9 @@ import {
 
 const PAGE_SIZE = 20;
 const STARTABLE: SupervisedPhase[] = ['queued', 'errored'];
+// "AI for these": a sentinel for leaving each run on its own AI.
+const EACH_RUNS_OWN = '__each__';
+const EACH_OPTION = [{ value: EACH_RUNS_OWN, label: "Each run's own" }];
 
 type TabKey = 'start' | 'running' | 'review' | 'done';
 const TABS: Array<{ key: TabKey; label: string; phases: SupervisedPhase[] }> = [
@@ -139,8 +143,12 @@ export default function AdminCadQueuePage() {
     [items],
   );
 
+  // A chosen AI builds and reviews, as on the generate page; "Each run's own" sends no tiers.
+  const [aiForThese, setAiForThese] = useState(EACH_RUNS_OWN);
   const start = useMutation({
-    mutationFn: ({ ids }: { ids: string[]; all: boolean }) => startSupervisedRuns(ids),
+    mutationFn: ({ ids }: { ids: string[]; all: boolean }) => (aiForThese === EACH_RUNS_OWN
+      ? startSupervisedRuns(ids)
+      : startSupervisedRuns(ids, { llm_tier: aiForThese, analysis_tier: aiForThese })),
     onSuccess: (results, { all }) => {
       setOutcome({ results, all });
       void query.refetch();
@@ -254,17 +262,28 @@ export default function AdminCadQueuePage() {
             )}
           </div>
           {tab.key === 'start' && (
-            <Button
-              size="sm"
-              className="h-9 gap-1.5 px-4"
-              disabled={startableIds.length === 0 || start.isPending}
-              onClick={() => start.mutate({ ids: startableIds, all: true })}
-            >
-              {start.isPending
-                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                : <Play className="h-3.5 w-3.5" />}
-              Start all ({startableIds.length})
-            </Button>
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-end">
+              <div className="sm:w-64">
+                <CadTierSelect
+                  label="AI for these"
+                  value={aiForThese}
+                  onChange={setAiForThese}
+                  leading={EACH_OPTION}
+                  disabled={start.isPending}
+                />
+              </div>
+              <Button
+                size="sm"
+                className="h-10 gap-1.5 px-4"
+                disabled={startableIds.length === 0 || start.isPending}
+                onClick={() => start.mutate({ ids: startableIds, all: true })}
+              >
+                {start.isPending
+                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  : <Play className="h-3.5 w-3.5" />}
+                Start all ({startableIds.length})
+              </Button>
+            </div>
           )}
         </div>
       )}

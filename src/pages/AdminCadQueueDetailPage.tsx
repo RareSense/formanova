@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import SupervisedReplacementPanel from '@/components/admin/SupervisedReplacementPanel';
+import CadTierSelect from '@/components/admin/CadTierSelect';
 import { GLBPreviewSlot, ScissorGLBGrid } from '@/components/generations/ScissorGLBGrid';
 import { normalizeAdminGenerationDetail } from '@/lib/admin-generations-api';
 import {
@@ -42,6 +43,7 @@ import {
   startSupervisedRuns,
   supervisedRunTypeLabel,
   supervisedStatusLabel,
+  type StartTiers,
   type SupervisedPhase,
   type SupervisedRunDetail,
 } from '@/lib/supervised-runs-api';
@@ -59,6 +61,10 @@ const NOTE_MAX = 10000;
 type ButtonAction = 'start' | 'send' | 'reject' | 'fail';
 const BUTTON_LABELS: Record<ButtonAction, string> = { start: 'Start', send: 'Send', reject: 'Reject', fail: 'Fail' };
 const BUTTON_ACTIONS = Object.keys(BUTTON_LABELS) as ButtonAction[];
+// The AI pickers show where Start is allowed. "Default" stands for the toolkit's default (a null tier).
+const TIER_PHASES: SupervisedPhase[] = ['queued', 'errored'];
+const DEFAULT_TIER = '__default__';
+const DEFAULT_OPTION = [{ value: DEFAULT_TIER, label: 'Default' }];
 // One sentence per phase: what the admin should do now.
 const GUIDANCE: Record<SupervisedPhase, string> = {
   queued: 'Press Start to run it.',
@@ -415,6 +421,9 @@ export default function AdminCadQueueDetailPage() {
   const [messageFrom, setMessageFrom] = useState<'buttons' | 'replacement'>('buttons');
   // An upload or Remove in the replacement panel; Fail waits for it.
   const [panelBusy, setPanelBusy] = useState(false);
+  // The admin's AI choice for Start; null until the picker is changed.
+  const [buildChoice, setBuildChoice] = useState<string | null>(null);
+  const [reviewChoice, setReviewChoice] = useState<string | null>(null);
 
   const mounted = useRef(true);
   useEffect(() => () => { mounted.current = false; }, []);
@@ -436,6 +445,9 @@ export default function AdminCadQueueDetailPage() {
 
   const data = query.data;
   const phase = data?.supervision.phase;
+  // The AI the run uses now; null is the toolkit's default.
+  const currentBuild = data?.supervision.tiers?.llm_tier ?? null;
+  const currentReview = data?.supervision.tiers?.analysis_tier ?? null;
   const runDetail = useMemo(
     () => (data ? normalizeAdminGenerationDetail(data.run, workflowId) : null),
     [data, workflowId],
@@ -511,7 +523,8 @@ export default function AdminCadQueueDetailPage() {
   }
 
   const start = () => run(async () => {
-    const results = await startSupervisedRuns([workflowId]);
+    const tiers = changedTiers();
+    const results = tiers ? await startSupervisedRuns([workflowId], tiers) : await startSupervisedRuns([workflowId]);
     const mine = results.find((r) => r.workflow_id === workflowId) ?? results[0];
     if (!mine) return { accepted: false, code: 'not_found' };
     return 'code' in mine && !mine.accepted ? { accepted: false, code: mine.code } : { accepted: Boolean(mine.accepted) };
@@ -522,6 +535,14 @@ export default function AdminCadQueueDetailPage() {
     setSendOpen(false);
     void run(() => sendSupervisedRun(workflowId, ticked));
   };
+
+  // Only a tier the admin changed is sent; one left alone keeps the run's own.
+  function changedTiers(): StartTiers | null {
+    const tiers: StartTiers = {};
+    if (buildChoice && buildChoice !== DEFAULT_TIER && buildChoice !== currentBuild) tiers.llm_tier = buildChoice;
+    if (reviewChoice && reviewChoice !== DEFAULT_TIER && reviewChoice !== currentReview) tiers.analysis_tier = reviewChoice;
+    return Object.keys(tiers).length > 0 ? tiers : null;
+  }
 
   function openSend() {
     setTicked([]);
@@ -607,6 +628,28 @@ export default function AdminCadQueueDetailPage() {
             {(allowed.length > 0 || (message && messageFrom === 'buttons')) && (
               <Card>
                 <CardContent className="space-y-3 pt-6">
+                  {phase && TIER_PHASES.includes(phase) && (
+                    <div className="space-y-2">
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <CadTierSelect
+                          label="Build AI"
+                          value={buildChoice ?? currentBuild ?? DEFAULT_TIER}
+                          onChange={setBuildChoice}
+                          // "Default" can't be sent, so it is only offered while the run is on it.
+                          leading={currentBuild ? [] : DEFAULT_OPTION}
+                          disabled={buttonsLocked}
+                        />
+                        <CadTierSelect
+                          label="Review AI"
+                          value={reviewChoice ?? currentReview ?? DEFAULT_TIER}
+                          onChange={setReviewChoice}
+                          leading={currentReview ? [] : DEFAULT_OPTION}
+                          disabled={buttonsLocked}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">Applies to this run's Start and later restarts.</p>
+                    </div>
+                  )}
                   {allowed.length > 0 && (
                     <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
                       {allowed.map((action) => (
