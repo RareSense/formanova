@@ -231,6 +231,61 @@ describe('useImageToCADWorkflow hand-replaced delivery', () => {
   }, 10_000);
 });
 
+describe('useImageToCADWorkflow tracked run and the vault', () => {
+  const downloads = [{ kind: 'stones' as const, filename: 'stones.csv', bytes: 1 }];
+  const delivered = {
+    set_id: 'set-r',
+    versions: [{ asset_id: 'v-del', position: 0, source_workflow_id: 'wf-admin', glb_url: '/api/artifacts/del', downloads }],
+  };
+  const modelsCalls = () => mockFetch.mock.calls.filter(([url]) => String(url).startsWith('/api/cad/models'));
+
+  beforeEach(() => {
+    checkCredits.mockReset();
+    checkCredits.mockResolvedValue(true);
+    mockFetch.mockReset();
+    generationsState.generations = [];
+    mockFetch.mockImplementation(async (url) => {
+      const path = String(url);
+      if (path.startsWith('/api/run/state/')) return { ok: true, status: 200, json: async () => ({ workflow_id: 'state-new' }) } as Response;
+      if (path.startsWith('/api/cad/models')) return { ok: true, status: 200, json: async () => ({ items: [delivered] }) } as Response;
+      return { ok: false, status: 404, json: async () => ({}) } as Response;
+    });
+  });
+
+  function completeRun(glbUrl: string | null) {
+    generationsState.generations = [{
+      kind: 'cad', workflowId: 'state-new', status: 'completed', generationStep: '', glbUrl,
+      threedmUrl: null, stlUrls: [], stepUrls: [],
+    }];
+  }
+
+  it('offers the files of a hand-replaced version when the run completes with its GLB', async () => {
+    const { result, rerender } = renderWorkflow();
+    await act(async () => { await result.current.simulateGeneration(); });
+    completeRun('/api/artifacts/del');
+    rerender();
+    await vi.waitFor(() => expect(result.current.versionDownloads).toMatchObject({ assetId: 'v-del', downloads }));
+  });
+
+  it("never attaches the previous model's ring to a run that completed with no GLB", async () => {
+    const { result, rerender } = renderWorkflow();
+    // The previous model, still in the viewer, belongs to the delivered ring.
+    await act(async () => {
+      await result.current.restoreCompletedWorkflow('wf-old', '/api/artifacts/del');
+    });
+    await vi.waitFor(() => expect(result.current.versions).toHaveLength(1));
+
+    await act(async () => { await result.current.simulateGeneration(); });
+    expect(result.current.versions).toHaveLength(0);
+    const before = modelsCalls().length;
+    completeRun(null);
+    rerender();
+    await vi.waitFor(() => expect(modelsCalls().length).toBeGreaterThan(before));
+    await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
+    expect(result.current.versions).toHaveLength(0);
+  });
+});
+
 describe('useImageToCADWorkflow supervised runs', () => {
   beforeEach(() => {
     checkCredits.mockReset();

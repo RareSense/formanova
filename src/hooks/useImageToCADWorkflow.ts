@@ -263,8 +263,10 @@ export function useImageToCADWorkflow({
     const runCompleted = trackedRun?.status === 'completed';
     // The model on screen, for a hand-replaced delivery whose version carries
     // another run's id. Read here, not a dependency: the lookup is driven by
-    // the run, and the GLB is already set by the time it is ready.
-    const shownGlbUrl = trackedRun?.glbUrl ?? glbUrl ?? null;
+    // the run, and the GLB is already set by the time it is ready. A tracked
+    // run speaks only for itself: a new run never clears glbUrl, so falling
+    // back to it would tie a run with no GLB to the previous model's ring.
+    const shownGlbUrl = trackedRun ? (trackedRun.glbUrl ?? null) : (glbUrl ?? null);
     let cancelled = false;
     findRingForWorkflow(sourceWorkflowId, { glbUrl: shownGlbUrl })
       .then(async (found) => {
