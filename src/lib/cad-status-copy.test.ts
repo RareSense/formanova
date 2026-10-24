@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cadInProgressNotice, cadQueuedNotice, cadStatusNotice } from './cad-status-copy';
+import { cadInProgressNotice, cadStatusNotice } from './cad-status-copy';
 
 describe('cadStatusNotice', () => {
   it.each([
@@ -19,14 +19,6 @@ describe('cadStatusNotice', () => {
 });
 
 describe('supervised CAD copy', () => {
-  it('says the run is queued and when the result arrives', () => {
-    expect(cadQueuedNotice()).toEqual({
-      tone: 'success',
-      title: "You're in the queue",
-      message: "Your CAD starts as soon as the queue clears, and you'll have the result within 24 hours.",
-    });
-  });
-
   it('says a waiting run is still in progress, never failed', () => {
     expect(cadInProgressNotice()).toEqual({
       tone: 'success',

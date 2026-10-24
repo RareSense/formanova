@@ -3,6 +3,19 @@ import { describe, expect, it, vi } from 'vitest';
 import GenerationProgress from '@/components/text-to-cad/GenerationProgress';
 
 describe('GenerationProgress', () => {
+  it('tells a supervised run it is queued, with the 24-hour estimate', () => {
+    render(<GenerationProgress visible currentStep="building" queued />);
+    expect(screen.getByText("You’re in the queue")).toBeTruthy();
+    expect(screen.getByText('up to 24 hours')).toBeTruthy();
+    expect(screen.queryByText('up to 1 hour')).toBeNull();
+  });
+
+  it('says nothing about a queue for an ordinary run', () => {
+    render(<GenerationProgress visible currentStep="building" />);
+    expect(screen.queryByText("You’re in the queue")).toBeNull();
+    expect(screen.getByText('up to 1 hour')).toBeTruthy();
+  });
+
   it('shows a compact background wait state without history or elapsed counters', () => {
     const onKeepCreating = vi.fn();
     render(

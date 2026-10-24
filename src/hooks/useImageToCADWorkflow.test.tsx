@@ -3,8 +3,10 @@ import { renderHook, act } from '@testing-library/react';
 
 const checkCredits = vi.fn();
 vi.mock('@/hooks/use-credit-preflight', () => ({ useCreditPreflight: () => ({ checkCredits }) }));
+const generationsState = vi.hoisted(() => ({ generations: [] as unknown[] }));
+const trackCadGenerationMock = vi.hoisted(() => vi.fn());
 vi.mock('@/contexts/GenerationsContext', () => ({
-  useGenerations: () => ({ generations: [], trackCadGeneration: vi.fn() }),
+  useGenerations: () => ({ generations: generationsState.generations, trackCadGeneration: trackCadGenerationMock }),
 }));
 vi.mock('@/lib/authenticated-fetch', () => ({
   authenticatedFetch: vi.fn(),
@@ -160,6 +162,8 @@ describe('useImageToCADWorkflow supervised runs', () => {
   beforeEach(() => {
     checkCredits.mockReset();
     mockFetch.mockReset();
+    generationsState.generations = [];
+    trackCadGenerationMock.mockReset();
   });
 
   it('opens a waiting run as still in progress, not as a failure', async () => {
@@ -177,12 +181,20 @@ describe('useImageToCADWorkflow supervised runs', () => {
     expect(result.current.statusNotice?.title).toBe('Still in progress');
   });
 
-  it('tells the user they are queued when the start reply says the run is supervised', async () => {
+  it('hands a supervised start to the tracker and shows it as queued, with no popup', async () => {
     checkCredits.mockResolvedValue(true);
     mockFetch.mockResolvedValue({ ok: true, json: async () => ({ workflow_id: 'state-1', supervised: true }) } as Response);
-    const { result } = renderWorkflow();
+    const { result, rerender } = renderWorkflow();
     await act(async () => { await result.current.simulateGeneration(); });
-    expect(result.current.statusNotice?.title).toBe("You're in the queue");
+
+    expect(trackCadGenerationMock).toHaveBeenCalledWith(expect.objectContaining({ workflowId: 'state-1', supervised: true }));
+    expect(result.current.statusNotice).toBeNull();
+
+    generationsState.generations = [{
+      kind: 'cad', workflowId: 'state-1', status: 'running', generationStep: 'Analyzing your design...', supervised: true,
+    }];
+    rerender();
+    expect(result.current.isQueued).toBe(true);
   });
 
   it('says nothing extra when the start reply is not supervised', async () => {
@@ -191,5 +203,7 @@ describe('useImageToCADWorkflow supervised runs', () => {
     const { result } = renderWorkflow();
     await act(async () => { await result.current.simulateGeneration(); });
     expect(result.current.statusNotice).toBeNull();
+    expect(trackCadGenerationMock).toHaveBeenCalledWith(expect.not.objectContaining({ supervised: true }));
+    expect(result.current.isQueued).toBe(false);
   });
 });

@@ -42,15 +42,6 @@ export function cadStatusNotice(reasonCode?: string): CadStatusNotice {
   }
 }
 
-/** After submitting a CAD run the backend reports as supervised. */
-export function cadQueuedNotice(): CadStatusNotice {
-  return {
-    tone: 'success',
-    title: "You're in the queue",
-    message: "Your CAD starts as soon as the queue clears, and you'll have the result within 24 hours.",
-  };
-}
-
 /** Opening a supervised run that is still queued or in review (/result 409). */
 export function cadInProgressNotice(): CadStatusNotice {
   return {

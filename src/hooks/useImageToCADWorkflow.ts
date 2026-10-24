@@ -47,7 +47,7 @@ import {
   type CadRing,
   type CadRestoreSeed,
 } from "@/lib/cad-versions-api";
-import { cadInProgressNotice, cadQueuedNotice, cadStatusNotice, type CadStatusNotice } from '@/lib/cad-status-copy';
+import { cadInProgressNotice, cadStatusNotice, type CadStatusNotice } from '@/lib/cad-status-copy';
 import { blockIfCadDown } from '@/lib/cad-service-status';
 
 
@@ -411,8 +411,8 @@ export function useImageToCADWorkflow({
           ...(started.projected_cost !== undefined ? { projected_cost: started.projected_cost } : {}),
           ...(started.authorized_budget !== undefined ? { authorized_budget: started.authorized_budget } : {}),
         },
+        ...(started.supervised === true ? { supervised: true } : {}),
       });
-      if (started.supervised === true) setStatusNotice(cadQueuedNotice());
     } catch (error) {
       if (error instanceof CadImproveError && error.failure === 'insufficient_credits') {
         setImproveLocked(false);
@@ -678,8 +678,8 @@ export function useImageToCADWorkflow({
         // The two ends of the funnel therefore describe the run identically,
         // and completion no longer depends on this page still being mounted.
         analytics: cadAnalytics,
+        ...(supervised === true ? { supervised: true } : {}),
       });
-      if (supervised === true) setStatusNotice(cadQueuedNotice());
 
       // Polling is now GenerationsContext's job. The effect below mirrors that
       // run's state into this hook so the on-page overlay still updates while
@@ -763,7 +763,7 @@ export function useImageToCADWorkflow({
   }, []);
 
   return {
-    isGenerating, isStarting, hasModel, setHasModel,
+    isGenerating, isQueued: trackedRun?.supervised === true, isStarting, hasModel, setHasModel,
     isModelLoading, setIsModelLoading,
     progressStep, setProgressStep,
     retryAttempt,

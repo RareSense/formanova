@@ -438,6 +438,23 @@ describe('GenerationsContext', () => {
 });
 
 describe('GenerationsContext - Image to 3D runs', () => {
+  it('keeps a supervised run marked as supervised, across a refresh', async () => {
+    const first = renderHook(() => useGenerations(), { wrapper });
+    act(() => { first.result.current.trackCadGeneration({ workflowId: 'cad-sup', supervised: true }); });
+    expect(first.result.current.generations[0].supervised).toBe(true);
+    await waitFor(() => expect(localStorage.getItem('formanova_running_cad_v1')).toContain('"supervised":true'));
+    first.unmount();
+
+    const second = renderHook(() => useGenerations(), { wrapper });
+    expect(second.result.current.generations[0].supervised).toBe(true);
+  });
+
+  it('leaves an ordinary run unmarked', () => {
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    act(() => { result.current.trackCadGeneration({ workflowId: 'cad-plain' }); });
+    expect(result.current.generations[0].supervised).toBeUndefined();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetchImproveOutcome.mockResolvedValue(null);

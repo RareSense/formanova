@@ -46,6 +46,8 @@ interface PersistedCadGeneration {
   /** Carried across a refresh so the completion event keeps its properties.
    *  Only scalars -- the prompt's length, never the prompt itself. */
   cadAnalytics?: CadGenerationAnalytics;
+  /** Supervised runs wait in a queue for review; carried so a reload still says so. */
+  supervised?: boolean;
 }
 
 function loadPersistedCadGenerations(): TrackedGeneration[] {
@@ -83,6 +85,7 @@ function loadPersistedCadGenerations(): TrackedGeneration[] {
         cadRoute: row.cadRoute ?? '/image-to-cad',
         timeoutMs: row.timeoutMs ?? RING_CAD_POLL_TIMEOUT_MS,
         ...(row.cadAnalytics ? { cadAnalytics: row.cadAnalytics } : {}),
+        ...(row.supervised ? { supervised: true } : {}),
       }));
   } catch {
     try { localStorage.removeItem(CAD_TRACKING_STORAGE_KEY); } catch { /* unavailable storage */ }
@@ -194,6 +197,8 @@ export interface TrackedGeneration {
   notAllSolid?: boolean;
   /** CAD only: which page started this run, so restore paths return to the right one. */
   cadRoute?: '/text-to-cad' | '/image-to-cad';
+  /** CAD only: an admin starts and reviews this run before the user gets it (start reply's "supervised"). */
+  supervised?: boolean;
 }
 
 export type GenerationKind = 'photoshoot' | 'cad';
@@ -256,6 +261,8 @@ export interface TrackCadGenerationParams {
   cadRoute?: '/text-to-cad' | '/image-to-cad';
   /** Completion-event properties, captured now and emitted when the run settles. */
   analytics?: CadGenerationAnalytics;
+  /** True when the start reply said "supervised": true. */
+  supervised?: boolean;
 }
 
 export interface GenerationsContextValue {
@@ -475,6 +482,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
         cadRoute: params.cadRoute ?? '/image-to-cad',
         timeoutMs: params.timeoutMs ?? RING_CAD_POLL_TIMEOUT_MS,
         ...(params.analytics ? { cadAnalytics: params.analytics } : {}),
+        ...(params.supervised ? { supervised: true } : {}),
       };
       return [...prev.filter(g => g.workflowId !== params.workflowId), next];
     });
@@ -772,6 +780,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
         cadRoute: g.cadRoute ?? '/image-to-cad',
         timeoutMs: g.timeoutMs ?? RING_CAD_POLL_TIMEOUT_MS,
         ...(g.cadAnalytics ? { cadAnalytics: g.cadAnalytics } : {}),
+        ...(g.supervised ? { supervised: true } : {}),
       })),
   );
 
