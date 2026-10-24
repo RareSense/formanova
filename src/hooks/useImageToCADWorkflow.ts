@@ -330,6 +330,14 @@ export function useImageToCADWorkflow({
   const viewerThreedmUrl = activeVersion?.viewer_threedm_url && activeVersion.glb_url === glbUrl
     ? activeVersion.viewer_threedm_url
     : null;
+  /**
+   * The complete files the vault lists for the model on screen (STL, STEP,
+   * casting STL, stone list). Same rule as the viewing copy: offered only when
+   * the viewer really shows that version's GLB.
+   */
+  const versionDownloads = activeVersion?.downloads?.length && activeVersion.glb_url === glbUrl
+    ? { assetId: activeVersion.asset_id, downloads: activeVersion.downloads, source: cadSource }
+    : null;
 
   /** Opens an earlier version in the viewer. Its files are already published. */
   const selectVersion = useCallback((assetId: string) => {
@@ -772,6 +780,7 @@ export function useImageToCADWorkflow({
     sourceWorkflowId, setSourceWorkflowId,
     threedmArtifact, setThreedmArtifact,
     viewerThreedmUrl,
+    versionDownloads,
     stlArtifacts, stepArtifacts, estimatedMetalMassG,
     failureMessage, notAllSolid,
     statusNotice,

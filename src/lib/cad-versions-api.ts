@@ -6,6 +6,8 @@
  *   GET  /api/cad/models                       -> one entry per model, versions nested
  *                                                 (/api/cad/rings is the older, identical path)
  *   POST /api/cad/versions/{asset_id}/improve  -> 202, starts ring_cad_improve
+ *   GET  /api/cad/versions/{asset_id}/downloads/{kind}
+ *                                              -> 200 { url, expires_at, filename }, 404
  *
  * Two things backend confirmed (2026-09-18) shape this module:
  *
@@ -27,6 +29,15 @@ import { blockIfCadDown, CadServiceDownError } from '@/lib/cad-service-status';
 export interface CadVersionLabel {
   code: string;
   text: string;
+}
+
+/** A file kind GET /api/cad/models lists on a version once that file is complete. */
+export type CadDownloadKind = 'threedm' | 'stl' | 'step' | 'casting_stl' | 'stones';
+
+export interface CadVersionDownload {
+  kind: CadDownloadKind;
+  filename: string;
+  bytes: number;
 }
 
 export interface CadRingVersion {
@@ -55,6 +66,8 @@ export interface CadRingVersion {
   /** Why improvable is false (e.g. legacy_workflow_retired); null when it is true. */
   improve_unavailable_reason?: string | null;
   created_at?: string | null;
+  /** The version's complete files. Absent on older backends; only listed kinds can be fetched. */
+  downloads?: CadVersionDownload[];
 }
 
 export interface CadRing {
@@ -265,6 +278,34 @@ export async function fetchCadRingBySetId(setId: string): Promise<CadRing | null
   } catch {
     return null;
   }
+}
+
+/** The version has no such file (404): nothing to retry. */
+export class CadDownloadUnavailableError extends Error {
+  constructor(message = 'That file is not available for this model.') {
+    super(message);
+    this.name = 'CadDownloadUnavailableError';
+  }
+}
+
+export interface CadDownloadLink {
+  url: string;
+  expires_at: string;
+  filename: string;
+}
+
+/**
+ * A fresh, short-lived link to one of a version's files. Asked for on every
+ * press and never kept: the link expires, and it already makes the browser
+ * save the file under `filename`.
+ */
+export async function fetchVersionDownloadLink(assetId: string, kind: CadDownloadKind): Promise<CadDownloadLink> {
+  const response = await authenticatedFetch(
+    `/api/cad/versions/${encodeURIComponent(assetId)}/downloads/${encodeURIComponent(kind)}`,
+  );
+  if (response.status === 404) throw new CadDownloadUnavailableError();
+  if (!response.ok) throw new Error(`Could not get the download link (${response.status})`);
+  return (await response.json()) as CadDownloadLink;
 }
 
 /** Starts one repair pass on a version. The backend builds the payload. */

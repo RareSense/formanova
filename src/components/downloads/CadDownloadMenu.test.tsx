@@ -1,7 +1,16 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
+vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+vi.mock('@/lib/posthog-events', () => ({ trackDownloadClicked: vi.fn() }));
+vi.mock('@/lib/cad-versions-api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/cad-versions-api')>();
+  return { ...actual, fetchVersionDownloadLink: vi.fn() };
+});
+
+import { toast } from 'sonner';
+import { CadDownloadUnavailableError, fetchVersionDownloadLink, type CadVersionDownload } from '@/lib/cad-versions-api';
 import { CadDownloadMenu } from './CadDownloadMenu';
 
 /**
@@ -126,5 +135,130 @@ describe('CadDownloadMenu', () => {
     expect(button).toBeDisabled();
     fireEvent.keyDown(button, { key: 'Enter' });
     expect(screen.queryByRole('menuitem')).toBeNull();
+  });
+});
+
+/**
+ * The model's complete files, listed on its version by GET /api/cad/models.
+ * Each press asks for a fresh, short-lived link and then follows it.
+ */
+describe('CadDownloadMenu: files from the version', () => {
+  const linkMock = vi.mocked(fetchVersionDownloadLink);
+  const ALL: CadVersionDownload[] = [
+    { kind: 'threedm', filename: 'ring.3dm', bytes: 10 },
+    { kind: 'stl', filename: 'ring.stl', bytes: 10 },
+    { kind: 'step', filename: 'ring.step', bytes: 10 },
+    { kind: 'casting_stl', filename: 'ring-casting.stl', bytes: 10 },
+    { kind: 'stones', filename: 'ring-stones.csv', bytes: 10 },
+  ];
+  const LABELS = {
+    stl: 'Full model STL – with stones, for viewing and CAD',
+    step: 'Full model STEP – with stones, for viewing and CAD',
+    casting_stl: 'Casting STL – send to your caster',
+    stones: 'Stone list',
+  };
+
+  beforeEach(() => {
+    linkMock.mockReset();
+    vi.mocked(toast.error).mockReset();
+  });
+
+  it("lists only the kinds the version has, with their labels, after today's items", async () => {
+    render(
+      <CadDownloadMenu
+        onDownloadThreedm={noop}
+        onDownloadGlb={noop}
+        versionDownloads={{ assetId: 'v1', downloads: [ALL[3], ALL[4]] }}
+      />,
+    );
+
+    openMenu();
+    await screen.findByText(LABELS.casting_stl);
+    expect(screen.getByText(LABELS.stones)).toBeInTheDocument();
+    expect(screen.queryByText(LABELS.stl)).toBeNull();
+    expect(screen.queryByText(LABELS.step)).toBeNull();
+    const rows = menuRows();
+    expect(rows.slice(0, 2)).toEqual(['3DMRhino, editable', 'GLB3D preview']);
+    expect(rows).toHaveLength(4);
+  });
+
+  it("shows one item per kind: the version's STL and STEP replace the run's, the 3DM keeps today's item", async () => {
+    const onDownloadStl = vi.fn();
+    const onDownloadStep = vi.fn();
+    render(
+      <CadDownloadMenu
+        onDownloadThreedm={noop}
+        onDownloadGlb={noop}
+        onDownloadStl={onDownloadStl}
+        onDownloadStep={onDownloadStep}
+        versionDownloads={{ assetId: 'v1', downloads: ALL }}
+      />,
+    );
+
+    openMenu();
+    await screen.findByText(LABELS.stl);
+    expect(screen.queryByText('3D printing')).toBeNull();
+    expect(screen.queryByText('Other CAD software')).toBeNull();
+    expect(screen.getAllByText('Rhino, editable')).toHaveLength(1);
+    for (const label of Object.values(LABELS)) expect(screen.getByText(label)).toBeInTheDocument();
+  });
+
+  it("keeps the run's STL and STEP items when the version does not list them", async () => {
+    render(
+      <CadDownloadMenu
+        onDownloadThreedm={noop}
+        onDownloadGlb={noop}
+        onDownloadStl={noop}
+        onDownloadStep={noop}
+        versionDownloads={{ assetId: 'v1', downloads: [ALL[4]] }}
+      />,
+    );
+
+    openMenu();
+    await screen.findByText(LABELS.stones);
+    expect(screen.getByText('3D printing')).toBeInTheDocument();
+    expect(screen.getByText('Other CAD software')).toBeInTheDocument();
+  });
+
+  it('fetches a fresh link on every press and follows it', async () => {
+    const clicked: string[] = [];
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      clicked.push(this.href);
+    });
+    linkMock
+      .mockResolvedValueOnce({ url: 'https://blob.example/one', expires_at: 'x', filename: 'ring-casting.stl' })
+      .mockResolvedValueOnce({ url: 'https://blob.example/two', expires_at: 'x', filename: 'ring-casting.stl' });
+
+    render(<CadDownloadMenu onDownloadGlb={noop} versionDownloads={{ assetId: 'v1', downloads: ALL }} />);
+
+    openMenu();
+    fireEvent.click(await screen.findByText(LABELS.casting_stl));
+    await waitFor(() => expect(clicked).toEqual(['https://blob.example/one']));
+    openMenu();
+    fireEvent.click(await screen.findByText(LABELS.casting_stl));
+    await waitFor(() => expect(clicked).toEqual(['https://blob.example/one', 'https://blob.example/two']));
+
+    expect(linkMock).toHaveBeenCalledTimes(2);
+    expect(linkMock).toHaveBeenNthCalledWith(1, 'v1', 'casting_stl');
+    expect(linkMock).toHaveBeenNthCalledWith(2, 'v1', 'casting_stl');
+    clickSpy.mockRestore();
+  });
+
+  it('says the file is not available when the link request is a 404', async () => {
+    linkMock.mockRejectedValueOnce(new CadDownloadUnavailableError());
+    render(<CadDownloadMenu onDownloadGlb={noop} versionDownloads={{ assetId: 'v1', downloads: ALL }} />);
+
+    openMenu();
+    fireEvent.click(await screen.findByText(LABELS.stones));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("That file isn't available for this model."));
+  });
+
+  it('asks to try again on any other failure', async () => {
+    linkMock.mockRejectedValueOnce(new Error('boom'));
+    render(<CadDownloadMenu onDownloadGlb={noop} versionDownloads={{ assetId: 'v1', downloads: ALL }} />);
+
+    openMenu();
+    fireEvent.click(await screen.findByText(LABELS.step));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Couldn't get the download link. Try again."));
   });
 });

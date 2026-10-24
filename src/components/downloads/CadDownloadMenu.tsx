@@ -13,6 +13,7 @@
  */
 
 import { Download, ChevronDown } from 'lucide-react';
+import { toast } from 'sonner';
 
 import {
   DropdownMenu,
@@ -22,6 +23,25 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import { AuthExpiredError } from '@/lib/authenticated-fetch';
+import type { CadSource } from '@/lib/cad-analytics';
+import {
+  CadDownloadUnavailableError,
+  fetchVersionDownloadLink,
+  type CadDownloadKind,
+  type CadVersionDownload,
+} from '@/lib/cad-versions-api';
+import { trackDownloadClicked } from '@/lib/posthog-events';
+
+/**
+ * The files the shown version lists as complete (GET /api/cad/models). Each is
+ * fetched through a fresh, short-lived link at the moment it is chosen.
+ */
+export interface CadVersionDownloads {
+  assetId: string;
+  downloads: CadVersionDownload[];
+  source?: CadSource;
+}
 
 export interface CadDownloadMenuProps {
   /** Omit when the run has no .3dm, e.g. workflows predating ring_cad_nurbs_v1. */
@@ -58,6 +78,12 @@ export interface CadDownloadMenuProps {
    */
   variant?: 'viewport' | 'card' | 'result';
   className?: string;
+  /**
+   * The shown version's complete files. Their items follow today's; a version
+   * STL or STEP replaces the run's item of the same kind, and a version 3DM is
+   * listed only when there is no Rhino item already.
+   */
+  versionDownloads?: CadVersionDownloads | null;
 }
 
 const TRIGGER_BASE =
@@ -113,6 +139,48 @@ interface FormatRow {
   onSelect: () => void;
 }
 
+/** What each version file is called in the list. The 3DM keeps the Rhino hint used above. */
+const VERSION_FILE_LABELS: Record<CadDownloadKind, string> = {
+  threedm: 'Rhino, editable',
+  stl: 'Full model STL – with stones, for viewing and CAD',
+  step: 'Full model STEP – with stones, for viewing and CAD',
+  casting_stl: 'Casting STL – send to your caster',
+  stones: 'Stone list',
+};
+
+const VERSION_FILE_FORMATS: Record<CadDownloadKind, string> = {
+  threedm: '3DM',
+  stl: 'STL',
+  step: 'STEP',
+  casting_stl: 'STL',
+  stones: 'LIST',
+};
+
+const VERSION_FILE_ORDER: CadDownloadKind[] = ['threedm', 'stl', 'step', 'casting_stl', 'stones'];
+
+/**
+ * Asks for a fresh link and follows it. The link carries the filename, so the
+ * browser saves the file itself; nothing is cached, since links expire.
+ */
+async function saveVersionFile(assetId: string, kind: CadDownloadKind, source?: CadSource) {
+  try {
+    const link = await fetchVersionDownloadLink(assetId, kind);
+    const anchor = document.createElement('a');
+    anchor.href = link.url;
+    anchor.download = link.filename;
+    anchor.rel = 'noopener';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    trackDownloadClicked({ file_name: link.filename, file_type: kind, context: source, source });
+  } catch (err) {
+    if (err instanceof AuthExpiredError) return;
+    toast.error(err instanceof CadDownloadUnavailableError
+      ? "That file isn't available for this model."
+      : "Couldn't get the download link. Try again.");
+  }
+}
+
 function FormatItem({ format, hint, onSelect }: FormatRow) {
   return (
     <DropdownMenuItem onSelect={onSelect} className="gap-3 py-2">
@@ -133,10 +201,15 @@ export function CadDownloadMenu({
   isBusy = false,
   variant = 'viewport',
   className,
+  versionDownloads,
 }: CadDownloadMenuProps) {
+  // One entry per kind, in a fixed order, whatever order the list arrives in.
+  const versionKinds = new Set((versionDownloads?.downloads ?? []).map((file) => file.kind));
+  const versionFiles = VERSION_FILE_ORDER.filter((kind) => versionKinds.has(kind));
+
   // STL, STEP and the viewing copy are only ever produced alongside a 3DM or
-  // GLB, so a run with neither has nothing to offer.
-  if (!onDownloadThreedm && !onDownloadGlb) return null;
+  // GLB, so a run with neither (and no complete version files) has nothing to offer.
+  if (!onDownloadThreedm && !onDownloadGlb && versionFiles.length === 0) return null;
 
   // Fixed light download beside fixed dark Improve, in every theme.
   const tone = variant === 'result' ? 'quiet' : 'filled';
@@ -147,8 +220,18 @@ export function CadDownloadMenu({
   if (onDownloadThreedm) formats.push({ format: '3DM', hint: 'Rhino, editable', onSelect: onDownloadThreedm });
   if (onDownloadGlb) formats.push({ format: 'GLB', hint: '3D preview', onSelect: onDownloadGlb });
   if (onDownloadViewerThreedm) formats.push({ format: '3DM', hint: 'Viewer only (mesh)', onSelect: onDownloadViewerThreedm });
-  if (onDownloadStep) formats.push({ format: 'STEP', hint: 'Other CAD software', onSelect: onDownloadStep });
-  if (onDownloadStl) formats.push({ format: 'STL', hint: '3D printing', onSelect: onDownloadStl });
+  if (onDownloadStep && !versionKinds.has('step')) formats.push({ format: 'STEP', hint: 'Other CAD software', onSelect: onDownloadStep });
+  if (onDownloadStl && !versionKinds.has('stl')) formats.push({ format: 'STL', hint: '3D printing', onSelect: onDownloadStl });
+  // The version's own files follow, one item per kind. Today's Rhino item
+  // stays the 3DM whenever it exists.
+  for (const kind of versionFiles) {
+    if (kind === 'threedm' && onDownloadThreedm) continue;
+    formats.push({
+      format: VERSION_FILE_FORMATS[kind],
+      hint: VERSION_FILE_LABELS[kind],
+      onSelect: () => { void saveVersionFile(versionDownloads.assetId, kind, versionDownloads.source); },
+    });
+  }
 
   const iconSize = variant === 'result' ? 'h-[18px] w-[18px]' : 'h-3.5 w-3.5';
 

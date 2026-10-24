@@ -17,8 +17,13 @@ vi.mock('@/lib/cad-artifact-download', async () => {
   const actual = await vi.importActual<typeof import('@/lib/cad-artifact-download')>('@/lib/cad-artifact-download');
   return { ...actual, downloadCadArtifact: vi.fn() };
 });
+vi.mock('@/lib/cad-versions-api', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/cad-versions-api')>('@/lib/cad-versions-api');
+  return { ...actual, fetchVersionDownloadLink: vi.fn() };
+});
 
 import { WorkflowCard } from './WorkflowCard';
+import { fetchVersionDownloadLink } from '@/lib/cad-versions-api';
 import { fetchCadResult } from '@/lib/generation-history-api';
 import { downloadCadArtifact } from '@/lib/cad-artifact-download';
 
@@ -169,6 +174,38 @@ describe('CAD generation history card', () => {
     fireEvent.click(await screen.findByText('Viewer only (mesh)'));
     await waitFor(() => expect(downloadCadArtifact).toHaveBeenCalledTimes(2));
     expect(vi.mocked(downloadCadArtifact).mock.calls[1][0]).toBe('/v1.viewer.3dm');
+  });
+
+  it("offers the shown version's complete files and asks for a link to that version", async () => {
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    vi.mocked(fetchVersionDownloadLink).mockResolvedValue({ url: 'https://blob.example/c.stl', expires_at: 'x', filename: 'c.stl' });
+    render(
+      <MemoryRouter>
+        <WorkflowCard
+          workflow={{
+            ...cadWorkflow,
+            cad_restore_seed: {
+              ring: {
+                set_id: 'set-1',
+                versions: [{
+                  asset_id: 'asset-1',
+                  position: 0,
+                  downloads: [{ kind: 'casting_stl', filename: 'c.stl', bytes: 1 }],
+                }],
+              },
+              selectedVersionId: 'asset-1',
+            },
+          } as WorkflowSummary}
+          index={1}
+          onClick={() => {}}
+        />
+      </MemoryRouter>,
+    );
+
+    await chooseDownload('Casting STL – send to your caster');
+    await waitFor(() => expect(fetchVersionDownloadLink).toHaveBeenCalledWith('asset-1', 'casting_stl'));
+    expect(screen.queryByText('Stone list')).toBeNull();
+    clickSpy.mockRestore();
   });
 
   it('offers no viewing copy for a version made before it existed', async () => {

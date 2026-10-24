@@ -158,6 +158,41 @@ describe('useImageToCADWorkflow viewing copy', () => {
   });
 });
 
+describe('useImageToCADWorkflow version files', () => {
+  const downloads = [{ kind: 'casting_stl' as const, filename: 'c.stl', bytes: 1 }];
+  const ring = {
+    set_id: 'set-1',
+    versions: [
+      { asset_id: 'v1', position: 0, glb_url: '/v1.glb' },
+      { asset_id: 'v2', position: 1, glb_url: '/v2.glb', downloads },
+    ],
+  };
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValue({ ok: false, status: 404, json: async () => ({}) } as Response);
+  });
+
+  it('are the files of the version on screen, and only while the viewer shows it', async () => {
+    const { result } = renderWorkflow();
+    await act(async () => {
+      await result.current.restoreCompletedWorkflow('state-v2', '/v2.glb', { ring, selectedVersionId: 'v2' });
+    });
+    expect(result.current.versionDownloads).toMatchObject({ assetId: 'v2', downloads });
+
+    act(() => result.current.selectVersion('v1'));
+    expect(result.current.versionDownloads).toBeNull();
+  });
+
+  it('are withheld when the viewer shows a different model than the version', async () => {
+    const { result } = renderWorkflow();
+    await act(async () => {
+      await result.current.restoreCompletedWorkflow('state-x', '/other.glb', { ring, selectedVersionId: 'v2' });
+    });
+    expect(result.current.versionDownloads).toBeNull();
+  });
+});
+
 describe('useImageToCADWorkflow supervised runs', () => {
   beforeEach(() => {
     checkCredits.mockReset();

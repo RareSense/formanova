@@ -4,8 +4,10 @@ vi.mock('@/lib/authenticated-fetch', () => ({ authenticatedFetch: vi.fn() }));
 
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import {
+  CadDownloadUnavailableError,
   CadImproveError,
   canImproveVersion,
+  fetchVersionDownloadLink,
   fetchImproveOutcome,
   fetchCadRingBySetId,
   fetchCadRings,
@@ -285,5 +287,27 @@ describe('isLegacyWorkflowRetired', () => {
   });
   it('is not mistaken for an exhausted version', () => {
     expect(isImprovementExhausted({ ...(base as object), improvable: false, improve_unavailable_reason: 'legacy_workflow_retired' } as never)).toBe(false);
+  });
+});
+
+describe('fetchVersionDownloadLink', () => {
+  it('asks for a fresh link to one kind of a version and returns it', async () => {
+    const link = { url: 'https://blob.example/x.stl?sig=1', expires_at: '2026-10-25T12:00:00Z', filename: 'ring.stl' };
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, link));
+
+    await expect(fetchVersionDownloadLink('asset_9', 'casting_stl')).resolves.toEqual(link);
+    expect(fetchMock).toHaveBeenCalledWith('/api/cad/versions/asset_9/downloads/casting_stl');
+  });
+
+  it('throws a typed error on 404, so the caller can say the file is not available', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(404, { detail: 'not found' }));
+    await expect(fetchVersionDownloadLink('asset_9', 'stones')).rejects.toBeInstanceOf(CadDownloadUnavailableError);
+  });
+
+  it('throws a plain error for any other failure', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(500, {}));
+    const error = await fetchVersionDownloadLink('asset_9', 'stl').catch((e) => e);
+    expect(error).toBeInstanceOf(Error);
+    expect(error).not.toBeInstanceOf(CadDownloadUnavailableError);
   });
 });
