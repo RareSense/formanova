@@ -41,8 +41,10 @@ interface Props {
   runAction?: ActionRunner;
   /** True while the page holds its action lock. */
   locked?: boolean;
-  /** The page's action message, shown beside Send replacement. */
+  /** The page's message for a Send replacement it ran, shown beside that button. */
   message?: string | null;
+  /** Told whenever an upload or Remove starts or ends, so the page can hold Fail meanwhile. */
+  onBusyChange?: (busy: boolean) => void;
 }
 
 type Transfer = { stage: 'uploading' | 'checking'; progress: number };
@@ -76,6 +78,8 @@ function uploadErrorCopy(err: unknown): string {
       return 'The upload to storage failed. Choose the file again.';
     case 'too_large_for_browser':
       return "Files over 256 MB aren't supported yet.";
+    case 'invalid_phase':
+      return 'This run is no longer rejected. Refresh the page.';
     default:
       return err.code;
   }
@@ -184,7 +188,9 @@ function RoleRow({ spec, upload, downloadUrl, transfer, error, removing, disable
   );
 }
 
-export default function SupervisedReplacementPanel({ detail, workflowId, onChanged, runAction, locked = false, message }: Props) {
+export default function SupervisedReplacementPanel({
+  detail, workflowId, onChanged, runAction, locked = false, message, onBusyChange,
+}: Props) {
   const [transfers, setTransfers] = useState<Partial<Record<UploadRole, Transfer>>>({});
   const [errors, setErrors] = useState<Partial<Record<UploadRole, string>>>({});
   const [removing, setRemoving] = useState<Partial<Record<UploadRole, boolean>>>({});
@@ -209,13 +215,30 @@ export default function SupervisedReplacementPanel({ detail, workflowId, onChang
   const missing = check?.missing ?? [];
   const tickedNow = ticked.filter((name) => missing.includes(name));
   const needsType = missing.includes('jewelry_type');
-  const uploading = Object.keys(transfers).length > 0;
+  const fileBusy = Object.keys(transfers).length > 0 || Object.keys(removing).length > 0;
   const actionsLocked = locked || ownSending;
+
+  // A tick only counts for the missing list it was made against: when a name leaves the list
+  // (an upload filled it) it is dropped, so it comes back unticked if the list brings it back.
+  const missingKey = missing.join('|');
+  useEffect(() => {
+    const current = missingKey ? missingKey.split('|') : [];
+    setTicked((prev) => {
+      const kept = prev.filter((name) => current.includes(name));
+      return kept.length === prev.length ? prev : kept;
+    });
+    if (!current.includes('jewelry_type')) setJewelryType('');
+  }, [missingKey]);
+
+  const busyReport = useRef(onBusyChange);
+  busyReport.current = onBusyChange;
+  useEffect(() => { busyReport.current?.(fileBusy); }, [fileBusy]);
+  useEffect(() => () => { busyReport.current?.(false); }, []);
   const canSend = hasModel
     && sameNames(tickedNow, missing)
     && (!needsType || Boolean(jewelryType))
     && !actionsLocked
-    && !uploading;
+    && !fileBusy;
 
   function setRole<T>(setter: (fn: (prev: Partial<Record<UploadRole, T>>) => Partial<Record<UploadRole, T>>) => void, role: UploadRole, value: T | undefined) {
     setter((prev) => {

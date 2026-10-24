@@ -11,6 +11,7 @@ const api = vi.hoisted(() => ({
   failSupervisedRun: vi.fn(),
   addSupervisedRunNote: vi.fn(),
   sendSupervisedReplacement: vi.fn(),
+  uploadReplacementFile: vi.fn(),
 }));
 vi.mock('@/lib/supervised-runs-api', async (orig) => ({ ...(await orig<object>()), ...api }));
 vi.mock('@/pages/AdminGenerationDetailPage', () => ({ DetailContent: () => <div>run detail</div> }));
@@ -263,6 +264,49 @@ describe('AdminCadQueueDetailPage', () => {
     expect(screen.getByRole('button', { name: 'Fail' }).hasAttribute('disabled')).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: 'Send replacement' }));
     expect(api.sendSupervisedReplacement).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a Fail error on a rejected run beside Fail, not under Send replacement', async () => {
+    api.getSupervisedRun.mockResolvedValue(detail('rejected', {
+      replacement_check: { has_model: true, missing: [], final_preview: {} },
+    }));
+    api.failSupervisedRun.mockRejectedValue(new SupervisedRunsApiError(502, 'signal_failed', { code: 'signal_failed' }));
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Fail' }));
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Fail run' }));
+    const messages = await screen.findAllByText('Nothing happened. Press again.');
+    expect(messages).toHaveLength(1);
+    expect(messages[0].parentElement?.contains(screen.getByRole('button', { name: 'Fail' }))).toBe(true);
+    expect(messages[0].parentElement?.contains(screen.getByRole('button', { name: 'Send replacement' }))).toBe(false);
+  });
+
+  it('shows a Send replacement error under Send replacement, not beside Fail', async () => {
+    api.getSupervisedRun.mockResolvedValue(detail('rejected', {
+      replacement_check: { has_model: true, missing: [], final_preview: {} },
+    }));
+    api.sendSupervisedReplacement.mockRejectedValue(new SupervisedRunsApiError(502, 'signal_failed', { code: 'signal_failed' }));
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Send replacement' }));
+    const messages = await screen.findAllByText('Nothing happened. Press again.');
+    expect(messages).toHaveLength(1);
+    expect(messages[0].parentElement?.contains(screen.getByRole('button', { name: 'Send replacement' }))).toBe(true);
+    expect(messages[0].parentElement?.contains(screen.getByRole('button', { name: 'Fail' }))).toBe(false);
+  });
+
+  it('holds Fail while a replacement upload is running', async () => {
+    api.getSupervisedRun.mockResolvedValue(detail('rejected', {
+      replacement_check: { has_model: false, missing: [], final_preview: {} },
+    }));
+    let finish: (value: unknown) => void = () => {};
+    api.uploadReplacementFile.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    renderPage();
+    const fail = await screen.findByRole('button', { name: 'Fail' });
+    expect(fail.hasAttribute('disabled')).toBe(false);
+    const file = new File(['x'], 'ring.glb');
+    fireEvent.change(screen.getByLabelText('GLB model file'), { target: { files: [file] } });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Fail' }).hasAttribute('disabled')).toBe(true));
+    await act(async () => { finish({ upload_id: 'u1', role: 'glb', ref: {} }); });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Fail' }).hasAttribute('disabled')).toBe(false));
   });
 
   it('keeps Send disabled when there is no model', async () => {

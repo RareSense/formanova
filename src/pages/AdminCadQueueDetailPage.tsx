@@ -273,6 +273,10 @@ export default function AdminCadQueueDetailPage() {
   const [sendOpen, setSendOpen] = useState(false);
   const [failOpen, setFailOpen] = useState(false);
   const [ticked, setTicked] = useState<string[]>([]);
+  // Which control the message belongs to: it is shown beside that control.
+  const [messageFrom, setMessageFrom] = useState<'buttons' | 'replacement'>('buttons');
+  // An upload or Remove in the replacement panel; Fail waits for it.
+  const [panelBusy, setPanelBusy] = useState(false);
 
   const mounted = useRef(true);
   useEffect(() => () => { mounted.current = false; }, []);
@@ -331,11 +335,15 @@ export default function AdminCadQueueDetailPage() {
     }
   }
 
-  async function run(action: () => Promise<{ accepted: boolean; code?: string }>) {
+  async function run(
+    action: () => Promise<{ accepted: boolean; code?: string }>,
+    source: 'buttons' | 'replacement' = 'buttons',
+  ) {
     if (!phase || locked.current) return;
     locked.current = true;
     let accepted = false;
     const from = phase;
+    setMessageFrom(source);
     setBusy(true);
     setMessage(null);
     setWaitingFrom(null);
@@ -387,6 +395,7 @@ export default function AdminCadQueueDetailPage() {
   const missing = data?.send_check?.missing ?? [];
   const noModel = data?.send_check?.has_model === false;
   const actionsLocked = busy || waitingFrom !== null;
+  const buttonsLocked = actionsLocked || panelBusy;
   const canSend = !noModel && sameNames(ticked, missing) && !actionsLocked;
   const onPress: Record<ButtonAction, () => void> = {
     start: () => void start(),
@@ -455,7 +464,7 @@ export default function AdminCadQueueDetailPage() {
                         key={action}
                         variant={action === 'fail' ? 'destructive' : action === 'reject' ? 'outline' : 'default'}
                         className="h-10 w-full px-4 sm:w-28"
-                        disabled={actionsLocked}
+                        disabled={buttonsLocked}
                         onClick={onPress[action]}
                       >
                         {BUTTON_LABELS[action]}
@@ -463,7 +472,7 @@ export default function AdminCadQueueDetailPage() {
                     ))}
                   </div>
                 ) : null}
-                {message && phase !== 'rejected' && (
+                {message && messageFrom === 'buttons' && (
                   <p className="break-words text-sm" aria-live="polite">{message}</p>
                 )}
               </CardContent>
@@ -474,9 +483,10 @@ export default function AdminCadQueueDetailPage() {
                 detail={data}
                 workflowId={workflowId}
                 onChanged={() => void query.refetch()}
-                runAction={run}
+                runAction={(action) => run(action, 'replacement')}
                 locked={actionsLocked}
-                message={message}
+                message={messageFrom === 'replacement' ? message : null}
+                onBusyChange={setPanelBusy}
               />
             )}
 
@@ -538,7 +548,7 @@ export default function AdminCadQueueDetailPage() {
                 <AlertDialogFooter>
                   <AlertDialogCancel className="px-4 sm:w-28">Cancel</AlertDialogCancel>
                   <AlertDialogAction
-                    disabled={actionsLocked}
+                    disabled={buttonsLocked}
                     className="bg-destructive px-4 text-destructive-foreground hover:bg-destructive/90 sm:w-28"
                     onClick={() => void fail()}
                   >

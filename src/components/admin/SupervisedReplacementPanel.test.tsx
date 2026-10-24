@@ -136,6 +136,28 @@ describe('SupervisedReplacementPanel', () => {
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
   });
 
+  it('drops a tick when its name leaves the missing list, so it comes back unticked', () => {
+    const check = (missing: string[]) => detail({ replacement_check: { has_model: true, missing, final_preview: {} } });
+    const { rerender } = render(
+      <SupervisedReplacementPanel detail={check(['loop_state_artifact', 'code_artifact'])} workflowId="wf-1" onChanged={vi.fn()} />,
+    );
+    fireEvent.click(screen.getByRole('checkbox', { name: 'loop_state_artifact' }));
+    rerender(<SupervisedReplacementPanel detail={check(['code_artifact'])} workflowId="wf-1" onChanged={vi.fn()} />);
+    rerender(
+      <SupervisedReplacementPanel detail={check(['loop_state_artifact', 'code_artifact'])} workflowId="wf-1" onChanged={vi.fn()} />,
+    );
+    expect(screen.getByRole('checkbox', { name: 'loop_state_artifact' }).getAttribute('data-state')).toBe('unchecked');
+    fireEvent.click(screen.getByRole('checkbox', { name: 'code_artifact' }));
+    expect(screen.getByRole('button', { name: 'Send replacement' }).hasAttribute('disabled')).toBe(true);
+  });
+
+  it('says the run moved when an upload meets invalid_phase', async () => {
+    api.uploadReplacementFile.mockRejectedValue(new SupervisedRunsApiError(409, 'invalid_phase', { code: 'invalid_phase' }));
+    renderPanel(detail());
+    pick('GLB model', sizedFile('ring.glb', 1000));
+    expect(await screen.findByText('This run is no longer rejected. Refresh the page.')).toBeTruthy();
+  });
+
   it('asks for the GLB first when there is no model', () => {
     renderPanel(detail({ replacement_check: { has_model: false, missing: [], final_preview: {} } }));
     expect(screen.getByText('Upload the GLB first.')).toBeTruthy();
