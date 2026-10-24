@@ -522,7 +522,7 @@ function InvalidRequestState({ message }: { message: string }) {
   );
 }
 
-function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
+export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
   // Both CAD families produce a GLB. Image-to-CAD (including ring_cad_nurbs_v1)
   // was excluded here, so its runs always rendered
   // "No 3D output" no matter what the pipeline returned.
