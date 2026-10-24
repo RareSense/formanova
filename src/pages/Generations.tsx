@@ -28,7 +28,7 @@ import {
   getAssetArtifactKeys,
   type CachePayload,
 } from '@/lib/generation-history-utils';
-import { fetchCadRings } from '@/lib/cad-versions-api';
+import { fetchCadRings, type CadRing } from '@/lib/cad-versions-api';
 import { WorkflowSection, SectionIcons } from '@/components/generations/WorkflowSection';
 import { ScissorGLBGrid } from '@/components/generations/ScissorGLBGrid';
 import CADRuntimeErrorBoundary from '@/components/cad/CADRuntimeErrorBoundary';
@@ -79,6 +79,8 @@ export default function Generations() {
 
   // Track enriched IDs + their data for sessionStorage persistence
   const enrichedRef = useRef<Record<string, Partial<WorkflowSummary>>>({});
+  /** The vault as read once for this page load, for runs whose steps hold no model. */
+  const ringsRef = useRef<CadRing[]>([]);
   const generatedAssetNamesRef = useRef<{
     byAssetId: Record<string, string>;
     byWorkflowId: Record<string, string>;
@@ -150,6 +152,7 @@ export default function Generations() {
         // together; anything it does not know passes through untouched, and a
         // vault that cannot be reached leaves the list exactly as it was.
         const rings = await fetchCadRings().catch(() => []);
+        ringsRef.current = rings;
         const workflows = groupRingVersions(visible, rings);
         if (import.meta.env.DEV) console.log('[Generations] fetched:', rawWorkflows.length, '→ valid:', workflows.length);
 
@@ -304,7 +307,22 @@ export default function Generations() {
                 });
                 return;
               }
-              const stepData = extractCadTextData(details.steps ?? []);
+              let stepData: Partial<WorkflowSummary> = extractCadTextData(details.steps ?? []);
+              // A supervised run's history has no steps, so its model is the
+              // version it delivered, which the vault already listed above.
+              if (!stepData.glb_url && wf.status === 'completed' && wf.output_asset_id) {
+                const delivered = ringsRef.current
+                  .flatMap((ring) => ring.versions ?? [])
+                  .find((version) => version.asset_id === wf.output_asset_id);
+                if (delivered?.glb_url) {
+                  stepData = {
+                    ...stepData,
+                    glb_url: delivered.glb_url,
+                    threedm_url: stepData.threedm_url ?? delivered.threedm_url ?? null,
+                    ...(delivered.thumbnail_url ? { thumbnail_url: delivered.thumbnail_url } : {}),
+                  };
+                }
+              }
               if (!cancelled) applyEnrichment(wf.workflow_id, stepData);
 
               // /result blocks until a run ends, so a run still in progress

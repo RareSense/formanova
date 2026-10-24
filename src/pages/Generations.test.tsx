@@ -1,12 +1,14 @@
 import React from 'react';
 import '@testing-library/jest-dom/vitest';
-import { render, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WorkflowSummary } from '@/lib/generation-history-api';
 
 vi.mock('react-helmet-async', () => ({ Helmet: () => null }));
-vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 'user-1' } }) }));
+// One user object for the whole test, as the real context keeps it between renders.
+const authState = vi.hoisted(() => ({ user: { id: 'user-1' } }));
+vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => authState }));
 vi.mock('@/lib/generation-history-api', () => ({
   listAllMyWorkflows: vi.fn(),
   getWorkflowDetails: vi.fn(),
@@ -43,6 +45,7 @@ vi.mock('@/components/cad/CADRuntimeErrorBoundary', () => ({
 
 import Generations from './Generations';
 import { fetchCadResult, getWorkflowDetails, listAllMyWorkflows } from '@/lib/generation-history-api';
+import { fetchCadRings } from '@/lib/cad-versions-api';
 
 function cadRow(overrides: Partial<WorkflowSummary>): WorkflowSummary {
   return {
@@ -83,5 +86,34 @@ describe('Generations: /result is only asked about finished runs', () => {
     // The finished run is enriched; the running one must not be asked about.
     await waitFor(() => expect(fetchCadResult).toHaveBeenCalledWith('wf-done'));
     expect(fetchCadResult).not.toHaveBeenCalledWith('wf-running');
+  });
+});
+
+describe('Generations: supervised runs', () => {
+  it("shows the delivered version's model and thumbnail when the run has no steps", async () => {
+    vi.mocked(listAllMyWorkflows).mockResolvedValue([
+      cadRow({ workflow_id: 'wf-supervised', output_asset_id: 'asset-delivered' }),
+    ]);
+    vi.mocked(fetchCadRings).mockResolvedValue([
+      {
+        set_id: 'set-1',
+        versions: [{
+          asset_id: 'asset-delivered',
+          position: 0,
+          source_workflow_id: 'wf-admin',
+          glb_url: '/api/artifacts/delivered-glb',
+          thumbnail_url: '/api/artifacts/delivered-thumb',
+        }],
+      },
+    ]);
+    renderPage();
+
+    const row = await screen.findByTestId('row-wf-supervised');
+    await waitFor(() => expect(row).toHaveAttribute('data-glb', '/api/artifacts/delivered-glb'));
+    expect(row).toHaveAttribute('data-thumbnail', '/api/artifacts/delivered-thumb');
+    // The vault already answered, so /result is not asked as well.
+    expect(fetchCadResult).not.toHaveBeenCalled();
+    // The vault is read once per page load, never per card.
+    expect(fetchCadRings).toHaveBeenCalledTimes(1);
   });
 });
