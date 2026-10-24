@@ -14,9 +14,16 @@ const api = vi.hoisted(() => ({
   uploadReplacementFile: vi.fn(),
 }));
 vi.mock('@/lib/supervised-runs-api', async (orig) => ({ ...(await orig<object>()), ...api }));
+const authFetch = vi.hoisted(() => ({ authenticatedFetch: vi.fn() }));
+vi.mock('@/lib/authenticated-fetch', () => authFetch);
+vi.mock('@/components/generations/ScissorGLBGrid', () => ({
+  ScissorGLBGrid: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  GLBPreviewSlot: ({ glbUrl }: { glbUrl: string }) => <div data-testid="glb">{glbUrl}</div>,
+}));
 vi.mock('@/pages/AdminGenerationDetailPage', () => ({ DetailContent: () => <div>run detail</div> }));
 
 import AdminCadQueueDetailPage from './AdminCadQueueDetailPage';
+import { azureUriToUrl } from '@/lib/azure-utils';
 import { SupervisedRunsApiError, type SupervisedPhase, type SupervisedRunDetail } from '@/lib/supervised-runs-api';
 
 function detail(phase: SupervisedPhase, extra: Partial<SupervisedRunDetail> = {}): SupervisedRunDetail {
@@ -57,7 +64,7 @@ function renderPage() {
   );
 }
 
-const IGNORED = ['Back to CAD Queue', 'Refresh', 'Add note', 'Choose file', 'Replace file', 'Remove', 'What will be sent', 'Send replacement'];
+const IGNORED = ['Back to CAD Queue', 'Refresh', 'Add note', 'Choose file', 'Replace file', 'Remove', 'What will be sent', 'Send replacement', 'Download 3DM'];
 function actionButtonNames(): string[] {
   return screen.getAllByRole('button')
     .map((button) => button.textContent?.trim() ?? '')
@@ -67,6 +74,7 @@ function actionButtonNames(): string[] {
 beforeEach(() => {
   vi.useRealTimers();
   Object.values(api).forEach((fn) => fn.mockReset());
+  authFetch.authenticatedFetch.mockReset();
 });
 
 describe('AdminCadQueueDetailPage', () => {
@@ -390,5 +398,52 @@ describe('AdminCadQueueDetailPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Send' }));
     fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Send' }));
     expect(await screen.findByText('The missing list changed. Check it again.')).toBeTruthy();
+  });
+
+  describe('What Send delivers', () => {
+    const check = (extra: Record<string, unknown>) => detail('awaiting_review', {
+      send_check: { has_model: true, missing: [], ...extra },
+    });
+
+    it('shows the exact GLB Send delivers in the shared viewer, with a normalized URL', async () => {
+      const raw = 'azure://agentic-artifacts/x/model.glb';
+      api.getSupervisedRun.mockResolvedValue(check({ glb_url: raw }));
+      renderPage();
+      expect(await screen.findByText('What Send delivers')).toBeTruthy();
+      expect(screen.getByTestId('glb').textContent).toBe(azureUriToUrl(raw) || raw);
+      expect(screen.getByText(/can show an earlier loop/)).toBeTruthy();
+    });
+
+    it('says there is no model to send when glb_url is null', async () => {
+      api.getSupervisedRun.mockResolvedValue(check({ glb_url: null, has_model: false }));
+      renderPage();
+      expect(await screen.findByText('No model to send.')).toBeTruthy();
+      expect(screen.queryByTestId('glb')).toBeNull();
+    });
+
+    it('downloads the 3DM with the normalized URL', async () => {
+      const raw = '/artifacts/wf-1/model.3dm';
+      const header = '3D Geometry File Format ' + '       7' + 'padding-bytes';
+      authFetch.authenticatedFetch.mockResolvedValue({ ok: true, blob: async () => new Blob([header]) });
+      const create = vi.fn(() => 'blob:x');
+      const revoke = vi.fn();
+      Object.assign(URL, { createObjectURL: create, revokeObjectURL: revoke });
+      const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+      api.getSupervisedRun.mockResolvedValue(check({ glb_url: 'azure://a/m.glb', threedm_url: raw }));
+      renderPage();
+      fireEvent.click(await screen.findByRole('button', { name: 'Download 3DM' }));
+      await waitFor(() => expect(click).toHaveBeenCalled());
+      expect(authFetch.authenticatedFetch).toHaveBeenCalledWith(azureUriToUrl(raw) || raw);
+      expect(create).toHaveBeenCalled();
+      click.mockRestore();
+    });
+
+    it('shows an error when the 3DM download fails', async () => {
+      authFetch.authenticatedFetch.mockResolvedValue({ ok: false, status: 500 });
+      api.getSupervisedRun.mockResolvedValue(check({ glb_url: 'azure://a/m.glb', threedm_url: 'azure://a/m.3dm' }));
+      renderPage();
+      fireEvent.click(await screen.findByRole('button', { name: 'Download 3DM' }));
+      expect(await screen.findByText("Couldn't download the 3DM.")).toBeTruthy();
+    });
   });
 });
