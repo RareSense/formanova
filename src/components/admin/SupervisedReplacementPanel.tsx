@@ -218,7 +218,9 @@ export default function SupervisedReplacementPanel({
   const check = detail.replacement_check;
   const hasModel = check?.has_model === true;
   const missing = check?.missing ?? [];
-  const tickedNow = ticked.filter((name) => missing.includes(name));
+  // The type is satisfied by the picker, never by a tick: naming it makes the backend refuse.
+  const ackNames = missing.filter((name) => name !== 'jewelry_type');
+  const tickedNow = ticked.filter((name) => ackNames.includes(name));
   const needsType = missing.includes('jewelry_type');
   const fileBusy = Object.keys(transfers).length > 0 || Object.keys(removing).length > 0;
   const actionsLocked = locked || ownSending;
@@ -240,7 +242,7 @@ export default function SupervisedReplacementPanel({
   useEffect(() => { busyReport.current?.(fileBusy); }, [fileBusy]);
   useEffect(() => () => { busyReport.current?.(false); }, []);
   const canSend = hasModel
-    && sameNames(tickedNow, missing)
+    && sameNames(tickedNow, ackNames)
     && (!needsType || Boolean(jewelryType))
     && !actionsLocked
     && !fileBusy;
@@ -377,15 +379,15 @@ export default function SupervisedReplacementPanel({
 
         {!hasModel ? (
           <p className="text-sm text-muted-foreground">Upload the GLB first.</p>
-        ) : missing.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nothing is missing.</p>
+        ) : ackNames.length === 0 ? (
+          needsType ? null : <p className="text-sm text-muted-foreground">Nothing is missing.</p>
         ) : (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
               Without these files the user can't improve this model later. Tick each one to confirm.
             </p>
             <ul className="space-y-2">
-              {missing.map((name) => {
+              {ackNames.map((name) => {
                 const id = `replacement-missing-${name}`;
                 return (
                   <li key={name} className="flex min-w-0 items-center gap-3">
@@ -404,7 +406,7 @@ export default function SupervisedReplacementPanel({
 
         {hasModel && needsType && (
           <div className="space-y-2">
-            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Jewelry type</p>
+            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Jewelry type (required)</p>
             <Select value={jewelryType} onValueChange={setJewelryType}>
               <SelectTrigger aria-label="Jewelry type" className="w-full sm:w-56">
                 <SelectValue placeholder="Choose a type" />

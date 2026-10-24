@@ -111,15 +111,17 @@ describe('SupervisedReplacementPanel', () => {
     expect(await screen.findByText('Refused: bad_signature. Upload it again.')).toBeTruthy();
   });
 
-  it('enables Send replacement only when every missing name is ticked and a jewelry type is chosen', async () => {
+  it('enables Send replacement only when every acknowledgeable name is ticked and a jewelry type is chosen', async () => {
     api.sendSupervisedReplacement.mockResolvedValue({ accepted: true, phase: 'finalizing' });
     const onChanged = renderPanel(detail({
       replacement_check: { has_model: true, missing: ['loop_state_artifact', 'jewelry_type'], final_preview: {} },
     }));
     const send = screen.getByRole('button', { name: 'Send replacement' });
     expect(send.hasAttribute('disabled')).toBe(true);
+    expect(screen.getAllByRole('checkbox')).toHaveLength(1);
+    expect(screen.queryByRole('checkbox', { name: 'jewelry_type' })).toBeNull();
+    expect(screen.getByText('Jewelry type (required)')).toBeTruthy();
     fireEvent.click(screen.getByRole('checkbox', { name: 'loop_state_artifact' }));
-    fireEvent.click(screen.getByRole('checkbox', { name: 'jewelry_type' }));
     expect(send.hasAttribute('disabled')).toBe(true);
 
     const trigger = screen.getByRole('combobox', { name: 'Jewelry type' });
@@ -129,11 +131,24 @@ describe('SupervisedReplacementPanel', () => {
 
     fireEvent.click(send);
     await waitFor(() => expect(api.sendSupervisedReplacement).toHaveBeenCalled());
-    expect(api.sendSupervisedReplacement).toHaveBeenCalledWith(
-      'wf-1', expect.arrayContaining(['loop_state_artifact', 'jewelry_type']), 'ring',
-    );
-    expect(api.sendSupervisedReplacement.mock.calls[0][1]).toHaveLength(2);
+    expect(api.sendSupervisedReplacement).toHaveBeenCalledWith('wf-1', ['loop_state_artifact'], 'ring');
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
+  });
+
+  it('needs only a picked type when jewelry_type is the only missing name', async () => {
+    api.sendSupervisedReplacement.mockResolvedValue({ accepted: true, phase: 'finalizing' });
+    renderPanel(detail({
+      replacement_check: { has_model: true, missing: ['jewelry_type'], final_preview: {} },
+    }));
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(screen.queryByText('Nothing is missing.')).toBeNull();
+    const send = screen.getByRole('button', { name: 'Send replacement' });
+    expect(send.hasAttribute('disabled')).toBe(true);
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Jewelry type' }), { key: 'Enter' });
+    fireEvent.click(await screen.findByRole('option', { name: 'ring' }));
+    await waitFor(() => expect(send.hasAttribute('disabled')).toBe(false));
+    fireEvent.click(send);
+    await waitFor(() => expect(api.sendSupervisedReplacement).toHaveBeenCalledWith('wf-1', [], 'ring'));
   });
 
   it('drops a tick when its name leaves the missing list, so it comes back unticked', () => {

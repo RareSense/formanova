@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import SupervisedReplacementPanel from '@/components/admin/SupervisedReplacementPanel';
+import { GLBPreviewSlot, ScissorGLBGrid } from '@/components/generations/ScissorGLBGrid';
 import { normalizeAdminGenerationDetail } from '@/lib/admin-generations-api';
 import {
   PHASE_ACTIONS,
@@ -42,6 +43,8 @@ import {
   type SupervisedPhase,
   type SupervisedRunDetail,
 } from '@/lib/supervised-runs-api';
+import { azureUriToUrl } from '@/lib/azure-utils';
+import { downloadCadArtifact } from '@/lib/cad-artifact-download';
 import { DetailContent } from '@/pages/AdminGenerationDetailPage';
 
 const POLL_MS = 5000;
@@ -262,6 +265,61 @@ function NotesCard({ data, workflowId, onSaved }: { data: SupervisedRunDetail; w
             Add note
           </Button>
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SendDeliversCard({ check, workflowId }: { check: NonNullable<SupervisedRunDetail['send_check']>; workflowId: string }) {
+  const [downloading, setDownloading] = useState(false);
+  const [error, setError] = useState(false);
+  const mounted = useRef(true);
+  useEffect(() => () => { mounted.current = false; }, []);
+  const glb = check.glb_url ? azureUriToUrl(check.glb_url) || check.glb_url : null;
+  const threedm = check.threedm_url ? azureUriToUrl(check.threedm_url) || check.threedm_url : null;
+
+  async function download() {
+    if (!threedm || downloading) return;
+    setDownloading(true);
+    setError(false);
+    try {
+      await downloadCadArtifact(threedm, `${workflowId}.3dm`, '3dm');
+    } catch {
+      if (mounted.current) setError(true);
+    } finally {
+      if (mounted.current) setDownloading(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="font-display text-2xl tracking-wide">What Send delivers</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {glb ? (
+          <div className="w-full max-w-2xl">
+            <ScissorGLBGrid>
+              <GLBPreviewSlot
+                id={`send-${workflowId}`}
+                glbUrl={glb}
+                className="min-h-[360px] w-full aspect-[4/3] rounded-md border border-border bg-muted/20"
+                forceJewelryPalette
+              />
+            </ScissorGLBGrid>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No model to send.</p>
+        )}
+        {threedm && (
+          <div className="flex flex-wrap items-center gap-3">
+            <Button variant="outline" className="px-4" disabled={downloading} onClick={() => void download()}>
+              {downloading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Download 3DM
+            </Button>
+            {error && <p className="break-words text-sm text-destructive" role="alert">Couldn't download the 3DM.</p>}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -508,10 +566,17 @@ export default function AdminCadQueueDetailPage() {
               />
             )}
 
+            {data.send_check && <SendDeliversCard check={data.send_check} workflowId={workflowId} />}
+
             <NotesCard data={data} workflowId={workflowId} onSaved={() => void query.refetch()} />
 
             <section className="min-w-0 space-y-4">
               <h2 className="font-display text-2xl tracking-wide">The run</h2>
+              {data.send_check && (
+                <p className="text-sm text-muted-foreground">
+                  The run's own preview below can show an earlier loop. Review the model under What Send delivers.
+                </p>
+              )}
               {runDetail && (
                 <div className="min-w-0 [overflow-wrap:anywhere]">
                   <DetailContent detail={runDetail} />

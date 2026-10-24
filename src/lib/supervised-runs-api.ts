@@ -84,7 +84,12 @@ export interface SupervisedRunDetail {
     delivery: unknown;
     events: Array<Record<string, unknown>>;
   };
-  send_check: { has_model: boolean; missing: string[] } | null;
+  send_check: {
+    has_model: boolean;
+    missing: string[];
+    glb_url?: string | null;
+    threedm_url?: string | null;
+  } | null;
   replacement_check: { has_model: boolean; missing: string[]; final_preview: unknown } | null;
   uploads: SupervisedUpload[];
   notes: SupervisedNote[];
