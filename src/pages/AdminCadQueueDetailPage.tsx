@@ -275,6 +275,9 @@ export default function AdminCadQueueDetailPage() {
 
   const mounted = useRef(true);
   useEffect(() => () => { mounted.current = false; }, []);
+  // Synchronous lock: held from the press until the request fails, or, once accepted, until the
+  // phase moves or the 2-minute wait ends. State alone lets a second same-tick click through.
+  const locked = useRef(false);
 
   const query = useQuery({
     queryKey: ['admin-cad-queue-run', workflowId],
@@ -293,6 +296,7 @@ export default function AdminCadQueueDetailPage() {
 
   useEffect(() => {
     if (waitingFrom && phase && phase !== waitingFrom) {
+      locked.current = false;
       setWaitingFrom(null);
       setMessage(null);
     }
@@ -301,6 +305,7 @@ export default function AdminCadQueueDetailPage() {
   useEffect(() => {
     if (!waitingFrom) return;
     const timer = setTimeout(() => {
+      locked.current = false;
       setWaitingFrom(null);
       setMessage(`Still ${phaseLabel(waitingFrom)}. Refresh to check again.`);
     }, POLL_LIMIT_MS);
@@ -326,7 +331,9 @@ export default function AdminCadQueueDetailPage() {
   }
 
   async function run(action: () => Promise<{ accepted: boolean; code?: string }>) {
-    if (!phase || busy) return;
+    if (!phase || locked.current) return;
+    locked.current = true;
+    let accepted = false;
     const from = phase;
     setBusy(true);
     setMessage(null);
@@ -335,6 +342,7 @@ export default function AdminCadQueueDetailPage() {
       const result = await action();
       if (!mounted.current) return;
       if (result.accepted) {
+        accepted = true;
         setMessage('Done. Waiting for the run to move...');
         setWaitingFrom(from);
         void query.refetch();
@@ -346,6 +354,7 @@ export default function AdminCadQueueDetailPage() {
       if (err instanceof SupervisedRunsApiError) await handleCode(err.code, err.detail);
       else setMessage(err instanceof Error && err.message ? err.message : 'request_failed');
     } finally {
+      if (!accepted) locked.current = false;
       if (mounted.current) setBusy(false);
     }
   }
@@ -376,7 +385,8 @@ export default function AdminCadQueueDetailPage() {
   const allowed = phase ? BUTTON_ACTIONS.filter((a) => PHASE_ACTIONS[phase].includes(a)) : [];
   const missing = data?.send_check?.missing ?? [];
   const noModel = data?.send_check?.has_model === false;
-  const canSend = !noModel && sameNames(ticked, missing) && !busy;
+  const actionsLocked = busy || waitingFrom !== null;
+  const canSend = !noModel && sameNames(ticked, missing) && !actionsLocked;
   const onPress: Record<ButtonAction, () => void> = {
     start: () => void start(),
     send: openSend,
@@ -444,7 +454,7 @@ export default function AdminCadQueueDetailPage() {
                         key={action}
                         variant={action === 'fail' ? 'destructive' : action === 'reject' ? 'outline' : 'default'}
                         className="h-10 w-full px-4 sm:w-28"
-                        disabled={busy}
+                        disabled={actionsLocked}
                         onClick={onPress[action]}
                       >
                         {BUTTON_LABELS[action]}
@@ -516,6 +526,7 @@ export default function AdminCadQueueDetailPage() {
                 <AlertDialogFooter>
                   <AlertDialogCancel className="px-4 sm:w-28">Cancel</AlertDialogCancel>
                   <AlertDialogAction
+                    disabled={actionsLocked}
                     className="bg-destructive px-4 text-destructive-foreground hover:bg-destructive/90 sm:w-28"
                     onClick={() => void fail()}
                   >

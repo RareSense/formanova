@@ -215,4 +215,42 @@ describe('AdminCadQueueDetailPage', () => {
     expect(await screen.findByText('Working: no actions until this finishes.', {}, { timeout: 7000 })).toBeTruthy();
     expect(screen.queryByText('Done. Waiting for the run to move...')).toBeNull();
   }, 15000);
+  it('calls Fail once for a double confirm press and a Fail press while waiting', async () => {
+    api.getSupervisedRun.mockResolvedValue(detail('queued'));
+    let resolveFail: (value: unknown) => void = () => {};
+    api.failSupervisedRun.mockImplementation(() => new Promise((resolve) => { resolveFail = resolve; }));
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Fail' }));
+    const confirm = within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Fail run' });
+    // Both clicks inside one act(): React has not re-rendered between them (same tick).
+    act(() => {
+      confirm.click();
+      confirm.click();
+    });
+    await act(async () => { resolveFail({ accepted: true, phase: 'queued' }); });
+    expect(await screen.findByText('Done. Waiting for the run to move...')).toBeTruthy();
+    const fail = screen.getByRole('button', { name: 'Fail' });
+    expect(fail.hasAttribute('disabled')).toBe(true);
+    fireEvent.click(fail);
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(api.failSupervisedRun).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows Fail as the only action for a rejected run', async () => {
+    api.getSupervisedRun.mockResolvedValue(detail('rejected'));
+    renderPage();
+    await screen.findByText('Attempt 1');
+    expect(actionButtonNames()).toEqual(['Fail']);
+  });
+
+  it('keeps Send disabled when there is no model', async () => {
+    api.getSupervisedRun.mockResolvedValue(detail('awaiting_review', {
+      send_check: { has_model: false, missing: [] },
+    }));
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Send' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('There is no model to send.')).toBeTruthy();
+    expect(within(dialog).getByRole('button', { name: 'Send' }).hasAttribute('disabled')).toBe(true);
+  });
 });
