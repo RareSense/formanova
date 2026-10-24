@@ -100,6 +100,9 @@ export function useImageToCADWorkflow({
   const [glbUrl, setGlbUrl] = useState<string | undefined>(undefined);
   const [glbArtifact, setGlbArtifact] = useState<{ uri: string; type: string; bytes: number; sha256: string } | null>(null);
   const [sourceWorkflowId, setSourceWorkflowId] = useState<string | null>(null);
+  // From Generate until the start reply: the run's queue status isn't known yet, so the overlay
+  // shows a still "sending" state rather than the generating spinner.
+  const [isSending, setIsSending] = useState(false);
   /** The machinable deliverable. Present only for ring_cad_nurbs_v1 runs. */
   const [threedmArtifact, setThreedmArtifact] = useState<ArtifactRef | null>(null);
   const [stlArtifacts, setStlArtifacts] = useState<ArtifactRef[]>([]);
@@ -620,6 +623,7 @@ export function useImageToCADWorkflow({
     awaitingGeneratedToastRef.current = true;
     onWorkspaceActivate();
     setIsGenerating(true);
+    setIsSending(true);
     setGenerationFailed(false);
     setFailureMessage(null);
     setRetryAttempt(0);
@@ -695,6 +699,8 @@ export function useImageToCADWorkflow({
         ...(supervised === true ? { supervised: true } : {}),
       });
 
+      setIsSending(false);
+
       // Polling is now GenerationsContext's job. The effect below mirrors that
       // run's state into this hook so the on-page overlay still updates while
       // the user stays, without a second poll hitting the same endpoints.
@@ -715,6 +721,7 @@ export function useImageToCADWorkflow({
       // active on this environment) is actionable, and hiding it behind the
       // generic message means the user only sees it with DevTools open.
       setFailureMessage(err instanceof Error && err.message ? err.message : null);
+      setIsSending(false);
       setIsGenerating(false);
       setProgressStep("failed_final");
       setGenerationFailed(true);
@@ -777,7 +784,7 @@ export function useImageToCADWorkflow({
   }, []);
 
   return {
-    isGenerating, isQueued: trackedRun?.supervised === true, isStarting, hasModel, setHasModel,
+    isGenerating, isQueued: trackedRun?.supervised === true, isSending, isStarting, hasModel, setHasModel,
     isModelLoading, setIsModelLoading,
     progressStep, setProgressStep,
     retryAttempt,

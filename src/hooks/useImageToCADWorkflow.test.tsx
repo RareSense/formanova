@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 
 const checkCredits = vi.fn();
 vi.mock('@/hooks/use-credit-preflight', () => ({ useCreditPreflight: () => ({ checkCredits }) }));
@@ -323,6 +323,29 @@ describe('useImageToCADWorkflow supervised runs', () => {
     }];
     rerender();
     expect(result.current.isQueued).toBe(true);
+  });
+
+  it('is sending from Generate until the start reply, then not', async () => {
+    checkCredits.mockResolvedValue(true);
+    let reply!: (r: Response) => void;
+    mockFetch.mockReturnValue(new Promise<Response>((resolve) => { reply = resolve; }));
+    const { result } = renderWorkflow();
+    let started!: Promise<boolean>;
+    act(() => { started = result.current.simulateGeneration(); });
+    await waitFor(() => expect(result.current.isSending).toBe(true));
+    await act(async () => {
+      reply({ ok: true, json: async () => ({ workflow_id: 'state-2', supervised: true }) } as Response);
+      await started;
+    });
+    expect(result.current.isSending).toBe(false);
+  });
+
+  it('stops sending when the start fails', async () => {
+    checkCredits.mockResolvedValue(true);
+    mockFetch.mockResolvedValue({ ok: false, status: 500, json: async () => ({}) } as Response);
+    const { result } = renderWorkflow();
+    await act(async () => { await result.current.simulateGeneration(); });
+    expect(result.current.isSending).toBe(false);
   });
 
   it('hands a supervised improve start to the tracker with the flag', async () => {
