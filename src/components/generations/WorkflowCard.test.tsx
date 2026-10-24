@@ -24,6 +24,7 @@ vi.mock('@/lib/cad-versions-api', async () => {
 
 import { WorkflowCard } from './WorkflowCard';
 import { fetchVersionDownloadLink } from '@/lib/cad-versions-api';
+import { groupRingVersions } from '@/lib/generation-history-utils';
 import { fetchCadResult } from '@/lib/generation-history-api';
 import { downloadCadArtifact } from '@/lib/cad-artifact-download';
 
@@ -206,6 +207,31 @@ describe('CAD generation history card', () => {
     await waitFor(() => expect(fetchVersionDownloadLink).toHaveBeenCalledWith('asset-1', 'casting_stl'));
     expect(screen.queryByText('Stone list')).toBeNull();
     clickSpy.mockRestore();
+  });
+
+  it('offers the delivered version files on a hand-replaced delivery', async () => {
+    const [row] = groupRingVersions(
+      [{ ...cadWorkflow, workflow_id: 'wf-user', output_asset_id: 'asset-del' }],
+      [{
+        set_id: 'set-r',
+        versions: [{
+          asset_id: 'asset-del',
+          position: 0,
+          source_workflow_id: 'wf-admin',
+          glb_url: '/del.glb',
+          downloads: [{ kind: 'stones', filename: 'stones.csv', bytes: 1 }],
+        }],
+      }],
+    );
+    vi.mocked(fetchVersionDownloadLink).mockRejectedValue(new Error('offline'));
+    render(
+      <MemoryRouter>
+        <WorkflowCard workflow={row as WorkflowSummary} index={1} onClick={() => {}} />
+      </MemoryRouter>,
+    );
+
+    await chooseDownload('Stone list');
+    await waitFor(() => expect(fetchVersionDownloadLink).toHaveBeenCalledWith('asset-del', 'stones'));
   });
 
   it('offers no viewing copy for a version made before it existed', async () => {

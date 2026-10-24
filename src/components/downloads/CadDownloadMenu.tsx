@@ -148,13 +148,16 @@ const VERSION_FILE_LABELS: Record<CadDownloadKind, string> = {
   stones: 'Stone list',
 };
 
-const VERSION_FILE_FORMATS: Record<CadDownloadKind, string> = {
-  threedm: '3DM',
-  stl: 'STL',
-  step: 'STEP',
-  casting_stl: 'STL',
-  stones: 'LIST',
-};
+/**
+ * The short format shown beside a version file: its extension, e.g. CSV for
+ * the stone list. A name with no extension, or one too long for the column,
+ * reads LIST.
+ */
+function formatOfFile(filename: string | undefined): string {
+  const name = filename ?? '';
+  const ext = name.includes('.') ? name.split('.').pop()?.toUpperCase() ?? '' : '';
+  return ext && ext.length <= 4 ? ext : 'LIST';
+}
 
 const VERSION_FILE_ORDER: CadDownloadKind[] = ['threedm', 'stl', 'step', 'casting_stl', 'stones'];
 
@@ -227,7 +230,7 @@ export function CadDownloadMenu({
   for (const kind of versionFiles) {
     if (kind === 'threedm' && onDownloadThreedm) continue;
     formats.push({
-      format: VERSION_FILE_FORMATS[kind],
+      format: formatOfFile(versionDownloads.downloads.find((file) => file.kind === kind)?.filename),
       hint: VERSION_FILE_LABELS[kind],
       onSelect: () => { void saveVersionFile(versionDownloads.assetId, kind, versionDownloads.source); },
     });

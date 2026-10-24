@@ -242,10 +242,14 @@ export function versionLabel(version: CadRingVersion): string {
  * Call this after /result/{id} has returned, where one attempt is enough. The
  * retries cover the caller who got here straight from /status, where the
  * version row may still be moments away.
+ *
+ * `glbUrl` is the model on screen. A hand-replaced delivery's version carries
+ * the replacing run's id, so when no version names this run, the version whose
+ * GLB is the one on screen is the ring. The run's own version always wins.
  */
 export async function findRingForWorkflow(
   workflowId: string,
-  { attempts = 4, delayMs = 750 }: { attempts?: number; delayMs?: number } = {},
+  { attempts = 4, delayMs = 750, glbUrl }: { attempts?: number; delayMs?: number; glbUrl?: string | null } = {},
 ): Promise<CadRing | null> {
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
@@ -259,6 +263,10 @@ export async function findRingForWorkflow(
     const match = rings.find((ring) =>
       (ring.versions ?? []).some((version) => version.source_workflow_id === workflowId));
     if (match) return match;
+    const byGlb = glbUrl
+      ? rings.find((ring) => (ring.versions ?? []).some((version) => version.glb_url === glbUrl))
+      : undefined;
+    if (byGlb) return byGlb;
   }
   return null;
 }

@@ -123,6 +123,23 @@ describe('findRingForWorkflow', () => {
     expect(await findRingForWorkflow('wf_other', { attempts: 1 })).toBeNull();
   });
 
+  it('falls back to the version whose GLB is on screen, for a hand-replaced delivery', async () => {
+    const replaced = {
+      set_id: 'set_r',
+      versions: [{ asset_id: 'a_del', position: 0, source_workflow_id: 'wf_admin', glb_url: '/api/artifacts/del' }],
+    };
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { items: [replaced] }));
+    expect((await findRingForWorkflow('wf_user', { attempts: 1, glbUrl: '/api/artifacts/del' }))?.set_id).toBe('set_r');
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { items: [replaced] }));
+    expect(await findRingForWorkflow('wf_user', { attempts: 1 })).toBeNull();
+  });
+
+  it('prefers the version the run produced over a GLB match', async () => {
+    const byGlb = { set_id: 'set_glb', versions: [{ asset_id: 'x', position: 0, source_workflow_id: 'wf_x', glb_url: '/g' }] };
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { items: [byGlb, RING] }));
+    expect((await findRingForWorkflow('wf_1', { attempts: 1, glbUrl: '/g' }))?.set_id).toBe('set_1');
+  });
+
   it('retries: the version row is written after /status turns terminal', async () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse(200, { items: [] }))

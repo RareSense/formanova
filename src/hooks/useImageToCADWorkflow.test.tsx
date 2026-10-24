@@ -193,6 +193,44 @@ describe('useImageToCADWorkflow version files', () => {
   });
 });
 
+describe('useImageToCADWorkflow hand-replaced delivery', () => {
+  const downloads = [{ kind: 'casting_stl' as const, filename: 'c.stl', bytes: 1 }];
+  // The delivered version was made by another run, so only its GLB ties it to this one.
+  const delivered = {
+    set_id: 'set-r',
+    versions: [{ asset_id: 'v-del', position: 0, source_workflow_id: 'wf-admin', glb_url: '/api/artifacts/del', downloads }],
+  };
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('finds the delivered version by the GLB on screen and offers its files', async () => {
+    mockFetch.mockImplementation(async (url) => (String(url).startsWith('/api/cad/models')
+      ? { ok: true, status: 200, json: async () => ({ items: [delivered] }) }
+      : { ok: false, status: 404, json: async () => ({}) }) as Response);
+    const { result } = renderWorkflow();
+    await act(async () => {
+      await result.current.restoreCompletedWorkflow('wf-user', '/api/artifacts/del');
+    });
+    await vi.waitFor(() => expect(result.current.versionDownloads).toMatchObject({ assetId: 'v-del', downloads }));
+  });
+
+  it('keeps a seeded ring when the lookup finds nothing', async () => {
+    mockFetch.mockImplementation(async (url) => (String(url).startsWith('/api/cad/models')
+      ? { ok: true, status: 200, json: async () => ({ items: [] }) }
+      : { ok: false, status: 404, json: async () => ({}) }) as Response);
+    const { result } = renderWorkflow();
+    await act(async () => {
+      await result.current.restoreCompletedWorkflow('wf-user', '/api/artifacts/del', { ring: delivered, selectedVersionId: 'v-del' });
+    });
+    // The lookup gives up after its retries; the seeded ring must survive it.
+    await act(async () => { await new Promise((r) => setTimeout(r, 2600)); });
+    expect(mockFetch.mock.calls.some(([url]) => String(url).startsWith('/api/cad/models'))).toBe(true);
+    expect(result.current.versionDownloads).toMatchObject({ assetId: 'v-del' });
+  }, 10_000);
+});
+
 describe('useImageToCADWorkflow supervised runs', () => {
   beforeEach(() => {
     checkCredits.mockReset();

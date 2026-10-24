@@ -182,6 +182,24 @@ describe('CadDownloadMenu: files from the version', () => {
     expect(rows).toHaveLength(4);
   });
 
+  it('names the format after the file extension, or LIST when there is none', async () => {
+    render(
+      <CadDownloadMenu
+        onDownloadGlb={noop}
+        versionDownloads={{ assetId: 'v1', downloads: [
+          { kind: 'stones', filename: 'ring-stones.csv', bytes: 1 },
+          { kind: 'casting_stl', filename: 'casting', bytes: 1 },
+        ] }}
+      />,
+    );
+
+    openMenu();
+    await screen.findByText(LABELS.stones);
+    const rows = menuRows();
+    expect(rows).toContain(`CSV${LABELS.stones}`);
+    expect(rows).toContain(`LIST${LABELS.casting_stl}`);
+  });
+
   it("shows one item per kind: the version's STL and STEP replace the run's, the 3DM keeps today's item", async () => {
     const onDownloadStl = vi.fn();
     const onDownloadStep = vi.fn();
