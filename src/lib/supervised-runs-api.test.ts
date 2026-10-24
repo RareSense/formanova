@@ -6,7 +6,7 @@ vi.mock('@/lib/authenticated-fetch', () => ({ authenticatedFetch: mockFetch }));
 import {
   PHASE_ACTIONS, SupervisedRunsApiError, addSupervisedRunNote, failSupervisedRun, getSupervisedRun,
   listSupervisedRuns, rejectSupervisedRun, removeSupervisedUpload, sameNames, sendSupervisedReplacement,
-  sendSupervisedRun, startSupervisedRuns, uploadReplacementFile,
+  sendSupervisedRun, startSupervisedRuns, uploadReplacementFile, isUncertainCheckFailure,
 } from './supervised-runs-api';
 
 const ok = (body: unknown, status = 200) => ({ ok: true, status, json: async () => body });
@@ -158,5 +158,53 @@ describe('uploadReplacementFile', () => {
     const err = await uploadReplacementFile('a', 'glb', file, { put: vi.fn(async () => {}) }).catch((e) => e);
     expect(err.code).toBe('upload_invalid');
     expect(err.detail.reason).toBe('bad_content');
+    expect(isUncertainCheckFailure(err)).toBe(false);
+  });
+
+  it('marks a proxy timeout on complete with its upload id, after one PUT and one complete', async () => {
+    mockFetch
+      .mockResolvedValueOnce(ok({ upload_id: 'u7', upload_url: 'https://blob/x', expires_at: '', headers: {} }))
+      .mockResolvedValueOnce({ ok: false, status: 524, json: async () => { throw new Error('html'); } });
+    const put = vi.fn(async () => {});
+    const err = await uploadReplacementFile('a', 'glb', file, { put }).catch((e) => e);
+    expect(err).toBeInstanceOf(SupervisedRunsApiError);
+    expect(err.status).toBe(524);
+    expect(err.detail.upload_id).toBe('u7');
+    expect(isUncertainCheckFailure(err)).toBe(true);
+    expect(put).toHaveBeenCalledTimes(1);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('turns a network failure on complete into status 0 with the upload id', async () => {
+    mockFetch
+      .mockResolvedValueOnce(ok({ upload_id: 'u8', upload_url: 'https://blob/x', expires_at: '', headers: {} }))
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    const err = await uploadReplacementFile('a', 'glb', file, { put: vi.fn(async () => {}) }).catch((e) => e);
+    expect(err).toBeInstanceOf(SupervisedRunsApiError);
+    expect(err.status).toBe(0);
+    expect(err.detail.upload_id).toBe('u8');
+    expect(isUncertainCheckFailure(err)).toBe(true);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not treat a coded signal_failed, a failed PUT or a failed link as an uncertain check', async () => {
+    mockFetch
+      .mockResolvedValueOnce(ok({ upload_id: 'u9', upload_url: 'https://blob/x', expires_at: '', headers: {} }))
+      .mockResolvedValueOnce(fail(502, { code: 'signal_failed' }));
+    const signal = await uploadReplacementFile('a', 'glb', file, { put: vi.fn(async () => {}) }).catch((e) => e);
+    expect(signal.code).toBe('signal_failed');
+    expect(isUncertainCheckFailure(signal)).toBe(false);
+
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValueOnce(ok({ upload_id: 'u9', upload_url: 'https://blob/x', expires_at: '', headers: {} }));
+    const putErr = await uploadReplacementFile('a', 'glb', file, {
+      put: vi.fn(async () => { throw new SupervisedRunsApiError(0, 'upload_put_failed', {}); }),
+    }).catch((e) => e);
+    expect(isUncertainCheckFailure(putErr)).toBe(false);
+
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValueOnce(fail(503, {}));
+    const linkErr = await uploadReplacementFile('a', 'glb', file, { put: vi.fn() }).catch((e) => e);
+    expect(isUncertainCheckFailure(linkErr)).toBe(false);
   });
 });

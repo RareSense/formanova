@@ -153,6 +153,30 @@ export class SupervisedRunsApiError extends Error {
   }
 }
 
+const STATUS_WORDS: Record<SupervisedPhase, string> = {
+  queued: 'Queued',
+  running: 'Running',
+  finalizing: 'Finishing',
+  errored: 'Errored',
+  awaiting_review: 'Needs review',
+  rejected: 'Rejected',
+  delivered: 'Delivered',
+  failed: 'Failed',
+};
+
+/** A run's status in plain words; the attempt shows once it is a retry, and always on an error. */
+export function supervisedStatusLabel(phase: SupervisedPhase, attempt: number): string {
+  const word = STATUS_WORDS[phase] ?? String(phase).replace(/_/g, ' ');
+  return phase === 'errored' || attempt > 1 ? `${word} (attempt ${attempt})` : word;
+}
+
+/** "Generate" / "Improve" for the two CAD workflows, else the raw workflow name. */
+export function supervisedRunTypeLabel(workflowName: string | null | undefined): string {
+  if (workflowName === 'jewelry_cad_generate') return 'Generate';
+  if (workflowName === 'jewelry_cad_improve') return 'Improve';
+  return workflowName || '-';
+}
+
 /** acknowledge_missing must equal `missing` exactly: same names, no subset, no extras. */
 export function sameNames(a: string[], b: string[]): boolean {
   if (a.length !== b.length) return false;
@@ -269,5 +293,26 @@ export async function uploadReplacementFile(
     'POST', `${run(workflowId)}/uploads`, { role, filename: file.name, bytes: file.size },
   );
   await put(link.upload_url, file, { 'x-ms-blob-type': 'BlockBlob', ...(link.headers ?? {}) }, onProgress);
-  return request('POST', `${run(workflowId)}/uploads/${encodeURIComponent(link.upload_id)}/complete`, {});
+  try {
+    return await request('POST', `${run(workflowId)}/uploads/${encodeURIComponent(link.upload_id)}/complete`, {});
+  } catch (err) {
+    // The check can outlive the proxy (Cloudflare cuts at about 100 s): say which upload it was,
+    // so the caller can wait for it instead of uploading again.
+    if (err instanceof SupervisedRunsApiError) {
+      throw new SupervisedRunsApiError(err.status, err.code, { ...err.detail, upload_id: link.upload_id });
+    }
+    throw new SupervisedRunsApiError(0, 'network_error', { upload_id: link.upload_id });
+  }
+}
+
+/**
+ * True when `complete` failed in a way that says nothing about the check itself: no response
+ * (status 0) or a 5xx other than a coded signal_failed. The check may still pass, so wait for the
+ * upload to show as verified; never PUT or complete again.
+ */
+export function isUncertainCheckFailure(err: unknown): err is SupervisedRunsApiError {
+  if (!(err instanceof SupervisedRunsApiError)) return false;
+  if (typeof err.detail.upload_id !== 'string' || !err.detail.upload_id) return false;
+  if (err.status === 0) return true;
+  return err.status >= 500 && err.code !== 'signal_failed';
 }

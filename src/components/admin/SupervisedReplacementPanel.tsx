@@ -13,6 +13,8 @@ import {
   MAX_SINGLE_PUT_BYTES,
   SupervisedRunsApiError,
   UPLOAD_ROLES,
+  getSupervisedRun,
+  isUncertainCheckFailure,
   removeSupervisedUpload,
   sameNames,
   sendSupervisedReplacement,
@@ -24,6 +26,9 @@ import {
 } from '@/lib/supervised-runs-api';
 
 const JEWELRY_TYPES = ['ring', 'necklace', 'bracelet', 'earring', 'other'];
+// Shown first; the rest sit under "More files" (design contract and reference manifest are usually
+// the missing ones on a generate run, so they stay in view).
+const MAIN_ROLES: UploadRole[] = ['glb', 'threedm', 'code', 'loop_state', 'design_contract', 'reference_manifest'];
 const GLB_HINT = "Must differ from the pipeline's model. An identical GLB saves nothing and the user gets no model; use Send instead.";
 
 export type ActionResult = { accepted: boolean; code?: string };
@@ -47,7 +52,12 @@ interface Props {
   onBusyChange?: (busy: boolean) => void;
 }
 
-type Transfer = { stage: 'uploading' | 'checking'; progress: number };
+// 'waiting': complete failed without an answer (proxy timeout); the page polls for the result.
+type Transfer = { stage: 'uploading' | 'checking' | 'waiting'; progress: number };
+
+const CHECK_POLL_MS = 5000;
+const CHECK_WAIT_MS = 3 * 60 * 1000;
+const CHECK_TIMEOUT_COPY = 'The check is taking long. Refresh in a minute to see if it finished.';
 
 const KiB = 1024;
 const MiB = 1024 * KiB;
@@ -181,7 +191,7 @@ function RoleRow({ spec, upload, downloadUrl, transfer, error, removing, disable
         ) : (
           <p className="flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2 className="h-3 w-3 animate-spin" />
-            Checking...
+            {transfer.stage === 'waiting' ? 'Still checking...' : 'Checking...'}
           </p>
         )
       )}
@@ -199,6 +209,7 @@ export default function SupervisedReplacementPanel({
   const [ticked, setTicked] = useState<string[]>([]);
   const [jewelryType, setJewelryType] = useState('');
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [ownSending, setOwnSending] = useState(false);
   const [ownMessage, setOwnMessage] = useState<string | null>(null);
   // One upload at a time per role; state alone would let a same-tick second pick through.
@@ -268,6 +279,8 @@ export default function SupervisedReplacementPanel({
       return;
     }
     inFlight.current.add(spec.role);
+    // The file this role holds now: once the role shows a different verified upload, it is ours.
+    const previousId = (detail.uploads ?? []).find((u) => u.role === spec.role && isVerified(u))?.upload_id;
     setRole<Transfer>(setTransfers, spec.role, { stage: 'uploading', progress: 0 });
     try {
       await uploadReplacementFile(workflowId, spec.role, file, {
@@ -281,11 +294,41 @@ export default function SupervisedReplacementPanel({
       if (!mounted.current) return;
       onChanged();
     } catch (err) {
-      if (mounted.current) setRole(setErrors, spec.role, uploadErrorCopy(err));
+      if (!mounted.current) return;
+      if (isUncertainCheckFailure(err)) {
+        // The check may still pass behind the proxy timeout: wait for it, never upload again.
+        setRole<Transfer>(setTransfers, spec.role, { stage: 'waiting', progress: 1 });
+        const verifiedNow = await waitForCheck(spec.role, String(err.detail.upload_id), previousId);
+        if (!mounted.current) return;
+        if (verifiedNow) onChanged();
+        else setRole(setErrors, spec.role, CHECK_TIMEOUT_COPY);
+      } else {
+        setRole(setErrors, spec.role, uploadErrorCopy(err));
+      }
     } finally {
       inFlight.current.delete(spec.role);
       if (mounted.current) setRole<Transfer>(setTransfers, spec.role, undefined);
     }
+  }
+
+  /** Poll the run every 5 s for up to 3 minutes until this upload (or a new file in its role) is verified. */
+  async function waitForCheck(role: UploadRole, uploadId: string, previousId: string | undefined): Promise<boolean> {
+    const deadline = Date.now() + CHECK_WAIT_MS;
+    while (Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, CHECK_POLL_MS));
+      if (!mounted.current) return false;
+      try {
+        const fresh = await getSupervisedRun(workflowId);
+        const done = (fresh.uploads ?? []).some((u) => isVerified(u) && (
+          u.upload_id === uploadId || (u.role === role && u.upload_id !== previousId)
+        ));
+        if (done) return true;
+      } catch {
+        // A failed poll says nothing either; try again on the next tick.
+      }
+      if (!mounted.current) return false;
+    }
+    return false;
   }
 
   async function remove(role: UploadRole) {
@@ -340,6 +383,27 @@ export default function SupervisedReplacementPanel({
   }
   const shownMessage = message ?? ownMessage;
 
+  // A role with a file, an upload in flight or an error never hides inside the closed section.
+  const inView = (role: UploadRole) =>
+    MAIN_ROLES.includes(role) || verified.has(role) || Boolean(transfers[role]) || Boolean(removing[role]) || Boolean(errors[role]);
+  const mainRoles = roles.filter((spec) => inView(spec.role));
+  const moreRoles = roles.filter((spec) => !inView(spec.role));
+
+  const renderRow = (spec: UploadRoleSpec) => (
+    <RoleRow
+      key={spec.role}
+      spec={spec}
+      upload={verified.get(spec.role)}
+      downloadUrl={detail.download_urls?.[spec.role]}
+      transfer={transfers[spec.role]}
+      error={errors[spec.role]}
+      removing={Boolean(removing[spec.role])}
+      disabled={actionsLocked}
+      onPick={(file) => void pick(spec, file)}
+      onRemove={() => void remove(spec.role)}
+    />
+  );
+
   return (
     <Card>
       <CardHeader>
@@ -347,21 +411,24 @@ export default function SupervisedReplacementPanel({
       </CardHeader>
       <CardContent className="space-y-6">
         <ul className="space-y-3">
-          {roles.map((spec) => (
-            <RoleRow
-              key={spec.role}
-              spec={spec}
-              upload={verified.get(spec.role)}
-              downloadUrl={detail.download_urls?.[spec.role]}
-              transfer={transfers[spec.role]}
-              error={errors[spec.role]}
-              removing={Boolean(removing[spec.role])}
-              disabled={actionsLocked}
-              onPick={(file) => void pick(spec, file)}
-              onRemove={() => void remove(spec.role)}
-            />
-          ))}
+          {mainRoles.map(renderRow)}
         </ul>
+
+        {moreRoles.length > 0 && (
+          <Collapsible open={moreOpen} onOpenChange={setMoreOpen}>
+            <CollapsibleTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2 px-4">
+                More files
+                <ChevronDown className={`h-4 w-4 transition-transform ${moreOpen ? 'rotate-180' : ''}`} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <ul className="mt-3 space-y-3">
+                {moreRoles.map(renderRow)}
+              </ul>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
 
         <Collapsible open={previewOpen} onOpenChange={setPreviewOpen}>
           <CollapsibleTrigger asChild>

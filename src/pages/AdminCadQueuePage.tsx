@@ -5,7 +5,6 @@ import { AlertTriangle, ExternalLink, Loader2, Play, Search } from 'lucide-react
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import {
   Table,
@@ -20,22 +19,27 @@ import {
   SupervisedRunsApiError,
   listSupervisedRuns,
   startSupervisedRuns,
+  supervisedRunTypeLabel,
+  supervisedStatusLabel,
   type StartResult,
   type SupervisedPhase,
   type SupervisedRunListItem,
 } from '@/lib/supervised-runs-api';
 
 const PAGE_SIZE = 20;
-const ALL_PHASES: SupervisedPhase[] = [
-  'queued', 'running', 'errored', 'awaiting_review', 'rejected', 'finalizing', 'delivered', 'failed',
-];
-const DEFAULT_PHASES: SupervisedPhase[] = ['queued', 'errored', 'awaiting_review'];
 const STARTABLE: SupervisedPhase[] = ['queued', 'errored'];
+
+type TabKey = 'start' | 'running' | 'review' | 'done';
+const TABS: Array<{ key: TabKey; label: string; phases: SupervisedPhase[] }> = [
+  { key: 'start', label: 'To start', phases: ['queued', 'errored'] },
+  { key: 'running', label: 'Running', phases: ['running', 'finalizing'] },
+  { key: 'review', label: 'To review', phases: ['awaiting_review', 'rejected'] },
+  { key: 'done', label: 'Done', phases: ['delivered', 'failed'] },
+];
 
 function formatDateTime(value: string | null): string {
   if (!value) return '-';
   return new Intl.DateTimeFormat(undefined, {
-    year: 'numeric',
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
@@ -43,24 +47,16 @@ function formatDateTime(value: string | null): string {
   }).format(new Date(value));
 }
 
-function phaseLabel(phase: string): string {
-  return phase.replace(/_/g, ' ');
-}
-
-function PhaseBadge({ phase }: { phase: SupervisedPhase }) {
+function StatusBadge({ phase, attempt }: { phase: SupervisedPhase; attempt: number }) {
   const variant =
     phase === 'delivered' ? 'default'
       : phase === 'errored' || phase === 'failed' ? 'destructive'
         : 'secondary';
   return (
-    <Badge variant={variant} className="capitalize whitespace-nowrap">
-      {phaseLabel(phase)}
+    <Badge variant={variant} className="whitespace-nowrap">
+      {supervisedStatusLabel(phase, attempt)}
     </Badge>
   );
-}
-
-function PayingBadge({ isPaying }: { isPaying: boolean }) {
-  return <Badge variant={isPaying ? 'default' : 'outline'}>{isPaying ? 'Paying' : 'Free'}</Badge>;
 }
 
 function NotAuthorizedState() {
@@ -93,19 +89,20 @@ function isRefused(result: StartResult): result is RefusedStart {
   return !result.accepted;
 }
 
-type StartOutcome = { results: StartResult[] } | { error: string };
+/** What the last Start press did: a summary for Start all, or the request's own failure. */
+type StartOutcome = { results: StartResult[]; all: boolean } | { error: string };
+
+function firstLine(text: string): string {
+  return text.split(/\r?\n/, 1)[0];
+}
 
 export default function AdminCadQueuePage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const phaseParams = searchParams.getAll('phase');
-  const phases = useMemo(() => {
-    const picked = ALL_PHASES.filter((phase) => phaseParams.includes(phase));
-    return picked.length > 0 ? picked : DEFAULT_PHASES;
-    // phaseParams is a fresh array each render; its joined value is the real dependency.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phaseParams.join(',')]);
+  const tabParam = searchParams.get('tab');
+  const tab = TABS.find((t) => t.key === tabParam) ?? TABS[0];
+  const phases = tab.phases;
   const search = searchParams.get('search') ?? '';
   const offset = Number(searchParams.get('offset') ?? '0') || 0;
   const trimmedSearch = search.trim();
@@ -133,23 +130,19 @@ export default function AdminCadQueuePage() {
     refetchInterval: 15000,
   });
 
-  const [ticked, setTicked] = useState<Set<string>>(() => new Set());
   const [outcome, setOutcome] = useState<StartOutcome | null>(null);
 
   const items = useMemo(() => query.data?.items ?? [], [query.data]);
-  // Only ticks on visible, still-startable rows count (a refetch can move a run on).
-  const selectedIds = useMemo(
-    () => items
-      .filter((item) => STARTABLE.includes(item.phase) && ticked.has(item.workflow_id))
-      .map((item) => item.workflow_id),
-    [items, ticked],
+  // Only rows still startable on screen count (a refetch can move a run on).
+  const startableIds = useMemo(
+    () => items.filter((item) => STARTABLE.includes(item.phase)).map((item) => item.workflow_id),
+    [items],
   );
 
   const start = useMutation({
-    mutationFn: (ids: string[]) => startSupervisedRuns(ids),
-    onSuccess: (results) => {
-      setOutcome({ results });
-      setTicked(new Set());
+    mutationFn: ({ ids }: { ids: string[]; all: boolean }) => startSupervisedRuns(ids),
+    onSuccess: (results, { all }) => {
+      setOutcome({ results, all });
       void query.refetch();
     },
     onError: (error) => {
@@ -157,19 +150,27 @@ export default function AdminCadQueuePage() {
     },
   });
 
+  // Each run's own result line: "Started." or the code it was refused with.
+  const rowResults = useMemo(() => {
+    const map = new Map<string, string>();
+    if (outcome && 'results' in outcome) {
+      for (const r of outcome.results) map.set(r.workflow_id, isRefused(r) ? r.code : 'Started.');
+    }
+    return map;
+  }, [outcome]);
+
   const total = query.data?.total ?? 0;
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const error = query.error instanceof SupervisedRunsApiError ? query.error : null;
 
-  // Ticks and the Start outcome belong to the list that was on screen; drop them when it changes.
-  function resetSelection() {
-    setTicked(new Set());
+  // The Start results belong to the list that was on screen; drop them when it changes.
+  function resetOutcome() {
     setOutcome(null);
   }
 
   function updateParam(key: string, value: string) {
-    resetSelection();
+    resetOutcome();
     const next = new URLSearchParams(searchParams);
     if (value) next.set(key, value);
     else next.delete(key);
@@ -177,22 +178,19 @@ export default function AdminCadQueuePage() {
     setSearchParams(next);
   }
 
-  function togglePhase(phase: SupervisedPhase) {
-    const nextPhases = phases.includes(phase)
-      ? phases.filter((p) => p !== phase)
-      : ALL_PHASES.filter((p) => p === phase || phases.includes(p));
-    // At least one phase stays on; an empty set would silently snap back to the default.
-    if (nextPhases.length === 0) return;
-    resetSelection();
+  function selectTab(key: TabKey) {
+    if (key === tab.key) return;
+    resetOutcome();
     const next = new URLSearchParams(searchParams);
     next.delete('phase');
-    for (const p of nextPhases) next.append('phase', p);
+    if (key === 'start') next.delete('tab');
+    else next.set('tab', key);
     next.delete('offset');
     setSearchParams(next);
   }
 
   function setPage(page: number) {
-    resetSelection();
+    resetOutcome();
     const next = new URLSearchParams(searchParams);
     const nextOffset = Math.max(0, (page - 1) * PAGE_SIZE);
     if (nextOffset === 0) next.delete('offset');
@@ -200,25 +198,14 @@ export default function AdminCadQueuePage() {
     setSearchParams(next);
   }
 
-  function toggleTick(id: string, checked: boolean) {
-    setTicked((prev) => {
-      const next = new Set(prev);
-      if (checked) next.add(id);
-      else next.delete(id);
-      return next;
-    });
-  }
-
   function openDetail(item: SupervisedRunListItem) {
     const qs = searchParams.toString();
     navigate(`/admin/cad-queue/${encodeURIComponent(item.workflow_id)}${qs ? `?${qs}` : ''}`);
   }
 
-  const hasFilters = searchParams.has('phase') || Boolean(search);
-
   return (
     <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 sm:py-8">
-      <div className="mb-3 flex flex-wrap gap-2">
+      <div className="mb-4 flex flex-wrap gap-2">
         <div className="relative w-full shrink-0 sm:w-64">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -230,64 +217,57 @@ export default function AdminCadQueuePage() {
           />
         </div>
 
-        {hasFilters && (
-          <Button variant="outline" size="sm" className="h-9" onClick={() => { resetSelection(); setSearchParams({}); }}>
+        {search && (
+          <Button variant="outline" size="sm" className="h-9 px-4" onClick={() => updateParam('search', '')}>
             Clear
           </Button>
         )}
       </div>
 
-      <div className="mb-5 flex flex-wrap gap-2" role="group" aria-label="Phases">
-        {ALL_PHASES.map((phase) => {
-          const pressed = phases.includes(phase);
+      <div className="mb-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap" role="tablist" aria-label="Runs">
+        {TABS.map((t) => {
+          const selected = t.key === tab.key;
           return (
             <Button
-              key={phase}
+              key={t.key}
               type="button"
-              size="sm"
-              variant={pressed ? 'default' : 'outline'}
-              aria-pressed={pressed}
-              className="h-8 capitalize"
-              onClick={() => togglePhase(phase)}
+              role="tab"
+              aria-selected={selected}
+              variant={selected ? 'default' : 'outline'}
+              className="h-9 w-full px-4 sm:w-36"
+              onClick={() => selectTab(t.key)}
             >
-              {phaseLabel(phase)}
+              {t.label}{selected && query.data ? ` (${total})` : ''}
             </Button>
           );
         })}
       </div>
 
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="min-w-0 flex-1 text-sm" aria-live="polite">
-          {outcome && 'error' in outcome && (
-            <p className="break-words text-destructive">Start failed: {outcome.error}</p>
-          )}
-          {outcome && 'results' in outcome && (
-            <div className="space-y-1">
+      {(tab.key === 'start' || outcome) && (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0 flex-1 text-sm" aria-live="polite">
+            {outcome && 'error' in outcome && (
+              <p className="break-words text-destructive">Start failed: {outcome.error}</p>
+            )}
+            {outcome && 'results' in outcome && outcome.all && (
               <p>Started {outcome.results.filter((r) => r.accepted).length}.</p>
-              {outcome.results.some((r) => !r.accepted) && (
-                <ul className="space-y-0.5">
-                  {outcome.results.filter(isRefused).map((r) => (
-                    <li key={r.workflow_id} className="break-all font-mono text-xs text-muted-foreground">
-                      {r.workflow_id}: {r.code}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+            )}
+          </div>
+          {tab.key === 'start' && (
+            <Button
+              size="sm"
+              className="h-9 gap-1.5 px-4"
+              disabled={startableIds.length === 0 || start.isPending}
+              onClick={() => start.mutate({ ids: startableIds, all: true })}
+            >
+              {start.isPending
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                : <Play className="h-3.5 w-3.5" />}
+              Start all ({startableIds.length})
+            </Button>
           )}
         </div>
-        <Button
-          size="sm"
-          className="h-9 gap-1.5 px-4"
-          disabled={selectedIds.length === 0 || start.isPending}
-          onClick={() => start.mutate(selectedIds)}
-        >
-          {start.isPending
-            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            : <Play className="h-3.5 w-3.5" />}
-          Start selected ({selectedIds.length})
-        </Button>
-      </div>
+      )}
 
       {query.data && query.error && (
         <p className="mb-3 border border-border bg-muted px-3 py-2 text-sm text-muted-foreground" role="status">
@@ -314,7 +294,7 @@ export default function AdminCadQueuePage() {
       ) : items.length === 0 ? (
         <div className="border border-border bg-card">
           <div className="flex flex-col items-center justify-center gap-4 py-16">
-            <p className="text-sm text-muted-foreground">No runs in these phases.</p>
+            <p className="text-sm text-muted-foreground">Nothing here.</p>
             {offset > 0 && (
               <Button variant="outline" size="sm" className="h-9 px-4" onClick={() => setPage(1)}>
                 Back to first page
@@ -328,67 +308,71 @@ export default function AdminCadQueuePage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-10"><span className="sr-only">Select</span></TableHead>
-                  <TableHead className="font-mono text-[10px] uppercase tracking-widest">Created</TableHead>
+                  <TableHead className="font-mono text-[10px] uppercase tracking-widest">When</TableHead>
                   <TableHead className="font-mono text-[10px] uppercase tracking-widest">User</TableHead>
-                  <TableHead className="font-mono text-[10px] uppercase tracking-widest">Workflow</TableHead>
-                  <TableHead className="font-mono text-[10px] uppercase tracking-widest">Phase</TableHead>
-                  <TableHead className="font-mono text-[10px] uppercase tracking-widest">Attempt</TableHead>
-                  <TableHead className="font-mono text-[10px] uppercase tracking-widest">Last Error</TableHead>
-                  <TableHead className="font-mono text-[10px] uppercase tracking-widest">Notes</TableHead>
-                  <TableHead className="font-mono text-[10px] uppercase tracking-widest">Paying</TableHead>
-                  <TableHead className="font-mono text-[10px] uppercase tracking-widest text-right">Open</TableHead>
+                  <TableHead className="font-mono text-[10px] uppercase tracking-widest">Type</TableHead>
+                  <TableHead className="font-mono text-[10px] uppercase tracking-widest">Status</TableHead>
+                  <TableHead className="text-right"><span className="sr-only">Action</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {items.map((item) => {
                   const startable = STARTABLE.includes(item.phase);
+                  const result = rowResults.get(item.workflow_id);
                   return (
                     <TableRow
                       key={item.workflow_id}
                       className="cursor-pointer"
                       onClick={() => openDetail(item)}
                     >
-                      <TableCell onClick={(event) => event.stopPropagation()}>
-                        <Checkbox
-                          aria-label={`Select ${item.workflow_id}`}
-                          disabled={!startable}
-                          checked={startable && ticked.has(item.workflow_id)}
-                          onCheckedChange={(checked) => toggleTick(item.workflow_id, checked === true)}
-                        />
-                      </TableCell>
                       <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">
                         {formatDateTime(item.created_at)}
                       </TableCell>
-                      <TableCell className="max-w-[220px] truncate text-sm">{item.user_email || '-'}</TableCell>
-                      <TableCell className="max-w-[240px] truncate text-sm">
-                        {item.workflow_name || item.workflow_id}
+                      <TableCell className="max-w-[220px] truncate text-sm" title={item.user_email || undefined}>
+                        {item.user_email || '-'}
                       </TableCell>
-                      <TableCell><PhaseBadge phase={item.phase} /></TableCell>
-                      <TableCell className="font-mono text-xs">{item.attempt}</TableCell>
-                      <TableCell className="max-w-[260px] text-sm">
-                        {item.last_error ? (
-                          <span className="block truncate text-muted-foreground" title={item.last_error}>
-                            {item.last_error}
+                      <TableCell className="max-w-[160px] truncate text-sm">
+                        {supervisedRunTypeLabel(item.workflow_name)}
+                      </TableCell>
+                      <TableCell className="max-w-[260px]">
+                        <StatusBadge phase={item.phase} attempt={item.attempt} />
+                        {item.phase === 'errored' && item.last_error && (
+                          <span className="mt-1 block truncate text-xs text-muted-foreground" title={item.last_error}>
+                            {firstLine(item.last_error)}
                           </span>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
                         )}
                       </TableCell>
-                      <TableCell className="font-mono text-xs">{item.note_count}</TableCell>
-                      <TableCell><PayingBadge isPaying={item.is_paying} /></TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          className="gap-1.5"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            openDetail(item);
-                          }}
-                        >
-                          Open
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </Button>
+                      <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
+                        <div className="flex flex-col items-end gap-1">
+                          {startable ? (
+                            <Button
+                              size="sm"
+                              className="h-8 w-24 gap-1.5 px-4"
+                              disabled={start.isPending}
+                              onClick={() => start.mutate({ ids: [item.workflow_id], all: false })}
+                            >
+                              <Play className="h-3.5 w-3.5" />
+                              Start
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 w-24 gap-1.5 px-4"
+                              onClick={() => openDetail(item)}
+                            >
+                              Open
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          {result && (
+                            <span
+                              className={`max-w-[160px] break-all text-xs ${result === 'Started.' ? 'text-muted-foreground' : 'font-mono text-destructive'}`}
+                            >
+                              {result}
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );

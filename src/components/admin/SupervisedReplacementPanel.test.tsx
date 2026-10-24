@@ -1,10 +1,11 @@
-import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach, beforeAll, beforeEach } from 'vitest';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 const api = vi.hoisted(() => ({
   uploadReplacementFile: vi.fn(),
   removeSupervisedUpload: vi.fn(),
   sendSupervisedReplacement: vi.fn(),
+  getSupervisedRun: vi.fn(),
 }));
 vi.mock('@/lib/supervised-runs-api', async (orig) => ({ ...(await orig<object>()), ...api }));
 
@@ -53,6 +54,10 @@ function pick(label: string, file: File) {
   fireEvent.change(screen.getByLabelText(`${label} file`), { target: { files: [file] } });
 }
 
+function openMoreFiles() {
+  fireEvent.click(screen.getByRole('button', { name: 'More files' }));
+}
+
 beforeAll(() => {
   // Radix Select needs these in jsdom.
   const proto = window.HTMLElement.prototype as unknown as Record<string, unknown>;
@@ -74,18 +79,57 @@ describe('SupervisedReplacementPanel', () => {
     const { unmount } = render(
       <SupervisedReplacementPanel detail={detail()} workflowId="wf-1" onChanged={vi.fn()} />,
     );
+    openMoreFiles();
     for (const label of labels) expect(screen.getByText(label)).toBeTruthy();
     expect(screen.getByText(GLB_HINT)).toBeTruthy();
     unmount();
 
     renderPanel(detail({}, 'jewelry_cad_improve'));
+    openMoreFiles();
     expect(screen.queryByText('Design contract')).toBeNull();
     expect(screen.queryByText('Reference manifest')).toBeNull();
     expect(screen.getByText('Full model STL')).toBeTruthy();
   });
 
+  it('shows the main files first and folds the rest under More files', () => {
+    renderPanel(detail());
+    for (const label of ['GLB model', 'Rhino 3DM', 'CAD code', 'Loop state', 'Design contract', 'Reference manifest']) {
+      expect(screen.getByText(label)).toBeTruthy();
+    }
+    const more = screen.getByRole('button', { name: 'More files' });
+    expect(more.getAttribute('aria-expanded')).toBe('false');
+    for (const label of ['Viewer 3DM (mesh only)', 'Thumbnail', 'Full model STL', 'Full model STEP', 'Casting STL', 'Stone list']) {
+      expect(screen.queryByText(label)).toBeNull();
+    }
+    fireEvent.click(more);
+    expect(screen.getByText('Casting STL')).toBeTruthy();
+    expect(screen.getByLabelText('Casting STL file')).toBeTruthy();
+  });
+
+  it('keeps a role that already has an upload in view while More files is closed', () => {
+    renderPanel(detail({
+      uploads: [{
+        upload_id: 'u2',
+        role: 'casting_stl',
+        filename: 'casting.stl',
+        status: 'verified',
+        bytes: 4096,
+        sha256: null,
+        uploaded_by_email: 'a@b.c',
+        created_at: '2026-10-24T10:00:00Z',
+        verified_at: '2026-10-24T10:01:00Z',
+      }],
+    }));
+    expect(screen.getByRole('button', { name: 'More files' }).getAttribute('aria-expanded')).toBe('false');
+    expect(screen.getByText('Casting STL')).toBeTruthy();
+    expect(screen.getByText('casting.stl')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Remove' })).toBeTruthy();
+    expect(screen.queryByText('Stone list')).toBeNull();
+  });
+
   it('refuses a file over 256 MB before any request', () => {
     renderPanel(detail());
+    openMoreFiles();
     pick('Full model STL', sizedFile('big.stl', 300_000_000));
     expect(screen.getByText("Files over 256 MB aren't supported yet.")).toBeTruthy();
     expect(api.uploadReplacementFile).not.toHaveBeenCalled();
@@ -202,6 +246,100 @@ describe('SupervisedReplacementPanel', () => {
     renderPanel(detail({ replacement_check: { has_model: false, missing: [], final_preview: {} } }));
     expect(screen.getByText('Upload the GLB first.')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Send replacement' }).hasAttribute('disabled')).toBe(true);
+  });
+
+  describe('a check that outlasts the proxy', () => {
+    const TIMEOUT_COPY = 'The check is taking long. Refresh in a minute to see if it finished.';
+    const proxyTimeout = () => new SupervisedRunsApiError(524, 'http_524', { upload_id: 'u9' });
+    const verifiedGlb = (uploadId: string) => detail({
+      uploads: [{
+        upload_id: uploadId,
+        role: 'glb',
+        filename: 'ring.glb',
+        status: 'verified',
+        bytes: 1000,
+        sha256: null,
+        uploaded_by_email: 'a@b.c',
+        created_at: '2026-10-24T10:00:00Z',
+        verified_at: '2026-10-24T10:01:00Z',
+      }],
+    });
+
+    afterEach(() => { vi.useRealTimers(); });
+
+    it('keeps checking after a 524 and succeeds once the upload shows as verified', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      api.uploadReplacementFile.mockRejectedValue(proxyTimeout());
+      api.getSupervisedRun
+        .mockResolvedValueOnce(detail())
+        .mockResolvedValue(verifiedGlb('u9'));
+      const onBusy = vi.fn();
+      const onChanged = vi.fn();
+      render(<SupervisedReplacementPanel detail={detail()} workflowId="wf-1" onChanged={onChanged} onBusyChange={onBusy} />);
+      pick('GLB model', sizedFile('ring.glb', 1000));
+      expect(await screen.findByText('Still checking...')).toBeTruthy();
+      expect(onBusy).toHaveBeenLastCalledWith(true);
+      expect(onChanged).not.toHaveBeenCalled();
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+      expect(api.getSupervisedRun).toHaveBeenCalledWith('wf-1');
+      expect(onChanged).not.toHaveBeenCalled();
+      await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+      await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
+      expect(screen.queryByText('Still checking...')).toBeNull();
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(onBusy).toHaveBeenLastCalledWith(false);
+      expect(api.uploadReplacementFile).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not take an older verified file of the same role for the new one', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      api.uploadReplacementFile.mockRejectedValue(proxyTimeout());
+      api.getSupervisedRun.mockResolvedValue(verifiedGlb('u-old'));
+      const onChanged = vi.fn();
+      render(<SupervisedReplacementPanel detail={verifiedGlb('u-old')} workflowId="wf-1" onChanged={onChanged} />);
+      pick('GLB model', sizedFile('ring.glb', 1000));
+      expect(await screen.findByText('Still checking...')).toBeTruthy();
+      await act(async () => { await vi.advanceTimersByTimeAsync(15000); });
+      expect(onChanged).not.toHaveBeenCalled();
+      expect(screen.getByText('Still checking...')).toBeTruthy();
+    });
+
+    it('gives up after 3 minutes with a refresh hint and releases the busy state', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      api.uploadReplacementFile.mockRejectedValue(new SupervisedRunsApiError(0, 'network_error', { upload_id: 'u9' }));
+      api.getSupervisedRun.mockResolvedValue(detail());
+      const onBusy = vi.fn();
+      const onChanged = vi.fn();
+      render(<SupervisedReplacementPanel detail={detail()} workflowId="wf-1" onChanged={onChanged} onBusyChange={onBusy} />);
+      pick('GLB model', sizedFile('ring.glb', 1000));
+      expect(await screen.findByText('Still checking...')).toBeTruthy();
+      await act(async () => { await vi.advanceTimersByTimeAsync(170_000); });
+      expect(screen.queryByText(TIMEOUT_COPY)).toBeNull();
+      expect(onBusy).toHaveBeenLastCalledWith(true);
+      await act(async () => { await vi.advanceTimersByTimeAsync(11_000); });
+      expect(await screen.findByText(TIMEOUT_COPY)).toBeTruthy();
+      expect(screen.queryByText('Still checking...')).toBeNull();
+      expect(onBusy).toHaveBeenLastCalledWith(false);
+      expect(onChanged).not.toHaveBeenCalled();
+      expect(api.uploadReplacementFile).toHaveBeenCalledTimes(1);
+      const polls = api.getSupervisedRun.mock.calls.length;
+      await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+      expect(api.getSupervisedRun.mock.calls.length).toBe(polls);
+    });
+
+    it('shows a coded upload_invalid at once, without polling', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      api.uploadReplacementFile.mockRejectedValue(
+        new SupervisedRunsApiError(422, 'upload_invalid', { code: 'upload_invalid', reason: 'bad_signature', upload_id: 'u9' }),
+      );
+      renderPanel(detail());
+      pick('GLB model', sizedFile('ring.glb', 1000));
+      expect(await screen.findByText('Refused: bad_signature. Upload it again.')).toBeTruthy();
+      expect(screen.queryByText('Still checking...')).toBeNull();
+      await act(async () => { await vi.advanceTimersByTimeAsync(15000); });
+      expect(api.getSupervisedRun).not.toHaveBeenCalled();
+    });
   });
 
   it('shows a verified upload with a Remove button', async () => {
