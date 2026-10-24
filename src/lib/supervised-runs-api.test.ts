@@ -38,6 +38,20 @@ describe('supervised runs client', () => {
     expect(r[1]).toEqual({ workflow_id: 'b', accepted: false, code: 'invalid_phase' });
   });
 
+  it('sends only the tiers given when starting', async () => {
+    mockFetch.mockResolvedValue(ok({ results: [] }));
+    await startSupervisedRuns(['a']);
+    expect(JSON.parse(call(0).init.body)).toEqual({ workflow_ids: ['a'] });
+    await startSupervisedRuns(['a'], { llm_tier: 'x_tier' });
+    expect(JSON.parse(call(1).init.body)).toEqual({ workflow_ids: ['a'], llm_tier: 'x_tier' });
+    await startSupervisedRuns(['a'], { analysis_tier: 'y_tier' });
+    expect(JSON.parse(call(2).init.body)).toEqual({ workflow_ids: ['a'], analysis_tier: 'y_tier' });
+    await startSupervisedRuns(['a'], { llm_tier: 'x_tier', analysis_tier: 'y_tier' });
+    expect(JSON.parse(call(3).init.body)).toEqual({ workflow_ids: ['a'], llm_tier: 'x_tier', analysis_tier: 'y_tier' });
+    await startSupervisedRuns(['a'], {});
+    expect(JSON.parse(call(4).init.body)).toEqual({ workflow_ids: ['a'] });
+  });
+
   it('returns no start results for a null body', async () => {
     mockFetch.mockResolvedValue(ok(null));
     await expect(startSupervisedRuns(['a'])).resolves.toEqual([]);

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -90,6 +90,24 @@ const GUIDANCE: Record<SupervisedPhase, string> = {
   delivered: 'Delivered to the user.',
   failed: 'Failed. The user was refunded.',
 };
+
+beforeAll(() => {
+  // Radix Select needs these in jsdom.
+  const proto = window.HTMLElement.prototype as unknown as Record<string, unknown>;
+  proto.hasPointerCapture ??= () => false;
+  proto.releasePointerCapture ??= () => undefined;
+  proto.scrollIntoView ??= () => undefined;
+});
+
+function withTiers(phase: SupervisedPhase, tiers: { llm_tier: string | null; analysis_tier: string | null }) {
+  const base = detail(phase);
+  return { ...base, supervision: { ...base.supervision, tiers } };
+}
+
+async function choose(label: string, optionName: string) {
+  fireEvent.keyDown(screen.getByRole('combobox', { name: label }), { key: 'Enter' });
+  fireEvent.click(await screen.findByRole('option', { name: optionName }));
+}
 
 beforeEach(() => {
   vi.useRealTimers();
@@ -542,6 +560,73 @@ describe('AdminCadQueueDetailPage', () => {
       renderPage();
       fireEvent.click(await screen.findByRole('button', { name: 'Download 3DM' }));
       expect(await screen.findByText("Couldn't download the 3DM.")).toBeTruthy();
+    });
+  });
+
+  describe('AI pickers', () => {
+    it('defaults each picker from supervision.tiers, and to Default when null', async () => {
+      api.getSupervisedRun.mockResolvedValue(withTiers('queued', { llm_tier: 'gpt_6_astra_openai', analysis_tier: null }));
+      renderPage();
+      await loaded();
+      expect(screen.getByRole('combobox', { name: 'Build AI' }).textContent).toContain('GPT-6 Astra');
+      expect(screen.getByRole('combobox', { name: 'Review AI' }).textContent).toContain('Default');
+      expect(screen.getByText("Applies to this run's Start and later restarts.")).toBeTruthy();
+    });
+
+    it('shows the pickers for an errored run but not for other phases', async () => {
+      api.getSupervisedRun.mockResolvedValue(withTiers('errored', { llm_tier: null, analysis_tier: null }));
+      const first = renderPage();
+      await loaded();
+      expect(screen.getByRole('combobox', { name: 'Build AI' })).toBeTruthy();
+      first.unmount();
+      api.getSupervisedRun.mockResolvedValue(withTiers('awaiting_review', { llm_tier: null, analysis_tier: null }));
+      renderPage();
+      await loaded();
+      expect(screen.queryByRole('combobox', { name: 'Build AI' })).toBeNull();
+    });
+
+    it('sends only the changed tier when Start is pressed', async () => {
+      api.getSupervisedRun.mockResolvedValue(withTiers('queued', { llm_tier: null, analysis_tier: 'gpt_6_astra_openai' }));
+      api.startSupervisedRuns.mockResolvedValue([{ workflow_id: 'wf-1', accepted: true }]);
+      renderPage();
+      await loaded();
+      await choose('Build AI', 'GPT-6 Astra Pro');
+      fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+      await waitFor(() => expect(api.startSupervisedRuns).toHaveBeenCalledTimes(1));
+      expect(api.startSupervisedRuns).toHaveBeenCalledWith(['wf-1'], { llm_tier: 'gpt_6_astra_pro_openrouter' });
+    });
+
+    it('sends no tiers when the pickers are untouched', async () => {
+      api.getSupervisedRun.mockResolvedValue(withTiers('queued', { llm_tier: 'gpt_6_astra_openai', analysis_tier: null }));
+      api.startSupervisedRuns.mockResolvedValue([{ workflow_id: 'wf-1', accepted: true }]);
+      renderPage();
+      await loaded();
+      fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+      await waitFor(() => expect(api.startSupervisedRuns).toHaveBeenCalledTimes(1));
+      expect(api.startSupervisedRuns.mock.calls[0]).toEqual([['wf-1']]);
+    });
+
+    it('offers Default only while the run is on the default, since it cannot be sent', async () => {
+      api.getSupervisedRun.mockResolvedValue(withTiers('queued', { llm_tier: 'gpt_6_astra_openai', analysis_tier: null }));
+      renderPage();
+      await loaded();
+      fireEvent.keyDown(screen.getByRole('combobox', { name: 'Build AI' }), { key: 'Enter' });
+      await screen.findAllByRole('option');
+      expect(screen.queryByRole('option', { name: 'Default' })).toBeNull();
+      fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+      fireEvent.keyDown(screen.getByRole('combobox', { name: 'Review AI' }), { key: 'Enter' });
+      expect(await screen.findByRole('option', { name: 'Default' })).toBeTruthy();
+    });
+
+    it('shows an unknown current value as its own option and keeps it', async () => {
+      api.getSupervisedRun.mockResolvedValue(withTiers('queued', { llm_tier: 'mystery_tier_9', analysis_tier: null }));
+      api.startSupervisedRuns.mockResolvedValue([{ workflow_id: 'wf-1', accepted: true }]);
+      renderPage();
+      await loaded();
+      expect(screen.getByRole('combobox', { name: 'Build AI' }).textContent).toContain('mystery_tier_9');
+      fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+      await waitFor(() => expect(api.startSupervisedRuns).toHaveBeenCalledTimes(1));
+      expect(api.startSupervisedRuns.mock.calls[0]).toEqual([['wf-1']]);
     });
   });
 });

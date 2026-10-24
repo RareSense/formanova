@@ -83,6 +83,8 @@ export interface SupervisedRunDetail {
     acknowledged_missing: string[] | null;
     delivery: unknown;
     events: Array<Record<string, unknown>>;
+    /** The AI each step uses now; null is the CAD toolkit's default. */
+    tiers?: { llm_tier: string | null; analysis_tier: string | null };
   };
   send_check: {
     has_model: boolean;
@@ -226,8 +228,17 @@ export function getSupervisedRun(workflowId: string): Promise<SupervisedRunDetai
   return request('GET', run(workflowId));
 }
 
-export async function startSupervisedRuns(workflowIds: string[]): Promise<StartResult[]> {
-  const data = await request<{ results: StartResult[] } | null>('POST', '/start', { workflow_ids: workflowIds });
+/** The AI that builds the model and the AI that reviews it; one left out keeps the run's own. */
+export interface StartTiers {
+  llm_tier?: string;
+  analysis_tier?: string;
+}
+
+export async function startSupervisedRuns(workflowIds: string[], tiers?: StartTiers): Promise<StartResult[]> {
+  const body: Record<string, unknown> = { workflow_ids: workflowIds };
+  if (tiers?.llm_tier) body.llm_tier = tiers.llm_tier;
+  if (tiers?.analysis_tier) body.analysis_tier = tiers.analysis_tier;
+  const data = await request<{ results: StartResult[] } | null>('POST', '/start', body);
   return data?.results ?? [];
 }
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
@@ -26,6 +26,19 @@ function renderPage(path = '/admin/cad-queue') {
 /** The table row that shows this run (found by its user email). */
 function rowOf(id: string): HTMLElement {
   return screen.getByText(`${id}@x.com`).closest('tr') as HTMLElement;
+}
+
+beforeAll(() => {
+  // Radix Select needs these in jsdom.
+  const proto = window.HTMLElement.prototype as unknown as Record<string, unknown>;
+  proto.hasPointerCapture ??= () => false;
+  proto.releasePointerCapture ??= () => undefined;
+  proto.scrollIntoView ??= () => undefined;
+});
+
+async function chooseAi(optionName: string) {
+  fireEvent.keyDown(screen.getByRole('combobox', { name: 'AI for these' }), { key: 'Enter' });
+  fireEvent.click(await screen.findByRole('option', { name: optionName }));
 }
 
 beforeEach(() => {
@@ -189,5 +202,34 @@ describe('AdminCadQueuePage', () => {
     await waitFor(() => expect(api.listSupervisedRuns.mock.calls[0][0].offset).toBe(20));
     fireEvent.click(await screen.findByRole('button', { name: 'Back to first page' }));
     await waitFor(() => expect(api.listSupervisedRuns.mock.calls.at(-1)![0].offset).toBe(0));
+  });
+
+  it("starts without tiers when AI for these is left on Each run's own", async () => {
+    api.listSupervisedRuns.mockResolvedValue({ items: [row('wf-a', 'queued')], total: 1, limit: 20, offset: 0 });
+    api.startSupervisedRuns.mockResolvedValue([{ workflow_id: 'wf-a', accepted: true }]);
+    renderPage();
+    await screen.findByText('wf-a@x.com');
+    expect(screen.getByRole('combobox', { name: 'AI for these' }).textContent).toContain("Each run's own");
+    fireEvent.click(screen.getByRole('button', { name: /Start all/ }));
+    await waitFor(() => expect(api.startSupervisedRuns).toHaveBeenCalledTimes(1));
+    expect(api.startSupervisedRuns.mock.calls[0]).toEqual([['wf-a']]);
+    fireEvent.click(within(rowOf('wf-a')).getByRole('button', { name: 'Start' }));
+    await waitFor(() => expect(api.startSupervisedRuns).toHaveBeenCalledTimes(2));
+    expect(api.startSupervisedRuns.mock.calls[1]).toEqual([['wf-a']]);
+  });
+
+  it('sends a chosen tier as both fields for Start all and a row Start', async () => {
+    api.listSupervisedRuns.mockResolvedValue({ items: [row('wf-a', 'queued'), row('wf-b', 'errored')], total: 2, limit: 20, offset: 0 });
+    api.startSupervisedRuns.mockResolvedValue([]);
+    renderPage();
+    await screen.findByText('wf-a@x.com');
+    await chooseAi('GPT-6 Astra Pro');
+    const tiers = { llm_tier: 'gpt_6_astra_pro_openrouter', analysis_tier: 'gpt_6_astra_pro_openrouter' };
+    fireEvent.click(screen.getByRole('button', { name: /Start all/ }));
+    await waitFor(() => expect(api.startSupervisedRuns).toHaveBeenCalledTimes(1));
+    expect(api.startSupervisedRuns.mock.calls[0]).toEqual([['wf-a', 'wf-b'], tiers]);
+    fireEvent.click(within(rowOf('wf-b')).getByRole('button', { name: 'Start' }));
+    await waitFor(() => expect(api.startSupervisedRuns).toHaveBeenCalledTimes(2));
+    expect(api.startSupervisedRuns.mock.calls[1]).toEqual([['wf-b'], tiers]);
   });
 });
