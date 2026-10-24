@@ -36,6 +36,7 @@ beforeEach(() => {
     threedm_url: '/fresh/manufacturing-3dm',
     azure_source: null,
     not_all_solid: false,
+    pending: false,
   });
 });
 

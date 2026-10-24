@@ -6,6 +6,7 @@
  */
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { azureUriToUrl } from '@/lib/azure-utils';
+import { fetchCadRings } from '@/lib/cad-versions-api';
 import { parseRingCadResult } from '@/lib/ring-cad-nurbs-api';
 
 const __DEV__ = import.meta.env.DEV;
@@ -45,6 +46,11 @@ export async function fetchCadResult(
    * old run shows an alarm nobody can act on.
    */
   not_all_solid: boolean;
+  /**
+   * True when /result answered 409: a supervised run waiting in the queue or
+   * for review. It is still running, not failed, and can stay so for hours.
+   */
+  pending: boolean;
 }> {
   function extractArtifactUri(results: Record<string, unknown>, nodeKey: string, artifactKey: string): string | null {
     const node = results[nodeKey];
@@ -65,7 +71,8 @@ export async function fetchCadResult(
     const res = await authenticatedFetch(
       `/api/result/${workflowId}`,
     );
-    if (!res.ok) return { glb_url: null, threedm_url: null, azure_source: null, not_all_solid: false };
+    if (res.status === 409) return { glb_url: null, threedm_url: null, azure_source: null, not_all_solid: false, pending: true };
+    if (!res.ok) return { glb_url: null, threedm_url: null, azure_source: null, not_all_solid: false, pending: false };
 
     const data = await res.json() as Record<string, unknown>;
 
@@ -85,8 +92,17 @@ export async function fetchCadResult(
           threedm_url: flat.threedmArtifact?.url ?? null,
           azure_source: flat.sourceStage,
           not_all_solid: flat.notAllSolid,
+          pending: false,
         };
       } catch {
+        // No model in the body. A delivered hand-made replacement answers
+        // {"supervised_delivery": [...]}; its model is in the vault instead.
+        if (!isExplicitCadFailure(data)) {
+          const vault = await findVaultModelForWorkflow(workflowId, outputAssetIdOf(data));
+          if (vault) {
+            return { glb_url: vault.glbUrl, threedm_url: vault.threedmUrl, azure_source: 'cad_models', not_all_solid: false, pending: false };
+          }
+        }
         // Not a ring_cad_nurbs_v1 result — fall through to the legacy nested shape.
       }
     }
@@ -95,13 +111,13 @@ export async function fetchCadResult(
     const finalUri = extractArtifactUri(data, 'success_final', 'glb_artifact')
       || extractArtifactUri(data, 'success_final', 'original_glb_artifact');
     if (finalUri) {
-      return { glb_url: resolveUrl(finalUri), threedm_url: null, azure_source: 'success_final', not_all_solid: false };
+      return { glb_url: resolveUrl(finalUri), threedm_url: null, azure_source: 'success_final', not_all_solid: false, pending: false };
     }
 
     // 2. success_original_glb: use original_glb_artifact only
     const originalUri = extractArtifactUri(data, 'success_original_glb', 'original_glb_artifact');
     if (originalUri) {
-      return { glb_url: resolveUrl(originalUri), threedm_url: null, azure_source: 'success_original_glb', not_all_solid: false };
+      return { glb_url: resolveUrl(originalUri), threedm_url: null, azure_source: 'success_original_glb', not_all_solid: false, pending: false };
     }
 
     // 3. failed_final: only build_initial is allowed as fallback
@@ -110,9 +126,9 @@ export async function fetchCadResult(
       const failedInitialUri = extractArtifactUri(data, 'build_initial', 'glb_artifact')
         || extractArtifactUri(data, 'build_initial', 'original_glb_artifact');
       if (failedInitialUri) {
-        return { glb_url: resolveUrl(failedInitialUri), threedm_url: null, azure_source: 'build_initial', not_all_solid: false };
+        return { glb_url: resolveUrl(failedInitialUri), threedm_url: null, azure_source: 'build_initial', not_all_solid: false, pending: false };
       }
-      return { glb_url: null, threedm_url: null, azure_source: 'failed_final', not_all_solid: false };
+      return { glb_url: null, threedm_url: null, azure_source: 'failed_final', not_all_solid: false, pending: false };
     }
 
     // 4. ring_edit_v1 currently returns build nodes rather than success sinks.
@@ -121,13 +137,85 @@ export async function fetchCadResult(
       || extractArtifactUri(data, 'build_initial', 'glb_artifact')
       || extractArtifactUri(data, 'build_initial', 'original_glb_artifact');
     if (buildUri) {
-      return { glb_url: resolveUrl(buildUri), threedm_url: null, azure_source: 'build_retry', not_all_solid: false };
+      return { glb_url: resolveUrl(buildUri), threedm_url: null, azure_source: 'build_retry', not_all_solid: false, pending: false };
     }
 
-    return { glb_url: null, threedm_url: null, azure_source: null, not_all_solid: false };
+    return { glb_url: null, threedm_url: null, azure_source: null, not_all_solid: false, pending: false };
   } catch (e) {
     if (__DEV__) console.warn('[HistoryAPI] fetchCadResult error:', workflowId, e);
-    return { glb_url: null, threedm_url: null, azure_source: null, not_all_solid: false };
+    return { glb_url: null, threedm_url: null, azure_source: null, not_all_solid: false, pending: false };
+  }
+}
+
+/** The files of a finished CAD run, whichever source they came from. */
+export interface CadModelUrls {
+  glbUrl: string | null;
+  threedmUrl: string | null;
+  stlUrls: string[];
+  stepUrls: string[];
+  estimatedMetalMassG: number | null;
+  notAllSolid: boolean;
+}
+
+/** A /result body that itself says the run failed; no model is looked for elsewhere. */
+export function isExplicitCadFailure(raw: unknown): boolean {
+  const d = raw as Record<string, unknown> | null;
+  if (!d || typeof d !== 'object') return false;
+  return d.ok === false || (typeof d.status === 'string' && d.status.toLowerCase() === 'failed');
+}
+
+/** The top-level output_asset_id of a /result body: the delivered version's asset_id. */
+function outputAssetIdOf(raw: unknown): string | null {
+  const id = (raw as Record<string, unknown> | null)?.output_asset_id;
+  return typeof id === 'string' && id ? id : null;
+}
+
+/**
+ * The model the CAD vault (GET /cad/models) holds for this run.
+ *
+ * The vault is right for every run, including a supervised one the CAD team
+ * replaced by hand, whose /result has no model fields. Backend contract
+ * (2026-10-24): /result's output_asset_id is the delivered version's asset_id,
+ * and /result answers only after that version is saved, so one read is enough.
+ * Without an output_asset_id, the version this run produced is used. The
+ * delivered version is among the newest, so the first page is enough.
+ */
+export async function findVaultModelForWorkflow(
+  workflowId: string,
+  outputAssetId: string | null = null,
+): Promise<{ glbUrl: string | null; threedmUrl: string | null } | null> {
+  let rings: Awaited<ReturnType<typeof fetchCadRings>>;
+  try {
+    rings = await fetchCadRings();
+  } catch {
+    return null;
+  }
+  const versions = rings.flatMap((ring) => ring.versions ?? []);
+  const version = (outputAssetId ? versions.find((v) => v.asset_id === outputAssetId) : undefined)
+    ?? versions.find((v) => v.source_workflow_id === workflowId);
+  if (!version || (!version.glb_url && !version.threedm_url)) return null;
+  return { glbUrl: version.glb_url ?? null, threedmUrl: version.threedm_url ?? null };
+}
+
+/**
+ * The model of a run /status reported completed: from the /result body, or
+ * else from the vault. Null only when neither has one, i.e. a real failure.
+ */
+export async function resolveCadModel(workflowId: string, raw: unknown): Promise<CadModelUrls | null> {
+  try {
+    const parsed = parseRingCadResult(raw);
+    return {
+      glbUrl: parsed.glbUrl,
+      threedmUrl: parsed.threedmArtifact?.url ?? null,
+      stlUrls: parsed.stlArtifacts.map((artifact) => artifact.url),
+      stepUrls: parsed.stepArtifacts.map((artifact) => artifact.url),
+      estimatedMetalMassG: parsed.estimatedMetalMassG,
+      notAllSolid: parsed.notAllSolid,
+    };
+  } catch {
+    if (isExplicitCadFailure(raw)) return null;
+    const vault = await findVaultModelForWorkflow(workflowId, outputAssetIdOf(raw));
+    return vault ? { ...vault, stlUrls: [], stepUrls: [], estimatedMetalMassG: null, notAllSolid: false } : null;
   }
 }
 
