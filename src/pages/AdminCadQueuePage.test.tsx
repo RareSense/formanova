@@ -15,11 +15,12 @@ const row = (id: string, phase: string, extra = {}) => ({
 
 function renderPage(path = '/admin/cad-queue') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  const utils = render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[path]}><AdminCadQueuePage /></MemoryRouter>
     </QueryClientProvider>,
   );
+  return { ...utils, client };
 }
 
 beforeEach(() => {
@@ -64,5 +65,36 @@ describe('AdminCadQueuePage', () => {
     renderPage();
     const button = await screen.findByRole('button', { name: /start selected \(0\)/i });
     expect(button.hasAttribute('disabled')).toBe(true);
+  });
+
+  it('keeps the table and shows a banner when a background refresh fails', async () => {
+    api.listSupervisedRuns
+      .mockResolvedValueOnce({ items: [row('wf-a', 'queued')], total: 1, limit: 20, offset: 0 })
+      .mockRejectedValueOnce(new Error('boom'));
+    const { client } = renderPage();
+    expect(await screen.findByLabelText('Select wf-a')).toBeTruthy();
+    await client.refetchQueries({ queryKey: ['admin-cad-queue'] });
+    expect(await screen.findByText("Couldn't refresh. Showing the last loaded list.")).toBeTruthy();
+    expect(screen.getByLabelText('Select wf-a')).toBeTruthy();
+    expect(screen.queryByText(/Failed to load the queue/)).toBeNull();
+  });
+
+  it('clears ticks when the phase filter changes', async () => {
+    api.listSupervisedRuns.mockResolvedValue({ items: [row('wf-a', 'queued')], total: 1, limit: 20, offset: 0 });
+    renderPage();
+    fireEvent.click(await screen.findByLabelText('Select wf-a'));
+    expect(screen.getByRole('button', { name: /start selected \(1\)/i })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'running' }));
+    await waitFor(() => expect(api.listSupervisedRuns).toHaveBeenCalledTimes(2));
+    expect(await screen.findByLabelText('Select wf-a')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /start selected \(0\)/i })).toBeTruthy();
+  });
+
+  it('offers a way back to the first page when the current page is empty', async () => {
+    api.listSupervisedRuns.mockResolvedValue({ items: [], total: 5, limit: 20, offset: 20 });
+    renderPage('/admin/cad-queue?offset=20');
+    await waitFor(() => expect(api.listSupervisedRuns.mock.calls[0][0].offset).toBe(20));
+    fireEvent.click(await screen.findByRole('button', { name: 'Back to first page' }));
+    await waitFor(() => expect(api.listSupervisedRuns.mock.calls.at(-1)![0].offset).toBe(0));
   });
 });
