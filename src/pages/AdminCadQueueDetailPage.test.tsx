@@ -10,6 +10,7 @@ const api = vi.hoisted(() => ({
   rejectSupervisedRun: vi.fn(),
   failSupervisedRun: vi.fn(),
   addSupervisedRunNote: vi.fn(),
+  sendSupervisedReplacement: vi.fn(),
 }));
 vi.mock('@/lib/supervised-runs-api', async (orig) => ({ ...(await orig<object>()), ...api }));
 vi.mock('@/pages/AdminGenerationDetailPage', () => ({ DetailContent: () => <div>run detail</div> }));
@@ -55,7 +56,7 @@ function renderPage() {
   );
 }
 
-const IGNORED = ['Back to CAD Queue', 'Add note'];
+const IGNORED = ['Back to CAD Queue', 'Add note', 'Choose file', 'Replace file', 'Remove', 'What will be sent', 'Send replacement'];
 function actionButtonNames(): string[] {
   return screen.getAllByRole('button')
     .map((button) => button.textContent?.trim() ?? '')
@@ -241,6 +242,27 @@ describe('AdminCadQueueDetailPage', () => {
     renderPage();
     await screen.findByText('Attempt 1');
     expect(actionButtonNames()).toEqual(['Fail']);
+  });
+
+  it('sends a replacement once through the page lock, then waits for the run to move', async () => {
+    api.getSupervisedRun.mockResolvedValue(detail('rejected', {
+      replacement_check: { has_model: true, missing: [], final_preview: {} },
+    }));
+    let resolveSend: (value: { accepted: boolean; phase: SupervisedPhase }) => void = () => {};
+    api.sendSupervisedReplacement.mockReturnValue(new Promise((resolve) => { resolveSend = resolve; }));
+    renderPage();
+    const send = await screen.findByRole('button', { name: 'Send replacement' });
+    expect(send.hasAttribute('disabled')).toBe(false);
+    fireEvent.click(send);
+    fireEvent.click(send);
+    expect(api.sendSupervisedReplacement).toHaveBeenCalledTimes(1);
+    expect(api.sendSupervisedReplacement).toHaveBeenCalledWith('wf-1', [], undefined);
+    await act(async () => { resolveSend({ accepted: true, phase: 'finalizing' }); });
+    expect(await screen.findByText('Done. Waiting for the run to move...')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Send replacement' }).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByRole('button', { name: 'Fail' }).hasAttribute('disabled')).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Send replacement' }));
+    expect(api.sendSupervisedReplacement).toHaveBeenCalledTimes(1);
   });
 
   it('keeps Send disabled when there is no model', async () => {

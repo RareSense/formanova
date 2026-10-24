@@ -27,6 +27,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import SupervisedReplacementPanel from '@/components/admin/SupervisedReplacementPanel';
 import { normalizeAdminGenerationDetail } from '@/lib/admin-generations-api';
 import {
   PHASE_ACTIONS,
@@ -462,11 +463,22 @@ export default function AdminCadQueueDetailPage() {
                     ))}
                   </div>
                 ) : null}
-                {message && (
+                {message && phase !== 'rejected' && (
                   <p className="break-words text-sm" aria-live="polite">{message}</p>
                 )}
               </CardContent>
             </Card>
+
+            {phase === 'rejected' && (
+              <SupervisedReplacementPanel
+                detail={data}
+                workflowId={workflowId}
+                onChanged={() => void query.refetch()}
+                runAction={run}
+                locked={actionsLocked}
+                message={message}
+              />
+            )}
 
             <NotesCard data={data} workflowId={workflowId} onSaved={() => void query.refetch()} />
 
