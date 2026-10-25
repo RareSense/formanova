@@ -639,4 +639,35 @@ describe('AdminCadQueueDetailPage', () => {
       expect(api.startSupervisedRuns).toHaveBeenCalledWith(['wf-1'], { llm_tier: 'mystery_tier_9' });
     });
   });
+  describe('AI shown read-only', () => {
+    it('says Running with, and names both AIs, while running', async () => {
+      api.getSupervisedRun.mockResolvedValue(withTiers('running', { llm_tier: 'gpt_6_astra_openai', analysis_tier: 'mystery_tier_9' }));
+      renderPage();
+      await loaded();
+      const line = screen.getByText(/Running with/);
+      expect(line.textContent).toBe('Running with Build AI: GPT-6 Astra · Direct API · Review AI: mystery_tier_9');
+      expect(screen.queryByRole('combobox', { name: 'Build AI' })).toBeNull();
+    });
+
+    it('says Ran with once delivered', async () => {
+      api.getSupervisedRun.mockResolvedValue(withTiers('delivered', { llm_tier: 'gpt_6_astra_openai', analysis_tier: 'gpt_6_astra_pro_openrouter' }));
+      renderPage();
+      await loaded();
+      expect(screen.getByText(/Ran with/).textContent).toContain('Review AI: GPT-6 Astra Pro · OpenRouter');
+    });
+
+    it('shows Default for null tiers', async () => {
+      api.getSupervisedRun.mockResolvedValue(withTiers('awaiting_review', { llm_tier: null, analysis_tier: null }));
+      renderPage();
+      await loaded();
+      expect(screen.getByText(/Ran with/).textContent).toBe('Ran with Build AI: Default · Review AI: Default');
+    });
+
+    it('is not shown beside the pickers', async () => {
+      api.getSupervisedRun.mockResolvedValue(withTiers('queued', { llm_tier: null, analysis_tier: null }));
+      renderPage();
+      await loaded();
+      expect(screen.queryByText(/Ran with|Running with/)).toBeNull();
+    });
+  });
 });

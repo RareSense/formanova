@@ -48,6 +48,7 @@ import {
   type SupervisedRunDetail,
 } from '@/lib/supervised-runs-api';
 import { azureUriToUrl } from '@/lib/azure-utils';
+import { cadTierText } from '@/lib/cad-model-options';
 import { downloadCadArtifact } from '@/lib/cad-artifact-download';
 import { DetailContent } from '@/pages/AdminGenerationDetailPage';
 
@@ -630,6 +631,12 @@ export default function AdminCadQueueDetailPage() {
 
             {phase === 'awaiting_review' && data.send_check && (
               <SendDeliversCard check={data.send_check} workflowId={workflowId} />
+            )}
+
+            {!TIER_PHASES.includes(phase) && (
+              <p className="text-sm text-muted-foreground">
+                {`${phase === 'running' ? 'Running with' : 'Ran with'} Build AI: ${cadTierText(currentBuild)} · Review AI: ${cadTierText(currentReview)}`}
+              </p>
             )}
 
             {(allowed.length > 0 || (message && messageFrom === 'buttons')) && (
