@@ -20,6 +20,8 @@ import {
   listAdminGenerations,
   type AdminGenerationDetail,
 } from '@/lib/admin-generations-api';
+import { cadTierText } from '@/lib/cad-model-options';
+import { getSupervisedRun, SupervisedRunsApiError } from '@/lib/supervised-runs-api';
 import { fetchCadResult, resolveSourceType } from '@/lib/generation-history-api';
 import { parseRingCadResult } from '@/lib/ring-cad-nurbs-api';
 import { cadFlowLabel, isDesignImageWorkflow, readCadStudioInputs, type AdminRunInputs } from '@/lib/admin-generation-inputs';
@@ -522,6 +524,19 @@ function InvalidRequestState({ message }: { message: string }) {
   );
 }
 
+function submittedTier(payload: unknown, key: string): string | null {
+  const read = (value: unknown): string | null => {
+    const v = value && typeof value === 'object' ? (value as Record<string, unknown>)[key] : null;
+    return typeof v === 'string' && v ? v : null;
+  };
+  const nested = payload && typeof payload === 'object' ? (payload as Record<string, unknown>).payload : null;
+  return read(payload) ?? read(nested);
+}
+
+function tiersText(build: string | null | undefined, review: string | null | undefined): string {
+  return `Build AI ${cadTierText(build)} · Review AI ${cadTierText(review)}`;
+}
+
 export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
   // Both CAD families produce a GLB. Image-to-CAD (including ring_cad_nurbs_v1)
   // was excluded here, so its runs always rendered
@@ -536,6 +551,22 @@ export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
     staleTime: Infinity,
     retry: 1,
   });
+  // Only supervised runs have one; a plain generation answers not found, which is not an error here.
+  const supervisedQuery = useQuery({
+    queryKey: ['admin-generation-supervised-tiers', detail.workflow_id],
+    queryFn: async () => {
+      try {
+        return await getSupervisedRun(detail.workflow_id);
+      } catch (error) {
+        if (error instanceof SupervisedRunsApiError && (error.status === 404 || error.code === 'not_found')) return null;
+        throw error;
+      }
+    },
+    enabled: isCadModel,
+    staleTime: 60_000,
+    retry: false,
+  });
+  const appliedTiers = supervisedQuery.data?.supervision.tiers ?? null;
   const [downloading3dm, setDownloading3dm] = useState(false);
   // CAD studio runs (design pictures, and CAD from Image / Idea / Inspiration)
   // keep their inputs in shapes the generic finders below don't read.
@@ -712,6 +743,17 @@ export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
           <MetaItem label="Workflow ID" value={detail.workflow_id} />
           <MetaItem label="Status" value={detail.status.replace(/_/g, ' ')} />
           {cadSourceLabel && <MetaItem label="CAD Source" value={cadSourceLabel} />}
+          {isCadModel && (
+            <div className="space-y-1 sm:col-span-2 lg:col-span-4">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">AI</p>
+              <p className="text-sm">
+                {`Submitted: ${tiersText(submittedTier(detail.input_payload, 'llm_tier'), submittedTier(detail.input_payload, 'analysis_tier'))}`}
+              </p>
+              {appliedTiers && (
+                <p className="text-sm">{`Applied at Start: ${tiersText(appliedTiers.llm_tier, appliedTiers.analysis_tier)}`}</p>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -796,6 +838,9 @@ export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
       </Card>
 
       <CollapsibleCardSection title="Input Payload">
+        <p className="mb-2 text-xs text-muted-foreground">
+          Raw JSON shows the submitted request; the AI actually used is under 'Applied at Start'.
+        </p>
         <JsonBlock title="Raw JSON" value={detail.input_payload} />
       </CollapsibleCardSection>
 

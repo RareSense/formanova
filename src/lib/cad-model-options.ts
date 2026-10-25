@@ -70,3 +70,9 @@ export const CAD_MODEL_GROUPS: CadModelGroup[] = (["direct", "openrouter", "subs
 export function cadModelLabel(tier: RingCadTier): string {
   return `${MODEL_NAMES[tier]} · ${GROUP_LABELS[cadModelRoute(tier)]}`;
 }
+
+/** A stored tier id for admins: model and route when known, the raw id when not, "Default" when null. */
+export function cadTierText(tier: string | null | undefined): string {
+  if (!tier) return 'Default';
+  return tier in MODEL_NAMES ? cadModelLabel(tier as RingCadTier) : tier;
+}
