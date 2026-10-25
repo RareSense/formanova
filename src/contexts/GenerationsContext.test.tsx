@@ -17,7 +17,7 @@ vi.mock('@/lib/generation-lifecycle', () => ({
 vi.mock('@/lib/azure-utils', () => ({ azureUriToUrl: (v: string) => v.replace('azure://', 'https://cdn.example.com/') }));
 vi.mock('@/lib/generation-history-api', () => ({ getWorkflowDetails: vi.fn() }));
 vi.mock('@/lib/posthog-events', () => ({ trackCadGenerationCompleted: vi.fn() }));
-vi.mock('@/lib/cad-versions-api', () => ({ fetchImproveOutcome: vi.fn() }));
+vi.mock('@/lib/cad-versions-api', () => ({ fetchImproveOutcome: vi.fn(), fetchCadRings: vi.fn() }));
 vi.mock('@/lib/generation-enrichment', () => ({
   extractPhotoThumbnail: vi.fn(),
   extractProductShotThumbnail: vi.fn(),
@@ -29,7 +29,8 @@ import { getWorkflowDetails } from '@/lib/generation-history-api';
 import { extractPhotoThumbnail, extractProductShotThumbnail } from '@/lib/generation-enrichment';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { trackCadGenerationCompleted } from '@/lib/posthog-events';
-import { fetchImproveOutcome } from '@/lib/cad-versions-api';
+import { fetchImproveOutcome, fetchCadRings } from '@/lib/cad-versions-api';
+const mockFetchCadRings = vi.mocked(fetchCadRings);
 
 const mockTrackCadCompleted = vi.mocked(trackCadGenerationCompleted);
 const mockPollWorkflow = vi.mocked(pollWorkflow);
@@ -437,9 +438,29 @@ describe('GenerationsContext', () => {
 });
 
 describe('GenerationsContext - Image to 3D runs', () => {
+  it('keeps a supervised run marked as supervised, across a refresh', async () => {
+    const first = renderHook(() => useGenerations(), { wrapper });
+    act(() => { first.result.current.trackCadGeneration({ workflowId: 'cad-sup', supervised: true }); });
+    expect(first.result.current.generations[0].supervised).toBe(true);
+    await waitFor(() => expect(localStorage.getItem('formanova_running_cad_v1')).toContain('"supervised":true'));
+    first.unmount();
+
+    const second = renderHook(() => useGenerations(), { wrapper });
+    expect(second.result.current.generations[0].supervised).toBe(true);
+  });
+
+  it('leaves an ordinary run unmarked', () => {
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    act(() => { result.current.trackCadGeneration({ workflowId: 'cad-plain' }); });
+    expect(result.current.generations[0].supervised).toBeUndefined();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetchImproveOutcome.mockResolvedValue(null);
+    mockFetchCadRings.mockResolvedValue([]);
+    // clearAllMocks keeps implementations; a leaked /status answer would settle later runs.
+    mockAuthenticatedFetch.mockReset();
     localStorage.clear();
     mockPollWorkflow.mockReturnValue(new Promise(() => {}));
   });
@@ -451,6 +472,94 @@ describe('GenerationsContext - Image to 3D runs', () => {
     threedm_artifact: { uri: 'azure://a/r.3dm', url: 'https://s/r.3dm', type: '', bytes: 1, sha256: '' },
     glb_artifact: { uri: 'azure://a/r.glb', url: 'https://s/r.glb', type: '', bytes: 1, sha256: '' },
   };
+
+  it('keeps a cad run running when /status keeps failing (offline, a deploy)', async () => {
+    mockPollWorkflow.mockRejectedValueOnce(new Error('Status polling failed 10 times (last status: 502)'));
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    act(() => { result.current.trackCadGeneration({ workflowId: 'cad-offline' }); });
+    await waitFor(() => expect(mockPollWorkflow).toHaveBeenCalled());
+    await act(async () => {});
+
+    expect(result.current.generations[0].status).toBe('running');
+    expect(mockMarkFailed).not.toHaveBeenCalled();
+    expect(mockFetchImproveOutcome).not.toHaveBeenCalled();
+  });
+
+  it('still fails a cad run the backend reports failed', async () => {
+    mockPollWorkflow.mockRejectedValueOnce(new Error('Workflow failed'));
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    act(() => { result.current.trackCadGeneration({ workflowId: 'cad-real-fail', cadRoute: '/image-to-cad' }); });
+
+    await waitFor(() => expect(result.current.generations[0].status).toBe('failed'));
+    expect(mockMarkFailed).toHaveBeenCalledTimes(1);
+  });
+
+  it('restores a supervised run that has waited more than a day, but not an ordinary one', () => {
+    const twoDaysAgo = Date.now() - 2 * 24 * 60 * 60 * 1000;
+    localStorage.setItem('formanova_running_cad_v1', JSON.stringify([
+      { workflowId: 'cad-old-sup', startedAt: twoDaysAgo, cadRoute: '/text-to-cad', timeoutMs: 60_000, supervised: true },
+      { workflowId: 'cad-old-plain', startedAt: twoDaysAgo, cadRoute: '/text-to-cad', timeoutMs: 60_000 },
+    ]));
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    expect(result.current.generations.map(g => g.workflowId)).toEqual(['cad-old-sup']);
+  });
+
+  it('keeps a cad run running when this tab reaches its own poll limit', async () => {
+    mockPollWorkflow.mockRejectedValueOnce(new Error('Workflow timed out after 5400000ms'));
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    act(() => { result.current.trackCadGeneration({ workflowId: 'cad-wait' }); });
+    await waitFor(() => expect(mockPollWorkflow).toHaveBeenCalled());
+    await act(async () => {});
+
+    expect(result.current.generations[0].status).toBe('running');
+    expect(mockMarkFailed).not.toHaveBeenCalled();
+    expect(mockFetchImproveOutcome).not.toHaveBeenCalled();
+  });
+
+  it('still fails it once the backend reports failed after the poll limit', async () => {
+    mockPollWorkflow.mockRejectedValueOnce(new Error('Workflow timed out after 5400000ms'));
+    mockAuthenticatedFetch.mockResolvedValue(jsonResponse({ runtime: { state: 'failed' } }));
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    act(() => { result.current.trackCadGeneration({ workflowId: 'cad-wait-fail', cadRoute: '/image-to-cad' }); });
+    await waitFor(() => expect(mockPollWorkflow).toHaveBeenCalled());
+
+    act(() => { window.dispatchEvent(new Event('focus')); });
+
+    await waitFor(() => expect(result.current.generations[0].status).toBe('failed'));
+    expect(mockMarkFailed).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a hand-made replacement from the CAD vault', async () => {
+    mockPollWorkflow.mockResolvedValue({
+      status: 'completed', result: { supervised_delivery: [{}], output_asset_id: 'v-rep' },
+    } as never);
+    mockFetchCadRings.mockResolvedValue([{
+      set_id: 's', versions: [{ asset_id: 'v-rep', position: 0, source_workflow_id: 'cad-rep', glb_url: 'https://s/rep.glb', threedm_url: 'https://s/rep.3dm' }],
+    }] as never);
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    act(() => { result.current.trackCadGeneration({ workflowId: 'cad-rep' }); });
+
+    await waitFor(() => expect(result.current.generations[0].status).toBe('completed'));
+    expect(result.current.generations[0].glbUrl).toBe('https://s/rep.glb');
+    expect(result.current.generations[0].threedmUrl).toBe('https://s/rep.3dm');
+    expect(mockMarkFailed).not.toHaveBeenCalled();
+  });
+
+  it('shows a replacement found by the tab check from the CAD vault', async () => {
+    mockAuthenticatedFetch
+      .mockResolvedValueOnce(jsonResponse({ runtime: { state: 'completed' } }))
+      .mockResolvedValueOnce(jsonResponse({ supervised_delivery: [{}], output_asset_id: 'v-rep2' }));
+    mockFetchCadRings.mockResolvedValue([{
+      set_id: 's', versions: [{ asset_id: 'v-rep2', position: 0, source_workflow_id: 'cad-rep2', glb_url: 'https://s/rep2.glb', threedm_url: null }],
+    }] as never);
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    act(() => { result.current.trackCadGeneration({ workflowId: 'cad-rep2' }); });
+
+    act(() => { window.dispatchEvent(new Event('focus')); });
+
+    await waitFor(() => expect(result.current.generations[0].glbUrl).toBe('https://s/rep2.glb'));
+    expect(result.current.generations[0].status).toBe('completed');
+  });
 
   it('tracks a cad run tagged with kind so it never mixes with photoshoots', () => {
     const { result } = renderHook(() => useGenerations(), { wrapper });

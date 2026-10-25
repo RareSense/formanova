@@ -14,7 +14,12 @@
 
 import { Sparkles } from 'lucide-react';
 
-import { CadDownloadMenu, CAD_RESULT_ACTION_SIZE, CAD_RESULT_ACTION_WIDTH } from '@/components/downloads/CadDownloadMenu';
+import {
+  CadDownloadMenu,
+  CAD_RESULT_ACTION_SIZE,
+  CAD_RESULT_ACTION_WIDTH,
+  type CadVersionDownloads,
+} from '@/components/downloads/CadDownloadMenu';
 import { cn } from '@/lib/utils';
 
 export interface CadResultActionsProps {
@@ -31,6 +36,8 @@ export interface CadResultActionsProps {
   onExportEdited?: () => void;
   /** Disables the download while bytes are being fetched. */
   isBusy?: boolean;
+  /** The shown version's complete files, added to the download list. */
+  versionDownloads?: CadVersionDownloads | null;
   /**
    * The latest version's label, e.g. "V3". Omit when the run reports no
    * versions, which is every run today: the backend does not send them yet.
@@ -82,6 +89,7 @@ export function CadResultActions({
   estimatedMetalMassG,
   onExportEdited,
   isBusy = false,
+  versionDownloads,
   latestVersionLabel,
   onImproveFromVersion,
   improveDisabled = false,
@@ -118,6 +126,7 @@ export function CadResultActions({
           onDownloadStep={onDownloadStep}
           estimatedMetalMassG={estimatedMetalMassG}
           onExportEdited={onExportEdited}
+          versionDownloads={versionDownloads}
         />
       </div>
     );
@@ -151,6 +160,7 @@ export function CadResultActions({
         onDownloadStep={onDownloadStep}
         estimatedMetalMassG={estimatedMetalMassG}
         onExportEdited={onExportEdited}
+        versionDownloads={versionDownloads}
       />
     </div>
   );

@@ -4,8 +4,10 @@ vi.mock('@/lib/authenticated-fetch', () => ({ authenticatedFetch: vi.fn() }));
 
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import {
+  CadDownloadUnavailableError,
   CadImproveError,
   canImproveVersion,
+  fetchVersionDownloadLink,
   fetchImproveOutcome,
   fetchCadRingBySetId,
   fetchCadRings,
@@ -119,6 +121,23 @@ describe('findRingForWorkflow', () => {
   it('does not claim a ring for an unrelated run', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { items: [RING] }));
     expect(await findRingForWorkflow('wf_other', { attempts: 1 })).toBeNull();
+  });
+
+  it('falls back to the version whose GLB is on screen, for a hand-replaced delivery', async () => {
+    const replaced = {
+      set_id: 'set_r',
+      versions: [{ asset_id: 'a_del', position: 0, source_workflow_id: 'wf_admin', glb_url: '/api/artifacts/del' }],
+    };
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { items: [replaced] }));
+    expect((await findRingForWorkflow('wf_user', { attempts: 1, glbUrl: '/api/artifacts/del' }))?.set_id).toBe('set_r');
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { items: [replaced] }));
+    expect(await findRingForWorkflow('wf_user', { attempts: 1 })).toBeNull();
+  });
+
+  it('prefers the version the run produced over a GLB match', async () => {
+    const byGlb = { set_id: 'set_glb', versions: [{ asset_id: 'x', position: 0, source_workflow_id: 'wf_x', glb_url: '/g' }] };
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { items: [byGlb, RING] }));
+    expect((await findRingForWorkflow('wf_1', { attempts: 1, glbUrl: '/g' }))?.set_id).toBe('set_1');
   });
 
   it('retries: the version row is written after /status turns terminal', async () => {
@@ -285,5 +304,27 @@ describe('isLegacyWorkflowRetired', () => {
   });
   it('is not mistaken for an exhausted version', () => {
     expect(isImprovementExhausted({ ...(base as object), improvable: false, improve_unavailable_reason: 'legacy_workflow_retired' } as never)).toBe(false);
+  });
+});
+
+describe('fetchVersionDownloadLink', () => {
+  it('asks for a fresh link to one kind of a version and returns it', async () => {
+    const link = { url: 'https://blob.example/x.stl?sig=1', expires_at: '2026-10-25T12:00:00Z', filename: 'ring.stl' };
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, link));
+
+    await expect(fetchVersionDownloadLink('asset_9', 'casting_stl')).resolves.toEqual(link);
+    expect(fetchMock).toHaveBeenCalledWith('/api/cad/versions/asset_9/downloads/casting_stl');
+  });
+
+  it('throws a typed error on 404, so the caller can say the file is not available', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(404, { detail: 'not found' }));
+    await expect(fetchVersionDownloadLink('asset_9', 'stones')).rejects.toBeInstanceOf(CadDownloadUnavailableError);
+  });
+
+  it('throws a plain error for any other failure', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(500, {}));
+    const error = await fetchVersionDownloadLink('asset_9', 'stl').catch((e) => e);
+    expect(error).toBeInstanceOf(Error);
+    expect(error).not.toBeInstanceOf(CadDownloadUnavailableError);
   });
 });

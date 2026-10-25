@@ -47,7 +47,7 @@ import {
   type CadRing,
   type CadRestoreSeed,
 } from "@/lib/cad-versions-api";
-import { cadStatusNotice, type CadStatusNotice } from '@/lib/cad-status-copy';
+import { cadInProgressNotice, cadStatusNotice, type CadStatusNotice } from '@/lib/cad-status-copy';
 import { blockIfCadDown } from '@/lib/cad-service-status';
 
 
@@ -100,6 +100,9 @@ export function useImageToCADWorkflow({
   const [glbUrl, setGlbUrl] = useState<string | undefined>(undefined);
   const [glbArtifact, setGlbArtifact] = useState<{ uri: string; type: string; bytes: number; sha256: string } | null>(null);
   const [sourceWorkflowId, setSourceWorkflowId] = useState<string | null>(null);
+  // From Generate until the start reply: the run's queue status isn't known yet, so the overlay
+  // shows a still "sending" state rather than the generating spinner.
+  const [isSending, setIsSending] = useState(false);
   /** The machinable deliverable. Present only for ring_cad_nurbs_v1 runs. */
   const [threedmArtifact, setThreedmArtifact] = useState<ArtifactRef | null>(null);
   const [stlArtifacts, setStlArtifacts] = useState<ArtifactRef[]>([]);
@@ -261,15 +264,22 @@ export function useImageToCADWorkflow({
     // Only the re-read after a run of ours completed may lift the lock; the
     // render right after a press has no tracked run yet and must not.
     const runCompleted = trackedRun?.status === 'completed';
+    // The model on screen, for a hand-replaced delivery whose version carries
+    // another run's id. Read here, not a dependency: the lookup is driven by
+    // the run, and the GLB is already set by the time it is ready. A tracked
+    // run speaks only for itself: a new run never clears glbUrl, so falling
+    // back to it would tie a run with no GLB to the previous model's ring.
+    const shownGlbUrl = trackedRun ? (trackedRun.glbUrl ?? null) : (glbUrl ?? null);
     let cancelled = false;
-    findRingForWorkflow(sourceWorkflowId)
+    findRingForWorkflow(sourceWorkflowId, { glbUrl: shownGlbUrl })
       .then(async (found) => {
         if (cancelled) return;
-        setRing(found);
+        // Never wipe a ring seeded from history because the lookup missed it.
+        if (found) setRing(found);
         if (runCompleted) setImproveLocked(false);
         const producedVersion = (found?.versions ?? []).find(
           (version) => version.source_workflow_id === sourceWorkflowId,
-        );
+        ) ?? (shownGlbUrl ? (found?.versions ?? []).find((version) => version.glb_url === shownGlbUrl) : undefined);
         if (producedVersion) setSelectedVersionId(producedVersion.asset_id);
         // The photos and brief belong to the ring, not to the press: an
         // improve run's own inputs are the saved files it was handed, so
@@ -285,13 +295,12 @@ export function useImageToCADWorkflow({
       })
       .catch(() => {
         if (cancelled) return;
-        setRing(null);
         if (runCompleted) setImproveLocked(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [hasModel, trackedRun?.status, sourceWorkflowId]);
+  }, [hasModel, trackedRun?.status, sourceWorkflowId]); // eslint-disable-line react-hooks/exhaustive-deps -- trackedRun and glbUrl are read, not followed: the lookup re-runs on the run's transitions only, and the GLB on screen is already set when it does. Every new run and restore sets the ring itself first, so a missed lookup keeps the right one.
 
   /**
    * Re-reads the ring on screen after an Improve press failed.
@@ -329,6 +338,14 @@ export function useImageToCADWorkflow({
    */
   const viewerThreedmUrl = activeVersion?.viewer_threedm_url && activeVersion.glb_url === glbUrl
     ? activeVersion.viewer_threedm_url
+    : null;
+  /**
+   * The complete files the vault lists for the model on screen (STL, STEP,
+   * casting STL, stone list). Same rule as the viewing copy: offered only when
+   * the viewer really shows that version's GLB.
+   */
+  const versionDownloads = activeVersion?.downloads?.length && activeVersion.glb_url === glbUrl
+    ? { assetId: activeVersion.asset_id, downloads: activeVersion.downloads, source: cadSource }
     : null;
 
   /** Opens an earlier version in the viewer. Its files are already published. */
@@ -411,6 +428,7 @@ export function useImageToCADWorkflow({
           ...(started.projected_cost !== undefined ? { projected_cost: started.projected_cost } : {}),
           ...(started.authorized_budget !== undefined ? { authorized_budget: started.authorized_budget } : {}),
         },
+        ...(started.supervised === true ? { supervised: true } : {}),
       });
     } catch (error) {
       if (error instanceof CadImproveError && error.failure === 'insufficient_credits') {
@@ -497,6 +515,13 @@ export function useImageToCADWorkflow({
     if (fallbackGlbUrl) seedGlb(fallbackGlbUrl);
 
     const result = workflowId ? await fetchCadResult(workflowId) : null;
+    if (result?.pending) {
+      // A supervised run still in the queue or in review: nothing has failed.
+      setIsModelLoading(false);
+      setProgressStep('');
+      setStatusNotice(cadInProgressNotice());
+      return true;
+    }
     setNotAllSolid(result?.not_all_solid === true);
     const resolvedGlbUrl = result?.glb_url ?? fallbackGlbUrl ?? null;
     if (!resolvedGlbUrl) {
@@ -598,6 +623,7 @@ export function useImageToCADWorkflow({
     awaitingGeneratedToastRef.current = true;
     onWorkspaceActivate();
     setIsGenerating(true);
+    setIsSending(true);
     setGenerationFailed(false);
     setFailureMessage(null);
     setRetryAttempt(0);
@@ -643,7 +669,7 @@ export function useImageToCADWorkflow({
         throw new Error(err.error || err.detail || `Failed to start generation (${startRes.status})`);
       }
 
-      const { workflow_id } = await startRes.json();
+      const { workflow_id, supervised } = await startRes.json();
       if (!workflow_id) throw new Error("No workflow_id returned");
       setSourceWorkflowId(workflow_id);
 
@@ -670,7 +696,10 @@ export function useImageToCADWorkflow({
         // The two ends of the funnel therefore describe the run identically,
         // and completion no longer depends on this page still being mounted.
         analytics: cadAnalytics,
+        ...(supervised === true ? { supervised: true } : {}),
       });
+
+      setIsSending(false);
 
       // Polling is now GenerationsContext's job. The effect below mirrors that
       // run's state into this hook so the on-page overlay still updates while
@@ -692,6 +721,7 @@ export function useImageToCADWorkflow({
       // active on this environment) is actionable, and hiding it behind the
       // generic message means the user only sees it with DevTools open.
       setFailureMessage(err instanceof Error && err.message ? err.message : null);
+      setIsSending(false);
       setIsGenerating(false);
       setProgressStep("failed_final");
       setGenerationFailed(true);
@@ -754,7 +784,7 @@ export function useImageToCADWorkflow({
   }, []);
 
   return {
-    isGenerating, isStarting, hasModel, setHasModel,
+    isGenerating, isQueued: trackedRun?.supervised === true, isSending, isStarting, hasModel, setHasModel,
     isModelLoading, setIsModelLoading,
     progressStep, setProgressStep,
     retryAttempt,
@@ -763,6 +793,7 @@ export function useImageToCADWorkflow({
     sourceWorkflowId, setSourceWorkflowId,
     threedmArtifact, setThreedmArtifact,
     viewerThreedmUrl,
+    versionDownloads,
     stlArtifacts, stepArtifacts, estimatedMetalMassG,
     failureMessage, notAllSolid,
     statusNotice,

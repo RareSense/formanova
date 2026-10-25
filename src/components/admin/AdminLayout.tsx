@@ -5,6 +5,7 @@ import { ScanEye } from 'lucide-react';
 const TABS = [
   { label: 'Promo Codes', to: '/admin/promo-codes' },
   { label: 'Generations', to: '/admin/generations' },
+  { label: 'CAD Queue', to: '/admin/cad-queue' },
   { label: 'Feedback', to: '/admin/feedback' },
   { label: 'AI Fixes', to: '/admin/ai-fixes' },
   { label: 'Brands', to: '/admin/brands' },
@@ -24,14 +25,14 @@ export function AdminLayout() {
         </div>
 
         {/* Tab nav */}
-        <nav className="flex gap-1 border-b mb-0">
+        <nav className="flex gap-1 mb-0 overflow-x-auto overflow-y-hidden whitespace-nowrap shadow-[inset_0_-1px_0_hsl(var(--border))]">
           {TABS.map(({ label, to }) => (
             <NavLink
               key={to}
               to={to}
               className={({ isActive }) =>
                 cn(
-                  'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+                  'shrink-0 px-4 py-2 text-sm font-medium border-b-2 transition-colors',
                   isActive
                     ? 'border-primary text-primary'
                     : 'border-transparent text-muted-foreground hover:text-foreground'

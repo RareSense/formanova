@@ -41,8 +41,6 @@ import GemToggle from "@/components/text-to-cad/QualityToggle";
 import { runMicroBenchmark } from "@/lib/gpu-detect";
 import type { GemMode } from "@/components/text-to-cad/CADCanvas";
 import { RING_CAD_DEFAULT_TIER, RING_CAD_NURBS_WORKFLOW, RING_CAD_TIERS, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
-import CadModelPicker from "@/components/create-cad/CadModelPicker";
-import { useCadModelChoice } from "@/hooks/useCadModelChoice";
 import { recordStudioVisit } from '@/lib/studio-preference';
 import { useCadRestoreFromUrl } from "@/hooks/useCadRestoreFromUrl";
 
@@ -70,9 +68,8 @@ export default function TextToCAD({ variant = "idea" }: { variant?: DesignStartV
     : undefined;
   // Every run uses the customer default (GPT-6 Astra, OpenAI direct) unless
   // the URL explicitly asks for the GPT-5.6 Sol tier.
-  // Admins pick the model instead (CadModelPicker).
-  const modelChoice = useCadModelChoice(requestedTier ?? RING_CAD_DEFAULT_TIER);
-  const activeTier = modelChoice.tier;
+  // Admins choose the AI in the admin CAD queue, not here.
+  const activeTier = requestedTier ?? RING_CAD_DEFAULT_TIER;
 
   const [model] = useState("gemini");
   const [prompt, setPrompt] = useState("");
@@ -270,6 +267,7 @@ export default function TextToCAD({ variant = "idea" }: { variant?: DesignStartV
       onDownloadStep={workflow.stepArtifacts.length ? downloads.downloadStep : undefined}
       estimatedMetalMassG={workflow.estimatedMetalMassG}
       onExportEdited={hasEdits ? downloads.exportEdited : undefined}
+      versionDownloads={workflow.versionDownloads}
       latestVersionLabel={workflow.latestVersionLabel}
       onImproveFromVersion={workflow.improveFromLatestVersion}
       improveDisabled={!workflow.canImproveLatestVersion}
@@ -313,7 +311,6 @@ export default function TextToCAD({ variant = "idea" }: { variant?: DesignStartV
           creatingCad={workflow.isStarting || workflow.isGenerating}
           onCreateCad={createCadFromDesign}
           onStartMode={setStartMode}
-          modelPicker={modelChoice.isAdmin ? <CadModelPicker value={modelChoice.tier} onChange={modelChoice.setTier} disabled={workflow.isStarting || workflow.isGenerating} /> : null}
         />
       </div>
     );
@@ -487,6 +484,8 @@ export default function TextToCAD({ variant = "idea" }: { variant?: DesignStartV
             <GenerationProgress
               visible={workflow.isGenerating || workflow.isModelLoading}
               currentStep={workflow.progressStep}
+              queued={workflow.isQueued}
+              sending={workflow.isSending}
               onRetry={() => workflow.simulateGeneration()}
               failureMessage={workflow.failureMessage}
               notificationEmail={notificationEmail.notificationEmail}

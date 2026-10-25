@@ -3,6 +3,31 @@ import { describe, expect, it, vi } from 'vitest';
 import GenerationProgress from '@/components/text-to-cad/GenerationProgress';
 
 describe('GenerationProgress', () => {
+  it('shows a supervised run a calm queue state, with no spinner or generating text', () => {
+    const { container } = render(<GenerationProgress visible currentStep="building" queued />);
+    expect(screen.getByRole('heading', { name: "You’re in the queue" })).toBeTruthy();
+    expect(screen.getByText('Your CAD starts as soon as the queue clears. You’ll have it within 24 hours.')).toBeTruthy();
+    expect(screen.getByText('We’ll email you when it’s ready.')).toBeTruthy();
+    expect(screen.queryByText('Your CAD is generating')).toBeNull();
+    expect(screen.queryByText(/Estimated time/)).toBeNull();
+    expect(screen.queryByText(/You can leave this page/)).toBeNull();
+    expect(container.querySelector('.animate-spin')).toBeNull();
+  });
+
+  it('shows a still sending state, not the generating spinner, before the start reply', () => {
+    const { container } = render(<GenerationProgress visible currentStep="analyzing" sending queued={false} />);
+    expect(screen.getByRole('heading', { name: 'Sending your design' })).toBeTruthy();
+    expect(screen.queryByText('Your CAD is generating')).toBeNull();
+    expect(screen.queryByText(/Estimated time/)).toBeNull();
+    expect(container.querySelector('.animate-spin')).toBeNull();
+  });
+
+  it('says nothing about a queue for an ordinary run', () => {
+    render(<GenerationProgress visible currentStep="building" />);
+    expect(screen.queryByText("You’re in the queue")).toBeNull();
+    expect(screen.getByText('up to 1 hour')).toBeTruthy();
+  });
+
   it('shows a compact background wait state without history or elapsed counters', () => {
     const onKeepCreating = vi.fn();
     render(

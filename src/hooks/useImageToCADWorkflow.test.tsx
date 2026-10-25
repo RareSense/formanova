@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 
 const checkCredits = vi.fn();
 vi.mock('@/hooks/use-credit-preflight', () => ({ useCreditPreflight: () => ({ checkCredits }) }));
+const generationsState = vi.hoisted(() => ({ generations: [] as unknown[] }));
+const trackCadGenerationMock = vi.hoisted(() => vi.fn());
 vi.mock('@/contexts/GenerationsContext', () => ({
-  useGenerations: () => ({ generations: [], trackCadGeneration: vi.fn() }),
+  useGenerations: () => ({ generations: generationsState.generations, trackCadGeneration: trackCadGenerationMock }),
 }));
 vi.mock('@/lib/authenticated-fetch', () => ({
   authenticatedFetch: vi.fn(),
@@ -153,5 +155,224 @@ describe('useImageToCADWorkflow viewing copy', () => {
       await result.current.restoreCompletedWorkflow('state-x', '/other.glb', { ring, selectedVersionId: 'v2' });
     });
     expect(result.current.viewerThreedmUrl).toBeNull();
+  });
+});
+
+describe('useImageToCADWorkflow version files', () => {
+  const downloads = [{ kind: 'casting_stl' as const, filename: 'c.stl', bytes: 1 }];
+  const ring = {
+    set_id: 'set-1',
+    versions: [
+      { asset_id: 'v1', position: 0, glb_url: '/v1.glb' },
+      { asset_id: 'v2', position: 1, glb_url: '/v2.glb', downloads },
+    ],
+  };
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValue({ ok: false, status: 404, json: async () => ({}) } as Response);
+  });
+
+  it('are the files of the version on screen, and only while the viewer shows it', async () => {
+    const { result } = renderWorkflow();
+    await act(async () => {
+      await result.current.restoreCompletedWorkflow('state-v2', '/v2.glb', { ring, selectedVersionId: 'v2' });
+    });
+    expect(result.current.versionDownloads).toMatchObject({ assetId: 'v2', downloads });
+
+    act(() => result.current.selectVersion('v1'));
+    expect(result.current.versionDownloads).toBeNull();
+  });
+
+  it('are withheld when the viewer shows a different model than the version', async () => {
+    const { result } = renderWorkflow();
+    await act(async () => {
+      await result.current.restoreCompletedWorkflow('state-x', '/other.glb', { ring, selectedVersionId: 'v2' });
+    });
+    expect(result.current.versionDownloads).toBeNull();
+  });
+});
+
+describe('useImageToCADWorkflow hand-replaced delivery', () => {
+  const downloads = [{ kind: 'casting_stl' as const, filename: 'c.stl', bytes: 1 }];
+  // The delivered version was made by another run, so only its GLB ties it to this one.
+  const delivered = {
+    set_id: 'set-r',
+    versions: [{ asset_id: 'v-del', position: 0, source_workflow_id: 'wf-admin', glb_url: '/api/artifacts/del', downloads }],
+  };
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('finds the delivered version by the GLB on screen and offers its files', async () => {
+    mockFetch.mockImplementation(async (url) => (String(url).startsWith('/api/cad/models')
+      ? { ok: true, status: 200, json: async () => ({ items: [delivered] }) }
+      : { ok: false, status: 404, json: async () => ({}) }) as Response);
+    const { result } = renderWorkflow();
+    await act(async () => {
+      await result.current.restoreCompletedWorkflow('wf-user', '/api/artifacts/del');
+    });
+    await vi.waitFor(() => expect(result.current.versionDownloads).toMatchObject({ assetId: 'v-del', downloads }));
+  });
+
+  it('keeps a seeded ring when the lookup finds nothing', async () => {
+    mockFetch.mockImplementation(async (url) => (String(url).startsWith('/api/cad/models')
+      ? { ok: true, status: 200, json: async () => ({ items: [] }) }
+      : { ok: false, status: 404, json: async () => ({}) }) as Response);
+    const { result } = renderWorkflow();
+    await act(async () => {
+      await result.current.restoreCompletedWorkflow('wf-user', '/api/artifacts/del', { ring: delivered, selectedVersionId: 'v-del' });
+    });
+    // The lookup gives up after its retries; the seeded ring must survive it.
+    await act(async () => { await new Promise((r) => setTimeout(r, 2600)); });
+    expect(mockFetch.mock.calls.some(([url]) => String(url).startsWith('/api/cad/models'))).toBe(true);
+    expect(result.current.versionDownloads).toMatchObject({ assetId: 'v-del' });
+  }, 10_000);
+});
+
+describe('useImageToCADWorkflow tracked run and the vault', () => {
+  const downloads = [{ kind: 'stones' as const, filename: 'stones.csv', bytes: 1 }];
+  const delivered = {
+    set_id: 'set-r',
+    versions: [{ asset_id: 'v-del', position: 0, source_workflow_id: 'wf-admin', glb_url: '/api/artifacts/del', downloads }],
+  };
+  const modelsCalls = () => mockFetch.mock.calls.filter(([url]) => String(url).startsWith('/api/cad/models'));
+
+  beforeEach(() => {
+    checkCredits.mockReset();
+    checkCredits.mockResolvedValue(true);
+    mockFetch.mockReset();
+    generationsState.generations = [];
+    mockFetch.mockImplementation(async (url) => {
+      const path = String(url);
+      if (path.startsWith('/api/run/state/')) return { ok: true, status: 200, json: async () => ({ workflow_id: 'state-new' }) } as Response;
+      if (path.startsWith('/api/cad/models')) return { ok: true, status: 200, json: async () => ({ items: [delivered] }) } as Response;
+      return { ok: false, status: 404, json: async () => ({}) } as Response;
+    });
+  });
+
+  function completeRun(glbUrl: string | null) {
+    generationsState.generations = [{
+      kind: 'cad', workflowId: 'state-new', status: 'completed', generationStep: '', glbUrl,
+      threedmUrl: null, stlUrls: [], stepUrls: [],
+    }];
+  }
+
+  it('offers the files of a hand-replaced version when the run completes with its GLB', async () => {
+    const { result, rerender } = renderWorkflow();
+    await act(async () => { await result.current.simulateGeneration(); });
+    completeRun('/api/artifacts/del');
+    rerender();
+    await vi.waitFor(() => expect(result.current.versionDownloads).toMatchObject({ assetId: 'v-del', downloads }));
+  });
+
+  it("never attaches the previous model's ring to a run that completed with no GLB", async () => {
+    const { result, rerender } = renderWorkflow();
+    // The previous model, still in the viewer, belongs to the delivered ring.
+    await act(async () => {
+      await result.current.restoreCompletedWorkflow('wf-old', '/api/artifacts/del');
+    });
+    await vi.waitFor(() => expect(result.current.versions).toHaveLength(1));
+
+    await act(async () => { await result.current.simulateGeneration(); });
+    expect(result.current.versions).toHaveLength(0);
+    const before = modelsCalls().length;
+    completeRun(null);
+    rerender();
+    await vi.waitFor(() => expect(modelsCalls().length).toBeGreaterThan(before));
+    await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
+    expect(result.current.versions).toHaveLength(0);
+  });
+});
+
+describe('useImageToCADWorkflow supervised runs', () => {
+  beforeEach(() => {
+    checkCredits.mockReset();
+    mockFetch.mockReset();
+    generationsState.generations = [];
+    trackCadGenerationMock.mockReset();
+  });
+
+  it('opens a waiting run as still in progress, not as a failure', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 409,
+      json: async () => ({ detail: { message: 'workflow is waiting for human input', pending_human_tasks: [] } }),
+    } as Response);
+    const { result } = renderWorkflow();
+    let restored: boolean | undefined;
+    await act(async () => { restored = await result.current.restoreCompletedWorkflow('state-q', null); });
+
+    expect(restored).toBe(true);
+    expect(result.current.generationFailed).toBe(false);
+    expect(result.current.statusNotice?.title).toBe('Still in progress');
+  });
+
+  it('hands a supervised start to the tracker and shows it as queued, with no popup', async () => {
+    checkCredits.mockResolvedValue(true);
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({ workflow_id: 'state-1', supervised: true }) } as Response);
+    const { result, rerender } = renderWorkflow();
+    await act(async () => { await result.current.simulateGeneration(); });
+
+    expect(trackCadGenerationMock).toHaveBeenCalledWith(expect.objectContaining({ workflowId: 'state-1', supervised: true }));
+    expect(result.current.statusNotice).toBeNull();
+
+    generationsState.generations = [{
+      kind: 'cad', workflowId: 'state-1', status: 'running', generationStep: 'Analyzing your design...', supervised: true,
+    }];
+    rerender();
+    expect(result.current.isQueued).toBe(true);
+  });
+
+  it('is sending from Generate until the start reply, then not', async () => {
+    checkCredits.mockResolvedValue(true);
+    let reply!: (r: Response) => void;
+    mockFetch.mockReturnValue(new Promise<Response>((resolve) => { reply = resolve; }));
+    const { result } = renderWorkflow();
+    let started!: Promise<boolean>;
+    act(() => { started = result.current.simulateGeneration(); });
+    await waitFor(() => expect(result.current.isSending).toBe(true));
+    await act(async () => {
+      reply({ ok: true, json: async () => ({ workflow_id: 'state-2', supervised: true }) } as Response);
+      await started;
+    });
+    expect(result.current.isSending).toBe(false);
+  });
+
+  it('stops sending when the start fails', async () => {
+    checkCredits.mockResolvedValue(true);
+    mockFetch.mockResolvedValue({ ok: false, status: 500, json: async () => ({}) } as Response);
+    const { result } = renderWorkflow();
+    await act(async () => { await result.current.simulateGeneration(); });
+    expect(result.current.isSending).toBe(false);
+  });
+
+  it('hands a supervised improve start to the tracker with the flag', async () => {
+    checkCredits.mockResolvedValue(true);
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({ workflow_id: 'state-imp', supervised: true }) } as Response);
+    const ring = {
+      set_id: 'set-1',
+      versions: [{ asset_id: 'v1', position: 0, glb_url: '/v1.glb', viewer_threedm_url: '/v1.viewer.3dm', improvable: true }],
+    };
+    const { result } = renderWorkflow();
+    await act(async () => {
+      await result.current.restoreCompletedWorkflow('state-r', '/v1.glb', { ring, selectedVersionId: 'v1' });
+    });
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({ workflow_id: 'state-imp', supervised: true }) } as Response);
+    await act(async () => { await result.current.improveFromLatestVersion(); });
+
+    expect(mockFetch).toHaveBeenCalledWith('/api/cad/versions/v1/improve', expect.objectContaining({ method: 'POST' }));
+    expect(trackCadGenerationMock).toHaveBeenCalledWith(expect.objectContaining({ workflowId: 'state-imp', supervised: true }));
+  });
+
+  it('says nothing extra when the start reply is not supervised', async () => {
+    checkCredits.mockResolvedValue(true);
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({ workflow_id: 'state-1', supervised: false }) } as Response);
+    const { result } = renderWorkflow();
+    await act(async () => { await result.current.simulateGeneration(); });
+    expect(result.current.statusNotice).toBeNull();
+    expect(trackCadGenerationMock).toHaveBeenCalledWith(expect.not.objectContaining({ supervised: true }));
+    expect(result.current.isQueued).toBe(false);
   });
 });

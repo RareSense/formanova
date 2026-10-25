@@ -37,6 +37,8 @@ export interface AdminGenerationsListParams {
   has_feedback?: boolean;
   user_type?: string;
   is_paying?: boolean;
+  /** false keeps supervised runs (the CAD queue) out of this list. */
+  supervised?: boolean;
 }
 
 export interface AdminGenerationListItem {
@@ -241,6 +243,7 @@ export async function listAdminGenerations(
   if (params.has_feedback !== undefined) q.set('has_feedback', String(params.has_feedback));
   if (params.user_type) q.set('user_type', params.user_type);
   if (params.is_paying !== undefined) q.set('is_paying', String(params.is_paying));
+  if (params.supervised !== undefined) q.set('supervised', String(params.supervised));
 
   const response = await adminGenerationsFetch(
     `${ADMIN_GENERATIONS_BASE}${q.toString() ? `?${q.toString()}` : ''}`,
@@ -265,7 +268,12 @@ export async function listAdminGenerations(
 export async function getAdminGenerationDetail(workflowId: string): Promise<AdminGenerationDetail> {
   const response = await adminGenerationsFetch(`${ADMIN_GENERATIONS_BASE}/${encodeURIComponent(workflowId)}`);
   const data = await response.json();
-  const payload = data.data ?? data;
+  return normalizeAdminGenerationDetail(data, workflowId);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function normalizeAdminGenerationDetail(data: any, workflowId: string): AdminGenerationDetail {
+  const payload = data?.data ?? data;
 
   return {
     workflow_id: payload.workflow_id ?? payload.id ?? workflowId,

@@ -24,6 +24,10 @@ const MODEL_NAMES: Record<RingCadTier, string> = {
   gemini_3_8_flash_openrouter: "Gemini 3.8 Flash",
   gemini_4_argon_google: "Gemini 4 Argon",
   gemini_4_argon_openrouter: "Gemini 4 Argon",
+  kimi_k3_moonshot: "Kimi K3",
+  kimi_k3_openrouter: "Kimi K3",
+  kimi_k3_1_pro_moonshot: "Kimi K3.1 Pro",
+  kimi_k3_1_pro_openrouter: "Kimi K3.1 Pro",
   claude_fable_5_1_subscription: "Claude Fable 5.1",
   claude_opus_5_5_subscription: "Claude Opus 5.5",
   gpt_6_astra_chatgpt_subscription: "GPT-6 Astra",
@@ -65,4 +69,10 @@ export const CAD_MODEL_GROUPS: CadModelGroup[] = (["direct", "openrouter", "subs
 /** "GPT-6 Astra · Direct API" — what the closed picker shows. */
 export function cadModelLabel(tier: RingCadTier): string {
   return `${MODEL_NAMES[tier]} · ${GROUP_LABELS[cadModelRoute(tier)]}`;
+}
+
+/** A stored tier id for admins: model and route when known, the raw id when not, "Default" when null. */
+export function cadTierText(tier: string | null | undefined): string {
+  if (!tier) return 'Default';
+  return tier in MODEL_NAMES ? cadModelLabel(tier as RingCadTier) : tier;
 }

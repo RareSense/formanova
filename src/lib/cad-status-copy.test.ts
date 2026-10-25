@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cadStatusNotice } from './cad-status-copy';
+import { cadInProgressNotice, cadStatusNotice } from './cad-status-copy';
 
 describe('cadStatusNotice', () => {
   it.each([
@@ -14,6 +14,24 @@ describe('cadStatusNotice', () => {
     expect(cadStatusNotice('unexpected')).toMatchObject({
       tone: 'error',
       title: 'AI is overwhelmed',
+    });
+  });
+});
+
+describe('supervised CAD copy', () => {
+  it('says a waiting run is still in progress, never failed', () => {
+    expect(cadInProgressNotice()).toEqual({
+      tone: 'success',
+      title: 'Still in progress',
+      message: "We're still working on this CAD. You'll have the result within 24 hours.",
+    });
+  });
+
+  it('tells the user an admin-failed run was refunded, not that AI is overwhelmed', () => {
+    expect(cadStatusNotice('failed_by_admin')).toEqual({
+      tone: 'error',
+      title: "We couldn't make this design",
+      message: 'Your credits have been returned.',
     });
   });
 });

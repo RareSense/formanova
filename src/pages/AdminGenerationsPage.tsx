@@ -151,6 +151,7 @@ export default function AdminGenerationsPage() {
     queryFn: () => listAdminGenerations({
       limit: PAGE_SIZE,
       offset,
+      supervised: false,
       status: status || undefined,
       user_email: hasSearch && searchField === 'email' ? trimmedSearch : undefined,
       workflow_name: hasSearch && searchField === 'workflow' ? trimmedSearch : undefined,
