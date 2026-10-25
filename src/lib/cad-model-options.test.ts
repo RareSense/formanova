@@ -23,4 +23,13 @@ describe("cad model options", () => {
     expect(cadModelLabel(RING_CAD_TIERS.CLAUDE_FABLE_5_1_SUBSCRIPTION)).toBe("Claude Fable 5.1 · Subscription");
     expect(cadModelLabel(RING_CAD_TIERS.GPT_6_ASTRA_OPENAI)).toBe("GPT-6 Astra · Direct API");
   });
+
+  it("offers the Kimi tiers under their route", () => {
+    expect(cadModelLabel(RING_CAD_TIERS.KIMI_K3_1_PRO_MOONSHOT)).toBe("Kimi K3.1 Pro · Direct API");
+    expect(cadModelLabel(RING_CAD_TIERS.KIMI_K3_OPENROUTER)).toBe("Kimi K3 · OpenRouter");
+    const direct = CAD_MODEL_GROUPS.find((group) => group.route === "direct")!;
+    expect(direct.options.map((option) => option.tier)).toContain("kimi_k3_1_pro_moonshot");
+    const openrouter = CAD_MODEL_GROUPS.find((group) => group.route === "openrouter")!;
+    expect(openrouter.options.map((option) => option.tier)).toContain("kimi_k3_1_pro_openrouter");
+  });
 });

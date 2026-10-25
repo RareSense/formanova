@@ -52,6 +52,10 @@ export const RING_CAD_TIERS = {
   GEMINI_3_8_FLASH_OPENROUTER: 'gemini_3_8_flash_openrouter',
   GEMINI_4_ARGON_GOOGLE: 'gemini_4_argon_google',
   GEMINI_4_ARGON_OPENROUTER: 'gemini_4_argon_openrouter',
+  KIMI_K3_MOONSHOT: 'kimi_k3_moonshot',
+  KIMI_K3_OPENROUTER: 'kimi_k3_openrouter',
+  KIMI_K3_1_PRO_MOONSHOT: 'kimi_k3_1_pro_moonshot',
+  KIMI_K3_1_PRO_OPENROUTER: 'kimi_k3_1_pro_openrouter',
   // Run on the Claude or ChatGPT subscription connected to the toolkit, not an API key.
   CLAUDE_FABLE_5_1_SUBSCRIPTION: 'claude_fable_5_1_subscription',
   CLAUDE_OPUS_5_5_SUBSCRIPTION: 'claude_opus_5_5_subscription',
