@@ -585,7 +585,7 @@ describe('AdminCadQueueDetailPage', () => {
       expect(screen.queryByRole('combobox', { name: 'Build AI' })).toBeNull();
     });
 
-    it('sends only the changed tier when Start is pressed', async () => {
+    it('sends the changed Build AI and the unchanged Review AI when Start is pressed', async () => {
       api.getSupervisedRun.mockResolvedValue(withTiers('queued', { llm_tier: null, analysis_tier: 'gpt_6_astra_openai' }));
       api.startSupervisedRuns.mockResolvedValue([{ workflow_id: 'wf-1', accepted: true }]);
       renderPage();
@@ -593,11 +593,21 @@ describe('AdminCadQueueDetailPage', () => {
       await choose('Build AI', 'GPT-6 Astra Pro');
       fireEvent.click(screen.getByRole('button', { name: 'Start' }));
       await waitFor(() => expect(api.startSupervisedRuns).toHaveBeenCalledTimes(1));
-      expect(api.startSupervisedRuns).toHaveBeenCalledWith(['wf-1'], { llm_tier: 'gpt_6_astra_pro_openrouter' });
+      expect(api.startSupervisedRuns).toHaveBeenCalledWith(['wf-1'], { llm_tier: 'gpt_6_astra_pro_openrouter', analysis_tier: 'gpt_6_astra_openai' });
     });
 
-    it('sends no tiers when the pickers are untouched', async () => {
+    it('sends the run own real tier when the pickers are untouched, and omits Default', async () => {
       api.getSupervisedRun.mockResolvedValue(withTiers('queued', { llm_tier: 'gpt_6_astra_openai', analysis_tier: null }));
+      api.startSupervisedRuns.mockResolvedValue([{ workflow_id: 'wf-1', accepted: true }]);
+      renderPage();
+      await loaded();
+      fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+      await waitFor(() => expect(api.startSupervisedRuns).toHaveBeenCalledTimes(1));
+      expect(api.startSupervisedRuns).toHaveBeenCalledWith(['wf-1'], { llm_tier: 'gpt_6_astra_openai' });
+    });
+
+    it('sends no tiers when both pickers are untouched on Default', async () => {
+      api.getSupervisedRun.mockResolvedValue(withTiers('queued', { llm_tier: null, analysis_tier: null }));
       api.startSupervisedRuns.mockResolvedValue([{ workflow_id: 'wf-1', accepted: true }]);
       renderPage();
       await loaded();
@@ -618,7 +628,7 @@ describe('AdminCadQueueDetailPage', () => {
       expect(await screen.findByRole('option', { name: 'Default' })).toBeTruthy();
     });
 
-    it('shows an unknown current value as its own option and keeps it', async () => {
+    it('shows an unknown current value as its own option and sends it on Start', async () => {
       api.getSupervisedRun.mockResolvedValue(withTiers('queued', { llm_tier: 'mystery_tier_9', analysis_tier: null }));
       api.startSupervisedRuns.mockResolvedValue([{ workflow_id: 'wf-1', accepted: true }]);
       renderPage();
@@ -626,7 +636,7 @@ describe('AdminCadQueueDetailPage', () => {
       expect(screen.getByRole('combobox', { name: 'Build AI' }).textContent).toContain('mystery_tier_9');
       fireEvent.click(screen.getByRole('button', { name: 'Start' }));
       await waitFor(() => expect(api.startSupervisedRuns).toHaveBeenCalledTimes(1));
-      expect(api.startSupervisedRuns.mock.calls[0]).toEqual([['wf-1']]);
+      expect(api.startSupervisedRuns).toHaveBeenCalledWith(['wf-1'], { llm_tier: 'mystery_tier_9' });
     });
   });
 });

@@ -528,7 +528,7 @@ export default function AdminCadQueueDetailPage() {
   }
 
   const start = () => run(async () => {
-    const tiers = changedTiers();
+    const tiers = tiersToSend();
     const results = tiers ? await startSupervisedRuns([workflowId], tiers) : await startSupervisedRuns([workflowId]);
     const mine = results.find((r) => r.workflow_id === workflowId) ?? results[0];
     if (!mine) return { accepted: false, code: 'not_found' };
@@ -541,11 +541,13 @@ export default function AdminCadQueueDetailPage() {
     void run(() => sendSupervisedRun(workflowId, ticked));
   };
 
-  // Only a tier the admin changed is sent; one left alone keeps the run's own.
-  function changedTiers(): StartTiers | null {
+  // Start always sends the AI shown in the pickers, changed or not. Default sends nothing for that key.
+  function tiersToSend(): StartTiers | null {
     const tiers: StartTiers = {};
-    if (buildChoice && buildChoice !== DEFAULT_TIER && buildChoice !== currentBuild) tiers.llm_tier = buildChoice;
-    if (reviewChoice && reviewChoice !== DEFAULT_TIER && reviewChoice !== currentReview) tiers.analysis_tier = reviewChoice;
+    const build = buildChoice ?? currentBuild;
+    const review = reviewChoice ?? currentReview;
+    if (build && build !== DEFAULT_TIER) tiers.llm_tier = build;
+    if (review && review !== DEFAULT_TIER) tiers.analysis_tier = review;
     return Object.keys(tiers).length > 0 ? tiers : null;
   }
 
