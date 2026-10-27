@@ -127,12 +127,14 @@ describe('SupervisedReplacementPanel', () => {
     expect(screen.queryByText('Stone list')).toBeNull();
   });
 
-  it('refuses a file over 256 MB before any request', () => {
-    renderPanel(detail());
+  it('uploads a file over 256 MB', async () => {
+    api.uploadReplacementFile.mockResolvedValue({ upload_id: 'u1', role: 'stl', ref: {} });
+    const onChanged = renderPanel(detail());
     openMoreFiles();
-    pick('Full model STL', sizedFile('big.stl', 300_000_000));
-    expect(screen.getByText("Files over 256 MB aren't supported yet.")).toBeTruthy();
-    expect(api.uploadReplacementFile).not.toHaveBeenCalled();
+    const file = sizedFile('big.stl', 900_000_000);
+    pick('Full model STL', file);
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
+    expect(api.uploadReplacementFile).toHaveBeenCalledWith('wf-1', 'stl', file, expect.anything());
   });
 
   it('uploads a picked GLB and then refreshes', async () => {

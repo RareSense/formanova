@@ -2,6 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockFetch = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/authenticated-fetch', () => ({ authenticatedFetch: mockFetch }));
+const blob = vi.hoisted(() => ({ url: '', uploadData: vi.fn() }));
+vi.mock('@azure/storage-blob', () => ({
+  BlockBlobClient: class {
+    constructor(url: string) { blob.url = url; }
+    uploadData = blob.uploadData;
+  },
+}));
 
 import {
   PHASE_ACTIONS, SupervisedRunsApiError, addSupervisedRunNote, failSupervisedRun, getSupervisedRun,
@@ -156,7 +163,7 @@ describe('helpers', () => {
 describe('uploadReplacementFile', () => {
   const file = new File(['x'.repeat(10)], 'ring.glb');
 
-  it('asks for a link, PUTs once with the returned headers, then completes', async () => {
+  it('asks for a link, uploads once, then completes', async () => {
     mockFetch
       .mockResolvedValueOnce(ok({ upload_id: 'u1', upload_url: 'https://blob/x?sig', expires_at: '', headers: { 'x-ms-blob-type': 'BlockBlob' } }))
       .mockResolvedValueOnce(ok({ upload_id: 'u1', role: 'glb', ref: { uri: 'azure://x' } }));
@@ -165,7 +172,7 @@ describe('uploadReplacementFile', () => {
     expect(call(0).url).toBe('/api/admin/supervised-runs/a/uploads');
     expect(JSON.parse(call(0).init.body)).toEqual({ role: 'glb', filename: 'ring.glb', bytes: 10 });
     expect(put).toHaveBeenCalledTimes(1);
-    expect(put).toHaveBeenCalledWith('https://blob/x?sig', file, { 'x-ms-blob-type': 'BlockBlob' }, undefined);
+    expect(put).toHaveBeenCalledWith('https://blob/x?sig', file, undefined);
     expect(call(1).url).toBe('/api/admin/supervised-runs/a/uploads/u1/complete');
     expect(done.upload_id).toBe('u1');
   });
@@ -178,20 +185,42 @@ describe('uploadReplacementFile', () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
-  it('always sends the BlockBlob header even if the backend omits it', async () => {
+  it('uploads with the Azure SDK by default and reports progress as a fraction', async () => {
+    blob.uploadData.mockReset().mockImplementation(async (_data: Blob, opts: { onProgress: (p: { loadedBytes: number }) => void }) => {
+      opts.onProgress({ loadedBytes: 5 });
+      opts.onProgress({ loadedBytes: 10 });
+    });
     mockFetch
-      .mockResolvedValueOnce(ok({ upload_id: 'u1', upload_url: 'https://blob/x', expires_at: '' }))
+      .mockResolvedValueOnce(ok({ upload_id: 'u1', upload_url: 'https://blob/x?sig', expires_at: '', headers: {} }))
       .mockResolvedValueOnce(ok({ upload_id: 'u1', role: 'glb', ref: {} }));
-    const put = vi.fn(async () => {});
-    await uploadReplacementFile('a', 'glb', file, { put });
-    expect((put.mock.calls[0] as unknown[])[2]).toEqual({ 'x-ms-blob-type': 'BlockBlob' });
+    const onProgress = vi.fn();
+    await uploadReplacementFile('a', 'glb', file, { onProgress });
+    expect(blob.url).toBe('https://blob/x?sig');
+    expect(blob.uploadData).toHaveBeenCalledTimes(1);
+    expect(blob.uploadData.mock.calls[0][0]).toBe(file);
+    expect(onProgress.mock.calls).toEqual([[0.5], [1]]);
+    expect(call(1).url).toBe('/api/admin/supervised-runs/a/uploads/u1/complete');
   });
 
-  it('refuses a file over the single-PUT limit before any request', async () => {
-    const big = new File(['x'], 'big.stl');
-    Object.defineProperty(big, 'size', { value: 256_000_001 });
-    await expect(uploadReplacementFile('a', 'stl', big, { put: vi.fn() })).rejects.toMatchObject({ code: 'too_large_for_browser' });
-    expect(mockFetch).not.toHaveBeenCalled();
+  it('sends a file over 256 MB to the same upload path', async () => {
+    blob.uploadData.mockReset().mockResolvedValue({});
+    const big = new File(['x'], 'big.3dm');
+    Object.defineProperty(big, 'size', { value: 900_000_000 });
+    mockFetch
+      .mockResolvedValueOnce(ok({ upload_id: 'u1', upload_url: 'https://blob/x', expires_at: '', headers: {} }))
+      .mockResolvedValueOnce(ok({ upload_id: 'u1', role: 'threedm', ref: {} }));
+    await uploadReplacementFile('a', 'threedm', big);
+    expect(JSON.parse(call(0).init.body)).toEqual({ role: 'threedm', filename: 'big.3dm', bytes: 900_000_000 });
+    expect(blob.uploadData).toHaveBeenCalledTimes(1);
+  });
+
+  it('turns an SDK failure into upload_put_failed and never completes', async () => {
+    blob.uploadData.mockReset().mockRejectedValue(Object.assign(new Error('AuthenticationFailed'), { statusCode: 403 }));
+    mockFetch.mockResolvedValueOnce(ok({ upload_id: 'u1', upload_url: 'https://blob/x', expires_at: '', headers: {} }));
+    const err = await uploadReplacementFile('a', 'glb', file).catch((e) => e);
+    expect(err).toBeInstanceOf(SupervisedRunsApiError);
+    expect(err).toMatchObject({ status: 403, code: 'upload_put_failed' });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
   it('reports a failed check with its reason', async () => {

@@ -139,12 +139,6 @@ export const UPLOAD_ROLES: UploadRoleSpec[] = [
   { role: 'stones', label: 'Stone list', accept: '.json', maxBytes: MiB },
 ];
 
-/**
- * One PUT is safe up to 256 MB (handoff). Larger files need the Azure Storage SDK's block upload,
- * which this page does not ship yet, so the picker refuses them before any request.
- */
-export const MAX_SINGLE_PUT_BYTES = 256_000_000;
-
 export class SupervisedRunsApiError extends Error {
   status: number;
   code: string;
@@ -294,25 +288,27 @@ export function sendSupervisedReplacement(workflowId: string, acknowledgeMissing
   });
 }
 
-type PutBlob = (url: string, file: File, headers: Record<string, string>, onProgress?: (fraction: number) => void) => Promise<void>;
-
-/** One PUT straight to Azure, with progress. Never retried: a second PUT would replace a checked file. */
-const putBlobOnce: PutBlob = (url, file, headers, onProgress) => new Promise((resolve, reject) => {
-  const xhr = new XMLHttpRequest();
-  xhr.open('PUT', url);
-  for (const [key, value] of Object.entries(headers)) xhr.setRequestHeader(key, value);
-  xhr.upload.onprogress = (event) => {
-    if (event.lengthComputable) onProgress?.(event.loaded / event.total);
-  };
-  xhr.onload = () => (xhr.status >= 200 && xhr.status < 300
-    ? resolve()
-    : reject(new SupervisedRunsApiError(xhr.status, 'upload_put_failed', {})));
-  xhr.onerror = () => reject(new SupervisedRunsApiError(0, 'upload_put_failed', {}));
-  xhr.send(file);
-});
+type PutBlob = (url: string, file: File, onProgress?: (fraction: number) => void) => Promise<void>;
 
 /**
- * Upload one replacement file: ask for a link, PUT the file to it once, then ask the backend to
+ * Upload straight to Azure with the Storage SDK: one request for small files, blocks for large
+ * ones (a single PUT is only safe up to 256 MB). Loaded on demand, so only uploads download it.
+ * Never repeated once it settles: a second upload would replace a checked file.
+ */
+const putBlob: PutBlob = async (url, file, onProgress) => {
+  try {
+    const { BlockBlobClient } = await import('@azure/storage-blob');
+    await new BlockBlobClient(url).uploadData(file, {
+      onProgress: (progress) => onProgress?.(file.size ? progress.loadedBytes / file.size : 1),
+    });
+  } catch (err) {
+    const status = (err as { statusCode?: unknown })?.statusCode;
+    throw new SupervisedRunsApiError(typeof status === 'number' ? status : 0, 'upload_put_failed', {});
+  }
+};
+
+/**
+ * Upload one replacement file: ask for a link, upload the file to it once, then ask the backend to
  * check it. A refusal at any step throws SupervisedRunsApiError; start again from the top for a
  * corrected file (never reuse the link).
  */
@@ -320,15 +316,13 @@ export async function uploadReplacementFile(
   workflowId: string,
   role: UploadRole,
   file: File,
-  { onProgress, put = putBlobOnce }: { onProgress?: (fraction: number) => void; put?: PutBlob } = {},
+  { onProgress, put = putBlob }: { onProgress?: (fraction: number) => void; put?: PutBlob } = {},
 ): Promise<{ upload_id: string; role: UploadRole; ref: unknown }> {
-  if (file.size > MAX_SINGLE_PUT_BYTES) {
-    throw new SupervisedRunsApiError(0, 'too_large_for_browser', { max_bytes: MAX_SINGLE_PUT_BYTES });
-  }
-  const link = await request<{ upload_id: string; upload_url: string; expires_at: string; headers?: Record<string, string> }>(
+  // The link's headers only ask for a block blob, which the SDK always writes.
+  const link = await request<{ upload_id: string; upload_url: string; expires_at: string }>(
     'POST', `${run(workflowId)}/uploads`, { role, filename: file.name, bytes: file.size },
   );
-  await put(link.upload_url, file, { 'x-ms-blob-type': 'BlockBlob', ...(link.headers ?? {}) }, onProgress);
+  await put(link.upload_url, file, onProgress);
   try {
     return await request('POST', `${run(workflowId)}/uploads/${encodeURIComponent(link.upload_id)}/complete`, {});
   } catch (err) {

@@ -10,7 +10,6 @@ import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { normalizeAdminGenerationDetail } from '@/lib/admin-generations-api';
 import {
-  MAX_SINGLE_PUT_BYTES,
   SupervisedRunsApiError,
   UPLOAD_ROLES,
   getSupervisedRun,
@@ -90,8 +89,6 @@ function uploadErrorCopy(err: unknown): string {
       return 'This upload was already used. Choose the file again.';
     case 'upload_put_failed':
       return 'The upload to storage failed. Choose the file again.';
-    case 'too_large_for_browser':
-      return "Files over 256 MB aren't supported yet.";
     case 'invalid_phase':
       return 'This run is no longer rejected. Refresh the page.';
     case 'no_verified_upload':
@@ -276,10 +273,6 @@ export default function SupervisedReplacementPanel({
     setRole(setErrors, spec.role, undefined);
     if (file.size > spec.maxBytes) {
       setRole(setErrors, spec.role, `Too big for this role (max ${formatBytes(spec.maxBytes)}).`);
-      return;
-    }
-    if (file.size > MAX_SINGLE_PUT_BYTES) {
-      setRole(setErrors, spec.role, "Files over 256 MB aren't supported yet.");
       return;
     }
     inFlight.current.add(spec.role);
