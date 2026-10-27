@@ -68,6 +68,11 @@ export interface CadRingVersion {
   created_at?: string | null;
   /** The version's complete files. Absent on older backends; only listed kinds can be fetched. */
   downloads?: CadVersionDownload[];
+  /**
+   * A short note left with this version's result (plain text, line breaks kept); null or absent
+   * when there is none. Show it as text, never as HTML.
+   */
+  user_note?: string | null;
 }
 
 export interface CadRing {

@@ -22,6 +22,7 @@ import { useNotificationEmail } from "@/hooks/useNotificationEmail";
 import { useCadArtifactDownloads } from "@/hooks/useCadArtifactDownloads";
 import { useCadAutoRotate } from "@/hooks/useCadAutoRotate";
 import CadResultActions from "@/components/text-to-cad/CadResultActions";
+import CadVersionNote from "@/components/text-to-cad/CadVersionNote";
 import CadStatusDialog from '@/components/text-to-cad/CadStatusDialog';
 import { trackCadStudioOpen } from "@/lib/posthog-events";
 
@@ -424,6 +425,10 @@ export default function TextToCAD({ variant = "idea" }: { variant?: DesignStartV
             {/* Result actions, bottom center (on phones, the dock under the sheet). */}
             {layoutMode !== "phone" && resultActions}
 
+            {/* Top-left: the note left with the model on screen, when there is one. */}
+            {workflow.versionNote && workflow.hasModel && !workflow.isGenerating && !workflow.isModelLoading && (
+              <CadVersionNote assetId={workflow.versionNote.assetId} text={workflow.versionNote.text} />
+            )}
             {/* Bottom-left: gem toggle */}
             {workflow.hasModel && !workflow.isGenerating && !workflow.isModelLoading && (
               <div className="absolute bottom-4 left-4 z-50">

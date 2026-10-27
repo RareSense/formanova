@@ -50,6 +50,8 @@ interface Props {
   message?: string | null;
   /** Told whenever an upload or Remove starts or ends, so the page can hold Fail meanwhile. */
   onBusyChange?: (busy: boolean) => void;
+  /** The page's note to the user, sent with Send replacement (blank sends none). */
+  userNote?: string;
 }
 
 // 'waiting': complete failed without an answer (proxy timeout); the page polls for the result.
@@ -203,7 +205,7 @@ function RoleRow({ spec, upload, downloadUrl, transfer, error, removing, disable
 }
 
 export default function SupervisedReplacementPanel({
-  detail, workflowId, onChanged, runAction, locked = false, message, onBusyChange,
+  detail, workflowId, onChanged, runAction, locked = false, message, onBusyChange, userNote,
 }: Props) {
   const [transfers, setTransfers] = useState<Partial<Record<UploadRole, Transfer>>>({});
   const [errors, setErrors] = useState<Partial<Record<UploadRole, string>>>({});
@@ -379,7 +381,8 @@ export default function SupervisedReplacementPanel({
     if (!canSend) return;
     const ack = [...tickedNow];
     const type = needsType ? jewelryType : undefined;
-    const action = () => sendSupervisedReplacement(workflowId, ack, type);
+    const note = userNote;
+    const action = () => sendSupervisedReplacement(workflowId, ack, type, note);
     void (runAction ? runAction(action) : runOwn(action));
   }
 

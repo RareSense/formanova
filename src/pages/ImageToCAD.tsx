@@ -15,6 +15,7 @@ import { useNotificationEmail } from "@/hooks/useNotificationEmail";
 import { useCadArtifactDownloads } from "@/hooks/useCadArtifactDownloads";
 import { useCadAutoRotate } from "@/hooks/useCadAutoRotate";
 import CadResultActions from "@/components/text-to-cad/CadResultActions";
+import CadVersionNote from "@/components/text-to-cad/CadVersionNote";
 import CadStatusDialog from '@/components/text-to-cad/CadStatusDialog';
 import { trackCadStudioOpen, trackCadReferenceUploaded } from "@/lib/posthog-events";
 import { useCADKeyboardShortcuts } from "@/hooks/use-cad-keyboard-shortcuts";
@@ -405,6 +406,10 @@ export default function ImageToCAD() {
             {/* Result actions, bottom center (on phones, the dock under the sheet). */}
             {layoutMode !== "phone" && resultActions}
 
+            {/* Top-left: the note left with the model on screen, when there is one. */}
+            {workflow.versionNote && workflow.hasModel && !workflow.isGenerating && !workflow.isModelLoading && (
+              <CadVersionNote assetId={workflow.versionNote.assetId} text={workflow.versionNote.text} />
+            )}
             {workflow.hasModel && !workflow.isGenerating && !workflow.isModelLoading && (
               <div className="absolute bottom-4 left-4 z-50">
                 <GemToggle visible mode={gemMode} onModeChange={setGemMode} />

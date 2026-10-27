@@ -348,6 +348,14 @@ export function useImageToCADWorkflow({
     ? { assetId: activeVersion.asset_id, downloads: activeVersion.downloads, source: cadSource }
     : null;
 
+  /**
+   * The note left with the model on screen (plain text), and the version it belongs to. Same rule
+   * as the downloads: only while the viewer really shows that version's GLB.
+   */
+  const versionNote = activeVersion?.user_note?.trim() && activeVersion.glb_url === glbUrl
+    ? { assetId: activeVersion.asset_id, text: activeVersion.user_note }
+    : null;
+
   /** Opens an earlier version in the viewer. Its files are already published. */
   const selectVersion = useCallback((assetId: string) => {
     const version = (ring?.versions ?? []).find((v) => v.asset_id === assetId);
@@ -823,6 +831,8 @@ export function useImageToCADWorkflow({
     /** Every saved version of this ring, oldest first, for the side panel. */
     versions,
     selectedVersionId: activeVersion?.asset_id ?? null,
+    /** The note left with the model on screen, or null. */
+    versionNote,
     selectVersion,
     improveFromLatestVersion,
     improveMessage,

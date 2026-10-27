@@ -242,7 +242,7 @@ function extractGlbFromSteps(steps: AdminGenerationStep[]): string | null {
     // Prefer a backend-signed url when present; otherwise resolve the azure://
     // reference. Never fall back to the raw uri: azure:// cannot be fetched, so
     // returning it guarantees the viewer fails instead of showing "No 3D output".
-    const glbArt = (out.glb_artifact ?? out.original_glb_artifact) as any;
+    const glbArt = (out.glb_artifact ?? out.original_glb_artifact) as { url?: unknown; uri?: unknown } | null | undefined;
     const glbArtUrl = typeof glbArt?.url === 'string' ? glbArt.url : undefined;
     if (glbArtUrl) return glbArtUrl;
     if (typeof glbArt?.uri === 'string') {
@@ -251,7 +251,7 @@ function extractGlbFromSteps(steps: AdminGenerationStep[]): string | null {
     }
     const glbPath = out.glb_path;
     if (glbPath) {
-      const p = typeof glbPath === 'string' ? glbPath : (glbPath as any)?.uri;
+      const p = typeof glbPath === 'string' ? glbPath : (glbPath as { uri?: unknown } | null)?.uri;
       if (typeof p === 'string') {
         const resolved = azureUriToUrl(p);
         if (resolved) return resolved;
@@ -537,13 +537,130 @@ function tiersText(build: string | null | undefined, review: string | null | und
   return `Build AI ${cadTierText(build)} · Review AI ${cadTierText(review)}`;
 }
 
+/**
+ * What the customer sent with a run: the CAD studio inputs (prompt, pictures, details), the design
+ * steps behind a CAD from a design picture, and every jewelry image the payload carries. Shared by
+ * DetailContent and RunInputsPanel so both read the inputs the same way.
+ */
+function useCadRunInputs(detail: AdminGenerationDetail) {
+  const referenceImageCount = getReferenceImageCount(detail.input_payload);
+  const cadSourceType = resolveSourceType(detail.source_type, detail.workflow_name, referenceImageCount);
+  const isCadModel = cadSourceType === 'text_to_cad' || cadSourceType === 'image_to_cad';
+  // CAD studio runs (design pictures, and CAD from Image / Idea / Inspiration)
+  // keep their inputs in shapes the generic finders below don't read.
+  const studioInputsRaw = readCadStudioInputs(detail.workflow_name, detail.input_payload, isCadModel);
+  // A CAD from a design picture: walk back to the doodle / words / edits behind it.
+  const designArtifact = isCadModel ? cadDesignArtifact(detail.input_payload) : null;
+  const designHistoryQuery = useQuery({
+    queryKey: ['admin-design-history', detail.workflow_id],
+    queryFn: () => traceDesignHistory(designArtifact, detail.created_at || null, {
+      fetchRun: getAdminGenerationDetail,
+      // The customer's own design pictures, to match the CAD's picture against.
+      listRuns: async () => !detail.user_email ? [] : (await listAdminGenerations({ user_email: detail.user_email, workflow_name: 'design_image_v1', limit: 100 }))
+        .items.filter((item) => isDesignImageWorkflow(item.workflow_name)),
+    }),
+    enabled: isCadModel && mayHaveDesignHistory(detail.input_payload),
+    staleTime: Infinity,
+    retry: false,
+  });
+  const designHistory = designHistoryQuery.data ?? null;
+  const fromDoodle = startedFromDoodle(designHistory);
+  // The CAD payload says "idea" for both words and drawings; the trail tells them apart.
+  const studioInputs = studioInputsRaw && fromDoodle
+    ? { ...studioInputsRaw, details: studioInputsRaw.details.map((d) => (d.label === 'Flow' ? { ...d, value: 'CAD from Doodle' } : d)) }
+    : studioInputsRaw;
+  // Derivative runs (upscale) store their source under `image` — either a bare
+  // string or `{ uri }` — with no jewelry_image_url. Surface it so the workflow's
+  // input still renders in the admin detail.
+  const derivativeSourceUrl = (() => {
+    const img = (detail.input_payload as Record<string, unknown> | null)?.image;
+    if (typeof img === 'string') return img;
+    if (img && typeof img === 'object' && typeof (img as Record<string, unknown>).uri === 'string') {
+      return (img as Record<string, unknown>).uri as string;
+    }
+    return null;
+  })();
+  // The request wraps everything as { payload: {...} }, so image fields live one
+  // level down (input_payload.payload.*) - the shallow finders miss them at the top
+  // level. Search the raw payload, its nested payload, and the first step's resolved
+  // input so the full jewelry_image_urls array (High Effort) is always found.
+  const payloadRoots: unknown[] = [
+    detail.input_payload,
+    (detail.input_payload as Record<string, unknown> | null)?.payload,
+    detail.steps[0]?.input,
+  ];
+  const jewelryInputUrls = [...new Set(
+    [
+      ...payloadRoots.flatMap((root) => [
+        ...extractTypedImageArtifacts(root),
+        ...findStringArray(root, ['jewelry_image_urls', 'input_image_urls', 'input_images']),
+        ...['jewelry_image_url', 'input_image_url', 'image_url', 'source_image_url']
+          .map((key) => findString(root, [key]))
+          .filter((value): value is string => Boolean(value)),
+      ]),
+      ...(derivativeSourceUrl ? [derivativeSourceUrl] : []),
+    ]
+      .map((value) => normalizeRenderableUrl(value))
+      .filter((value): value is string => Boolean(value)),
+  )];
+  // Older CAD workflows keep the prompt and pictures under other keys; the
+  // previous finders still apply whenever the studio reader comes back empty.
+  const cadInputs = isCadModel && studioInputs
+    ? {
+        ...studioInputs,
+        prompt: studioInputs.prompt
+          ?? findText(detail.input_payload, ['prompt', 'description', 'ring_description', 'text_input', 'input_text', 'text', 'query', 'user_description']),
+        images: studioInputs.images.length
+          ? studioInputs.images
+          : jewelryInputUrls.map((url, index) => ({ url, label: `Uploaded Image ${index + 1}` })),
+      }
+    : null;
+  return {
+    cadSourceType, isCadModel, studioInputs, designHistory, designHistoryQuery, fromDoodle,
+    payloadRoots, jewelryInputUrls, cadInputs,
+  };
+}
+
+/**
+ * The customer's inputs on their own, for pages that put them first (the CAD queue). The same
+ * reading as the Visual Summary in DetailContent; nothing here is folded away.
+ */
+export function RunInputsPanel({ detail }: { detail: AdminGenerationDetail }) {
+  const { designHistory, designHistoryQuery, cadInputs, jewelryInputUrls } = useCadRunInputs(detail);
+  const hasAnything = Boolean(designHistory || cadInputs || jewelryInputUrls.length);
+  return (
+    <div className="space-y-4">
+      {designHistory ? (
+        <DesignHistorySection history={designHistory} />
+      ) : designHistoryQuery.isLoading ? (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading design steps
+        </div>
+      ) : null}
+      {cadInputs ? (
+        <StudioInputs inputs={cadInputs} />
+      ) : jewelryInputUrls.length > 0 ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {jewelryInputUrls.map((url, index) => (
+            <ImagePreview key={`${url}-${index}`} url={url} label={`Uploaded Image ${index + 1}`} zoomable />
+          ))}
+        </div>
+      ) : null}
+      {!hasAnything && !designHistoryQuery.isLoading && (
+        <p className="text-sm text-muted-foreground">This run carries no prompt or pictures.</p>
+      )}
+    </div>
+  );
+}
+
 export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
   // Both CAD families produce a GLB. Image-to-CAD (including ring_cad_nurbs_v1)
   // was excluded here, so its runs always rendered
   // "No 3D output" no matter what the pipeline returned.
-  const referenceImageCount = getReferenceImageCount(detail.input_payload);
-  const cadSourceType = resolveSourceType(detail.source_type, detail.workflow_name, referenceImageCount);
-  const isCadModel = cadSourceType === 'text_to_cad' || cadSourceType === 'image_to_cad';
+  const {
+    cadSourceType, isCadModel, studioInputs, designHistory, designHistoryQuery, fromDoodle, payloadRoots,
+    jewelryInputUrls, cadInputs,
+  } = useCadRunInputs(detail);
   const cadResultQuery = useQuery({
     queryKey: ['admin-cad-result', detail.workflow_id],
     queryFn: () => fetchCadResult(detail.workflow_id),
@@ -568,29 +685,6 @@ export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
   });
   const appliedTiers = supervisedQuery.data?.supervision.tiers ?? null;
   const [downloading3dm, setDownloading3dm] = useState(false);
-  // CAD studio runs (design pictures, and CAD from Image / Idea / Inspiration)
-  // keep their inputs in shapes the generic finders below don't read.
-  const studioInputsRaw = readCadStudioInputs(detail.workflow_name, detail.input_payload, isCadModel);
-  // A CAD from a design picture: walk back to the doodle / words / edits behind it.
-  const designArtifact = isCadModel ? cadDesignArtifact(detail.input_payload) : null;
-  const designHistoryQuery = useQuery({
-    queryKey: ['admin-design-history', detail.workflow_id],
-    queryFn: () => traceDesignHistory(designArtifact, detail.created_at || null, {
-      fetchRun: getAdminGenerationDetail,
-      // The customer's own design pictures, to match the CAD's picture against.
-      listRuns: async () => !detail.user_email ? [] : (await listAdminGenerations({ user_email: detail.user_email, workflow_name: 'design_image_v1', limit: 100 }))
-        .items.filter((item) => isDesignImageWorkflow(item.workflow_name)),
-    }),
-    enabled: isCadModel && mayHaveDesignHistory(detail.input_payload),
-    staleTime: Infinity,
-    retry: false,
-  });
-  const designHistory = designHistoryQuery.data ?? null;
-  const fromDoodle = startedFromDoodle(designHistory);
-  // The CAD payload says "idea" for both words and drawings; the trail tells them apart.
-  const studioInputs = studioInputsRaw && fromDoodle
-    ? { ...studioInputsRaw, details: studioInputsRaw.details.map((d) => (d.label === 'Flow' ? { ...d, value: 'CAD from Doodle' } : d)) }
-    : studioInputsRaw;
   const isDesignImage = isDesignImageWorkflow(detail.workflow_name);
   const cadGlbUrl = isCadModel
     ? cadResultQuery.data?.glb_url ?? extractGlbFromSteps(detail.steps)
@@ -631,40 +725,6 @@ export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
       .map((value) => normalizeRenderableUrl(value))
       .filter((value): value is string => Boolean(value)),
   );
-  // Derivative runs (upscale) store their source under `image` — either a bare
-  // string or `{ uri }` — with no jewelry_image_url. Surface it so the workflow's
-  // input still renders in the admin detail.
-  const derivativeSourceUrl = (() => {
-    const img = (detail.input_payload as Record<string, unknown> | null)?.image;
-    if (typeof img === 'string') return img;
-    if (img && typeof img === 'object' && typeof (img as Record<string, unknown>).uri === 'string') {
-      return (img as Record<string, unknown>).uri as string;
-    }
-    return null;
-  })();
-  // The request wraps everything as { payload: {...} }, so image fields live one
-  // level down (input_payload.payload.*) - the shallow finders miss them at the top
-  // level. Search the raw payload, its nested payload, and the first step's resolved
-  // input so the full jewelry_image_urls array (High Effort) is always found.
-  const payloadRoots: unknown[] = [
-    detail.input_payload,
-    (detail.input_payload as Record<string, unknown> | null)?.payload,
-    detail.steps[0]?.input,
-  ];
-  const jewelryInputUrls = [...new Set(
-    [
-      ...payloadRoots.flatMap((root) => [
-        ...extractTypedImageArtifacts(root),
-        ...findStringArray(root, ['jewelry_image_urls', 'input_image_urls', 'input_images']),
-        ...['jewelry_image_url', 'input_image_url', 'image_url', 'source_image_url']
-          .map((key) => findString(root, [key]))
-          .filter((value): value is string => Boolean(value)),
-      ]),
-      ...(derivativeSourceUrl ? [derivativeSourceUrl] : []),
-    ]
-      .map((value) => normalizeRenderableUrl(value))
-      .filter((value): value is string => Boolean(value)),
-  )];
   const inspirationImageUrl = firstRenderableUrl(
     payloadRoots.flatMap((root) => [
       findString(root, ['inspiration_image_url']),
@@ -698,18 +758,6 @@ export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
         label: jewelryInputUrls.length > 1 ? `Jewelry Input ${i + 1}` : 'Jewelry Input',
       }))
     : [{ url: null, label: 'Jewelry Input' }];
-  // Older CAD workflows keep the prompt and pictures under other keys; the
-  // previous finders still apply whenever the studio reader comes back empty.
-  const cadInputs = isCadModel && studioInputs
-    ? {
-        ...studioInputs,
-        prompt: studioInputs.prompt
-          ?? findText(detail.input_payload, ['prompt', 'description', 'ring_description', 'text_input', 'input_text', 'text', 'query', 'user_description']),
-        images: studioInputs.images.length
-          ? studioInputs.images
-          : jewelryInputUrls.map((url, index) => ({ url, label: `Uploaded Image ${index + 1}` })),
-      }
-    : null;
   const visualSummaryImages = [
     ...jewelryEntries,
     ...(referenceImage ? [referenceImage] : []),
