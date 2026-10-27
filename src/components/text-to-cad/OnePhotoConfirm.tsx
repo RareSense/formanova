@@ -1,10 +1,10 @@
 /**
- * Asked once per Generate press when a CAD from Image has a single photo: one view leaves the
- * other sides to guesswork, and more angles are the cheapest way to a closer model. Adding photos
- * is the suggested choice (the main button); continuing is always one press away.
+ * Asked once per Generate press when a CAD from Image has a single photo. The picture does the
+ * explaining: the user's own photo beside two empty slots for the angles it is missing, then one
+ * short line. Adding photos is the suggested choice (focused); continuing is one press away.
  */
 import { useRef } from 'react';
-import { Camera } from 'lucide-react';
+import { ImageOff } from 'lucide-react';
 
 import {
   AlertDialog,
@@ -17,8 +17,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-export default function OnePhotoConfirm({ open, onAddPhotos, onContinue }: {
+const MISSING_ANGLES = ['Side', 'Top'];
+
+export default function OnePhotoConfirm({ open, photoUrl, onAddPhotos, onContinue }: {
   open: boolean;
+  /** The one photo they uploaded, shown first. */
+  photoUrl?: string | null;
   /** Close and go back to the upload, to add more angles. */
   onAddPhotos: () => void;
   /** Make the CAD from the one photo anyway. */
@@ -28,26 +32,42 @@ export default function OnePhotoConfirm({ open, onAddPhotos, onContinue }: {
   return (
     <AlertDialog open={open} onOpenChange={(next) => { if (!next) onAddPhotos(); }}>
       <AlertDialogContent
-        className="w-[calc(100%-2rem)] max-w-md"
+        className="w-[calc(100%-2rem)] max-w-md shadow-none"
         // Focus the suggested choice, so Enter adds photos rather than continuing with one.
         onOpenAutoFocus={(event) => { event.preventDefault(); addRef.current?.focus(); }}
       >
-        <AlertDialogHeader className="items-center text-center sm:text-center">
-          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-            <Camera className="h-5 w-5 text-foreground" aria-hidden="true" />
+        {/* Their photo, then the angles it is missing. Same size, one gap, so the row reads as a set. */}
+        <div className="grid grid-cols-3 gap-3 pt-2" aria-hidden="true">
+          <div className="aspect-square overflow-hidden border border-border bg-muted">
+            {photoUrl ? (
+              <img src={photoUrl} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                <ImageOff className="h-5 w-5" />
+              </div>
+            )}
           </div>
-          <AlertDialogTitle className="font-display text-2xl tracking-wide">Only one photo?</AlertDialogTitle>
-          <AlertDialogDescription className="text-sm leading-relaxed">
-            One photo shows only one side of your piece, so the rest has to be guessed. Add two or three photos from
-            different angles (front, side, top) and the CAD will match much more closely.
+          {MISSING_ANGLES.map((angle) => (
+            <div
+              key={angle}
+              className="flex aspect-square items-center justify-center border-2 border-dashed border-border font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground"
+            >
+              {angle}
+            </div>
+          ))}
+        </div>
+        <AlertDialogHeader className="items-center text-center sm:text-center">
+          <AlertDialogTitle className="font-display text-2xl tracking-wide">Just one photo?</AlertDialogTitle>
+          <AlertDialogDescription className="text-sm">
+            Other sides are a guess. Add 2–3 angles for a closer match.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter className="gap-2 sm:justify-center sm:gap-2">
-          <AlertDialogCancel className="mt-0 h-10 px-6 sm:w-48" onClick={onContinue}>
-            Continue with 1 photo
+          <AlertDialogCancel className="mt-0 h-10 px-6 sm:w-44" onClick={onContinue}>
+            Continue anyway
           </AlertDialogCancel>
-          <AlertDialogAction ref={addRef} className="h-10 px-6 sm:w-48" onClick={onAddPhotos}>
-            Add more photos
+          <AlertDialogAction ref={addRef} className="h-10 px-6 sm:w-44" onClick={onAddPhotos}>
+            Add photos
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

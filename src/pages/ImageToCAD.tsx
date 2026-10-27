@@ -297,6 +297,7 @@ export default function ImageToCAD() {
         />
         <OnePhotoConfirm
           open={onePhotoOpen}
+          photoUrl={panelReferenceUrls[0] ?? null}
           onAddPhotos={() => setOnePhotoOpen(false)}
           onContinue={() => { setOnePhotoOpen(false); workflow.simulateGeneration(); }}
         />

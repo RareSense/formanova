@@ -4,34 +4,42 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import OnePhotoConfirm from './OnePhotoConfirm';
 
 describe('OnePhotoConfirm', () => {
-  it('says why more angles help and offers both choices', () => {
-    render(<OnePhotoConfirm open onAddPhotos={vi.fn()} onContinue={vi.fn()} />);
-    expect(screen.getByRole('alertdialog')).toBeTruthy();
-    expect(screen.getByText('Only one photo?')).toBeTruthy();
-    expect(screen.getByText(/different angles \(front, side, top\)/)).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Add more photos' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Continue with 1 photo' })).toBeTruthy();
+  it('shows their photo beside the missing angles, with one short line and both choices', () => {
+    render(<OnePhotoConfirm open photoUrl="blob:photo-1" onAddPhotos={vi.fn()} onContinue={vi.fn()} />);
+    const dialog = screen.getByRole('alertdialog');
+    expect(dialog.querySelector('img')?.getAttribute('src')).toBe('blob:photo-1');
+    expect(screen.getByText('Side')).toBeTruthy();
+    expect(screen.getByText('Top')).toBeTruthy();
+    expect(screen.getByText('Just one photo?')).toBeTruthy();
+    expect(screen.getByText('Other sides are a guess. Add 2–3 angles for a closer match.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Add photos' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Continue anyway' })).toBeTruthy();
   });
 
-  it('puts the focus on the suggested choice, Add more photos', async () => {
+  it('keeps its shape without a photo', () => {
+    render(<OnePhotoConfirm open onAddPhotos={vi.fn()} onContinue={vi.fn()} />);
+    expect(screen.getByRole('alertdialog').querySelector('img')).toBeNull();
+    expect(screen.getByText('Just one photo?')).toBeTruthy();
+  });
+
+  it('puts the focus on the suggested choice, Add photos', async () => {
     render(<OnePhotoConfirm open onAddPhotos={vi.fn()} onContinue={vi.fn()} />);
     await new Promise((r) => setTimeout(r, 0));
-    expect(document.activeElement?.textContent).toBe('Add more photos');
+    expect(document.activeElement?.textContent).toBe('Add photos');
   });
 
-  it('continues only on Continue with 1 photo', () => {
-    const onAddPhotos = vi.fn();
+  it('continues only on Continue anyway', () => {
     const onContinue = vi.fn();
-    render(<OnePhotoConfirm open onAddPhotos={onAddPhotos} onContinue={onContinue} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Continue with 1 photo' }));
+    render(<OnePhotoConfirm open onAddPhotos={vi.fn()} onContinue={onContinue} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Continue anyway' }));
     expect(onContinue).toHaveBeenCalledTimes(1);
   });
 
-  it('goes back to add photos on Add more photos', () => {
+  it('goes back to add photos on Add photos', () => {
     const onAddPhotos = vi.fn();
     const onContinue = vi.fn();
     render(<OnePhotoConfirm open onAddPhotos={onAddPhotos} onContinue={onContinue} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Add more photos' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add photos' }));
     expect(onAddPhotos).toHaveBeenCalled();
     expect(onContinue).not.toHaveBeenCalled();
   });
