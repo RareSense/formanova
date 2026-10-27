@@ -9,6 +9,8 @@
  *   GET    /api/admin/supervised-runs/{id}            -> one run, its checks, uploads and notes
  *   POST   /api/admin/supervised-runs/start           -> start 1..50 runs
  *   POST   /api/admin/supervised-runs/{id}/send|reject|fail|notes|send-replacement
+ *          (send, fail and send-replacement take an optional user_note: the note the user reads
+ *           with their result, saved only when the press is accepted, final after that)
  *   POST   /api/admin/supervised-runs/{id}/uploads    -> a one-time Azure upload link
  *   POST   /api/admin/supervised-runs/{id}/uploads/{upload_id}/complete
  *   DELETE /api/admin/supervised-runs/{id}/uploads/{role}
@@ -78,6 +80,8 @@ export interface SupervisedRunDetail {
     last_error: string | null;
     last_error_at: string | null;
     decision: string | null;
+    /** The admin's note to the user, saved with the decision; null for none. Final once set. */
+    user_note?: string | null;
     decided_by_email: string | null;
     decided_at: string | null;
     acknowledged_missing: string[] | null;
@@ -242,16 +246,36 @@ export async function startSupervisedRuns(workflowIds: string[], tiers?: StartTi
   return data?.results ?? [];
 }
 
-export function sendSupervisedRun(workflowId: string, acknowledgeMissing: string[]) {
-  return request<{ accepted: boolean; phase: SupervisedPhase }>('POST', `${run(workflowId)}/send`, { acknowledge_missing: acknowledgeMissing });
+/** The backend's limit for a note to the user, in characters (code points) after trimming. */
+export const USER_NOTE_MAX_CHARS = 2000;
+
+/**
+ * A note's length the way the backend counts it: characters after trimming both ends. Never use
+ * .length or .slice() on the text: they count UTF-16 units and can cut an emoji in half.
+ */
+export function userNoteLength(text: string): number {
+  return [...text.trim()].length;
+}
+
+/** The request field for a note: trimmed text, or nothing for a blank box. */
+function userNoteField(note?: string): { user_note?: string } {
+  const text = note?.trim();
+  return text ? { user_note: text } : {};
+}
+
+export function sendSupervisedRun(workflowId: string, acknowledgeMissing: string[], userNote?: string) {
+  return request<{ accepted: boolean; phase: SupervisedPhase }>('POST', `${run(workflowId)}/send`, {
+    acknowledge_missing: acknowledgeMissing,
+    ...userNoteField(userNote),
+  });
 }
 
 export function rejectSupervisedRun(workflowId: string) {
   return request<{ accepted: boolean; phase: SupervisedPhase }>('POST', `${run(workflowId)}/reject`, {});
 }
 
-export function failSupervisedRun(workflowId: string) {
-  return request<{ accepted: boolean; phase: SupervisedPhase }>('POST', `${run(workflowId)}/fail`, {});
+export function failSupervisedRun(workflowId: string, userNote?: string) {
+  return request<{ accepted: boolean; phase: SupervisedPhase }>('POST', `${run(workflowId)}/fail`, userNoteField(userNote));
 }
 
 export function addSupervisedRunNote(workflowId: string, body: string) {
@@ -262,10 +286,11 @@ export function removeSupervisedUpload(workflowId: string, role: UploadRole) {
   return request<{ removed: boolean }>('DELETE', `${run(workflowId)}/uploads/${encodeURIComponent(role)}`);
 }
 
-export function sendSupervisedReplacement(workflowId: string, acknowledgeMissing: string[], jewelryType?: string) {
+export function sendSupervisedReplacement(workflowId: string, acknowledgeMissing: string[], jewelryType?: string, userNote?: string) {
   return request<{ accepted: boolean; phase: SupervisedPhase }>('POST', `${run(workflowId)}/send-replacement`, {
     acknowledge_missing: acknowledgeMissing,
     ...(jewelryType ? { jewelry_type: jewelryType } : {}),
+    ...userNoteField(userNote),
   });
 }
 

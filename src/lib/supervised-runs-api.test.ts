@@ -6,7 +6,7 @@ vi.mock('@/lib/authenticated-fetch', () => ({ authenticatedFetch: mockFetch }));
 import {
   PHASE_ACTIONS, SupervisedRunsApiError, addSupervisedRunNote, failSupervisedRun, getSupervisedRun,
   listSupervisedRuns, rejectSupervisedRun, removeSupervisedUpload, sameNames, sendSupervisedReplacement,
-  sendSupervisedRun, startSupervisedRuns, uploadReplacementFile, isUncertainCheckFailure,
+  sendSupervisedRun, startSupervisedRuns, uploadReplacementFile, isUncertainCheckFailure, userNoteLength, USER_NOTE_MAX_CHARS,
 } from './supervised-runs-api';
 
 const ok = (body: unknown, status = 200) => ({ ok: true, status, json: async () => body });
@@ -84,6 +84,26 @@ describe('supervised runs client', () => {
     expect(JSON.parse(call(1).init.body)).toEqual({ acknowledge_missing: ['loop_state_artifact'] });
   });
 
+  it('adds the note to the user, trimmed, to send, fail and send-replacement', async () => {
+    mockFetch.mockResolvedValue(ok({ accepted: true, phase: 'awaiting_review' }, 202));
+    await sendSupervisedRun('a', [], '  Send three sharp photos.\nIn daylight.  ');
+    await failSupervisedRun('a', 'Too dark to read.');
+    await sendSupervisedReplacement('a', [], 'ring', 'A note 💎');
+    expect(JSON.parse(call(0).init.body)).toEqual({ acknowledge_missing: [], user_note: 'Send three sharp photos.\nIn daylight.' });
+    expect(JSON.parse(call(1).init.body)).toEqual({ user_note: 'Too dark to read.' });
+    expect(JSON.parse(call(2).init.body)).toEqual({ acknowledge_missing: [], jewelry_type: 'ring', user_note: 'A note 💎' });
+  });
+
+  it('leaves user_note out for a blank or missing note', async () => {
+    mockFetch.mockResolvedValue(ok({ accepted: true, phase: 'awaiting_review' }, 202));
+    await sendSupervisedRun('a', [], '   ');
+    await failSupervisedRun('a', '');
+    await sendSupervisedReplacement('a', [], undefined, '\n ');
+    expect(JSON.parse(call(0).init.body)).toEqual({ acknowledge_missing: [] });
+    expect(JSON.parse(call(1).init.body)).toEqual({});
+    expect(JSON.parse(call(2).init.body)).toEqual({ acknowledge_missing: [] });
+  });
+
   it('removes an upload by role', async () => {
     mockFetch.mockResolvedValue(ok({ removed: true }));
     await removeSupervisedUpload('a', 'glb');
@@ -113,6 +133,15 @@ describe('helpers', () => {
     expect(sameNames(['a', 'b'], ['b', 'a'])).toBe(true);
     expect(sameNames(['a'], ['a', 'b'])).toBe(false);
     expect(sameNames(['a', 'a'], ['a', 'b'])).toBe(false);
+  });
+
+  it('counts a note the way the backend does: characters after trimming, an emoji as one', () => {
+    expect(USER_NOTE_MAX_CHARS).toBe(2000);
+    expect(userNoteLength('  hello  ')).toBe(5);
+    expect(userNoteLength('💎💎')).toBe(2);
+    expect('💎💎'.length).toBe(4);
+    expect(userNoteLength('a\nb')).toBe(3);
+    expect(userNoteLength('   ')).toBe(0);
   });
 
   it('allows only the handoff actions per phase', () => {

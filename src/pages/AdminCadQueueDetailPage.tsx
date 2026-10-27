@@ -28,6 +28,8 @@ import {
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import SupervisedReplacementPanel from '@/components/admin/SupervisedReplacementPanel';
+import SupervisedDeliveredCard from '@/components/admin/SupervisedDeliveredCard';
+import { UserNoteField, UserNoteView } from '@/components/admin/SupervisedUserNote';
 import CadTierSelect from '@/components/admin/CadTierSelect';
 import { GLBPreviewSlot, ScissorGLBGrid } from '@/components/generations/ScissorGLBGrid';
 import { normalizeAdminGenerationDetail } from '@/lib/admin-generations-api';
@@ -50,7 +52,7 @@ import {
 import { azureUriToUrl } from '@/lib/azure-utils';
 import { cadTierText } from '@/lib/cad-model-options';
 import { downloadCadArtifact } from '@/lib/cad-artifact-download';
-import { DetailContent } from '@/pages/AdminGenerationDetailPage';
+import { DetailContent, RunInputsPanel } from '@/pages/AdminGenerationDetailPage';
 
 const POLL_MS = 5000;
 // A run that is queued or working can move on its own; check it now and then.
@@ -64,12 +66,14 @@ const BUTTON_LABELS: Record<ButtonAction, string> = { start: 'Start', send: 'Sen
 const BUTTON_ACTIONS = Object.keys(BUTTON_LABELS) as ButtonAction[];
 // The AI pickers show where Start is allowed. "Default" stands for the toolkit's default (a null tier).
 const TIER_PHASES: SupervisedPhase[] = ['queued', 'errored'];
+// Phases where Send, Send replacement or Fail can still be pressed, so a note to the user can go with them.
+const NOTE_PHASES: SupervisedPhase[] = ['queued', 'errored', 'awaiting_review', 'rejected'];
 const DEFAULT_TIER = '__default__';
 const DEFAULT_OPTION = [{ value: DEFAULT_TIER, label: 'Default' }];
 // One sentence per phase: what the admin should do now.
 const GUIDANCE: Record<SupervisedPhase, string> = {
-  queued: 'Press Start to run it.',
-  errored: 'It broke. Press Start to try again, or Fail to refund the user.',
+  queued: 'Press Start to run it, or Reject to skip the AI and upload your own files.',
+  errored: 'It broke. Press Start to try again, Reject to upload your own files, or Fail to refund the user.',
   running: 'Running. This page updates by itself.',
   finalizing: 'Running. This page updates by itself.',
   awaiting_review: 'Check the model, then Send it, or Reject it to upload your own.',
@@ -248,6 +252,8 @@ function RunHeader({ data, workflowId, typeLabel, userEmail, refreshing, onRefre
   onRefresh: () => void;
 }) {
   const s = data.supervision;
+  // Every Start that got the AI going records attempt_started; that is how often this run was generated.
+  const generations = (s.events ?? []).filter((event) => event.event === 'attempt_started').length;
   return (
     <Card>
       <CardContent className="space-y-4 pt-6">
@@ -255,6 +261,9 @@ function RunHeader({ data, workflowId, typeLabel, userEmail, refreshing, onRefre
           <StatusBadge phase={s.phase} attempt={s.attempt} />
           <span className="text-sm font-medium">{typeLabel}</span>
           {userEmail && <span className="min-w-0 break-all text-sm text-muted-foreground">{userEmail}</span>}
+          <span className="text-sm text-muted-foreground">
+            {generations === 0 ? 'Not generated yet' : `Generated ${generations} ${generations === 1 ? 'time' : 'times'}`}
+          </span>
           <Button variant="outline" size="sm" className="gap-2 px-4" onClick={onRefresh}>
             <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
@@ -430,6 +439,8 @@ export default function AdminCadQueueDetailPage() {
   // The admin's AI choice for Start; null until the picker is changed.
   const [buildChoice, setBuildChoice] = useState<string | null>(null);
   const [reviewChoice, setReviewChoice] = useState<string | null>(null);
+  // The note to the user, sent with Send, Send replacement or Fail. Kept when a press is refused.
+  const [userNote, setUserNote] = useState('');
 
   const mounted = useRef(true);
   useEffect(() => () => { mounted.current = false; }, []);
@@ -490,6 +501,8 @@ export default function AdminCadQueueDetailPage() {
       void query.refetch();
     } else if (code === 'no_model') {
       setMessage('There is no model to send.');
+    } else if (code === 'bad_user_note') {
+      setMessage("The note to the user can't be saved. Keep it under 2,000 characters and remove any odd symbols.");
     } else {
       setMessage(code);
     }
@@ -512,6 +525,7 @@ export default function AdminCadQueueDetailPage() {
       if (!mounted.current) return;
       if (result.accepted) {
         accepted = true;
+        setUserNote('');
         setMessage('Done. Waiting for the run to move...');
         setWaitingFrom(from);
         void query.refetch();
@@ -536,10 +550,10 @@ export default function AdminCadQueueDetailPage() {
     return 'code' in mine && !mine.accepted ? { accepted: false, code: mine.code } : { accepted: Boolean(mine.accepted) };
   });
   const reject = () => run(() => rejectSupervisedRun(workflowId));
-  const fail = () => run(() => failSupervisedRun(workflowId));
+  const fail = () => run(() => failSupervisedRun(workflowId, userNote));
   const send = () => {
     setSendOpen(false);
-    void run(() => sendSupervisedRun(workflowId, ticked));
+    void run(() => sendSupervisedRun(workflowId, ticked, userNote));
   };
 
   // Start always sends the AI shown in the pickers, changed or not. Default sends nothing for that key.
@@ -629,6 +643,24 @@ export default function AdminCadQueueDetailPage() {
               onRefresh={() => void query.refetch()}
             />
 
+            {/* The customer's inputs come first, in every phase: they are what every decision here is judged against. */}
+            {runDetail && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-display text-2xl tracking-wide">Customer inputs</CardTitle>
+                </CardHeader>
+                <CardContent className="min-w-0 [overflow-wrap:anywhere]">
+                  <RunInputsPanel detail={runDetail} />
+                </CardContent>
+              </Card>
+            )}
+
+            {phase === 'delivered' && <SupervisedDeliveredCard workflowId={workflowId} decision={data.supervision.decision} />}
+
+            {data.supervision.user_note && (
+              <UserNoteView note={data.supervision.user_note} by={data.supervision.decided_by_email} at={data.supervision.decided_at} />
+            )}
+
             {phase === 'awaiting_review' && data.send_check && (
               <SendDeliversCard check={data.send_check} workflowId={workflowId} />
             )}
@@ -637,6 +669,10 @@ export default function AdminCadQueueDetailPage() {
               <p className="text-sm text-muted-foreground">
                 {`${phase === 'running' ? 'Running with' : 'Ran with'} Build AI: ${cadTierText(currentBuild)} · Review AI: ${cadTierText(currentReview)}`}
               </p>
+            )}
+
+            {NOTE_PHASES.includes(phase) && !data.supervision.user_note && (
+              <UserNoteField value={userNote} onChange={setUserNote} disabled={actionsLocked} />
             )}
 
             {(allowed.length > 0 || (message && messageFrom === 'buttons')) && (
@@ -695,6 +731,7 @@ export default function AdminCadQueueDetailPage() {
                 locked={actionsLocked}
                 message={messageFrom === 'replacement' ? message : null}
                 onBusyChange={setPanelBusy}
+                userNote={userNote}
               />
             )}
 

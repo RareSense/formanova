@@ -175,7 +175,7 @@ describe('SupervisedReplacementPanel', () => {
 
     fireEvent.click(send);
     await waitFor(() => expect(api.sendSupervisedReplacement).toHaveBeenCalled());
-    expect(api.sendSupervisedReplacement).toHaveBeenCalledWith('wf-1', ['loop_state_artifact'], 'ring');
+    expect(api.sendSupervisedReplacement).toHaveBeenCalledWith('wf-1', ['loop_state_artifact'], 'ring', undefined);
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
   });
 
@@ -192,7 +192,7 @@ describe('SupervisedReplacementPanel', () => {
     fireEvent.click(await screen.findByRole('option', { name: 'ring' }));
     await waitFor(() => expect(send.hasAttribute('disabled')).toBe(false));
     fireEvent.click(send);
-    await waitFor(() => expect(api.sendSupervisedReplacement).toHaveBeenCalledWith('wf-1', [], 'ring'));
+    await waitFor(() => expect(api.sendSupervisedReplacement).toHaveBeenCalledWith('wf-1', [], 'ring', undefined));
   });
 
   it('drops a tick when its name leaves the missing list, so it comes back unticked', () => {

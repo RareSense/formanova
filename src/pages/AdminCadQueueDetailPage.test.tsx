@@ -20,7 +20,12 @@ vi.mock('@/components/generations/ScissorGLBGrid', () => ({
   ScissorGLBGrid: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   GLBPreviewSlot: ({ glbUrl }: { glbUrl: string }) => <div data-testid="glb">{glbUrl}</div>,
 }));
-vi.mock('@/pages/AdminGenerationDetailPage', () => ({ DetailContent: () => <div>run detail</div> }));
+vi.mock('@/pages/AdminGenerationDetailPage', () => ({
+  DetailContent: () => <div>run detail</div>,
+  RunInputsPanel: () => <div>customer inputs</div>,
+}));
+const cadResult = vi.hoisted(() => ({ fetchCadResult: vi.fn() }));
+vi.mock('@/lib/cad-result-api', () => cadResult);
 
 import AdminCadQueueDetailPage from './AdminCadQueueDetailPage';
 import { azureUriToUrl } from '@/lib/azure-utils';
@@ -81,8 +86,8 @@ function openSection(name: string | RegExp) {
 }
 
 const GUIDANCE: Record<SupervisedPhase, string> = {
-  queued: 'Press Start to run it.',
-  errored: 'It broke. Press Start to try again, or Fail to refund the user.',
+  queued: 'Press Start to run it, or Reject to skip the AI and upload your own files.',
+  errored: 'It broke. Press Start to try again, Reject to upload your own files, or Fail to refund the user.',
   running: 'Running. This page updates by itself.',
   finalizing: 'Running. This page updates by itself.',
   awaiting_review: 'Check the model, then Send it, or Reject it to upload your own.',
@@ -113,6 +118,7 @@ beforeEach(() => {
   vi.useRealTimers();
   Object.values(api).forEach((fn) => fn.mockReset());
   authFetch.authenticatedFetch.mockReset();
+  cadResult.fetchCadResult.mockReset();
 });
 
 describe('AdminCadQueueDetailPage', () => {
@@ -171,7 +177,7 @@ describe('AdminCadQueueDetailPage', () => {
     const send = within(dialog).getByRole('button', { name: 'Send' });
     expect(send.hasAttribute('disabled')).toBe(false);
     fireEvent.click(send);
-    await waitFor(() => expect(api.sendSupervisedRun).toHaveBeenCalledWith('wf-1', []));
+    await waitFor(() => expect(api.sendSupervisedRun).toHaveBeenCalledWith('wf-1', [], ''));
   });
 
   it('fails the run only after the confirm', async () => {
@@ -190,7 +196,7 @@ describe('AdminCadQueueDetailPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Fail' }));
     dialog = await screen.findByRole('alertdialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Fail run' }));
-    await waitFor(() => expect(api.failSupervisedRun).toHaveBeenCalledWith('wf-1'));
+    await waitFor(() => expect(api.failSupervisedRun).toHaveBeenCalledWith('wf-1', ''));
   });
 
   it('says nothing happened when the reject signal fails', async () => {
@@ -381,7 +387,7 @@ describe('AdminCadQueueDetailPage', () => {
     fireEvent.click(send);
     fireEvent.click(send);
     expect(api.sendSupervisedReplacement).toHaveBeenCalledTimes(1);
-    expect(api.sendSupervisedReplacement).toHaveBeenCalledWith('wf-1', [], undefined);
+    expect(api.sendSupervisedReplacement).toHaveBeenCalledWith('wf-1', [], undefined, '');
     await act(async () => { resolveSend({ accepted: true, phase: 'finalizing' }); });
     expect(await screen.findByText('Done. Waiting for the run to move...')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Send replacement' }).hasAttribute('disabled')).toBe(true);
@@ -513,6 +519,118 @@ describe('AdminCadQueueDetailPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Send' }));
     fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Send' }));
     expect(await screen.findByText('The missing list changed. Check it again.')).toBeTruthy();
+  });
+
+  describe('customer inputs, the delivered model and the generation count', () => {
+    it('shows the customer inputs open, above the actions, in every phase', async () => {
+      for (const phase of ['queued', 'rejected', 'delivered'] as SupervisedPhase[]) {
+        api.getSupervisedRun.mockResolvedValue(detail(phase));
+        cadResult.fetchCadResult.mockResolvedValue({ glb_url: null, threedm_url: null, azure_source: null, not_all_solid: false, pending: false });
+        const view = renderPage();
+        await loaded();
+        expect(screen.getByText('Customer inputs')).toBeTruthy();
+        expect(screen.getByText('customer inputs')).toBeTruthy();
+        view.unmount();
+      }
+    });
+
+    it('shows a delivered run with the model the user got and where it came from', async () => {
+      api.getSupervisedRun.mockResolvedValue(detail('delivered', {
+        supervision: { ...detail('delivered').supervision, decision: 'send_replacement' },
+      }));
+      cadResult.fetchCadResult.mockResolvedValue({ glb_url: '/api/artifacts/abc', threedm_url: null, azure_source: null, not_all_solid: false, pending: false });
+      renderPage();
+      expect(await screen.findByText('What the user got')).toBeTruthy();
+      expect(screen.getByText('Your uploaded replacement.')).toBeTruthy();
+      expect((await screen.findByTestId('glb')).textContent).toBe('/api/artifacts/abc');
+      expect(cadResult.fetchCadResult).toHaveBeenCalledWith('wf-1');
+    });
+
+    it('counts how many times the run was generated', async () => {
+      api.getSupervisedRun.mockResolvedValue(detail('awaiting_review', {
+        supervision: { ...detail('awaiting_review').supervision, events: [
+          { event: 'attempt_started', at: '2026-10-24T10:00:00Z' },
+          { event: 'attempt_errored', at: '2026-10-24T10:10:00Z' },
+          { event: 'attempt_started', at: '2026-10-24T10:20:00Z' },
+        ] },
+      }));
+      renderPage();
+      expect(await screen.findByText('Generated 2 times')).toBeTruthy();
+    });
+
+    it('says a run that never ran was not generated yet', async () => {
+      api.getSupervisedRun.mockResolvedValue(detail('queued'));
+      renderPage();
+      expect(await screen.findByText('Not generated yet')).toBeTruthy();
+    });
+  });
+
+  describe('note to the user', () => {
+    it('sends the note with Send', async () => {
+      api.getSupervisedRun.mockResolvedValue(detail('awaiting_review', { send_check: { has_model: true, missing: [] } }));
+      api.sendSupervisedRun.mockResolvedValue({ accepted: true, phase: 'awaiting_review' });
+      renderPage();
+      await loaded();
+      fireEvent.change(screen.getByRole('textbox', { name: 'Note to user' }), { target: { value: 'Send sharper photos.' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+      const dialog = await screen.findByRole('dialog');
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Send' }));
+      await waitFor(() => expect(api.sendSupervisedRun).toHaveBeenCalledWith('wf-1', [], 'Send sharper photos.'));
+    });
+
+    it('sends the note with Fail', async () => {
+      api.getSupervisedRun.mockResolvedValue(detail('queued'));
+      api.failSupervisedRun.mockResolvedValue({ accepted: true, phase: 'queued' });
+      renderPage();
+      await loaded();
+      fireEvent.change(screen.getByRole('textbox', { name: 'Note to user' }), { target: { value: 'Photos too dark.' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Fail' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Fail run' }));
+      await waitFor(() => expect(api.failSupervisedRun).toHaveBeenCalledWith('wf-1', 'Photos too dark.'));
+    });
+
+    it('keeps the draft when the press is refused, and says why for a bad note', async () => {
+      api.getSupervisedRun.mockResolvedValue(detail('queued'));
+      api.failSupervisedRun.mockRejectedValue(new SupervisedRunsApiError(422, 'bad_user_note', { max_chars: 2000 }));
+      renderPage();
+      await loaded();
+      fireEvent.change(screen.getByRole('textbox', { name: 'Note to user' }), { target: { value: 'Keep me.' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Fail' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Fail run' }));
+      expect(await screen.findByText(/The note to the user can't be saved/)).toBeTruthy();
+      expect((screen.getByRole('textbox', { name: 'Note to user' }) as HTMLTextAreaElement).value).toBe('Keep me.');
+    });
+
+    it('counts characters, not UTF-16 units, and refuses a change past 2,000', async () => {
+      api.getSupervisedRun.mockResolvedValue(detail('queued'));
+      renderPage();
+      await loaded();
+      const box = screen.getByRole('textbox', { name: 'Note to user' }) as HTMLTextAreaElement;
+      fireEvent.change(box, { target: { value: '\u{1F48E}\u{1F48E}' } });
+      expect(screen.getByText('2 / 2000')).toBeTruthy();
+      fireEvent.change(box, { target: { value: 'a'.repeat(2000) } });
+      expect(screen.getByText('2000 / 2000')).toBeTruthy();
+      fireEvent.change(box, { target: { value: 'a'.repeat(2001) } });
+      expect(box.value).toBe('a'.repeat(2000));
+    });
+
+    it('shows the saved note, who wrote it and no box once decided', async () => {
+      api.getSupervisedRun.mockResolvedValue(detail('failed', {
+        supervision: { ...detail('failed').supervision, decision: 'fail', user_note: 'Line one\nLine two', decided_by_email: 'qc@x.com', decided_at: '2026-10-26T10:00:00Z' },
+      }));
+      renderPage();
+      const note = await screen.findByText(/Line one/);
+      expect(note.textContent).toBe('Line one\nLine two');
+      expect(screen.getByText('qc@x.com')).toBeTruthy();
+      expect(screen.queryByRole('textbox', { name: 'Note to user' })).toBeNull();
+    });
+
+    it('offers no note box while the run is running', async () => {
+      api.getSupervisedRun.mockResolvedValue(detail('running'));
+      renderPage();
+      await loaded();
+      expect(screen.queryByRole('textbox', { name: 'Note to user' })).toBeNull();
+    });
   });
 
   describe('What Send delivers', () => {

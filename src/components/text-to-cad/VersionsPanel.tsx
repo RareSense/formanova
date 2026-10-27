@@ -11,6 +11,8 @@
  * saves none, and an empty section would read as something being broken.
  */
 
+import { Lightbulb } from 'lucide-react';
+
 import { ScissorGLBGrid, GLBPreviewSlot } from '@/components/generations/ScissorGLBGrid';
 import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
 import { cn } from '@/lib/utils';
@@ -24,6 +26,8 @@ export interface VersionCard {
   created_at?: string | null;
   /** The improve verdict, e.g. "Looks better"; absent on the first version. */
   label?: { code: string; text: string } | null;
+  /** A note left with this version; the card shows a lightbulb, the viewer shows the note. */
+  user_note?: string | null;
 }
 
 export interface VersionsPanelProps {
@@ -113,6 +117,16 @@ export function VersionsPanel({ versions, selectedAssetId, onSelect }: VersionsP
             )}
             <div className="pointer-events-none relative flex aspect-square items-center justify-center">
               <VersionCardModel version={version} />
+              {version.user_note?.trim() && (
+                // Bottom-left of the picture: clear of the Latest badge (top-right) and the footer text.
+                <span
+                  className="absolute bottom-1 left-1 z-10 flex h-4 w-4 items-center justify-center border border-border bg-card text-primary"
+                  role="img"
+                  aria-label="Has a note"
+                >
+                  <Lightbulb className="h-2.5 w-2.5" aria-hidden="true" />
+                </span>
+              )}
             </div>
             <div className="flex items-baseline justify-between border-t border-border bg-card px-1.5 py-1">
               <span className="font-mono text-[10px] font-bold tracking-wider">{`V${version.position + 1}`}</span>
