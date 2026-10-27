@@ -16,6 +16,7 @@ import { useCadArtifactDownloads } from "@/hooks/useCadArtifactDownloads";
 import { useCadAutoRotate } from "@/hooks/useCadAutoRotate";
 import CadResultActions from "@/components/text-to-cad/CadResultActions";
 import CadVersionNote from "@/components/text-to-cad/CadVersionNote";
+import OnePhotoConfirm from "@/components/text-to-cad/OnePhotoConfirm";
 import CadStatusDialog from '@/components/text-to-cad/CadStatusDialog';
 import { trackCadStudioOpen, trackCadReferenceUploaded } from "@/lib/posthog-events";
 import { useCADKeyboardShortcuts } from "@/hooks/use-cad-keyboard-shortcuts";
@@ -133,6 +134,13 @@ export default function ImageToCAD() {
 
   // A new model starts assembled.
   useEffect(() => { setExploded(false); }, [workflow.glbUrl]);
+
+  // One photo leaves the other sides to guesswork: ask once per press before making the CAD.
+  const [onePhotoOpen, setOnePhotoOpen] = useState(false);
+  const generateFromPhotos = () => {
+    if (referenceImages.length === 1) setOnePhotoOpen(true);
+    else workflow.simulateGeneration();
+  };
 
   useEffect(() => { runMicroBenchmark(); }, []);
 
@@ -263,7 +271,7 @@ export default function ImageToCAD() {
           jewelryType={jewelryType}
           setJewelryType={setJewelryType}
           isGenerating={workflow.isGenerating}
-          onGenerate={workflow.simulateGeneration}
+          onGenerate={generateFromPhotos}
           referenceImagePreviewUrls={panelReferenceUrls}
           onAddReferenceImages={(files) => { editBeforeCad.picturesChanged(); addReferenceImages(files); }}
           onRemoveReferenceImage={(index) => { editBeforeCad.picturesChanged(); removeReferenceImage(index); }}
@@ -286,6 +294,11 @@ export default function ImageToCAD() {
               workflow.setThreedmArtifact({ uri: demo3dm, url: demo3dm, type: 'model/3dm', bytes: 0, sha256: '' });
             }
           } : undefined}
+        />
+        <OnePhotoConfirm
+          open={onePhotoOpen}
+          onAddPhotos={() => setOnePhotoOpen(false)}
+          onContinue={() => { setOnePhotoOpen(false); workflow.simulateGeneration(); }}
         />
         <DesignEditor
           {...editBeforeCad.editorProps}
