@@ -46,53 +46,79 @@ beforeEach(() => {
   api.startSupervisedRuns.mockReset();
 });
 
+/** The table's own requests (the per-tab counts ask for limit 1). */
+function tableCalls() {
+  return api.listSupervisedRuns.mock.calls.map((c) => c[0]).filter((p) => p.limit !== 1);
+}
+
 describe('AdminCadQueuePage', () => {
-  it('opens on To start, which asks for queued and errored runs', async () => {
-    api.listSupervisedRuns.mockResolvedValue({ items: [], total: 0, limit: 20, offset: 0 });
+  it('opens on All open: every run not finished, in one table', async () => {
+    api.listSupervisedRuns.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
     renderPage();
-    await waitFor(() => expect(api.listSupervisedRuns).toHaveBeenCalled());
-    expect(api.listSupervisedRuns.mock.calls[0][0].phases).toEqual(['queued', 'errored']);
-    expect(await screen.findByText('Nothing here.')).toBeTruthy();
+    await waitFor(() => expect(tableCalls().length).toBeGreaterThan(0));
+    expect(tableCalls()[0].phases).toEqual(['queued', 'errored', 'awaiting_review', 'rejected', 'running', 'finalizing']);
+    expect(await screen.findByText('Nothing waiting. The queue is clear.')).toBeTruthy();
     const tabs = screen.getAllByRole('tab');
-    expect(tabs.map((tab) => tab.textContent?.replace(/\s*\(\d+\)$/, ''))).toEqual(['To start', 'Running', 'To review', 'Done']);
-    expect(screen.getByRole('tab', { name: /To start/ }).getAttribute('aria-selected')).toBe('true');
+    expect(tabs.map((tab) => tab.textContent?.replace(/\d+$/, ''))).toEqual(['All open', 'To start', 'To review', 'Running', 'Done']);
+    expect(screen.getByRole('tab', { name: /All open/ }).getAttribute('aria-selected')).toBe('true');
   });
 
   it('switches to To review and asks for awaiting review and rejected runs', async () => {
-    api.listSupervisedRuns.mockResolvedValue({ items: [], total: 0, limit: 20, offset: 0 });
+    api.listSupervisedRuns.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
     renderPage();
-    await waitFor(() => expect(api.listSupervisedRuns).toHaveBeenCalled());
+    await waitFor(() => expect(tableCalls().length).toBeGreaterThan(0));
     fireEvent.click(screen.getByRole('tab', { name: /To review/ }));
-    await waitFor(() => expect(api.listSupervisedRuns.mock.calls.at(-1)![0].phases).toEqual(['awaiting_review', 'rejected']));
+    await waitFor(() => expect(tableCalls().at(-1)!.phases).toEqual(['awaiting_review', 'rejected']));
     expect(screen.getByRole('tab', { name: /To review/ }).getAttribute('aria-selected')).toBe('true');
   });
 
   it('maps the other tabs from the URL', async () => {
-    api.listSupervisedRuns.mockResolvedValue({ items: [], total: 0, limit: 20, offset: 0 });
+    api.listSupervisedRuns.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
     const first = renderPage('/admin/cad-queue?tab=running');
-    await waitFor(() => expect(api.listSupervisedRuns.mock.calls.at(-1)![0].phases).toEqual(['running', 'finalizing']));
+    await waitFor(() => expect(tableCalls().at(-1)!.phases).toEqual(['running', 'finalizing']));
     first.unmount();
-    renderPage('/admin/cad-queue?tab=done');
-    await waitFor(() => expect(api.listSupervisedRuns.mock.calls.at(-1)![0].phases).toEqual(['delivered', 'failed']));
+    renderPage('/admin/cad-queue?tab=start');
+    await waitFor(() => expect(tableCalls().at(-1)!.phases).toEqual(['queued', 'errored']));
   });
 
-  it('shows the count on the active tab only', async () => {
-    api.listSupervisedRuns.mockResolvedValue({ items: [row('wf-a', 'queued')], total: 7, limit: 20, offset: 0 });
+  it('shows a live count on every tab, not just the open one', async () => {
+    api.listSupervisedRuns.mockImplementation(async (p: { phases: string[]; limit: number }) => {
+      const totals: Record<string, number> = { queued: 3, awaiting_review: 2, running: 1, delivered: 9 };
+      const total = p.phases.reduce((sum, phase) => sum + (totals[phase] ?? 0), 0);
+      return { items: p.limit === 1 ? [] : [row('wf-a', 'queued')], total, limit: p.limit, offset: 0 };
+    });
     renderPage();
-    expect(await screen.findByRole('tab', { name: 'To start (7)' })).toBeTruthy();
-    expect(screen.getByRole('tab', { name: 'Running' })).toBeTruthy();
-    expect(screen.getByRole('tab', { name: 'To review' })).toBeTruthy();
-    expect(screen.getByRole('tab', { name: 'Done' })).toBeTruthy();
+    expect(await screen.findByRole('tab', { name: 'All open 6' })).toBeTruthy();
+    expect(await screen.findByRole('tab', { name: 'To start 3' })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'To review 2' })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Running 1' })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Done 9' })).toBeTruthy();
   });
 
-  it('renders no tick boxes and only the five columns', async () => {
-    api.listSupervisedRuns.mockResolvedValue({ items: [row('wf-a', 'queued'), row('wf-b', 'errored')], total: 2, limit: 20, offset: 0 });
+  it('groups All open by what each run needs next, with every column', async () => {
+    api.listSupervisedRuns.mockResolvedValue({
+      items: [row('wf-r', 'running'), row('wf-q', 'queued', { is_paying: true, note_count: 2 }), row('wf-v', 'awaiting_review')],
+      total: 3, limit: 50, offset: 0,
+    });
     renderPage();
-    await screen.findByText('wf-a@x.com');
+    await screen.findByText('wf-q@x.com');
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
-    expect(screen.getAllByRole('columnheader').map((h) => h.textContent?.trim())).toEqual(['When', 'User', 'Type', 'Status', 'Action']);
-    expect(screen.queryByText('wf-a')).toBeNull();
-    expect(screen.queryByText(/Paying|Free/)).toBeNull();
+    expect(screen.getAllByRole('columnheader').map((h) => h.textContent?.trim()))
+      .toEqual(['Waiting', 'User', 'Type', 'Status', 'Tries', 'Updated', 'Notes', 'Action']);
+    const order = screen.getAllByRole('row').map((r) => r.textContent ?? '');
+    const at = (text: string) => order.findIndex((t) => t.includes(text));
+    expect(at('To start')).toBeLessThan(at('wf-q@x.com'));
+    expect(at('wf-q@x.com')).toBeLessThan(at('To review'));
+    expect(at('To review')).toBeLessThan(at('wf-v@x.com'));
+    expect(at('wf-v@x.com')).toBeLessThan(at('Running'));
+    expect(within(rowOf('wf-q')).getByText('Paying')).toBeTruthy();
+    expect(within(rowOf('wf-q')).getByText('2')).toBeTruthy();
+  });
+
+  it('says when the list was last updated', async () => {
+    api.listSupervisedRuns.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
+    renderPage();
+    expect(await screen.findByText(/^Updated \d/)).toBeTruthy();
   });
 
   it('says the run type and status in plain words', async () => {
@@ -144,6 +170,8 @@ describe('AdminCadQueuePage', () => {
     fireEvent.click(await screen.findByRole('button', { name: /start all \(2\)/i }));
     await waitFor(() => expect(api.startSupervisedRuns).toHaveBeenCalledWith(['wf-a', 'wf-b']));
     expect(await screen.findByText('Started 1.')).toBeTruthy();
+    // A refused run can leave the view on the refresh, so the summary says how many and why.
+    expect(screen.getByText(/1 not started \(invalid_phase\)/)).toBeTruthy();
     expect(within(rowOf('wf-a')).getByText('Started.')).toBeTruthy();
     expect(within(rowOf('wf-b')).getByText('invalid_phase')).toBeTruthy();
   });

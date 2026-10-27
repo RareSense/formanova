@@ -1,67 +1,36 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { AlertTriangle, ExternalLink, Loader2, Play, Search } from 'lucide-react';
+import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
+import { AlertTriangle, Loader2, Play, RefreshCw, Search } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { PaginationBar } from '@/components/generations/PaginationBar';
+import CadQueueTable from '@/components/admin/CadQueueTable';
 import CadTierSelect from '@/components/admin/CadTierSelect';
+import { QUEUE_GROUPS, STARTABLE } from '@/lib/cad-queue-view';
 import {
   SupervisedRunsApiError,
   listSupervisedRuns,
   startSupervisedRuns,
-  supervisedRunTypeLabel,
-  supervisedStatusLabel,
   type StartResult,
   type SupervisedPhase,
   type SupervisedRunListItem,
 } from '@/lib/supervised-runs-api';
 
-const PAGE_SIZE = 20;
-const STARTABLE: SupervisedPhase[] = ['queued', 'errored'];
+const PAGE_SIZE = 50;
+const REFRESH_MS = 15000;
 // "AI for these": a sentinel for leaving each run on its own AI.
 const EACH_RUNS_OWN = '__each__';
 const EACH_OPTION = [{ value: EACH_RUNS_OWN, label: "Each run's own" }];
 
-type TabKey = 'start' | 'running' | 'review' | 'done';
+type TabKey = 'open' | 'start' | 'running' | 'review' | 'done';
+const OPEN_PHASES: SupervisedPhase[] = ['queued', 'errored', 'awaiting_review', 'rejected', 'running', 'finalizing'];
+// All open first: a short queue is all on one screen, grouped by what each run needs next.
 const TABS: Array<{ key: TabKey; label: string; phases: SupervisedPhase[] }> = [
-  { key: 'start', label: 'To start', phases: ['queued', 'errored'] },
-  { key: 'running', label: 'Running', phases: ['running', 'finalizing'] },
-  { key: 'review', label: 'To review', phases: ['awaiting_review', 'rejected'] },
-  { key: 'done', label: 'Done', phases: ['delivered', 'failed'] },
+  { key: 'open', label: 'All open', phases: OPEN_PHASES },
+  ...QUEUE_GROUPS.map((group) => ({ key: group.key as TabKey, label: group.label, phases: group.phases })),
 ];
-
-function formatDateTime(value: string | null): string {
-  if (!value) return '-';
-  return new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value));
-}
-
-function StatusBadge({ phase, attempt }: { phase: SupervisedPhase; attempt: number }) {
-  const variant =
-    phase === 'delivered' ? 'default'
-      : phase === 'errored' || phase === 'failed' ? 'destructive'
-        : 'secondary';
-  return (
-    <Badge variant={variant} className="whitespace-nowrap">
-      {supervisedStatusLabel(phase, attempt)}
-    </Badge>
-  );
-}
 
 function NotAuthorizedState() {
   return (
@@ -96,8 +65,8 @@ function isRefused(result: StartResult): result is RefusedStart {
 /** What the last Start press did: a summary for Start all, or the request's own failure. */
 type StartOutcome = { results: StartResult[]; all: boolean } | { error: string };
 
-function firstLine(text: string): string {
-  return text.split(/\r?\n/, 1)[0];
+function clockTime(ms: number): string {
+  return new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(ms));
 }
 
 export default function AdminCadQueuePage() {
@@ -131,7 +100,17 @@ export default function AdminCadQueuePage() {
       offset,
     }),
     retry: false,
-    refetchInterval: 15000,
+    refetchInterval: REFRESH_MS,
+  });
+
+  // Every tab's count, kept current, so the queue's shape shows without opening each tab.
+  const counts = useQueries({
+    queries: TABS.map((t) => ({
+      queryKey: ['admin-cad-queue-count', t.key, search],
+      queryFn: () => listSupervisedRuns({ phases: t.phases, userEmail: trimmedSearch || undefined, limit: 1 }),
+      retry: false,
+      refetchInterval: REFRESH_MS,
+    })),
   });
 
   const [outcome, setOutcome] = useState<StartOutcome | null>(null);
@@ -152,6 +131,7 @@ export default function AdminCadQueuePage() {
     onSuccess: (results, { all }) => {
       setOutcome({ results, all });
       void query.refetch();
+      counts.forEach((c) => void c.refetch());
     },
     onError: (error) => {
       setOutcome({ error: errorCode(error) });
@@ -171,6 +151,9 @@ export default function AdminCadQueuePage() {
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const error = query.error instanceof SupervisedRunsApiError ? query.error : null;
+  const canStartHere = tab.key === 'start' || tab.key === 'open';
+  // "How long ago" columns move on with each refresh.
+  const now = query.dataUpdatedAt || Date.now();
 
   // The Start results belong to the list that was on screen; drop them when it changes.
   function resetOutcome() {
@@ -191,7 +174,7 @@ export default function AdminCadQueuePage() {
     resetOutcome();
     const next = new URLSearchParams(searchParams);
     next.delete('phase');
-    if (key === 'start') next.delete('tab');
+    if (key === 'open') next.delete('tab');
     else next.set('tab', key);
     next.delete('offset');
     setSearchParams(next);
@@ -213,7 +196,7 @@ export default function AdminCadQueuePage() {
 
   return (
     <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 sm:py-8">
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="relative w-full shrink-0 sm:w-64">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -230,11 +213,17 @@ export default function AdminCadQueuePage() {
             Clear
           </Button>
         )}
+
+        <p className="ml-auto flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground" aria-live="polite">
+          <RefreshCw className={`h-3 w-3 ${query.isFetching ? 'animate-spin' : ''}`} aria-hidden="true" />
+          {query.dataUpdatedAt ? `Updated ${clockTime(query.dataUpdatedAt)}` : 'Loading'}
+        </p>
       </div>
 
       <div className="mb-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap" role="tablist" aria-label="Runs">
-        {TABS.map((t) => {
+        {TABS.map((t, index) => {
           const selected = t.key === tab.key;
+          const count = counts[index]?.data?.total;
           return (
             <Button
               key={t.key}
@@ -242,26 +231,37 @@ export default function AdminCadQueuePage() {
               role="tab"
               aria-selected={selected}
               variant={selected ? 'default' : 'outline'}
-              className="h-9 w-full px-4 sm:w-36"
+              className="h-9 w-full gap-2 px-4 sm:w-36"
               onClick={() => selectTab(t.key)}
             >
-              {t.label}{selected && query.data ? ` (${total})` : ''}
+              {t.label}
+              {count !== undefined && <span className="tabular-nums opacity-70">{count}</span>}
             </Button>
           );
         })}
       </div>
 
-      {(tab.key === 'start' || outcome) && (
+      {(canStartHere || outcome) && (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0 flex-1 text-sm" aria-live="polite">
             {outcome && 'error' in outcome && (
               <p className="break-words text-destructive">Start failed: {outcome.error}</p>
             )}
-            {outcome && 'results' in outcome && outcome.all && (
-              <p>Started {outcome.results.filter((r) => r.accepted).length}.</p>
-            )}
+            {outcome && 'results' in outcome && outcome.all && (() => {
+              // A refused run can leave this view on the refresh, so say here how many and why.
+              const refused = outcome.results.filter(isRefused);
+              const reasons = [...new Set(refused.map((r) => r.code))].join(', ');
+              return (
+                <p>
+                  {`Started ${outcome.results.length - refused.length}.`}
+                  {refused.length > 0 && (
+                    <span className="text-destructive">{` ${refused.length} not started (${reasons}).`}</span>
+                  )}
+                </p>
+              );
+            })()}
           </div>
-          {tab.key === 'start' && (
+          {canStartHere && (
             <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-end">
               <div className="sm:w-64">
                 <CadTierSelect
@@ -313,7 +313,7 @@ export default function AdminCadQueuePage() {
       ) : items.length === 0 ? (
         <div className="border border-border bg-card">
           <div className="flex flex-col items-center justify-center gap-4 py-16">
-            <p className="text-sm text-muted-foreground">Nothing here.</p>
+            <p className="text-sm text-muted-foreground">{tab.key === 'open' ? 'Nothing waiting. The queue is clear.' : 'Nothing here.'}</p>
             {offset > 0 && (
               <Button variant="outline" size="sm" className="h-9 px-4" onClick={() => setPage(1)}>
                 Back to first page
@@ -323,82 +323,15 @@ export default function AdminCadQueuePage() {
         </div>
       ) : (
         <>
-          <div className="border border-border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="font-mono text-[10px] uppercase tracking-widest">When</TableHead>
-                  <TableHead className="font-mono text-[10px] uppercase tracking-widest">User</TableHead>
-                  <TableHead className="font-mono text-[10px] uppercase tracking-widest">Type</TableHead>
-                  <TableHead className="font-mono text-[10px] uppercase tracking-widest">Status</TableHead>
-                  <TableHead className="text-right"><span className="sr-only">Action</span></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((item) => {
-                  const startable = STARTABLE.includes(item.phase);
-                  const result = rowResults.get(item.workflow_id);
-                  return (
-                    <TableRow
-                      key={item.workflow_id}
-                      className="cursor-pointer"
-                      onClick={() => openDetail(item)}
-                    >
-                      <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">
-                        {formatDateTime(item.created_at)}
-                      </TableCell>
-                      <TableCell className="max-w-[220px] truncate text-sm" title={item.user_email || undefined}>
-                        {item.user_email || '-'}
-                      </TableCell>
-                      <TableCell className="max-w-[160px] truncate text-sm">
-                        {supervisedRunTypeLabel(item.workflow_name)}
-                      </TableCell>
-                      <TableCell className="max-w-[260px]">
-                        <StatusBadge phase={item.phase} attempt={item.attempt} />
-                        {item.phase === 'errored' && item.last_error && (
-                          <span className="mt-1 block truncate text-xs text-muted-foreground" title={item.last_error}>
-                            {firstLine(item.last_error)}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
-                        <div className="flex flex-col items-end gap-1">
-                          {startable ? (
-                            <Button
-                              size="sm"
-                              className="h-8 w-24 gap-1.5 px-4"
-                              disabled={start.isPending}
-                              onClick={() => start.mutate({ ids: [item.workflow_id], all: false })}
-                            >
-                              <Play className="h-3.5 w-3.5" />
-                              Start
-                            </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 w-24 gap-1.5 px-4"
-                              onClick={() => openDetail(item)}
-                            >
-                              Open
-                              <ExternalLink className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                          {result && (
-                            <span
-                              className={`max-w-[160px] break-all text-xs ${result === 'Started.' ? 'text-muted-foreground' : 'font-mono text-destructive'}`}
-                            >
-                              {result}
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
+          <CadQueueTable
+            items={items}
+            grouped={tab.key === 'open'}
+            now={now}
+            rowResults={rowResults}
+            starting={start.isPending}
+            onStart={(item) => start.mutate({ ids: [item.workflow_id], all: false })}
+            onOpen={openDetail}
+          />
 
           <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
             <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
