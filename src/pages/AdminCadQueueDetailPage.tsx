@@ -29,6 +29,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import SupervisedReplacementPanel from '@/components/admin/SupervisedReplacementPanel';
 import SupervisedDeliveredCard from '@/components/admin/SupervisedDeliveredCard';
+import { deliveredFiles } from '@/lib/supervised-delivery';
 import { UserNoteField, UserNoteView } from '@/components/admin/SupervisedUserNote';
 import CadTierSelect from '@/components/admin/CadTierSelect';
 import { GLBPreviewSlot, ScissorGLBGrid } from '@/components/generations/ScissorGLBGrid';
@@ -655,7 +656,7 @@ export default function AdminCadQueueDetailPage() {
               </Card>
             )}
 
-            {phase === 'delivered' && <SupervisedDeliveredCard workflowId={workflowId} decision={data.supervision.decision} />}
+            {phase === 'delivered' && <SupervisedDeliveredCard workflowId={workflowId} detail={data} />}
 
             {data.supervision.user_note && (
               <UserNoteView note={data.supervision.user_note} by={data.supervision.decided_by_email} at={data.supervision.decided_at} />
@@ -733,6 +734,11 @@ export default function AdminCadQueueDetailPage() {
                 onBusyChange={setPanelBusy}
                 userNote={userNote}
               />
+            )}
+
+            {/* Once a GLB is uploaded, show the replacement as the user will get it, before it is sent. */}
+            {phase === 'rejected' && deliveredFiles(data).glb && (
+              <SupervisedDeliveredCard workflowId={workflowId} detail={data} title="What Send replacement delivers" />
             )}
 
             {phase !== 'awaiting_review' && data.send_check && (

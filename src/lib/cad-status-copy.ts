@@ -47,6 +47,6 @@ export function cadInProgressNotice(): CadStatusNotice {
   return {
     tone: 'success',
     title: 'Still in progress',
-    message: "We're still working on this CAD. You'll have the result within 24 hours.",
+    message: "This CAD is still in progress. You'll have the result within 24 hours.",
   };
 }

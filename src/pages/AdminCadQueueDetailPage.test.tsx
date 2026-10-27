@@ -534,16 +534,49 @@ describe('AdminCadQueueDetailPage', () => {
       }
     });
 
-    it('shows a delivered run with the model the user got and where it came from', async () => {
+    const SHA = 'a'.repeat(64);
+    const upload = { uri: 'azure://agentic-artifacts/cad-uploads/wf-1/u1/glb.glb', sha256: SHA, type: 'model/gltf-binary', bytes: 10 };
+
+    it('shows a delivered replacement from its own delivery files, never from /result', async () => {
+      // /result for a replacement points at the user's own model list, which an admin cannot read.
       api.getSupervisedRun.mockResolvedValue(detail('delivered', {
-        supervision: { ...detail('delivered').supervision, decision: 'send_replacement' },
+        supervision: { ...detail('delivered').supervision, decision: 'send_replacement', delivery: { final: { glb_artifact: upload } } },
       }));
-      cadResult.fetchCadResult.mockResolvedValue({ glb_url: '/api/artifacts/abc', threedm_url: null, azure_source: null, not_all_solid: false, pending: false });
       renderPage();
       expect(await screen.findByText('What the user got')).toBeTruthy();
       expect(screen.getByText('Your uploaded replacement.')).toBeTruthy();
+      expect((await screen.findByTestId('glb')).textContent).toBe(`/api/artifacts/${SHA}`);
+      expect(cadResult.fetchCadResult).not.toHaveBeenCalled();
+    });
+
+    it('falls back to the verified uploads when the delivery has no files', async () => {
+      api.getSupervisedRun.mockResolvedValue(detail('delivered', {
+        supervision: { ...detail('delivered').supervision, decision: 'send_replacement' },
+        download_urls: { glb: `https://formanova.ai/api/artifacts/${SHA}` },
+      }));
+      renderPage();
+      expect((await screen.findByTestId('glb')).textContent).toBe(`/api/artifacts/${SHA}`);
+      expect(cadResult.fetchCadResult).not.toHaveBeenCalled();
+    });
+
+    it('reads an AI model that was sent as it was from /result', async () => {
+      api.getSupervisedRun.mockResolvedValue(detail('delivered', {
+        supervision: { ...detail('delivered').supervision, decision: 'send' },
+      }));
+      cadResult.fetchCadResult.mockResolvedValue({ glb_url: '/api/artifacts/abc', threedm_url: null, azure_source: null, not_all_solid: false, pending: false });
+      renderPage();
+      expect(await screen.findByText('The model the AI made, sent as it was.')).toBeTruthy();
       expect((await screen.findByTestId('glb')).textContent).toBe('/api/artifacts/abc');
       expect(cadResult.fetchCadResult).toHaveBeenCalledWith('wf-1');
+    });
+
+    it('previews the uploaded replacement on a rejected run before it is sent', async () => {
+      api.getSupervisedRun.mockResolvedValue(detail('rejected', {
+        download_urls: { glb: `https://formanova.ai/api/artifacts/${SHA}` },
+      }));
+      renderPage();
+      expect(await screen.findByText('What Send replacement delivers')).toBeTruthy();
+      expect(screen.getAllByTestId('glb').map((n) => n.textContent)).toContain(`/api/artifacts/${SHA}`);
     });
 
     it('counts how many times the run was generated', async () => {
