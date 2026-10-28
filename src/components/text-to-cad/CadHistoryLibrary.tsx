@@ -11,14 +11,14 @@ import { useEffect, useState } from "react";
 import { useAuthenticatedImage } from "@/hooks/useAuthenticatedImage";
 import { useCadHistoryLibrary, type CadLibraryEntry } from "@/hooks/useCadHistoryLibrary";
 import { Search, ChevronLeft, ChevronRight, Diamond, Layers, Pencil, Check, X } from "lucide-react";
+import { parseServerTime } from "@/lib/server-time";
 
 const localDateFmt = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
 
 /** Local rendering of a workflow timestamp — bare seconds/ms precision from the
  * backend is normalized to a Date-parseable ISO string first. */
 function formatLocalTimestamp(ts: string): string {
-  const normalized = ts.trim() && !/[Zz]$/.test(ts) && !/[+-]\d{2}:?\d{2}$/.test(ts) ? `${ts}Z` : ts;
-  const date = new Date(normalized);
+  const date = parseServerTime(ts);
   return Number.isNaN(date.getTime()) ? "" : localDateFmt.format(date);
 }
 

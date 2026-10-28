@@ -28,6 +28,7 @@ import {
   STORE_PLATFORMS,
   type AdminBrandListItem,
 } from '@/lib/admin-brands-api';
+import { parseServerTime } from '@/lib/server-time';
 
 const PAGE_SIZE = 20;
 
@@ -49,7 +50,7 @@ function formatDateTime(value: string | null): string {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
-  }).format(new Date(value));
+  }).format(parseServerTime(value));
 }
 
 function HostLink({ url }: { url: string | null }) {

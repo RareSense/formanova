@@ -28,6 +28,7 @@ import {
   type AdminGenerationListItem,
 } from '@/lib/admin-generations-api';
 import { matchesAdminGenerationSearch } from '@/lib/admin-generations-search';
+import { parseServerTime } from '@/lib/server-time';
 
 const PAGE_SIZE = 20;
 // 'queued' intentionally absent: the backend never sets it (rows start at 'running').
@@ -48,7 +49,7 @@ function formatDateTime(value: string | null): string {
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-  }).format(new Date(value));
+  }).format(parseServerTime(value));
 }
 
 function formatCredits(value: number | null): string {

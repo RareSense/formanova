@@ -54,6 +54,7 @@ import { azureUriToUrl } from '@/lib/azure-utils';
 import { cadTierText } from '@/lib/cad-model-options';
 import { downloadCadArtifact } from '@/lib/cad-artifact-download';
 import { DetailContent, RunInputsPanel } from '@/pages/AdminGenerationDetailPage';
+import { parseServerTime } from '@/lib/server-time';
 
 const POLL_MS = 5000;
 // A run that is queued or working can move on its own; check it now and then.
@@ -85,7 +86,7 @@ const GUIDANCE: Record<SupervisedPhase, string> = {
 
 function formatDateTime(value: string | null | undefined): string {
   if (!value) return '-';
-  const date = new Date(value);
+  const date = parseServerTime(value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat(undefined, {
     year: 'numeric',

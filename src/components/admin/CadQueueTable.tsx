@@ -15,6 +15,7 @@ import {
   type SupervisedPhase,
   type SupervisedRunListItem,
 } from '@/lib/supervised-runs-api';
+import { parseServerTime } from '@/lib/server-time';
 
 // On phones only Waiting, User and Status show; the whole row opens the run (Start is there and in Start all).
 const WIDE = 'hidden md:table-cell';
@@ -25,7 +26,7 @@ const COLUMNS: Array<{ name: string; wideOnly?: boolean }> = [
 
 function formatDateTime(value: string | null): string {
   if (!value) return '-';
-  const date = new Date(value);
+  const date = parseServerTime(value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date);
 }

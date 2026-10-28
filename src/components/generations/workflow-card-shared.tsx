@@ -4,6 +4,7 @@
 // file focused and under the file-size limit.
 
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
+import { normalizeServerTime } from '@/lib/server-time';
 
 export const DISPLAY_NAME_MAX_CHARS = 50;
 
@@ -18,11 +19,7 @@ const localDateFmt = new Intl.DateTimeFormat(undefined, {
   timeStyle: 'short',
 });
 export function normalizeTimestamp(ts: string): string {
-  let normalized = ts.trim();
-  if (normalized && !/[Zz]$/.test(normalized) && !/[+-]\d{2}:?\d{2}$/.test(normalized)) {
-    normalized += 'Z';
-  }
-  return normalized;
+  return normalizeServerTime(ts);
 }
 
 export function formatLocal(ts: string): string {

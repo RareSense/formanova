@@ -16,6 +16,7 @@ import { Lightbulb } from 'lucide-react';
 import { ScissorGLBGrid, GLBPreviewSlot } from '@/components/generations/ScissorGLBGrid';
 import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
 import { cn } from '@/lib/utils';
+import { parseServerTime } from '@/lib/server-time';
 
 export interface VersionCard {
   asset_id: string;
@@ -39,7 +40,7 @@ export interface VersionsPanelProps {
 /** Saved-at time, hour and minute, which is what distinguishes same-day versions. */
 function savedAt(value?: string | null): string {
   if (!value) return '';
-  const when = new Date(value);
+  const when = parseServerTime(value);
   return Number.isNaN(when.getTime())
     ? ''
     : when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });

@@ -25,6 +25,7 @@ import {
   listAIFixes,
   getAIFixById,
 } from '@/lib/ai-fixes-api';
+import { parseServerTime } from '@/lib/server-time';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -53,11 +54,10 @@ const STATUS_CFG: Record<AIFixStatus, { label: string; pill: string }> = {
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
 function formatLocalDate(iso: string): string {
-  const utc = iso.endsWith('Z') ? iso : iso + 'Z';
   return new Intl.DateTimeFormat(undefined, {
     year: 'numeric', month: 'short', day: 'numeric',
     hour: '2-digit', minute: '2-digit',
-  }).format(new Date(utc));
+  }).format(parseServerTime(iso));
 }
 
 async function downloadAuthImage(url: string, filename: string) {

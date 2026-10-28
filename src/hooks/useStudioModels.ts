@@ -43,6 +43,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { fetchUserAssets, getAssetDisplayName, renameAsset, type UserAsset } from '@/lib/assets-api';
 import type { UserModel } from '@/components/studio/ModelCard';
+import { parseServerTime } from '@/lib/server-time';
 
 const MY_MODELS_STORAGE_KEY = 'formanova_my_models';
 const MY_INSPIRATIONS_STORAGE_KEY = 'formanova_my_inspirations';
@@ -90,7 +91,7 @@ export function useStudioModels({
         id: a.id,
         name: getAssetDisplayName(a) || (isProductShot ? 'Inspiration' : 'Model'),
         url: a.thumbnail_url,
-        uploadedAt: new Date(a.created_at).getTime(),
+        uploadedAt: parseServerTime(a.created_at).getTime(),
       }));
       setMyModels(backendModels);
       const backendIds = new Set(backendModels.map(m => m.id));

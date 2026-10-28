@@ -15,10 +15,11 @@ import { Lightbulb } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { USER_NOTE_MAX_CHARS, userNoteLength } from '@/lib/supervised-runs-api';
+import { parseServerTime } from '@/lib/server-time';
 
 function formatDateTime(value: string | null | undefined): string {
   if (!value) return '-';
-  const date = new Date(value);
+  const date = parseServerTime(value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat(undefined, {
     year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
