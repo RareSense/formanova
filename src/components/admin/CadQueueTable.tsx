@@ -20,7 +20,8 @@ import {
 const WIDE = 'hidden md:table-cell';
 const COLUMNS: Array<{ name: string; wideOnly?: boolean }> = [
   { name: 'Waiting' }, { name: 'User' }, { name: 'Type', wideOnly: true }, { name: 'Status' },
-  { name: 'Tries', wideOnly: true }, { name: 'Updated', wideOnly: true }, { name: 'Notes', wideOnly: true },
+  { name: 'Tries', wideOnly: true }, { name: 'Updated', wideOnly: true }, { name: 'My notes', wideOnly: true },
+  { name: 'Note to user', wideOnly: true },
 ];
 
 function formatDateTime(value: string | null): string {
@@ -112,6 +113,11 @@ export default function CadQueueTable({ items, grouped, now, rowResults, startin
                     {ago(item.updated_at, now)}
                   </TableCell>
                   <TableCell className={`text-sm tabular-nums ${WIDE}`}>{item.note_count || '-'}</TableCell>
+                  <TableCell className={`max-w-[240px] ${WIDE}`}>
+                    <span className="block truncate text-sm" title={item.user_note || undefined}>
+                      {item.user_note ? firstLine(item.user_note) : '-'}
+                    </span>
+                  </TableCell>
                   <TableCell className={`text-right ${WIDE}`} onClick={(event) => event.stopPropagation()}>
                     <div className="flex flex-col items-end gap-1">
                       {startable ? (

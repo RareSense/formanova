@@ -104,7 +104,7 @@ describe('AdminCadQueuePage', () => {
     await screen.findByText('wf-q@x.com');
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
     expect(screen.getAllByRole('columnheader').map((h) => h.textContent?.trim()))
-      .toEqual(['Waiting', 'User', 'Type', 'Status', 'Tries', 'Updated', 'Notes', 'Action']);
+      .toEqual(['Waiting', 'User', 'Type', 'Status', 'Tries', 'Updated', 'My notes', 'Note to user', 'Action']);
     const order = screen.getAllByRole('row').map((r) => r.textContent ?? '');
     const at = (text: string) => order.findIndex((t) => t.includes(text));
     expect(at('To start')).toBeLessThan(at('wf-q@x.com'));
@@ -113,6 +113,18 @@ describe('AdminCadQueuePage', () => {
     expect(at('wf-v@x.com')).toBeLessThan(at('Running'));
     expect(within(rowOf('wf-q')).getByText('Paying')).toBeTruthy();
     expect(within(rowOf('wf-q')).getByText('2')).toBeTruthy();
+  });
+
+  it('shows the note sent to the user, first line only, beside the admin note count', async () => {
+    api.listSupervisedRuns.mockResolvedValue({
+      items: [row('wf-d', 'delivered', { note_count: 1, user_note: 'Send side photos next time.\nThanks!' }), row('wf-f', 'failed')],
+      total: 2, limit: 50, offset: 0,
+    });
+    renderPage();
+    await screen.findByText('wf-d@x.com');
+    const note = within(rowOf('wf-d')).getByText('Send side photos next time.');
+    expect(note.getAttribute('title')).toBe('Send side photos next time.\nThanks!');
+    expect(within(rowOf('wf-f')).getAllByText('-').length).toBeGreaterThanOrEqual(2);
   });
 
   it('says when the list was last updated', async () => {

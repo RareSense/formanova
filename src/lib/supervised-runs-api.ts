@@ -49,6 +49,8 @@ export interface SupervisedRunListItem {
   last_error: string | null;
   decision: string | null;
   note_count: number;
+  /** The note sent to the user with the decision; absent from older backends. */
+  user_note?: string | null;
 }
 
 export interface SupervisedUpload {
