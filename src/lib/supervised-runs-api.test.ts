@@ -14,6 +14,7 @@ import {
   PHASE_ACTIONS, SupervisedRunsApiError, addSupervisedRunNote, failSupervisedRun, getSupervisedRun,
   listSupervisedRuns, rejectSupervisedRun, removeSupervisedUpload, sameNames, sendSupervisedReplacement,
   sendSupervisedRun, startSupervisedRuns, uploadReplacementFile, isUncertainCheckFailure, userNoteLength, USER_NOTE_MAX_CHARS,
+  UPLOAD_ROLES,
 } from './supervised-runs-api';
 
 const ok = (body: unknown, status = 200) => ({ ok: true, status, json: async () => body });
@@ -135,6 +136,16 @@ describe('supervised runs client', () => {
 });
 
 describe('helpers', () => {
+  it('uses the backend size limit for every upload role (src/supervision/delivery.py)', () => {
+    const MiB = 1024 * 1024;
+    const GiB = 1024 * MiB;
+    expect(Object.fromEntries(UPLOAD_ROLES.map((spec) => [spec.role, spec.maxBytes]))).toEqual({
+      glb: GiB, threedm: GiB, viewer_threedm: GiB, stl: GiB, step: GiB, casting_stl: GiB,
+      code: 50 * MiB, loop_state: 50 * MiB, thumbnail: 50 * MiB, design_contract: 50 * MiB, reference_manifest: 50 * MiB,
+      stones: 10 * MiB,
+    });
+  });
+
   it('compares names as sets of the same size', () => {
     expect(sameNames([], [])).toBe(true);
     expect(sameNames(['a', 'b'], ['b', 'a'])).toBe(true);
