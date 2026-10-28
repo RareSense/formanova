@@ -32,7 +32,7 @@ export interface CadVersionLabel {
 }
 
 /** A file kind GET /api/cad/models lists on a version once that file is complete. */
-export type CadDownloadKind = 'threedm' | 'stl' | 'step' | 'casting_stl' | 'stones';
+export type CadDownloadKind = 'threedm' | 'stl' | 'step' | 'casting_stl' | 'stones' | 'spec_sheet';
 
 export interface CadVersionDownload {
   kind: CadDownloadKind;
@@ -73,6 +73,8 @@ export interface CadRingVersion {
    * when there is none. Show it as text, never as HTML.
    */
   user_note?: string | null;
+  /** Open Review required flags on the version's spec sheet (kind 'spec_sheet'); absent when there is none. */
+  spec_sheet_open_flags?: number | null;
 }
 
 export interface CadRing {
