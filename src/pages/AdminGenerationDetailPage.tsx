@@ -41,6 +41,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { parseServerTime } from '@/lib/server-time';
 
 function formatDateTime(value: string | null): string {
   if (!value) return '-';
@@ -50,7 +51,7 @@ function formatDateTime(value: string | null): string {
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-  }).format(new Date(value));
+  }).format(parseServerTime(value));
 }
 
 function formatDuration(value: number | null): string {

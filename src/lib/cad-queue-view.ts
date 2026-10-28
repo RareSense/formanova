@@ -5,6 +5,7 @@
  * through them, which phases can be started, and "how long ago" in plain units.
  */
 import type { SupervisedPhase } from '@/lib/supervised-runs-api';
+import { parseServerTime } from './server-time';
 
 export const STARTABLE: SupervisedPhase[] = ['queued', 'errored'];
 
@@ -19,7 +20,7 @@ export const QUEUE_GROUPS: Array<{ key: string; label: string; phases: Supervise
 /** How long ago, in the largest whole unit: "just now", "12 min", "3 h", "2 d". */
 export function ago(value: string | null, now: number): string {
   if (!value) return '-';
-  const then = new Date(value).getTime();
+  const then = parseServerTime(value).getTime();
   if (Number.isNaN(then)) return '-';
   const minutes = Math.max(0, Math.floor((now - then) / 60000));
   if (minutes < 1) return 'just now';

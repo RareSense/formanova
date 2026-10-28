@@ -20,18 +20,19 @@ import {
 import { Pencil, Ban, Plus, Loader2, TicketPercent } from 'lucide-react';
 import { toast } from 'sonner';
 import type { PromoCode, CreatePromoCodePayload, UpdatePromoCodePayload } from '@/types/promo';
+import { parseServerTime } from '@/lib/server-time';
 
 const API_BASE = '/api/credits/admin/ui/promo-codes';
 
 function formatDate(iso: string | null) {
   if (!iso) return 'Never';
-  return new Date(iso).toLocaleDateString('en-US', {
+  return parseServerTime(iso).toLocaleDateString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
   });
 }
 
 function codeStatus(code: PromoCode): 'active' | 'expired' | 'inactive' {
-  if (code.expires_at && new Date(code.expires_at) <= new Date()) return 'expired';
+  if (code.expires_at && parseServerTime(code.expires_at) <= new Date()) return 'expired';
   if (!code.is_active) return 'inactive';
   return 'active';
 }

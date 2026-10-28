@@ -25,6 +25,7 @@ import {
   listFeedback,
   getAdminFeedbackById,
 } from '@/lib/feedback-api';
+import { parseServerTime } from '@/lib/server-time';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -45,7 +46,7 @@ function formatLocalDate(iso: string): string {
   return new Intl.DateTimeFormat(undefined, {
     year: 'numeric', month: 'short', day: 'numeric',
     hour: '2-digit', minute: '2-digit',
-  }).format(new Date(iso));
+  }).format(parseServerTime(iso));
 }
 
 /** Derives the email notification status from item fields. */
