@@ -122,19 +122,18 @@ beforeEach(() => {
 });
 
 describe('AdminCadQueueDetailPage', () => {
-  it('shows only the actions the phase allows', async () => {
-    api.getSupervisedRun.mockResolvedValue(detail('queued'));
-    const first = renderPage();
+  // One render per case: three full page mounts in one test overran the 5 s test timeout under full-suite load.
+  it.each([
+    ['queued', ['Start', 'Reject', 'Fail']],
+    ['awaiting_review', ['Send', 'Reject', 'Fail']],
+  ] as const)('shows only the actions a %s run allows', async (phase, actions) => {
+    api.getSupervisedRun.mockResolvedValue(detail(phase));
+    renderPage();
     await loaded();
-    expect(actionButtonNames()).toEqual(['Start', 'Reject', 'Fail']);
-    first.unmount();
+    expect(actionButtonNames()).toEqual(actions);
+  });
 
-    api.getSupervisedRun.mockResolvedValue(detail('awaiting_review'));
-    const second = renderPage();
-    await loaded();
-    expect(actionButtonNames()).toEqual(['Send', 'Reject', 'Fail']);
-    second.unmount();
-
+  it('shows no actions while the run is running', async () => {
     api.getSupervisedRun.mockResolvedValue(detail('running'));
     renderPage();
     expect(await screen.findByText('Running. This page updates by itself.')).toBeTruthy();
