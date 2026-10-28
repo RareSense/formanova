@@ -213,8 +213,7 @@ describe('AdminCadQueueDetailPage', () => {
     api.addSupervisedRunNote.mockResolvedValue({ id: 'n1', author_email: 'a@x.com', body: 'checked the prongs', created_at: '2026-10-24T11:00:00Z' });
     renderPage();
     await loaded();
-    openSection('Notes (0)');
-    expect(await screen.findByText("Notes can't be edited or deleted.")).toBeTruthy();
+    expect(screen.getByText("Only admins see these. Notes can't be edited or deleted.")).toBeTruthy();
     const add = screen.getByRole('button', { name: 'Add note' });
     expect(add.hasAttribute('disabled')).toBe(true);
     fireEvent.change(screen.getByRole('textbox', { name: 'New note' }), { target: { value: '   ' } });
@@ -283,23 +282,16 @@ describe('AdminCadQueueDetailPage', () => {
     expect(viewer.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('folds Notes, History and Details away until opened', async () => {
-    api.getSupervisedRun.mockResolvedValue(detail('queued', {
-      notes: [{ id: 'n1', author_email: 'a@x.com', body: 'checked the prongs', created_at: '2026-10-24T11:00:00Z' }],
-    }));
+  it('folds History and Details away until opened', async () => {
+    api.getSupervisedRun.mockResolvedValue(detail('queued'));
     renderPage();
     await loaded();
-    expect(screen.queryByText('checked the prongs')).toBeNull();
-    expect(screen.queryByRole('textbox', { name: 'New note' })).toBeNull();
     expect(screen.queryByText('Attempt 1')).toBeNull();
     expect(screen.queryByText('run detail')).toBeNull();
-    for (const name of ['Notes (1)', 'History', 'Details']) {
+    for (const name of ['History', 'Details']) {
       expect(screen.getByRole('button', { name }).getAttribute('aria-expanded')).toBe('false');
     }
 
-    openSection('Notes (1)');
-    expect(await screen.findByText('checked the prongs')).toBeTruthy();
-    expect(screen.getByRole('textbox', { name: 'New note' })).toBeTruthy();
     openSection('History');
     expect(await screen.findByText('Attempt 1')).toBeTruthy();
     expect(screen.getByText('No events yet.')).toBeTruthy();
@@ -599,6 +591,28 @@ describe('AdminCadQueueDetailPage', () => {
   });
 
   describe('note to the user', () => {
+    it('shows My notes and the note to the user side by side, both open', async () => {
+      api.getSupervisedRun.mockResolvedValue(detail('queued', {
+        notes: [{ id: 'n1', author_email: 'a@x.com', body: 'checked the prongs', created_at: '2026-10-24T11:00:00Z' }],
+      }));
+      renderPage();
+      await loaded();
+      expect(screen.getByText('checked the prongs')).toBeTruthy();
+      const mine = screen.getByText('My notes (1)').closest('.rounded-lg') as HTMLElement;
+      const user = screen.getByRole('textbox', { name: 'Note to user' }).closest('.rounded-lg') as HTMLElement;
+      expect(within(mine).getByRole('textbox', { name: 'New note' })).toBeTruthy();
+      expect(mine.parentElement).toBe(user.parentElement);
+      expect(mine.parentElement?.className).toContain('lg:grid-cols-2');
+    });
+
+    it('says there is no note to the user when none was sent', async () => {
+      api.getSupervisedRun.mockResolvedValue(detail('running'));
+      renderPage();
+      await loaded();
+      expect(screen.getByText('No note to user.')).toBeTruthy();
+      expect(screen.getByText('My notes (0)')).toBeTruthy();
+    });
+
     it('sends the note with Send', async () => {
       api.getSupervisedRun.mockResolvedValue(detail('awaiting_review', { send_check: { has_model: true, missing: [] } }));
       api.sendSupervisedRun.mockResolvedValue({ accepted: true, phase: 'awaiting_review' });

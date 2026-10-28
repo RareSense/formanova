@@ -4,7 +4,7 @@
  *
  * The note goes with Send, Send replacement or Fail and is saved only when that press is accepted;
  * a refused press keeps the draft here so the admin can fix the problem and press again. Once
- * saved it is final.
+ * saved it is final. With no note, the view says so, so the card can still sit beside My notes.
  *
  * Length is counted in characters the way the backend counts them ([...text]), never with
  * .length or a maxLength attribute: both count UTF-16 units and can cut an emoji in half. A change
@@ -25,10 +25,11 @@ function formatDateTime(value: string | null | undefined): string {
   }).format(date);
 }
 
-export function UserNoteField({ value, onChange, disabled = false }: {
+export function UserNoteField({ value, onChange, disabled = false, className }: {
   value: string;
   onChange: (next: string) => void;
   disabled?: boolean;
+  className?: string;
 }) {
   const used = userNoteLength(value);
   const atLimit = used >= USER_NOTE_MAX_CHARS;
@@ -40,7 +41,7 @@ export function UserNoteField({ value, onChange, disabled = false }: {
   }
 
   return (
-    <Card>
+    <Card className={className}>
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 font-display text-2xl tracking-wide">
           <Lightbulb className="h-5 w-5 text-primary" aria-hidden="true" />
@@ -69,9 +70,9 @@ export function UserNoteField({ value, onChange, disabled = false }: {
   );
 }
 
-export function UserNoteView({ note, by, at }: { note: string; by: string | null; at: string | null }) {
+export function UserNoteView({ note, by, at, className }: { note: string | null; by: string | null; at: string | null; className?: string }) {
   return (
-    <Card>
+    <Card className={className}>
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 font-display text-2xl tracking-wide">
           <Lightbulb className="h-5 w-5 text-primary" aria-hidden="true" />
@@ -79,13 +80,20 @@ export function UserNoteView({ note, by, at }: { note: string; by: string | null
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
-        <p className="flex flex-wrap gap-x-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-          {by && <span className="break-all normal-case">{by}</span>}
-          <span>{formatDateTime(at)}</span>
-        </p>
-        <p className="whitespace-pre-wrap break-words border border-border bg-muted/40 p-3 text-sm leading-relaxed [overflow-wrap:anywhere]">
-          {note}
-        </p>
+        {note ? (
+          <>
+            <p className="flex flex-wrap gap-x-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              {by && <span className="break-all normal-case">{by}</span>}
+              <span>{formatDateTime(at)}</span>
+            </p>
+            <p className="whitespace-pre-wrap break-words border border-border bg-muted/40 p-3 text-sm leading-relaxed [overflow-wrap:anywhere]">
+              {note}
+            </p>
+          </>
+        ) : (
+          // No note was sent, or the run is in a phase where none can be written yet.
+          <p className="text-sm text-muted-foreground">No note to user.</p>
+        )}
       </CardContent>
     </Card>
   );

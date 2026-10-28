@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, ArrowLeft, Check, ChevronDown, Copy, Loader2, MessageSquareWarning, RefreshCw } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Check, ChevronDown, Copy, Loader2, MessageSquareWarning, RefreshCw, StickyNote } from 'lucide-react';
 
 import {
   AlertDialog,
@@ -303,7 +303,8 @@ function HistoryBody({ data }: { data: SupervisedRunDetail }) {
   );
 }
 
-function NotesBody({ data, workflowId, onSaved }: { data: SupervisedRunDetail; workflowId: string; onSaved: () => void }) {
+// The admins' own notes on a run. The user never sees them; the note to the user sits beside them.
+function MyNotesCard({ data, workflowId, onSaved }: { data: SupervisedRunDetail; workflowId: string; onSaved: () => void }) {
   const [body, setBody] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -329,39 +330,47 @@ function NotesBody({ data, workflowId, onSaved }: { data: SupervisedRunDetail; w
   }
 
   return (
-    <>
-      {data.notes.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No notes yet.</p>
-      ) : (
-        <ul className="space-y-3">
-          {data.notes.map((note) => (
-            <li key={note.id} className="min-w-0 border border-border p-3">
-              <p className="flex flex-wrap gap-x-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                <span className="break-all normal-case">{note.author_email}</span>
-                <span>{formatDateTime(note.created_at)}</span>
-              </p>
-              <p className="mt-2 whitespace-pre-wrap break-words text-sm [overflow-wrap:anywhere]">{note.body}</p>
-            </li>
-          ))}
-        </ul>
-      )}
-      <div className="space-y-2">
-        <Textarea
-          aria-label="New note"
-          value={body}
-          maxLength={NOTE_MAX}
-          onChange={(event) => setBody(event.target.value)}
-          placeholder="Write a note..."
-          className="min-h-24"
-        />
-        <p className="text-xs text-muted-foreground">Notes can't be edited or deleted.</p>
-        {error && <p className="break-words text-sm text-destructive" role="alert">{error}</p>}
-        <Button className="px-4" disabled={!body.trim() || saving} onClick={() => void save()}>
-          {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Add note
-        </Button>
-      </div>
-    </>
+    <Card className="h-full">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 font-display text-2xl tracking-wide">
+          <StickyNote className="h-5 w-5 text-primary" aria-hidden="true" />
+          {`My notes (${data.notes.length})`}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {data.notes.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No notes yet.</p>
+        ) : (
+          <ul className="space-y-3">
+            {data.notes.map((note) => (
+              <li key={note.id} className="min-w-0 border border-border p-3">
+                <p className="flex flex-wrap gap-x-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                  <span className="break-all normal-case">{note.author_email}</span>
+                  <span>{formatDateTime(note.created_at)}</span>
+                </p>
+                <p className="mt-2 whitespace-pre-wrap break-words text-sm [overflow-wrap:anywhere]">{note.body}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="space-y-2">
+          <Textarea
+            aria-label="New note"
+            value={body}
+            maxLength={NOTE_MAX}
+            onChange={(event) => setBody(event.target.value)}
+            placeholder="Write a note..."
+            className="min-h-24"
+          />
+          <p className="text-xs text-muted-foreground">Only admins see these. Notes can't be edited or deleted.</p>
+          {error && <p className="break-words text-sm text-destructive" role="alert">{error}</p>}
+          <Button className="px-4" disabled={!body.trim() || saving} onClick={() => void save()}>
+            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Add note
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -658,10 +667,6 @@ export default function AdminCadQueueDetailPage() {
 
             {phase === 'delivered' && <SupervisedDeliveredCard workflowId={workflowId} detail={data} />}
 
-            {data.supervision.user_note && (
-              <UserNoteView note={data.supervision.user_note} by={data.supervision.decided_by_email} at={data.supervision.decided_at} />
-            )}
-
             {phase === 'awaiting_review' && data.send_check && (
               <SendDeliversCard check={data.send_check} workflowId={workflowId} />
             )}
@@ -672,9 +677,15 @@ export default function AdminCadQueueDetailPage() {
               </p>
             )}
 
-            {NOTE_PHASES.includes(phase) && !data.supervision.user_note && (
-              <UserNoteField value={userNote} onChange={setUserNote} disabled={actionsLocked} />
-            )}
+            {/* My notes and the note to the user, side by side. The note to the user goes with the buttons below. */}
+            <div className="grid items-stretch gap-6 lg:grid-cols-2">
+              <MyNotesCard data={data} workflowId={workflowId} onSaved={() => void query.refetch()} />
+              {NOTE_PHASES.includes(phase) && !data.supervision.user_note ? (
+                <UserNoteField className="h-full" value={userNote} onChange={setUserNote} disabled={actionsLocked} />
+              ) : (
+                <UserNoteView className="h-full" note={data.supervision.user_note ?? null} by={data.supervision.decided_by_email} at={data.supervision.decided_at} />
+              )}
+            </div>
 
             {(allowed.length > 0 || (message && messageFrom === 'buttons')) && (
               <Card>
@@ -744,10 +755,6 @@ export default function AdminCadQueueDetailPage() {
             {phase !== 'awaiting_review' && data.send_check && (
               <SendDeliversCard check={data.send_check} workflowId={workflowId} />
             )}
-
-            <FoldSection title={`Notes (${data.notes.length})`}>
-              <NotesBody data={data} workflowId={workflowId} onSaved={() => void query.refetch()} />
-            </FoldSection>
 
             <FoldSection title="History">
               <HistoryBody data={data} />
