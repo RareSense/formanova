@@ -128,15 +128,15 @@ export const UPLOAD_ROLES: UploadRoleSpec[] = [
   { role: 'glb', label: 'GLB model', accept: '.glb', maxBytes: GiB, required: true },
   { role: 'threedm', label: 'Rhino 3DM', accept: '.3dm', maxBytes: GiB },
   { role: 'viewer_threedm', label: 'Viewer 3DM (mesh only)', accept: '.3dm', maxBytes: GiB },
-  { role: 'code', label: 'CAD code', accept: '.py', maxBytes: 10 * MiB },
-  { role: 'loop_state', label: 'Loop state', accept: '.json', maxBytes: 10 * MiB },
-  { role: 'thumbnail', label: 'Thumbnail', accept: '.png', maxBytes: 20 * MiB },
-  { role: 'design_contract', label: 'Design contract', accept: '.json', maxBytes: 10 * MiB, generateOnly: true },
-  { role: 'reference_manifest', label: 'Reference manifest', accept: '.json', maxBytes: 10 * MiB, generateOnly: true },
+  { role: 'code', label: 'CAD code', accept: '.py', maxBytes: 50 * MiB },
+  { role: 'loop_state', label: 'Loop state', accept: '.json', maxBytes: 50 * MiB },
+  { role: 'thumbnail', label: 'Thumbnail', accept: '.png', maxBytes: 50 * MiB },
+  { role: 'design_contract', label: 'Design contract', accept: '.json', maxBytes: 50 * MiB, generateOnly: true },
+  { role: 'reference_manifest', label: 'Reference manifest', accept: '.json', maxBytes: 50 * MiB, generateOnly: true },
   { role: 'stl', label: 'Full model STL', accept: '.stl', maxBytes: GiB },
   { role: 'step', label: 'Full model STEP', accept: '.step', maxBytes: GiB },
   { role: 'casting_stl', label: 'Casting STL', accept: '.stl', maxBytes: GiB },
-  { role: 'stones', label: 'Stone list', accept: '.json', maxBytes: MiB },
+  { role: 'stones', label: 'Stone list', accept: '.json', maxBytes: 10 * MiB },
 ];
 
 export class SupervisedRunsApiError extends Error {
