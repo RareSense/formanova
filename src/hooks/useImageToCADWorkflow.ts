@@ -345,7 +345,12 @@ export function useImageToCADWorkflow({
    * the viewer really shows that version's GLB.
    */
   const versionDownloads = activeVersion?.downloads?.length && activeVersion.glb_url === glbUrl
-    ? { assetId: activeVersion.asset_id, downloads: activeVersion.downloads, source: cadSource }
+    ? {
+      assetId: activeVersion.asset_id,
+      downloads: activeVersion.downloads,
+      source: cadSource,
+      specSheetOpenFlags: activeVersion.spec_sheet_open_flags,
+    }
     : null;
 
   /**

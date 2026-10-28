@@ -146,6 +146,7 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
         assetId: shownVaultVersion.asset_id,
         downloads: shownVaultVersion.downloads,
         source: cadSourceFromSourceType(workflow.source_type),
+        specSheetOpenFlags: shownVaultVersion.spec_sheet_open_flags,
       }
     : null;
   const viewerThreedmFilename = `${shownBaseName}-viewing-copy.3dm`;

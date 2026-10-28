@@ -41,6 +41,8 @@ export interface CadVersionDownloads {
   assetId: string;
   downloads: CadVersionDownload[];
   source?: CadSource;
+  /** Open Review required flags on the spec sheet, shown beside it; omit when the version sends none. */
+  specSheetOpenFlags?: number | null;
 }
 
 export interface CadDownloadMenuProps {
@@ -137,6 +139,8 @@ interface FormatRow {
   format: string;
   hint: string;
   onSelect: () => void;
+  /** A short note after the hint, e.g. the spec sheet's open flags. */
+  note?: string;
 }
 
 /** What each version file is called in the list. The 3DM keeps the Rhino hint used above. */
@@ -146,6 +150,7 @@ const VERSION_FILE_LABELS: Record<CadDownloadKind, string> = {
   step: 'Full model STEP – with stones, for viewing and CAD',
   casting_stl: 'Casting STL – send to your caster',
   stones: 'Stone list',
+  spec_sheet: 'Spec sheet – for jeweller review',
 };
 
 /**
@@ -159,7 +164,10 @@ function formatOfFile(filename: string | undefined): string {
   return ext && ext.length <= 4 ? ext : 'LIST';
 }
 
-const VERSION_FILE_ORDER: CadDownloadKind[] = ['threedm', 'stl', 'step', 'casting_stl', 'stones'];
+const VERSION_FILE_ORDER: CadDownloadKind[] = ['threedm', 'stl', 'step', 'casting_stl', 'stones', 'spec_sheet'];
+
+/** Pause between files in Download all, so the browser takes each one as its own download. */
+const DOWNLOAD_ALL_GAP_MS = 400;
 
 /**
  * Asks for a fresh link and follows it. The link carries the filename, so the
@@ -184,13 +192,31 @@ async function saveVersionFile(assetId: string, kind: CadDownloadKind, source?: 
   }
 }
 
-function FormatItem({ format, hint, onSelect }: FormatRow) {
+function FormatItem({ format, hint, onSelect, note }: FormatRow) {
   return (
     <DropdownMenuItem onSelect={onSelect} className="gap-3 py-2">
       <span className="w-10 shrink-0 font-mono text-[11px] font-semibold uppercase tracking-wider">{format}</span>
       <span className="text-[12px] text-muted-foreground">{hint}</span>
+      {note && (
+        <span className="ml-auto shrink-0 rounded-sm border border-border px-1.5 py-0.5 font-mono text-[10px] tabular-nums">
+          {note}
+        </span>
+      )}
     </DropdownMenuItem>
   );
+}
+
+function openFlagsNote(count: number | null | undefined): string | undefined {
+  if (typeof count !== 'number') return undefined;
+  return `${count} open flag${count === 1 ? '' : 's'}`;
+}
+
+/** Every listed version file, one fresh link at a time, with a short pause between saves. */
+async function saveAllVersionFiles(assetId: string, kinds: CadDownloadKind[], source?: CadSource) {
+  for (const [index, kind] of kinds.entries()) {
+    if (index > 0) await new Promise((resolve) => setTimeout(resolve, DOWNLOAD_ALL_GAP_MS));
+    await saveVersionFile(assetId, kind, source);
+  }
 }
 
 export function CadDownloadMenu({
@@ -233,8 +259,13 @@ export function CadDownloadMenu({
       format: formatOfFile(versionDownloads.downloads.find((file) => file.kind === kind)?.filename),
       hint: VERSION_FILE_LABELS[kind],
       onSelect: () => { void saveVersionFile(versionDownloads.assetId, kind, versionDownloads.source); },
+      note: kind === 'spec_sheet' ? openFlagsNote(versionDownloads.specSheetOpenFlags) : undefined,
     });
   }
+  // Download all arrives with the spec sheet, so a version without one keeps today's list exactly.
+  const downloadAll = versionKinds.has('spec_sheet')
+    ? () => { void saveAllVersionFiles(versionDownloads.assetId, versionFiles, versionDownloads.source); }
+    : null;
 
   const iconSize = variant === 'result' ? 'h-[18px] w-[18px]' : 'h-3.5 w-3.5';
 
@@ -260,6 +291,7 @@ export function CadDownloadMenu({
         {formats.map((row) => (
           <FormatItem key={`${row.format}-${row.hint}`} {...row} />
         ))}
+        {downloadAll && <FormatItem format="ALL" hint="Download all" onSelect={downloadAll} />}
         {onExportEdited && (
           <>
             <DropdownMenuSeparator />

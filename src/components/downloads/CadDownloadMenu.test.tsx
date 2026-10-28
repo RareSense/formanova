@@ -280,3 +280,98 @@ describe('CadDownloadMenu: files from the version', () => {
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Couldn't get the download link. Try again."));
   });
 });
+
+describe('CadDownloadMenu: the spec sheet and Download all', () => {
+  const linkMock = vi.mocked(fetchVersionDownloadLink);
+  const FILES: CadVersionDownload[] = [
+    { kind: 'stl', filename: 'ring.stl', bytes: 10 },
+    { kind: 'casting_stl', filename: 'ring-casting.stl', bytes: 10 },
+    { kind: 'stones', filename: 'ring-stones.json', bytes: 10 },
+  ];
+  const SHEET: CadVersionDownload = { kind: 'spec_sheet', filename: 'ring-spec-sheet.pdf', bytes: 10 };
+
+  beforeEach(() => {
+    linkMock.mockReset();
+    vi.mocked(toast.error).mockReset();
+  });
+
+  it('renders exactly as before when the version has no spec sheet: no PDF, no Download all', async () => {
+    render(<CadDownloadMenu onDownloadGlb={noop} versionDownloads={{ assetId: 'v1', downloads: FILES }} />);
+    openMenu();
+    await screen.findByText('Casting STL – send to your caster');
+    expect(menuRows()).toEqual([
+      'GLB3D preview',
+      'STLFull model STL – with stones, for viewing and CAD',
+      'STLCasting STL – send to your caster',
+      'JSONStone list',
+    ]);
+    expect(screen.queryByText(/spec sheet/i)).toBeNull();
+    expect(screen.queryByText('Download all')).toBeNull();
+  });
+
+  it('lists the spec sheet last with its open-flag count beside it', async () => {
+    render(
+      <CadDownloadMenu
+        onDownloadGlb={noop}
+        versionDownloads={{ assetId: 'v1', downloads: [SHEET, ...FILES], specSheetOpenFlags: 3 }}
+      />,
+    );
+    openMenu();
+    const item = (await screen.findByText('Spec sheet – for jeweller review')).closest('[role="menuitem"]');
+    expect(item?.textContent).toBe('PDFSpec sheet – for jeweller review3 open flags');
+    const rows = menuRows();
+    expect(rows[rows.length - 2]).toBe('PDFSpec sheet – for jeweller review3 open flags');
+    expect(rows[rows.length - 1]).toBe('ALLDownload all');
+  });
+
+  it('says 1 open flag in the singular, and shows no count when the version sends none', async () => {
+    const { unmount } = render(
+      <CadDownloadMenu onDownloadGlb={noop} versionDownloads={{ assetId: 'v1', downloads: [SHEET], specSheetOpenFlags: 1 }} />,
+    );
+    openMenu();
+    expect(await screen.findByText('1 open flag')).toBeInTheDocument();
+    unmount();
+    render(<CadDownloadMenu onDownloadGlb={noop} versionDownloads={{ assetId: 'v1', downloads: [SHEET] }} />);
+    openMenu();
+    const item = (await screen.findByText('Spec sheet – for jeweller review')).closest('[role="menuitem"]');
+    expect(item?.textContent).toBe('PDFSpec sheet – for jeweller review');
+  });
+
+  it('fetches the spec sheet through a fresh link like the other files', async () => {
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    linkMock.mockResolvedValue({ url: 'https://blob.example/sheet', expires_at: 'x', filename: 'ring-spec-sheet.pdf' });
+    render(<CadDownloadMenu onDownloadGlb={noop} versionDownloads={{ assetId: 'v1', downloads: [SHEET], specSheetOpenFlags: 2 }} />);
+    openMenu();
+    fireEvent.click(await screen.findByText('Spec sheet – for jeweller review'));
+    await waitFor(() => expect(linkMock).toHaveBeenCalledWith('v1', 'spec_sheet'));
+    clickSpy.mockRestore();
+  });
+
+  it('Download all saves every version file, the spec sheet included, one fresh link at a time', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const clicked: string[] = [];
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      clicked.push(this.download);
+    });
+    let inFlight = 0;
+    let most = 0;
+    linkMock.mockImplementation(async (_asset, kind) => {
+      inFlight += 1;
+      most = Math.max(most, inFlight);
+      await Promise.resolve();
+      inFlight -= 1;
+      return { url: `https://blob.example/${kind}`, expires_at: 'x', filename: `ring-${kind}` };
+    });
+    render(
+      <CadDownloadMenu onDownloadGlb={noop} versionDownloads={{ assetId: 'v1', downloads: [SHEET, ...FILES], specSheetOpenFlags: 0 }} />,
+    );
+    openMenu();
+    fireEvent.click(await screen.findByText('Download all'));
+    await waitFor(() => expect(clicked).toHaveLength(4), { timeout: 5000 });
+    expect(linkMock.mock.calls.map((call) => call[1])).toEqual(['stl', 'casting_stl', 'stones', 'spec_sheet']);
+    expect(clicked).toEqual(['ring-stl', 'ring-casting_stl', 'ring-stones', 'ring-spec_sheet']);
+    expect(most).toBe(1);
+    clickSpy.mockRestore();
+    vi.useRealTimers();
+  });
+});
