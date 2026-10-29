@@ -152,12 +152,13 @@ export default function ShootSteps(p: Props) {
       {!p.running ? (
         <div className="space-y-1.5 pt-1">
           <button type="button" disabled={!p.canShoot || p.pieceCount === 0} onClick={p.onShootAll}
-            className="w-full h-11 px-6 bg-formanova-hero-accent text-primary-foreground font-mono text-[11px] uppercase tracking-[0.2em] disabled:opacity-40">
-            Shoot {p.pieceCount > 1 ? `all ${p.pieceCount} pieces` : 'piece'} · {p.totalPictures} pictures
+            className="w-full min-h-12 py-2 px-6 flex flex-col items-center justify-center gap-0.5 bg-formanova-hero-accent text-primary-foreground font-mono uppercase disabled:opacity-40">
+            <span className="text-[12px] tracking-[0.2em]">{p.pieceCount > 1 ? 'Shoot all' : 'Shoot'}</span>
+            <span className="text-[9px] tracking-[0.12em] opacity-90">{p.pieceCount} {p.pieceCount === 1 ? 'piece' : 'pieces'} · {p.totalPictures} {p.totalPictures === 1 ? 'picture' : 'pictures'}</span>
           </button>
           {p.pieceCount > 1 && (
             <button type="button" disabled={!p.canShoot} onClick={p.onShootOpen} className="w-full h-9 px-6 border border-border font-mono text-[10px] uppercase tracking-[0.15em] hover:bg-accent/50 disabled:opacity-40">
-              Shoot only the open piece · {p.perPiece.pictures}
+              Only the open piece · {p.perPiece.pictures}
             </button>
           )}
         </div>
