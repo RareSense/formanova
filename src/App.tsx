@@ -65,6 +65,7 @@ const UnifiedStudio = lazyWithRetry(() => import("./pages/UnifiedStudio"));
 // const CategoryUploadStudio = lazyWithRetry(() => import("@/components/bulk").then(m => ({ default: m.CategoryUploadStudio })));
 const TextToCAD = lazyWithRetry(() => import("./pages/TextToCAD"));
 const ImageToCAD = lazyWithRetry(() => import("./pages/ImageToCAD"));
+const CADToCatalog = lazyWithRetry(() => import("./pages/CADToCatalog"));
 const Generations = lazyWithRetry(() => import("./pages/Generations"));
 const Credits = lazyWithRetry(() => import("./pages/Credits"));
 const MyShopifyStore = lazyWithRetry(() => import("./pages/MyShopifyStore"));
@@ -251,6 +252,7 @@ const MainApp = () => (
                   <Route path="/text-to-cad" element={<ProtectedRoute><CADGate><TextToCAD key="idea" /></CADGate></ProtectedRoute>} />
                   <Route path="/inspiration-to-cad" element={<ProtectedRoute><CADGate><TextToCAD key="inspiration" variant="inspiration" /></CADGate></ProtectedRoute>} />
                   <Route path="/image-to-cad" element={<ProtectedRoute><CADGate><ImageToCAD /></CADGate></ProtectedRoute>} />
+                  <Route path="/cad-to-catalog" element={<ProtectedRoute><CADGate><CADToCatalog /></CADGate></ProtectedRoute>} />
                   
                   {/* Admin routes */}
                   <Route path="/admin" element={<AdminRouteGuard><AdminLayout /></AdminRouteGuard>}>

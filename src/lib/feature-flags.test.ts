@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { isCadUploadEnabled, isWeightStlEnabled } from './feature-flags';
+import { isCadToCatalogEnabled, isCadUploadEnabled, isWeightStlEnabled } from './feature-flags';
 
 describe('CAD rollout allowlists', () => {
   afterEach(() => {
@@ -28,5 +28,19 @@ describe('CAD rollout allowlists', () => {
   it('disables allowlisted gates when env values or emails are missing', () => {
     expect(isWeightStlEnabled('maker@example.com')).toBe(false);
     expect(isCadUploadEnabled(null)).toBe(false);
+  });
+});
+
+describe('Catalog from CAD allowlist', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('opens Catalog from CAD only to allowlisted emails', () => {
+    vi.stubEnv('VITE_CAD_TO_CATALOG_ALLOWLIST_EMAILS', 'shoot@example.com, Other@Example.com');
+    expect(isCadToCatalogEnabled('shoot@example.com')).toBe(true);
+    expect(isCadToCatalogEnabled('OTHER@example.com')).toBe(true);
+    expect(isCadToCatalogEnabled('nobody@example.com')).toBe(false);
+    expect(isCadToCatalogEnabled(null)).toBe(false);
   });
 });

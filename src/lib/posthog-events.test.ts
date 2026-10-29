@@ -31,6 +31,7 @@ import {
   trackCadResultRestored,
   trackGenerationComplete,
   trackDownloadClicked,
+  trackCatalogShootStarted,
   trackAIFixSubmitted,
   trackAIFixModalOpened,
   trackPaymentSuccess,
@@ -820,6 +821,18 @@ describe('trackUpscalePaywallHit', () => {
       credits_cost: 40,
       category: 'earring',
       surface: 'studio',
+    })
+  })
+})
+
+describe('trackCatalogShootStarted', () => {
+  it('captures catalog_shoot_started with the size of the shoot', () => {
+    trackCatalogShootStarted({ pieces: 3, pictures: 30, photo_backgrounds: 1, metals: 2 })
+    expect(posthog.capture).toHaveBeenCalledWith('catalog_shoot_started', {
+      pieces: 3,
+      pictures: 30,
+      photo_backgrounds: 1,
+      metals: 2,
     })
   })
 })

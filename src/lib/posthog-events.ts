@@ -485,6 +485,20 @@ export function trackDownloadClicked(props?: {
   capture('download_clicked', props ?? {});
 }
 
+// Catalog from CAD: a shoot started (one or many CAD files into catalog pictures).
+export interface CatalogShootStartedProps {
+  pieces: number;
+  pictures: number;
+  /** Photo backgrounds ticked; each such picture is an AI placement. */
+  photo_backgrounds: number;
+  /** Metals ticked; 0 = each piece keeps its own. */
+  metals: number;
+}
+
+export function trackCatalogShootStarted(props: CatalogShootStartedProps) {
+  capture('catalog_shoot_started', { ...props });
+}
+
 // Fired only on a confirmed successful export (draft product created in the
 // user's store) — not on button click — so unique-user counts answer
 // "how many people actually put an image into Shopify".

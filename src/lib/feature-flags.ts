@@ -42,6 +42,13 @@ export function isCadUploadEnabled(email: string | undefined | null): boolean {
 }
 
 /**
+ * Users allowed to open Catalog from CAD (/cad-to-catalog) while it rolls out.
+ */
+export function isCadToCatalogEnabled(email: string | undefined | null): boolean {
+  return isAllowlistedEmail(email, 'VITE_CAD_TO_CATALOG_ALLOWLIST_EMAILS');
+}
+
+/**
  * Image to 3D shipped publicly — the flag was removed per its own removal
  * condition and the history section renders for everyone.
  * VITE_IMAGE_TO_CAD_ALLOWLIST_EMAILS is no longer read and can be dropped
