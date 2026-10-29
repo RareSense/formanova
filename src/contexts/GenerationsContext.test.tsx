@@ -4,6 +4,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { GenerationsContextProvider, GenerationsContext, useGenerations, buildCadRestorePath, type TrackedGeneration } from './GenerationsContext';
 import { resolveRestoreEntry } from '@/lib/cad-analytics';
+import { AUTH_STATE_CHANGE_EVENT } from '@/lib/auth-api';
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
 vi.mock('@/lib/poll-workflow', () => ({ pollWorkflow: vi.fn() }));
@@ -97,6 +98,7 @@ describe('GenerationsContext', () => {
     vi.clearAllMocks();
     mockFetchImproveOutcome.mockResolvedValue(null);
     localStorage.clear();
+    localStorage.setItem('formanova_auth_token', 'test-token'); // signed in
     // Default: never resolves (long-running generation)
     mockPollWorkflow.mockReturnValue(new Promise(() => {}));
     mockGetWorkflowDetails.mockResolvedValue({ summary: { id: 'wf', name: '', status: 'completed', created_at: '', finished_at: null }, steps: [] });
@@ -462,7 +464,39 @@ describe('GenerationsContext - Image to 3D runs', () => {
     // clearAllMocks keeps implementations; a leaked /status answer would settle later runs.
     mockAuthenticatedFetch.mockReset();
     localStorage.clear();
+    localStorage.setItem('formanova_auth_token', 'test-token'); // signed in
     mockPollWorkflow.mockReturnValue(new Promise(() => {}));
+  });
+
+  it('does not check saved runs while signed out (no /login reload loop)', async () => {
+    // A protected call with no token redirects to /login, which reloads the page and
+    // restores the run again: the login page reloaded forever.
+    localStorage.removeItem('formanova_auth_token');
+    localStorage.setItem('formanova_running_cad_v1', JSON.stringify([
+      { workflowId: 'cad-signed-out', startedAt: Date.now(), cadRoute: '/text-to-cad', timeoutMs: 60_000, supervised: true },
+    ]));
+    const { result } = renderHook(() => useGenerations(), { wrapper });
+    await act(async () => {});
+    expect(result.current.generations.map(g => g.workflowId)).toEqual(['cad-signed-out']); // still remembered
+    expect(mockPollWorkflow).not.toHaveBeenCalled();
+    expect(mockAuthenticatedFetch).not.toHaveBeenCalled();
+    expect(localStorage.getItem('formanova_running_cad_v1')).toContain('cad-signed-out');
+  });
+
+  it('starts checking saved runs as soon as the user signs in', async () => {
+    localStorage.removeItem('formanova_auth_token');
+    localStorage.setItem('formanova_running_cad_v1', JSON.stringify([
+      { workflowId: 'cad-after-login', startedAt: Date.now(), cadRoute: '/text-to-cad', timeoutMs: 60_000 },
+    ]));
+    mockAuthenticatedFetch.mockResolvedValue(jsonResponse({ runtime: { state: 'running' } }));
+    renderHook(() => useGenerations(), { wrapper });
+    await act(async () => {});
+    expect(mockPollWorkflow).not.toHaveBeenCalled();
+    act(() => {
+      localStorage.setItem('formanova_auth_token', 'fresh-token');
+      window.dispatchEvent(new CustomEvent(AUTH_STATE_CHANGE_EVENT, { detail: { user: { id: 'u' } } }));
+    });
+    await waitFor(() => expect(mockPollWorkflow).toHaveBeenCalled());
   });
 
   const CAD_RESULT = {
