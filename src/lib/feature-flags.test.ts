@@ -43,4 +43,11 @@ describe('Catalog from CAD allowlist', () => {
     expect(isCadToCatalogEnabled('nobody@example.com')).toBe(false);
     expect(isCadToCatalogEnabled(null)).toBe(false);
   });
+
+  it('opens it to everyone with "*" (staging), and to nobody when unset (production default)', () => {
+    vi.stubEnv('VITE_CAD_TO_CATALOG_ALLOWLIST_EMAILS', ' * ');
+    expect(isCadToCatalogEnabled('anyone@example.com')).toBe(true);
+    vi.stubEnv('VITE_CAD_TO_CATALOG_ALLOWLIST_EMAILS', '');
+    expect(isCadToCatalogEnabled('anyone@example.com')).toBe(false);
+  });
 });

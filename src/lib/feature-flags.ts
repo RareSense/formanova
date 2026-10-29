@@ -43,8 +43,10 @@ export function isCadUploadEnabled(email: string | undefined | null): boolean {
 
 /**
  * Users allowed to open Catalog from CAD (/cad-to-catalog) while it rolls out.
+ * "*" opens it to every signed-in user (staging).
  */
 export function isCadToCatalogEnabled(email: string | undefined | null): boolean {
+  if (import.meta.env.VITE_CAD_TO_CATALOG_ALLOWLIST_EMAILS?.trim() === '*') return true;
   return isAllowlistedEmail(email, 'VITE_CAD_TO_CATALOG_ALLOWLIST_EMAILS');
 }
 
