@@ -66,36 +66,39 @@ export default function PiecesPanel({ queue, openId, onFiles, onOpen, onRemove, 
             const busy = queue.running && p.status !== 'waiting' && p.status !== 'done';
             const thumb = queue.pictures.find((x) => x.pieceId === p.id && x.status === 'done' && x.background === 'white')?.url;
             return (
-              <li key={p.id} className={`flex items-stretch border ${open ? 'border-foreground bg-accent/30' : 'border-border'}`}>
-                <button type="button" disabled={queue.running} onClick={() => onOpen(p.id)} className="flex-1 min-w-0 flex items-center gap-2.5 p-2 text-left hover:bg-accent/20 disabled:hover:bg-transparent">
-                  <span className="w-10 h-10 shrink-0 bg-muted/40 border border-border/60 overflow-hidden">
-                    {thumb && <img src={thumb} alt="" className="w-full h-full object-contain" />}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-mono text-[11px]" title={p.name}>{p.name}</span>
-                    <span className={`flex items-center gap-1 truncate font-mono text-[9px] uppercase tracking-[0.1em] ${p.status === 'failed' ? 'text-destructive' : 'text-muted-foreground'}`} title={st.text}>
+              <li key={p.id} className={`flex items-start gap-2.5 p-2 border ${open ? 'border-foreground bg-accent/30' : 'border-border'}`}>
+                <button type="button" disabled={queue.running} onClick={() => onOpen(p.id)} aria-label={`Open ${p.name}`}
+                  className="w-12 h-12 shrink-0 bg-muted/40 border border-border/60 overflow-hidden hover:border-foreground">
+                  {thumb && <img src={thumb} alt="" className="w-full h-full object-contain" />}
+                </button>
+                <div className="min-w-0 flex-1 space-y-1">
+                  {/* The whole name, on its own line: files of one collection differ only at the end. */}
+                  <button type="button" disabled={queue.running} onClick={() => onOpen(p.id)} title={p.name}
+                    className="block w-full text-left font-mono text-[11px] leading-snug break-all line-clamp-2 hover:underline disabled:hover:no-underline">
+                    {p.name}
+                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`flex-1 min-w-0 flex items-center gap-1 truncate font-mono text-[9px] uppercase tracking-[0.1em] ${p.status === 'failed' ? 'text-destructive' : 'text-muted-foreground'}`} title={st.text}>
                       {st.busy && <Loader2 className="w-3 h-3 animate-spin shrink-0" />}{st.text}
                     </span>
-                  </span>
-                </button>
-                <div className="flex items-center gap-1 pr-1.5">
-                  <select
-                    value={p.category}
-                    disabled={busy}
-                    onChange={(e) => onCategory(p.id, e.target.value as JewelryCategory)}
-                    aria-label={`Jewellery type of ${p.name}`}
-                    className="h-7 px-1 bg-background border border-border font-mono text-[10px]"
-                  >
-                    {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>)}
-                  </select>
-                  {(p.status === 'failed' || p.status === 'stopped') && !queue.running && (
-                    <button type="button" onClick={() => onRetry(p.id)} aria-label={`Shoot ${p.name} again`} title="Shoot again" className="w-7 h-7 flex items-center justify-center border border-border hover:bg-accent/50">
-                      <RotateCcw className="w-3.5 h-3.5" />
+                    <select
+                      value={p.category}
+                      disabled={busy}
+                      onChange={(e) => onCategory(p.id, e.target.value as JewelryCategory)}
+                      aria-label={`Jewellery type of ${p.name}`}
+                      className="h-6 px-1 bg-background border border-border font-mono text-[9px]"
+                    >
+                      {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>)}
+                    </select>
+                    {(p.status === 'failed' || p.status === 'stopped') && !queue.running && (
+                      <button type="button" onClick={() => onRetry(p.id)} aria-label={`Shoot ${p.name} again`} title="Shoot again" className="w-6 h-6 flex items-center justify-center border border-border hover:bg-accent/50">
+                        <RotateCcw className="w-3 h-3" />
+                      </button>
+                    )}
+                    <button type="button" disabled={busy} onClick={() => onRemove(p.id)} aria-label={`Remove ${p.name}`} title="Remove" className="w-6 h-6 flex items-center justify-center border border-border hover:bg-accent/50 disabled:opacity-30">
+                      <X className="w-3 h-3" />
                     </button>
-                  )}
-                  <button type="button" disabled={busy} onClick={() => onRemove(p.id)} aria-label={`Remove ${p.name}`} className="w-7 h-7 flex items-center justify-center border border-border hover:bg-accent/50 disabled:opacity-30">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
+                  </div>
                 </div>
               </li>
             );

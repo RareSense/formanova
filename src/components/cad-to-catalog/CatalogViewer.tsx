@@ -77,7 +77,7 @@ export default function CatalogViewer({ onEngine, onFiles, busy, locked, childre
       )}
 
       {hasModel && (
-        <div className="absolute top-3 left-3 z-10 max-w-[45%] truncate font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground bg-card/80 px-2 py-1 border border-border" title={state.fileName}>
+        <div className="absolute top-12 left-2 z-10 max-w-[45%] truncate font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground bg-card/80 px-2 py-1 border border-border" title={state.fileName}>
           {state.fileName}
         </div>
       )}
