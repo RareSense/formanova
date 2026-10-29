@@ -108,17 +108,28 @@ src/lib/cad-to-catalog-zip.ts   Download all (jszip, folder per piece)
 | `cad_to_catalog_place_v1` | `formanova_cad_to_catalog_place_in_scene` | `render_image` (data: URL), `background_image` (data: URL or artifact), `materials`, `aspect`, `model: "gpt"` | `image` artifact |
 | `cad_to_catalog_fastload_v1` | `formanova_cad_to_catalog_cad_fastload` | `cad_file` (artifact from `/upload`) | `skeleton_3dm`, `meshes`, `triangles` |
 | `cad_to_catalog_rhino_mesh_v1` | `formanova_cad_to_catalog_rhino_mesh` | `cad_file` | `cad_file`, `meshed_count` |
+| `cad_to_catalog_save_v1` | `formanova_cad_to_catalog_save_pictures` | `piece` (file name), `category`, `pictures: [{name, angle, metal, image (data: URL)}]` | `images: [{name, angle, metal, file}]` |
 
-Toolkit change: a file field also accepts a plain string (data: URL, azure:// or https://), the
+Toolkit changes: a new atomic tool `save_pictures` (stores the browser-drawn pictures of one
+piece and returns their artifacts; no AI, no rendering, cost 0); and a file field also accepts a plain string (data: URL, azure:// or https://), the
 shape GraphFlow passes on after storing a data: URL.
 
-## Credits, analytics, history
+## History (the existing global Generations page)
+
+No new history. Every shoot is in Generations:
+- White / transparent pictures: when a piece finishes shooting, its pictures go to
+  `cad_to_catalog_save_v1` (one run per piece, all its pictures). Not charged.
+- Photo backgrounds: each `cad_to_catalog_place_v1` run.
+- Both classify as the existing `cad_render` source type (image-first card). A rule for
+  `cad_to_catalog` (priority above the generic CAD/render rule) labels them "Catalog from CAD" and
+  sets `loadRoute: '/cad-to-catalog'`. The card's thumbnail lookup is checked against these results
+  (artifact with `sha256` -> `/api/artifacts/<sha>`) and given the result path if it does not find it.
+
+## Credits, analytics
 
 - `TOOL_COSTS['cad_to_catalog_place_v1']` with a placeholder (price decided later; backend
   billing policy is the real source). The shared credit preflight runs before Shoot for the number
   of placements; insufficient credits -> the existing modal; credits refresh after.
-- `workflow-classifier.ts`: `cad_to_catalog_*` -> "Catalog from CAD" (checked before the generic
-  CAD/render rules).
 - PostHog: `trackCatalogShootStarted`, `trackCatalogShootCompleted`, `trackDownloadClicked`
   (context `catalog`), `trackPaywallHit` on a failed credit gate (TDD per CLAUDE.md).
 
