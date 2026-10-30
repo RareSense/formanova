@@ -95,7 +95,7 @@ describe('priced drawn pictures', () => {
   });
 
   it('adds up photo and drawn pictures at their own prices', () => {
-    expect(shootCredits({ photos: 3, drawn: 5 }, { place: 28, save: 4 })).toBe(3 * 28 + 5 * 4);
-    expect(CATALOG_FALLBACK_PRICES).toEqual({ place: { '1K': 28, '2K': 44, '4K': 60 }, save: { '1K': 4, '2K': 6, '4K': 10 } });
+    expect(shootCredits({ photos: 3, drawn: 5 }, { place: 24, save: 4 })).toBe(3 * 24 + 5 * 4);
+    expect(CATALOG_FALLBACK_PRICES).toEqual({ place: { '1K': 24, '2K': 36, '4K': 48 }, save: { '1K': 4, '2K': 6, '4K': 10 } });
   });
 });

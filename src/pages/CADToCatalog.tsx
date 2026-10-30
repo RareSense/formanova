@@ -4,7 +4,7 @@
  * opened in the 3D view while it is shot and every picture appears as it is
  * made. The CAD to Pictures tool's experience, inside FormaNova.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -16,6 +16,8 @@ import PartsPanel from '@/components/cad-to-catalog/PartsPanel';
 import PiecesPanel from '@/components/cad-to-catalog/PiecesPanel';
 import PicturesStrip from '@/components/cad-to-catalog/PicturesStrip';
 import ShootSteps, { type BackgroundOption } from '@/components/cad-to-catalog/ShootSteps';
+import BackgroundLibrary, { type LibraryBackground } from '@/components/cad-to-catalog/BackgroundLibrary';
+import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import type { CatalogEngine } from '@/components/cad-to-catalog/engine/engine';
 import type { FileEntry } from '@/components/cad-to-catalog/engine/package';
 import { useAuth } from '@/contexts/AuthContext';
@@ -28,12 +30,9 @@ import { blobToDataUrl, picturePrice } from '@/lib/cad-to-catalog-run';
 import { anglesFor, hasOwnAngles, resetAngles, saveAngles } from '@/lib/cad-to-catalog-angles';
 import { countShoot, isPhoto, type BackgroundId, type JewelryCategory, type Picture, type PlannedAngle } from '@/lib/cad-to-catalog-queue';
 
-const SHIPPED: BackgroundOption[] = [
+const PLAIN: BackgroundOption[] = [
   { id: 'white', name: 'White', thumb: '#ffffff' },
   { id: 'transparent', name: 'Transparent', thumb: 'repeating-conic-gradient(#e8e8e8 0% 25%, #ffffff 0% 50%) 50% / 12px 12px' },
-  ...['aurora-lake', 'black-silk', 'champagne-silk'].map((id) => ({
-    id, name: id.replace('-', ' '), thumb: `/cad-to-catalog/backgrounds/${id}-thumb.webp`,
-  })),
 ];
 
 function save(blob: Blob, name: string) {
@@ -55,7 +54,10 @@ export default function CADToCatalog() {
   const view = useEngineState(engine);
   const [metals, setMetals] = useState<Set<string>>(new Set());
   const [chosenBg, setChosenBg] = useState<Set<BackgroundId>>(new Set(['white']));
-  const [uploads, setUploads] = useState<(BackgroundOption & { data: string })[]>([]);
+  // Photo backgrounds picked from the library, by id; each stays listed until unticked.
+  const [photoBgs, setPhotoBgs] = useState<LibraryBackground[]>([]);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const bgData = useRef(new Map<string, Promise<string>>()); // each photo fetched once per visit
   const [aspect, setAspect] = useState<CatalogAspect>('1:1');
   const [resolution, setResolution] = useState<CatalogResolution>('1K');
   const [skipped, setSkipped] = useState<Set<string>>(new Set());
@@ -78,7 +80,7 @@ export default function CADToCatalog() {
   const category = openPiece?.category ?? null;
   const listFor = useCallback((c: JewelryCategory) => working[c] ?? anglesFor(c), [working, anglesVersion]); // eslint-disable-line react-hooks/exhaustive-deps -- anglesVersion re-reads saved angles
   const anglesOf = useCallback((c: JewelryCategory) => listFor(c).filter((a) => !skipped.has(a.name)), [listFor, skipped]);
-  const backgrounds = useMemo(() => [...SHIPPED, ...uploads], [uploads]);
+  const backgrounds = useMemo(() => [...PLAIN, ...photoBgs.map((b) => ({ id: b.id, name: b.name, thumb: b.url }))], [photoBgs]);
   const settings = { metals: [...metals], backgrounds: [...chosenBg], aspect, resolution };
   const perPictures = (c: JewelryCategory) => anglesOf(c).length * Math.max(1, metals.size) * chosenBg.size;
   const totalPictures = shoot.queue.pieces.reduce((n, p) => n + perPictures(p.category), 0);
@@ -98,12 +100,26 @@ export default function CADToCatalog() {
     if (!shoot.openId) void shoot.openPiece(fresh[0]);
   };
 
-  const backgroundData = async (id: BackgroundId) => {
-    const own = uploads.find((u) => u.id === id);
-    if (own) return own.data;
-    const res = await fetch(`/cad-to-catalog/backgrounds/${id}.webp`);
-    if (!res.ok) throw new Error(`Background ${id} is missing`);
-    return blobToDataUrl(await res.blob());
+  // A photo background as a data: URL for the AI placement (library images need the sign-in token).
+  const backgroundData = (id: BackgroundId) => {
+    const bg = photoBgs.find((b) => b.id === id);
+    if (!bg) return Promise.reject(new Error('That background is no longer chosen'));
+    if (!bgData.current.has(id)) {
+      const load = authenticatedFetch(bg.url).then(async (res) => {
+        if (!res.ok) throw new Error(`Couldn't load the background ${bg.name} (${res.status})`);
+        return blobToDataUrl(await res.blob());
+      });
+      load.catch(() => bgData.current.delete(id)); // try again next time
+      bgData.current.set(id, load);
+    }
+    return bgData.current.get(id)!;
+  };
+
+  // From the library: pick adds it to Background and ticks it; picking it again removes it.
+  const toggleLibrary = (bg: LibraryBackground) => {
+    const picked = photoBgs.some((b) => b.id === bg.id);
+    setPhotoBgs((list) => (picked ? list.filter((b) => b.id !== bg.id) : [...list, bg]));
+    setChosenBg((s) => { const next = new Set(s); if (picked) next.delete(bg.id); else next.add(bg.id); return next; });
   };
 
   const startShoot = async (ids: string[]) => {
@@ -162,14 +178,7 @@ export default function CADToCatalog() {
           backgrounds={backgrounds}
           chosenBackgrounds={chosenBg}
           onToggleBackground={(id) => setChosenBg((s) => toggle(s, id))}
-          onUploadBackground={async (files) => {
-            const added = await Promise.all([...files].map(async (f, i) => {
-              const data = await blobToDataUrl(f);
-              return { id: `own-${Date.now()}-${i}`, name: f.name.replace(/\.[^.]+$/, ''), thumb: data, data };
-            }));
-            setUploads((u) => [...u, ...added]);
-            setChosenBg((s) => new Set([...s, ...added.map((a) => a.id)]));
-          }}
+          onOpenLibrary={() => setLibraryOpen(true)}
           aspect={aspect}
           onAspect={setAspect}
           resolution={resolution}
@@ -234,6 +243,14 @@ export default function CADToCatalog() {
             </CatalogViewer>
           </CADRuntimeErrorBoundary>
         }
+      />
+      <BackgroundLibrary
+        open={libraryOpen}
+        onOpenChange={setLibraryOpen}
+        chosen={new Set(photoBgs.map((b) => b.id))}
+        onToggle={toggleLibrary}
+        disabled={shoot.queue.running}
+        onError={(m) => toast.error(m)}
       />
     </>
   );

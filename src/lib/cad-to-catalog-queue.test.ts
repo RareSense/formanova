@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { countShoot, guessCategory, initialQueue, nextPiece, planPictures, progress, queueReducer, type QueueState, type ShootSettings } from './cad-to-catalog-queue';
+import { backgroundId, countShoot, guessCategory, initialQueue, nextPiece, planPictures, progress, queueReducer, type QueueState, type ShootSettings } from './cad-to-catalog-queue';
 
 const ANGLES = [{ name: 'Front', dir: [0, 0.12, 1] }, { name: 'Top', dir: [0, 1, 0] }];
 const SETTINGS: ShootSettings = { metals: ['Yellow Gold', 'White Gold'], backgrounds: ['white', 'bg-silk'], aspect: '1:1' };
@@ -105,5 +105,13 @@ describe('countShoot', () => {
     // 2 pieces x 2 angles x 2 metals = 8 shots; one white and one photo background each
     expect(countShoot(pieces, SETTINGS, () => ANGLES)).toEqual({ photos: 8, drawn: 8 });
     expect(countShoot(pieces, { metals: [], backgrounds: ['white', 'transparent'] }, () => ANGLES)).toEqual({ photos: 0, drawn: 8 });
+  });
+});
+
+describe('backgroundId', () => {
+  it('names a library photo by its label and a short part of its id', () => {
+    expect(backgroundId('Black silk', '6f3a2b91-77aa-4c2e')).toBe('Black_silk-6f3a2b');
+    expect(backgroundId('  ', 'abc')).toBe('Background-abc');
+    expect(backgroundId('Black silk', '6f3a2b91')).not.toBe(backgroundId('Black silk', '7f3a2b91'));
   });
 });

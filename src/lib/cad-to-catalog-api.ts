@@ -35,7 +35,7 @@ export type CatalogPriceKind = 'place' | 'save';
  * The backend's billing policy for each workflow is what is charged.
  */
 export const CATALOG_FALLBACK_PRICES: Record<CatalogPriceKind, Record<CatalogResolution, number>> = {
-  place: { '1K': 28, '2K': 44, '4K': 60 },
+  place: { '1K': 24, '2K': 36, '4K': 48 },
   save: { '1K': 4, '2K': 6, '4K': 10 },
 };
 
