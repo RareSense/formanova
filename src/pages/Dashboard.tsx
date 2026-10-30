@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Camera } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { usePrefetchGenerations } from '@/hooks/use-prefetch-generations';
 import { useShopifyStatus } from '@/hooks/useShopify';
 import { trackStudioTypeSelected } from '@/lib/posthog-events';
+import { isCadToCatalogEnabled } from '@/lib/feature-flags';
 
 import { PeopleIcon } from '@/components/icons/PeopleIcon';
 import { RingIcon } from '@/components/icons/RingIcon';
@@ -20,6 +21,7 @@ import type { EffortLevel } from '@/components/studio/EffortToggle';
 import modelShotImg from '@/assets/jewelry/model-shot-card.webp';
 import productShotImg from '@/assets/cad-studio/product-shot-card.webp';
 import CadStoryPicture, { type CadStory } from '@/components/create-cad/CadStoryPicture';
+import CatalogStoryPicture, { type CatalogStory } from '@/components/create-cad/CatalogStoryPicture';
 // Real Rhino captures of models we built, as theme-coloured layers.
 import fireflyPhoto from '@/assets/cad-cards/story/firefly-photo.webp';
 import ladybugPhoto from '@/assets/cad-cards/story/ladybug-photo.webp';
@@ -42,6 +44,8 @@ type Workflow = {
   image?: string;
   /** CAD cards: what goes in and the CAD it becomes, drawn in theme colours. */
   story?: CadStory;
+  /** Catalog from CAD: the CAD and the catalog photo it becomes. */
+  catalogStory?: CatalogStory;
   /** Photography still passes through the first-run effort chooser. */
   usesEffortIntro?: boolean;
   /** PostHog value, identical to what the Photo Studio page sent. */
@@ -71,6 +75,15 @@ const photographyWorkflows: Workflow[] = [
     studioType: 'product-shot',
   },
 ];
+
+// Photography's third card; shown to whoever the Catalog from CAD page is open to.
+const catalogWorkflow: Workflow = {
+  title: 'Catalog from CAD',
+  description: 'Turn your CAD files into catalog pictures.',
+  route: '/cad-to-catalog',
+  icon: Camera,
+  catalogStory: { cad: { shade: solitaireShade, metal: solitaireMetal, gems: solitaireGems }, photo: productShotImg },
+};
 
 const cadWorkflows: Workflow[] = [
   {
@@ -201,6 +214,8 @@ function WorkflowCard({
       <div className="relative aspect-[4/3] overflow-hidden">
         {workflow.story ? (
           <CadStoryPicture story={workflow.story} />
+        ) : workflow.catalogStory ? (
+          <CatalogStoryPicture story={workflow.catalogStory} />
         ) : (
           <img
             src={workflow.image}
@@ -251,6 +266,8 @@ export default function Dashboard() {
   const { user } = useAuth();
   const { refetch: refetchShopifyStatus } = useShopifyStatus();
   const userName = user?.email ? user.email.split('@')[0] : '';
+  const photography = isCadToCatalogEnabled(user?.email) ? [...photographyWorkflows, catalogWorkflow] : photographyWorkflows;
+  const threeEach = photography.length === 3;
 
   // First-run effort chooser, shown on the photography cards before category
   // selection. pendingRoute holds where to go once the user picks; null = closed.
@@ -311,24 +328,27 @@ export default function Dashboard() {
         </motion.div>
 
         {/* Every card is the same size on every screen, so no workflow looks
-            more important. Laptop: all five in one line (2 + 3). Tablet: one
-            section per row, three columns, Photography's two centred. Phone:
-            two columns, the third CAD card centred under the other two. */}
+            more important. Laptop: one line (2 + 3, or 3 + 3 with Catalog from
+            CAD). Tablet: one section per row, three columns, Photography's two
+            centred when it has two. Phone: two columns, a third card centred
+            under the other two. */}
           <motion.div
             variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className="w-full max-w-[1400px] grid lg:grid-cols-[2fr_3fr] gap-x-4 lg:gap-x-6 xl:gap-x-8 gap-y-2 sm:gap-y-6 pb-0 sm:pb-4"
+            className={`w-full max-w-[1400px] grid ${threeEach ? 'lg:grid-cols-2' : 'lg:grid-cols-[2fr_3fr]'} gap-x-4 lg:gap-x-6 xl:gap-x-8 gap-y-2 sm:gap-y-6 pb-0 sm:pb-4`}
           >
             <section aria-labelledby="dashboard-photography" className="flex flex-col">
               <CategoryDivider id="dashboard-photography" label="Photography" />
-              <div className="grid grid-cols-2 sm:grid-cols-6 lg:grid-cols-2 gap-2 sm:gap-4 md:gap-5 flex-1">
-                {photographyWorkflows.map((workflow, i) => (
+              <div className={`grid grid-cols-2 gap-2 sm:gap-4 md:gap-5 flex-1 ${threeEach ? 'sm:grid-cols-3' : 'sm:grid-cols-6 lg:grid-cols-2'}`}>
+                {photography.map((workflow, i) => (
                   <WorkflowCard
                     key={workflow.title}
                     workflow={workflow}
                     onSelect={handleSelect}
-                    className={`sm:col-span-2 lg:col-span-1 ${i === 0 ? 'sm:col-start-2 lg:col-start-auto' : ''}`}
+                    className={threeEach
+                      ? (i === 2 ? 'col-span-2 w-[calc(50%-4px)] justify-self-center sm:col-span-1 sm:w-auto sm:justify-self-stretch' : '')
+                      : `sm:col-span-2 lg:col-span-1 ${i === 0 ? 'sm:col-start-2 lg:col-start-auto' : ''}`}
                   />
                 ))}
               </div>
