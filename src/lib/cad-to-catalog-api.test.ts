@@ -17,18 +17,19 @@ const PNG = 'data:image/png;base64,iVBORw0KGgo=';
 
 describe('buildPlaceBody', () => {
   it('sends the render, background, materials and shape to the place tool', () => {
-    const body = buildPlaceBody({ render: PNG, background: 'data:image/jpeg;base64,/9j/', materials: 'band: Yellow Gold', aspect: '4:5' });
-    expect(body.payload).toEqual({ render_image: PNG, background_image: 'data:image/jpeg;base64,/9j/', materials: 'band: Yellow Gold', aspect: '4:5', model: 'gpt' });
+    const body = buildPlaceBody({ render: PNG, background: 'data:image/jpeg;base64,/9j/', materials: 'band: Yellow Gold', aspect: '4:5', resolution: '4K' });
+    expect(body.payload).toEqual({ render_image: PNG, background_image: 'data:image/jpeg;base64,/9j/', materials: 'band: Yellow Gold', aspect: '4:5', resolution: '4K', model: 'gemini' });
   });
 
   it('refuses what the tool would refuse, before any request', () => {
-    expect(() => buildPlaceBody({ render: 'data:image/jpeg;base64,x', background: PNG, materials: '', aspect: '1:1' })).toThrow(/transparent PNG/);
-    expect(() => buildPlaceBody({ render: PNG, background: '', materials: '', aspect: '1:1' })).toThrow(/background/);
-    expect(() => buildPlaceBody({ render: PNG, background: PNG, materials: '', aspect: '7:3' as never })).toThrow(/shape/);
+    expect(() => buildPlaceBody({ render: 'data:image/jpeg;base64,x', background: PNG, materials: '', aspect: '1:1', resolution: '1K' })).toThrow(/transparent PNG/);
+    expect(() => buildPlaceBody({ render: PNG, background: '', materials: '', aspect: '1:1', resolution: '1K' })).toThrow(/background/);
+    expect(() => buildPlaceBody({ render: PNG, background: PNG, materials: '', aspect: '7:3' as never, resolution: '1K' })).toThrow(/shape/);
+    expect(() => buildPlaceBody({ render: PNG, background: PNG, materials: '', aspect: '1:1', resolution: '8K' as never })).toThrow(/resolution/);
   });
 
   it('keeps the materials text within the tool limit', () => {
-    const body = buildPlaceBody({ render: PNG, background: PNG, materials: 'x'.repeat(900), aspect: '1:1' });
+    const body = buildPlaceBody({ render: PNG, background: PNG, materials: 'x'.repeat(900), aspect: '1:1', resolution: '1K' });
     expect((body.payload.materials as string).length).toBe(600);
   });
 });

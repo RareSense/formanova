@@ -18,7 +18,7 @@ import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { useCreditPreflight } from '@/hooks/use-credit-preflight';
 import { useCredits } from '@/contexts/CreditsContext';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
-import { CATALOG_PLACE_WORKFLOW, type CatalogAspect } from '@/lib/cad-to-catalog-api';
+import { CATALOG_PLACE_WORKFLOW, type CatalogAspect, type CatalogResolution } from '@/lib/cad-to-catalog-api';
 import { blobToDataUrl, fastloadFile, placeOnBackground, rhinoMeshFile, savePictures } from '@/lib/cad-to-catalog-run';
 import {
   guessCategory, initialQueue, isPhoto, nextPiece, queueReducer,
@@ -48,6 +48,7 @@ interface Placement {
   background: string;
   materials: string;
   aspect: CatalogAspect;
+  resolution: CatalogResolution;
 }
 
 export interface UseCatalogShoot {
@@ -158,7 +159,7 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
       const job = placeQueue.current.shift()!;
       placing.current++;
       dispatch({ type: 'picture', pictureId: job.picture.id, status: 'placing' });
-      placeOnBackground({ render: job.render, background: job.background, materials: job.materials, aspect: job.aspect }, life.current.signal)
+      placeOnBackground({ render: job.render, background: job.background, materials: job.materials, aspect: job.aspect, resolution: job.resolution }, life.current.signal)
         .then(async (res) => {
           if (!res) return;
           const r = await authenticatedFetch(res.image.url, { signal: life.current.signal });
@@ -210,7 +211,7 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
           try {
             const blob = await engine!.capture({ background: pic.background === 'white' ? 'white' : 'clear' });
             if (photo) {
-              placeQueue.current.push({ picture: pic, render: await blobToDataUrl(blob), background: await backgroundData(pic.background), materials, aspect: settings.aspect as CatalogAspect });
+              placeQueue.current.push({ picture: pic, render: await blobToDataUrl(blob), background: await backgroundData(pic.background), materials, aspect: settings.aspect as CatalogAspect, resolution: (settings.resolution || '1K') as CatalogResolution });
               pump();
             } else {
               dispatch({ type: 'picture', pictureId: pic.id, status: 'done', url: keepUrl(blob) });

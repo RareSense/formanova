@@ -22,9 +22,12 @@ export const CATALOG_RHINO_MESH_WORKFLOW = 'cad_to_catalog_rhino_mesh_v1';
 
 export const CATALOG_ASPECTS = ['1:1', '4:5', '3:4', '2:3', '9:16', '5:4', '4:3', '3:2', '16:9'] as const;
 export type CatalogAspect = (typeof CATALOG_ASPECTS)[number];
+/** Size of the AI photo pictures (long edge about 1024, 2048 or 4096 px), as in the studio. */
+export const CATALOG_RESOLUTIONS = ['1K', '2K', '4K'] as const;
+export type CatalogResolution = (typeof CATALOG_RESOLUTIONS)[number];
 
 export const PLACE_POLL_INTERVAL_MS = 3000;
-export const PLACE_POLL_TIMEOUT_MS = 8 * 60 * 1000; // GPT image placements take 2-3 minutes
+export const PLACE_POLL_TIMEOUT_MS = 26 * 60 * 1000; // the tool allows 25 minutes (4K takes longest)
 export const SAVE_POLL_INTERVAL_MS = 2000;
 export const SAVE_POLL_TIMEOUT_MS = 3 * 60 * 1000;
 export const FASTLOAD_POLL_TIMEOUT_MS = 5 * 60 * 1000;
@@ -49,13 +52,15 @@ export interface PlaceParams {
   /** "band: Yellow Gold; round x14: Diamond". */
   materials: string;
   aspect: CatalogAspect;
+  resolution: CatalogResolution;
 }
 
-export function buildPlaceBody({ render, background, materials, aspect }: PlaceParams): StartBody {
+export function buildPlaceBody({ render, background, materials, aspect, resolution }: PlaceParams): StartBody {
   if (!render.startsWith('data:image/png')) throw new CatalogRequestError('The render must be a transparent PNG');
   if (!background.startsWith('data:image/')) throw new CatalogRequestError('Choose a background photo');
   if (!CATALOG_ASPECTS.includes(aspect)) throw new CatalogRequestError(`Unknown picture shape ${aspect}`);
-  return { payload: { render_image: render, background_image: background, materials: materials.slice(0, 600), aspect, model: 'gpt' } };
+  if (!CATALOG_RESOLUTIONS.includes(resolution)) throw new CatalogRequestError(`Unknown resolution ${resolution}`);
+  return { payload: { render_image: render, background_image: background, materials: materials.slice(0, 600), aspect, resolution, model: 'gemini' } };
 }
 
 export interface SavedPicture {
