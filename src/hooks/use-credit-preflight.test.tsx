@@ -6,8 +6,11 @@ import { MemoryRouter } from 'react-router-dom';
 // Mock the underlying preflight so we only assert the hook's forwarding contract.
 const mockPreflight = vi.hoisted(() => vi.fn());
 
+const mockPreflightFor = vi.hoisted(() => vi.fn());
+
 vi.mock('@/lib/credit-preflight', () => ({
   performCreditPreflight: mockPreflight,
+  preflightForCredits: mockPreflightFor,
 }));
 
 const mockNavigate = vi.hoisted(() => vi.fn());
@@ -30,6 +33,7 @@ import { useCreditPreflight } from './use-credit-preflight';
 
 beforeEach(() => {
   mockPreflight.mockReset();
+  mockPreflightFor.mockReset();
   mockNavigate.mockReset();
   mockSaveReturn.mockReset();
 });
@@ -128,5 +132,17 @@ describe('useCreditPreflight door-in redirect', () => {
 
     expect(mockNavigate).not.toHaveBeenCalled();
     expect(result.current.showInsufficientModal).toBe(true);
+  });
+});
+
+describe('useCreditPreflight.checkCreditsFor', () => {
+  it('checks a total the caller added up and sends a short user to the credits page', async () => {
+    mockPreflightFor.mockResolvedValueOnce({ approved: false, estimatedCredits: 120, currentBalance: 40 });
+    const { result } = renderHook(() => useCreditPreflight(), { wrapper });
+    let ok: boolean | undefined;
+    await act(async () => { ok = await result.current.checkCreditsFor(120, 'cad_to_catalog_place_v1'); });
+    expect(ok).toBe(false);
+    expect(mockPreflightFor).toHaveBeenCalledWith(120);
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/credits', { state: { requiredCredits: 120, workflowName: 'cad_to_catalog_place_v1' } }));
   });
 });

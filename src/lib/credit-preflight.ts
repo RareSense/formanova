@@ -50,7 +50,15 @@ export async function performCreditPreflight(
     // Estimate failed — use client-side fallback
   }
 
-  // 2️⃣ Fetch current balance
+  // 2️⃣ Fetch current balance, 3️⃣ compare
+  return preflightForCredits(estimatedCredits);
+}
+
+/**
+ * Balance check for a cost the caller already knows (e.g. a shoot that mixes
+ * several workflows and resolutions). GET /credits/balance/me → available (or balance).
+ */
+export async function preflightForCredits(estimatedCredits: number): Promise<PreflightResult> {
   const balanceRes = await authenticatedFetch('/api/credits/balance/me');
 
   if (!balanceRes.ok) {
@@ -61,7 +69,6 @@ export async function performCreditPreflight(
   // Use "available" (balance minus reserved holds), fall back to "balance"
   const currentBalance = balanceData.available ?? balanceData.balance ?? 0;
 
-  // 3️⃣ Compare
   return {
     approved: currentBalance >= estimatedCredits,
     estimatedCredits,

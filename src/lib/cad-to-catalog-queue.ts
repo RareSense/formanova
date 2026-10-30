@@ -20,7 +20,8 @@ export const CATEGORY_LABEL: Record<JewelryCategory, string> = {
 export type BackgroundId = 'white' | 'transparent' | string;
 
 export type PieceStatus = 'waiting' | 'opening' | 'shooting' | 'finishing' | 'done' | 'failed' | 'stopped';
-export type PictureStatus = 'waiting' | 'drawing' | 'placing' | 'done' | 'failed';
+/** placing: an AI photo is being made; saving: a drawn picture is being kept (and charged). */
+export type PictureStatus = 'waiting' | 'drawing' | 'placing' | 'saving' | 'done' | 'failed';
 
 export interface PlannedAngle {
   name: string;
@@ -57,6 +58,21 @@ export interface ShootSettings {
   backgrounds: BackgroundId[];
   aspect: string;            // only sent to the AI placement
   resolution?: string;       // only sent to the AI placement (1K / 2K / 4K)
+}
+
+/** Photo pictures (AI) and drawn ones (white / transparent) a shoot of these pieces makes. */
+export function countShoot(
+  pieces: Pick<Piece, 'category'>[],
+  settings: Pick<ShootSettings, 'metals' | 'backgrounds'>,
+  anglesOf: (c: JewelryCategory) => PlannedAngle[],
+): { photos: number; drawn: number } {
+  const photosPer = settings.backgrounds.filter(isPhoto).length;
+  const drawnPer = settings.backgrounds.length - photosPer;
+  const metals = Math.max(1, settings.metals.length);
+  return pieces.reduce((n, p) => {
+    const shots = anglesOf(p.category).length * metals;
+    return { photos: n.photos + shots * photosPer, drawn: n.drawn + shots * drawnPer };
+  }, { photos: 0, drawn: 0 });
 }
 
 export interface QueueState {

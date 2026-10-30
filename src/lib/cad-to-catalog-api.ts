@@ -25,6 +25,24 @@ export type CatalogAspect = (typeof CATALOG_ASPECTS)[number];
 /** Size of the AI photo pictures (long edge about 1024, 2048 or 4096 px), as in the studio. */
 export const CATALOG_RESOLUTIONS = ['1K', '2K', '4K'] as const;
 export type CatalogResolution = (typeof CATALOG_RESOLUTIONS)[number];
+/** Long side, px, of a picture the browser draws at each resolution. */
+export const CATALOG_PICTURE_PX: Record<CatalogResolution, number> = { '1K': 1024, '2K': 2048, '4K': 4096 };
+
+/** What a priced picture is: placed in a photo by AI, or drawn here and kept (white / transparent). */
+export type CatalogPriceKind = 'place' | 'save';
+/**
+ * Credits per picture, shown until the backend's own estimate answers (and used if it can't).
+ * The backend's billing policy for each workflow is what is charged.
+ */
+export const CATALOG_FALLBACK_PRICES: Record<CatalogPriceKind, Record<CatalogResolution, number>> = {
+  place: { '1K': 28, '2K': 44, '4K': 60 },
+  save: { '1K': 4, '2K': 6, '4K': 10 },
+};
+
+/** Credits a shoot costs: every photo picture and every white / transparent picture. */
+export function shootCredits(counts: { photos: number; drawn: number }, prices: Record<CatalogPriceKind, number>): number {
+  return counts.photos * prices.place + counts.drawn * prices.save;
+}
 
 export const PLACE_POLL_INTERVAL_MS = 3000;
 export const PLACE_POLL_TIMEOUT_MS = 26 * 60 * 1000; // the tool allows 25 minutes (4K takes longest)
@@ -71,14 +89,17 @@ export interface SavedPicture {
   image: string;
 }
 
-export function buildSaveBody(piece: string, category: string, pictures: SavedPicture[]): StartBody {
+/** resolution prices the run (each drawn picture is kept, and charged, at its size). */
+export function buildSaveBody(piece: string, category: string, pictures: SavedPicture[], resolution?: CatalogResolution): StartBody {
   if (!pictures.length) throw new CatalogRequestError('No pictures to keep');
   if (pictures.length > MAX_SAVE_PICTURES) throw new CatalogRequestError(`At most ${MAX_SAVE_PICTURES} pictures per piece`);
+  if (resolution && !CATALOG_RESOLUTIONS.includes(resolution)) throw new CatalogRequestError(`Unknown resolution ${resolution}`);
   return {
     payload: {
       piece: piece.slice(0, 200),
       category,
       pictures: pictures.map((p) => ({ name: p.name.slice(0, 120), angle: p.angle || null, metal: p.metal, image: p.image })),
+      ...(resolution ? { resolution } : {}),
     },
   };
 }

@@ -319,6 +319,12 @@ export class CatalogEngine {
   /* ---------- pictures ---------- */
 
   /** The current view as a picture: white with a soft shadow, or transparent with no shadow. */
+  /** Largest picture side, px, this device's graphics can draw (4K needs 4096). */
+  maxPicturePx(): number {
+    const gl = this.renderer.getContext();
+    return Math.min(this.renderer.capabilities.maxTextureSize, gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) as number);
+  }
+
   async capture({ background = 'white' as 'white' | 'clear', long = 2048, type = 'image/png', shadow = background === 'white' } = {}): Promise<Blob> {
     const w = long, h = long; // pictures are square; the aspect only goes to the AI placement
     const [vw, vh] = this.viewSize();

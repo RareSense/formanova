@@ -20,14 +20,14 @@ interface Props {
 
 function statusText(piece: Piece, queue: QueueState): { text: string; busy: boolean } {
   const pr = progress(queue, piece.id);
-  const placing = queue.pictures.some((x) => x.pieceId === piece.id && x.status === 'placing');
+  const finishing = queue.pictures.some((x) => x.pieceId === piece.id && (x.status === 'placing' || x.status === 'saving'));
   switch (piece.status) {
     case 'opening': return { text: 'Opening…', busy: true };
     case 'shooting': return { text: `Shooting ${pr.done}/${pr.total}`, busy: true };
     case 'failed': return { text: piece.error ? `Failed: ${piece.error}` : 'Failed', busy: false };
     case 'stopped': return { text: pr.done ? `Stopped · ${pr.done}/${pr.total}` : 'Stopped', busy: false };
     case 'done':
-      if (placing) return { text: `Placing in photos · ${pr.done}/${pr.total}`, busy: true };
+      if (finishing) return { text: `Finishing · ${pr.done}/${pr.total}`, busy: true };
       return { text: pr.failed ? `${pr.done}/${pr.total} · ${pr.failed} failed` : `Done · ${pr.done}`, busy: false };
     default: return { text: queue.running && pr.total ? 'Waiting' : pr.done ? `${pr.done} pictures` : 'Not shot yet', busy: false };
   }

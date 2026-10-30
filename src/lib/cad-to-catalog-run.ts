@@ -14,6 +14,7 @@ import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { pollWorkflow } from '@/lib/poll-workflow';
 import type { ArtifactRef } from '@/lib/ring-cad-nurbs-api';
 import {
+  CATALOG_FALLBACK_PRICES,
   CATALOG_FASTLOAD_WORKFLOW,
   CATALOG_PLACE_WORKFLOW,
   CATALOG_RHINO_MESH_WORKFLOW,
@@ -31,6 +32,8 @@ import {
   parsePlaceResult,
   parseRhinoMeshResult,
   parseSaveResult,
+  type CatalogPriceKind,
+  type CatalogResolution,
   type PlaceParams,
   type SavedPicture,
   type SavedResult,
@@ -119,10 +122,32 @@ export async function placeOnBackground(params: PlaceParams, signal?: AbortSigna
   return image ? { workflowId, image } : null;
 }
 
-/** Keeps one piece's browser-drawn pictures with a run, so they are in Generations. */
-export async function savePictures(piece: string, category: string, pictures: SavedPicture[], signal?: AbortSignal): Promise<SavedResult[] | null> {
-  const workflowId = await startCatalogRun(CATALOG_SAVE_WORKFLOW, buildSaveBody(piece, category, pictures), signal);
+/** Keeps browser-drawn pictures with a run, so they are in Generations (charged at `resolution`). */
+export async function savePictures(piece: string, category: string, pictures: SavedPicture[], signal?: AbortSignal, resolution?: CatalogResolution): Promise<SavedResult[] | null> {
+  const workflowId = await startCatalogRun(CATALOG_SAVE_WORKFLOW, buildSaveBody(piece, category, pictures, resolution), signal);
   return waitForCatalogRun(workflowId, parseSaveResult, { intervalMs: SAVE_POLL_INTERVAL_MS, timeoutMs: SAVE_POLL_TIMEOUT_MS, signal });
+}
+
+const PRICE_WORKFLOW: Record<CatalogPriceKind, string> = { place: CATALOG_PLACE_WORKFLOW, save: CATALOG_SAVE_WORKFLOW };
+
+/** Credits for one picture: the backend's estimate for that workflow at that resolution, else the fallback. */
+export async function picturePrice(kind: CatalogPriceKind, resolution: CatalogResolution, signal?: AbortSignal): Promise<number> {
+  try {
+    const res = await authenticatedFetch('/api/credits/estimate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workflow_name: PRICE_WORKFLOW[kind], num_variations: 1, pricing_context: { resolution } }),
+      signal,
+    });
+    if (res.ok) {
+      const data = (await res.json()) as { projected_max_hold?: number; estimated_credits?: number };
+      const cost = data.projected_max_hold ?? data.estimated_credits;
+      if (typeof cost === 'number' && cost > 0) return cost;
+    }
+  } catch (e) {
+    if ((e as Error).name === 'AbortError') throw e;
+  }
+  return CATALOG_FALLBACK_PRICES[kind][resolution];
 }
 
 async function fetchBytes(ref: ArtifactRef, signal?: AbortSignal): Promise<ArrayBuffer> {
