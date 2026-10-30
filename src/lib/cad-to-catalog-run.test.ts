@@ -14,7 +14,7 @@ vi.mock('@/lib/cad-to-catalog-api', async (importOriginal) => ({
   SAVE_POLL_TIMEOUT_MS: 2000,
 }));
 
-import { CatalogRunError, placeOnBackground, savePictures, startCatalogRun, waitForCatalogRun } from './cad-to-catalog-run';
+import { CatalogRunError, picturePrice, placeOnBackground, savePictures, startCatalogRun, waitForCatalogRun } from './cad-to-catalog-run';
 import { parsePlaceResult } from './cad-to-catalog-api';
 
 const SHA = 'c'.repeat(64);
@@ -103,5 +103,23 @@ describe('placeOnBackground / savePictures', () => {
       .mockResolvedValueOnce(json(200, { runtime: { state: 'completed' } }))
       .mockResolvedValueOnce(json(200, { images: [] }));
     await expect(savePictures('a.3dm', 'ring', [{ name: 'x', angle: '', metal: null, image: PNG }])).rejects.toBeInstanceOf(CatalogRunError);
+  });
+});
+
+describe('picturePrice', () => {
+  it("asks the backend's estimate for that workflow at that size", async () => {
+    mockAuthFetch.mockResolvedValueOnce(json(200, { projected_max_hold: 31 }));
+    expect(await picturePrice('place', '2K')).toBe(31);
+    const body = JSON.parse(mockAuthFetch.mock.calls[0][1].body);
+    expect(body).toEqual({ workflow_name: 'cad_to_catalog_place_v1', num_variations: 1, pricing_context: { resolution: '2K' } });
+  });
+
+  it('falls back to the page prices when the estimate is missing, zero or fails', async () => {
+    mockAuthFetch.mockResolvedValueOnce(json(200, { projected_max_hold: 0 }));
+    expect(await picturePrice('save', '4K')).toBe(10);
+    mockAuthFetch.mockResolvedValueOnce(json(500, {}));
+    expect(await picturePrice('place', '1K')).toBe(28);
+    mockAuthFetch.mockRejectedValueOnce(new Error('offline'));
+    expect(await picturePrice('save', '1K')).toBe(4);
   });
 });

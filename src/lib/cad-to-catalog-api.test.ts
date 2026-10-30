@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   buildCadFileBody,
   buildPlaceBody,
+  CATALOG_FALLBACK_PRICES,
+  shootCredits,
   buildSaveBody,
   findResult,
   parseFailure,
@@ -82,5 +84,18 @@ describe('result parsing', () => {
   it("shows the tool's own words when a run fails", () => {
     expect(parseFailure({ node: [{ status: 'failed', user_message: 'This tool is busy', retryable: true }] })).toEqual({ userMessage: 'This tool is busy', retryable: true });
     expect(parseFailure({})).toEqual({ userMessage: "We couldn't finish that. Please try again.", retryable: false });
+  });
+});
+
+describe('priced drawn pictures', () => {
+  it('sends the resolution with a kept picture so the run is priced by size', () => {
+    const body = buildSaveBody('Ring A.3dm', 'ring', [{ name: '01_Front', angle: 'Front', metal: null, image: PNG }], '4K');
+    expect(body.payload.resolution).toBe('4K');
+    expect(() => buildSaveBody('Ring A.3dm', 'ring', [{ name: 'x', angle: 'Front', metal: null, image: PNG }], '8K' as never)).toThrow(/resolution/);
+  });
+
+  it('adds up photo and drawn pictures at their own prices', () => {
+    expect(shootCredits({ photos: 3, drawn: 5 }, { place: 28, save: 4 })).toBe(3 * 28 + 5 * 4);
+    expect(CATALOG_FALLBACK_PRICES).toEqual({ place: { '1K': 28, '2K': 44, '4K': 60 }, save: { '1K': 4, '2K': 6, '4K': 10 } });
   });
 });

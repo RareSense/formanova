@@ -1,7 +1,7 @@
 /**
  * The shoot settings, in the tool's order: 1 jewellery type (of the open
- * piece), 2 angles, 3 metals, 4 backgrounds, 5 picture shape and resolution
- * (photo backgrounds only); then Shoot.
+ * piece), 2 angles, 3 metals, 4 backgrounds, 5 picture size (and shape, for
+ * photo backgrounds); then Shoot, with what the shoot costs.
  * They apply to every piece; each piece uses its own type's angles.
  */
 import { useRef } from 'react';
@@ -50,6 +50,8 @@ interface Props {
   pieceCount: number;
   /** Pictures a Shoot all makes (each piece with its own type's angles). */
   totalPictures: number;
+  /** Credits a Shoot all costs; null while the price is being looked up. */
+  totalCredits: number | null;
   canShoot: boolean;
   running: boolean;
   paused: boolean;
@@ -141,16 +143,12 @@ export default function ShootSteps(p: Props) {
           </button>
           <input ref={upload} type="file" accept="image/png,image/jpeg,image/webp" multiple hidden onChange={(e) => { if (e.target.files?.length) p.onUploadBackground(e.target.files); e.target.value = ''; }} />
         </div>
-        {photos && <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">Photo backgrounds are placed by AI and use credits.</p>}
+        {photos && <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">Photo backgrounds are placed by AI.</p>}
       </div>
 
-      {photos && (
-        <div className="space-y-2">
-          <h3 className={STEP}><span className={NUM}>5</span>Picture shape &amp; size</h3>
-          <select value={p.aspect} disabled={disabled} onChange={(e) => p.onAspect(e.target.value as CatalogAspect)} aria-label="Shape of the photo pictures" className="w-full h-9 px-2 bg-background border border-border font-mono text-[11px]">
-            {CATALOG_ASPECTS.map((a) => <option key={a} value={a}>{a}</option>)}
-          </select>
-          <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Resolution of the photo pictures">
+      <div className="space-y-2">
+        <h3 className={STEP}><span className={NUM}>5</span>{photos ? 'Picture size & shape' : 'Picture size'}</h3>
+          <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Resolution of the pictures">
             {CATALOG_RESOLUTIONS.map((r) => (
               <button key={r} type="button" role="radio" aria-checked={p.resolution === r} disabled={disabled} onClick={() => p.onResolution(r)}
                 className={`h-11 px-4 flex flex-col items-center justify-center gap-0.5 border font-mono uppercase transition-colors disabled:opacity-40 ${p.resolution === r ? 'border-foreground bg-accent/40' : 'border-border hover:bg-accent/20'}`}>
@@ -160,15 +158,22 @@ export default function ShootSteps(p: Props) {
             ))}
           </div>
           {p.resolution === '4K' && <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">4K pictures take longer to make.</p>}
-        </div>
-      )}
+          {photos && (
+            <select value={p.aspect} disabled={disabled} onChange={(e) => p.onAspect(e.target.value as CatalogAspect)} aria-label="Shape of the photo pictures" className="w-full h-9 px-2 bg-background border border-border font-mono text-[11px]">
+              {CATALOG_ASPECTS.map((a) => <option key={a} value={a}>{a}</option>)}
+            </select>
+          )}
+      </div>
 
       {!p.running ? (
         <div className="space-y-1.5 pt-1">
           <button type="button" disabled={!p.canShoot || p.pieceCount === 0} onClick={p.onShootAll}
             className="w-full min-h-12 py-2 px-6 flex flex-col items-center justify-center gap-0.5 bg-formanova-hero-accent text-primary-foreground font-mono uppercase disabled:opacity-40">
             <span className="text-[12px] tracking-[0.2em]">{p.pieceCount > 1 ? 'Shoot all' : 'Shoot'}</span>
-            <span className="text-[9px] tracking-[0.12em] opacity-90">{p.pieceCount} {p.pieceCount === 1 ? 'piece' : 'pieces'} · {p.totalPictures} {p.totalPictures === 1 ? 'picture' : 'pictures'}</span>
+            <span className="text-[9px] tracking-[0.12em] opacity-90">
+              {p.pieceCount} {p.pieceCount === 1 ? 'piece' : 'pieces'} · {p.totalPictures} {p.totalPictures === 1 ? 'picture' : 'pictures'}
+              {p.totalCredits !== null && p.totalPictures > 0 && ` · ${p.totalCredits} credits`}
+            </span>
           </button>
           {p.pieceCount > 1 && (
             <button type="button" disabled={!p.canShoot} onClick={p.onShootOpen} className="w-full h-9 px-6 border border-border font-mono text-[10px] uppercase tracking-[0.15em] hover:bg-accent/50 disabled:opacity-40">

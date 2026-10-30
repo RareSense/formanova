@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { guessCategory, initialQueue, nextPiece, planPictures, progress, queueReducer, type QueueState, type ShootSettings } from './cad-to-catalog-queue';
+import { countShoot, guessCategory, initialQueue, nextPiece, planPictures, progress, queueReducer, type QueueState, type ShootSettings } from './cad-to-catalog-queue';
 
 const ANGLES = [{ name: 'Front', dir: [0, 0.12, 1] }, { name: 'Top', dir: [0, 1, 0] }];
 const SETTINGS: ShootSettings = { metals: ['Yellow Gold', 'White Gold'], backgrounds: ['white', 'bg-silk'], aspect: '1:1' };
@@ -96,5 +96,14 @@ describe('guessCategory', () => {
     expect(guessCategory('FFB BRAC-002.3dm')).toBe('bracelet');
     expect(guessCategory('Halo pendant.glb')).toBe('pendant');
     expect(guessCategory('unknown.stl')).toBe('ring');
+  });
+});
+
+describe('countShoot', () => {
+  it('counts photo and drawn pictures for every piece, angle and metal', () => {
+    const pieces = [{ category: 'ring' as const }, { category: 'earring' as const }];
+    // 2 pieces x 2 angles x 2 metals = 8 shots; one white and one photo background each
+    expect(countShoot(pieces, SETTINGS, () => ANGLES)).toEqual({ photos: 8, drawn: 8 });
+    expect(countShoot(pieces, { metals: [], backgrounds: ['white', 'transparent'] }, () => ANGLES)).toEqual({ photos: 0, drawn: 8 });
   });
 });

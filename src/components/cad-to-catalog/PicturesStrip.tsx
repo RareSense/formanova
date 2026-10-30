@@ -46,10 +46,10 @@ export default function PicturesStrip({ queue, onDownloadAll, downloading, onDow
               {x.status === 'done' && x.url && (
                 <img src={x.url} alt={x.name} className="absolute inset-0 w-full h-full object-contain" style={x.background === 'transparent' ? { background: CHECKER } : undefined} />
               )}
-              {(x.status === 'drawing' || x.status === 'placing' || x.status === 'waiting') && (
+              {(x.status === 'drawing' || x.status === 'placing' || x.status === 'saving' || x.status === 'waiting') && (
                 <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 font-mono text-[8px] uppercase text-muted-foreground">
                   {x.status !== 'waiting' && <Loader2 className="w-4 h-4 animate-spin text-formanova-hero-accent" />}
-                  {x.status === 'drawing' ? 'Drawing…' : x.status === 'placing' ? 'Placing…' : 'Waiting'}
+                  {x.status === 'drawing' ? 'Drawing…' : x.status === 'placing' ? 'Placing…' : x.status === 'saving' ? 'Saving…' : 'Waiting'}
                 </span>
               )}
               {x.status === 'failed' && (

@@ -4,7 +4,7 @@
  * opened in the 3D view while it is shot and every picture appears as it is
  * made. The CAD to Pictures tool's experience, inside FormaNova.
  */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -23,10 +23,10 @@ import { useCadBreakpoint } from '@/hooks/use-cad-breakpoint';
 import { useCatalogShoot } from '@/hooks/useCatalogShoot';
 import { isCadToCatalogEnabled } from '@/lib/feature-flags';
 import { trackCatalogShootStarted, trackDownloadClicked, trackPaywallHit } from '@/lib/posthog-events';
-import type { CatalogAspect, CatalogResolution } from '@/lib/cad-to-catalog-api';
-import { blobToDataUrl } from '@/lib/cad-to-catalog-run';
+import { shootCredits, type CatalogAspect, type CatalogPriceKind, type CatalogResolution } from '@/lib/cad-to-catalog-api';
+import { blobToDataUrl, picturePrice } from '@/lib/cad-to-catalog-run';
 import { anglesFor, hasOwnAngles, resetAngles, saveAngles } from '@/lib/cad-to-catalog-angles';
-import { isPhoto, type BackgroundId, type JewelryCategory, type Picture, type PlannedAngle } from '@/lib/cad-to-catalog-queue';
+import { countShoot, isPhoto, type BackgroundId, type JewelryCategory, type Picture, type PlannedAngle } from '@/lib/cad-to-catalog-queue';
 
 const SHIPPED: BackgroundOption[] = [
   { id: 'white', name: 'White', thumb: '#ffffff' },
@@ -62,6 +62,17 @@ export default function CADToCatalog() {
   const [working, setWorking] = useState<Partial<Record<JewelryCategory, PlannedAngle[]>>>({});
   const [anglesVersion, setAnglesVersion] = useState(0);
   const [downloading, setDownloading] = useState(false);
+  const [prices, setPrices] = useState<Record<CatalogPriceKind, number> | null>(null);
+
+  // Credits per picture at the chosen size: the backend's estimate, else the fallback.
+  useEffect(() => {
+    const ctrl = new AbortController();
+    setPrices(null);
+    Promise.all([picturePrice('place', resolution, ctrl.signal), picturePrice('save', resolution, ctrl.signal)])
+      .then(([place, save]) => setPrices({ place, save }))
+      .catch(() => {});
+    return () => ctrl.abort();
+  }, [resolution]);
 
   const openPiece = shoot.queue.pieces.find((p) => p.id === shoot.openId) ?? null;
   const category = openPiece?.category ?? null;
@@ -71,6 +82,7 @@ export default function CADToCatalog() {
   const settings = { metals: [...metals], backgrounds: [...chosenBg], aspect, resolution };
   const perPictures = (c: JewelryCategory) => anglesOf(c).length * Math.max(1, metals.size) * chosenBg.size;
   const totalPictures = shoot.queue.pieces.reduce((n, p) => n + perPictures(p.category), 0);
+  const totalCredits = prices ? shootCredits(countShoot(shoot.queue.pieces, settings, anglesOf), prices) : null;
   const perPiece = { pictures: category ? perPictures(category) : 0, photos: [...chosenBg].filter(isPhoto).length };
 
   if (!isCadToCatalogEnabled(user?.email)) return <Navigate to="/dashboard" replace />;
@@ -165,6 +177,7 @@ export default function CADToCatalog() {
           perPiece={perPiece}
           pieceCount={shoot.queue.pieces.length}
           totalPictures={totalPictures}
+          totalCredits={totalCredits}
           canShoot={!!engine && view.ready && shoot.queue.pieces.length > 0 && !shoot.opening}
           running={shoot.queue.running}
           paused={shoot.queue.paused}

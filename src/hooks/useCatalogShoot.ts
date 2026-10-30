@@ -5,23 +5,25 @@
  * and shooting many in a row. Every piece is opened in the view while it is
  * shot and every picture appears as it is made; nothing happens out of sight.
  *
- * - White / transparent pictures are drawn by the viewer in this browser.
+ * - White / transparent pictures are drawn by the viewer in this browser at the
+ *   chosen resolution (1K / 2K / 4K px); each is kept with its own
+ *   cad_to_catalog_save_v1 run (paid per picture) and shows once that run is done.
  * - A photo background: the piece is drawn transparent and placed by the
- *   cad_to_catalog_place_v1 workflow (up to PLACE_AT_ONCE at once, paid).
- * - When a piece is drawn, its pictures are kept with a cad_to_catalog_save_v1
- *   run, so every shoot is in Generations.
- * Owns the paid-feature rules (AI_RULES 6): one credit preflight for all the
- * placements of a shoot, cancellation of every run on unmount, a credit refresh
- * when placements settle. Queue rules live in lib/cad-to-catalog-queue.
+ *   cad_to_catalog_place_v1 workflow (paid per picture).
+ * Both run in the background, up to RUNS_AT_ONCE at a time, so every picture is
+ * in Generations. Owns the paid-feature rules (AI_RULES 6): one credit preflight
+ * for the whole shoot, a stop when credits run out, cancellation of every run on
+ * unmount, a credit refresh when the runs settle. Queue rules live in
+ * lib/cad-to-catalog-queue.
  */
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { useCreditPreflight } from '@/hooks/use-credit-preflight';
 import { useCredits } from '@/contexts/CreditsContext';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
-import { CATALOG_PLACE_WORKFLOW, type CatalogAspect, type CatalogResolution } from '@/lib/cad-to-catalog-api';
-import { blobToDataUrl, fastloadFile, placeOnBackground, rhinoMeshFile, savePictures } from '@/lib/cad-to-catalog-run';
+import { CATALOG_PICTURE_PX, CATALOG_PLACE_WORKFLOW, shootCredits, type CatalogAspect, type CatalogResolution } from '@/lib/cad-to-catalog-api';
+import { blobToDataUrl, CatalogRunError, fastloadFile, picturePrice, placeOnBackground, rhinoMeshFile, savePictures } from '@/lib/cad-to-catalog-run';
 import {
-  guessCategory, initialQueue, isPhoto, nextPiece, queueReducer,
+  countShoot, guessCategory, initialQueue, isPhoto, nextPiece, queueReducer,
   type JewelryCategory, type Picture, type PlannedAngle, type QueueState, type ShootSettings,
 } from '@/lib/cad-to-catalog-queue';
 import { anglesFor } from '@/lib/cad-to-catalog-angles';
@@ -34,7 +36,7 @@ import type { Choice } from '@/components/cad-to-catalog/engine/materials';
 
 /** Photo shots sit a little further back, so the AI has room for the scene (as the tool). */
 const IN_PHOTO_DISTANCE = 1.6;
-const PLACE_AT_ONCE = 4;
+const RUNS_AT_ONCE = 4;
 const RHINO_MESH_ON = import.meta.env.VITE_CAD_TO_CATALOG_RHINO_MESH === 'true';
 
 interface PieceFiles {
@@ -42,14 +44,10 @@ interface PieceFiles {
   files: Map<string, File>;
 }
 
-interface Placement {
-  picture: Picture;
-  render: string;
-  background: string;
-  materials: string;
-  aspect: CatalogAspect;
-  resolution: CatalogResolution;
-}
+/** A picture's paid run: placed in a photo by AI, or a drawn picture kept as it is. */
+type Job =
+  | { kind: 'place'; picture: Picture; render: string; background: string; materials: string; aspect: CatalogAspect; resolution: CatalogResolution }
+  | { kind: 'save'; picture: Picture; blob: Blob; piece: string; category: string; resolution: CatalogResolution };
 
 export interface UseCatalogShoot {
   queue: QueueState;
@@ -75,7 +73,7 @@ export interface UseCatalogShoot {
 const pieceId = (e: FileEntry) => `${e.path}|${e.file.size}|${e.file.lastModified}`;
 
 export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message: string, error?: boolean) => void): UseCatalogShoot {
-  const { checkCredits } = useCreditPreflight();
+  const { checkCreditsFor } = useCreditPreflight();
   const { refreshCredits } = useCredits();
   const [queue, dispatch] = useReducer(queueReducer, initialQueue);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -87,8 +85,8 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
   const openRef = useRef<string | null>(null);
   const control = useRef({ paused: false, stopped: false });
   const life = useRef(new AbortController()); // aborted on unmount: every run stops
-  const placeQueue = useRef<Placement[]>([]);
-  const placing = useRef(0);
+  const jobs = useRef<Job[]>([]);
+  const running = useRef(0);
   const urls = useRef(new Set<string>());
   const lastShoot = useRef<{ settings: ShootSettings; backgroundData: (id: string) => Promise<string>; anglesOf: (c: JewelryCategory) => PlannedAngle[] } | null>(null);
   const noticeRef = useRef(onNotice);
@@ -153,30 +151,53 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
     }
   }, [open]);
 
-  // Placements run in the background, a few at a time; each fills its tile when it lands.
+  // Out of credits mid-shoot: stop, drop what has not started, say so once.
+  const outOfCredits = useCallback(() => {
+    if (control.current.stopped) return;
+    control.current = { paused: false, stopped: true };
+    jobs.current.forEach((j) => dispatch({ type: 'picture', pictureId: j.picture.id, status: 'failed', error: 'Not enough credits' }));
+    jobs.current = [];
+    dispatch({ type: 'stop' });
+    noticeRef.current('Not enough credits: the shoot stopped. Pictures already made are kept.', true);
+  }, []);
+
+  // One job's run: an AI placement, or a drawn picture kept (and charged) as it is.
+  const runJob = useCallback(async (job: Job): Promise<string | null> => {
+    const signal = life.current.signal;
+    if (job.kind === 'save') {
+      const p = job.picture;
+      const image = await blobToDataUrl(job.blob);
+      const kept = await savePictures(job.piece, job.category, [{ name: p.name, angle: p.angle.name, metal: p.metal, image }], signal, job.resolution);
+      return kept ? keepUrl(job.blob) : null;
+    }
+    const res = await placeOnBackground({ render: job.render, background: job.background, materials: job.materials, aspect: job.aspect, resolution: job.resolution }, signal);
+    if (!res) return null;
+    const r = await authenticatedFetch(res.image.url, { signal });
+    if (!r.ok) throw new Error(`Couldn't download the photo (${r.status})`);
+    return keepUrl(await r.blob());
+  }, []);
+
+  // Paid runs go in the background, a few at a time; each fills its tile when it lands.
   const pump = useCallback(() => {
-    while (placing.current < PLACE_AT_ONCE && placeQueue.current.length) {
-      const job = placeQueue.current.shift()!;
-      placing.current++;
-      dispatch({ type: 'picture', pictureId: job.picture.id, status: 'placing' });
-      placeOnBackground({ render: job.render, background: job.background, materials: job.materials, aspect: job.aspect, resolution: job.resolution }, life.current.signal)
-        .then(async (res) => {
-          if (!res) return;
-          const r = await authenticatedFetch(res.image.url, { signal: life.current.signal });
-          if (!r.ok) throw new Error(`Couldn't download the photo (${r.status})`);
-          dispatch({ type: 'picture', pictureId: job.picture.id, status: 'done', url: keepUrl(await r.blob()) });
-        })
+    while (running.current < RUNS_AT_ONCE && jobs.current.length) {
+      const job = jobs.current.shift()!;
+      running.current++;
+      dispatch({ type: 'picture', pictureId: job.picture.id, status: job.kind === 'place' ? 'placing' : 'saving' });
+      runJob(job)
+        .then((url) => { if (url) dispatch({ type: 'picture', pictureId: job.picture.id, status: 'done', url }); })
         .catch((e) => {
-          if (!life.current.signal.aborted) dispatch({ type: 'picture', pictureId: job.picture.id, status: 'failed', error: (e as Error).message });
+          if (life.current.signal.aborted) return;
+          dispatch({ type: 'picture', pictureId: job.picture.id, status: 'failed', error: (e as Error).message });
+          if (e instanceof CatalogRunError && e.status === 402) outOfCredits();
         })
         .finally(() => {
-          placing.current--;
+          running.current--;
           if (life.current.signal.aborted) return;
-          if (!placing.current && !placeQueue.current.length) refreshCredits().catch(() => {});
+          if (!running.current && !jobs.current.length) refreshCredits().catch(() => {});
           pump();
         });
     }
-  }, [refreshCredits]);
+  }, [refreshCredits, runJob, outOfCredits]);
 
   const waitWhilePaused = async () => {
     while (control.current.paused && !control.current.stopped && !life.current.signal.aborted) await new Promise((r) => setTimeout(r, 250));
@@ -194,7 +215,7 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
     }
     dispatch({ type: 'piece', pieceId: id, status: 'shooting' });
     const materials = engine!.materialsText();
-    const drawn: { picture: Picture; blob: Blob }[] = [];
+    const resolution = (settings.resolution || '1K') as CatalogResolution;
     const pics = queueRef.current.pictures.filter((x) => x.pieceId === id && x.status === 'waiting');
     const metals = [...new Set(pics.map((p) => p.metal))];
     for (const metal of metals) {
@@ -209,14 +230,12 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
           const photo = isPhoto(pic.background);
           engine!.applyAngle(photo ? { ...pic.angle, dist: (pic.angle.dist || 1) * IN_PHOTO_DISTANCE } : pic.angle);
           try {
-            const blob = await engine!.capture({ background: pic.background === 'white' ? 'white' : 'clear' });
-            if (photo) {
-              placeQueue.current.push({ picture: pic, render: await blobToDataUrl(blob), background: await backgroundData(pic.background), materials, aspect: settings.aspect as CatalogAspect, resolution: (settings.resolution || '1K') as CatalogResolution });
-              pump();
-            } else {
-              dispatch({ type: 'picture', pictureId: pic.id, status: 'done', url: keepUrl(blob) });
-              drawn.push({ picture: pic, blob });
-            }
+            // A photo's render goes to the AI at its working size; drawn pictures are made at the chosen size.
+            const blob = await engine!.capture({ background: pic.background === 'white' ? 'white' : 'clear', long: photo ? 2048 : CATALOG_PICTURE_PX[resolution] });
+            jobs.current.push(photo
+              ? { kind: 'place', picture: pic, render: await blobToDataUrl(blob), background: await backgroundData(pic.background), materials, aspect: settings.aspect as CatalogAspect, resolution }
+              : { kind: 'save', picture: pic, blob, piece: piece.name, category: piece.category, resolution });
+            pump();
           } catch (e) {
             dispatch({ type: 'picture', pictureId: pic.id, status: 'failed', error: (e as Error).message });
           }
@@ -224,24 +243,18 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
       });
     }
     dispatch({ type: 'piece', pieceId: id, status: control.current.stopped ? 'stopped' : 'done' });
-    if (drawn.length) {
-      // Kept in the background; the pictures are already on the page.
-      Promise.all(drawn.map(async ({ picture, blob }) => ({ name: picture.name, angle: picture.angle.name, metal: picture.metal, image: await blobToDataUrl(blob) })))
-        .then((list) => savePictures(piece.name, piece.category, list, life.current.signal))
-        .catch((e) => {
-          if (!life.current.signal.aborted) noticeRef.current(`${piece.name}: pictures are on this page but could not be kept in Generations (${(e as Error).message})`, true);
-        });
-    }
   }, [engine, open, pump]);
 
   const shoot = useCallback(async (pieceIds: string[], settings: ShootSettings, backgroundData: (id: string) => Promise<string>, anglesOf: (c: JewelryCategory) => PlannedAngle[] = anglesFor) => {
     if (!engine || queueRef.current.running || !pieceIds.length) return false;
-    const perPiece = (anglesCount: number) => Math.max(1, settings.metals.length) * anglesCount;
-    const placements = pieceIds.reduce((n, id) => {
-      const p = queueRef.current.pieces.find((x) => x.id === id);
-      return n + (p ? perPiece(anglesOf(p.category).length) * settings.backgrounds.filter(isPhoto).length : 0);
-    }, 0);
-    if (placements > 0 && !(await checkCredits(CATALOG_PLACE_WORKFLOW, placements))) return false;
+    const resolution = (settings.resolution || '1K') as CatalogResolution;
+    if (settings.backgrounds.some((b) => !isPhoto(b)) && CATALOG_PICTURE_PX[resolution] > engine.maxPicturePx()) {
+      noticeRef.current(`This device can't draw ${resolution} pictures. Choose a smaller size.`, true);
+      return false;
+    }
+    const counts = countShoot(queueRef.current.pieces.filter((p) => pieceIds.includes(p.id)), settings, anglesOf);
+    const prices = { place: await picturePrice('place', resolution), save: await picturePrice('save', resolution) };
+    if (!(await checkCreditsFor(shootCredits(counts, prices), CATALOG_PLACE_WORKFLOW))) return false;
     if (engine.hasModel && openRef.current) choices.current.set(openRef.current, engine.choices());
     lastShoot.current = { settings, backgroundData, anglesOf };
     control.current = { paused: false, stopped: false };
@@ -258,7 +271,7 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
       if (!life.current.signal.aborted) dispatch({ type: 'finished' });
     }
     return true;
-  }, [engine, checkCredits, shootPiece]);
+  }, [engine, checkCreditsFor, shootPiece]);
 
   const downloadAll = useCallback(() => buildZip(queueRef.current.pieces, queueRef.current.pictures, async (p) => (await fetch(p.url!)).blob()), []);
 
