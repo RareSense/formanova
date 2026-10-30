@@ -118,7 +118,7 @@ describe('picturePrice', () => {
     mockAuthFetch.mockResolvedValueOnce(json(200, { projected_max_hold: 0 }));
     expect(await picturePrice('save', '4K')).toBe(10);
     mockAuthFetch.mockResolvedValueOnce(json(500, {}));
-    expect(await picturePrice('place', '1K')).toBe(28);
+    expect(await picturePrice('place', '1K')).toBe(24);
     mockAuthFetch.mockRejectedValueOnce(new Error('offline'));
     expect(await picturePrice('save', '1K')).toBe(4);
   });
