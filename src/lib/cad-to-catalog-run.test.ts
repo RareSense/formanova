@@ -83,7 +83,7 @@ describe('placeOnBackground / savePictures', () => {
       .mockResolvedValueOnce(json(202, { workflow_id: 'wf_p' }))
       .mockResolvedValueOnce(json(200, { runtime: { state: 'completed' } }))
       .mockResolvedValueOnce(json(200, { image: REF }));
-    const res = await placeOnBackground({ render: PNG, background: PNG, materials: 'm', aspect: '1:1' });
+    const res = await placeOnBackground({ render: PNG, background: PNG, materials: 'm', aspect: '1:1', resolution: '1K' });
     expect(res).toMatchObject({ workflowId: 'wf_p', image: { sha256: SHA } });
   });
 

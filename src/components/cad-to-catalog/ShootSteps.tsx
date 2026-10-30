@@ -1,11 +1,12 @@
 /**
  * The shoot settings, in the tool's order: 1 jewellery type (of the open
- * piece), 2 angles, 3 metals, 4 backgrounds, 5 picture shape; then Shoot.
+ * piece), 2 angles, 3 metals, 4 backgrounds, 5 picture shape and resolution
+ * (photo backgrounds only); then Shoot.
  * They apply to every piece; each piece uses its own type's angles.
  */
 import { useRef } from 'react';
 import { Check, Pause, Play, Plus, Square, Upload } from 'lucide-react';
-import { CATALOG_ASPECTS, type CatalogAspect } from '@/lib/cad-to-catalog-api';
+import { CATALOG_ASPECTS, CATALOG_RESOLUTIONS, type CatalogAspect, type CatalogResolution } from '@/lib/cad-to-catalog-api';
 import { CATEGORIES, CATEGORY_LABEL, type BackgroundId, type JewelryCategory, type PlannedAngle } from '@/lib/cad-to-catalog-queue';
 import { METALS } from './engine/materials';
 
@@ -19,6 +20,7 @@ export interface BackgroundOption {
 const STEP = 'font-display text-sm tracking-[0.15em] uppercase font-bold flex items-center gap-2';
 const NUM = 'w-5 h-5 flex items-center justify-center border border-foreground font-mono text-[10px]';
 const TICK = (on: boolean) => `w-4 h-4 flex items-center justify-center border ${on ? 'bg-foreground border-foreground text-background' : 'border-border'}`;
+const RESOLUTION_LABEL: Record<CatalogResolution, string> = { '1K': 'Standard HD', '2K': 'High Res', '4K': 'Ultra HD' };
 const CHIP = (on: boolean) => `flex items-center gap-2 px-2.5 py-2 border text-left font-mono text-[10px] transition-colors ${on ? 'border-foreground bg-accent/40' : 'border-border hover:bg-accent/20'}`;
 
 interface Props {
@@ -41,6 +43,8 @@ interface Props {
   onUploadBackground: (files: FileList) => void;
   aspect: CatalogAspect;
   onAspect: (a: CatalogAspect) => void;
+  resolution: CatalogResolution;
+  onResolution: (r: CatalogResolution) => void;
   /** Pictures one piece gets, photos among them (for the button and the credit note). */
   perPiece: { pictures: number; photos: number };
   pieceCount: number;
@@ -142,10 +146,20 @@ export default function ShootSteps(p: Props) {
 
       {photos && (
         <div className="space-y-2">
-          <h3 className={STEP}><span className={NUM}>5</span>Picture shape</h3>
+          <h3 className={STEP}><span className={NUM}>5</span>Picture shape &amp; size</h3>
           <select value={p.aspect} disabled={disabled} onChange={(e) => p.onAspect(e.target.value as CatalogAspect)} aria-label="Shape of the photo pictures" className="w-full h-9 px-2 bg-background border border-border font-mono text-[11px]">
             {CATALOG_ASPECTS.map((a) => <option key={a} value={a}>{a}</option>)}
           </select>
+          <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Resolution of the photo pictures">
+            {CATALOG_RESOLUTIONS.map((r) => (
+              <button key={r} type="button" role="radio" aria-checked={p.resolution === r} disabled={disabled} onClick={() => p.onResolution(r)}
+                className={`h-11 px-4 flex flex-col items-center justify-center gap-0.5 border font-mono uppercase transition-colors disabled:opacity-40 ${p.resolution === r ? 'border-foreground bg-accent/40' : 'border-border hover:bg-accent/20'}`}>
+                <span className="text-[11px] tracking-[0.12em]">{r}</span>
+                <span className="text-[8px] tracking-[0.08em] text-muted-foreground whitespace-nowrap">{RESOLUTION_LABEL[r]}</span>
+              </button>
+            ))}
+          </div>
+          {p.resolution === '4K' && <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">4K pictures take longer to make.</p>}
         </div>
       )}
 

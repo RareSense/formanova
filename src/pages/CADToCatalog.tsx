@@ -23,7 +23,7 @@ import { useCadBreakpoint } from '@/hooks/use-cad-breakpoint';
 import { useCatalogShoot } from '@/hooks/useCatalogShoot';
 import { isCadToCatalogEnabled } from '@/lib/feature-flags';
 import { trackCatalogShootStarted, trackDownloadClicked, trackPaywallHit } from '@/lib/posthog-events';
-import type { CatalogAspect } from '@/lib/cad-to-catalog-api';
+import type { CatalogAspect, CatalogResolution } from '@/lib/cad-to-catalog-api';
 import { blobToDataUrl } from '@/lib/cad-to-catalog-run';
 import { anglesFor, hasOwnAngles, resetAngles, saveAngles } from '@/lib/cad-to-catalog-angles';
 import { isPhoto, type BackgroundId, type JewelryCategory, type Picture, type PlannedAngle } from '@/lib/cad-to-catalog-queue';
@@ -57,6 +57,7 @@ export default function CADToCatalog() {
   const [chosenBg, setChosenBg] = useState<Set<BackgroundId>>(new Set(['white']));
   const [uploads, setUploads] = useState<(BackgroundOption & { data: string })[]>([]);
   const [aspect, setAspect] = useState<CatalogAspect>('1:1');
+  const [resolution, setResolution] = useState<CatalogResolution>('1K');
   const [skipped, setSkipped] = useState<Set<string>>(new Set());
   const [working, setWorking] = useState<Partial<Record<JewelryCategory, PlannedAngle[]>>>({});
   const [anglesVersion, setAnglesVersion] = useState(0);
@@ -67,7 +68,7 @@ export default function CADToCatalog() {
   const listFor = useCallback((c: JewelryCategory) => working[c] ?? anglesFor(c), [working, anglesVersion]); // eslint-disable-line react-hooks/exhaustive-deps -- anglesVersion re-reads saved angles
   const anglesOf = useCallback((c: JewelryCategory) => listFor(c).filter((a) => !skipped.has(a.name)), [listFor, skipped]);
   const backgrounds = useMemo(() => [...SHIPPED, ...uploads], [uploads]);
-  const settings = { metals: [...metals], backgrounds: [...chosenBg], aspect };
+  const settings = { metals: [...metals], backgrounds: [...chosenBg], aspect, resolution };
   const perPictures = (c: JewelryCategory) => anglesOf(c).length * Math.max(1, metals.size) * chosenBg.size;
   const totalPictures = shoot.queue.pieces.reduce((n, p) => n + perPictures(p.category), 0);
   const perPiece = { pictures: category ? perPictures(category) : 0, photos: [...chosenBg].filter(isPhoto).length };
@@ -159,6 +160,8 @@ export default function CADToCatalog() {
           }}
           aspect={aspect}
           onAspect={setAspect}
+          resolution={resolution}
+          onResolution={setResolution}
           perPiece={perPiece}
           pieceCount={shoot.queue.pieces.length}
           totalPictures={totalPictures}

@@ -56,6 +56,7 @@ export interface ShootSettings {
   metals: string[];          // metal names; empty = the file's own colours
   backgrounds: BackgroundId[];
   aspect: string;            // only sent to the AI placement
+  resolution?: string;       // only sent to the AI placement (1K / 2K / 4K)
 }
 
 export interface QueueState {
