@@ -4,8 +4,8 @@
  * photo backgrounds); then Shoot, with what the shoot costs.
  * They apply to every piece; each piece uses its own type's angles.
  */
-import { useRef } from 'react';
-import { Check, Pause, Play, Plus, Square, Upload } from 'lucide-react';
+import { Check, Images, Pause, Play, Plus, Square } from 'lucide-react';
+import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
 import { CATALOG_ASPECTS, CATALOG_RESOLUTIONS, type CatalogAspect, type CatalogResolution } from '@/lib/cad-to-catalog-api';
 import { CATEGORIES, CATEGORY_LABEL, type BackgroundId, type JewelryCategory, type PlannedAngle } from '@/lib/cad-to-catalog-queue';
 import { METALS } from './engine/materials';
@@ -13,8 +13,15 @@ import { METALS } from './engine/materials';
 export interface BackgroundOption {
   id: BackgroundId;
   name: string;
-  /** Thumbnail (or a CSS colour for white / transparent). */
+  /** A CSS background for white / transparent; the image URL for a photo (may need the sign-in token). */
   thumb: string;
+}
+
+function BackgroundThumb({ b }: { b: BackgroundOption }) {
+  const plain = b.id === 'white' || b.id === 'transparent';
+  const src = useAuthenticatedImage(plain ? null : b.thumb);
+  if (plain) return <span className="absolute inset-0" style={{ background: b.thumb }} />;
+  return src ? <img src={src} alt="" className="absolute inset-0 w-full h-full object-cover" /> : <span className="absolute inset-0 bg-muted/30" />;
 }
 
 const STEP = 'font-display text-sm tracking-[0.15em] uppercase font-bold flex items-center gap-2';
@@ -40,7 +47,8 @@ interface Props {
   backgrounds: BackgroundOption[];
   chosenBackgrounds: Set<BackgroundId>;
   onToggleBackground: (id: BackgroundId) => void;
-  onUploadBackground: (files: FileList) => void;
+  /** Opens the background library (FormaNova library / My own). */
+  onOpenLibrary: () => void;
   aspect: CatalogAspect;
   onAspect: (a: CatalogAspect) => void;
   resolution: CatalogResolution;
@@ -63,7 +71,6 @@ interface Props {
 }
 
 export default function ShootSteps(p: Props) {
-  const upload = useRef<HTMLInputElement>(null);
   const photos = [...p.chosenBackgrounds].some((b) => b !== 'white' && b !== 'transparent');
   const disabled = p.running;
   return (
@@ -126,22 +133,18 @@ export default function ShootSteps(p: Props) {
         <div className="grid grid-cols-3 gap-1.5">
           {p.backgrounds.map((b) => {
             const on = p.chosenBackgrounds.has(b.id);
-            const plain = b.id === 'white' || b.id === 'transparent';
             return (
-              <button key={b.id} type="button" disabled={disabled} onClick={() => p.onToggleBackground(b.id)} title={b.name}
+              <button key={b.id} type="button" disabled={disabled} onClick={() => p.onToggleBackground(b.id)} title={b.name} aria-pressed={on}
                 className={`relative aspect-square border overflow-hidden ${on ? 'border-foreground ring-1 ring-foreground' : 'border-border'}`}>
-                {plain
-                  ? <span className="absolute inset-0" style={{ background: b.thumb }} />
-                  : <img src={b.thumb} alt="" className="absolute inset-0 w-full h-full object-cover" />}
+                <BackgroundThumb b={b} />
                 <span className="absolute left-0 right-0 bottom-0 bg-card/85 px-1 py-0.5 font-mono text-[8px] uppercase truncate">{b.name}</span>
                 {on && <span className="absolute top-1 right-1 w-4 h-4 bg-foreground text-background flex items-center justify-center"><Check className="w-3 h-3" /></span>}
               </button>
             );
           })}
-          <button type="button" disabled={disabled} onClick={() => upload.current?.click()} className="aspect-square border border-dashed border-border flex flex-col items-center justify-center gap-1 font-mono text-[8px] uppercase hover:bg-accent/20">
-            <Upload className="w-4 h-4" /> Your photo
+          <button type="button" disabled={disabled} onClick={p.onOpenLibrary} className="aspect-square border border-dashed border-border flex flex-col items-center justify-center gap-1 px-1 font-mono text-[8px] uppercase hover:bg-accent/20">
+            <Images className="w-4 h-4" /> Library
           </button>
-          <input ref={upload} type="file" accept="image/png,image/jpeg,image/webp" multiple hidden onChange={(e) => { if (e.target.files?.length) p.onUploadBackground(e.target.files); e.target.value = ''; }} />
         </div>
         {photos && <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">Photo backgrounds are placed by AI.</p>}
       </div>

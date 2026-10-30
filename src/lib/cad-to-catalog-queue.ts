@@ -119,6 +119,12 @@ export function planPictures(piece: Piece, settings: ShootSettings, angles: Plan
 
 export const isPhoto = (bg: BackgroundId) => bg !== 'white' && bg !== 'transparent';
 
+/** A library photo's id: "Black silk" + asset 6f3a2b… → Black_silk-6f3a2b, readable in picture names and still unique. */
+export function backgroundId(name: string, assetId: string): string {
+  const slug = name.replace(/[^\w.-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'Background';
+  return `${slug}-${assetId.replace(/[^\w]/g, '').slice(0, 6)}`;
+}
+
 export function queueReducer(state: QueueState, action: QueueAction): QueueState {
   switch (action.type) {
     case 'add': {
