@@ -312,6 +312,22 @@ export class CatalogEngine {
     this.needsRender = true;
   }
   applyAngle(a: Angle) { applyAngle(this, a); this.needsRender = true; }
+  /** A small picture of the piece from each angle (as the CAD to Pictures tool's angle tiles);
+   *  the view goes back to where it was. */
+  async angleThumbs(angles: Angle[], long = 220): Promise<Blob[]> {
+    const back = currentAngle(this);
+    try {
+      const out: Blob[] = [];
+      for (const a of angles) {
+        applyAngle(this, a);
+        out.push(await this.capture({ background: 'white', long, type: 'image/webp' }));
+      }
+      return out;
+    } finally {
+      applyAngle(this, back);
+      this.needsRender = true;
+    }
+  }
   currentAngle(): Angle { return currentAngle(this); }
   fitDistanceFor(radius: number, focal: number) { return fitDistance(this, radius, focal); }
   modelSphere() { return this.sphere(); }
