@@ -65,6 +65,8 @@ export class CatalogRequestError extends Error {
 
 export interface StartBody {
   payload: Record<string, unknown>;
+  /** Nodes whose output the run result carries; without it only the last node's (skipped `save` on a photo run). */
+  return_nodes?: string[];
 }
 
 export interface PlaceParams {
@@ -83,7 +85,7 @@ export function buildPlaceBody({ render, background, materials, aspect, resoluti
   if (!background.startsWith('data:image/')) throw new CatalogRequestError('Choose a background photo');
   if (!CATALOG_ASPECTS.includes(aspect)) throw new CatalogRequestError(`Unknown picture shape ${aspect}`);
   if (!CATALOG_RESOLUTIONS.includes(resolution)) throw new CatalogRequestError(`Unknown resolution ${resolution}`);
-  return { payload: { kind: 'photo', render_image: render, background_image: background, materials: materials.slice(0, 600), aspect, resolution, model: 'gemini' } };
+  return { payload: { kind: 'photo', render_image: render, background_image: background, materials: materials.slice(0, 600), aspect, resolution, model: 'gemini' }, return_nodes: ['place'] };
 }
 
 export interface SavedPicture {

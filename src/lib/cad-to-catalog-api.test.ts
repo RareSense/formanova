@@ -21,6 +21,8 @@ describe('buildPlaceBody', () => {
   it('sends the render, background, materials and shape to the place tool', () => {
     const body = buildPlaceBody({ render: PNG, background: 'data:image/jpeg;base64,/9j/', materials: 'band: Yellow Gold', aspect: '4:5', resolution: '4K' });
     expect(body.payload).toEqual({ kind: 'photo', render_image: PNG, background_image: 'data:image/jpeg;base64,/9j/', materials: 'band: Yellow Gold', aspect: '4:5', resolution: '4K', model: 'gemini' });
+    // the run ends on the skipped save node; without this the result has no photo
+    expect(body.return_nodes).toEqual(['place']);
   });
 
   it('refuses what the tool would refuse, before any request', () => {
