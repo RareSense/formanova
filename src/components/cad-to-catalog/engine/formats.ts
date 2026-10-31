@@ -17,8 +17,9 @@ export const THREE_CDN = `https://cdn.jsdelivr.net/npm/three@0.${THREE.REVISION}
 const OCCT_CDN = 'https://cdn.jsdelivr.net/npm/occt-import-js@0.0.23/dist/';
 const BASE = 'pkg/'; // fake folder the loaders resolve a model's relative paths against
 export const UNIT_SCALE: Record<string, number> = { mm: 1, cm: 10, m: 1000, in: 25.4, ft: 304.8, um: 0.001 };
-/** Above this a .3dm is opened through the toolkit's lossless fastload. */
-export const FASTLOAD_ABOVE = 10e6;
+/** Above this a .3dm is opened through the toolkit's lossless fastload. Below it the browser
+ *  opens the file itself, which is faster than sending it to the server and back. */
+export const FASTLOAD_ABOVE = 60e6;
 
 export interface LoadInfo {
   format: string;
