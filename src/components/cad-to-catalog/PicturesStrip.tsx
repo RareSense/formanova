@@ -55,6 +55,7 @@ export default function PicturesStrip({ queue, onDownloadAll, downloading, onDow
               {x.status === 'failed' && (
                 <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 p-1 font-mono text-[8px] uppercase text-destructive text-center">
                   <AlertTriangle className="w-4 h-4" /> Failed
+                  {x.error && <span className="normal-case leading-tight line-clamp-3 break-words">{x.error}</span>}
                 </span>
               )}
               <span className="absolute left-0 right-0 bottom-0 bg-card/85 px-1 py-0.5 font-mono text-[8px] truncate text-left">{x.angle.name}{x.metal ? ` · ${x.metal}` : ''}</span>

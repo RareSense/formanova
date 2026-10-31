@@ -116,7 +116,12 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
   };
 
   const addFiles = useCallback((entries: FileEntry[]) => {
-    const pieces = piecesFromEntries(entries).map(({ cad, files: f }) => {
+    // A FormaNova CAD download holds the piece twice: "…_nurbs_editable.3dm" (surfaces, often with
+    // no display meshes, which a browser cannot draw) and "…_viewer_only.3dm" (meshes). Keep the
+    // viewer copy when both are there.
+    const all = piecesFromEntries(entries);
+    const viewerStems = new Set(all.map(({ cad }) => cad.file.name.match(/^(.*)_viewer_only\.3dm$/i)?.[1]).filter(Boolean));
+    const pieces = all.filter(({ cad }) => !viewerStems.has(cad.file.name.match(/^(.*)_nurbs_editable\.3dm$/i)?.[1] ?? '')).map(({ cad, files: f }) => {
       const id = pieceId(cad);
       files.current.set(id, { cad, files: f });
       return { id, name: cad.file.name, category: guessCategory(cad.file.name) };
@@ -151,6 +156,10 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
       if (own) engine.restoreChoices(own);
       openRef.current = id;
       setOpenId(id);
+      const noMesh = engine.state.info?.rhino?.noMesh ?? 0;
+      if (noMesh) {
+        noticeRef.current(`${noMesh} ${noMesh === 1 ? 'part was' : 'parts were'} saved without a display mesh and can't be shown. Open the viewer copy (…_viewer_only.3dm) or a GLB, or save it in Rhino with "Save small" off.`, true);
+      }
       // The list's still picture, from the view just opened (cheap: 256 px).
       if (!queueRef.current.pieces.find((p) => p.id === id)?.thumb && engine.isReady) {
         engine.capture(THUMB).then((b) => dispatch({ type: 'thumb', pieceId: id, url: keepUrl(b) })).catch(() => {});
