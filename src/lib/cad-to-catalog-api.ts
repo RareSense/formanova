@@ -1,24 +1,22 @@
 /**
  * cad-to-catalog-api.ts
  *
- * Request and result shaping for Catalog from CAD. Pure functions only;
+ * Request and result shaping for Product Shot from CAD. Pure functions only;
  * starting and polling live in cad-to-catalog-run.ts.
  *
- * Workflows (one tool each, FormaNova CAD to Catalog toolkit,
- * RareSense/cad-to-pictures-fof formanova_cad_to_catalog/):
- *   cad_to_catalog_place_v1       place_in_scene  a transparent render placed in a background photo (AI)
- *   cad_to_catalog_save_v1        save_pictures   the white pictures a browser drew of one piece, kept with the run
- *   cad_to_catalog_fastload_v1    cad_fastload    a heavy .3dm split into a skeleton + its exact meshes
- *   cad_to_catalog_rhino_mesh_v1  rhino_mesh      display meshes for surfaces saved without them
+ * Workflows (FormaNova CAD to Catalog toolkit, RareSense/FormaNova_cad_to_catalog):
+ *   cad_to_catalog_shot      one picture the browser drew: kind "photo" goes through
+ *                            place_in_scene (AI places it in the background photo),
+ *                            kind "white" through save_pictures (kept as it is).
+ *                            Each kind skips the other step and is charged per picture.
+ *   cad_to_catalog_fastload  a heavy .3dm split into a skeleton + its exact meshes
  *
  * Pictures and files go inline as data: URLs; the backend stores them on receipt.
  */
 import { readArtifact, type ArtifactRef } from '@/lib/ring-cad-nurbs-api';
 
-export const CATALOG_PLACE_WORKFLOW = 'cad_to_catalog_place_v1';
-export const CATALOG_SAVE_WORKFLOW = 'cad_to_catalog_save_v1';
-export const CATALOG_FASTLOAD_WORKFLOW = 'cad_to_catalog_fastload_v1';
-export const CATALOG_RHINO_MESH_WORKFLOW = 'cad_to_catalog_rhino_mesh_v1';
+export const CATALOG_SHOT_WORKFLOW = 'cad_to_catalog_shot';
+export const CATALOG_FASTLOAD_WORKFLOW = 'cad_to_catalog_fastload';
 
 export const CATALOG_ASPECTS = ['1:1', '4:5', '3:4', '2:3', '9:16', '5:4', '4:3', '3:2', '16:9'] as const;
 export type CatalogAspect = (typeof CATALOG_ASPECTS)[number];
@@ -28,20 +26,27 @@ export type CatalogResolution = (typeof CATALOG_RESOLUTIONS)[number];
 /** Long side, px, of a picture the browser draws at each resolution. */
 export const CATALOG_PICTURE_PX: Record<CatalogResolution, number> = { '1K': 1024, '2K': 2048, '4K': 4096 };
 
-/** What a priced picture is: placed in a photo by AI, or drawn here and kept (white / transparent). */
-export type CatalogPriceKind = 'place' | 'save';
 /**
- * Credits per picture, shown until the backend's own estimate answers (and used if it can't).
- * The backend's billing policy for each workflow is what is charged.
+ * Credits per picture, white or photo, shown until the backend's price list answers (and
+ * used if it can't). The backend's billing policy for cad_to_catalog_shot is what is charged.
  */
-export const CATALOG_FALLBACK_PRICES: Record<CatalogPriceKind, Record<CatalogResolution, number>> = {
-  place: { '1K': 24, '2K': 36, '4K': 48 },
-  save: { '1K': 4, '2K': 6, '4K': 10 },
-};
+export const CATALOG_FALLBACK_PRICES: Record<CatalogResolution, number> = { '1K': 24, '2K': 36, '4K': 48 };
 
-/** Credits a shoot costs: every photo picture and every white / transparent picture. */
-export function shootCredits(counts: { photos: number; drawn: number }, prices: Record<CatalogPriceKind, number>): number {
-  return counts.photos * prices.place + counts.drawn * prices.save;
+/** Credits a shoot costs: every picture, photo or white / transparent, at one price. */
+export function shootCredits(counts: { photos: number; drawn: number }, price: number): number {
+  return (counts.photos + counts.drawn) * price;
+}
+
+/**
+ * A picture's price from cad_to_catalog_shot's billing policy (GET /credits/policy/<workflow>):
+ * the rule for that resolution. null when the policy has none.
+ */
+export function priceFromPolicy(data: unknown, resolution: CatalogResolution): number | null {
+  const rules = (data as { policy?: { conditional_pricing_rules?: unknown } } | null)?.policy?.conditional_pricing_rules;
+  if (!Array.isArray(rules)) return null;
+  const rule = rules.find((r) => (r as { when?: { resolution?: string } })?.when?.resolution?.toUpperCase() === resolution);
+  const cost = (rule as { cost?: unknown } | undefined)?.cost;
+  return typeof cost === 'number' && cost > 0 ? cost : null;
 }
 
 export const PLACE_POLL_INTERVAL_MS = 3000;
@@ -78,7 +83,7 @@ export function buildPlaceBody({ render, background, materials, aspect, resoluti
   if (!background.startsWith('data:image/')) throw new CatalogRequestError('Choose a background photo');
   if (!CATALOG_ASPECTS.includes(aspect)) throw new CatalogRequestError(`Unknown picture shape ${aspect}`);
   if (!CATALOG_RESOLUTIONS.includes(resolution)) throw new CatalogRequestError(`Unknown resolution ${resolution}`);
-  return { payload: { render_image: render, background_image: background, materials: materials.slice(0, 600), aspect, resolution, model: 'gemini' } };
+  return { payload: { kind: 'photo', render_image: render, background_image: background, materials: materials.slice(0, 600), aspect, resolution, model: 'gemini' } };
 }
 
 export interface SavedPicture {
@@ -96,6 +101,7 @@ export function buildSaveBody(piece: string, category: string, pictures: SavedPi
   if (resolution && !CATALOG_RESOLUTIONS.includes(resolution)) throw new CatalogRequestError(`Unknown resolution ${resolution}`);
   return {
     payload: {
+      kind: 'white',
       piece: piece.slice(0, 200),
       category,
       pictures: pictures.map((p) => ({ name: p.name.slice(0, 120), angle: p.angle || null, metal: p.metal, image: p.image })),
@@ -178,7 +184,3 @@ export function parseFastloadResult(data: unknown): FastloadResult | null {
   return skeleton && meshes ? { skeleton, meshes } : null;
 }
 
-export function parseRhinoMeshResult(data: unknown): ArtifactRef | null {
-  if (failed(data)) return null;
-  return readArtifact(findResult(data, 'meshed_count')?.cad_file);
-}

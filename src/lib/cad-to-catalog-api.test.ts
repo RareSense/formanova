@@ -3,13 +3,13 @@ import {
   buildCadFileBody,
   buildPlaceBody,
   CATALOG_FALLBACK_PRICES,
+  priceFromPolicy,
   shootCredits,
   buildSaveBody,
   findResult,
   parseFailure,
   parseFastloadResult,
   parsePlaceResult,
-  parseRhinoMeshResult,
   parseSaveResult,
 } from './cad-to-catalog-api';
 
@@ -20,7 +20,7 @@ const PNG = 'data:image/png;base64,iVBORw0KGgo=';
 describe('buildPlaceBody', () => {
   it('sends the render, background, materials and shape to the place tool', () => {
     const body = buildPlaceBody({ render: PNG, background: 'data:image/jpeg;base64,/9j/', materials: 'band: Yellow Gold', aspect: '4:5', resolution: '4K' });
-    expect(body.payload).toEqual({ render_image: PNG, background_image: 'data:image/jpeg;base64,/9j/', materials: 'band: Yellow Gold', aspect: '4:5', resolution: '4K', model: 'gemini' });
+    expect(body.payload).toEqual({ kind: 'photo', render_image: PNG, background_image: 'data:image/jpeg;base64,/9j/', materials: 'band: Yellow Gold', aspect: '4:5', resolution: '4K', model: 'gemini' });
   });
 
   it('refuses what the tool would refuse, before any request', () => {
@@ -39,7 +39,7 @@ describe('buildPlaceBody', () => {
 describe('buildSaveBody', () => {
   it('sends every picture of the piece with its angle and metal', () => {
     const body = buildSaveBody('Ring A.3dm', 'ring', [{ name: '01_Front_White_Gold', angle: 'Front', metal: 'White Gold', image: PNG }]);
-    expect(body.payload).toEqual({ piece: 'Ring A.3dm', category: 'ring', pictures: [{ name: '01_Front_White_Gold', angle: 'Front', metal: 'White Gold', image: PNG }] });
+    expect(body.payload).toEqual({ kind: 'white', piece: 'Ring A.3dm', category: 'ring', pictures: [{ name: '01_Front_White_Gold', angle: 'Front', metal: 'White Gold', image: PNG }] });
   });
 
   it('needs 1 to 64 pictures', () => {
@@ -78,7 +78,6 @@ describe('result parsing', () => {
   it('reads fastload and rhino_mesh files', () => {
     expect(parseFastloadResult({ skeleton_3dm: ref('s.3dm'), meshes: ref('m.bin.gz'), triangles: 9 })?.meshes.sha256).toBe(SHA);
     expect(parseFastloadResult({ skeleton_3dm: ref('s.3dm') })).toBeNull();
-    expect(parseRhinoMeshResult({ cad_file: ref('meshed.3dm'), meshed_count: 2 })?.uri).toContain('meshed.3dm');
   });
 
   it("shows the tool's own words when a run fails", () => {
@@ -94,8 +93,28 @@ describe('priced drawn pictures', () => {
     expect(() => buildSaveBody('Ring A.3dm', 'ring', [{ name: 'x', angle: 'Front', metal: null, image: PNG }], '8K' as never)).toThrow(/resolution/);
   });
 
-  it('adds up photo and drawn pictures at their own prices', () => {
-    expect(shootCredits({ photos: 3, drawn: 5 }, { place: 24, save: 4 })).toBe(3 * 24 + 5 * 4);
-    expect(CATALOG_FALLBACK_PRICES).toEqual({ place: { '1K': 24, '2K': 36, '4K': 48 }, save: { '1K': 4, '2K': 6, '4K': 10 } });
+  it('charges every picture, photo or white, the same price', () => {
+    expect(shootCredits({ photos: 3, drawn: 5 }, 24)).toBe(8 * 24);
+    expect(CATALOG_FALLBACK_PRICES).toEqual({ '1K': 24, '2K': 36, '4K': 48 });
+  });
+});
+
+describe('picture kinds and prices', () => {
+  it('tells the shot workflow which step a picture takes', () => {
+    expect(buildSaveBody('a.3dm', 'ring', [{ name: 'x', angle: 'Front', metal: null, image: PNG }], '1K').payload.kind).toBe('white');
+    expect(buildPlaceBody({ render: PNG, background: PNG, materials: '', aspect: '1:1', resolution: '1K' }).payload.kind).toBe('photo');
+  });
+
+  it("reads a picture's price for a resolution from the workflow's price list", () => {
+    const policy = { policy: { conditional_pricing_rules: [
+      { tool: 'formanova_cad_to_catalog_place_in_scene', when: { resolution: '1K' }, cost: 24 },
+      { tool: 'formanova_cad_to_catalog_place_in_scene', when: { resolution: '4K' }, cost: 48 },
+      { tool: 'formanova_cad_to_catalog_place_in_scene', cost: 48 },
+    ] } };
+    expect(priceFromPolicy(policy, '1K')).toBe(24);
+    expect(priceFromPolicy(policy, '4K')).toBe(48);
+    expect(priceFromPolicy(policy, '2K')).toBeNull();
+    expect(priceFromPolicy({ policy: {} }, '1K')).toBeNull();
+    expect(priceFromPolicy(null, '1K')).toBeNull();
   });
 });

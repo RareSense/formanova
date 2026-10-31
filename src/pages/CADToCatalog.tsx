@@ -25,7 +25,7 @@ import { useCadBreakpoint } from '@/hooks/use-cad-breakpoint';
 import { useCatalogShoot } from '@/hooks/useCatalogShoot';
 import { isCadToCatalogEnabled } from '@/lib/feature-flags';
 import { trackCatalogShootStarted, trackDownloadClicked, trackPaywallHit } from '@/lib/posthog-events';
-import { shootCredits, type CatalogAspect, type CatalogPriceKind, type CatalogResolution } from '@/lib/cad-to-catalog-api';
+import { shootCredits, type CatalogAspect, type CatalogResolution } from '@/lib/cad-to-catalog-api';
 import { blobToDataUrl, picturePrice } from '@/lib/cad-to-catalog-run';
 import { anglesFor, hasOwnAngles, resetAngles, saveAngles } from '@/lib/cad-to-catalog-angles';
 import { countShoot, isPhoto, type BackgroundId, type JewelryCategory, type Picture, type PlannedAngle } from '@/lib/cad-to-catalog-queue';
@@ -64,27 +64,29 @@ export default function CADToCatalog() {
   const [working, setWorking] = useState<Partial<Record<JewelryCategory, PlannedAngle[]>>>({});
   const [anglesVersion, setAnglesVersion] = useState(0);
   const [downloading, setDownloading] = useState(false);
-  const [prices, setPrices] = useState<Record<CatalogPriceKind, number> | null>(null);
+  const [price, setPrice] = useState<number | null>(null);
 
-  // Credits per picture at the chosen size: the backend's estimate, else the fallback.
+  // Credits per picture (white or photo) at the chosen size: the backend's price list, else the fallback.
   useEffect(() => {
     const ctrl = new AbortController();
-    setPrices(null);
-    Promise.all([picturePrice('place', resolution, ctrl.signal), picturePrice('save', resolution, ctrl.signal)])
-      .then(([place, save]) => setPrices({ place, save }))
-      .catch(() => {});
+    setPrice(null);
+    picturePrice(resolution, ctrl.signal).then(setPrice).catch(() => {});
     return () => ctrl.abort();
   }, [resolution]);
 
   const openPiece = shoot.queue.pieces.find((p) => p.id === shoot.openId) ?? null;
   const category = openPiece?.category ?? null;
-  const listFor = useCallback((c: JewelryCategory) => working[c] ?? anglesFor(c), [working, anglesVersion]); // eslint-disable-line react-hooks/exhaustive-deps -- anglesVersion re-reads saved angles
+  // anglesVersion is not read inside, so the lint rule calls it unnecessary; it is listed on
+  // purpose: anglesFor() reads saved angles from storage, and a save/reset bumps anglesVersion
+  // so the list re-reads them. Safe: it only makes the callback newer. Watch for: angles that
+  // stay stale after "Save as default" or "Reset" if this dependency is ever dropped.
+  const listFor = useCallback((c: JewelryCategory) => working[c] ?? anglesFor(c), [working, anglesVersion]); // eslint-disable-line react-hooks/exhaustive-deps -- see above
   const anglesOf = useCallback((c: JewelryCategory) => listFor(c).filter((a) => !skipped.has(a.name)), [listFor, skipped]);
   const backgrounds = useMemo(() => [...PLAIN, ...photoBgs.map((b) => ({ id: b.id, name: b.name, thumb: b.url }))], [photoBgs]);
   const settings = { metals: [...metals], backgrounds: [...chosenBg], aspect, resolution };
   const perPictures = (c: JewelryCategory) => anglesOf(c).length * Math.max(1, metals.size) * chosenBg.size;
   const totalPictures = shoot.queue.pieces.reduce((n, p) => n + perPictures(p.category), 0);
-  const totalCredits = prices ? shootCredits(countShoot(shoot.queue.pieces, settings, anglesOf), prices) : null;
+  const totalCredits = price !== null ? shootCredits(countShoot(shoot.queue.pieces, settings, anglesOf), price) : null;
   const perPiece = { pictures: category ? perPictures(category) : 0, photos: [...chosenBg].filter(isPhoto).length };
 
   if (!isCadToCatalogEnabled(user?.email)) return <Navigate to="/dashboard" replace />;
@@ -92,7 +94,7 @@ export default function CADToCatalog() {
   const addFiles = (entries: FileEntry[]) => {
     const fresh = shoot.addFiles(entries);
     if (!fresh.length) {
-      if (!entries.some((e) => /\.(3dm|glb|gltf|step|stp|obj|ply|stl)$/i.test(e.file.name))) toast.error('No CAD file there. Catalog from CAD opens 3DM, GLB, GLTF, STEP, OBJ, PLY and STL.');
+      if (!entries.some((e) => /\.(3dm|glb|gltf|step|stp|obj|ply|stl)$/i.test(e.file.name))) toast.error('No CAD file there. Product Shot from CAD opens 3DM, GLB, GLTF, STEP, OBJ, PLY and STL.');
       return;
     }
     if (fresh.length > 1) toast(`${fresh.length} pieces added`);
@@ -215,7 +217,7 @@ export default function CADToCatalog() {
   };
 
   const downloadOne = async (p: Picture) => {
-    const blob = await (await fetch(p.url!)).blob();
+    const blob = await (await fetch(p.url!)).blob(); // a blob: URL made on this page (AI_RULES 1)
     const piece = shoot.queue.pieces.find((x) => x.id === p.pieceId)?.name.replace(/\.[^.]+$/, '') ?? 'piece';
     save(blob, `${piece}_${p.name}.${blob.type.includes('jpeg') ? 'jpg' : 'png'}`);
     trackDownloadClicked({ context: 'catalog_from_cad', file_type: blob.type, category: category ?? undefined });
@@ -224,8 +226,8 @@ export default function CADToCatalog() {
   return (
     <>
       <Helmet>
-        <title>Catalog from CAD | FormaNova</title>
-        <meta name="description" content="Turn jewelry CAD files into catalog pictures: every angle, every metal, on white or in a photo, one piece or a whole collection." />
+        <title>Product Shot from CAD | FormaNova</title>
+        <meta name="description" content="Turn jewelry CAD files into product pictures: every angle, every metal, on white or in a photo, one piece or a whole collection." />
         <link rel="canonical" href="/cad-to-catalog" />
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>

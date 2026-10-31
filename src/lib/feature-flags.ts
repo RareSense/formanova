@@ -42,8 +42,10 @@ export function isCadUploadEnabled(email: string | undefined | null): boolean {
 }
 
 /**
- * Users allowed to open Catalog from CAD (/cad-to-catalog) while it rolls out.
- * "*" opens it to every signed-in user (staging).
+ * Users allowed to open Product Shot from CAD (/cad-to-catalog) and see its
+ * dashboard card while it rolls out. "*" opens it to every signed-in user (staging).
+ * Owner: CAD to Catalog (uswa). Reason: needs the cad_to_catalog toolkit and
+ * workflows live in each environment first. Remove when it opens to everyone on prod.
  */
 export function isCadToCatalogEnabled(email: string | undefined | null): boolean {
   if (import.meta.env.VITE_CAD_TO_CATALOG_ALLOWLIST_EMAILS?.trim() === '*') return true;

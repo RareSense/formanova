@@ -7,9 +7,9 @@
  *
  * - White / transparent pictures are drawn by the viewer in this browser at the
  *   chosen resolution (1K / 2K / 4K px); each is kept with its own
- *   cad_to_catalog_save_v1 run (paid per picture) and shows once that run is done.
- * - A photo background: the piece is drawn transparent and placed by the
- *   cad_to_catalog_place_v1 workflow (paid per picture).
+ *   cad_to_catalog_shot run (kind "white", paid per picture) and shows once it is done.
+ * - A photo background: the piece is drawn transparent and placed by AI in a
+ *   cad_to_catalog_shot run (kind "photo", same price per picture).
  * Both run in the background, up to RUNS_AT_ONCE at a time, so every picture is
  * in Generations. Owns the paid-feature rules (AI_RULES 6): one credit preflight
  * for the whole shoot, a stop when credits run out, cancellation of every run on
@@ -20,8 +20,8 @@ import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { useCreditPreflight } from '@/hooks/use-credit-preflight';
 import { useCredits } from '@/contexts/CreditsContext';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
-import { CATALOG_PICTURE_PX, CATALOG_PLACE_WORKFLOW, shootCredits, type CatalogAspect, type CatalogResolution } from '@/lib/cad-to-catalog-api';
-import { blobToDataUrl, CatalogRunError, fastloadFile, picturePrice, placeOnBackground, rhinoMeshFile, savePictures } from '@/lib/cad-to-catalog-run';
+import { CATALOG_PICTURE_PX, CATALOG_SHOT_WORKFLOW, shootCredits, type CatalogAspect, type CatalogResolution } from '@/lib/cad-to-catalog-api';
+import { blobToDataUrl, CatalogRunError, fastloadFile, picturePrice, placeOnBackground, savePictures } from '@/lib/cad-to-catalog-run';
 import {
   countShoot, guessCategory, initialQueue, isPhoto, nextPiece, queueReducer,
   type JewelryCategory, type Picture, type PlannedAngle, type QueueState, type ShootSettings,
@@ -37,7 +37,6 @@ import type { Choice } from '@/components/cad-to-catalog/engine/materials';
 /** Photo shots sit a little further back, so the AI has room for the scene (as the tool). */
 const IN_PHOTO_DISTANCE = 1.6;
 const RUNS_AT_ONCE = 4;
-const RHINO_MESH_ON = import.meta.env.VITE_CAD_TO_CATALOG_RHINO_MESH === 'true';
 
 interface PieceFiles {
   cad: FileEntry;
@@ -131,7 +130,6 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
           const { skeleton, packed } = await fastloadFile(data, life.current.signal);
           return { skeleton, meshes: unpackMeshes(packed) };
         },
-        rhinoMesh: RHINO_MESH_ON ? (data) => rhinoMeshFile(data, life.current.signal) : null,
       });
       const own = choices.current.get(id);
       if (own) engine.restoreChoices(own);
@@ -253,8 +251,7 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
       return false;
     }
     const counts = countShoot(queueRef.current.pieces.filter((p) => pieceIds.includes(p.id)), settings, anglesOf);
-    const prices = { place: await picturePrice('place', resolution), save: await picturePrice('save', resolution) };
-    if (!(await checkCreditsFor(shootCredits(counts, prices), CATALOG_PLACE_WORKFLOW))) return false;
+    if (!(await checkCreditsFor(shootCredits(counts, await picturePrice(resolution)), CATALOG_SHOT_WORKFLOW))) return false;
     if (engine.hasModel && openRef.current) choices.current.set(openRef.current, engine.choices());
     lastShoot.current = { settings, backgroundData, anglesOf };
     control.current = { paused: false, stopped: false };
@@ -273,6 +270,7 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
     return true;
   }, [engine, checkCreditsFor, shootPiece]);
 
+  // Every picture's url is a blob: URL made here (AI_RULES 1 allows raw fetch for those).
   const downloadAll = useCallback(() => buildZip(queueRef.current.pieces, queueRef.current.pictures, async (p) => (await fetch(p.url!)).blob()), []);
 
   return {

@@ -16,9 +16,7 @@ import type { ArtifactRef } from '@/lib/ring-cad-nurbs-api';
 import {
   CATALOG_FALLBACK_PRICES,
   CATALOG_FASTLOAD_WORKFLOW,
-  CATALOG_PLACE_WORKFLOW,
-  CATALOG_RHINO_MESH_WORKFLOW,
-  CATALOG_SAVE_WORKFLOW,
+  CATALOG_SHOT_WORKFLOW,
   FASTLOAD_POLL_TIMEOUT_MS,
   PLACE_POLL_INTERVAL_MS,
   PLACE_POLL_TIMEOUT_MS,
@@ -30,9 +28,8 @@ import {
   parseFailure,
   parseFastloadResult,
   parsePlaceResult,
-  parseRhinoMeshResult,
   parseSaveResult,
-  type CatalogPriceKind,
+  priceFromPolicy,
   type CatalogResolution,
   type PlaceParams,
   type SavedPicture,
@@ -117,37 +114,32 @@ export async function waitForCatalogRun<T>(
 
 /** A transparent render placed in a background photo by AI. */
 export async function placeOnBackground(params: PlaceParams, signal?: AbortSignal): Promise<{ workflowId: string; image: ArtifactRef } | null> {
-  const workflowId = await startCatalogRun(CATALOG_PLACE_WORKFLOW, buildPlaceBody(params), signal);
+  const workflowId = await startCatalogRun(CATALOG_SHOT_WORKFLOW, buildPlaceBody(params), signal);
   const image = await waitForCatalogRun(workflowId, parsePlaceResult, { intervalMs: PLACE_POLL_INTERVAL_MS, timeoutMs: PLACE_POLL_TIMEOUT_MS, signal });
   return image ? { workflowId, image } : null;
 }
 
 /** Keeps browser-drawn pictures with a run, so they are in Generations (charged at `resolution`). */
 export async function savePictures(piece: string, category: string, pictures: SavedPicture[], signal?: AbortSignal, resolution?: CatalogResolution): Promise<SavedResult[] | null> {
-  const workflowId = await startCatalogRun(CATALOG_SAVE_WORKFLOW, buildSaveBody(piece, category, pictures, resolution), signal);
+  const workflowId = await startCatalogRun(CATALOG_SHOT_WORKFLOW, buildSaveBody(piece, category, pictures, resolution), signal);
   return waitForCatalogRun(workflowId, parseSaveResult, { intervalMs: SAVE_POLL_INTERVAL_MS, timeoutMs: SAVE_POLL_TIMEOUT_MS, signal });
 }
 
-const PRICE_WORKFLOW: Record<CatalogPriceKind, string> = { place: CATALOG_PLACE_WORKFLOW, save: CATALOG_SAVE_WORKFLOW };
-
-/** Credits for one picture: the backend's estimate for that workflow at that resolution, else the fallback. */
-export async function picturePrice(kind: CatalogPriceKind, resolution: CatalogResolution, signal?: AbortSignal): Promise<number> {
+/**
+ * Credits for one picture at this resolution, from the workflow's price list. Not
+ * /credits/estimate: that adds up both of the workflow's steps, though each picture runs one.
+ */
+export async function picturePrice(resolution: CatalogResolution, signal?: AbortSignal): Promise<number> {
   try {
-    const res = await authenticatedFetch('/api/credits/estimate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ workflow_name: PRICE_WORKFLOW[kind], num_variations: 1, pricing_context: { resolution } }),
-      signal,
-    });
+    const res = await authenticatedFetch(`/api/credits/policy/${CATALOG_SHOT_WORKFLOW}`, { signal });
     if (res.ok) {
-      const data = (await res.json()) as { projected_max_hold?: number; estimated_credits?: number };
-      const cost = data.projected_max_hold ?? data.estimated_credits;
-      if (typeof cost === 'number' && cost > 0) return cost;
+      const price = priceFromPolicy(await res.json(), resolution);
+      if (price !== null) return price;
     }
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e;
   }
-  return CATALOG_FALLBACK_PRICES[kind][resolution];
+  return CATALOG_FALLBACK_PRICES[resolution];
 }
 
 async function fetchBytes(ref: ArtifactRef, signal?: AbortSignal): Promise<ArrayBuffer> {
@@ -169,13 +161,4 @@ export async function fastloadFile(data: ArrayBuffer, signal?: AbortSignal): Pro
   if (!res) throw new CatalogRunError('cancelled');
   const [skeleton, meshes] = await Promise.all([fetchBytes(res.skeleton, signal), fetchBytes(res.meshes, signal)]);
   return { skeleton, packed: await gunzip(meshes) };
-}
-
-/** Display meshes for surfaces saved without them, made by Rhino on the server. */
-export async function rhinoMeshFile(data: ArrayBuffer, signal?: AbortSignal): Promise<ArrayBuffer> {
-  const body = buildCadFileBody(await blobToDataUrl(new Blob([data], { type: 'application/octet-stream' })));
-  const workflowId = await startCatalogRun(CATALOG_RHINO_MESH_WORKFLOW, body, signal);
-  const res = await waitForCatalogRun(workflowId, parseRhinoMeshResult, { intervalMs: SAVE_POLL_INTERVAL_MS, timeoutMs: FASTLOAD_POLL_TIMEOUT_MS, signal });
-  if (!res) throw new CatalogRunError('cancelled');
-  return fetchBytes(res, signal);
 }
