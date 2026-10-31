@@ -253,6 +253,9 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
     const counts = countShoot(queueRef.current.pieces.filter((p) => pieceIds.includes(p.id)), settings, anglesOf);
     if (!(await checkCreditsFor(shootCredits(counts, await picturePrice(resolution)), CATALOG_SHOT_WORKFLOW))) return false;
     if (engine.hasModel && openRef.current) choices.current.set(openRef.current, engine.choices());
+    // Every picture takes the chosen shape; each angle is fitted to it, the piece centred.
+    const [aw, ah] = (settings.aspect || '1:1').split(':').map(Number);
+    engine.pictureAspect = aw > 0 && ah > 0 ? aw / ah : 1;
     lastShoot.current = { settings, backgroundData, anglesOf };
     control.current = { paused: false, stopped: false };
     dispatch({ type: 'start', pieceIds, settings, anglesFor: anglesOf });
@@ -265,6 +268,7 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
         await new Promise((r) => setTimeout(r, 0)); // let React apply this piece's updates before reading the next
       }
     } finally {
+      engine.pictureAspect = 1; // back to the square view box for lining up angles
       if (!life.current.signal.aborted) dispatch({ type: 'finished' });
     }
     return true;

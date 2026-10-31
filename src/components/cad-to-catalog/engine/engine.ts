@@ -319,6 +319,10 @@ export class CatalogEngine {
   /* ---------- pictures ---------- */
 
   /** The current view as a picture: white with a soft shadow, or transparent with no shadow. */
+  /** Width / height of the pictures being made. A shoot sets it so each picture is framed and
+   *  fitted to its shape (the piece stays centred); 1 (square) the rest of the time. */
+  pictureAspect = 1;
+
   /** Largest picture side, px, this device's graphics can draw (4K needs 4096). */
   maxPicturePx(): number {
     const gl = this.renderer.getContext();
@@ -326,7 +330,9 @@ export class CatalogEngine {
   }
 
   async capture({ background = 'white' as 'white' | 'clear', long = 2048, type = 'image/png', shadow = background === 'white' } = {}): Promise<Blob> {
-    const w = long, h = long; // pictures are square; the aspect only goes to the AI placement
+    const a = this.pictureAspect;
+    const w = a >= 1 ? long : Math.round(long * a);
+    const h = a >= 1 ? Math.round(long / a) : long;
     const [vw, vh] = this.viewSize();
     const f = frameRect(this); // render only the picture box, so the picture is what the angle lined up
     this.camera.aspect = vw / vh;

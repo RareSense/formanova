@@ -1,6 +1,6 @@
 /**
  * The shoot settings, in the tool's order: 1 jewellery type (of the open
- * piece), 2 angles, 3 metals, 4 backgrounds, 5 aspect ratio (photo backgrounds),
+ * piece), 2 angles, 3 metals, 4 backgrounds, 5 aspect ratio,
  * 6 picture size; then Shoot, with what the shoot costs.
  * They apply to every piece; each piece uses its own type's angles.
  */
@@ -135,10 +135,10 @@ export default function ShootSteps(p: Props) {
         )}
       </div>
 
-      {/* As in the CAD to Pictures tool: always shown, one click; only photo pictures take the shape. */}
+      {/* As in the CAD to Pictures tool: always shown, one click. Every picture takes the shape. */}
       <div className="space-y-2">
         <h3 className={STEP}><span className={NUM}>5</span>Aspect ratio</h3>
-        <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Aspect ratio of the photo pictures">
+        <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Aspect ratio of the pictures">
           {SHAPES.map((a) => (
             <button key={a} type="button" role="radio" aria-checked={p.aspect === a} disabled={disabled} onClick={() => p.onAspect(a)}
               className={`h-9 px-4 border font-mono text-[11px] transition-colors disabled:opacity-40 ${p.aspect === a ? 'border-foreground bg-accent/40' : 'border-border hover:bg-accent/20'}`}>
@@ -146,7 +146,6 @@ export default function ShootSteps(p: Props) {
             </button>
           ))}
         </div>
-        {!photos && <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">For photo backgrounds; white stays square.</p>}
       </div>
 
       <div className="space-y-2">
