@@ -95,7 +95,7 @@ export default function PartsPanel({ engine, section, locked }: Props) {
       <div className={HEAD}><span className={TITLE}>Material</span><span className="font-mono text-[10px] text-muted-foreground">{sel.length ? `${sel.length} selected` : 'whole piece'}</span></div>
       <div className="overflow-y-auto min-h-0 px-4 py-3 space-y-3 scrollbar-thin">
         <p className="font-mono text-[10px] leading-relaxed text-muted-foreground text-justify">
-          {sel.length ? 'Pick a metal or stone for the selected parts.' : 'Click a metal or stone to put it on the whole piece. To change only some parts, pick them first.'}
+          {sel.length ? 'For the selected parts.' : 'For the whole piece, or select parts first.'}
         </p>
         <div className={LABEL}>Metal{sel.length ? '' : ' · all metal parts'}</div>
         <div className="grid grid-cols-4 gap-1.5">{METALS.map((m) => tile(m.id, m.name, m.color, false, same(curMetal, { kind: 'preset', id: m.id })))}</div>

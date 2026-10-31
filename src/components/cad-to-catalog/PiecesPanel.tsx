@@ -56,7 +56,7 @@ export default function PiecesPanel({ queue, openId, onFiles, onOpen, onRemove, 
       </div>
       {!queue.pieces.length ? (
         <p className="px-4 py-4 font-mono text-[10px] leading-relaxed text-muted-foreground text-justify">
-          Add one CAD file, or many at once: every piece is opened in the view and shot with the same angles, metals and backgrounds.
+          Add one CAD file or many.
         </p>
       ) : (
         <ul className="overflow-y-auto min-h-0 max-h-[34vh] px-4 py-3 space-y-1 scrollbar-thin">

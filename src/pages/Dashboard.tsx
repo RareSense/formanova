@@ -238,7 +238,9 @@ function WorkflowCard({
             }`}
           />
         </div>
-        <h3 className="font-display text-lg sm:text-xl md:text-2xl uppercase tracking-wide text-foreground leading-none mb-1 sm:mb-1.5">
+        {/* Room for two lines on every card, so a long title (Product Shot from CAD)
+            does not push its description and button below the cards beside it. */}
+        <h3 className="min-h-[2em] flex items-center justify-center text-center font-display text-lg sm:text-xl md:text-2xl uppercase tracking-wide text-foreground leading-none mb-1 sm:mb-1.5">
           {workflow.title}
         </h3>
         <p className="font-mono text-[9px] sm:text-[11px] md:text-xs tracking-[0.1em] sm:tracking-[0.15em] text-foreground/80 uppercase text-center max-w-[240px]">
