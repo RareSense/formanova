@@ -41,7 +41,7 @@ export default function PiecesPanel({ queue, openId, onFiles, onOpen, onRemove, 
   return (
     <section aria-label="Pieces" className="flex flex-col shrink-0">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <span className="font-display text-sm tracking-[0.15em] uppercase font-bold">Pieces</span>
+        <span className="font-display text-base tracking-[0.12em] uppercase text-foreground">Pieces</span>
         <span className="font-mono text-[10px] text-muted-foreground">{queue.pieces.length}</span>
       </div>
       <div className="flex gap-1.5 px-4 pt-3">
@@ -54,11 +54,7 @@ export default function PiecesPanel({ queue, openId, onFiles, onOpen, onRemove, 
         <input ref={files} type="file" multiple hidden onChange={(e) => { pick(e.target.files); e.target.value = ''; }} />
         <input ref={folder} type="file" multiple hidden {...{ webkitdirectory: '' }} onChange={(e) => { pick(e.target.files); e.target.value = ''; }} />
       </div>
-      {!queue.pieces.length ? (
-        <p className="px-4 py-4 font-mono text-[10px] leading-relaxed text-muted-foreground text-justify">
-          Add one CAD file or many.
-        </p>
-      ) : (
+      {queue.pieces.length > 0 && (
         <ul className="overflow-y-auto min-h-0 max-h-[34vh] px-4 py-3 space-y-1 scrollbar-thin">
           {queue.pieces.map((p) => {
             const st = statusText(p, queue);

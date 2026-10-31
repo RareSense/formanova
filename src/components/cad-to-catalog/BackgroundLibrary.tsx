@@ -1,13 +1,15 @@
 /**
  * Photo backgrounds, picked right in the Background step (no pop-up), in two
- * tabs as on Product Shot: FormaNova (the product-shot inspirations, by
- * category) and My own (the user's uploads: the same inspiration_photo library
- * Product Shot keeps, so a background added here is in Product Shot too).
+ * tabs as on Product Shot: My own first (the user's uploads: the same
+ * inspiration_photo library Product Shot keeps, so a background added here is in
+ * Product Shot too), then FormaNova (the product-shot inspirations, by category).
+ * Both are masonry grids, as in the photoshoot studio.
  * One click picks or unpicks; any number can be picked, each makes its own picture.
  */
 import { useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Diamond, Loader2 } from 'lucide-react';
+import { MasonryGrid } from '@/components/ui/masonry-grid';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
 import { fetchUserAssets, getAssetDisplayName } from '@/lib/assets-api';
@@ -28,14 +30,15 @@ export interface LibraryBackground {
 
 const TAB = 'h-8 font-mono text-[10px] uppercase tracking-[0.15em] data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=inactive]:text-muted-foreground';
 const NOTE = 'font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground text-center py-4';
-const GRID = 'grid grid-cols-3 gap-1.5 max-h-60 overflow-y-auto pr-1 scrollbar-thin';
+const SCROLL = 'max-h-72 overflow-y-auto pr-1 scrollbar-thin';
+const GAP = 6;
 
 function Thumb({ item, on, disabled, onToggle }: { item: LibraryBackground; on: boolean; disabled: boolean; onToggle: () => void }) {
   const src = useAuthenticatedImage(item.url);
   return (
     <button type="button" disabled={disabled} onClick={onToggle} title={item.name} aria-pressed={on}
-      className={`relative aspect-square border overflow-hidden bg-muted/20 ${on ? 'border-foreground ring-1 ring-foreground' : 'border-border hover:border-foreground/40'}`}>
-      {src ? <img src={src} alt="" className="absolute inset-0 w-full h-full object-cover" /> : <Loader2 className="absolute inset-0 m-auto w-4 h-4 animate-spin text-muted-foreground/50" />}
+      className={`relative block w-full border overflow-hidden bg-muted/20 ${on ? 'border-foreground ring-1 ring-foreground' : 'border-border hover:border-foreground/40'}`}>
+      {src ? <img src={src} alt="" className="block w-full h-auto" /> : <span className="flex aspect-[3/4] items-center justify-center"><Loader2 className="w-4 h-4 animate-spin text-muted-foreground/50" /></span>}
       {on && <span className="absolute top-1 right-1 w-4 h-4 bg-foreground text-background flex items-center justify-center"><Check className="w-3 h-3" /></span>}
     </button>
   );
@@ -94,7 +97,7 @@ export default function BackgroundLibrary({ chosen, onToggle, disabled, onError 
     <button type="button" disabled={disabled || uploading > 0} onClick={() => fileInput.current?.click()}
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => { e.preventDefault(); if (e.dataTransfer.files.length) void upload(e.dataTransfer.files); }}
-      className={`${big ? 'w-full py-8' : 'aspect-square'} border border-dashed border-border flex flex-col items-center justify-center gap-2 px-4 hover:bg-accent/20 disabled:opacity-50`}>
+      className={`w-full ${big ? 'py-8' : 'aspect-[3/4]'} border border-dashed border-border flex flex-col items-center justify-center gap-2 px-4 hover:bg-accent/20 disabled:opacity-50`}>
       {uploading ? <Loader2 className="h-9 w-9 animate-spin text-primary" /> : <Diamond className="h-9 w-9 text-primary" />}
       <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground text-center">
         {uploading ? 'Uploading…' : big ? 'Upload backgrounds' : 'Upload'}
@@ -103,10 +106,10 @@ export default function BackgroundLibrary({ chosen, onToggle, disabled, onError 
   );
 
   return (
-    <Tabs defaultValue="formanova" className="space-y-2">
+    <Tabs defaultValue="own" className="space-y-2">
       <TabsList className="w-full grid grid-cols-2 h-9 bg-muted/30">
-        <TabsTrigger value="formanova" className={TAB}>FormaNova</TabsTrigger>
         <TabsTrigger value="own" className={TAB}>My own</TabsTrigger>
+        <TabsTrigger value="formanova" className={TAB}>FormaNova</TabsTrigger>
       </TabsList>
 
       <TabsContent value="formanova" className="mt-0 space-y-2">
@@ -125,8 +128,10 @@ export default function BackgroundLibrary({ chosen, onToggle, disabled, onError 
                   ))}
                 </div>
               )}
-              <div className={GRID}>
-                {libraryItems.map((b) => <Thumb key={b.id} item={b} on={chosen.has(b.id)} disabled={disabled} onToggle={() => onToggle(b)} />)}
+              <div className={SCROLL}>
+                <MasonryGrid key={activeCategory?.id} columns={2} gap={GAP}>
+                  {libraryItems.map((b) => <Thumb key={b.id} item={b} on={chosen.has(b.id)} disabled={disabled} onToggle={() => onToggle(b)} />)}
+                </MasonryGrid>
               </div>
             </>
           )}
@@ -136,9 +141,11 @@ export default function BackgroundLibrary({ chosen, onToggle, disabled, onError 
         {own.isLoading ? <p className={NOTE}><Loader2 className="w-4 h-4 animate-spin mx-auto" /></p>
           : !ownItems.length ? uploadButton(true)
           : (
-            <div className={GRID}>
-              {uploadButton(false)}
-              {ownItems.map((b) => <Thumb key={b.id} item={b} on={chosen.has(b.id)} disabled={disabled} onToggle={() => onToggle(b)} />)}
+            <div className={SCROLL}>
+              <MasonryGrid columns={2} gap={GAP}>
+                {uploadButton(false)}
+                {ownItems.map((b) => <Thumb key={b.id} item={b} on={chosen.has(b.id)} disabled={disabled} onToggle={() => onToggle(b)} />)}
+              </MasonryGrid>
             </div>
           )}
         <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp,image/heic,image/heif" multiple hidden
