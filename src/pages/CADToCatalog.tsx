@@ -60,6 +60,7 @@ export default function CADToCatalog() {
   const [anglesVersion, setAnglesVersion] = useState(0);
   const [downloading, setDownloading] = useState(false);
   const [price, setPrice] = useState<number | null>(null);
+  const [angleThumbs, setAngleThumbs] = useState<Record<string, string>>({});
 
   // Credits per picture (white or photo) at the chosen size: the backend's price list, else the fallback.
   useEffect(() => {
@@ -82,6 +83,21 @@ export default function CADToCatalog() {
   const totalPictures = shoot.queue.pieces.reduce((n, p) => n + perPictures(p.category), 0);
   const totalCredits = price !== null ? shootCredits(countShoot(shoot.queue.pieces, settings, anglesOf), price) : null;
   const perPiece = { pictures: category ? perPictures(category) : 0, photos: [...chosenBg].filter(isPhoto).length };
+
+  // A small picture per angle of the open piece, remade when the piece, its type or its angles change.
+  const angleKey = category ? `${shoot.openId}|${listFor(category).map((a) => `${a.name}:${a.dir}:${a.dist ?? 1}`).join(',')}` : '';
+  useEffect(() => {
+    if (!engine || !category || !view.ready || !view.parts.length || shoot.queue.running) return;
+    let cancelled = false;
+    const list = listFor(category);
+    engine.angleThumbs(list).then((blobs) => {
+      if (cancelled) return;
+      const urls = blobs.map((b) => URL.createObjectURL(b));
+      // Swap in the new set, then free the old one (freeing first would flash broken tiles).
+      setAngleThumbs((old) => { Object.values(old).forEach((u) => URL.revokeObjectURL(u)); return Object.fromEntries(list.map((a, i) => [a.name, urls[i]])); });
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [angleKey, view.ready]); // eslint-disable-line react-hooks/exhaustive-deps -- angleKey stands for engine/category/angles/the open piece; excluding the objects avoids remaking on every render. Watch for: stale tiles if an input is left out of angleKey.
 
   if (!isCadToCatalogEnabled(user?.email)) return <Navigate to="/dashboard" replace />;
 
@@ -147,6 +163,7 @@ export default function CADToCatalog() {
           angles={category ? listFor(category) : []}
           skipped={skipped}
           onToggleAngle={(name) => setSkipped((s) => toggle(s, name))}
+          angleThumbs={angleThumbs}
           onGoToAngle={(a) => engine?.applyAngle(a)}
           onAddView={() => {
             if (!engine || !category) return;

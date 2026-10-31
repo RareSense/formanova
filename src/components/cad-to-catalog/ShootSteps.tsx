@@ -26,6 +26,8 @@ interface Props {
   skipped: Set<string>;
   onToggleAngle: (name: string) => void;
   onGoToAngle: (a: PlannedAngle) => void;
+  /** Small pictures of the open piece from each angle, by angle name. */
+  angleThumbs: Record<string, string>;
   onAddView: () => void;
   ownAngles: boolean;
   anglesChanged: boolean;
@@ -81,13 +83,17 @@ export default function ShootSteps(p: Props) {
 
       <div className="space-y-2">
         <h3 className={STEP}><span className={NUM}>2</span>Angles</h3>
-        <div className="grid grid-cols-2 gap-1.5">
+        {/* As in the CAD to Pictures tool: a picture per angle; click it to look from there, tick to shoot it. */}
+        <div className="grid grid-cols-3 gap-1.5">
           {p.angles.map((a) => {
             const on = !p.skipped.has(a.name);
             return (
-              <div key={a.name} className={CHIP(on)}>
-                <button type="button" disabled={disabled} onClick={() => p.onToggleAngle(a.name)} aria-label={`${on ? 'Skip' : 'Shoot'} ${a.name}`} className={TICK(on)}>{on && <Check className="w-3 h-3" />}</button>
-                <button type="button" disabled={disabled} onClick={() => p.onGoToAngle(a)} className="flex-1 min-w-0 truncate text-left" title={`Look from ${a.name}`}>{a.name}</button>
+              <div key={a.name} className={`relative border ${on ? 'border-foreground' : 'border-border'}`}>
+                <button type="button" disabled={disabled} onClick={() => p.onGoToAngle(a)} title={`Look from ${a.name}`} className="block w-full aspect-square bg-white">
+                  {p.angleThumbs[a.name] && <img src={p.angleThumbs[a.name]} alt="" className="w-full h-full object-contain" />}
+                </button>
+                <button type="button" disabled={disabled} onClick={() => p.onToggleAngle(a.name)} aria-label={`${on ? 'Skip' : 'Shoot'} ${a.name}`} className={`absolute top-1 right-1 bg-card ${TICK(on)}`}>{on && <Check className="w-3 h-3" />}</button>
+                <span className="block px-1 py-0.5 border-t border-border font-mono text-[8px] uppercase truncate">{a.name}</span>
               </div>
             );
           })}
