@@ -112,7 +112,9 @@ async function read3dm(buffer: ArrayBuffer): Promise<RhinoReport> {
     };
     objects.set(a.id, rec);
     if (g.objectType === rhino.ObjectType.InstanceReference) refs.push({ ...rec, idef: g.parentIdefId });
-    if (g.objectType === rhino.ObjectType.Brep) {
+    // Only shown parts count: construction objects on switched-off layers often have no
+    // display mesh, and Rhino does not draw them either.
+    if (!rec.hidden && g.objectType === rhino.ObjectType.Brep) {
       const faces = g.faces();
       let all = faces.count > 0;
       for (let f = 0; f < faces.count && all; f++) {
@@ -123,7 +125,7 @@ async function read3dm(buffer: ArrayBuffer): Promise<RhinoReport> {
       }
       faces.delete();
       if (!all) { noMesh++; noMeshNames.push(rec.name || `Surface ${i + 1}`); }
-    } else if (g.objectType === rhino.ObjectType.Extrusion) {
+    } else if (!rec.hidden && g.objectType === rhino.ObjectType.Extrusion) {
       const m = g.getMesh(rhino.MeshType.Any);
       if (m) m.delete(); else { noMesh++; noMeshNames.push(rec.name || `Surface ${i + 1}`); }
     }
