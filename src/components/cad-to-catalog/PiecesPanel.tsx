@@ -40,10 +40,12 @@ export default function PiecesPanel({ queue, openId, onFiles, onOpen, onRemove, 
 
   return (
     <section aria-label="Pieces" className="flex flex-col shrink-0">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <span className="font-display text-base tracking-[0.12em] uppercase text-foreground">Pieces</span>
-        <span className="font-mono text-[10px] text-muted-foreground">{queue.pieces.length}</span>
-      </div>
+      {queue.pieces.length > 0 && (
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <span className="font-display text-base tracking-[0.12em] uppercase text-foreground">Pieces</span>
+          <span className="font-mono text-[10px] text-muted-foreground">{queue.pieces.length}</span>
+        </div>
+      )}
       <div className="flex gap-1.5 px-4 pt-3">
         <button type="button" onClick={() => files.current?.click()} className="flex-1 h-9 px-4 flex items-center justify-center gap-1.5 bg-formanova-hero-accent text-primary-foreground font-mono text-[10px] uppercase tracking-[0.15em]">
           <Plus className="w-3.5 h-3.5" /> Add CAD files

@@ -3,7 +3,7 @@
  * tabs as on Product Shot: My own first (the user's uploads: the same
  * inspiration_photo library Product Shot keeps, so a background added here is in
  * Product Shot too), then FormaNova (the product-shot inspirations, by category).
- * Both are masonry grids, as in the photoshoot studio.
+ * Both are three-column masonry, laid out as in the photoshoot studio.
  * One click picks or unpicks; any number can be picked, each makes its own picture.
  */
 import { useRef, useState } from 'react';
@@ -117,23 +117,25 @@ export default function BackgroundLibrary({ chosen, onToggle, disabled, onError 
           : library.isError ? <p className={NOTE}>Library unavailable</p>
           : !categories.length ? <p className={NOTE}>No backgrounds yet</p>
           : (
-            <>
-              {categories.length > 1 && (
-                <div className="flex gap-1.5 overflow-x-auto scrollbar-thin pb-1">
-                  {categories.map((c) => (
-                    <button key={c.id} type="button" onClick={() => setCategory(c.id)}
-                      className={`shrink-0 h-7 px-3 font-mono text-[9px] uppercase tracking-[0.12em] border ${c.id === activeCategory?.id ? 'bg-foreground text-background border-foreground' : 'border-border text-muted-foreground hover:text-foreground'}`}>
-                      {c.label}
+            // As the photoshoot studio's FormaNova tab: CSS columns, the category buttons
+            // at the top of the first column and the pictures flowing after them.
+            <div className={SCROLL}>
+              <div className="columns-3 gap-1.5">
+                {categories.map((c) => (
+                  <div key={c.id} className="break-inside-avoid mb-1.5">
+                    <button type="button" onClick={() => setCategory(c.id)}
+                      className={`w-full px-2 py-2.5 text-center transition-colors ${c.id === activeCategory?.id ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground hover:bg-foreground/5'}`}>
+                      <span className="block font-mono text-[9px] uppercase tracking-[0.12em] leading-tight">{c.label}</span>
                     </button>
-                  ))}
-                </div>
-              )}
-              <div className={SCROLL}>
-                <MasonryGrid key={activeCategory?.id} columns={2} gap={GAP}>
-                  {libraryItems.map((b) => <Thumb key={b.id} item={b} on={chosen.has(b.id)} disabled={disabled} onToggle={() => onToggle(b)} />)}
-                </MasonryGrid>
+                  </div>
+                ))}
+                {libraryItems.map((b) => (
+                  <div key={b.id} className="break-inside-avoid mb-1.5">
+                    <Thumb item={b} on={chosen.has(b.id)} disabled={disabled} onToggle={() => onToggle(b)} />
+                  </div>
+                ))}
               </div>
-            </>
+            </div>
           )}
       </TabsContent>
 
@@ -142,7 +144,7 @@ export default function BackgroundLibrary({ chosen, onToggle, disabled, onError 
           : !ownItems.length ? uploadButton(true)
           : (
             <div className={SCROLL}>
-              <MasonryGrid columns={2} gap={GAP}>
+              <MasonryGrid columns={3} gap={GAP}>
                 {uploadButton(false)}
                 {ownItems.map((b) => <Thumb key={b.id} item={b} on={chosen.has(b.id)} disabled={disabled} onToggle={() => onToggle(b)} />)}
               </MasonryGrid>
