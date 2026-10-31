@@ -16,7 +16,7 @@ export interface Angle {
 
 /** Room around the piece: 1 = touching the frame; 1.5 leaves it about two-thirds of the picture. */
 export const FIT_MARGIN = 1.5;
-/** The picture is the centred square of the view, at 94% of its short side. */
+/** The picture box is centred in the view and fills 94% of it on its limiting side. */
 export const FRAME_SHARE = 0.94;
 
 interface View {
@@ -24,13 +24,17 @@ interface View {
   controls: OrbitControls;
   holder: THREE.Object3D;
   viewSize(): [number, number];
+  /** Width / height of the pictures being made (1 = square, the default). */
+  pictureAspect?: number;
 }
 
-/** The picture box inside the view (x, y from the top left, in CSS px). */
+/** The picture box inside the view (x, y from the top left, in CSS px), in the picture's shape. */
 export function frameRect(v: View) {
   const [w, h] = v.viewSize();
-  const s = Math.min(w, h) * FRAME_SHARE;
-  return { x: (w - s) / 2, y: (h - s) / 2, w: s, h: s };
+  const a = v.pictureAspect || 1;
+  const bw = Math.min(w, h * a) * FRAME_SHARE;
+  const bh = bw / a;
+  return { x: (w - bw) / 2, y: (h - bh) / 2, w: bw, h: bh };
 }
 
 const sphere = (v: View) => new THREE.Box3().setFromObject(v.holder).getBoundingSphere(new THREE.Sphere());
@@ -39,7 +43,7 @@ const sphere = (v: View) => new THREE.Box3().setFromObject(v.holder).getBounding
 export function fitDistance(v: View, radius: number, focal: number) {
   const k = frameRect(v).h / v.viewSize()[1];
   const fov = 2 * Math.atan(v.camera.getFilmHeight() / 2 / focal * k);
-  const hfov = 2 * Math.atan(Math.tan(fov / 2) * 1); // the box is square
+  const hfov = 2 * Math.atan(Math.tan(fov / 2) * (v.pictureAspect || 1)); // the box's width, by its shape
   return radius / Math.sin(Math.min(fov, hfov) / 2) * FIT_MARGIN;
 }
 
