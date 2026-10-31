@@ -6,7 +6,6 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { CadWorkspaceLayout } from '@/components/text-to-cad/CadWorkspaceLayout';
 import { CADRuntimeErrorBoundary } from '@/components/cad/CADRuntimeErrorBoundary';
@@ -20,10 +19,8 @@ import BackgroundLibrary, { type LibraryBackground } from '@/components/cad-to-c
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import type { CatalogEngine } from '@/components/cad-to-catalog/engine/engine';
 import type { FileEntry } from '@/components/cad-to-catalog/engine/package';
-import { useAuth } from '@/contexts/AuthContext';
 import { useCadBreakpoint } from '@/hooks/use-cad-breakpoint';
 import { useCatalogShoot } from '@/hooks/useCatalogShoot';
-import { isCadToCatalogEnabled } from '@/lib/feature-flags';
 import { trackCatalogShootStarted, trackDownloadClicked, trackPaywallHit } from '@/lib/posthog-events';
 import { CATALOG_FALLBACK_PRICES, shootCredits, type CatalogAspect, type CatalogResolution } from '@/lib/cad-to-catalog-api';
 import { blobToDataUrl, picturePrice } from '@/lib/cad-to-catalog-run';
@@ -42,7 +39,6 @@ function save(blob: Blob, name: string) {
 }
 
 export default function CADToCatalog() {
-  const { user } = useAuth();
   const mode = useCadBreakpoint();
   const [engine, setEngine] = useState<CatalogEngine | null>(null);
   const notice = useCallback((m: string, err?: boolean) => (err ? toast.error(m) : toast(m)), []);
@@ -108,8 +104,6 @@ export default function CADToCatalog() {
     }).catch(() => {});
     return () => { cancelled = true; };
   }, [angleKey, view.ready]); // eslint-disable-line react-hooks/exhaustive-deps -- angleKey stands for engine/category/angles/the open piece; excluding the objects avoids remaking on every render. Watch for: stale tiles if an input is left out of angleKey.
-
-  if (!isCadToCatalogEnabled(user?.email)) return <Navigate to="/dashboard" replace />;
 
   const addFiles = (entries: FileEntry[]) => {
     const fresh = shoot.addFiles(entries);
