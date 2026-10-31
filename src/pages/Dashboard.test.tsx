@@ -129,13 +129,13 @@ describe('Dashboard as the merged studio hub', () => {
     expect(continueButtons).toHaveLength(5);
   });
 
-  it('puts Catalog from CAD under Photography for whoever the page is open to', () => {
+  it('puts Product Shot from CAD under Photography for whoever the page is open to', () => {
     vi.stubEnv('VITE_CAD_TO_CATALOG_ALLOWLIST_EMAILS', '*');
     try {
       const el = renderDashboard();
       const photography = el.querySelector('section[aria-labelledby="dashboard-photography"]');
-      expect(photography?.textContent).toContain('Catalog from CAD');
-      expect(el.querySelector('section[aria-labelledby="dashboard-cad"]')?.textContent).not.toContain('Catalog from CAD');
+      expect(photography?.textContent).toContain('Product Shot from CAD');
+      expect(el.querySelector('section[aria-labelledby="dashboard-cad"]')?.textContent).not.toContain('Product Shot from CAD');
       const continueButtons = Array.from(el.querySelectorAll('button')).filter((node) => node.textContent?.includes('Continue'));
       expect(continueButtons).toHaveLength(6);
     } finally {

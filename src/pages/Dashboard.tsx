@@ -44,7 +44,7 @@ type Workflow = {
   image?: string;
   /** CAD cards: what goes in and the CAD it becomes, drawn in theme colours. */
   story?: CadStory;
-  /** Catalog from CAD: the CAD and the catalog photo it becomes. */
+  /** Product Shot from CAD: the CAD and the product photo it becomes. */
   catalogStory?: CatalogStory;
   /** Photography still passes through the first-run effort chooser. */
   usesEffortIntro?: boolean;
@@ -76,10 +76,10 @@ const photographyWorkflows: Workflow[] = [
   },
 ];
 
-// Photography's third card; shown to whoever the Catalog from CAD page is open to.
+// Photography's third card; shown to whoever the Product Shot from CAD page is open to.
 const catalogWorkflow: Workflow = {
-  title: 'Catalog from CAD',
-  description: 'Turn your CAD files into catalog pictures.',
+  title: 'Product Shot from CAD',
+  description: 'Turn your CAD files into product pictures.',
   route: '/cad-to-catalog',
   icon: Camera,
   catalogStory: { cad: { shade: solitaireShade, metal: solitaireMetal, gems: solitaireGems }, photo: productShotImg },

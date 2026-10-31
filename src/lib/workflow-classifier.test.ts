@@ -15,11 +15,11 @@ describe('workflow classification', () => {
     expect(inferSourceType('sketch_generate_v1')).toBe('image_to_cad');
   });
 
-  it('labels Catalog from CAD runs and reopens their page, in the CAD render section', () => {
-    for (const name of ['cad_to_catalog_place_v1', 'cad_to_catalog_save_v1']) {
+  it('labels Product Shot from CAD runs and reopens their page, in the CAD render section', () => {
+    for (const name of ['cad_to_catalog_shot', 'cad_to_catalog_fastload']) {
       const meta = classifyWorkflow(name);
       expect(meta.sourceType).toBe('cad_render');
-      expect(meta.label).toBe('Catalog from CAD');
+      expect(meta.label).toBe('Product Shot from CAD');
       expect(meta.loadRoute).toBe('/cad-to-catalog');
     }
     // The section title of every other CAD render run stays as it was.
