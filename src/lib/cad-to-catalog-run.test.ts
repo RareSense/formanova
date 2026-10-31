@@ -30,9 +30,9 @@ beforeEach(() => mockAuthFetch.mockReset());
 describe('startCatalogRun', () => {
   it('POSTs the body to the workflow and returns the run id', async () => {
     mockAuthFetch.mockResolvedValueOnce(json(202, { workflow_id: 'wf_1' }));
-    await expect(startCatalogRun('cad_to_catalog_place_v1', { payload: { a: 1 } })).resolves.toBe('wf_1');
+    await expect(startCatalogRun('cad_to_catalog_shot', { payload: { a: 1 } })).resolves.toBe('wf_1');
     const [url, init] = mockAuthFetch.mock.calls[0];
-    expect(url).toBe('/api/run/state/cad_to_catalog_place_v1');
+    expect(url).toBe('/api/run/state/cad_to_catalog_shot');
     expect(JSON.parse(init.body)).toEqual({ payload: { a: 1 } });
   });
 
@@ -107,19 +107,27 @@ describe('placeOnBackground / savePictures', () => {
 });
 
 describe('picturePrice', () => {
-  it("asks the backend's estimate for that workflow at that size", async () => {
-    mockAuthFetch.mockResolvedValueOnce(json(200, { projected_max_hold: 31 }));
-    expect(await picturePrice('place', '2K')).toBe(31);
-    const body = JSON.parse(mockAuthFetch.mock.calls[0][1].body);
-    expect(body).toEqual({ workflow_name: 'cad_to_catalog_place_v1', num_variations: 1, pricing_context: { resolution: '2K' } });
+  it("reads the shot workflow's price list for that size", async () => {
+    mockAuthFetch.mockResolvedValueOnce(json(200, { policy: { conditional_pricing_rules: [{ tool: 't', when: { resolution: '2K' }, cost: 36 }] } }));
+    expect(await picturePrice('2K')).toBe(36);
+    expect(mockAuthFetch.mock.calls[0][0]).toBe('/api/credits/policy/cad_to_catalog_shot');
   });
 
-  it('falls back to the page prices when the estimate is missing, zero or fails', async () => {
-    mockAuthFetch.mockResolvedValueOnce(json(200, { projected_max_hold: 0 }));
-    expect(await picturePrice('save', '4K')).toBe(10);
+  it('falls back to the page prices when the price list is missing or fails', async () => {
+    mockAuthFetch.mockResolvedValueOnce(json(200, { policy: {} }));
+    expect(await picturePrice('4K')).toBe(48);
     mockAuthFetch.mockResolvedValueOnce(json(500, {}));
-    expect(await picturePrice('place', '1K')).toBe(24);
+    expect(await picturePrice('1K')).toBe(24);
     mockAuthFetch.mockRejectedValueOnce(new Error('offline'));
-    expect(await picturePrice('save', '1K')).toBe(4);
+    expect(await picturePrice('2K')).toBe(36);
+  });
+
+  it('sends both kinds of picture to the one shot workflow', async () => {
+    mockAuthFetch.mockResolvedValue(json(500, { detail: 'stop here' }));
+    await expect(savePictures('a.3dm', 'ring', [{ name: 'x', angle: 'Front', metal: null, image: PNG }], undefined, '1K')).rejects.toThrow();
+    await expect(placeOnBackground({ render: PNG, background: PNG, materials: '', aspect: '1:1', resolution: '1K' })).rejects.toThrow();
+    const urls = mockAuthFetch.mock.calls.map((c) => c[0]);
+    expect(urls).toEqual(['/api/run/state/cad_to_catalog_shot', '/api/run/state/cad_to_catalog_shot']);
+    mockAuthFetch.mockReset();
   });
 });

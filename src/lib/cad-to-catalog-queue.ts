@@ -7,7 +7,7 @@
  *
  * A picture is one angle x one metal x one background. White / transparent
  * pictures are drawn in the browser; a photo background is drawn transparent
- * and then placed by the cad_to_catalog_place_v1 workflow.
+ * and then placed by the cad_to_catalog_place workflow.
  */
 
 export type JewelryCategory = 'ring' | 'earring' | 'pendant' | 'necklace' | 'bracelet' | 'other';

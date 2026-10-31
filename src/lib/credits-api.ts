@@ -37,6 +37,12 @@ export const TOOL_COSTS: Record<string, number> = {
   // used if /credits/estimate fails, so keep it at the highest current hold instead
   // of the removed legacy static 10/13/18 table.
   human_fix_photoshoot: 44,
+  // Product Shot from CAD: one picture (white or photo) per run; the backend policy
+  // prices it by resolution, 24 / 36 / 48 for 1K / 2K / 4K. The page reads that list
+  // (cad-to-catalog-run picturePrice); this key is the gate's last resort, at the
+  // max tier so it never under-quotes. Opening a large .3dm is free.
+  cad_to_catalog_shot: 48,
+  cad_to_catalog_fastload: 0,
   // One design picture (new design, edit, regenerate or angle); the backend
   // policy design_image_v1 charges the same fixed amount.
   design_image_v1: DESIGN_IMAGE_CREDITS,

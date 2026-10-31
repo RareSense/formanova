@@ -140,9 +140,9 @@ describe('useCreditPreflight.checkCreditsFor', () => {
     mockPreflightFor.mockResolvedValueOnce({ approved: false, estimatedCredits: 120, currentBalance: 40 });
     const { result } = renderHook(() => useCreditPreflight(), { wrapper });
     let ok: boolean | undefined;
-    await act(async () => { ok = await result.current.checkCreditsFor(120, 'cad_to_catalog_place_v1'); });
+    await act(async () => { ok = await result.current.checkCreditsFor(120, 'cad_to_catalog_shot'); });
     expect(ok).toBe(false);
     expect(mockPreflightFor).toHaveBeenCalledWith(120);
-    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/credits', { state: { requiredCredits: 120, workflowName: 'cad_to_catalog_place_v1' } }));
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/credits', { state: { requiredCredits: 120, workflowName: 'cad_to_catalog_shot' } }));
   });
 });
