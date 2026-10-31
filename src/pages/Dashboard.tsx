@@ -8,7 +8,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { usePrefetchGenerations } from '@/hooks/use-prefetch-generations';
 import { useShopifyStatus } from '@/hooks/useShopify';
 import { trackStudioTypeSelected } from '@/lib/posthog-events';
-import { isCadToCatalogEnabled } from '@/lib/feature-flags';
 
 import { PeopleIcon } from '@/components/icons/PeopleIcon';
 import { RingIcon } from '@/components/icons/RingIcon';
@@ -264,7 +263,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   const { refetch: refetchShopifyStatus } = useShopifyStatus();
   const userName = user?.email ? user.email.split('@')[0] : '';
-  const photography = isCadToCatalogEnabled(user?.email) ? [...photographyWorkflows, catalogWorkflow] : photographyWorkflows;
+  const photography = [...photographyWorkflows, catalogWorkflow];
   const threeEach = photography.length === 3;
 
   // First-run effort chooser, shown on the photography cards before category
