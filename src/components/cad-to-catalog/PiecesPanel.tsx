@@ -62,7 +62,7 @@ export default function PiecesPanel({ queue, openId, onFiles, onOpen, onRemove, 
             const st = statusText(p, queue);
             const open = p.id === openId;
             const busy = queue.running && p.status !== 'waiting' && p.status !== 'done';
-            const thumb = queue.pictures.find((x) => x.pieceId === p.id && x.status === 'done' && x.background === 'white')?.url;
+            const thumb = p.thumb ?? queue.pictures.find((x) => x.pieceId === p.id && x.status === 'done' && x.background === 'white')?.url;
             return (
               <li key={p.id} className={`flex items-start gap-2.5 p-2 border ${open ? 'border-foreground bg-accent/30' : 'border-border'}`}>
                 <button type="button" disabled={queue.running} onClick={() => onOpen(p.id)} aria-label={`Open ${p.name}`}

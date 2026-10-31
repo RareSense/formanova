@@ -39,7 +39,9 @@ export class CatalogEngine {
   private history: Snapshot[] = [];
   private future: Snapshot[] = [];
   private glows: THREE.Mesh[] = [];
-  private glowMat = new THREE.MeshBasicMaterial({ color: 0x1565ff, transparent: true, opacity: 0.6, depthWrite: false, depthFunc: THREE.LessEqualDepth, toneMapped: false });
+  // polygonOffset draws the highlight a hair in front of its part: drawn at exactly the same
+  // depth the two fought frame to frame, and the selected part flickered.
+  private glowMat = new THREE.MeshBasicMaterial({ color: 0x1565ff, transparent: true, opacity: 0.6, depthWrite: false, depthFunc: THREE.LessEqualDepth, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   private needsRender = true;
   private busy = false;
   private moving = false;
@@ -162,6 +164,8 @@ export class CatalogEngine {
   }
 
   get hasModel() { return !!this.model; }
+  /** Lighting and gem environment loaded, so a picture comes out right. */
+  get isReady() { return this.look.ready; }
 
   clear() {
     if (!this.model) return;
