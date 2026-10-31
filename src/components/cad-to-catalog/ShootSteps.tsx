@@ -1,32 +1,21 @@
 /**
  * The shoot settings, in the tool's order: 1 jewellery type (of the open
- * piece), 2 angles, 3 metals, 4 backgrounds, 5 picture size (and shape, for
- * photo backgrounds); then Shoot, with what the shoot costs.
+ * piece), 2 angles, 3 metals, 4 backgrounds, 5 picture size, 6 aspect ratio
+ * (photo backgrounds); then Shoot, with what the shoot costs.
  * They apply to every piece; each piece uses its own type's angles.
  */
-import { Check, Images, Pause, Play, Plus, Square } from 'lucide-react';
-import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
-import { CATALOG_ASPECTS, CATALOG_RESOLUTIONS, type CatalogAspect, type CatalogResolution } from '@/lib/cad-to-catalog-api';
+import type { ReactNode } from 'react';
+import { Check, Pause, Play, Plus, Square } from 'lucide-react';
+import creditCoinIcon from '@/assets/icons/credit-coin.png';
+import { CATALOG_RESOLUTIONS, type CatalogAspect, type CatalogResolution } from '@/lib/cad-to-catalog-api';
 import { CATEGORIES, CATEGORY_LABEL, type BackgroundId, type JewelryCategory, type PlannedAngle } from '@/lib/cad-to-catalog-queue';
 import { METALS } from './engine/materials';
-
-export interface BackgroundOption {
-  id: BackgroundId;
-  name: string;
-  /** A CSS background for white / transparent; the image URL for a photo (may need the sign-in token). */
-  thumb: string;
-}
-
-function BackgroundThumb({ b }: { b: BackgroundOption }) {
-  const plain = b.id === 'white' || b.id === 'transparent';
-  const src = useAuthenticatedImage(plain ? null : b.thumb);
-  if (plain) return <span className="absolute inset-0" style={{ background: b.thumb }} />;
-  return src ? <img src={src} alt="" className="absolute inset-0 w-full h-full object-cover" /> : <span className="absolute inset-0 bg-muted/30" />;
-}
 
 const STEP = 'font-display text-sm tracking-[0.15em] uppercase font-bold flex items-center gap-2';
 const NUM = 'w-5 h-5 flex items-center justify-center border border-foreground font-mono text-[10px]';
 const TICK = (on: boolean) => `w-4 h-4 flex items-center justify-center border ${on ? 'bg-foreground border-foreground text-background' : 'border-border'}`;
+/** The CAD to Pictures tool's shapes. */
+const SHAPES: CatalogAspect[] = ['1:1', '4:5', '3:4', '2:3', '16:9', '9:16'];
 const RESOLUTION_LABEL: Record<CatalogResolution, string> = { '1K': 'Standard HD', '2K': 'High Res', '4K': 'Ultra HD' };
 const CHIP = (on: boolean) => `flex items-center gap-2 px-2.5 py-2 border text-left font-mono text-[10px] transition-colors ${on ? 'border-foreground bg-accent/40' : 'border-border hover:bg-accent/20'}`;
 
@@ -44,11 +33,12 @@ interface Props {
   onResetAngles: () => void;
   metals: Set<string>;
   onToggleMetal: (name: string) => void;
-  backgrounds: BackgroundOption[];
   chosenBackgrounds: Set<BackgroundId>;
   onToggleBackground: (id: BackgroundId) => void;
-  /** Opens the background library (FormaNova library / My own). */
-  onOpenLibrary: () => void;
+  /** The photo backgrounds picker (FormaNova / My own), shown under White. */
+  photoPicker: ReactNode;
+  photoCount: number;
+  onClearPhotos: () => void;
   aspect: CatalogAspect;
   onAspect: (a: CatalogAspect) => void;
   resolution: CatalogResolution;
@@ -125,32 +115,28 @@ export default function ShootSteps(p: Props) {
             );
           })}
         </div>
-        {!p.metals.size && <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">None ticked: each piece keeps its own metal.</p>}
+        {!p.metals.size && <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">None: each piece keeps its own metal.</p>}
       </div>
 
       <div className="space-y-2">
         <h3 className={STEP}><span className={NUM}>4</span>Background</h3>
-        <div className="grid grid-cols-3 gap-1.5">
-          {p.backgrounds.map((b) => {
-            const on = p.chosenBackgrounds.has(b.id);
-            return (
-              <button key={b.id} type="button" disabled={disabled} onClick={() => p.onToggleBackground(b.id)} title={b.name} aria-pressed={on}
-                className={`relative aspect-square border overflow-hidden ${on ? 'border-foreground ring-1 ring-foreground' : 'border-border'}`}>
-                <BackgroundThumb b={b} />
-                <span className="absolute left-0 right-0 bottom-0 bg-card/85 px-1 py-0.5 font-mono text-[8px] uppercase truncate">{b.name}</span>
-                {on && <span className="absolute top-1 right-1 w-4 h-4 bg-foreground text-background flex items-center justify-center"><Check className="w-3 h-3" /></span>}
-              </button>
-            );
-          })}
-          <button type="button" disabled={disabled} onClick={p.onOpenLibrary} className="aspect-square border border-dashed border-border flex flex-col items-center justify-center gap-1 px-1 font-mono text-[8px] uppercase hover:bg-accent/20">
-            <Images className="w-4 h-4" /> Library
-          </button>
-        </div>
-        {photos && <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">Photo backgrounds are placed by AI.</p>}
+        <button type="button" disabled={disabled} onClick={() => p.onToggleBackground('white')} aria-pressed={p.chosenBackgrounds.has('white')}
+          className={`w-full ${CHIP(p.chosenBackgrounds.has('white'))}`}>
+          <span className={TICK(p.chosenBackgrounds.has('white'))}>{p.chosenBackgrounds.has('white') && <Check className="w-3 h-3" />}</span>
+          <span className="w-3 h-3 shrink-0 border border-border bg-white" />
+          <span>White</span>
+        </button>
+        {p.photoPicker}
+        {p.photoCount > 0 && (
+          <div className="flex items-center justify-between gap-2 font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">
+            <span>{p.photoCount} photo {p.photoCount === 1 ? 'background' : 'backgrounds'} · placed by AI</span>
+            <button type="button" disabled={disabled} onClick={p.onClearPhotos} className="h-7 px-3 border border-border hover:bg-accent/50">Clear</button>
+          </div>
+        )}
       </div>
 
       <div className="space-y-2">
-        <h3 className={STEP}><span className={NUM}>5</span>{photos ? 'Picture size & shape' : 'Picture size'}</h3>
+        <h3 className={STEP}><span className={NUM}>5</span>Picture size</h3>
           <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Resolution of the pictures">
             {CATALOG_RESOLUTIONS.map((r) => (
               <button key={r} type="button" role="radio" aria-checked={p.resolution === r} disabled={disabled} onClick={() => p.onResolution(r)}
@@ -160,23 +146,34 @@ export default function ShootSteps(p: Props) {
               </button>
             ))}
           </div>
-          {p.resolution === '4K' && <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">4K pictures take longer to make.</p>}
-          {photos && (
-            <select value={p.aspect} disabled={disabled} onChange={(e) => p.onAspect(e.target.value as CatalogAspect)} aria-label="Shape of the photo pictures" className="w-full h-9 px-2 bg-background border border-border font-mono text-[11px]">
-              {CATALOG_ASPECTS.map((a) => <option key={a} value={a}>{a}</option>)}
-            </select>
-          )}
+          {p.resolution === '4K' && <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">4K takes longer.</p>}
+      </div>
+
+      {/* As in the CAD to Pictures tool: always shown, one click; only photo pictures take the shape. */}
+      <div className="space-y-2">
+        <h3 className={STEP}><span className={NUM}>6</span>Aspect ratio</h3>
+        <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Aspect ratio of the photo pictures">
+          {SHAPES.map((a) => (
+            <button key={a} type="button" role="radio" aria-checked={p.aspect === a} disabled={disabled} onClick={() => p.onAspect(a)}
+              className={`h-9 px-4 border font-mono text-[11px] transition-colors disabled:opacity-40 ${p.aspect === a ? 'border-foreground bg-accent/40' : 'border-border hover:bg-accent/20'}`}>
+              {a}
+            </button>
+          ))}
+        </div>
+        {!photos && <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">For photo backgrounds; white stays square.</p>}
       </div>
 
       {!p.running ? (
         <div className="space-y-1.5 pt-1">
           <button type="button" disabled={!p.canShoot || p.pieceCount === 0} onClick={p.onShootAll}
-            className="w-full min-h-12 py-2 px-6 flex flex-col items-center justify-center gap-0.5 bg-formanova-hero-accent text-primary-foreground font-mono uppercase disabled:opacity-40">
-            <span className="text-[12px] tracking-[0.2em]">{p.pieceCount > 1 ? 'Shoot all' : 'Shoot'}</span>
-            <span className="text-[9px] tracking-[0.12em] opacity-90">
-              {p.pieceCount} {p.pieceCount === 1 ? 'piece' : 'pieces'} · {p.totalPictures} {p.totalPictures === 1 ? 'picture' : 'pictures'}
-              {p.totalCredits !== null && p.totalPictures > 0 && ` · ${p.totalCredits} credits`}
-            </span>
+            title={`${p.pieceCount} ${p.pieceCount === 1 ? 'piece' : 'pieces'}`}
+            className="w-full h-12 px-4 flex items-center justify-center gap-2 whitespace-nowrap bg-formanova-hero-accent text-primary-foreground font-mono text-[11px] uppercase tracking-[0.15em] disabled:opacity-40">
+            <span>{p.pieceCount > 1 ? 'Shoot all' : 'Shoot'} · {p.totalPictures} {p.totalPictures === 1 ? 'picture' : 'pictures'}</span>
+            {p.totalCredits !== null && p.totalPictures > 0 && (
+              <span className="flex items-center gap-1" aria-label={`${p.totalCredits} credits`}>
+                <img src={creditCoinIcon} alt="" className="w-4 h-4" />{p.totalCredits}
+              </span>
+            )}
           </button>
           {p.pieceCount > 1 && (
             <button type="button" disabled={!p.canShoot} onClick={p.onShootOpen} className="w-full h-9 px-6 border border-border font-mono text-[10px] uppercase tracking-[0.15em] hover:bg-accent/50 disabled:opacity-40">

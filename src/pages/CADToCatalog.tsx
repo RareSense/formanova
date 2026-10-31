@@ -15,7 +15,7 @@ import { useEngineState } from '@/components/cad-to-catalog/useEngineState';
 import PartsPanel from '@/components/cad-to-catalog/PartsPanel';
 import PiecesPanel from '@/components/cad-to-catalog/PiecesPanel';
 import PicturesStrip from '@/components/cad-to-catalog/PicturesStrip';
-import ShootSteps, { type BackgroundOption } from '@/components/cad-to-catalog/ShootSteps';
+import ShootSteps from '@/components/cad-to-catalog/ShootSteps';
 import BackgroundLibrary, { type LibraryBackground } from '@/components/cad-to-catalog/BackgroundLibrary';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import type { CatalogEngine } from '@/components/cad-to-catalog/engine/engine';
@@ -30,10 +30,6 @@ import { blobToDataUrl, picturePrice } from '@/lib/cad-to-catalog-run';
 import { anglesFor, hasOwnAngles, resetAngles, saveAngles } from '@/lib/cad-to-catalog-angles';
 import { countShoot, isPhoto, type BackgroundId, type JewelryCategory, type Picture, type PlannedAngle } from '@/lib/cad-to-catalog-queue';
 
-const PLAIN: BackgroundOption[] = [
-  { id: 'white', name: 'White', thumb: '#ffffff' },
-  { id: 'transparent', name: 'Transparent', thumb: 'repeating-conic-gradient(#e8e8e8 0% 25%, #ffffff 0% 50%) 50% / 12px 12px' },
-];
 
 function save(blob: Blob, name: string) {
   const a = document.createElement('a');
@@ -56,7 +52,6 @@ export default function CADToCatalog() {
   const [chosenBg, setChosenBg] = useState<Set<BackgroundId>>(new Set(['white']));
   // Photo backgrounds picked from the library, by id; each stays listed until unticked.
   const [photoBgs, setPhotoBgs] = useState<LibraryBackground[]>([]);
-  const [libraryOpen, setLibraryOpen] = useState(false);
   const bgData = useRef(new Map<string, Promise<string>>()); // each photo fetched once per visit
   const [aspect, setAspect] = useState<CatalogAspect>('1:1');
   const [resolution, setResolution] = useState<CatalogResolution>('1K');
@@ -82,7 +77,6 @@ export default function CADToCatalog() {
   // stay stale after "Save as default" or "Reset" if this dependency is ever dropped.
   const listFor = useCallback((c: JewelryCategory) => working[c] ?? anglesFor(c), [working, anglesVersion]); // eslint-disable-line react-hooks/exhaustive-deps -- see above
   const anglesOf = useCallback((c: JewelryCategory) => listFor(c).filter((a) => !skipped.has(a.name)), [listFor, skipped]);
-  const backgrounds = useMemo(() => [...PLAIN, ...photoBgs.map((b) => ({ id: b.id, name: b.name, thumb: b.url }))], [photoBgs]);
   const settings = { metals: [...metals], backgrounds: [...chosenBg], aspect, resolution };
   const perPictures = (c: JewelryCategory) => anglesOf(c).length * Math.max(1, metals.size) * chosenBg.size;
   const totalPictures = shoot.queue.pieces.reduce((n, p) => n + perPictures(p.category), 0);
@@ -94,7 +88,7 @@ export default function CADToCatalog() {
   const addFiles = (entries: FileEntry[]) => {
     const fresh = shoot.addFiles(entries);
     if (!fresh.length) {
-      if (!entries.some((e) => /\.(3dm|glb|gltf|step|stp|obj|ply|stl)$/i.test(e.file.name))) toast.error('No CAD file there. Product Shot from CAD opens 3DM, GLB, GLTF, STEP, OBJ, PLY and STL.');
+      if (!entries.some((e) => /\.(3dm|glb|gltf|step|stp|obj|ply|stl)$/i.test(e.file.name))) toast.error('Not a CAD file. Use 3DM, GLB, GLTF, STEP, OBJ, PLY or STL.');
       return;
     }
     if (fresh.length > 1) toast(`${fresh.length} pieces added`);
@@ -177,10 +171,11 @@ export default function CADToCatalog() {
           }}
           metals={metals}
           onToggleMetal={(m) => setMetals((s) => toggle(s, m))}
-          backgrounds={backgrounds}
           chosenBackgrounds={chosenBg}
           onToggleBackground={(id) => setChosenBg((s) => toggle(s, id))}
-          onOpenLibrary={() => setLibraryOpen(true)}
+          photoPicker={<BackgroundLibrary chosen={new Set(photoBgs.map((b) => b.id))} onToggle={toggleLibrary} disabled={shoot.queue.running} onError={(m) => toast.error(m)} />}
+          photoCount={photoBgs.length}
+          onClearPhotos={() => { setPhotoBgs([]); setChosenBg((s) => new Set([...s].filter((id) => !isPhoto(id)))); }}
           aspect={aspect}
           onAspect={setAspect}
           resolution={resolution}
@@ -245,14 +240,6 @@ export default function CADToCatalog() {
             </CatalogViewer>
           </CADRuntimeErrorBoundary>
         }
-      />
-      <BackgroundLibrary
-        open={libraryOpen}
-        onOpenChange={setLibraryOpen}
-        chosen={new Set(photoBgs.map((b) => b.id))}
-        onToggle={toggleLibrary}
-        disabled={shoot.queue.running}
-        onError={(m) => toast.error(m)}
       />
     </>
   );
