@@ -53,7 +53,7 @@ export const PLACE_POLL_INTERVAL_MS = 3000;
 export const PLACE_POLL_TIMEOUT_MS = 26 * 60 * 1000; // the tool allows 25 minutes (4K takes longest)
 export const SAVE_POLL_INTERVAL_MS = 2000;
 export const SAVE_POLL_TIMEOUT_MS = 3 * 60 * 1000;
-export const FASTLOAD_POLL_TIMEOUT_MS = 5 * 60 * 1000;
+export const FASTLOAD_POLL_TIMEOUT_MS = 11 * 60 * 1000; // the tool allows 10 minutes (meshing a big Rhino file takes ~5)
 export const MAX_SAVE_PICTURES = 64;
 
 export class CatalogRequestError extends Error {
