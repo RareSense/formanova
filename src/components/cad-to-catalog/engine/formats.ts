@@ -112,14 +112,17 @@ export async function loadCad(file: File, files: Map<string, File>, opts: LoadOp
 async function load3dm(file: File, manager: THREE.LoadingManager, info: LoadInfo, opts: LoadOptions): Promise<THREE.Object3D> {
   let data = await file.arrayBuffer();
   let fast: { skeleton: ArrayBuffer; meshes: PackedMeshes } | null = null;
-  if (data.byteLength > FASTLOAD_ABOVE && opts.fastload) {
-    opts.status?.('Preparing a large file…');
+  // The server also meshes shown surfaces saved without a display mesh ("Save small"),
+  // which a browser cannot draw, so such files go through it whatever their size.
+  const big = data.byteLength > FASTLOAD_ABOVE;
+  if (opts.fastload && (big || (await inspect3dm(data)).noMesh)) {
+    opts.status?.(big ? 'Preparing a large file…' : 'Meshing parts saved without a display mesh…');
     try {
       fast = await opts.fastload(data);
       data = fast.skeleton;
     } catch (e) {
       fast = null;
-      info.warnings.push(`Large-file preparation failed, opening the file directly: ${(e as Error).message}`);
+      info.warnings.push(`${big ? 'Large-file preparation' : 'Meshing'} failed, opening the file directly: ${(e as Error).message}`);
     }
   }
   let rh = await inspect3dm(data);
