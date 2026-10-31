@@ -12,6 +12,7 @@ import {
 } from '@/lib/posthog-events';
 import { pollWorkflow } from '@/lib/poll-workflow';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
+import { AUTH_STATE_CHANGE_EVENT, getStoredToken } from '@/lib/auth-api';
 import { markGenerationCompleted, markGenerationFailed } from '@/lib/generation-lifecycle';
 import { azureUriToUrl } from '@/lib/azure-utils';
 import type { PhotoshootResultResponse } from '@/lib/photoshoot-api';
@@ -426,6 +427,19 @@ export function GenerationsContextProvider({ children }: { children: React.React
   const controllers = useRef<Map<string, AbortController>>(new Map());
   const settledCadIds = useRef<Set<string>>(new Set());
   const reconcilingCadIds = useRef<Set<string>>(new Set());
+  // Runs restored from storage are only checked with a session: a protected call
+  // without a token redirects to /login, which reloads and restores them again,
+  // so the login page would reload forever. Checking starts once someone signs in.
+  const [signedIn, setSignedIn] = useState(() => !!getStoredToken());
+  useEffect(() => {
+    const sync = () => setSignedIn(!!getStoredToken());
+    window.addEventListener(AUTH_STATE_CHANGE_EVENT, sync);
+    window.addEventListener('storage', sync);
+    return () => {
+      window.removeEventListener(AUTH_STATE_CHANGE_EVENT, sync);
+      window.removeEventListener('storage', sync);
+    };
+  }, []);
   const { refreshCredits } = useCredits();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -805,6 +819,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
   // Reconcile independently of the long poll on an interval and whenever the
   // user returns to the tab.
   const reconcileCadGenerations = useCallback(async () => {
+    if (!getStoredToken()) return; // signed out: see signedIn above
     const runningCad = generationsRef.current.filter(g => g.kind === 'cad' && g.status === 'running');
     for (const gen of runningCad) {
       if (settledCadIds.current.has(gen.workflowId) || reconcilingCadIds.current.has(gen.workflowId)) continue;
@@ -908,16 +923,17 @@ export function GenerationsContextProvider({ children }: { children: React.React
     window.addEventListener('focus', reconcileOnReturn);
     window.addEventListener('online', reconcileOnReturn);
     document.addEventListener('visibilitychange', reconcileOnReturn);
-    void reconcileCadGenerations();
+    if (signedIn) void reconcileCadGenerations();
     return () => {
       window.clearInterval(interval);
       window.removeEventListener('focus', reconcileOnReturn);
       window.removeEventListener('online', reconcileOnReturn);
       document.removeEventListener('visibilitychange', reconcileOnReturn);
     };
-  }, [reconcileCadGenerations]);
+  }, [reconcileCadGenerations, signedIn]);
 
   useEffect(() => {
+    if (!signedIn) return; // signed out: see signedIn above
     const running = generations.filter(g => g.status === 'running');
 
     for (const gen of running) {
@@ -1158,7 +1174,8 @@ export function GenerationsContextProvider({ children }: { children: React.React
   // stop refreshing or toasts stop firing after completion.
   // Also watch: if runningKey doesn't update when a new workflowId is added, the new generation
   // won't start polling. Always verify trackGeneration triggers a re-run.
-  }, [runningKey]);
+  // signedIn: runs restored while signed out start polling once someone signs in.
+  }, [runningKey, signedIn]);
 
   // Abort all controllers on provider unmount
   useEffect(() => {
