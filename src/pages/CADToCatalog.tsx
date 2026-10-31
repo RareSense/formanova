@@ -25,7 +25,7 @@ import { useCadBreakpoint } from '@/hooks/use-cad-breakpoint';
 import { useCatalogShoot } from '@/hooks/useCatalogShoot';
 import { isCadToCatalogEnabled } from '@/lib/feature-flags';
 import { trackCatalogShootStarted, trackDownloadClicked, trackPaywallHit } from '@/lib/posthog-events';
-import { shootCredits, type CatalogAspect, type CatalogResolution } from '@/lib/cad-to-catalog-api';
+import { CATALOG_FALLBACK_PRICES, shootCredits, type CatalogAspect, type CatalogResolution } from '@/lib/cad-to-catalog-api';
 import { blobToDataUrl, picturePrice } from '@/lib/cad-to-catalog-run';
 import { anglesFor, hasOwnAngles, resetAngles, saveAngles } from '@/lib/cad-to-catalog-angles';
 import { countShoot, isPhoto, type BackgroundId, type JewelryCategory, type Picture, type PlannedAngle } from '@/lib/cad-to-catalog-queue';
@@ -59,13 +59,14 @@ export default function CADToCatalog() {
   const [working, setWorking] = useState<Partial<Record<JewelryCategory, PlannedAngle[]>>>({});
   const [anglesVersion, setAnglesVersion] = useState(0);
   const [downloading, setDownloading] = useState(false);
-  const [price, setPrice] = useState<number | null>(null);
+  // Shown straight away from the page's prices, then replaced by the backend's price list.
+  const [price, setPrice] = useState<number | null>(CATALOG_FALLBACK_PRICES['1K']);
   const [angleThumbs, setAngleThumbs] = useState<Record<string, string>>({});
 
   // Credits per picture (white or photo) at the chosen size: the backend's price list, else the fallback.
   useEffect(() => {
     const ctrl = new AbortController();
-    setPrice(null);
+    setPrice(CATALOG_FALLBACK_PRICES[resolution]);
     picturePrice(resolution, ctrl.signal).then(setPrice).catch(() => {});
     return () => ctrl.abort();
   }, [resolution]);
@@ -83,6 +84,15 @@ export default function CADToCatalog() {
   const totalPictures = shoot.queue.pieces.reduce((n, p) => n + perPictures(p.category), 0);
   const totalCredits = price !== null ? shootCredits(countShoot(shoot.queue.pieces, settings, anglesOf), price) : null;
   const perPiece = { pictures: category ? perPictures(category) : 0, photos: [...chosenBg].filter(isPhoto).length };
+
+  // A newly opened piece starts at its type's first angle (as the CAD to Pictures tool does),
+  // not at the generic fit view.
+  const openedId = view.parts.length ? shoot.openId : null;
+  useEffect(() => {
+    if (!engine || !openedId || !category || shoot.queue.running) return;
+    const first = anglesOf(category)[0] ?? listFor(category)[0];
+    if (first) engine.applyAngle(first);
+  }, [openedId]); // eslint-disable-line react-hooks/exhaustive-deps -- runs once per opened piece only; following later angle or type changes here would move the view while the user works. Watch for: a piece opening at the fit view instead of its first angle.
 
   // A small picture per angle of the open piece, remade when the piece, its type or its angles change.
   const angleKey = category ? `${shoot.openId}|${listFor(category).map((a) => `${a.name}:${a.dir}:${a.dist ?? 1}`).join(',')}` : '';
@@ -198,6 +208,7 @@ export default function CADToCatalog() {
           resolution={resolution}
           onResolution={setResolution}
           perPiece={perPiece}
+          recipe={{ angles: category ? anglesOf(category).length : 0, metals: Math.max(1, metals.size), backgrounds: chosenBg.size, price }}
           pieceCount={shoot.queue.pieces.length}
           totalPictures={totalPictures}
           totalCredits={totalCredits}
