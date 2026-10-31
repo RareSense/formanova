@@ -313,20 +313,18 @@ export class CatalogEngine {
   }
   applyAngle(a: Angle) { applyAngle(this, a); this.needsRender = true; }
   /** A small picture of the piece from each angle (as the CAD to Pictures tool's angle tiles);
-   *  the view goes back to where it was. */
+   *  the view goes back to where it was. Every angle is drawn and copied in one go, so the screen
+   *  never shows the camera moving; encoding happens after. */
   async angleThumbs(angles: Angle[], long = 220): Promise<Blob[]> {
     const back = currentAngle(this);
+    let copies: HTMLCanvasElement[];
     try {
-      const out: Blob[] = [];
-      for (const a of angles) {
-        applyAngle(this, a);
-        out.push(await this.capture({ background: 'white', long, type: 'image/webp' }));
-      }
-      return out;
+      copies = angles.map((a) => { applyAngle(this, a); return this.drawCopy({ background: 'white', long }); });
     } finally {
       applyAngle(this, back);
       this.needsRender = true;
     }
+    return Promise.all(copies.map((c) => toBlob(c, 'image/webp')));
   }
   currentAngle(): Angle { return currentAngle(this); }
   fitDistanceFor(radius: number, focal: number) { return fitDistance(this, radius, focal); }
@@ -350,6 +348,12 @@ export class CatalogEngine {
   }
 
   async capture({ background = 'white' as 'white' | 'clear', long = 2048, type = 'image/png', shadow = background === 'white' } = {}): Promise<Blob> {
+    return toBlob(this.drawCopy({ background, long, shadow }), type);
+  }
+
+  /** Draws the picture and copies it to an off-screen canvas, then puts the view back, all before
+   *  the browser next paints: the screen never shows the picture size or its framing. */
+  private drawCopy({ background = 'white' as 'white' | 'clear', long = 2048, shadow = background === 'white' }): HTMLCanvasElement {
     const a = this.pictureAspect;
     const w = a >= 1 ? long : Math.round(long * a);
     const h = a >= 1 ? Math.round(long / a) : long;
@@ -364,16 +368,18 @@ export class CatalogEngine {
     this.renderer.setSize(w, h, false);
     try {
       this.look.drawPicture(background as Backdrop, w, h);
-      const blob = await new Promise<Blob | null>((r) => this.renderer.domElement.toBlob(r, type, 0.92));
-      if (!blob) throw new Error('the browser could not save the picture');
-      return blob;
+      const copy = document.createElement('canvas');
+      copy.width = w;
+      copy.height = h;
+      copy.getContext('2d')!.drawImage(this.renderer.domElement, 0, 0);
+      return copy;
     } finally {
       this.look.floor.visible = true;
       for (const g of this.glows) g.visible = true;
       this.camera.clearViewOffset();
       this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
       this.resize();
-      this.busy = false;
+      this.busy = false; // resize() asked for a redraw; the loop draws it before the browser paints
     }
   }
 
@@ -426,4 +432,8 @@ function replaceWithPieces(mesh: THREE.Mesh, pieces: THREE.Mesh[] | null) {
   if (!pieces || !mesh.parent) return;
   for (const p of pieces) { p.position.copy(mesh.position); p.quaternion.copy(mesh.quaternion); p.scale.copy(mesh.scale); mesh.parent.add(p); }
   mesh.parent.remove(mesh);
+}
+
+function toBlob(canvas: HTMLCanvasElement, type: string): Promise<Blob> {
+  return new Promise((ok, bad) => canvas.toBlob((b) => (b ? ok(b) : bad(new Error('the browser could not save the picture'))), type, 0.92));
 }
