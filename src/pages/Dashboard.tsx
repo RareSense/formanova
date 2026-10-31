@@ -20,8 +20,8 @@ import type { EffortLevel } from '@/components/studio/EffortToggle';
 
 import modelShotImg from '@/assets/jewelry/model-shot-card.webp';
 import productShotImg from '@/assets/cad-studio/product-shot-card.webp';
+import productShotFromCadImg from '@/assets/cad-studio/product-shot-from-cad-card.webp';
 import CadStoryPicture, { type CadStory } from '@/components/create-cad/CadStoryPicture';
-import CatalogStoryPicture, { type CatalogStory } from '@/components/create-cad/CatalogStoryPicture';
 // Real Rhino captures of models we built, as theme-coloured layers.
 import fireflyPhoto from '@/assets/cad-cards/story/firefly-photo.webp';
 import ladybugPhoto from '@/assets/cad-cards/story/ladybug-photo.webp';
@@ -44,8 +44,6 @@ type Workflow = {
   image?: string;
   /** CAD cards: what goes in and the CAD it becomes, drawn in theme colours. */
   story?: CadStory;
-  /** Product Shot from CAD: the CAD and the product photo it becomes. */
-  catalogStory?: CatalogStory;
   /** Photography still passes through the first-run effort chooser. */
   usesEffortIntro?: boolean;
   /** PostHog value, identical to what the Photo Studio page sent. */
@@ -82,7 +80,7 @@ const catalogWorkflow: Workflow = {
   description: 'Turn your CAD files into product pictures.',
   route: '/cad-to-catalog',
   icon: Camera,
-  catalogStory: { cad: { shade: solitaireShade, metal: solitaireMetal, gems: solitaireGems }, photo: productShotImg },
+  image: productShotFromCadImg,
 };
 
 const cadWorkflows: Workflow[] = [
@@ -214,8 +212,6 @@ function WorkflowCard({
       <div className="relative aspect-[4/3] overflow-hidden">
         {workflow.story ? (
           <CadStoryPicture story={workflow.story} />
-        ) : workflow.catalogStory ? (
-          <CatalogStoryPicture story={workflow.catalogStory} />
         ) : (
           <img
             src={workflow.image}
