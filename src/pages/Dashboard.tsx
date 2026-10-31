@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
-import { ArrowRight, Camera } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { usePrefetchGenerations } from '@/hooks/use-prefetch-generations';
@@ -79,7 +79,7 @@ const catalogWorkflow: Workflow = {
   title: 'Product Shot from CAD',
   description: 'Turn your CAD files into product pictures.',
   route: '/cad-to-catalog',
-  icon: Camera,
+  icon: RingIcon,
   image: productShotFromCadImg,
 };
 
