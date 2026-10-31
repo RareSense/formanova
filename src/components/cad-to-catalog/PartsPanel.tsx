@@ -10,7 +10,7 @@ import { GEMS, METALS, PRESETS, swatchColor, type Choice } from './engine/materi
 import { useEngineState } from './useEngineState';
 
 const HEAD = 'flex items-center justify-between px-4 py-3 border-b border-border';
-const TITLE = 'font-display text-sm tracking-[0.15em] uppercase font-bold';
+const TITLE = 'font-display text-base tracking-[0.12em] uppercase text-foreground';
 const LABEL = 'font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground';
 const ball = (c: string, gem: boolean) => `radial-gradient(circle at 35% 30%, #fff 0 ${gem ? 12 : 8}%, ${c} ${gem ? 45 : 40}%, ${gem ? '#223' : '#3a3328'} 100%)`;
 const same = (a: Choice | null | undefined, b: Choice | null | undefined) => (a?.id ?? null) === (b?.id ?? null);

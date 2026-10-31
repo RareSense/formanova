@@ -29,7 +29,7 @@ export default function PicturesStrip({ queue, onDownloadAll, downloading, onDow
   return (
     <section aria-label="Pictures" className="absolute left-0 right-0 bottom-0 z-10 bg-card/95 border-t border-border">
       <div className="flex items-center justify-between gap-3 px-3 pt-2">
-        <span className="font-display text-sm tracking-[0.15em] uppercase font-bold">
+        <span className="font-display text-base tracking-[0.12em] uppercase text-foreground">
           Pictures <span className="font-mono text-[10px] text-muted-foreground normal-case tracking-normal">{pr.done}/{pr.total}{pr.failed ? ` · ${pr.failed} failed` : ''}</span>
         </span>
         <button type="button" disabled={!pr.done || downloading} onClick={onDownloadAll}

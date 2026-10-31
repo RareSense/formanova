@@ -1,7 +1,7 @@
 /**
  * The shoot settings, in the tool's order: 1 jewellery type (of the open
- * piece), 2 angles, 3 metals, 4 backgrounds, 5 picture size, 6 aspect ratio
- * (photo backgrounds); then Shoot, with what the shoot costs.
+ * piece), 2 angles, 3 metals, 4 backgrounds, 5 aspect ratio (photo backgrounds),
+ * 6 picture size; then Shoot, with what the shoot costs.
  * They apply to every piece; each piece uses its own type's angles.
  */
 import type { ReactNode } from 'react';
@@ -11,7 +11,7 @@ import { CATALOG_RESOLUTIONS, type CatalogAspect, type CatalogResolution } from 
 import { CATEGORIES, CATEGORY_LABEL, type BackgroundId, type JewelryCategory, type PlannedAngle } from '@/lib/cad-to-catalog-queue';
 import { METALS } from './engine/materials';
 
-const STEP = 'font-display text-sm tracking-[0.15em] uppercase font-bold flex items-center gap-2';
+const STEP = 'font-display text-base tracking-[0.12em] uppercase text-foreground flex items-center gap-2';
 const NUM = 'w-5 h-5 flex items-center justify-center border border-foreground font-mono text-[10px]';
 const TICK = (on: boolean) => `w-4 h-4 flex items-center justify-center border ${on ? 'bg-foreground border-foreground text-background' : 'border-border'}`;
 /** The CAD to Pictures tool's shapes. */
@@ -135,8 +135,22 @@ export default function ShootSteps(p: Props) {
         )}
       </div>
 
+      {/* As in the CAD to Pictures tool: always shown, one click; only photo pictures take the shape. */}
       <div className="space-y-2">
-        <h3 className={STEP}><span className={NUM}>5</span>Picture size</h3>
+        <h3 className={STEP}><span className={NUM}>5</span>Aspect ratio</h3>
+        <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Aspect ratio of the photo pictures">
+          {SHAPES.map((a) => (
+            <button key={a} type="button" role="radio" aria-checked={p.aspect === a} disabled={disabled} onClick={() => p.onAspect(a)}
+              className={`h-9 px-4 border font-mono text-[11px] transition-colors disabled:opacity-40 ${p.aspect === a ? 'border-foreground bg-accent/40' : 'border-border hover:bg-accent/20'}`}>
+              {a}
+            </button>
+          ))}
+        </div>
+        {!photos && <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">For photo backgrounds; white stays square.</p>}
+      </div>
+
+      <div className="space-y-2">
+        <h3 className={STEP}><span className={NUM}>6</span>Picture size</h3>
           <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Resolution of the pictures">
             {CATALOG_RESOLUTIONS.map((r) => (
               <button key={r} type="button" role="radio" aria-checked={p.resolution === r} disabled={disabled} onClick={() => p.onResolution(r)}
@@ -147,20 +161,6 @@ export default function ShootSteps(p: Props) {
             ))}
           </div>
           {p.resolution === '4K' && <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">4K takes longer.</p>}
-      </div>
-
-      {/* As in the CAD to Pictures tool: always shown, one click; only photo pictures take the shape. */}
-      <div className="space-y-2">
-        <h3 className={STEP}><span className={NUM}>6</span>Aspect ratio</h3>
-        <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Aspect ratio of the photo pictures">
-          {SHAPES.map((a) => (
-            <button key={a} type="button" role="radio" aria-checked={p.aspect === a} disabled={disabled} onClick={() => p.onAspect(a)}
-              className={`h-9 px-4 border font-mono text-[11px] transition-colors disabled:opacity-40 ${p.aspect === a ? 'border-foreground bg-accent/40' : 'border-border hover:bg-accent/20'}`}>
-              {a}
-            </button>
-          ))}
-        </div>
-        {!photos && <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">For photo backgrounds; white stays square.</p>}
       </div>
 
       {!p.running ? (
