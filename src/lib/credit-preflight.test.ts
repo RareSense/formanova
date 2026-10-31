@@ -6,7 +6,7 @@ vi.mock('@/lib/authenticated-fetch', () => ({
   authenticatedFetch: mockAuthFetch,
 }));
 
-import { performCreditPreflight } from './credit-preflight';
+import { performCreditPreflight, preflightForCredits } from './credit-preflight';
 
 function okJson(body: unknown): Response {
   return {
@@ -66,5 +66,17 @@ describe('performCreditPreflight', () => {
         num_variations: 1,
       }),
     });
+  });
+});
+
+describe('preflightForCredits', () => {
+  beforeEach(() => mockAuthFetch.mockReset());
+
+  it('compares a known total with the available balance', async () => {
+    mockAuthFetch.mockResolvedValueOnce(okJson({ available: 50, balance: 80 }));
+    expect(await preflightForCredits(56)).toEqual({ approved: false, estimatedCredits: 56, currentBalance: 50 });
+    expect(mockAuthFetch).toHaveBeenCalledWith('/api/credits/balance/me');
+    mockAuthFetch.mockResolvedValueOnce(okJson({ balance: 80 }));
+    expect((await preflightForCredits(56)).approved).toBe(true);
   });
 });

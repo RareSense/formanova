@@ -3,7 +3,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { performCreditPreflight, type PreflightResult } from '@/lib/credit-preflight';
+import { performCreditPreflight, preflightForCredits, type PreflightResult } from '@/lib/credit-preflight';
 import { AuthExpiredError } from '@/lib/authenticated-fetch';
 import { savePostPurchaseReturn } from '@/lib/post-purchase-return';
 
@@ -38,6 +38,11 @@ export interface UseCreditPreflightReturn {
     numVariations?: number,
     metadata?: CreditPreflightMetadata,
   ) => Promise<boolean>;
+  /**
+   * Same check for a cost the caller has already added up (several workflows or
+   * resolutions in one go). workflowName labels the credits page.
+   */
+  checkCreditsFor: (requiredCredits: number, workflowName: string) => Promise<boolean>;
   /** Whether the insufficient credits modal should be shown */
   showInsufficientModal: boolean;
   /** Close the modal */
@@ -58,15 +63,11 @@ export function useCreditPreflight(
   const navigate = useNavigate();
   const location = useLocation();
 
-  const checkCredits = useCallback(async (
-    workflowName: string,
-    numVariations: number = 1,
-    metadata?: CreditPreflightMetadata,
-  ): Promise<boolean> => {
+  const runCheck = useCallback(async (workflowName: string, preflight: () => Promise<PreflightResult>): Promise<boolean> => {
     setChecking(true);
     workflowRef.current = workflowName;
     try {
-      const result = await performCreditPreflight(workflowName, numVariations, metadata);
+      const result = await preflight();
       setPreflightResult(result);
 
       if (!result.approved) {
@@ -83,6 +84,16 @@ export function useCreditPreflight(
       setChecking(false);
     }
   }, []);
+
+  const checkCredits = useCallback((
+    workflowName: string,
+    numVariations: number = 1,
+    metadata?: CreditPreflightMetadata,
+  ) => runCheck(workflowName, () => performCreditPreflight(workflowName, numVariations, metadata)), [runCheck]);
+
+  const checkCreditsFor = useCallback((requiredCredits: number, workflowName: string) => (
+    runCheck(workflowName, () => preflightForCredits(requiredCredits))
+  ), [runCheck]);
 
   const dismissModal = useCallback(() => {
     setShowInsufficientModal(false);
@@ -110,6 +121,7 @@ export function useCreditPreflight(
 
   return {
     checkCredits,
+    checkCreditsFor,
     showInsufficientModal,
     dismissModal,
     preflightResult,

@@ -61,6 +61,17 @@ const WORKFLOW_RULES: WorkflowRule[] = [
     matches: (name) => includesAny(name, ["cad", "render"]),
   },
   {
+    // Product Shot from CAD (cad_to_catalog_*): its own label and page, in the CAD
+    // render section. Kept after the generic rule so that section's title is unchanged.
+    sourceType: "cad_render",
+    label: "Product Shot from CAD",
+    historyTitle: "Product Shot from CAD",
+    historySubtitle: "Product pictures made from CAD files",
+    loadRoute: "/cad-to-catalog",
+    priority: 75,
+    matches: (name) => name.includes("cad_to_catalog"),
+  },
+  {
     sourceType: "photo",
     label: "Model Shot",
     historyTitle: "Model Shot",

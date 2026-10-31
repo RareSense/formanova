@@ -19,6 +19,7 @@ import type { EffortLevel } from '@/components/studio/EffortToggle';
 
 import modelShotImg from '@/assets/jewelry/model-shot-card.webp';
 import productShotImg from '@/assets/cad-studio/product-shot-card.webp';
+import productShotFromCadImg from '@/assets/cad-studio/product-shot-from-cad-card.webp';
 import CadStoryPicture, { type CadStory } from '@/components/create-cad/CadStoryPicture';
 // Real Rhino captures of models we built, as theme-coloured layers.
 import fireflyPhoto from '@/assets/cad-cards/story/firefly-photo.webp';
@@ -71,6 +72,15 @@ const photographyWorkflows: Workflow[] = [
     studioType: 'product-shot',
   },
 ];
+
+// Photography's third card; shown to whoever the Product Shot from CAD page is open to.
+const catalogWorkflow: Workflow = {
+  title: 'Product Shot from CAD',
+  description: 'Turn your CAD files into product pictures.',
+  route: '/cad-to-catalog',
+  icon: RingIcon,
+  image: productShotFromCadImg,
+};
 
 const cadWorkflows: Workflow[] = [
   {
@@ -223,7 +233,9 @@ function WorkflowCard({
             }`}
           />
         </div>
-        <h3 className="font-display text-lg sm:text-xl md:text-2xl uppercase tracking-wide text-foreground leading-none mb-1 sm:mb-1.5">
+        {/* Room for two lines on every card, so a long title (Product Shot from CAD)
+            does not push its description and button below the cards beside it. */}
+        <h3 className="min-h-[2em] flex items-center justify-center text-center font-display text-lg sm:text-xl md:text-2xl uppercase tracking-wide text-foreground leading-none mb-1 sm:mb-1.5">
           {workflow.title}
         </h3>
         <p className="font-mono text-[9px] sm:text-[11px] md:text-xs tracking-[0.1em] sm:tracking-[0.15em] text-foreground/80 uppercase text-center max-w-[240px]">
@@ -251,6 +263,8 @@ export default function Dashboard() {
   const { user } = useAuth();
   const { refetch: refetchShopifyStatus } = useShopifyStatus();
   const userName = user?.email ? user.email.split('@')[0] : '';
+  const photography = [...photographyWorkflows, catalogWorkflow];
+  const threeEach = photography.length === 3;
 
   // First-run effort chooser, shown on the photography cards before category
   // selection. pendingRoute holds where to go once the user picks; null = closed.
@@ -311,24 +325,27 @@ export default function Dashboard() {
         </motion.div>
 
         {/* Every card is the same size on every screen, so no workflow looks
-            more important. Laptop: all five in one line (2 + 3). Tablet: one
-            section per row, three columns, Photography's two centred. Phone:
-            two columns, the third CAD card centred under the other two. */}
+            more important. Laptop: one line (2 + 3, or 3 + 3 with Catalog from
+            CAD). Tablet: one section per row, three columns, Photography's two
+            centred when it has two. Phone: two columns, a third card centred
+            under the other two. */}
           <motion.div
             variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className="w-full max-w-[1400px] grid lg:grid-cols-[2fr_3fr] gap-x-4 lg:gap-x-6 xl:gap-x-8 gap-y-2 sm:gap-y-6 pb-0 sm:pb-4"
+            className={`w-full max-w-[1400px] grid ${threeEach ? 'lg:grid-cols-2' : 'lg:grid-cols-[2fr_3fr]'} gap-x-4 lg:gap-x-6 xl:gap-x-8 gap-y-2 sm:gap-y-6 pb-0 sm:pb-4`}
           >
             <section aria-labelledby="dashboard-photography" className="flex flex-col">
               <CategoryDivider id="dashboard-photography" label="Photography" />
-              <div className="grid grid-cols-2 sm:grid-cols-6 lg:grid-cols-2 gap-2 sm:gap-4 md:gap-5 flex-1">
-                {photographyWorkflows.map((workflow, i) => (
+              <div className={`grid grid-cols-2 gap-2 sm:gap-4 md:gap-5 flex-1 ${threeEach ? 'sm:grid-cols-3' : 'sm:grid-cols-6 lg:grid-cols-2'}`}>
+                {photography.map((workflow, i) => (
                   <WorkflowCard
                     key={workflow.title}
                     workflow={workflow}
                     onSelect={handleSelect}
-                    className={`sm:col-span-2 lg:col-span-1 ${i === 0 ? 'sm:col-start-2 lg:col-start-auto' : ''}`}
+                    className={threeEach
+                      ? (i === 2 ? 'col-span-2 w-[calc(50%-4px)] justify-self-center sm:col-span-1 sm:w-auto sm:justify-self-stretch' : '')
+                      : `sm:col-span-2 lg:col-span-1 ${i === 0 ? 'sm:col-start-2 lg:col-start-auto' : ''}`}
                   />
                 ))}
               </div>

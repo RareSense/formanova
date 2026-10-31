@@ -126,6 +126,13 @@ describe('Dashboard as the merged studio hub', () => {
     const continueButtons = Array.from(el.querySelectorAll('button')).filter((node) =>
       node.textContent?.includes('Continue'),
     );
-    expect(continueButtons).toHaveLength(5);
+    expect(continueButtons).toHaveLength(6);
+  });
+
+  it('puts Product Shot from CAD under Photography', () => {
+    const el = renderDashboard();
+    const photography = el.querySelector('section[aria-labelledby="dashboard-photography"]');
+    expect(photography?.textContent).toContain('Product Shot from CAD');
+    expect(el.querySelector('section[aria-labelledby="dashboard-cad"]')?.textContent).not.toContain('Product Shot from CAD');
   });
 });

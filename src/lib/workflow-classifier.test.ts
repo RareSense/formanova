@@ -15,6 +15,18 @@ describe('workflow classification', () => {
     expect(inferSourceType('sketch_generate_v1')).toBe('image_to_cad');
   });
 
+  it('labels Product Shot from CAD runs and reopens their page, in the CAD render section', () => {
+    for (const name of ['cad_to_catalog_shot', 'cad_to_catalog_fastload']) {
+      const meta = classifyWorkflow(name);
+      expect(meta.sourceType).toBe('cad_render');
+      expect(meta.label).toBe('Product Shot from CAD');
+      expect(meta.loadRoute).toBe('/cad-to-catalog');
+    }
+    // The section title of every other CAD render run stays as it was.
+    expect(getWorkflowTypeMeta('cad_render').historyTitle).toBe('CAD Render');
+    expect(classifyWorkflow('cad_render_v1').label).toBe('CAD Render');
+  });
+
   it('labels the text workflow Text to CAD', () => {
     const meta = classifyWorkflow('ring_generate_v1');
     expect(meta.sourceType).toBe('text_to_cad');

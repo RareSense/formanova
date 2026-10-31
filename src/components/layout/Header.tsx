@@ -188,7 +188,7 @@ export function Header() {
       // paths stay active links rather than getting their own nav items.
       path: '/dashboard',
       label: 'Dashboard',
-      activePaths: ['/dashboard', '/studio', '/studio-cad', '/text-to-cad', '/image-to-cad'],
+      activePaths: ['/dashboard', '/studio', '/studio-cad', '/text-to-cad', '/image-to-cad', '/cad-to-catalog'],
     },
     // { path: '/tutorial', label: 'Tutorial' }, // hidden for now
   ];
