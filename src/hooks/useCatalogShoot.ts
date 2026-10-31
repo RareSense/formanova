@@ -28,7 +28,7 @@ import {
 } from '@/lib/cad-to-catalog-queue';
 import { anglesFor } from '@/lib/cad-to-catalog-angles';
 import { buildZip } from '@/lib/cad-to-catalog-zip';
-import type { CatalogEngine } from '@/components/cad-to-catalog/engine/engine';
+import { CatalogEngine } from '@/components/cad-to-catalog/engine/engine';
 import { unpackMeshes } from '@/components/cad-to-catalog/engine/fastpack';
 import { metalByName } from '@/components/cad-to-catalog/engine/materials';
 import { piecesFromEntries, type FileEntry } from '@/components/cad-to-catalog/engine/package';
@@ -37,6 +37,10 @@ import type { Choice } from '@/components/cad-to-catalog/engine/materials';
 /** Photo shots sit a little further back, so the AI has room for the scene (as the tool). */
 const IN_PHOTO_DISTANCE = 1.6;
 const RUNS_AT_ONCE = 4;
+/** List pictures: long side px, and the largest file previewed before it is opened. */
+const THUMB_PX = 256;
+const PREVIEW_MAX_BYTES = 15e6;
+const THUMB = { background: 'white' as const, long: THUMB_PX, type: 'image/webp' };
 
 interface PieceFiles {
   cad: FileEntry;
@@ -53,6 +57,8 @@ export interface UseCatalogShoot {
   /** The piece open in the viewer. */
   openId: string | null;
   opening: boolean;
+  /** What opening is doing right now ("Uploading 42 MB…"), shown over the view. */
+  openingText: string | null;
   /** Adds the CAD files among these; returns the ids of the pieces that are new. */
   addFiles: (entries: FileEntry[]) => string[];
   openPiece: (id: string, opts?: { showHidden?: boolean }) => Promise<void>;
@@ -77,6 +83,9 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
   const [queue, dispatch] = useReducer(queueReducer, initialQueue);
   const [openId, setOpenId] = useState<string | null>(null);
   const [opening, setOpening] = useState(false);
+  const [openingText, setOpeningText] = useState<string | null>(null);
+  // Each large .3dm is prepared on the server once per visit; going back to it is instant.
+  const prepared = useRef(new Map<string, Promise<{ skeleton: ArrayBuffer; meshes: ReturnType<typeof unpackMeshes> }>>());
   const queueRef = useRef(queue);
   queueRef.current = queue;
   const files = useRef(new Map<string, PieceFiles>());
@@ -123,22 +132,66 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
     if (!pf) throw new Error('That file is no longer here');
     if (openRef.current && openRef.current !== id && engine.hasModel) choices.current.set(openRef.current, engine.choices());
     setOpening(true);
+    setOpeningText('Opening…');
     try {
       await engine.open(pf.cad.file, pf.files, {
         showHidden,
-        fastload: async (data) => {
-          const { skeleton, packed } = await fastloadFile(data, life.current.signal);
-          return { skeleton, meshes: unpackMeshes(packed) };
+        status: setOpeningText,
+        fastload: (data) => {
+          let job = prepared.current.get(id);
+          if (!job) {
+            job = fastloadFile(data, life.current.signal, setOpeningText).then(({ skeleton, packed }) => ({ skeleton, meshes: unpackMeshes(packed) }));
+            job.catch(() => prepared.current.delete(id)); // try again next time
+            prepared.current.set(id, job);
+          }
+          return job;
         },
       });
       const own = choices.current.get(id);
       if (own) engine.restoreChoices(own);
       openRef.current = id;
       setOpenId(id);
+      // The list's still picture, from the view just opened (cheap: 256 px).
+      if (!queueRef.current.pieces.find((p) => p.id === id)?.thumb && engine.isReady) {
+        engine.capture(THUMB).then((b) => dispatch({ type: 'thumb', pieceId: id, url: keepUrl(b) })).catch(() => {});
+      }
     } finally {
       setOpening(false);
+      setOpeningText(null);
     }
   }, [engine]);
+
+  // Still pictures for pieces not opened yet: small files only, one at a time, in a hidden
+  // viewer, and only while nothing else is happening (no shoot, no file opening).
+  const previewTried = useRef(new Set<string>());
+  const previewBusy = useRef(false);
+  const [previewTick, setPreviewTick] = useState(0);
+  useEffect(() => {
+    if (queue.running || opening || previewBusy.current) return;
+    const next = queue.pieces.find((p) => !p.thumb && !previewTried.current.has(p.id) && (files.current.get(p.id)?.cad.file.size ?? Infinity) <= PREVIEW_MAX_BYTES);
+    if (!next) return;
+    previewBusy.current = true;
+    previewTried.current.add(next.id);
+    const host = document.createElement('div');
+    host.style.cssText = `position:fixed;left:-10000px;top:0;width:${THUMB_PX}px;height:${THUMB_PX}px;pointer-events:none`;
+    document.body.appendChild(host);
+    const viewer = new CatalogEngine(host);
+    (async () => {
+      for (let i = 0; i < 100 && !viewer.isReady; i++) await new Promise((r) => setTimeout(r, 150));
+      const pf = files.current.get(next.id);
+      if (!pf || life.current.signal.aborted) return;
+      await viewer.open(pf.cad.file, pf.files, { fastload: null });
+      const blob = await viewer.capture(THUMB);
+      if (!life.current.signal.aborted) dispatch({ type: 'thumb', pieceId: next.id, url: keepUrl(blob) });
+    })()
+      .catch(() => {}) // no preview for this one; the list shows its placeholder
+      .finally(() => {
+        viewer.dispose();
+        host.remove();
+        previewBusy.current = false;
+        if (!life.current.signal.aborted) setPreviewTick((n) => n + 1); // look for the next one
+      });
+  }, [queue.pieces, queue.running, opening, previewTick]);
 
   const openPiece = useCallback(async (id: string, opts: { showHidden?: boolean } = {}) => {
     if (queueRef.current.running) return;
@@ -279,7 +332,8 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
 
   return {
     queue, openId, opening, addFiles, openPiece,
-    remove: (id) => { files.current.delete(id); choices.current.delete(id); dispatch({ type: 'remove', pieceId: id }); },
+    openingText,
+    remove: (id) => { files.current.delete(id); choices.current.delete(id); prepared.current.delete(id); dispatch({ type: 'remove', pieceId: id }); },
     setCategory: (id, c) => dispatch({ type: 'category', pieceId: id, category: c }),
     shoot,
     pause: () => { control.current.paused = true; dispatch({ type: 'pause' }); },

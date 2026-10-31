@@ -51,6 +51,8 @@ export interface Piece {
   category: JewelryCategory;
   status: PieceStatus;
   error?: string;
+  /** A small still picture of the piece for the list (object URL), once one is made. */
+  thumb?: string;
 }
 
 export interface ShootSettings {
@@ -88,6 +90,7 @@ export type QueueAction =
   | { type: 'add'; pieces: { id: string; name: string; category: JewelryCategory }[] }
   | { type: 'remove'; pieceId: string }
   | { type: 'category'; pieceId: string; category: JewelryCategory }
+  | { type: 'thumb'; pieceId: string; url: string }
   | { type: 'start'; pieceIds: string[]; settings: ShootSettings; anglesFor: (c: JewelryCategory) => PlannedAngle[] }
   | { type: 'piece'; pieceId: string; status: PieceStatus; error?: string }
   | { type: 'picture'; pictureId: string; status: PictureStatus; url?: string; error?: string }
@@ -137,6 +140,8 @@ export function queueReducer(state: QueueState, action: QueueAction): QueueState
       return { ...state, pieces: state.pieces.filter((p) => p.id !== action.pieceId), pictures: state.pictures.filter((x) => x.pieceId !== action.pieceId) };
     case 'category':
       return { ...state, pieces: state.pieces.map((p) => (p.id === action.pieceId ? { ...p, category: action.category } : p)) };
+    case 'thumb':
+      return { ...state, pieces: state.pieces.map((p) => (p.id === action.pieceId ? { ...p, thumb: action.url } : p)) };
     case 'start': {
       if (state.running) return state;
       const ids = new Set(action.pieceIds);

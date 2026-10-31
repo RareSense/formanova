@@ -153,12 +153,18 @@ async function gunzip(buf: ArrayBuffer): Promise<ArrayBuffer> {
   return new Response(stream).arrayBuffer();
 }
 
-/** A heavy .3dm split on the server: the skeleton .3dm and the packed meshes (unzipped). */
-export async function fastloadFile(data: ArrayBuffer, signal?: AbortSignal): Promise<{ skeleton: ArrayBuffer; packed: ArrayBuffer }> {
+/**
+ * A heavy .3dm split on the server: the skeleton .3dm and the packed meshes (unzipped).
+ * onStage names each step for the user: uploading, preparing, loading.
+ */
+export async function fastloadFile(data: ArrayBuffer, signal?: AbortSignal, onStage?: (text: string) => void): Promise<{ skeleton: ArrayBuffer; packed: ArrayBuffer }> {
+  onStage?.(`Uploading ${Math.round(data.byteLength / 1e6)} MB…`);
   const body = buildCadFileBody(await blobToDataUrl(new Blob([data], { type: 'application/octet-stream' })));
   const workflowId = await startCatalogRun(CATALOG_FASTLOAD_WORKFLOW, body, signal);
+  onStage?.('Preparing…');
   const res = await waitForCatalogRun(workflowId, parseFastloadResult, { intervalMs: SAVE_POLL_INTERVAL_MS, timeoutMs: FASTLOAD_POLL_TIMEOUT_MS, signal });
   if (!res) throw new CatalogRunError('cancelled');
+  onStage?.('Loading…');
   const [skeleton, meshes] = await Promise.all([fetchBytes(res.skeleton, signal), fetchBytes(res.meshes, signal)]);
   return { skeleton, packed: await gunzip(meshes) };
 }

@@ -235,7 +235,7 @@ export default function CADToCatalog() {
         right={(section) => <PartsPanel engine={engine} section={section} locked={shoot.queue.running} />}
         viewport={
           <CADRuntimeErrorBoundary resetKeys={[shoot.openId]}>
-            <CatalogViewer onEngine={setEngine} onFiles={addFiles} busy={shoot.opening ? 'Opening…' : null} locked={shoot.queue.running}>
+            <CatalogViewer onEngine={setEngine} onFiles={addFiles} busy={shoot.opening ? shoot.openingText ?? 'Opening…' : null} locked={shoot.queue.running} compact={mode === 'phone'}>
               <PicturesStrip queue={shoot.queue} onDownloadAll={downloadAll} downloading={downloading} onDownloadOne={downloadOne} />
             </CatalogViewer>
           </CADRuntimeErrorBoundary>

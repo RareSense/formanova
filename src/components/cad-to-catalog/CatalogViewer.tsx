@@ -1,15 +1,14 @@
 /**
  * The 3D view of Catalog from CAD: hosts CatalogEngine's canvas, the drop area
  * before any file is open, an "Opening…" overlay, and the view tools
- * (undo / redo, zoom, fit). The engine lives as long as this component.
+ * (zoom, undo / redo, fit: the vertical strip the other CAD pages use). The engine lives as long as this component.
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Diamond, Loader2, Maximize, Minus, Plus, Redo2, Undo2 } from 'lucide-react';
+import { Diamond, Loader2 } from 'lucide-react';
+import { ViewportSideTools } from '@/components/text-to-cad/ViewportOverlays';
 import { CatalogEngine } from './engine/engine';
 import { useEngineState } from './useEngineState';
 import { entriesFromDrop, entriesFromInput, type FileEntry } from './engine/package';
-
-const TOOL = 'w-9 h-9 flex items-center justify-center bg-card/90 border border-border hover:bg-accent/60 transition-colors disabled:opacity-30';
 
 interface Props {
   onEngine: (engine: CatalogEngine | null) => void;
@@ -18,10 +17,12 @@ interface Props {
   busy: string | null;
   /** Shooting: the view is locked so the camera stays where each angle puts it. */
   locked: boolean;
+  /** Phones: the strip hugs the top-right corner, as on the other CAD pages. */
+  compact?: boolean;
   children?: ReactNode;
 }
 
-export default function CatalogViewer({ onEngine, onFiles, busy, locked, children }: Props) {
+export default function CatalogViewer({ onEngine, onFiles, busy, locked, compact = false, children }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const [engine, setEngine] = useState<CatalogEngine | null>(null);
@@ -66,15 +67,18 @@ export default function CatalogViewer({ onEngine, onFiles, busy, locked, childre
         </div>
       )}
 
-      {hasModel && (
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 flex gap-1" role="toolbar" aria-label="View">
-          <button type="button" className={TOOL} aria-label="Undo" title="Undo (Ctrl+Z)" disabled={!state.canUndo || locked} onClick={() => engine?.undo()}><Undo2 className="w-4 h-4" /></button>
-          <button type="button" className={TOOL} aria-label="Redo" title="Redo (Ctrl+Y)" disabled={!state.canRedo || locked} onClick={() => engine?.redo()}><Redo2 className="w-4 h-4" /></button>
-          <button type="button" className={TOOL} aria-label="Zoom in" disabled={locked} onClick={() => engine?.zoom(0.25)}><Plus className="w-4 h-4" /></button>
-          <button type="button" className={TOOL} aria-label="Zoom out" disabled={locked} onClick={() => engine?.zoom(-0.25)}><Minus className="w-4 h-4" /></button>
-          <button type="button" className={TOOL} aria-label="Fit the piece" disabled={locked} onClick={() => engine?.fit()}><Maximize className="w-4 h-4" /></button>
-        </div>
-      )}
+      {/* Hidden while shooting: the camera is the shoot's then. */}
+      <ViewportSideTools
+        visible={hasModel && !locked}
+        compact={compact}
+        onZoomIn={() => engine?.zoom(0.25)}
+        onZoomOut={() => engine?.zoom(-0.25)}
+        onResetView={() => engine?.fit()}
+        onUndo={() => engine?.undo()}
+        onRedo={() => engine?.redo()}
+        undoCount={state.canUndo ? 1 : 0}
+        redoCount={state.canRedo ? 1 : 0}
+      />
 
       {hasModel && (
         <div className="absolute top-12 left-2 z-10 max-w-[45%] truncate font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground bg-card/80 px-2 py-1 border border-border" title={state.fileName}>
