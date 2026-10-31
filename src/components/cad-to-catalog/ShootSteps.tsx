@@ -47,6 +47,8 @@ interface Props {
   onResolution: (r: CatalogResolution) => void;
   /** Pictures one piece gets, photos among them (for the button and the credit note). */
   perPiece: { pictures: number; photos: number };
+  /** What one piece's shoot is made of, and the credits per picture (shown live under Shoot). */
+  recipe: { angles: number; metals: number; backgrounds: number; price: number | null };
   pieceCount: number;
   /** Pictures a Shoot all makes (each piece with its own type's angles). */
   totalPictures: number;
@@ -185,6 +187,14 @@ export default function ShootSteps(p: Props) {
               Only the open piece · {p.perPiece.pictures}
             </button>
           )}
+          <p className="flex items-center justify-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">
+            <span>
+              {p.recipe.angles} {p.recipe.angles === 1 ? 'angle' : 'angles'} × {p.recipe.metals} {p.recipe.metals === 1 ? 'metal' : 'metals'} × {p.recipe.backgrounds} {p.recipe.backgrounds === 1 ? 'background' : 'backgrounds'}
+            </span>
+            {p.recipe.price !== null && (
+              <span className="flex items-center gap-1">· <img src={creditCoinIcon} alt="" className="w-3 h-3" />{p.recipe.price} each</span>
+            )}
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-1.5 pt-1">
