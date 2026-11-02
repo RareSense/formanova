@@ -171,6 +171,17 @@ export function cadJewelryNoun(type: CadJewelryType): string {
 export type CadMaterialProfile = MetalAlloy;
 export const CAD_MATERIAL_PROFILES: readonly CadMaterialProfile[] = METAL_ALLOYS;
 
+/**
+ * payload.weight_target: the weight the customer wants, in grams, in the alloy
+ * they chose (null: the shown one). The backend passes it into the build brief
+ * and stores it on the run and its versions.
+ */
+export interface WeightTargetPayload {
+  grams: number;
+  tolerance_pct: number;
+  alloy_id: string | null;
+}
+
 // -- Request ---------------------------------------------------------------
 
 /** A stored blob reference, the same shape the run produces internally. */
@@ -214,6 +225,8 @@ export interface RingCadStartParams {
   /** Product to build, from the Text/Image to CAD dropdown. Defaults to ring. */
   jewelryType?: CadJewelryType;
   material?: CadMaterialProfile | null;
+  /** Sent only with a positive gram figure. */
+  weightTarget?: WeightTargetPayload | null;
 }
 
 /**
@@ -295,6 +308,7 @@ export function buildRingCadStartBody({
   tier = RING_CAD_DEFAULT_TIER,
   jewelryType = DEFAULT_CAD_JEWELRY_TYPE,
   material = null,
+  weightTarget = null,
   clientFlow,
 }: RingCadStartParams): RingCadStartBody {
   const images = [...referenceImages];
@@ -340,6 +354,13 @@ export function buildRingCadStartBody({
   }
   if (material) {
     payload.material = materialPayload(material);
+  }
+  if (weightTarget && Number.isFinite(weightTarget.grams) && weightTarget.grams > 0) {
+    payload.weight_target = {
+      grams: weightTarget.grams,
+      tolerance_pct: weightTarget.tolerance_pct,
+      alloy_id: weightTarget.alloy_id,
+    };
   }
 
   if (clientFlow) payload.client_flow = clientFlow;

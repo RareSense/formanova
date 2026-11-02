@@ -376,3 +376,56 @@ describe('useImageToCADWorkflow supervised runs', () => {
     expect(result.current.isQueued).toBe(false);
   });
 });
+
+describe('useImageToCADWorkflow metal weight', () => {
+  const au14y = { id: 'au14y', label: '14K Yellow Gold', family: 'gold' as const, karat: 14, colour: 'yellow' as const,
+    density_g_cm3: 12.76, alloy: 'UPMR 204 Standard Yellow', source_url: 'https://www.unitedpmr.com/wp-content/uploads/2021/07/204.pdf' };
+  const weightTarget = { grams: 28, tolerance_pct: 5, alloy_id: 'au14y' };
+
+  beforeEach(() => {
+    checkCredits.mockReset();
+    mockFetch.mockReset();
+  });
+
+  it('sends material and weight_target, and keeps them for the run it started', async () => {
+    checkCredits.mockResolvedValue(true);
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({ workflow_id: 'state-w' }) } as Response);
+    const { result } = renderHook(() => useImageToCADWorkflow({
+      model: 'test', prompt: 'a band', referenceImages: [], cadRoute: '/text-to-cad', onWorkspaceActivate: vi.fn(),
+      material: au14y, weightTarget,
+    }));
+    await act(async () => { await result.current.simulateGeneration(); });
+
+    const body = JSON.parse(String(startCalls()[0][1]?.body));
+    expect(body.payload.material).toEqual({
+      alloy: '14K Yellow Gold', density_g_cm3: 12.76,
+      density_source: 'UPMR 204 Standard Yellow: https://www.unitedpmr.com/wp-content/uploads/2021/07/204.pdf',
+    });
+    expect(body.payload.weight_target).toEqual(weightTarget);
+    expect(result.current.metalWeight.target).toEqual({ grams: 28, tolerancePct: 5, alloyId: 'au14y' });
+    expect(result.current.metalWeight.requestedAlloyId).toBe('au14y');
+    // No result yet: nothing measured, so nothing to show.
+    expect(result.current.metalWeight.source.available).toBe(false);
+  });
+
+  it('weighs a restored version from its metal_volume_mm3', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 404, json: async () => ({}) } as Response);
+    const ring = { set_id: 'set-w', versions: [{ asset_id: 'v1', position: 0, glb_url: '/v1.glb', metal_volume_mm3: 2192.4 }] };
+    const { result } = renderWorkflow();
+    await act(async () => {
+      await result.current.restoreCompletedWorkflow('state-v1', '/v1.glb', { ring, selectedVersionId: 'v1' });
+    });
+    expect(result.current.metalWeight.key).toBe('v1');
+    expect(result.current.metalWeight.source).toEqual({ available: true, volumeMm3: 2192.4, from: 'version' });
+  });
+
+  it('says not available for an old run whose version has no volume', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 404, json: async () => ({}) } as Response);
+    const ring = { set_id: 'set-o', versions: [{ asset_id: 'v1', position: 0, glb_url: '/v1.glb' }] };
+    const { result } = renderWorkflow();
+    await act(async () => {
+      await result.current.restoreCompletedWorkflow('state-old', '/v1.glb', { ring, selectedVersionId: 'v1' });
+    });
+    expect(result.current.metalWeight.source.available).toBe(false);
+  });
+});
