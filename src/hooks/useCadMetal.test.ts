@@ -45,6 +45,30 @@ describe('useCadMetal', () => {
     expect(result.current.view.alloy.id).toBe('au14y');
   });
 
+  it('reports the look of the shown metal, so the Material panel can show it', () => {
+    const { result } = renderHook(() => useCadMetal(input, vi.fn()));
+    expect(result.current.look).toBe('gold-yellow-polished');
+    act(() => result.current.view.setAlloyId('ag925'));
+    expect(result.current.look).toBe('silver-natural-polished');
+  });
+
+  it('keeps a picked look that matches the metal (Brushed Gold stays Brushed Gold)', () => {
+    const { result } = renderHook(() => useCadMetal(input, vi.fn()));
+    act(() => result.current.chooseLook('gold-yellow-brushed'));
+    expect(result.current.look).toBe('gold-yellow-brushed');
+    expect(result.current.view.alloy.id).toBe('au14y');
+    // A table pick of another colour replaces it.
+    act(() => result.current.view.setAlloyId('au14r'));
+    expect(result.current.look).toBe('gold-rose-polished');
+  });
+
+  it('shows a look with no cited density as picked, while the weight keeps its metal', () => {
+    const { result } = renderHook(() => useCadMetal(input, vi.fn()));
+    act(() => result.current.chooseLook('copper-natural-polished'));
+    expect(result.current.look).toBe('copper-natural-polished');
+    expect(result.current.view.alloy.id).toBe('au14y');
+  });
+
   it('ignores an id that is not in the table', () => {
     const applyMetalToAll = vi.fn();
     const { result } = renderHook(() => useCadMetal(input, applyMetalToAll));

@@ -16,6 +16,8 @@ interface MeshPanelProps {
   onAction: (action: string) => void;
   onApplyMaterial: (matId: string) => void;
   onApplyMetalToAll?: (matId: string) => void;
+  /** The metal "All metal parts" shows (a MATERIAL_LIBRARY id); omit for a plain "Choose a metal…". */
+  metalToAllValue?: string;
   onSelectFamily?: (name: string, multi: boolean) => void;
   onHoverPart?: (name: string | null) => void;
   /** Parts under the pointer in the 3D view; their rows light up like a hovered row. */
@@ -26,7 +28,7 @@ interface MeshPanelProps {
   section?: "material" | "parts";
 }
 
-export default function MeshPanel({ meshes, onSelectMesh, onAction, onApplyMaterial, onApplyMetalToAll, onSelectFamily, onHoverPart, hoveredNames, onApplyGemToAll, onSceneAction, section }: MeshPanelProps) {
+export default function MeshPanel({ meshes, onSelectMesh, onAction, onApplyMaterial, onApplyMetalToAll, metalToAllValue, onSelectFamily, onHoverPart, hoveredNames, onApplyGemToAll, onSceneAction, section }: MeshPanelProps) {
   const [search, setSearch] = useState("");
   // Lifted here: MeshList remounts when the Material section collapses/expands.
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
@@ -63,7 +65,7 @@ export default function MeshPanel({ meshes, onSelectMesh, onAction, onApplyMater
   if (section === "material") {
     return (
       <div className="flex flex-col bg-card h-full min-h-0">
-        <MaterialContent hasSelection={hasSelection} matTab={matTab} setMatTab={setMatTab} filteredMaterials={filteredMaterials} onApplyMaterial={onApplyMaterial} onApplyMetalToAll={onApplyMetalToAll} onApplyGemToAll={onApplyGemToAll} />
+        <MaterialContent hasSelection={hasSelection} matTab={matTab} setMatTab={setMatTab} filteredMaterials={filteredMaterials} onApplyMaterial={onApplyMaterial} onApplyMetalToAll={onApplyMetalToAll} metalToAllValue={metalToAllValue} onApplyGemToAll={onApplyGemToAll} />
       </div>
     );
   }
@@ -103,7 +105,7 @@ export default function MeshPanel({ meshes, onSelectMesh, onAction, onApplyMater
       <div className="flex flex-col bg-card border-l border-border h-full">
         <div className="flex-1 flex flex-col min-h-0">
           <MaterialSectionHeader collapsed={false} onToggle={() => setMaterialCollapsed(true)} hasSelection={hasSelection} selectedMeshes={selectedMeshes} />
-          <MaterialContent hasSelection={hasSelection} matTab={matTab} setMatTab={setMatTab} filteredMaterials={filteredMaterials} onApplyMaterial={onApplyMaterial} onApplyMetalToAll={onApplyMetalToAll} onApplyGemToAll={onApplyGemToAll} />
+          <MaterialContent hasSelection={hasSelection} matTab={matTab} setMatTab={setMatTab} filteredMaterials={filteredMaterials} onApplyMaterial={onApplyMaterial} onApplyMetalToAll={onApplyMetalToAll} metalToAllValue={metalToAllValue} onApplyGemToAll={onApplyGemToAll} />
         </div>
         <SectionHeader title="Parts" subtitle={meshSubtitle} collapsed onToggle={() => setMeshCollapsed(false)} />
       </div>
@@ -117,7 +119,7 @@ export default function MeshPanel({ meshes, onSelectMesh, onAction, onApplyMater
         <ResizablePanel defaultSize={50} minSize={20}>
           <div className="flex flex-col h-full">
             <MaterialSectionHeader collapsed={false} onToggle={() => setMaterialCollapsed(true)} hasSelection={hasSelection} selectedMeshes={selectedMeshes} />
-            <MaterialContent hasSelection={hasSelection} matTab={matTab} setMatTab={setMatTab} filteredMaterials={filteredMaterials} onApplyMaterial={onApplyMaterial} onApplyMetalToAll={onApplyMetalToAll} onApplyGemToAll={onApplyGemToAll} />
+            <MaterialContent hasSelection={hasSelection} matTab={matTab} setMatTab={setMatTab} filteredMaterials={filteredMaterials} onApplyMaterial={onApplyMaterial} onApplyMetalToAll={onApplyMetalToAll} metalToAllValue={metalToAllValue} onApplyGemToAll={onApplyGemToAll} />
           </div>
         </ResizablePanel>
         <ResizableHandle withHandle />
@@ -171,12 +173,13 @@ function MaterialSectionHeader({ collapsed, onToggle, hasSelection, selectedMesh
 }
 
 // ── Material content ──
-function MaterialContent({ hasSelection, matTab, setMatTab, filteredMaterials, onApplyMaterial, onApplyMetalToAll, onApplyGemToAll }: {
+function MaterialContent({ hasSelection, matTab, setMatTab, filteredMaterials, onApplyMaterial, onApplyMetalToAll, metalToAllValue, onApplyGemToAll }: {
   hasSelection: boolean;
   matTab: "metal" | "gemstone"; setMatTab: (t: "metal" | "gemstone") => void;
   filteredMaterials: typeof MATERIAL_LIBRARY;
   onApplyMaterial: (matId: string) => void;
   onApplyMetalToAll?: (matId: string) => void;
+  metalToAllValue?: string;
   onApplyGemToAll?: (matId: string) => void;
 }) {
   return (
@@ -184,8 +187,9 @@ function MaterialContent({ hasSelection, matTab, setMatTab, filteredMaterials, o
       {onApplyMetalToAll && (
         <div className="space-y-1.5">
           <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">All metal parts</div>
-          {/* Value stays empty so picking the same metal again re-applies it. */}
-          <Select value="" onValueChange={onApplyMetalToAll}>
+          {/* Without a current metal the value stays empty, so picking the same
+              metal again re-applies it. With one (the weight's metal), it shows it. */}
+          <Select value={metalToAllValue ?? ""} onValueChange={onApplyMetalToAll}>
             <SelectTrigger className="h-8 font-mono text-[11px]" aria-label="Apply one metal to all metal parts">
               <SelectValue placeholder="Choose a metal…" />
             </SelectTrigger>

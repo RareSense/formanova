@@ -134,7 +134,7 @@ export default function ImageToCAD() {
 
   // One metal choice for the page: the weight table, the download line and the
   // Material panel's "All metal parts" (which it keeps in step with the look).
-  const { view: weightView, chooseLook } = useCadMetal(workflow.metalWeight, editor.handleApplyMetalToAll);
+  const { view: weightView, chooseLook, look: metalLook } = useCadMetal(workflow.metalWeight, editor.handleApplyMetalToAll);
   const metalStep = <MetalWeightStep value={metalRequest} onChange={setMetalRequest} disabled={workflow.isGenerating} />;
 
   // Edit before CAD: the choice under the upload and the editor window.
@@ -380,6 +380,7 @@ export default function ImageToCAD() {
               onAction={editor.handleMeshAction}
               onApplyMaterial={editor.handleApplyMaterial}
               onApplyMetalToAll={chooseLook}
+              metalToAllValue={metalLook}
               onSceneAction={editor.handleSceneAction}
             />
             </div>

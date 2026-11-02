@@ -151,7 +151,7 @@ export default function TextToCAD({ variant = "idea" }: { variant?: DesignStartV
 
   // One metal choice for the page: the weight table, the download line and the
   // Material panel's "All metal parts" (which it keeps in step with the look).
-  const { view: weightView, chooseLook } = useCadMetal(workflow.metalWeight, editor.handleApplyMetalToAll);
+  const { view: weightView, chooseLook, look: metalLook } = useCadMetal(workflow.metalWeight, editor.handleApplyMetalToAll);
 
   /**
    * Create CAD from the design editor: the approved pictures (main first) go
@@ -383,6 +383,7 @@ export default function TextToCAD({ variant = "idea" }: { variant?: DesignStartV
               onAction={editor.handleMeshAction}
               onApplyMaterial={editor.handleApplyMaterial}
               onApplyMetalToAll={chooseLook}
+              metalToAllValue={metalLook}
               onSceneAction={editor.handleSceneAction}
             />
             </div>
