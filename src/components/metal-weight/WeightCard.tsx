@@ -148,10 +148,11 @@ export function WeightCard({
             className="block h-3.5 w-3.5 cursor-pointer accent-foreground"
           />
         </TableCell>
-        <TableCell className="h-8 w-full max-w-0 px-2 py-0">
+        <TableCell className="h-8 w-full max-w-0 px-2 py-1">
+          {/* The name wraps rather than cutting off: "(nickel)" vs "(palladium)" is the whole difference. */}
           <span className="flex min-w-0 items-center gap-1.5">
             <MaterialSphere category="metal" preview={appearanceForAlloy(item).preview} size={10} className="shrink-0" />
-            <span className="min-w-0 truncate font-body text-[11px]">{item.name}</span>
+            <span className="min-w-0 break-words font-body text-[11px] leading-tight">{item.name}</span>
           </span>
         </TableCell>
         <TableCell className={NUM}>{formatFixed2(rowGrams)}</TableCell>

@@ -74,13 +74,16 @@ describe('WeightCard', () => {
     expect(figures(rowOf('Platinum 950'))).toEqual(['45.38', '29.18', '43.11']);
   });
 
-  it('shows jeweller names, one line per row, the alloy detail in the row tooltip', () => {
+  it('shows jeweller names whole (wrapping, never cut), the alloy detail in the row tooltip', () => {
     renderCard();
     expect(radios().map((r) => r.getAttribute('aria-label'))).toEqual([
       '10K Yellow Gold', '14K Yellow Gold', '18K Yellow Gold', 'Sterling Silver 925', 'Platinum 950',
     ]);
     expect(rowOf('Platinum 950')).toHaveAttribute('title', 'Platinum 950: UPMR 95% Pt / 5% Ru, 20.70 g/cm³');
-    expect(within(rowOf('Platinum 950')).getByText('Platinum 950')).toHaveClass('truncate');
+    // "18K White Gold (nickel)" vs "(palladium)" is the whole difference: a name wraps rather than ellipsis.
+    const name = within(rowOf('Platinum 950')).getByText('Platinum 950');
+    expect(name).not.toHaveClass('truncate');
+    expect(name).toHaveClass('break-words');
   });
 
   it('marks the shown metal as the selected row', () => {
