@@ -134,6 +134,38 @@ describe('CAD generation history card', () => {
     expect(screen.getByTestId('location-state').textContent).toContain('/reference.jpg');
   });
 
+  it("tags the card with the shown version's metal weight, in its target alloy", () => {
+    render(
+      <MemoryRouter>
+        <WorkflowCard
+          workflow={{
+            ...cadWorkflow,
+            ring_versions: [
+              { assetId: 'asset-v1', position: 0, workflowId: 'workflow-v1', thumbnailUrl: null, glbUrl: '/v1.glb' },
+              { assetId: 'asset-v2', position: 1, workflowId: 'workflow-v2', thumbnailUrl: null, glbUrl: '/v2.glb' },
+            ],
+            cad_restore_seed: {
+              ring: {
+                set_id: 'set-1',
+                versions: [
+                  { asset_id: 'asset-v1', position: 0 },
+                  { asset_id: 'asset-v2', position: 1, metal_volume_mm3: 2192.4, weight_target: { grams: 25, tolerance_pct: 5, alloy_id: 'au10y' } },
+                ],
+              },
+              selectedVersionId: 'asset-v2',
+            },
+          } as WorkflowSummary}
+          index={1}
+          onClick={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('24.6 g · 10K')).toBeTruthy();
+    // Version 1 predates the volume: no tag rather than a made-up figure.
+    fireEvent.click(screen.getByRole('button', { name: 'Preview version 1' }));
+    expect(screen.queryByText(/ g · /)).toBeNull();
+  });
+
   it('downloads the viewing copy of the version on screen, from the menu only', async () => {
     render(
       <MemoryRouter>

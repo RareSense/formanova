@@ -30,6 +30,9 @@ import {
 } from '@/lib/cad-artifact-download';
 import { CadDownloadMenu } from '@/components/downloads/CadDownloadMenu';
 import type { CadRestoreSeed } from '@/lib/cad-versions-api';
+import { WeightTag } from '@/components/metal-weight/WeightTag';
+import { useMetalChoice } from '@/hooks/useMetalChoice';
+import { pickWeightSource, readWeightTarget } from '@/lib/metal-weight/source';
 
 const CAD_RENAMES_KEY = 'formanova_cad_renames';
 
@@ -149,6 +152,13 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
         specSheetOpenFlags: shownVaultVersion.spec_sheet_open_flags,
       }
     : null;
+  // The same version's metal weight, in its target alloy or the user's usual one.
+  const weightSource = pickWeightSource({ versionVolumeMm3: shownVaultVersion?.metal_volume_mm3 });
+  const { alloy: weightAlloy } = useMetalChoice({
+    key: shownVaultVersion?.asset_id ?? null,
+    target: readWeightTarget(shownVaultVersion?.weight_target),
+    requestedAlloyId: null,
+  });
   const viewerThreedmFilename = `${shownBaseName}-viewing-copy.3dm`;
   const renameInputId = `cad-design-name-${workflow.workflow_id}`;
 
@@ -379,6 +389,7 @@ function CadTextCard({ workflow, index }: { workflow: WorkflowSummary; index: nu
                   >
                     {isEnriching ? '—' : visibleBaseName}
                   </span>
+                  {!isEnriching && <WeightTag source={weightSource} alloy={weightAlloy} className="ml-auto" />}
                   {!isEnriching && workflow.glb_url && (
                     <button
                       ref={renameButtonRef}
