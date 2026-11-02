@@ -365,10 +365,12 @@ export default function ImageToCAD() {
             />
       }
       right={(section) => (
-          <div className="flex h-full min-h-0 flex-col">
+          // One scroll for the whole inspector: the weight table at its natural height, then
+          // Material/Parts with room for both halves, so nothing is cut between sections.
+          <div className="flex h-full min-h-0 flex-col overflow-y-auto">
             {/* Weight heads the inspector, above Material (and the phone's Material tab). */}
             {section !== "parts" && <WeightCard {...weightView} />}
-            <div className="min-h-0 flex-1">
+            <div className="min-h-[36rem] flex-1">
             <MeshPanel
               section={section}
               meshes={editor.meshes}

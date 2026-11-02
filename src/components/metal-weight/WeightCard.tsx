@@ -12,9 +12,10 @@
  *
  * The rows are the metal picker: native radios sharing one name (arrow keys
  * move the choice), and a click anywhere on a row picks it. One line per row:
- * number columns are sized in ch to their longest figure, the name takes the
- * rest and truncates only in a very narrow panel (full detail in the row
- * tooltip). Collapsed, the header still reads "27.98 g · 14K Yellow Gold".
+ * number columns shrink to their figures, the name takes the rest and
+ * truncates only in a very narrow panel (full detail in the row tooltip).
+ * Type follows the Parts list: names in the body font, figures and headers in
+ * mono. Collapsed, the header still reads "27.98 g · 14K Yellow Gold".
  * Every figure is the measured volume times that row's cited density.
  */
 import { useId, useState } from 'react';
@@ -51,9 +52,10 @@ function rememberHintSeen() {
 }
 
 const INFO_BUTTON = 'inline-flex shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
-const NUM = 'whitespace-nowrap pl-3 text-right tabular-nums';
-/** Padding inside a number column (pl-3). */
-const COL_PAD = '0.75rem';
+/** A number column: as narrow as its widest figure or header, right-aligned. */
+const NUM = 'w-px whitespace-nowrap pl-3 text-right tabular-nums';
+/** Row inset (8) + radio (14) + gap (6) + swatch (10) + gap (6): where the names start. */
+const NAME_INDENT = 'pl-11';
 
 interface Row {
   alloy: MetalAlloy;
@@ -95,9 +97,6 @@ export function WeightCard({ source, target, alloy, setAlloyId, requestedUnavail
     return g === null ? null : { alloy: item, g: formatFixed2(g), dwt: formatFixed2(dwtFromGrams(g)), after: formatFixed2(finishedGrams(g)) };
   };
   const rowGroups = groups.map((group) => ({ label: group.label, rows: group.alloys.map(toRow).filter((r): r is Row => r !== null) }));
-  const allRows = rowGroups.flatMap((g) => g.rows);
-  // Number columns fit their longest figure (or header), in ch of this mono font.
-  const widest = (key: 'g' | 'dwt' | 'after', header: number) => Math.max(header, ...allRows.map((r) => r[key].length));
 
   const row = (item: Row) => {
     const selected = item.alloy.id === alloy.id;
@@ -108,12 +107,14 @@ export function WeightCard({ source, target, alloy, setAlloyId, requestedUnavail
         title={`${item.alloy.name}: ${item.alloy.alloy}, ${item.alloy.density_cited} g/cm³`}
         onClick={() => pick(item.alloy.id)}
         className={cn(
-          'h-8 cursor-pointer transition-colors focus-within:outline focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-ring',
-          selected ? 'bg-accent font-semibold text-foreground' : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+          // A subtle tint of the text colour reads as a highlight in light and dark alike;
+          // the ring shows for keyboard focus only.
+          'h-8 cursor-pointer transition-colors has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:-outline-offset-2 has-[:focus-visible]:outline-ring',
+          selected ? 'bg-foreground/[0.07] font-semibold text-foreground' : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground',
         )}
       >
-        <td className="min-w-0 pr-2">
-          <span className="flex min-w-0 items-center gap-2">
+        <td className="w-full max-w-0 pl-2 pr-1">
+          <span className="flex min-w-0 items-center gap-1.5">
             <input
               type="radio"
               name={`${ids}-metal`}
@@ -124,12 +125,12 @@ export function WeightCard({ source, target, alloy, setAlloyId, requestedUnavail
               className="h-3.5 w-3.5 shrink-0 cursor-pointer accent-foreground"
             />
             <MaterialSphere category="metal" preview={appearanceForAlloy(item.alloy).preview} size={10} className="shrink-0" />
-            <span className="min-w-0 truncate">{item.alloy.name}</span>
+            <span className="min-w-0 truncate font-body text-[11px]">{item.alloy.name}</span>
           </span>
         </td>
         <td className={NUM}>{item.g}</td>
         <td className={NUM}>{item.dwt}</td>
-        <td className={NUM}>{item.after}</td>
+        <td className={cn(NUM, 'pr-2')}>{item.after}</td>
       </tr>
     );
   };
@@ -137,7 +138,7 @@ export function WeightCard({ source, target, alloy, setAlloyId, requestedUnavail
   return (
     // Its own provider, so the card works wherever it is mounted (nested providers are fine).
     <TooltipProvider delayDuration={200}>
-    <section aria-label="Metal weight" className="max-h-[60%] flex-shrink-0 overflow-y-auto overflow-x-hidden border-b border-l border-border bg-card scrollbar-thin">
+    <section aria-label="Metal weight" className="flex-shrink-0 overflow-x-hidden border-b border-l border-border bg-card">
       <button
         type="button"
         aria-expanded={open}
@@ -160,20 +161,16 @@ export function WeightCard({ source, target, alloy, setAlloyId, requestedUnavail
             </p>
           ) : (
             <>
-              <table className="w-full table-fixed border-collapse">
+              {/* 8 px wider than the gutter on each side: the row tint and focus ring
+                  get room while radios and figures line up with the text around them. */}
+              <table className="-mx-2 w-[calc(100%+1rem)] border-collapse">
                 <caption className="sr-only">Metal weight in each metal</caption>
-                <colgroup>
-                  <col />
-                  <col style={{ width: `calc(${widest('g', 5)}ch + ${COL_PAD})` }} />
-                  <col style={{ width: `calc(${widest('dwt', 3)}ch + ${COL_PAD})` }} />
-                  <col style={{ width: `calc(max(${widest('after', 0)}ch, 12ch + 1rem) + ${COL_PAD})` }} />
-                </colgroup>
-                <thead className="text-muted-foreground">
+                <thead className="text-[10px] text-muted-foreground">
                   <tr className="h-8">
-                    <th scope="col" className="pl-[calc(0.875rem+0.5rem+10px+0.5rem)] text-left font-normal">Metal</th>
+                    <th scope="col" className={cn('w-full max-w-0 truncate text-left font-normal', NAME_INDENT)}>Metal</th>
                     <th scope="col" className={cn(NUM, 'font-normal')}>Grams</th>
                     <th scope="col" className={cn(NUM, 'font-normal')}>DWT</th>
-                    <th scope="col" className={cn(NUM, 'font-normal')}>
+                    <th scope="col" className={cn(NUM, 'pr-2 font-normal')}>
                       <span className="inline-flex items-center justify-end gap-1">
                         After polish
                         <Tooltip>
@@ -192,7 +189,7 @@ export function WeightCard({ source, target, alloy, setAlloyId, requestedUnavail
                   {rowGroups.map((group) => [
                     group.label && (
                       <tr key={`group-${group.label}`} className="h-7">
-                        <th scope="rowgroup" colSpan={4} className="pt-1 text-left align-bottom text-[10px] font-normal uppercase tracking-[0.12em] text-muted-foreground">
+                        <th scope="rowgroup" colSpan={4} className="pl-2 pt-1 text-left align-bottom text-[10px] font-normal uppercase tracking-[0.12em] text-muted-foreground">
                           {group.label}
                         </th>
                       </tr>
