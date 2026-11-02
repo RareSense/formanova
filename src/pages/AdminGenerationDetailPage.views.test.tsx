@@ -163,3 +163,43 @@ describe('a fetched picture that has not painted yet', () => {
     URL.revokeObjectURL = original.revoke;
   });
 });
+
+describe('the reel Poster is never an empty strip (step 3 and Outputs)', () => {
+  // Every state of every Poster thumbnail must show something: a loading placeholder, the
+  // picture, or "Could not load". An empty <div> or a 0-content figure is the bug.
+  const posters = () => [
+    ...section('Steps').getAllByRole('figure', { name: 'Poster' }),
+    ...section('Outputs').getAllByRole('figure', { name: 'Poster' }),
+  ];
+
+  it('shows Could not load in both places when the fetch fails', async () => {
+    renderDetail(syntheticReelRun());
+    expect(section('Steps').getAllByRole('figure', { name: 'Poster' }).length).toBeGreaterThan(0);
+    for (const poster of posters()) {
+      expect(await within(poster).findByText('Could not load')).toBeTruthy();
+    }
+  });
+
+  it('shows a Loading placeholder, then the picture, in both places', async () => {
+    const original = { create: URL.createObjectURL, revoke: URL.revokeObjectURL };
+    URL.createObjectURL = () => 'blob:poster';
+    URL.revokeObjectURL = () => {};
+    authFetch.authenticatedFetch.mockImplementation(async (url: string) => (
+      url === proxy(105) ? new Response(new Blob(['png'], { type: 'image/png' }), { status: 200 }) : new Response('{}', { status: 404 })
+    ));
+    const { unmount } = renderDetail(syntheticReelRun());
+    try {
+      for (const poster of posters()) {
+        const img = await within(poster).findByRole('img', { name: 'Poster' });
+        expect(within(poster).getByText('Loading')).toBeTruthy();
+        fireEvent.load(img);
+        expect(within(poster).queryByText('Loading')).toBeNull();
+        expect(img.getAttribute('src')).toBe('blob:poster');
+      }
+    } finally {
+      unmount();
+      URL.createObjectURL = original.create;
+      URL.revokeObjectURL = original.revoke;
+    }
+  });
+});
