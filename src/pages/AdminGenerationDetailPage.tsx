@@ -39,7 +39,7 @@ import { parseServerTime } from '@/lib/server-time';
 import { costView, USER_PAID_HELP, WORKFLOW_COST_HELP } from '@/lib/admin-cost-display';
 import { readProviderSpend } from '@/lib/admin-provider-spend';
 import { buildRunView } from '@/lib/admin-workflow-views';
-import { findNodes, technicalNodes } from '@/lib/admin-workflow-views/walker';
+import { findNodes, technicalNodes, type ViewNode } from '@/lib/admin-workflow-views/walker';
 import { buildIoSummary } from '@/lib/admin-workflow-views/io-summary';
 import { CostLabel, ProviderSpendBlock, WorkflowCostValue } from '@/components/admin/AdminCost';
 import { ImageThumb } from '@/components/admin/workflow-view/ImageThumb';
@@ -235,6 +235,19 @@ function MetaItem({ label, value }: { label: string; value: string }) {
       <p className="text-sm">{value}</p>
     </div>
   );
+}
+
+/**
+ * The request tree without the customer's prompt, for the Input payload section: the prompt is
+ * shown once, under the input pictures in the Inputs -> Outputs strip. Display only; the run
+ * view itself keeps every value, and the Raw JSON still carries the prompt.
+ */
+function withoutPrompt(node: ViewNode, prompt: string | null): ViewNode {
+  if (!prompt) return node;
+  const isPrompt = (n: ViewNode) => (n.kind === 'text' || n.kind === 'value') && n.value.trim() === prompt;
+  if (node.kind === 'group') return { ...node, children: node.children.filter((c) => !isPrompt(c)).map((c) => withoutPrompt(c, prompt)) };
+  if (node.kind === 'list') return { ...node, items: node.items.filter((c) => !isPrompt(c)).map((c) => withoutPrompt(c, prompt)) };
+  return node;
 }
 
 /** A section closed by default, as in the earlier simple layout; its title names the region. */
@@ -546,8 +559,10 @@ export function RunInputsPanel({ detail }: { detail: AdminGenerationDetail }) {
  */
 export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
   const {
-    cadSourceType, isCadModel: isCadSource, designHistory, designHistoryQuery, fromDoodle,
+    cadSourceType, isCadModel: isCadSource, designHistory, designHistoryQuery, fromDoodle, cadInputs, studioInputs,
   } = useCadRunInputs(detail);
+  // The customer's own words (CAD runs, and design-picture runs), trimmed as the readers return it.
+  const customerPrompt = cadInputs?.prompt ?? studioInputs?.prompt ?? null;
   const view = useMemo(() => buildRunView(detail, isCadSource), [detail, isCadSource]);
   // cad_to_catalog_* names contain "cad" but are not CAD models; the registry decides.
   const isCadModel = view.family === 'cad_model';
@@ -601,6 +616,7 @@ export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
       { label: 'Output image (from complaint)', url: complaintOutput, kind: 'image' },
     ],
   }), [view, fallbackGlb, fallback3dm, complaintOutput]);
+  const inputsWithoutPrompt = useMemo(() => withoutPrompt(view.inputs, customerPrompt), [view.inputs, customerPrompt]);
   const technical = useMemo(() => [
     { where: 'Input payload', tool: undefined, nodes: technicalNodes(view.inputs) },
     ...view.steps.flatMap((s) => [
@@ -655,7 +671,7 @@ export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
         </Card>
       </section>
 
-      <IoStrip summary={ioSummary} fallbackStem={detail.workflow_id} />
+      <IoStrip summary={ioSummary} fallbackStem={detail.workflow_id} prompt={customerPrompt} />
 
       <CollapsibleCardSection title="Steps">
         <StepTimeline steps={view.steps} enh={view.enh} fallbackStem={detail.workflow_id} />
@@ -669,7 +685,7 @@ export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
             <Loader2 className="h-4 w-4 animate-spin" /> Loading design steps
           </div>
         ) : null)}
-        <NodeView node={view.inputs} opts={{ ...opts, hideTechnical: true }} />
+        <NodeView node={inputsWithoutPrompt} opts={{ ...opts, hideTechnical: true }} />
         <p className="text-xs text-muted-foreground">
           Raw JSON shows the submitted request; the AI actually used is under 'Applied at Start'.
         </p>

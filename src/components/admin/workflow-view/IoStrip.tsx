@@ -8,7 +8,8 @@ import { FileTile, ModelTile } from './IoTiles';
 /**
  * The run at a glance, right under the run header: [input tiles] -> [output tiles] on one
  * line. It wraps on wider screens; on phones the strip scrolls sideways inside itself, the
- * page does not. Prompts, settings, steps and raw JSON are in the collapsed sections below.
+ * page does not. The customer's prompt sits right under the input tiles (clamped, with a
+ * more toggle); settings, steps and raw JSON are in the collapsed sections below.
  * No data-path here: the completeness contract is about those sections.
  */
 function Tile({ item, fallbackStem }: { item: IoItem; fallbackStem: string }) {
@@ -17,7 +18,42 @@ function Tile({ item, fallbackStem }: { item: IoItem; fallbackStem: string }) {
   return <FileTile item={item} fallbackStem={fallbackStem} />;
 }
 
-function Group({ title, items, fallbackStem }: { title: 'Inputs' | 'Outputs'; items: IoItem[]; fallbackStem: string }) {
+/** Prompts longer than this (or over PROMPT_LINES lines) start clamped, with a "more" toggle. */
+const PROMPT_CLAMP_CHARS = 180;
+const PROMPT_LINES = 3;
+
+function InputPrompt({ prompt }: { prompt: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const clampable = prompt.length > PROMPT_CLAMP_CHARS || prompt.split('\n').length > PROMPT_LINES;
+  const clamped = clampable && !expanded;
+  return (
+    <div data-testid="admin-io-prompt" className="w-64 space-y-1 sm:w-auto sm:max-w-md">
+      <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Customer prompt</p>
+      <p
+        data-testid="admin-io-prompt-text"
+        className={`whitespace-pre-wrap break-words text-sm leading-relaxed ${clamped ? 'line-clamp-3' : ''}`}
+      >
+        {prompt}
+      </p>
+      {clampable && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+        >
+          {expanded ? 'less' : 'more'}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function Group({ title, items, fallbackStem, prompt }: {
+  title: 'Inputs' | 'Outputs';
+  items: IoItem[];
+  fallbackStem: string;
+  prompt?: string | null;
+}) {
   const [limit, setLimit] = useState(TILE_PAGE);
   const id = `admin-io-${title.toLowerCase()}`;
   return (
@@ -40,17 +76,19 @@ function Group({ title, items, fallbackStem }: { title: 'Inputs' | 'Outputs'; it
           </button>
         )}
       </div>
+      {prompt && <InputPrompt prompt={prompt} />}
     </div>
   );
 }
 
-export function IoStrip({ summary, fallbackStem }: { summary: IoSummary; fallbackStem: string }) {
+/** `prompt`: the customer's own words, shown under the input tiles (CAD and design-picture runs). */
+export function IoStrip({ summary, fallbackStem, prompt = null }: { summary: IoSummary; fallbackStem: string; prompt?: string | null }) {
   return (
     <section aria-labelledby="admin-section-io" className="min-w-0 rounded-lg border border-border bg-card p-4 sm:p-6">
       <h2 id="admin-section-io" className="mb-3 font-display text-2xl font-semibold tracking-wide">Inputs → Outputs</h2>
       <div className="-mx-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:overflow-visible sm:px-0 sm:pb-0">
         <div className="flex w-max items-start gap-4 sm:w-auto sm:flex-wrap">
-          <Group title="Inputs" items={summary.inputs} fallbackStem={fallbackStem} />
+          <Group title="Inputs" items={summary.inputs} fallbackStem={fallbackStem} prompt={prompt} />
           <div className="flex h-[120px] shrink-0 items-center self-start pt-6 text-muted-foreground" aria-hidden>
             <ArrowRight className="h-6 w-6" />
           </div>
