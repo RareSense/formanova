@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { normalizeAdminGenerationDetail } from '@/lib/admin-generations-api';
@@ -13,7 +14,9 @@ import {
   SupervisedRunsApiError,
   UPLOAD_ROLES,
   getSupervisedRun,
+  hasFileHeader,
   isUncertainCheckFailure,
+  parseOpenFlags,
   removeSupervisedUpload,
   sameNames,
   sendSupervisedReplacement,
@@ -61,6 +64,10 @@ const CHECK_WAIT_MS = 3 * 60 * 1000;
 const CHECK_TIMEOUT_COPY = 'The check is taking long. Refresh in a minute to see if it finished.';
 // The backend marks an upload that failed its check as removed; after a cut-off the reason is lost.
 const CHECK_FAILED_COPY = 'This file failed the check. Upload it again.';
+const HEADER_COPY: Partial<Record<UploadRole, string>> = {
+  spec_sheet: 'Not a PDF (the file must start with %PDF).',
+};
+const OPEN_FLAGS_COPY = 'Enter a whole number of 0 or more, or leave it empty.';
 
 const KiB = 1024;
 const MiB = 1024 * KiB;
@@ -213,6 +220,7 @@ export default function SupervisedReplacementPanel({
   const [moreOpen, setMoreOpen] = useState(false);
   const [ownSending, setOwnSending] = useState(false);
   const [ownMessage, setOwnMessage] = useState<string | null>(null);
+  const [openFlags, setOpenFlags] = useState('');
   // One upload at a time per role; state alone would let a same-tick second pick through.
   const inFlight = useRef(new Set<UploadRole>());
   const ownLock = useRef(false);
@@ -236,6 +244,13 @@ export default function SupervisedReplacementPanel({
   const needsType = missing.includes('jewelry_type');
   const fileBusy = Object.keys(transfers).length > 0 || Object.keys(removing).length > 0;
   const actionsLocked = locked || ownSending;
+  // The open review items belong to a checked spec sheet; without one they are never sent.
+  const hasSpecSheet = (detail.uploads ?? []).some((u) => u.role === 'spec_sheet' && isVerified(u));
+  const parsedFlags = parseOpenFlags(openFlags);
+  const flagsValid = !hasSpecSheet || parsedFlags.ok;
+  useEffect(() => {
+    if (!hasSpecSheet) setOpenFlags('');
+  }, [hasSpecSheet]);
 
   // A tick only counts for the missing list it was made against: when a name leaves the list
   // (an upload filled it) it is dropped, so it comes back unticked if the list brings it back.
@@ -256,6 +271,7 @@ export default function SupervisedReplacementPanel({
   const canSend = hasModel
     && sameNames(tickedNow, ackNames)
     && (!needsType || Boolean(jewelryType))
+    && flagsValid
     && !actionsLocked
     && !fileBusy;
 
@@ -276,6 +292,25 @@ export default function SupervisedReplacementPanel({
       return;
     }
     inFlight.current.add(spec.role);
+    if (spec.header) {
+      let headerOk = false;
+      try {
+        headerOk = await hasFileHeader(file, spec.header);
+      } catch {
+        // An unreadable file is refused like a wrong one.
+      }
+      if (!headerOk) {
+        inFlight.current.delete(spec.role);
+        if (mounted.current) {
+          setRole(setErrors, spec.role, HEADER_COPY[spec.role] ?? `Wrong file (it must start with ${spec.header}).`);
+        }
+        return;
+      }
+      if (!mounted.current) {
+        inFlight.current.delete(spec.role);
+        return;
+      }
+    }
     // The file this role holds now: once the role shows a different verified upload, it is ours.
     const previousId = (detail.uploads ?? []).find((u) => u.role === spec.role && isVerified(u))?.upload_id;
     setRole<Transfer>(setTransfers, spec.role, { stage: 'uploading', progress: 0 });
@@ -375,7 +410,11 @@ export default function SupervisedReplacementPanel({
     const ack = [...tickedNow];
     const type = needsType ? jewelryType : undefined;
     const note = userNote;
-    const action = () => sendSupervisedReplacement(workflowId, ack, type, note);
+    // Without a spec sheet the call (and so the request) stays exactly as it was before them.
+    const flags = hasSpecSheet && parsedFlags.ok ? parsedFlags.value : undefined;
+    const action = hasSpecSheet
+      ? () => sendSupervisedReplacement(workflowId, ack, type, note, flags)
+      : () => sendSupervisedReplacement(workflowId, ack, type, note);
     void (runAction ? runAction(action) : runOwn(action));
   }
 
@@ -490,6 +529,29 @@ export default function SupervisedReplacementPanel({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+        )}
+
+        {hasSpecSheet && (
+          <div className="space-y-2">
+            <label
+              htmlFor="replacement-open-flags"
+              className="block font-mono text-[10px] uppercase tracking-widest text-muted-foreground"
+            >
+              Open review items
+            </label>
+            <Input
+              id="replacement-open-flags"
+              inputMode="numeric"
+              value={openFlags}
+              disabled={actionsLocked}
+              aria-invalid={!parsedFlags.ok}
+              onChange={(event) => setOpenFlags(event.target.value)}
+              placeholder="Leave empty if unknown"
+              className="w-full sm:w-56"
+            />
+            <p className="text-xs text-muted-foreground">Items on the spec sheet the jeweller still has to check.</p>
+            {!parsedFlags.ok && <p className="break-words text-sm text-destructive" role="alert">{OPEN_FLAGS_COPY}</p>}
           </div>
         )}
 

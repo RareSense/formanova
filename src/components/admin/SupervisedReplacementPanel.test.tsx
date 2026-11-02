@@ -75,6 +75,7 @@ describe('SupervisedReplacementPanel', () => {
     const labels = [
       'GLB model', 'Rhino 3DM', 'Viewer 3DM (mesh only)', 'CAD code', 'Loop state', 'Thumbnail',
       'Design contract', 'Reference manifest', 'Full model STL', 'Full model STEP', 'Casting STL', 'Stone list',
+      'Spec sheet (PDF)',
     ];
     const { unmount } = render(
       <SupervisedReplacementPanel detail={detail()} workflowId="wf-1" onChanged={vi.fn()} />,
@@ -410,5 +411,106 @@ describe('SupervisedReplacementPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
     await waitFor(() => expect(api.removeSupervisedUpload).toHaveBeenCalledWith('wf-1', 'glb'));
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
+  });
+
+  describe('spec sheet', () => {
+    const sheetUpload = {
+      upload_id: 'u-sheet',
+      role: 'spec_sheet' as const,
+      filename: 'ring_spec_sheet.pdf',
+      status: 'verified',
+      bytes: 4096,
+      sha256: null,
+      uploaded_by_email: 'a@b.c',
+      created_at: '2026-11-02T10:00:00Z',
+      verified_at: '2026-11-02T10:01:00Z',
+    };
+    const pdf = (name = 'ring_spec_sheet.pdf') => new File(['%PDF-1.7\n%stuff'], name, { type: 'application/pdf' });
+
+    it('takes a PDF only, max 50 MiB', () => {
+      renderPanel(detail());
+      openMoreFiles();
+      const input = screen.getByLabelText('Spec sheet (PDF) file');
+      expect(input.getAttribute('accept')).toBe('.pdf,application/pdf');
+      expect(screen.getByText('.pdf,application/pdf · max 50 MiB')).toBeTruthy();
+    });
+
+    it('uploads a chosen PDF to the spec_sheet role', async () => {
+      api.uploadReplacementFile.mockResolvedValue({ upload_id: 'u-sheet', role: 'spec_sheet', ref: {} });
+      const onChanged = renderPanel(detail());
+      openMoreFiles();
+      const file = pdf();
+      pick('Spec sheet (PDF)', file);
+      await waitFor(() => expect(onChanged).toHaveBeenCalled());
+      expect(api.uploadReplacementFile).toHaveBeenCalledWith('wf-1', 'spec_sheet', file, expect.anything());
+    });
+
+    it('refuses a file that does not start with %PDF, without uploading', async () => {
+      renderPanel(detail());
+      openMoreFiles();
+      pick('Spec sheet (PDF)', new File(['PK\u0003\u0004 a zip'], 'sheet.pdf', { type: 'application/pdf' }));
+      expect((await screen.findByRole('alert')).textContent).toBe('Not a PDF (the file must start with %PDF).');
+      expect(api.uploadReplacementFile).not.toHaveBeenCalled();
+    });
+
+    it('refuses a PDF over 50 MiB, without uploading', async () => {
+      renderPanel(detail());
+      openMoreFiles();
+      const big = pdf();
+      Object.defineProperty(big, 'size', { value: 50 * 1024 * 1024 + 1 });
+      pick('Spec sheet (PDF)', big);
+      expect((await screen.findByRole('alert')).textContent).toBe('Too big for this role (max 50 MiB).');
+      expect(api.uploadReplacementFile).not.toHaveBeenCalled();
+    });
+
+    it('shows Open review items only once a spec sheet is uploaded', () => {
+      const { unmount } = render(
+        <SupervisedReplacementPanel detail={detail()} workflowId="wf-1" onChanged={vi.fn()} />,
+      );
+      openMoreFiles();
+      expect(screen.queryByLabelText('Open review items')).toBeNull();
+      unmount();
+      renderPanel(detail({ uploads: [sheetUpload] }));
+      expect(screen.getByText('ring_spec_sheet.pdf')).toBeTruthy();
+      expect(screen.getByLabelText('Open review items')).toBeTruthy();
+    });
+
+    it('sends the open review items with the replacement', async () => {
+      api.sendSupervisedReplacement.mockResolvedValue({ accepted: true, phase: 'finalizing' });
+      renderPanel(detail({ uploads: [sheetUpload] }));
+      fireEvent.change(screen.getByLabelText('Open review items'), { target: { value: '3' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Send replacement' }));
+      await waitFor(() => expect(api.sendSupervisedReplacement).toHaveBeenCalledWith('wf-1', [], undefined, undefined, 3));
+    });
+
+    it('sends null for an empty Open review items box', async () => {
+      api.sendSupervisedReplacement.mockResolvedValue({ accepted: true, phase: 'finalizing' });
+      renderPanel(detail({ uploads: [sheetUpload] }));
+      fireEvent.click(screen.getByRole('button', { name: 'Send replacement' }));
+      await waitFor(() => expect(api.sendSupervisedReplacement).toHaveBeenCalledWith('wf-1', [], undefined, undefined, null));
+    });
+
+    it('refuses negatives, decimals and non-numbers and holds Send meanwhile', () => {
+      renderPanel(detail({ uploads: [sheetUpload] }));
+      const box = screen.getByLabelText('Open review items');
+      const send = screen.getByRole('button', { name: 'Send replacement' });
+      for (const bad of ['-1', '1.5', 'abc']) {
+        fireEvent.change(box, { target: { value: bad } });
+        expect(screen.getByRole('alert').textContent).toBe('Enter a whole number of 0 or more, or leave it empty.');
+        expect(send.hasAttribute('disabled')).toBe(true);
+      }
+      fireEvent.change(box, { target: { value: '0' } });
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(send.hasAttribute('disabled')).toBe(false);
+    });
+
+    it('sends exactly the old four arguments without a spec sheet', async () => {
+      api.sendSupervisedReplacement.mockResolvedValue({ accepted: true, phase: 'finalizing' });
+      renderPanel(detail());
+      fireEvent.click(screen.getByRole('button', { name: 'Send replacement' }));
+      await waitFor(() => expect(api.sendSupervisedReplacement).toHaveBeenCalled());
+      expect(api.sendSupervisedReplacement.mock.calls[0]).toEqual(['wf-1', [], undefined, undefined]);
+      expect(api.sendSupervisedReplacement.mock.calls[0]).toHaveLength(4);
+    });
   });
 });
