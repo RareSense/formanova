@@ -1,5 +1,6 @@
 import { azureUriToUrl } from '@/lib/azure-utils';
 import type { CadReferenceItem } from '@/lib/microservices-api';
+import { METAL_ALLOYS, materialPayload, type MetalAlloy } from '@/lib/metal-weight/alloys';
 
 /**
  * ring-cad-nurbs-api.ts
@@ -162,27 +163,13 @@ export function cadJewelryNoun(type: CadJewelryType): string {
   return CAD_JEWELRY_TYPES.find((t) => t.value === type)?.noun ?? 'piece';
 }
 
-export interface CadMaterialProfile {
-  id: string;
-  label: string;
-  alloy: string;
-  density_g_cm3: number;
-  density_source: string;
-}
-
-const STULLER_DENSITY_SOURCE = 'Stuller specific-gravity chart: https://www.stuller.com/articles/view/where-to-find-gravity-of-materials/';
-
-/** Explicit presets only. Alloy density varies by formulation, so no prompt inference is used. */
-export const CAD_MATERIAL_PROFILES: readonly CadMaterialProfile[] = [
-  { id: 'sterling_silver', label: 'Sterling silver', alloy: 'Sterling silver', density_g_cm3: 10.40, density_source: STULLER_DENSITY_SOURCE },
-  { id: '14k_yellow_gold', label: '14K yellow gold', alloy: '14K yellow gold', density_g_cm3: 13.07, density_source: STULLER_DENSITY_SOURCE },
-  { id: '14k_white_gold', label: '14K white gold', alloy: '14K white gold', density_g_cm3: 12.61, density_source: STULLER_DENSITY_SOURCE },
-  { id: '14k_rose_gold', label: '14K rose gold', alloy: '14K red/rose gold', density_g_cm3: 13.26, density_source: STULLER_DENSITY_SOURCE },
-  { id: '18k_yellow_gold', label: '18K yellow gold', alloy: '18K yellow gold', density_g_cm3: 15.58, density_source: STULLER_DENSITY_SOURCE },
-  { id: '18k_white_gold', label: '18K white gold', alloy: '18K white gold', density_g_cm3: 14.64, density_source: STULLER_DENSITY_SOURCE },
-  { id: '18k_rose_gold', label: '18K rose gold', alloy: '18K red/rose gold', density_g_cm3: 15.18, density_source: STULLER_DENSITY_SOURCE },
-  { id: 'platinum_cobalt', label: 'Platinum cobalt', alloy: 'Platinum cobalt', density_g_cm3: 20.80, density_source: STULLER_DENSITY_SOURCE },
-] as const;
+/**
+ * The alloy sent as payload.material. Densities live in one cited table,
+ * src/lib/metal-weight/alloys.ts; these two names stay so existing imports keep
+ * working, and the request's material block keeps its three keys.
+ */
+export type CadMaterialProfile = MetalAlloy;
+export const CAD_MATERIAL_PROFILES: readonly CadMaterialProfile[] = METAL_ALLOYS;
 
 // -- Request ---------------------------------------------------------------
 
@@ -352,11 +339,7 @@ export function buildRingCadStartBody({
     payload.analysis_tier = tier;
   }
   if (material) {
-    payload.material = {
-      alloy: material.alloy,
-      density_g_cm3: material.density_g_cm3,
-      density_source: material.density_source,
-    };
+    payload.material = materialPayload(material);
   }
 
   if (clientFlow) payload.client_flow = clientFlow;

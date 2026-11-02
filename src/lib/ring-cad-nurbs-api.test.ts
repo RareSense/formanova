@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildRingCadStartBody,
   CAD_JEWELRY_TYPES,
+  CAD_MATERIAL_PROFILES,
   cadJewelryNoun,
   DEFAULT_CAD_JEWELRY_TYPE,
   isRingCadSuccess,
@@ -18,6 +19,16 @@ import {
 const IMG = (n: number) => `data:image/jpeg;base64,IMG${n}`;
 
 describe('ring_cad_nurbs_v1 start body', () => {
+  it('sends the chosen alloy as material, with the same three keys as before', () => {
+    const { payload } = buildRingCadStartBody({
+      referenceImages: [],
+      userDescription: 'band',
+      material: CAD_MATERIAL_PROFILES.find((p) => p.id === 'au18y'),
+    });
+    expect(Object.keys(payload.material as object).sort()).toEqual(['alloy', 'density_g_cm3', 'density_source']);
+    expect((payload.material as { density_g_cm3: number }).density_g_cm3).toBe(15.49);
+  });
+
   it('text-only mode sends count 0 and the description, with no artifact fields', () => {
     const { payload } = buildRingCadStartBody({
       referenceImages: [],
