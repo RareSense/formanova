@@ -379,7 +379,7 @@ describe('useImageToCADWorkflow supervised runs', () => {
 
 describe('useImageToCADWorkflow metal weight', () => {
   const au14y = { id: 'au14y', label: '14K Yellow Gold', family: 'gold' as const, karat: 14, colour: 'yellow' as const,
-    density_g_cm3: 12.76, alloy: 'UPMR 204 Standard Yellow', source_url: 'https://www.unitedpmr.com/wp-content/uploads/2021/07/204.pdf' };
+    density_g_cm3: 12.76, density_cited: '12.76', alloy: 'UPMR 204 Standard Yellow', source_url: 'https://www.unitedpmr.com/wp-content/uploads/2021/07/204.pdf' };
   const weightTarget = { grams: 28, tolerance_pct: 5, alloy_id: 'au14y' };
 
   beforeEach(() => {

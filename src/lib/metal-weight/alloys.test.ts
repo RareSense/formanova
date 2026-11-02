@@ -38,6 +38,19 @@ describe('alloy table', () => {
     });
   });
 
+  it('keeps each density as written in Appendix A, and it matches the number', () => {
+    const cited = Object.fromEntries(METAL_ALLOYS.map((a) => [a.id, a.density_cited]));
+    expect(cited).toEqual({
+      au9y: '11.1', au9w: '11.9', au9r: '11.1',
+      au10y: '11.24', au10w: '11.0', au10wpd: '12.7', au10r: '11.68',
+      au14y: '12.76', au14w: '12.55', au14wpd: '14.08', au14r: '13.16',
+      au18y: '15.49', au18w: '14.59', au18wpd: '15.84', au18r: '15.09',
+      au22y: '17.55', au24: '19.32',
+      ag925: '10.36', pt950ru: '20.70', pt950ir: '21.50', pd950: '12.10',
+    });
+    for (const a of METAL_ALLOYS) expect(Number(a.density_cited)).toBe(a.density_g_cm3);
+  });
+
   it('cites the Appendix A source for a sample of rows', () => {
     expect(findAlloy('au9w')?.source_url).toBe('https://www.cooksongold.com/downloads/files/bullion/9ctWM_properties_sheet.pdf');
     expect(findAlloy('au18wpd')?.source_url).toBe('https://www.unitedpmr.com/wp-content/uploads/2026/08/Alloy-PD-2.pdf');

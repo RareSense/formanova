@@ -117,7 +117,7 @@ export function WeightCard({ source, target, alloy, setAlloyId, requestedUnavail
               </button>
 
               <p className="leading-relaxed text-muted-foreground">
-                {`Density ${alloy.density_g_cm3} g/cm³, `}
+                {`Density ${alloy.density_cited} g/cm³, `}
                 <a href={alloy.source_url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-foreground">
                   {alloy.alloy}
                 </a>
