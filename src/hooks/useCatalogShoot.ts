@@ -28,6 +28,10 @@ import {
 } from '@/lib/cad-to-catalog-queue';
 import { anglesFor } from '@/lib/cad-to-catalog-angles';
 import { buildZip } from '@/lib/cad-to-catalog-zip';
+import {
+  trackCatalogModelLoaded, trackCatalogModelLoadFailed, trackCatalogShootCompleted, trackCatalogShotCompleted, trackCatalogShotFailed,
+  type CatalogShotKind,
+} from '@/lib/posthog-events';
 import { CatalogEngine } from '@/components/cad-to-catalog/engine/engine';
 import { unpackMeshes } from '@/components/cad-to-catalog/engine/fastpack';
 import { metalByName } from '@/components/cad-to-catalog/engine/materials';
@@ -49,7 +53,7 @@ interface PieceFiles {
 
 /** A picture's paid run: placed in a photo by AI, or a drawn picture kept as it is. */
 type Job =
-  | { kind: 'place'; picture: Picture; render: string; background: string; materials: string; aspect: CatalogAspect; resolution: CatalogResolution }
+  | { kind: 'place'; picture: Picture; render: string; background: string; materials: string; aspect: CatalogAspect; resolution: CatalogResolution; category: string }
   | { kind: 'save'; picture: Picture; blob: Blob; piece: string; category: string; resolution: CatalogResolution };
 
 export interface UseCatalogShoot {
@@ -99,6 +103,8 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
   const lastShoot = useRef<{ settings: ShootSettings; backgroundData: (id: string) => Promise<string>; anglesOf: (c: JewelryCategory) => PlannedAngle[] } | null>(null);
   const noticeRef = useRef(onNotice);
   noticeRef.current = onNotice;
+  // The shoot in progress, for catalog_shoot_completed: open while pictures are drawn or runs are going.
+  const batch = useRef<{ startedAt: number; drawing: boolean; succeeded: number; failed: number } | null>(null);
 
   useEffect(() => {
     const ctrl = life.current;
@@ -145,7 +151,11 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
         fastload: (data) => {
           let job = prepared.current.get(id);
           if (!job) {
+            const startedAt = Date.now();
             job = fastloadFile(data, life.current.signal, setOpeningText).then(({ skeleton, packed }) => ({ skeleton, meshes: unpackMeshes(packed) }));
+            // Once per prepared file: a reopen reuses this job and fires nothing.
+            const load = () => ({ duration_ms: Date.now() - startedAt, file_bytes: data.byteLength });
+            job.then(() => trackCatalogModelLoaded(load()), () => { if (!life.current.signal.aborted) trackCatalogModelLoadFailed(load()); });
             job.catch(() => prepared.current.delete(id)); // try again next time
             prepared.current.set(id, job);
           }
@@ -221,6 +231,22 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
     noticeRef.current('Not enough credits: the shoot stopped. Pictures already made are kept.', true);
   }, []);
 
+  // A picture's outcome, counted towards the shoot it belongs to.
+  const shotSettled = useCallback((kind: CatalogShotKind, category: string, resolution: string, startedAt: number, failureStage?: 'draw' | 'run') => {
+    const props = { kind, category, resolution, duration_ms: Date.now() - startedAt };
+    if (failureStage) trackCatalogShotFailed({ ...props, failure_stage: failureStage });
+    else trackCatalogShotCompleted(props);
+    if (batch.current) batch.current[failureStage ? 'failed' : 'succeeded']++;
+  }, []);
+
+  // The shoot is over once every picture is drawn and no run is queued or going.
+  const settleShoot = useCallback(() => {
+    const b = batch.current;
+    if (!b || b.drawing || running.current || jobs.current.length) return;
+    batch.current = null;
+    trackCatalogShootCompleted({ succeeded: b.succeeded, failed: b.failed, stopped: control.current.stopped, duration_ms: Date.now() - b.startedAt });
+  }, []);
+
   // One job's run: an AI placement, or a drawn picture kept (and charged) as it is.
   const runJob = useCallback(async (job: Job): Promise<string | null> => {
     const signal = life.current.signal;
@@ -243,11 +269,18 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
       const job = jobs.current.shift()!;
       running.current++;
       dispatch({ type: 'picture', pictureId: job.picture.id, status: job.kind === 'place' ? 'placing' : 'saving' });
+      const kind: CatalogShotKind = job.kind === 'place' ? 'photo' : 'white';
+      const startedAt = Date.now();
       runJob(job)
-        .then((url) => { if (url) dispatch({ type: 'picture', pictureId: job.picture.id, status: 'done', url }); })
+        .then((url) => {
+          if (!url) return; // cancelled
+          dispatch({ type: 'picture', pictureId: job.picture.id, status: 'done', url });
+          shotSettled(kind, job.category, job.resolution, startedAt);
+        })
         .catch((e) => {
           if (life.current.signal.aborted) return;
           dispatch({ type: 'picture', pictureId: job.picture.id, status: 'failed', error: (e as Error).message });
+          shotSettled(kind, job.category, job.resolution, startedAt, 'run');
           if (e instanceof CatalogRunError && e.status === 402) outOfCredits();
         })
         .finally(() => {
@@ -255,9 +288,10 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
           if (life.current.signal.aborted) return;
           if (!running.current && !jobs.current.length) refreshCredits().catch(() => {});
           pump();
+          settleShoot();
         });
     }
-  }, [refreshCredits, runJob, outOfCredits]);
+  }, [refreshCredits, runJob, outOfCredits, shotSettled, settleShoot]);
 
   const waitWhilePaused = async () => {
     while (control.current.paused && !control.current.stopped && !life.current.signal.aborted) await new Promise((r) => setTimeout(r, 250));
@@ -288,22 +322,24 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
           dispatch({ type: 'picture', pictureId: pic.id, status: 'drawing' });
           await new Promise((r) => requestAnimationFrame(() => r(null))); // let the tile show "drawing" first
           const photo = isPhoto(pic.background);
+          const drawStartedAt = Date.now();
           engine!.applyAngle(photo ? { ...pic.angle, dist: (pic.angle.dist || 1) * IN_PHOTO_DISTANCE } : pic.angle);
           try {
             // A photo's render goes to the AI at its working size; drawn pictures are made at the chosen size.
             const blob = await engine!.capture({ background: pic.background === 'white' ? 'white' : 'clear', long: photo ? 2048 : CATALOG_PICTURE_PX[resolution] });
             jobs.current.push(photo
-              ? { kind: 'place', picture: pic, render: await blobToDataUrl(blob), background: await backgroundData(pic.background), materials, aspect: settings.aspect as CatalogAspect, resolution }
+              ? { kind: 'place', picture: pic, render: await blobToDataUrl(blob), background: await backgroundData(pic.background), materials, aspect: settings.aspect as CatalogAspect, resolution, category: piece.category }
               : { kind: 'save', picture: pic, blob, piece: piece.name, category: piece.category, resolution });
             pump();
           } catch (e) {
             dispatch({ type: 'picture', pictureId: pic.id, status: 'failed', error: (e as Error).message });
+            if (!life.current.signal.aborted) shotSettled(photo ? 'photo' : 'white', piece.category, resolution, drawStartedAt, 'draw');
           }
         }
       });
     }
     dispatch({ type: 'piece', pieceId: id, status: control.current.stopped ? 'stopped' : 'done' });
-  }, [engine, open, pump]);
+  }, [engine, open, pump, shotSettled]);
 
   const shoot = useCallback(async (pieceIds: string[], settings: ShootSettings, backgroundData: (id: string) => Promise<string>, anglesOf: (c: JewelryCategory) => PlannedAngle[] = anglesFor) => {
     if (!engine || queueRef.current.running || !pieceIds.length) return false;
@@ -320,6 +356,7 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
     engine.pictureAspect = aw > 0 && ah > 0 ? aw / ah : 1;
     lastShoot.current = { settings, backgroundData, anglesOf };
     control.current = { paused: false, stopped: false };
+    batch.current = { startedAt: Date.now(), drawing: true, succeeded: 0, failed: 0 };
     dispatch({ type: 'start', pieceIds, settings, anglesFor: anglesOf });
     // The reducer runs before the next render; read the planned queue from it directly.
     queueRef.current = queueReducer(queueRef.current, { type: 'start', pieceIds, settings, anglesFor: anglesOf });
@@ -331,10 +368,14 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
       }
     } finally {
       engine.pictureAspect = 1; // back to the square view box for lining up angles
-      if (!life.current.signal.aborted) dispatch({ type: 'finished' });
+      if (!life.current.signal.aborted) {
+        dispatch({ type: 'finished' });
+        if (batch.current) batch.current.drawing = false;
+        settleShoot();
+      }
     }
     return true;
-  }, [engine, checkCreditsFor, shootPiece]);
+  }, [engine, checkCreditsFor, shootPiece, settleShoot]);
 
   // Every picture's url is a blob: URL made here (AI_RULES 1 allows raw fetch for those).
   const downloadAll = useCallback(() => buildZip(queueRef.current.pieces, queueRef.current.pictures, async (p) => (await fetch(p.url!)).blob()), []);
