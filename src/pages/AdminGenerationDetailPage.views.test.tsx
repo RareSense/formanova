@@ -62,11 +62,15 @@ describe('DetailContent: Inputs -> Steps -> Outputs for any workflow', () => {
     expect(thumb(section('Outputs'), 'Upscaled image')).toBe(proxy(14));
   });
 
-  it('design image: role-named pictures, unpriced cost, reported spend', () => {
+  it('design image: role-named pictures, fixed price, reported spend', () => {
     renderDetail(designImageRun());
     expect(thumb(section('Inputs'), 'Design with annotations')).toBe(proxy(21));
     expect(thumb(section('Outputs'), 'Design picture')).toBe(proxy(23));
-    expect(section('Run').getByText('not priced')).toBeTruthy();
+    const run = section('Run');
+    expect(run.getByText('Fixed price: 14 credits')).toBeTruthy();
+    expect(run.getByText("This workflow charges a flat price. Its tools have no per-call cost set, so what it cost us isn't tracked.")).toBeTruthy();
+    expect(run.queryByText('not priced')).toBeNull();
+    expect(run.queryByText('0 credits')).toBeNull();
     expect(section('Run').getByText('Provider spend (reported): $0.07 across 1 step')).toBeTruthy();
   });
 
@@ -76,7 +80,7 @@ describe('DetailContent: Inputs -> Steps -> Outputs for any workflow', () => {
     expect(section('Inputs').getByRole('button', { name: /Download Input \.3dm pave-halo-ring\.3dm 74\.5 MB/ })).toBeTruthy();
     expect(section('Outputs').getByRole('button', { name: /Download Skeleton \.3dm/ })).toBeTruthy();
     expect(section('Outputs').getByText('4750000')).toBeTruthy();
-    expect(section('Run').getAllByText('free')).toHaveLength(2);
+    expect(section('Run').getAllByText('Free')).toHaveLength(2);
   });
 
   it('catalog shot: render + background in, placed photo out', () => {

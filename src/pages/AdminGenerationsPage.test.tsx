@@ -60,6 +60,7 @@ describe('AdminGenerationsPage cost columns', () => {
     expect(view.getByRole('columnheader', { name: /User paid/ })).toBeTruthy();
     const header = view.getByRole('columnheader', { name: /Workflow cost/ });
     expect(header.querySelector('[title]')?.getAttribute('title')).toMatch(/including failed attempts that were retried/);
+    expect(header.querySelector('[title]')?.getAttribute('title')).toMatch(/Fixed price/);
     expect(view.queryByText('Actual Cost')).toBeNull();
     expect(view.queryByText('Provider Cost')).toBeNull();
   });
@@ -67,8 +68,10 @@ describe('AdminGenerationsPage cost columns', () => {
   it('reads unpriced, retried and free runs honestly', async () => {
     const view = await renderList();
     const cells = (id: string) => Array.from(view.getByText(`${id}@b.co`).closest('tr')!.querySelectorAll('td')).map((td) => td.textContent);
-    expect(cells('wf-design').slice(4, 6)).toEqual(['14 credits', 'not priced']);
+    expect(cells('wf-design').slice(4, 6)).toEqual(['14 credits', 'Fixed price · tool costs not recorded']);
+    const fixedRow = view.getByText('wf-design@b.co').closest('tr')!;
+    expect(fixedRow.querySelector('[title]')?.getAttribute('title')).toMatch(/charges a flat price/);
     expect(cells('wf-photo').slice(4, 6)).toEqual(['20 credits', '28 credits+8']);
-    expect(cells('wf-fast').slice(4, 6)).toEqual(['free', 'free']);
+    expect(cells('wf-fast').slice(4, 6)).toEqual(['Free', 'Free']);
   });
 });

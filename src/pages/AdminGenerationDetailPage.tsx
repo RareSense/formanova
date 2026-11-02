@@ -41,9 +41,11 @@ import { costView, USER_PAID_HELP, WORKFLOW_COST_HELP } from '@/lib/admin-cost-d
 import { readProviderSpend } from '@/lib/admin-provider-spend';
 import { buildRunView } from '@/lib/admin-workflow-views';
 import { findNodes } from '@/lib/admin-workflow-views/walker';
+import { buildIoSummary } from '@/lib/admin-workflow-views/io-summary';
 import { CostLabel, ProviderSpendBlock, WorkflowCostValue } from '@/components/admin/AdminCost';
 import { FileLink } from '@/components/admin/workflow-view/FileLink';
 import { ImageThumb } from '@/components/admin/workflow-view/ImageThumb';
+import { IoSummarySection } from '@/components/admin/workflow-view/IoSummary';
 import { JsonBlock } from '@/components/admin/workflow-view/JsonBlock';
 import { LabelledValue } from '@/components/admin/workflow-view/LabelledValue';
 import { NodeView } from '@/components/admin/workflow-view/NodeView';
@@ -601,6 +603,12 @@ export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
       ? 'Image to CAD'
       : null);
   const opts = { enh: view.enh, fallbackStem: detail.workflow_id };
+  const ioSummary = useMemo(() => buildIoSummary(view, {
+    resultFiles: [
+      { label: '3D (from the run result)', url: fallbackGlb, format: 'glb' },
+      { label: '3DM (from the run result)', url: fallback3dm, format: '3dm' },
+    ],
+  }), [view, fallbackGlb, fallback3dm]);
 
   return (
     <div className="space-y-6">
@@ -627,7 +635,7 @@ export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
               <MetaItem label="Created" value={formatDateTime(detail.created_at)} />
               <MetaItem label="Finished" value={formatDateTime(detail.finished_at)} />
               <LabelledValue label={<CostLabel label="User paid" help={USER_PAID_HELP} />} value={cost.userPaid} />
-              <LabelledValue label={<CostLabel label="Workflow cost" help={WORKFLOW_COST_HELP} />} value={<WorkflowCostValue view={cost} />} />
+              <LabelledValue label={<CostLabel label="Workflow cost" help={WORKFLOW_COST_HELP} />} value={<WorkflowCostValue view={cost} detail />} />
               <MetaItem label="Workflow ID" value={detail.workflow_id} />
               <MetaItem label="Status" value={detail.status.replace(/_/g, ' ')} />
               {cadSourceLabel && <MetaItem label="CAD Source" value={cadSourceLabel} />}
@@ -647,6 +655,8 @@ export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
           </CardContent>
         </Card>
       </section>
+
+      <IoSummarySection summary={ioSummary} fallbackStem={detail.workflow_id} />
 
       <Section title="Inputs">
         {isCadModel && (designHistory ? (
