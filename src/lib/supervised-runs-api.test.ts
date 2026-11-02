@@ -14,7 +14,7 @@ import {
   PHASE_ACTIONS, SupervisedRunsApiError, addSupervisedRunNote, failSupervisedRun, getSupervisedRun,
   listSupervisedRuns, rejectSupervisedRun, removeSupervisedUpload, sameNames, sendSupervisedReplacement,
   sendSupervisedRun, startSupervisedRuns, uploadReplacementFile, isUncertainCheckFailure, userNoteLength, USER_NOTE_MAX_CHARS,
-  UPLOAD_ROLES,
+  UPLOAD_ROLES, hasFileHeader, parseOpenFlags,
 } from './supervised-runs-api';
 
 const ok = (body: unknown, status = 200) => ({ ok: true, status, json: async () => body });
@@ -112,6 +112,26 @@ describe('supervised runs client', () => {
     expect(JSON.parse(call(2).init.body)).toEqual({ acknowledge_missing: [] });
   });
 
+  it('sends a replacement without a spec sheet byte-for-byte as before', async () => {
+    mockFetch.mockResolvedValue(ok({ accepted: true, phase: 'finalizing' }, 202));
+    await sendSupervisedReplacement('a', ['loop_state_artifact'], 'ring', ' Hi ');
+    await sendSupervisedReplacement('a', []);
+    await sendSupervisedReplacement('a', [], undefined, undefined, undefined);
+    expect(call(0).init.body).toBe('{"acknowledge_missing":["loop_state_artifact"],"jewelry_type":"ring","user_note":"Hi"}');
+    expect(call(1).init.body).toBe('{"acknowledge_missing":[]}');
+    expect(call(2).init.body).toBe('{"acknowledge_missing":[]}');
+  });
+
+  it('sends spec_sheet_open_flags with a spec sheet: the number, or null for none given', async () => {
+    mockFetch.mockResolvedValue(ok({ accepted: true, phase: 'finalizing' }, 202));
+    await sendSupervisedReplacement('a', [], 'ring', 'Hi', 3);
+    await sendSupervisedReplacement('a', [], undefined, undefined, 0);
+    await sendSupervisedReplacement('a', [], undefined, undefined, null);
+    expect(call(0).init.body).toBe('{"acknowledge_missing":[],"jewelry_type":"ring","user_note":"Hi","spec_sheet_open_flags":3}');
+    expect(call(1).init.body).toBe('{"acknowledge_missing":[],"spec_sheet_open_flags":0}');
+    expect(call(2).init.body).toBe('{"acknowledge_missing":[],"spec_sheet_open_flags":null}');
+  });
+
   it('removes an upload by role', async () => {
     mockFetch.mockResolvedValue(ok({ removed: true }));
     await removeSupervisedUpload('a', 'glb');
@@ -142,8 +162,36 @@ describe('helpers', () => {
     expect(Object.fromEntries(UPLOAD_ROLES.map((spec) => [spec.role, spec.maxBytes]))).toEqual({
       glb: GiB, threedm: GiB, viewer_threedm: GiB, stl: GiB, step: GiB, casting_stl: GiB,
       code: 50 * MiB, loop_state: 50 * MiB, thumbnail: 50 * MiB, design_contract: 50 * MiB, reference_manifest: 50 * MiB,
-      stones: 10 * MiB,
+      stones: 10 * MiB, spec_sheet: 50 * MiB,
     });
+  });
+
+  it('declares an optional spec_sheet role that takes a PDF only', () => {
+    const spec = UPLOAD_ROLES.find((r) => r.role === 'spec_sheet');
+    expect(spec).toEqual({
+      role: 'spec_sheet', label: 'Spec sheet (PDF)', accept: '.pdf,application/pdf', maxBytes: 50 * 1024 * 1024, header: '%PDF',
+    });
+    // Only the spec sheet checks its first bytes in the browser.
+    expect(UPLOAD_ROLES.filter((r) => r.header).map((r) => r.role)).toEqual(['spec_sheet']);
+  });
+
+  it('checks a file starts with the given header bytes', async () => {
+    expect(await hasFileHeader(new File(['%PDF-1.7\n%...'], 's.pdf'), '%PDF')).toBe(true);
+    expect(await hasFileHeader(new File(['%PDF'], 's.pdf'), '%PDF')).toBe(true);
+    expect(await hasFileHeader(new File(['PK\u0003\u0004 not a pdf'], 's.pdf'), '%PDF')).toBe(false);
+    expect(await hasFileHeader(new File([' %PDF-1.7'], 's.pdf'), '%PDF')).toBe(false);
+    expect(await hasFileHeader(new File(['%PD'], 's.pdf'), '%PDF')).toBe(false);
+    expect(await hasFileHeader(new File([], 's.pdf'), '%PDF')).toBe(false);
+  });
+
+  it('reads the open review items as a whole number of 0 or more, or null when empty', () => {
+    expect(parseOpenFlags('')).toEqual({ ok: true, value: null });
+    expect(parseOpenFlags('   ')).toEqual({ ok: true, value: null });
+    expect(parseOpenFlags('0')).toEqual({ ok: true, value: 0 });
+    expect(parseOpenFlags(' 12 ')).toEqual({ ok: true, value: 12 });
+    for (const bad of ['-1', '-0', '1.5', '2.0', 'abc', '1e2', '0x10', '+3', '3 4', 'NaN', 'Infinity', '99999999999999999999']) {
+      expect(parseOpenFlags(bad)).toEqual({ ok: false });
+    }
   });
 
   it('compares names as sets of the same size', () => {

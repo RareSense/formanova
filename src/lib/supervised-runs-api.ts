@@ -108,7 +108,7 @@ export type StartResult =
 
 export type UploadRole =
   | 'glb' | 'threedm' | 'viewer_threedm' | 'code' | 'loop_state' | 'thumbnail' | 'design_contract'
-  | 'reference_manifest' | 'stl' | 'step' | 'casting_stl' | 'stones';
+  | 'reference_manifest' | 'stl' | 'step' | 'casting_stl' | 'stones' | 'spec_sheet';
 
 export interface UploadRoleSpec {
   role: UploadRole;
@@ -118,6 +118,8 @@ export interface UploadRoleSpec {
   required?: boolean;
   /** Only for jewelry_cad_generate runs. */
   generateOnly?: boolean;
+  /** The bytes the file must start with, checked in the browser before uploading. */
+  header?: string;
 }
 
 const MiB = 1024 * 1024;
@@ -137,7 +139,37 @@ export const UPLOAD_ROLES: UploadRoleSpec[] = [
   { role: 'step', label: 'Full model STEP', accept: '.step', maxBytes: GiB },
   { role: 'casting_stl', label: 'Casting STL', accept: '.stl', maxBytes: GiB },
   { role: 'stones', label: 'Stone list', accept: '.json', maxBytes: 10 * MiB },
+  { role: 'spec_sheet', label: 'Spec sheet (PDF)', accept: '.pdf,application/pdf', maxBytes: 50 * MiB, header: '%PDF' },
 ];
+
+/** True when the file starts with exactly these (ASCII) bytes. */
+export async function hasFileHeader(file: Blob, header: string): Promise<boolean> {
+  if (file.size < header.length) return false;
+  const bytes = new Uint8Array(await readBytes(file.slice(0, header.length)));
+  return [...header].every((char, i) => bytes[i] === char.charCodeAt(0));
+}
+
+function readBytes(blob: Blob): Promise<ArrayBuffer> {
+  if (typeof blob.arrayBuffer === 'function') return blob.arrayBuffer();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as ArrayBuffer);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsArrayBuffer(blob);
+  });
+}
+
+/**
+ * The "Open review items" box: a whole number of 0 or more, or null when left empty. Signs,
+ * decimals, exponents and numbers past the safe-integer range are refused.
+ */
+export function parseOpenFlags(text: string): { ok: true; value: number | null } | { ok: false } {
+  const trimmed = text.trim();
+  if (!trimmed) return { ok: true, value: null };
+  if (!/^\d+$/.test(trimmed)) return { ok: false };
+  const value = Number(trimmed);
+  return Number.isSafeInteger(value) ? { ok: true, value } : { ok: false };
+}
 
 export class SupervisedRunsApiError extends Error {
   status: number;
@@ -280,12 +312,33 @@ export function removeSupervisedUpload(workflowId: string, role: UploadRole) {
   return request<{ removed: boolean }>('DELETE', `${run(workflowId)}/uploads/${encodeURIComponent(role)}`);
 }
 
-export function sendSupervisedReplacement(workflowId: string, acknowledgeMissing: string[], jewelryType?: string, userNote?: string) {
-  return request<{ accepted: boolean; phase: SupervisedPhase }>('POST', `${run(workflowId)}/send-replacement`, {
+/** The send-replacement request body. */
+export interface SendReplacementBody {
+  acknowledge_missing: string[];
+  jewelry_type?: string;
+  user_note?: string;
+  /** Only with a spec sheet: its open review items, a whole number of 0 or more, or null. */
+  spec_sheet_open_flags?: number | null;
+}
+
+/**
+ * Leave specSheetOpenFlags undefined for a run without a spec sheet: the field is then left out,
+ * so the request is exactly what it was before spec sheets.
+ */
+export function sendSupervisedReplacement(
+  workflowId: string,
+  acknowledgeMissing: string[],
+  jewelryType?: string,
+  userNote?: string,
+  specSheetOpenFlags?: number | null,
+) {
+  const body: SendReplacementBody = {
     acknowledge_missing: acknowledgeMissing,
     ...(jewelryType ? { jewelry_type: jewelryType } : {}),
     ...userNoteField(userNote),
-  });
+    ...(specSheetOpenFlags !== undefined ? { spec_sheet_open_flags: specSheetOpenFlags } : {}),
+  };
+  return request<{ accepted: boolean; phase: SupervisedPhase }>('POST', `${run(workflowId)}/send-replacement`, body);
 }
 
 type PutBlob = (url: string, file: File, onProgress?: (fraction: number) => void) => Promise<void>;
