@@ -31,7 +31,8 @@ export interface CadResultActionsProps {
   onDownloadViewerThreedm?: () => void;
   onDownloadStl?: () => void;
   onDownloadStep?: () => void;
-  estimatedMetalMassG?: number | null;
+  /** The download menu's metal and weight line; see CadDownloadMenu. */
+  metalWeightLine?: string | null;
   /** Omit unless the user has actually edited the model. */
   onExportEdited?: () => void;
   /** Disables the download while bytes are being fetched. */
@@ -86,7 +87,7 @@ export function CadResultActions({
   onDownloadViewerThreedm,
   onDownloadStl,
   onDownloadStep,
-  estimatedMetalMassG,
+  metalWeightLine,
   onExportEdited,
   isBusy = false,
   versionDownloads,
@@ -124,7 +125,7 @@ export function CadResultActions({
           onDownloadViewerThreedm={onDownloadViewerThreedm}
           onDownloadStl={onDownloadStl}
           onDownloadStep={onDownloadStep}
-          estimatedMetalMassG={estimatedMetalMassG}
+          metalWeightLine={metalWeightLine}
           onExportEdited={onExportEdited}
           versionDownloads={versionDownloads}
         />
@@ -158,7 +159,7 @@ export function CadResultActions({
         onDownloadViewerThreedm={onDownloadViewerThreedm}
         onDownloadStl={onDownloadStl}
         onDownloadStep={onDownloadStep}
-        estimatedMetalMassG={estimatedMetalMassG}
+        metalWeightLine={metalWeightLine}
         onExportEdited={onExportEdited}
         versionDownloads={versionDownloads}
       />

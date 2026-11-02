@@ -107,11 +107,20 @@ describe('CadDownloadMenu', () => {
     expect(onExportEdited).toHaveBeenCalledTimes(1);
   });
 
-  it('shows the estimated metal weight above the formats', async () => {
-    render(<CadDownloadMenu onDownloadThreedm={noop} estimatedMetalMassG={4.214} />);
+  it('shows the metal and its weight above the formats, units in lower case', async () => {
+    render(<CadDownloadMenu onDownloadThreedm={noop} metalWeightLine="Metal: 14K Yellow Gold · Est. 27.98 g · 17.99 dwt" />);
 
     openMenu();
-    expect(await screen.findByText(/est\. metal weight: 4\.21 g/i)).toBeInTheDocument();
+    const line = await screen.findByText('Metal: 14K Yellow Gold · Est. 27.98 g · 17.99 dwt');
+    expect(line).not.toHaveClass('uppercase');
+  });
+
+  it('shows no weight line when there is none', async () => {
+    render(<CadDownloadMenu onDownloadThreedm={noop} metalWeightLine={null} />);
+
+    openMenu();
+    await screen.findByText('Rhino, editable');
+    expect(screen.queryByText(/^Metal:/)).toBeNull();
   });
 
   it('works for older runs that only have a GLB', async () => {

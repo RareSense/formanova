@@ -52,7 +52,12 @@ export interface CadDownloadMenuProps {
   onDownloadGlb?: () => void;
   onDownloadStl?: () => void;
   onDownloadStep?: () => void;
-  estimatedMetalMassG?: number | null;
+  /**
+   * The metal and estimated weight of the model on screen, e.g. "Metal: 10K
+   * Yellow Gold · Est. 25.37 g · 16.31 dwt" (metalWeightLine). Omit or null
+   * when there is no measured volume: no line beats a guessed one.
+   */
+  metalWeightLine?: string | null;
   /**
    * Omit when the version has no viewing copy. A mesh-only 3DM for generic
    * viewers, never the default action: the editable NURBS 3DM stays the lead.
@@ -225,7 +230,7 @@ export function CadDownloadMenu({
   onDownloadViewerThreedm,
   onDownloadStl,
   onDownloadStep,
-  estimatedMetalMassG,
+  metalWeightLine,
   onExportEdited,
   isBusy = false,
   variant = 'viewport',
@@ -283,9 +288,10 @@ export function CadDownloadMenu({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[15rem]">
-        {typeof estimatedMetalMassG === 'number' && (
-          <div className="px-2 py-2 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-            Est. metal weight: {estimatedMetalMassG.toFixed(2)} g
+        {/* Not upper-cased: "G" is not a gram. */}
+        {metalWeightLine && (
+          <div className="px-2 py-2 font-mono text-[10px] tracking-wider text-muted-foreground">
+            {metalWeightLine}
           </div>
         )}
         {formats.map((row) => (

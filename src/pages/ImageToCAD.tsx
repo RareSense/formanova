@@ -231,7 +231,6 @@ export default function ImageToCAD() {
       onDownloadViewerThreedm={workflow.viewerThreedmUrl ? downloads.downloadViewerThreedm : undefined}
       onDownloadStl={workflow.stlArtifacts.length ? downloads.downloadStl : undefined}
       onDownloadStep={workflow.stepArtifacts.length ? downloads.downloadStep : undefined}
-      estimatedMetalMassG={workflow.estimatedMetalMassG}
       onExportEdited={hasEdits ? downloads.exportEdited : undefined}
       versionDownloads={workflow.versionDownloads}
       latestVersionLabel={workflow.latestVersionLabel}
