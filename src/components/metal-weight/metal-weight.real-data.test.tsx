@@ -245,9 +245,10 @@ describe('request → result round trip', () => {
 });
 
 describe('legacy and edge paths', () => {
-  it('a version without a volume is not available, with no download line', async () => {
+  it('a version without a volume renders no weight section and no download line', async () => {
     render(<VersionScreen version={{ asset_id: 'v0' }} />);
-    expect(within(card()).getByText(/Weight not available for this model/)).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Metal weight' })).toBeNull();
+    expect(screen.queryByText(/Weight not available/)).toBeNull();
     openDownloads();
     await screen.findByText('3D preview');
     expect(screen.queryByText(/ g \(.* dwt\)$/)).toBeNull();

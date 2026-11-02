@@ -18,6 +18,9 @@
  * the header still reads "27.98 g · 14K Yellow Gold". Every figure is the
  * measured volume times that row's cited density; Download saves the listed
  * metals as CSV.
+ *
+ * A version without a measured metal volume gets no section at all: no
+ * header, no "not available" line, nothing.
  */
 import { useId, useState } from 'react';
 import { AlertTriangle, Check, ChevronDown, ChevronUp, Download, Info } from 'lucide-react';
@@ -96,9 +99,10 @@ export function WeightCard({
   const onTarget = summary?.status.kind === 'on';
   const castingCheck = castingCheckLine(volumeFlags);
 
-  const headerNote = !open
-    ? (grams === null ? 'Not available' : `${formatGrams(grams)} · ${alloy.name}`)
-    : (target && grams !== null ? formatTargetChip(target) : '');
+  // No measured volume: the section is not rendered at all.
+  if (volume === null || grams === null) return null;
+
+  const headerNote = !open ? `${formatGrams(grams)} · ${alloy.name}` : (target ? formatTargetChip(target) : '');
 
   const pick = (id: string) => {
     if (showHint) {
@@ -115,7 +119,6 @@ export function WeightCard({
     : [{ label: null, alloys: common }];
 
   const download = () => {
-    if (volume === null) return;
     downloadCsv(
       weightCsvFilename(modelName, versionLabel),
       weightCsv({ modelName, versionLabel, volumeMm3: volume, target, alloys: showAll ? METAL_ALLOYS : common }),
@@ -183,94 +186,86 @@ export function WeightCard({
 
         {open && (
           <div id={`${ids}-body`} className="space-y-2 font-mono text-[11px] text-foreground">
-            {grams === null ? (
-              <p className="text-muted-foreground" title={'reason' in source ? source.reason : undefined}>
-                Weight not available for this model.
-              </p>
-            ) : (
-              <>
-                <div data-weight-table className="border border-border">
-                  <Table>
-                    <caption className="sr-only">Metal weight in each metal</caption>
-                    <TableHeader className="bg-muted/60">
-                      <TableRow className="border-b border-border hover:bg-transparent">
-                        <TableHead className={cn(HEAD, 'w-px')}><span className="sr-only">Pick</span></TableHead>
-                        <TableHead className={cn(HEAD, 'w-full max-w-0 truncate text-left')}>Metal</TableHead>
-                        <TableHead className={NUM_HEAD}>Grams</TableHead>
-                        <TableHead className={NUM_HEAD}><HeaderTip label="DWT" tip={DWT_TIP} /></TableHead>
-                        <TableHead className={NUM_HEAD}><HeaderTip label="Polished" tip={POLISHED_TIP} /></TableHead>
+            <div data-weight-table className="border border-border">
+              <Table>
+                <caption className="sr-only">Metal weight in each metal</caption>
+                <TableHeader className="bg-muted/60">
+                  <TableRow className="border-b border-border hover:bg-transparent">
+                    <TableHead className={cn(HEAD, 'w-px')}><span className="sr-only">Pick</span></TableHead>
+                    <TableHead className={cn(HEAD, 'w-full max-w-0 truncate text-left')}>Metal</TableHead>
+                    <TableHead className={NUM_HEAD}>Grams</TableHead>
+                    <TableHead className={NUM_HEAD}><HeaderTip label="DWT" tip={DWT_TIP} /></TableHead>
+                    <TableHead className={NUM_HEAD}><HeaderTip label="Polished" tip={POLISHED_TIP} /></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody role="radiogroup" aria-label="Metal">
+                  {groups.map((group) => [
+                    group.label && (
+                      <TableRow key={`group-${group.label}`} className="border-b border-border bg-muted/30 hover:bg-muted/30">
+                        <th scope="rowgroup" colSpan={5} className="h-6 px-2 text-left font-mono text-[10px] font-normal uppercase tracking-[0.12em] text-muted-foreground">
+                          {group.label}
+                        </th>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody role="radiogroup" aria-label="Metal">
-                      {groups.map((group) => [
-                        group.label && (
-                          <TableRow key={`group-${group.label}`} className="border-b border-border bg-muted/30 hover:bg-muted/30">
-                            <th scope="rowgroup" colSpan={5} className="h-6 px-2 text-left font-mono text-[10px] font-normal uppercase tracking-[0.12em] text-muted-foreground">
-                              {group.label}
-                            </th>
-                          </TableRow>
-                        ),
-                        ...group.alloys.map(row),
-                      ])}
-                    </TableBody>
-                  </Table>
-                </div>
+                    ),
+                    ...group.alloys.map(row),
+                  ])}
+                </TableBody>
+              </Table>
+            </div>
 
-                <div className="flex items-center justify-between gap-2">
-                  <Button type="button" variant="ghost" size="sm" aria-expanded={showAll} onClick={() => setShowAll((s) => !s)} className="-ml-3 font-mono text-[11px] text-muted-foreground">
-                    {showAll ? 'Fewer metals' : 'More metals'}
-                    {showAll ? <ChevronUp aria-hidden="true" /> : <ChevronDown aria-hidden="true" />}
-                  </Button>
-                  <Button type="button" variant="outline" size="sm" onClick={download} aria-label="Download weight table (CSV)" className="font-mono text-[11px]">
-                    <Download aria-hidden="true" />
-                    Download
-                  </Button>
-                </div>
+            <div className="flex items-center justify-between gap-2">
+              <Button type="button" variant="ghost" size="sm" aria-expanded={showAll} onClick={() => setShowAll((s) => !s)} className="-ml-3 font-mono text-[11px] text-muted-foreground">
+                {showAll ? 'Fewer metals' : 'More metals'}
+                {showAll ? <ChevronUp aria-hidden="true" /> : <ChevronDown aria-hidden="true" />}
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={download} aria-label="Download weight table (CSV)" className="font-mono text-[11px]">
+                <Download aria-hidden="true" />
+                Download
+              </Button>
+            </div>
 
-                {showHint && <p className="text-muted-foreground">Pick a metal to see its weight</p>}
+            {showHint && <p className="text-muted-foreground">Pick a metal to see its weight</p>}
 
-                {castingCheck && <p className="text-muted-foreground">{castingCheck}</p>}
+            {castingCheck && <p className="text-muted-foreground">{castingCheck}</p>}
 
-                {summary && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <p
-                        tabIndex={0}
-                        className={cn(
-                          'flex w-fit items-center gap-1.5 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                          onTarget ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400',
-                        )}
-                      >
-                        {onTarget ? <Check aria-hidden="true" className="h-3.5 w-3.5 shrink-0" /> : <AlertTriangle aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />}
-                        {summary.text}
-                      </p>
-                    </TooltipTrigger>
-                    <TooltipContent className="font-mono text-[11px]">{summary.detail}</TooltipContent>
-                  </Tooltip>
-                )}
-
-                {twoTone && <p className="text-muted-foreground">{`Two-tone: total of all metal parts, weighed in ${alloy.name}.`}</p>}
-
-                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
-                  <span>Metal only. Stones not included.</span>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <button type="button" className="inline-flex items-center gap-1 rounded-sm underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                        How we calculate
-                        <Info className="h-3 w-3" aria-hidden="true" />
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent align="end" className="w-64 font-mono text-[11px] leading-relaxed">
-                      Weight = model volume × alloy density. Density from{' '}
-                      <a href={alloy.source_url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
-                        {alloy.alloy}
-                      </a>
-                      {` (${alloy.density_cited} g/cm³).`}
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </>
+            {summary && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <p
+                    tabIndex={0}
+                    className={cn(
+                      'flex w-fit items-center gap-1.5 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      onTarget ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400',
+                    )}
+                  >
+                    {onTarget ? <Check aria-hidden="true" className="h-3.5 w-3.5 shrink-0" /> : <AlertTriangle aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />}
+                    {summary.text}
+                  </p>
+                </TooltipTrigger>
+                <TooltipContent className="font-mono text-[11px]">{summary.detail}</TooltipContent>
+              </Tooltip>
             )}
+
+            {twoTone && <p className="text-muted-foreground">{`Two-tone: total of all metal parts, weighed in ${alloy.name}.`}</p>}
+
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+              <span>Metal only. Stones not included.</span>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button type="button" className="inline-flex items-center gap-1 rounded-sm underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    How we calculate
+                    <Info className="h-3 w-3" aria-hidden="true" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-64 font-mono text-[11px] leading-relaxed">
+                  Weight = model volume × alloy density. Density from{' '}
+                  <a href={alloy.source_url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+                    {alloy.alloy}
+                  </a>
+                  {` (${alloy.density_cited} g/cm³).`}
+                </PopoverContent>
+              </Popover>
+            </div>
             {requestedUnavailable && <p className="text-muted-foreground">Requested metal unavailable</p>}
           </div>
         )}
