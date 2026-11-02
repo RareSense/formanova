@@ -96,14 +96,22 @@ export interface MockOptions {
   volumeFlags?: string[] | null;
   specSheet?: 'ok' | 'broken' | 'none';
   openFlags?: number;
+  /** Where the signed link points: same origin, or a cross-origin storage host that allows this origin (as Azure does for formanova.ai). */
+  specSheetHost?: 'same' | 'azure';
+  /** An old version with no measured metal volume: no weight anywhere. */
+  noVolume?: boolean;
 }
+
+/** Stands in for the Azure blob account the signed links point at. */
+export const AZURE_PDF_URL = 'https://snapwear.blob.core.windows.net/agentic-artifacts/hashed/spec?sv=2024&sig=e2e';
 
 const json = (route: Route, body: unknown, status = 200) =>
   route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
 
 /** Signs in, skips onboarding, and answers every backend call the CAD page makes. */
 export async function mockCadApi(page: Page, options: MockOptions = {}) {
-  const { volumeFlags = null, specSheet = 'ok', openFlags = 3 } = options;
+  const { volumeFlags = null, specSheet = 'ok', openFlags = 3, specSheetHost = 'same', noVolume = false } = options;
+  const volume = noVolume ? null : VOLUME_MM3;
   const glb = torusGlb();
   const pdf = specSheetPdf();
   await page.addInitScript((user) => {
@@ -126,7 +134,7 @@ export async function mockCadApi(page: Page, options: MockOptions = {}) {
       ...(specSheet === 'none' ? [] : [{ kind: 'spec_sheet', filename: 'ring_spec.pdf', bytes: pdf.length }]),
     ],
     spec_sheet_open_flags: openFlags,
-    metal_volume_mm3: VOLUME_MM3,
+    metal_volume_mm3: volume,
     metal_volume_flags: volumeFlags,
     weight_target: { grams: 28, tolerance_pct: 5, alloy_id: 'au14y' },
   };
@@ -134,16 +142,25 @@ export async function mockCadApi(page: Page, options: MockOptions = {}) {
   await page.route((url) => /^\/(api|auth|billing|shopify|mock-files)\//.test(url.pathname) || url.hostname !== '127.0.0.1', async (route) => {
     const url = new URL(route.request().url());
     const path = url.pathname;
+    if (url.hostname === 'snapwear.blob.core.windows.net') {
+      const origin = route.request().headers().origin ?? '*';
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/pdf',
+        headers: { 'Access-Control-Allow-Origin': origin, 'Content-Disposition': 'attachment; filename="ring_spec.pdf"' },
+        body: specSheet === 'broken' ? Buffer.from('not a pdf') : pdf,
+      });
+    }
     if (url.hostname !== '127.0.0.1') return route.fulfill({ status: 204, body: '' });
     if (path === '/auth/users/me') return json(route, USER);
     if (path === '/api/credits/balance/me') return json(route, { balance: 5000, available: 5000 });
     if (path === '/api/user/profile') return json(route, { user_id: USER.id, role: 'jewelry_brand', brand_name: 'E2E', onboarding_complete: true });
     if (path === `/api/result/${WORKFLOW_ID}`) {
-      return json(route, { glb_artifact: { uri: '/mock-files/ring.glb', type: 'model/gltf-binary', bytes: glb.length, sha256: '' }, metal_volume_mm3: VOLUME_MM3, metal_volume_flags: volumeFlags });
+      return json(route, { glb_artifact: { uri: '/mock-files/ring.glb', type: 'model/gltf-binary', bytes: glb.length, sha256: '' }, metal_volume_mm3: volume, metal_volume_flags: volumeFlags });
     }
     if (path === '/api/cad/models') return json(route, { items: [{ set_id: 'set-e2e', name: 'Sample signet ring', family: 'ring', versions: [version] }] });
     if (path === `/api/cad/versions/${ASSET_ID}/downloads/spec_sheet`) {
-      return json(route, { url: '/mock-files/spec.pdf', expires_at: '2099-01-01T00:00:00Z', filename: 'ring_spec.pdf' });
+      return json(route, { url: specSheetHost === 'azure' ? AZURE_PDF_URL : '/mock-files/spec.pdf', expires_at: '2099-01-01T00:00:00Z', filename: 'ring_spec.pdf' });
     }
     if (path === '/mock-files/ring.glb') return route.fulfill({ status: 200, contentType: 'model/gltf-binary', body: glb });
     if (path === '/mock-files/spec.pdf') {

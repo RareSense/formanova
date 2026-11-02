@@ -9,6 +9,8 @@ const PORT = 5179;
 
 export default defineConfig({
   testDir: 'e2e',
+  // e2e/prod runs against the production build: playwright.prod.config.ts.
+  testIgnore: 'prod/**',
   timeout: 120_000,
   expect: { timeout: 20_000 },
   fullyParallel: false,

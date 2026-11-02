@@ -81,6 +81,11 @@ export default defineConfig(({ mode }) => {
       target: "es2022",
       rollupOptions: {
         output: {
+          // Emitted .mjs files (the pdf.js worker) get a .js name: the production
+          // nginx has no .mjs MIME type, sends them as application/octet-stream,
+          // and the browser refuses to start a module worker from that.
+          assetFileNames: (asset) =>
+            (asset.names?.[0] ?? '').endsWith('.mjs') ? 'assets/[name]-[hash].js' : 'assets/[name]-[hash][extname]',
           manualChunks: {
             "vendor-framer": ["framer-motion"],
             "vendor-posthog": ["posthog-js", "posthog-js/react"],
