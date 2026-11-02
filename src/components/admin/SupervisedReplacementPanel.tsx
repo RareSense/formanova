@@ -16,6 +16,8 @@ import {
   getSupervisedRun,
   hasFileHeader,
   isUncertainCheckFailure,
+  parseCastingFlags,
+  parseMetalVolume,
   parseOpenFlags,
   removeSupervisedUpload,
   sameNames,
@@ -68,6 +70,9 @@ const HEADER_COPY: Partial<Record<UploadRole, string>> = {
   spec_sheet: 'Not a PDF (the file must start with %PDF).',
 };
 const OPEN_FLAGS_COPY = 'Enter a whole number of 0 or more, or leave it empty.';
+const METAL_VOLUME_HINT = "From the package's measurements (casting STL volume). Leave empty if unknown.";
+const METAL_VOLUME_COPY = 'Enter a number above 0 (decimals allowed), or leave it empty.';
+const CASTING_FLAGS_COPY = 'Use lowercase letters and underscores, separated by commas (e.g. thin_walls, touching_edges).';
 
 const KiB = 1024;
 const MiB = 1024 * KiB;
@@ -221,6 +226,8 @@ export default function SupervisedReplacementPanel({
   const [ownSending, setOwnSending] = useState(false);
   const [ownMessage, setOwnMessage] = useState<string | null>(null);
   const [openFlags, setOpenFlags] = useState('');
+  const [metalVolume, setMetalVolume] = useState('');
+  const [castingFlags, setCastingFlags] = useState('');
   // One upload at a time per role; state alone would let a same-tick second pick through.
   const inFlight = useRef(new Set<UploadRole>());
   const ownLock = useRef(false);
@@ -251,6 +258,14 @@ export default function SupervisedReplacementPanel({
   useEffect(() => {
     if (!hasSpecSheet) setOpenFlags('');
   }, [hasSpecSheet]);
+  // Casting flags belong to a measured volume; without one they are hidden and never sent.
+  const parsedVolume = parseMetalVolume(metalVolume);
+  const hasVolume = metalVolume.trim() !== '';
+  const parsedCastingFlags = parseCastingFlags(castingFlags);
+  const volumeValid = parsedVolume.ok && (!hasVolume || parsedCastingFlags.ok);
+  useEffect(() => {
+    if (!hasVolume) setCastingFlags('');
+  }, [hasVolume]);
 
   // A tick only counts for the missing list it was made against: when a name leaves the list
   // (an upload filled it) it is dropped, so it comes back unticked if the list brings it back.
@@ -272,6 +287,7 @@ export default function SupervisedReplacementPanel({
     && sameNames(tickedNow, ackNames)
     && (!needsType || Boolean(jewelryType))
     && flagsValid
+    && volumeValid
     && !actionsLocked
     && !fileBusy;
 
@@ -412,9 +428,18 @@ export default function SupervisedReplacementPanel({
     const note = userNote;
     // Without a spec sheet the call (and so the request) stays exactly as it was before them.
     const flags = hasSpecSheet && parsedFlags.ok ? parsedFlags.value : undefined;
-    const action = hasSpecSheet
-      ? () => sendSupervisedReplacement(workflowId, ack, type, note, flags)
-      : () => sendSupervisedReplacement(workflowId, ack, type, note);
+    // Without a volume the call stays exactly as it was before them; flags only go with a volume.
+    const volume = parsedVolume.ok && parsedVolume.value !== null
+      ? {
+        mm3: parsedVolume.value,
+        ...(parsedCastingFlags.ok && parsedCastingFlags.value ? { flags: parsedCastingFlags.value } : {}),
+      }
+      : undefined;
+    const action = volume
+      ? () => sendSupervisedReplacement(workflowId, ack, type, note, flags, volume)
+      : hasSpecSheet
+        ? () => sendSupervisedReplacement(workflowId, ack, type, note, flags)
+        : () => sendSupervisedReplacement(workflowId, ack, type, note);
     void (runAction ? runAction(action) : runOwn(action));
   }
 
@@ -552,6 +577,50 @@ export default function SupervisedReplacementPanel({
             />
             <p className="text-xs text-muted-foreground">Items on the spec sheet the jeweller still has to check.</p>
             {!parsedFlags.ok && <p className="break-words text-sm text-destructive" role="alert">{OPEN_FLAGS_COPY}</p>}
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <label
+            htmlFor="replacement-metal-volume"
+            className="block font-mono text-[10px] uppercase tracking-widest text-muted-foreground"
+          >
+            Metal volume (mm³)
+          </label>
+          <Input
+            id="replacement-metal-volume"
+            inputMode="decimal"
+            value={metalVolume}
+            disabled={actionsLocked}
+            aria-invalid={!parsedVolume.ok}
+            onChange={(event) => setMetalVolume(event.target.value)}
+            placeholder="Leave empty if unknown"
+            className="w-full sm:w-56"
+          />
+          <p className="text-xs text-muted-foreground">{METAL_VOLUME_HINT}</p>
+          {!parsedVolume.ok && <p className="break-words text-sm text-destructive" role="alert">{METAL_VOLUME_COPY}</p>}
+        </div>
+
+        {hasVolume && (
+          <div className="space-y-2">
+            <label
+              htmlFor="replacement-casting-flags"
+              className="block font-mono text-[10px] uppercase tracking-widest text-muted-foreground"
+            >
+              Casting flags
+            </label>
+            <Input
+              id="replacement-casting-flags"
+              value={castingFlags}
+              disabled={actionsLocked}
+              aria-invalid={!parsedCastingFlags.ok}
+              onChange={(event) => setCastingFlags(event.target.value)}
+              placeholder="thin_walls, touching_edges"
+              className="w-full sm:w-96"
+            />
+            {!parsedCastingFlags.ok && (
+              <p className="break-words text-sm text-destructive" role="alert">{CASTING_FLAGS_COPY}</p>
+            )}
           </div>
         )}
 
