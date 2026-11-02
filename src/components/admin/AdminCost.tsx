@@ -1,6 +1,7 @@
 import { Info } from 'lucide-react';
 
 import type { CostView } from '@/lib/admin-cost-display';
+import { formatUsd, type ProviderSpend } from '@/lib/admin-provider-spend';
 
 /** A cost label with an (i) whose native tooltip says what the number means. */
 export function CostLabel({ label, help }: { label: string; help: string }) {
@@ -24,5 +25,31 @@ export function WorkflowCostValue({ view }: { view: CostView }) {
       )}
       {view.note && <span className="text-[11px] text-muted-foreground">{view.note}</span>}
     </span>
+  );
+}
+
+/**
+ * Real provider money the steps themselves reported (see admin-provider-spend.ts). Says so
+ * plainly when the workflow reports none, instead of showing an invented $0.
+ */
+export function ProviderSpendBlock({ spend }: { spend: ProviderSpend }) {
+  const priced = spend.steps.filter((s) => s.usd !== null);
+  return (
+    <div className="space-y-2">
+      <p className="text-sm">
+        {spend.totalUsd !== null
+          ? `Provider spend (reported): ${formatUsd(spend.totalUsd)} across ${priced.length} ${priced.length === 1 ? 'step' : 'steps'}`
+          : 'Provider spend (reported): not reported by this workflow'}
+      </p>
+      {spend.steps.length > 0 && (
+        <ul className="space-y-0.5 font-mono text-xs text-muted-foreground">
+          {spend.steps.map((s) => (
+            <li key={s.index}>
+              {`${s.index}. ${s.tool}: ${s.usd !== null ? formatUsd(s.usd) : 'usage reported, no USD'}${s.tokens !== null ? ` · ${s.tokens.toLocaleString('en-US')} tokens` : ''}`}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
