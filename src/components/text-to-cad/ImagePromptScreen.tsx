@@ -55,6 +55,8 @@ interface ImagePromptScreenProps {
   tier: string;
   /** Admin-only model choice, shown beside Generate CAD. */
   modelPicker?: ReactNode;
+  /** The "Metal & weight" step (MetalWeightStep), shown under the dimensions. */
+  metalStep?: ReactNode;
   prompt: string;
   setPrompt: (p: string) => void;
   jewelryType: CadJewelryType | null;
@@ -83,7 +85,7 @@ interface ImagePromptScreenProps {
 }
 
 export default function ImagePromptScreen({
-  model, tier, modelPicker, prompt, setPrompt, jewelryType, setJewelryType,
+  model, tier, modelPicker, metalStep, prompt, setPrompt, jewelryType, setJewelryType,
   isGenerating, onGenerate,
   referenceImagePreviewUrls,
   onAddReferenceImages, onRemoveReferenceImage, onReplaceReferenceImages,
@@ -288,6 +290,8 @@ export default function ImagePromptScreen({
                 </div>
               </div>
               )}
+              {/* Metal and target weight go with the dimensions: both describe the piece to build. */}
+              {!editing && metalStep}
 
             </div>
 

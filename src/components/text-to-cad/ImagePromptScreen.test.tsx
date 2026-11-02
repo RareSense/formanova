@@ -43,6 +43,18 @@ function renderScreen(
 }
 
 describe('ImagePromptScreen', () => {
+  it('shows the metal and weight step it is given', () => {
+    render(
+      <ImagePromptScreen
+        model="gemini" tier="claude_opus_5_openrouter" prompt="" setPrompt={vi.fn()} jewelryType="ring" setJewelryType={vi.fn()}
+        isGenerating={false} onGenerate={vi.fn()} referenceImagePreviewUrls={[]} onAddReferenceImages={vi.fn()}
+        onRemoveReferenceImage={vi.fn()} onReplaceReferenceImages={vi.fn()}
+        metalStep={<div data-testid="metal-step" />}
+      />,
+    );
+    expect(screen.getByTestId('metal-step')).toBeTruthy();
+  });
+
   it('names the chosen piece on the browse button', () => {
     renderScreen('bracelet');
 

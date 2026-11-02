@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { Helmet } from "react-helmet-async";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -38,6 +38,12 @@ import type { GemMode } from "@/components/text-to-cad/CADCanvas";
 import { RING_CAD_DEFAULT_TIER, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
 import { recordStudioVisit } from '@/lib/studio-preference';
 import { useCadRestoreFromUrl } from "@/hooks/useCadRestoreFromUrl";
+import { useMetalChoice } from "@/hooks/useMetalChoice";
+import MetalWeightStep from "@/components/metal-weight/MetalWeightStep";
+import WeightBar from "@/components/metal-weight/WeightBar";
+import WeightCard from "@/components/metal-weight/WeightCard";
+import { metalWeightLine } from "@/lib/metal-weight/format";
+import { EMPTY_METAL_REQUEST, metalRequestPayload, type MetalRequest } from "@/lib/metal-weight/request";
 
 /** Touch gizmos are too fiddly on a phone: the view only orbits there. */
 const PHONE_TRANSFORM_MODES = ["orbit"] as const;
@@ -91,6 +97,9 @@ export default function ImageToCAD() {
   const [workspaceActive, setWorkspaceActive] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [jewelryType, setJewelryType] = useState<CadJewelryType | null>(null);
+  /** The "Metal & weight" step: sent as payload.material and payload.weight_target. */
+  const [metalRequest, setMetalRequest] = useState<MetalRequest>(EMPTY_METAL_REQUEST);
+  const metalPayload = useMemo(() => metalRequestPayload(metalRequest), [metalRequest]);
 
   const canvasRef = useRef<CADCanvasHandle>(null);
 
@@ -115,12 +124,19 @@ export default function ImageToCAD() {
     referenceImages,
     tier: activeTier,
     jewelryType: jewelryType ?? undefined,
+    material: metalPayload.material,
+    weightTarget: metalPayload.weightTarget,
     cadRoute: '/image-to-cad',
     // Read once, at first render, so arriving from the result email
     // paints the loading state instead of an empty workspace.
     restoringFromUrl: isRestoringFromUrl,
     onWorkspaceActivate: activateWorkspace,
   });
+
+  // One metal choice drives the weight bar, the weight card and the download line.
+  const metal = useMetalChoice(workflow.metalWeight);
+  const weightView = { source: workflow.metalWeight.source, target: workflow.metalWeight.target, ...metal };
+  const metalStep = <MetalWeightStep value={metalRequest} onChange={setMetalRequest} disabled={workflow.isGenerating} />;
 
   // Edit before CAD: the choice under the upload and the editor window.
   const editBeforeCad = useEditBeforeCad({
@@ -231,6 +247,7 @@ export default function ImageToCAD() {
       onDownloadViewerThreedm={workflow.viewerThreedmUrl ? downloads.downloadViewerThreedm : undefined}
       onDownloadStl={workflow.stlArtifacts.length ? downloads.downloadStl : undefined}
       onDownloadStep={workflow.stepArtifacts.length ? downloads.downloadStep : undefined}
+      metalWeightLine={metalWeightLine(weightView.source, metal.alloy)}
       onExportEdited={hasEdits ? downloads.exportEdited : undefined}
       versionDownloads={workflow.versionDownloads}
       latestVersionLabel={workflow.latestVersionLabel}
@@ -279,6 +296,7 @@ export default function ImageToCAD() {
           designUse={editBeforeCad.designUse}
           onDesignUseChange={editBeforeCad.setDesignUse}
           editApproved={editBeforeCad.editApproved}
+          metalStep={metalStep}
           onGlbUpload={showCadUpload ? (file) => {
             setWorkspaceActive(true);
             workflow.setHasModel(true);
@@ -304,6 +322,7 @@ export default function ImageToCAD() {
           jewelryType={jewelryType}
           dimensions={prompt}
           onDimensions={setPrompt}
+          metalStep={metalStep}
         />
       </div>
     );
@@ -347,6 +366,10 @@ export default function ImageToCAD() {
             />
       }
       right={(section) => (
+          <div className="flex h-full min-h-0 flex-col">
+            {/* The weight card heads the Material side (its own tab on phones it shares). */}
+            {section !== "parts" && <WeightCard {...weightView} />}
+            <div className="min-h-0 flex-1">
             <MeshPanel
               section={section}
               meshes={editor.meshes}
@@ -360,7 +383,11 @@ export default function ImageToCAD() {
               onApplyMetalToAll={editor.handleApplyMetalToAll}
               onSceneAction={editor.handleSceneAction}
             />
+            </div>
+          </div>
       )}
+      // Under the 3D view on every screen size, whenever a finished model is on it.
+      viewportFooter={workflow.hasModel && !workflow.isGenerating && !workflow.isModelLoading ? <WeightBar {...weightView} /> : undefined}
       phoneActions={layoutMode === "phone" ? resultActions : undefined}
       viewport={
           <>

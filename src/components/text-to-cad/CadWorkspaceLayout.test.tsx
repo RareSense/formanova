@@ -73,6 +73,22 @@ describe('CadWorkspaceLayout', () => {
     expect(screen.getByText('right panel all')).toBeTruthy();
   });
 
+  it.each(['desktop', 'tablet', 'phone'] as const)('%s draws the footer under the 3D view, outside it', (mode) => {
+    setup(mode, { viewportFooter: <div data-testid="footer">weight bar</div> });
+    const footer = screen.getByTestId('footer');
+    expect(viewportEl().contains(footer)).toBe(false);
+    // Directly after the view, in the same column.
+    expect(viewportEl().nextElementSibling).toBe(footer);
+  });
+
+  it('keeps the 3D view mounted when the footer comes and goes', () => {
+    const { rerender, onMount } = setup('desktop');
+    rerender('desktop', { viewportFooter: <div>weight bar</div> });
+    rerender('phone', { viewportFooter: <div>weight bar</div> });
+    rerender('phone', { viewportFooter: undefined });
+    expect(onMount).toHaveBeenCalledTimes(1);
+  });
+
   it('never remounts the 3D view when crossing breakpoints', () => {
     const { rerender, onMount } = setup('desktop');
     rerender('tablet');

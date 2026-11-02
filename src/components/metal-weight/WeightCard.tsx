@@ -43,7 +43,7 @@ export function WeightCard({ source, target, alloy, setAlloyId, requestedUnavail
         <div id={bodyId} className="space-y-3 px-4 py-3 font-mono text-[11px] text-foreground">
           {grams === null ? (
             <p className="leading-relaxed text-muted-foreground">
-              Weight not available for this model ({source.available ? 'no usable volume' : source.reason}).
+              Weight not available for this model ({'reason' in source ? source.reason : 'no usable volume'}).
             </p>
           ) : (
             <>

@@ -66,6 +66,8 @@ interface DesignEditorProps {
   cadCostLoading: boolean;
   /** Admin-only model choice, shown beside Create CAD. */
   modelPicker?: ReactNode;
+  /** The "Metal & weight" step (MetalWeightStep), shown under the dimensions. */
+  metalStep?: ReactNode;
   creatingCad: boolean;
   /**
    * The picture is already a design made for the customer (Idea, Doodle,
@@ -113,7 +115,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
  *  ready  - the approved design, optional extra views (other uploads
  *           come in marked as the old design), optional dimensions, Create CAD.
  */
-export default function DesignEditor({ open, source, extras = [], jewelryType, onCancel, onKeep, onCreateCad, dimensions, onDimensions, cadCost, cadCostLoading, creatingCad, modelPicker, approveWithoutEdit = false, steps }: DesignEditorProps) {
+export default function DesignEditor({ open, source, extras = [], jewelryType, onCancel, onKeep, onCreateCad, dimensions, onDimensions, cadCost, cadCostLoading, creatingCad, modelPicker, metalStep, approveWithoutEdit = false, steps }: DesignEditorProps) {
   const { generate } = useDesignImageRun();
   const [picture, setPicture] = useState<Picture | null>(null);
   const [edited, setEdited] = useState(false);
@@ -657,6 +659,7 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
               costLoading={cadCostLoading}
               generating={creatingCad || startingCad}
               modelPicker={modelPicker}
+              metalStep={metalStep}
               error={cadError}
               onGenerate={() => void createCad()}
             />

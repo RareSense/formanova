@@ -37,7 +37,7 @@ export function WeightBar({ source, target, alloy, setAlloyId, requestedUnavaila
       {grams === null ? (
         <span className="min-w-0 text-muted-foreground">
           Weight not available for this model
-          <span className="text-muted-foreground/70"> ({source.available ? 'no usable volume' : source.reason})</span>
+          <span className="text-muted-foreground/70"> ({'reason' in source ? source.reason : 'no usable volume'})</span>
         </span>
       ) : (
         <>
