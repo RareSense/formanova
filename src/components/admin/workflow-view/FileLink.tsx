@@ -1,39 +1,8 @@
-import { useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
 
-import { authenticatedFetch } from '@/lib/authenticated-fetch';
+import { externalHref, formatBytes, isSameOrigin, useFileDownload, type FileRef } from './use-file-download';
 
-export interface FileRef {
-  label: string;
-  url: string;
-  name: string | null;
-  bytes: number | null;
-  ext?: string | null;
-}
-
-function formatBytes(bytes: number | null): string | null {
-  if (bytes === null || !Number.isFinite(bytes) || bytes < 0) return null;
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-}
-
-function downloadName(file: FileRef, fallbackStem: string): string {
-  if (file.name) {
-    const printable = Array.from(file.name).map((ch) => (ch.charCodeAt(0) < 0x20 ? '-' : ch)).join('');
-    return printable.replace(/[\\/:*?"<>|]+/g, '-').slice(0, 120);
-  }
-  const stem = `${fallbackStem}-${file.label}`.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/-+/g, '-').slice(0, 100);
-  return file.ext ? `${stem}.${file.ext.replace(/[^a-z0-9]/gi, '')}` : stem;
-}
-
-/**
- * Only same-origin paths are fetched with the admin's token: authenticatedFetch attaches the
- * Bearer token to whatever url it is given, so a cross-origin url must never reach it.
- */
-const sameOrigin = (url: string) => url.startsWith('/') && !url.startsWith('//');
+export type { FileRef } from './use-file-download';
 
 /**
  * Download button for a stored file. /api/artifacts/<sha> is auth-gated, so the bytes are
@@ -41,13 +10,12 @@ const sameOrigin = (url: string) => url.startsWith('/') && !url.startsWith('//')
  * link (no token, no referrer) marked as external.
  */
 export function FileLink({ file, fallbackStem, path }: { file: FileRef; fallbackStem: string; path?: string }) {
-  const [busy, setBusy] = useState(false);
+  const { busy, download } = useFileDownload(file, fallbackStem);
   const size = formatBytes(file.bytes);
-  const name = downloadName(file, fallbackStem);
   const kind = file.ext ? file.ext.toUpperCase() : null;
 
-  if (!sameOrigin(file.url)) {
-    const href = /^https?:\/\//i.test(file.url) ? file.url : null;
+  if (!isSameOrigin(file.url)) {
+    const href = externalHref(file.url);
     return (
       <span data-path={path} className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-md border border-dashed border-border px-3 py-2 text-sm">
         <span className="font-medium">{file.label}</span>
@@ -62,34 +30,10 @@ export function FileLink({ file, fallbackStem, path }: { file: FileRef; fallback
     );
   }
 
-  async function onClick() {
-    if (busy) return;
-    setBusy(true);
-    try {
-      const response = await authenticatedFetch(file.url);
-      if (!response.ok) throw new Error(`${response.status}`);
-      const blob = await response.blob();
-      if (blob.size === 0) throw new Error('empty file');
-      const blobUrl = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = blobUrl;
-      anchor.download = name;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
-    } catch (error) {
-      console.error('[Admin file download]', file.label, error);
-      toast.error(`Could not download ${file.label} (${error instanceof Error ? error.message : 'error'})`);
-    } finally {
-      setBusy(false);
-    }
-  }
-
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={download}
       disabled={busy}
       data-path={path}
       aria-label={`Download ${file.label}${file.name ? ` ${file.name}` : ''}${size ? ` ${size}` : ''}`}

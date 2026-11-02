@@ -55,15 +55,15 @@ describe('buildRunView: generic walk with family labels', () => {
   it('fastload: the .3dm is a file, never a picture placeholder', () => {
     const view = buildRunView(fastloadRun(), true);
     expect(view.family).toBe('cad_fastload');
-    expect(findNodes(view.inputs, (n) => n.kind === 'media')).toMatchObject([{ media: 'file', ext: '3dm', name: 'pave-halo-ring.3dm', label: 'Input .3dm' }]);
-    expect(findNodes(view.outputs!.node, (n) => n.kind === 'media').map((n) => n.label)).toEqual(['Skeleton .3dm', 'Meshes']);
+    expect(findNodes(view.inputs, (n) => n.kind === 'media')).toMatchObject([{ media: 'file', ext: '3dm', name: 'pave-halo-ring.3dm', label: 'Input 3DM' }]);
+    expect(findNodes(view.outputs!.node, (n) => n.kind === 'media').map((n) => n.label)).toEqual(['Skeleton 3DM', 'Meshes']);
   });
 
   it('CAD: the GLB is a 3D model and every file is a link', () => {
     const view = buildRunView(cadImproveRun(), true);
     const media = findNodes(view.outputs!.node, (n) => n.kind === 'media');
     expect(media.map((n) => n.kind === 'media' && [n.label, n.media])).toEqual([
-      ['GLB', 'model3d'], ['3DM', 'file'], ['STL', 'file'], ['STEP', 'file'], ['Files', 'file'], ['Spec sheet', 'file'],
+      ['GLB', 'model3d'], ['3DM', 'file'], ['STL', 'file'], ['STEP', 'file'], ['Casting body', 'file'], ['Spec sheet', 'file'],
     ]);
   });
 

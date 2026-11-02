@@ -112,13 +112,22 @@ export const designImageRun = (): AdminGenerationDetail => ({
   ],
 });
 
+/**
+ * The real cad_fastload tool answer (FormaNova_cad_to_catalog app/toolkit/tools/cad_fastload/service.py):
+ * store() returns { uri: azure://<container>/<prefix>/<yyyy/mm/dd>/<sha>/<name>, type, bytes, sha256 },
+ * with the file name only in the path.
+ */
+const stored = (n: number, type: string, name: string, bytes: number) => ({
+  uri: `azure://cad-to-catalog/toolkit/2026/11/02/${sha(n)}/${name}`, type, bytes, sha256: sha(n),
+});
+
 export const fastloadRun = (): AdminGenerationDetail => ({
   ...base('cad_to_catalog_fastload', 0, 0),
   input_payload: { payload: { cad_file: { ...art(30, 'model/vnd.3dm', 78_123_456), name: 'pave-halo-ring.3dm' } } },
   steps: [
     step('cad_fastload', {
-      skeleton_3dm: { ...art(31, 'model/vnd.3dm', 1_200_000) },
-      meshes: { ...art(32, 'application/x-cad-to-pictures-meshes+gzip', 40_000_000) },
+      skeleton_3dm: stored(31, 'model/vnd.3dm', 'skeleton.3dm', 1_200_000),
+      meshes: stored(32, 'application/x-cad-to-pictures-meshes+gzip', 'meshes.bin.gz', 40_000_000),
       triangles: 4_750_000, meshed: 3, unmeshed: 0, seconds: 41.2,
     }, {}, 41200),
   ],
