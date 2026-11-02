@@ -834,8 +834,9 @@ describe('trackUpscalePaywallHit', () => {
 
 describe('trackCatalogShootStarted', () => {
   it('captures catalog_shoot_started with the size of the shoot', () => {
-    trackCatalogShootStarted({ pieces: 3, pictures: 30, photo_backgrounds: 1, metals: 2 })
+    trackCatalogShootStarted({ shoot_id: 's1', pieces: 3, pictures: 30, photo_backgrounds: 1, metals: 2 })
     expect(posthog.capture).toHaveBeenCalledWith('catalog_shoot_started', {
+      shoot_id: 's1',
       pieces: 3,
       pictures: 30,
       photo_backgrounds: 1,
@@ -915,12 +916,19 @@ describe('trackCatalogShotFailed', () => {
 
 describe('trackCatalogShootCompleted', () => {
   it('captures catalog_shoot_completed with the settled counts', () => {
-    trackCatalogShootCompleted({ succeeded: 7, failed: 1, stopped: false, duration_ms: 120000 })
+    trackCatalogShootCompleted({ shoot_id: 's1', succeeded: 7, failed: 1, stopped: false, abandoned: false, duration_ms: 120000 })
     expect(posthog.capture).toHaveBeenCalledWith('catalog_shoot_completed', {
+      shoot_id: 's1',
       succeeded: 7,
       failed: 1,
       stopped: false,
+      abandoned: false,
       duration_ms: 120000,
     })
+  })
+
+  it('reports a shoot cut off by leaving the page as abandoned', () => {
+    trackCatalogShootCompleted({ shoot_id: 's2', succeeded: 1, failed: 0, stopped: false, abandoned: true, duration_ms: 5000 })
+    expect(posthog.capture).toHaveBeenCalledWith('catalog_shoot_completed', expect.objectContaining({ shoot_id: 's2', abandoned: true }))
   })
 })

@@ -486,7 +486,11 @@ export function trackDownloadClicked(props?: {
 }
 
 // Catalog from CAD: a shoot started (one or many CAD files into catalog pictures).
+// Fired once the credit and device checks pass, so every started gets exactly one
+// catalog_shoot_completed. A retry of a piece is a new shoot.
 export interface CatalogShootStartedProps {
+  /** Joins this shoot's started and completed events, as workflow_id does for CAD runs. */
+  shoot_id: string;
   pieces: number;
   pictures: number;
   /** Photo backgrounds ticked; each such picture is an AI placement. */
@@ -568,12 +572,16 @@ export function trackCatalogShotFailed(props: CatalogShotFailedProps) {
 }
 
 export interface CatalogShootCompletedProps {
+  shoot_id: string;
   /** catalog_shot_completed events in this shoot. */
   succeeded: number;
   /** catalog_shot_failed events in this shoot. */
   failed: number;
   /** Stopped by the user or by running out of credits. */
   stopped: boolean;
+  /** The page closed with the shoot still going: its unfinished runs were
+   *  cancelled, so the counts are what had settled by then. */
+  abandoned: boolean;
   duration_ms: number;
 }
 

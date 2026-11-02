@@ -8,6 +8,8 @@ const track = vi.hoisted(() => ({
   trackCatalogShotCompleted: vi.fn(),
   trackCatalogShotFailed: vi.fn(),
   trackCatalogShootCompleted: vi.fn(),
+  trackCatalogShootStarted: vi.fn(),
+  trackPaywallHit: vi.fn(),
 }));
 vi.mock('@/lib/posthog-events', () => track);
 
@@ -25,7 +27,8 @@ const run = vi.hoisted(() => {
   };
 });
 vi.mock('@/lib/cad-to-catalog-run', () => run);
-vi.mock('@/hooks/use-credit-preflight', () => ({ useCreditPreflight: () => ({ checkCreditsFor: async () => true }) }));
+const checkCreditsFor = vi.hoisted(() => vi.fn(async () => true));
+vi.mock('@/hooks/use-credit-preflight', () => ({ useCreditPreflight: () => ({ checkCreditsFor }) }));
 vi.mock('@/contexts/CreditsContext', () => ({ useCredits: () => ({ refreshCredits: async () => {} }) }));
 vi.mock('@/lib/authenticated-fetch', () => ({ authenticatedFetch: vi.fn(async () => ({ ok: true, blob: async () => new Blob(['p']) })) }));
 vi.mock('@/lib/cad-to-catalog-zip', () => ({ buildZip: vi.fn() }));
@@ -86,7 +89,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   run.savePictures.mockResolvedValue([{ name: 'p', file: { url: 'u' } }]);
   run.placeOnBackground.mockResolvedValue({ workflowId: 'w', image: { url: 'https://x/photo' } });
+  checkCreditsFor.mockResolvedValue(true);
 });
+
+const startedIds = () => track.trackCatalogShootStarted.mock.calls.map((c) => c[0].shoot_id);
+const completed = () => track.trackCatalogShootCompleted.mock.calls.map((c) => c[0]);
 
 describe('useCatalogShoot model load events', () => {
   it('fires catalog_model_loaded once per prepared file, not again when it is reopened', async () => {
@@ -130,7 +137,7 @@ describe('useCatalogShoot shot and shoot events', () => {
     expect(track.trackCatalogShotCompleted).toHaveBeenCalledTimes(2);
     expect(track.trackCatalogShotCompleted).toHaveBeenCalledWith({ kind: 'white', category: 'ring', resolution: '2K', duration_ms: expect.any(Number) });
     expect(track.trackCatalogShotCompleted).toHaveBeenCalledWith({ kind: 'photo', category: 'ring', resolution: '2K', duration_ms: expect.any(Number) });
-    expect(track.trackCatalogShootCompleted).toHaveBeenCalledWith({ succeeded: 2, failed: 0, stopped: false, duration_ms: expect.any(Number) });
+    expect(track.trackCatalogShootCompleted).toHaveBeenCalledWith({ shoot_id: expect.any(String), succeeded: 2, failed: 0, stopped: false, abandoned: false, duration_ms: expect.any(Number) });
     expect(track.trackCatalogShotFailed).not.toHaveBeenCalled();
   });
 
@@ -168,7 +175,7 @@ describe('useCatalogShoot shot and shoot events', () => {
     expect(run.savePictures).not.toHaveBeenCalled();
   });
 
-  it('fires nothing for runs cut off by leaving the page', async () => {
+  it('fires no shot events for runs cut off by leaving the page, and closes the shoot as abandoned', async () => {
     run.savePictures.mockReturnValue(new Promise(() => {}));
     run.placeOnBackground.mockReturnValue(new Promise(() => {}));
     const { result, id, unmount } = setup(fakeEngine());
@@ -177,7 +184,8 @@ describe('useCatalogShoot shot and shoot events', () => {
     await new Promise((r) => setTimeout(r, 20));
     expect(track.trackCatalogShotCompleted).not.toHaveBeenCalled();
     expect(track.trackCatalogShotFailed).not.toHaveBeenCalled();
-    expect(track.trackCatalogShootCompleted).not.toHaveBeenCalled();
+    // The shoot still closes, once, as abandoned with what had settled.
+    expect(completed()).toEqual([{ shoot_id: startedIds()[0], succeeded: 0, failed: 0, stopped: false, abandoned: true, duration_ms: expect.any(Number) }]);
   });
 
   it('does not report a drawing cut off by leaving the page as a failed shot', async () => {
@@ -193,13 +201,74 @@ describe('useCatalogShoot shot and shoot events', () => {
     fails.forEach((f) => f(new Error('context lost')));
     await shooting;
     expect(track.trackCatalogShotFailed).not.toHaveBeenCalled();
-    expect(track.trackCatalogShootCompleted).not.toHaveBeenCalled();
+    expect(completed()).toEqual([expect.objectContaining({ abandoned: true, succeeded: 0, failed: 0 })]);
   });
 
   it('fires no shoot events when the shoot never starts', async () => {
     const { result, id } = setup(fakeEngine({ maxPicturePx: () => 1024 }));
     await act(async () => { expect(await result.current.shoot([id], SETTINGS, bgData, ONE_ANGLE)).toBe(false); });
     await new Promise((r) => setTimeout(r, 20));
+    expect(track.trackCatalogShootStarted).not.toHaveBeenCalled();
     expect(track.trackCatalogShootCompleted).not.toHaveBeenCalled();
+    // The device limit is not a paywall.
+    expect(track.trackPaywallHit).not.toHaveBeenCalled();
+  });
+
+  it('fires catalog_shoot_started once the checks pass, joined to its completed by shoot_id', async () => {
+    const { result, id } = setup(fakeEngine());
+    await act(() => result.current.shoot([id], { ...SETTINGS, metals: ['Yellow Gold', 'White Gold'] }, bgData, ONE_ANGLE));
+    await waitFor(() => expect(track.trackCatalogShootCompleted).toHaveBeenCalledTimes(1));
+    expect(track.trackCatalogShootStarted).toHaveBeenCalledTimes(1);
+    expect(track.trackCatalogShootStarted).toHaveBeenCalledWith({ shoot_id: expect.any(String), pieces: 1, pictures: 4, photo_backgrounds: 1, metals: 2 });
+    expect(completed()[0].shoot_id).toBe(startedIds()[0]);
+  });
+
+  it('fires paywall_hit and no started or completed when credits block the shoot', async () => {
+    checkCreditsFor.mockResolvedValue(false);
+    const { result, id } = setup(fakeEngine());
+    await act(async () => { expect(await result.current.shoot([id], SETTINGS, bgData, ONE_ANGLE)).toBe(false); });
+    expect(track.trackPaywallHit).toHaveBeenCalledTimes(1);
+    expect(track.trackPaywallHit).toHaveBeenCalledWith({ category: 'ring', steps_completed: 4 });
+    expect(track.trackCatalogShootStarted).not.toHaveBeenCalled();
+    expect(track.trackCatalogShootCompleted).not.toHaveBeenCalled();
+  });
+
+  it('treats a retry as a new shoot: its own started and completed', async () => {
+    const { result, id } = setup(fakeEngine());
+    await act(() => result.current.shoot([id], SETTINGS, bgData, ONE_ANGLE));
+    await waitFor(() => expect(track.trackCatalogShootCompleted).toHaveBeenCalledTimes(1));
+    act(() => result.current.retry(id));
+    await waitFor(() => expect(track.trackCatalogShootCompleted).toHaveBeenCalledTimes(2));
+    expect(track.trackCatalogShootStarted).toHaveBeenCalledTimes(2);
+    const [first, second] = startedIds();
+    expect(first).not.toBe(second);
+    expect(completed().map((c) => c.shoot_id)).toEqual([first, second]);
+  });
+
+  it('counts each result into the shoot that made it when shoots overlap', async () => {
+    const { result, id } = setup(fakeEngine());
+    let second = '';
+    act(() => { second = result.current.addFiles([{ path: 'stud.3dm', file: new File(['y'], 'stud.3dm') }])[0]; });
+    // The first shoot's photo is still being placed when the second shoot starts.
+    let land!: (v: unknown) => void;
+    run.placeOnBackground.mockReturnValueOnce(new Promise((r) => { land = r; }));
+    await act(() => result.current.shoot([id], SETTINGS, bgData, ONE_ANGLE));
+    await waitFor(() => expect(track.trackCatalogShotCompleted).toHaveBeenCalledTimes(1));
+    await act(() => result.current.shoot([second], SETTINGS, bgData, ONE_ANGLE));
+    await waitFor(() => expect(track.trackCatalogShootCompleted).toHaveBeenCalledTimes(1));
+    const [firstId, secondId] = startedIds();
+    expect(completed()[0]).toEqual(expect.objectContaining({ shoot_id: secondId, succeeded: 2, failed: 0 }));
+    await act(async () => { land({ workflowId: 'w', image: { url: 'https://x/photo' } }); });
+    await waitFor(() => expect(track.trackCatalogShootCompleted).toHaveBeenCalledTimes(2));
+    expect(completed()[1]).toEqual(expect.objectContaining({ shoot_id: firstId, succeeded: 2, failed: 0, abandoned: false }));
+  });
+
+  it('closes a shoot cut off mid-run with the results it already had', async () => {
+    run.placeOnBackground.mockReturnValue(new Promise(() => {}));
+    const { result, id, unmount } = setup(fakeEngine());
+    await act(() => result.current.shoot([id], SETTINGS, bgData, ONE_ANGLE));
+    await waitFor(() => expect(track.trackCatalogShotCompleted).toHaveBeenCalledTimes(1));
+    unmount();
+    expect(completed()).toEqual([expect.objectContaining({ shoot_id: startedIds()[0], succeeded: 1, failed: 0, abandoned: true })]);
   });
 });

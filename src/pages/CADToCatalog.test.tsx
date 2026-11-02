@@ -41,7 +41,9 @@ vi.mock('@/components/cad/CADRuntimeErrorBoundary', () => ({ CADRuntimeErrorBoun
 vi.mock('@/components/cad-to-catalog/CatalogViewer', () => ({ default: () => null }));
 vi.mock('@/components/cad-to-catalog/PartsPanel', () => ({ default: () => null }));
 vi.mock('@/components/cad-to-catalog/PicturesStrip', () => ({ default: () => null }));
-vi.mock('@/components/cad-to-catalog/ShootSteps', () => ({ default: () => null }));
+vi.mock('@/components/cad-to-catalog/ShootSteps', () => ({
+  default: ({ onShootAll }: { onShootAll: () => void }) => <button onClick={onShootAll}>shoot</button>,
+}));
 vi.mock('@/components/cad-to-catalog/BackgroundLibrary', () => ({ default: () => null }));
 vi.mock('@/components/cad-to-catalog/PiecesPanel', () => ({
   default: ({ onFiles }: { onFiles: (e: { path: string; file: File }[]) => void }) => (
@@ -76,5 +78,17 @@ describe('CADToCatalog analytics', () => {
     const { getByText } = render(<CADToCatalog />);
     fireEvent.click(getByText('add'));
     expect(track.trackCatalogFileUploaded).not.toHaveBeenCalled();
+  });
+});
+
+describe('CADToCatalog shoot start', () => {
+  it('leaves catalog_shoot_started and paywall_hit to the hook, which knows whether the shoot really started', async () => {
+    shoot.shoot.mockResolvedValue(false);
+    const { getByText } = render(<CADToCatalog />);
+    fireEvent.click(getByText('shoot'));
+    await Promise.resolve();
+    expect(shoot.shoot).toHaveBeenCalledTimes(1);
+    expect(track.trackCatalogShootStarted).not.toHaveBeenCalled();
+    expect(track.trackPaywallHit).not.toHaveBeenCalled();
   });
 });
