@@ -201,3 +201,136 @@ export const unknownRun = (): AdminGenerationDetail => ({
   input_payload: { payload: { fix_instruction: 'remove the second ring', result_image_url: api(70), category: 'ring' } },
   steps: [step('fix_jewelry_image_model_shot_higher_tier', { output_url: api(71), category: 'ring' })],
 });
+
+const renamed = (run: AdminGenerationDetail, workflow_name: string): AdminGenerationDetail => ({ ...run, workflow_name, workflow_id: `wf-${workflow_name}` });
+
+/** fix_* (prepare_fix_request* -> fix_jewelry_image*), fields from the fix workflow spec. */
+const fixRun = (workflow_name: string, productShot: boolean, size: string): AdminGenerationDetail => ({
+  ...base(workflow_name, 10, 10),
+  input_payload: {
+    payload: {
+      generation_type: productShot ? 'product_shot_v1' : 'model_shot_v1',
+      result_image_url: api(80),
+      jewelry_image_urls: [api(81)],
+      ...(productShot ? {} : { model_image_url: api(82), model_description: 'a woman on a balcony' }),
+      jewelry_description: 'gold hoop earring',
+      fix_instruction: 'the hoop should be thinner',
+      category: 'earrings',
+      aspect_ratio: '4:5',
+      image_size: size,
+      source_asset_id: '44444444-4444-4444-8444-444444444444',
+    },
+  },
+  steps: [
+    step(productShot ? 'prepare_fix_request_higher_tier' : 'prepare_fix_request', { prompt: 'Fix: make the hoop thinner, keep everything else.' }),
+    step(productShot ? 'fix_jewelry_image_product_shot_higher_tier' : 'fix_jewelry_image', { output_url: api(83), image: art(83) }),
+    ...(size === '4K' ? [step('upscale_higher_tier_4k', { image: art(84), status: 'completed' })] : []),
+  ],
+});
+
+/** Low-effort generators: prepare_* -> generate_*. */
+const lowPhotoRun = (workflow_name: string, productShot: boolean): AdminGenerationDetail => ({
+  ...base(workflow_name, 8, 8),
+  input_payload: {
+    payload: {
+      jewelry_image_url: api(90),
+      ...(productShot ? { inspiration_image_url: api(91) } : { model_image_url: api(92) }),
+      category: 'ring',
+      image_size: '1K',
+    },
+  },
+  steps: [
+    step(productShot ? 'describe_jewelry_pdp' : 'prepare_jewelry_request', { description: 'a solitaire ring', prompt: 'Place the ring.' }),
+    step(productShot ? 'generate_jewelry_image_pdp' : 'generate_jewelry_image', { output_url: api(93) }),
+  ],
+});
+
+/** A workflow nobody wrote admin code for: new artifact types, groups and arrays. */
+export const syntheticReelRun = (): AdminGenerationDetail => ({
+  ...base('synthetic_video_reel_v1', 30, 34),
+  input_payload: {
+    payload: {
+      script: 'Open on the ring turning slowly on black velvet, then cut to a hand wearing it in window light. End on the logo.',
+      shots: [
+        { name: 'turntable', seconds: 4, still: art(100) },
+        { name: 'on hand', seconds: 3, still: art(101, 'image/jpeg') },
+      ],
+      music: { mood: 'calm', bpm: 84, licensed: true },
+      brand_kit: { uri: api(102), type: 'application/zip', bytes: 3_400_000, name: 'brand-kit.zip' },
+    },
+  },
+  steps: [
+    step('plan_reel', { result: { beats: ['turn', 'cut', 'logo'], storyboard: art(103), cost: { total_usd: 0.021 } } }),
+    step('render_reel', { error: 'GPU worker lost' }),
+    step('render_reel', {
+      video: { uri: api(104), type: 'video/mp4', bytes: 18_000_000, sha256: sha(104) },
+      poster: art(105),
+      captions: { uri: api(106), type: 'application/json', sha256: sha(106) },
+      frames: 240,
+      idempotency_key: 'reel-1',
+    }),
+  ],
+});
+
+/** A second unknown workflow: odd keys, deep nesting, unicode, mixed arrays, unsafe urls. */
+export const syntheticOddRun = (): AdminGenerationDetail => ({
+  ...base('synthetic_odd_payload_v2', 5, 5),
+  input_payload: JSON.parse(JSON.stringify({
+    'odd key with spaces': { 'a.b': [1, [2, [3, { deepest: null }]]], '': 'empty key' },
+    unicode_ключ: 'значение',
+    level1: { level2: { level3: { level4: { level5: { level6: { note: 'six levels down' } } } } } },
+    mixed: [1, 'two', true, null, { three: 3 }, []],
+    links: {
+      docs: 'https://example.com/docs',
+      tracker: 'https://tracker.example.com/pixel.gif',
+      bad_js: 'javascript:alert(1)',
+      bad_svg: 'data:image/svg+xml;base64,PHN2Zz4=',
+      inline_png: 'data:image/png;base64,iVBORw0KGgo=',
+    },
+    input_hash: 'abc123',
+  })),
+  steps: [
+    step('mystery_tool', { result: { verdict: 'ok', scores: { a: 0.91, b: -2 }, model_url: 'https://cdn.example.com/m/ring.glb' } }),
+  ],
+});
+
+/**
+ * One fixture per workflow name the app can start (see workflow-fixtures.test.ts), plus the
+ * synthetic unknowns. Every new workflow adds an entry here (AI_RULES.md section 13).
+ */
+export const FIXTURES: Record<string, () => AdminGenerationDetail> = {
+  Product_shot_pipeline: () => lowPhotoRun('Product_shot_pipeline', true),
+  Product_shot_pipeline_higher_tier: productShotRun,
+  Product_shot_pipeline_higher_tier_4k: () => renamed(productShotRun(), 'Product_shot_pipeline_higher_tier_4k'),
+  jewelry_photoshoots_generator: () => lowPhotoRun('jewelry_photoshoots_generator', false),
+  jewelry_photoshoots_generator_higher_tier: () => {
+    const run = renamed(photoshoot4kRun(), 'jewelry_photoshoots_generator_higher_tier');
+    return { ...run, steps: run.steps.slice(0, 6) };
+  },
+  jewelry_photoshoots_generator_higher_tier_4k: photoshoot4kRun,
+  fix_model_shot: () => fixRun('fix_model_shot', false, '1K'),
+  fix_product_shot: () => fixRun('fix_product_shot', true, '1K'),
+  fix_model_shot_higher_tier: () => fixRun('fix_model_shot_higher_tier', false, '2K'),
+  fix_model_shot_higher_tier_4k: () => fixRun('fix_model_shot_higher_tier_4k', false, '4K'),
+  fix_product_shot_higher_tier: () => fixRun('fix_product_shot_higher_tier', true, '2K'),
+  fix_product_shot_higher_tier_4k: () => fixRun('fix_product_shot_higher_tier_4k', true, '4K'),
+  upscale_image: () => ({
+    ...base('upscale_image', 12, 12),
+    input_payload: { payload: { image: { uri: api(110) }, factor: 2, image_size: '4K' } },
+    steps: [step('upscale', { image: art(111), status: 'completed' })],
+  }),
+  design_image_v1: designImageRun,
+  cad_to_catalog_fastload: fastloadRun,
+  cad_to_catalog_shot: catalogShotRun,
+  cad_to_catalog_shot_white: catalogWhiteRun,
+  jewelry_cad_generate: () => {
+    const run = renamed(cadImproveRun(), 'jewelry_cad_generate');
+    const { cad_improve: _lineage, ...payload } = run.input_payload as Record<string, unknown>;
+    return { ...run, input_payload: payload };
+  },
+  jewelry_cad_improve: cadImproveRun,
+  ring_cad_improve: () => renamed(cadImproveRun(), 'ring_cad_improve'),
+  ring_cad_nurbs_v1: () => renamed(cadImproveRun(), 'ring_cad_nurbs_v1'),
+  synthetic_video_reel_v1: syntheticReelRun,
+  synthetic_odd_payload_v2: syntheticOddRun,
+};

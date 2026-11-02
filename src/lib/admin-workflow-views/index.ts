@@ -1,44 +1,69 @@
 /**
- * Workflow name -> extractor for the admin detail page (Inputs -> Steps -> Outputs).
- * Unknown workflows get the generic view: every picture found and every key.
- *
- * isCadModel comes from the page's existing source-type resolution (resolveSourceType),
- * so the CAD model family matches what the rest of the page treats as a CAD model.
- * cad_to_catalog_* are matched first: their names contain "cad" but they are neither CAD
- * models nor image generations.
+ * The admin detail page's view of one run, for ANY workflow: Inputs (the request payload),
+ * a Steps timeline (every tool call's input and output) and Outputs (the last successful
+ * step's output). Everything is walked schema-free (walker.ts); the family only adds labels
+ * and order (families.ts). A new workflow needs no code here to be shown in full.
  */
 import type { AdminGenerationDetail } from '@/lib/admin-generations-api';
-import { catalogShotView, fastloadView } from './cad-catalog';
-import { cadModelView } from './cad-model';
-import { designImageView } from './design-image';
-import { genericView } from './generic';
-import { photoshootView } from './photoshoot';
-import { productShotView } from './product-shot';
-import type { WorkflowExtractor, WorkflowFamily, WorkflowView } from './types';
+import { stepFailure } from './common';
+import { ENHANCEMENTS, workflowFamily, type WorkflowFamily } from './families';
+import { walk, type Enhancement, type ViewNode } from './walker';
 
-export type { ViewField, ViewFile, ViewImage, ViewSection, ViewStep, WorkflowFamily, WorkflowView } from './types';
+export type { WorkflowFamily } from './families';
+export { workflowFamily } from './families';
+export type { ViewNode, MediaKind, Enhancement } from './walker';
 
-const EXTRACTORS: Record<WorkflowFamily, WorkflowExtractor> = {
-  product_shot: productShotView,
-  photoshoot: photoshootView,
-  design_image: designImageView,
-  cad_fastload: fastloadView,
-  cad_shot: catalogShotView,
-  cad_model: cadModelView,
-  generic: genericView,
-};
-
-export function workflowFamily(workflowName: string | null | undefined, isCadModel: boolean): WorkflowFamily {
-  const name = (workflowName ?? '').toLowerCase();
-  if (name.startsWith('cad_to_catalog_fastload')) return 'cad_fastload';
-  if (name.startsWith('cad_to_catalog_shot')) return 'cad_shot';
-  if (name.startsWith('product_shot_pipeline')) return 'product_shot';
-  if (name.startsWith('jewelry_photoshoots_generator')) return 'photoshoot';
-  if (name.startsWith('design_image')) return 'design_image';
-  if (isCadModel) return 'cad_model';
-  return 'generic';
+export interface StepView {
+  /** 1-based position among all recorded tool calls. */
+  index: number;
+  tool: string;
+  tookMs: number | null;
+  at: string | null;
+  /** Inferred from the output (common.ts stepFailure); the API sends no is_success. */
+  failed: boolean;
+  /** A later call of the same tool exists, so this failure was retried (inferred). */
+  retried: boolean;
+  error: string | null;
+  input: ViewNode;
+  output: ViewNode;
+  /** The recorded JSON, for the collapsible raw view. */
+  raw: { input: unknown; output: unknown };
 }
 
-export function extractWorkflowView(detail: AdminGenerationDetail, isCadModel: boolean): WorkflowView {
-  return EXTRACTORS[workflowFamily(detail.workflow_name, isCadModel)](detail);
+export interface RunView {
+  family: WorkflowFamily;
+  /** The family's labels and order, passed on to the renderer for on-demand deeper levels. */
+  enh: Enhancement;
+  inputs: ViewNode;
+  steps: StepView[];
+  /** The last successful step's output; intermediates stay in the timeline. */
+  outputs: { stepIndex: number; tool: string; node: ViewNode } | null;
+}
+
+export function buildRunView(detail: AdminGenerationDetail, isCadModel: boolean): RunView {
+  const family = workflowFamily(detail.workflow_name, isCadModel);
+  const enh = ENHANCEMENTS[family];
+  const steps: StepView[] = detail.steps.map((step, i) => {
+    const { failed, error } = stepFailure(step.output);
+    return {
+      index: i + 1,
+      tool: step.tool_name,
+      tookMs: step.took_ms,
+      at: step.at,
+      failed,
+      retried: failed && detail.steps.slice(i + 1).some((later) => later.tool_name === step.tool_name),
+      error,
+      input: walk(step.input, `steps[${i}].input`, enh, step.tool_name),
+      output: walk(step.output, `steps[${i}].output`, enh, step.tool_name),
+      raw: { input: step.input, output: step.output },
+    };
+  });
+  const last = [...steps].reverse().find((s) => !s.failed) ?? null;
+  return {
+    family,
+    enh,
+    inputs: walk(detail.input_payload, 'input_payload', enh),
+    steps,
+    outputs: last ? { stepIndex: last.index, tool: last.tool, node: last.output } : null,
+  };
 }
