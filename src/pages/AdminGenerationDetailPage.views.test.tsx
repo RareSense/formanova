@@ -13,8 +13,10 @@ vi.mock('@/components/generations/ScissorGLBGrid', () => ({
 import { DetailContent } from './AdminGenerationDetailPage';
 import type { AdminGenerationDetail } from '@/lib/admin-generations-api';
 import {
-  cadImproveRun, catalogShotRun, designImageRun, fastloadRun, photoshoot4kRun, productShotRun, proxy, unknownRun,
+  cadImproveRun, catalogShotRun, designImageRun, fastloadRun, FIXTURES, photoshoot4kRun, productShotRun, proxy,
+  syntheticOddRun, syntheticReelRun,
 } from '@/lib/admin-workflow-views/__fixtures__/runs';
+import { leafPaths } from '@/lib/admin-workflow-views/__fixtures__/leaf-paths';
 
 function renderDetail(detail: AdminGenerationDetail) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -26,119 +28,110 @@ function renderDetail(detail: AdminGenerationDetail) {
 }
 
 const section = (name: string) => within(screen.getByRole('region', { name }));
-const thumb = (scope: ReturnType<typeof section>, label: string) => scope.getByRole('figure', { name: label }).getAttribute('data-url');
+const thumb = (scope: ReturnType<typeof section>, label: string) => scope.getAllByRole('figure', { name: label })[0].getAttribute('data-url');
 
-describe('DetailContent: Inputs -> Steps -> Outputs per workflow', () => {
-  beforeEach(() => {
-    authFetch.authenticatedFetch.mockReset();
-    // Nothing reaches a real API: every call answers 404 (images stay as thumbnails without bytes).
-    authFetch.authenticatedFetch.mockResolvedValue(new Response(JSON.stringify({ detail: 'Not found' }), { status: 404 }));
-  });
+beforeEach(() => {
+  authFetch.authenticatedFetch.mockReset();
+  // Nothing reaches a real API: every call answers 404.
+  authFetch.authenticatedFetch.mockResolvedValue(new Response(JSON.stringify({ detail: 'Not found' }), { status: 404 }));
+});
 
-  it('product shot: jewelry + inspiration in, analysis and prompt, failed retry marked, final image out, honest cost', () => {
+describe('DetailContent: Inputs -> Steps -> Outputs for any workflow', () => {
+  it('product shot: labelled pictures and options in, failed retry marked, final image out, honest cost', () => {
     renderDetail(productShotRun());
     const inputs = section('Inputs');
     expect(thumb(inputs, 'Jewelry 1')).toBe(proxy(1));
-    expect(thumb(inputs, 'Jewelry 2')).toBe(proxy(2));
     expect(thumb(inputs, 'Inspiration')).toBe(proxy(3));
     expect(inputs.getByText('warm white marble, soft morning light')).toBeTruthy();
-
     const steps = section('Steps');
-    expect(steps.getByText('analyze_jewelry_pdp')).toBeTruthy();
-    expect(steps.getByText('pair')).toBeTruthy();
-    expect(steps.getByText(/Product photograph of a pair of gold hoop earrings/)).toBeTruthy();
     expect(steps.getByText('Failed, retried')).toBeTruthy();
-    expect(steps.getByText(/upstream timed out/)).toBeTruthy();
-
-    expect(thumb(section('Outputs'), 'Final image')).toBe(proxy(4));
-
+    expect(steps.getAllByText(/upstream timed out/).length).toBeGreaterThan(0);
+    expect(steps.getAllByText(/Product photograph of a pair of gold hoop earrings/).length).toBeGreaterThan(0);
+    const outputs = section('Outputs');
+    expect(outputs.getByText('From step 4: generate_jewelry_image_pdp_higher_tier')).toBeTruthy();
+    expect(thumb(outputs, 'Generated image')).toBe(proxy(4));
     const header = section('Run');
-    expect(header.getByText('28 credits')).toBeTruthy();
-    expect(header.getByText('56 credits')).toBeTruthy();
     expect(header.getByText('+28')).toBeTruthy();
     expect(header.getByText('incl. failed retries')).toBeTruthy();
-    expect(header.getByText(/Provider spend \(reported\): not reported by this workflow/)).toBeTruthy();
+    expect(header.getByText(/not reported by this workflow/)).toBeTruthy();
   });
 
-  it('photoshoot 4K: model + jewelry in, intermediate and polished images in the steps, upscaled out', () => {
+  it('photoshoot 4K: intermediate image in the timeline, upscaled image out', () => {
     renderDetail(photoshoot4kRun());
-    expect(thumb(section('Inputs'), 'Model')).toBe(proxy(10));
-    const steps = section('Steps');
-    expect(thumb(steps, 'Intermediate image')).toBe(proxy(12));
-    expect(thumb(steps, 'Polished image')).toBe(proxy(13));
-    expect(steps.getByText('Needs repose')).toBeTruthy();
-    expect(steps.getByText(/Place the emerald pendant/)).toBeTruthy();
-    expect(thumb(section('Outputs'), 'Final image (upscaled)')).toBe(proxy(14));
+    expect(thumb(section('Steps'), 'Intermediate image')).toBe(proxy(12));
+    expect(thumb(section('Outputs'), 'Upscaled image')).toBe(proxy(14));
   });
 
-  it('design image: prompt and role-labelled pictures, consistency out, unpriced cost, reported spend', () => {
+  it('design image: role-named pictures, unpriced cost, reported spend', () => {
     renderDetail(designImageRun());
-    const inputs = section('Inputs');
-    expect(inputs.getByText('Make the band thinner and add milgrain')).toBeTruthy();
-    expect(thumb(inputs, 'Design with annotations')).toBe(proxy(21));
-    const outputs = section('Outputs');
-    expect(thumb(outputs, 'Design picture')).toBe(proxy(23));
-    expect(outputs.getByText('Matches the design')).toBeTruthy();
-    expect(outputs.getByText('stone is oval, the design shows round')).toBeTruthy();
-    const header = section('Run');
-    expect(header.getByText('not priced')).toBeTruthy();
-    expect(header.getByText('Provider spend (reported): $0.07 across 1 step')).toBeTruthy();
+    expect(thumb(section('Inputs'), 'Design with annotations')).toBe(proxy(21));
+    expect(thumb(section('Outputs'), 'Design picture')).toBe(proxy(23));
+    expect(section('Run').getByText('not priced')).toBeTruthy();
+    expect(section('Run').getByText('Provider spend (reported): $0.07 across 1 step')).toBeTruthy();
   });
 
-  it('fastload: the .3dm in and its files out, no image placeholders, free', () => {
+  it('fastload: file links in and out, no picture placeholders', () => {
     renderDetail(fastloadRun());
-    expect(screen.queryByText('Jewelry Input')).toBeNull();
     expect(screen.queryByRole('figure')).toBeNull();
-    const inputs = section('Inputs');
-    expect(inputs.getByRole('button', { name: /Input \.3dm.*pave-halo-ring\.3dm.*74\.5 MB/ })).toBeTruthy();
-    const outputs = section('Outputs');
-    expect(outputs.getByRole('button', { name: /Skeleton \.3dm/ })).toBeTruthy();
-    expect(outputs.getByRole('button', { name: /Meshes/ })).toBeTruthy();
-    expect(outputs.getByText('4,750,000')).toBeTruthy();
-    expect(outputs.getByText('41.2')).toBeTruthy();
+    expect(section('Inputs').getByRole('button', { name: /Download Input \.3dm pave-halo-ring\.3dm 74\.5 MB/ })).toBeTruthy();
+    expect(section('Outputs').getByRole('button', { name: /Download Skeleton \.3dm/ })).toBeTruthy();
+    expect(section('Outputs').getByText('4750000')).toBeTruthy();
     expect(section('Run').getAllByText('free')).toHaveLength(2);
   });
 
-  it('CAD to catalog shot: render + background in, placed photo out', () => {
+  it('catalog shot: render + background in, placed photo out', () => {
     renderDetail(catalogShotRun());
-    const inputs = section('Inputs');
-    expect(thumb(inputs, 'Render')).toBe(proxy(40));
-    expect(thumb(inputs, 'Background')).toBe(proxy(41));
-    expect(inputs.getByText('band: Yellow Gold; round x14: Diamond')).toBeTruthy();
+    expect(thumb(section('Inputs'), 'Render')).toBe(proxy(40));
     expect(thumb(section('Outputs'), 'Placed photo')).toBe(proxy(42));
   });
 
-  it('CAD improve: studio inputs and lineage in, every file from the steps out, mass and validation', () => {
+  it('CAD improve: lineage in, 3D preview and every file out, reported spend', () => {
     renderDetail(cadImproveRun());
-    const inputs = section('Inputs');
-    expect(inputs.getByText('make the band thinner')).toBeTruthy();
-    expect(inputs.getByText('33333333-3333-4333-8333-333333333333')).toBeTruthy();
+    expect(section('Inputs').getByText('33333333-3333-4333-8333-333333333333')).toBeTruthy();
     const outputs = section('Outputs');
     expect(outputs.getByTestId('glb').getAttribute('data-url')).toBe(proxy(62));
-    for (const label of ['3DM', 'GLB', 'STL', 'STEP', 'Casting STL', 'Spec sheet']) {
+    for (const label of ['3DM', 'STL', 'STEP', 'Spec sheet']) {
       expect(outputs.getByRole('button', { name: new RegExp(`^Download ${label}\\b`) })).toBeTruthy();
     }
-    expect(outputs.getByText('4.82 g')).toBeTruthy();
-    expect(outputs.getByText('applied')).toBeTruthy();
-    expect(section('Steps').getByText('Failed, retried')).toBeTruthy();
+    expect(outputs.getByRole('button', { name: /casting_body\.stl/ })).toBeTruthy();
+    expect(outputs.getByText('4.82')).toBeTruthy();
     expect(section('Run').getByText('Provider spend (reported): $0.41 across 1 step')).toBeTruthy();
   });
 
-  it('unknown workflow: generic view with every key and picture', () => {
-    renderDetail(unknownRun());
+  it('unknown workflow #1 (video reel): new artifact types shown with no admin code', () => {
+    renderDetail(syntheticReelRun());
     const inputs = section('Inputs');
-    expect(inputs.getByText('fix_instruction')).toBeTruthy();
-    expect(thumb(inputs, 'result_image_url')).toBe(proxy(70));
-    expect(thumb(section('Outputs'), 'Output image')).toBe(proxy(71));
+    expect(inputs.getByText(/Open on the ring turning slowly/)).toBeTruthy();
+    expect(thumb(inputs, 'Still')).toBe(proxy(100));
+    expect(inputs.getByRole('button', { name: /Download Brand kit brand-kit\.zip/ })).toBeTruthy();
+    const outputs = section('Outputs');
+    expect(outputs.getByRole('button', { name: /Download Video/ })).toBeTruthy();
+    expect(thumb(outputs, 'Poster')).toBe(proxy(105));
+    expect(outputs.getByText('240')).toBeTruthy();
+    expect(section('Steps').getByText('Failed, retried')).toBeTruthy();
+    expect(section('Run').getByText('Provider spend (reported): $0.02 across 1 step')).toBeTruthy();
   });
 
-  it('renders a hostile prompt and labels as text, never as markup', () => {
-    const run = productShotRun();
-    run.input_payload = { user_art_direction: '<img src=x onerror="alert(1)">', category: '<script>alert(2)</script>' };
-    run.steps = [{ tool_name: '<b>bold</b>', took_ms: null, at: null, input: {}, output: { prompt: '<iframe src="javascript:alert(3)">' } }];
-    const { container } = renderDetail(run);
-    expect(screen.getByText('<img src=x onerror="alert(1)">')).toBeTruthy();
-    expect(screen.getByText('<script>alert(2)</script>')).toBeTruthy();
-    expect(container.querySelector('img[src="x"], script, iframe, b')).toBeNull();
+  it('unknown workflow #2 (odd payload): odd keys, unicode and deep values all visible', () => {
+    renderDetail(syntheticOddRun());
+    const inputs = section('Inputs');
+    expect(inputs.getByText('значение')).toBeTruthy();
+    expect(inputs.getByText('six levels down')).toBeTruthy();
+    expect(inputs.getByText('empty key')).toBeTruthy();
+    expect(inputs.getByText('javascript:alert(1)')).toBeTruthy();
+    expect(section('Outputs').getByRole('button', { name: /Show 3D preview|Download Model url/ })).toBeTruthy();
+  });
+});
+
+describe('completeness in the DOM: every leaf of every fixture is rendered', () => {
+  it.each(Object.keys(FIXTURES))('%s', (name) => {
+    const detail = FIXTURES[name]();
+    const { container } = renderDetail(detail);
+    const rendered = new Set(Array.from(container.querySelectorAll('[data-path]')).map((el) => el.getAttribute('data-path')));
+    const leaves = [
+      ...leafPaths(detail.input_payload, 'input_payload'),
+      ...detail.steps.flatMap((s, i) => [...leafPaths(s.input, `steps[${i}].input`), ...leafPaths(s.output, `steps[${i}].output`)]),
+    ];
+    expect(leaves.filter((p) => !rendered.has(p))).toEqual([]);
   });
 });

@@ -39,12 +39,14 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { parseServerTime } from '@/lib/server-time';
 import { costView, USER_PAID_HELP, WORKFLOW_COST_HELP } from '@/lib/admin-cost-display';
 import { readProviderSpend } from '@/lib/admin-provider-spend';
-import { extractWorkflowView, type ViewSection } from '@/lib/admin-workflow-views';
+import { buildRunView } from '@/lib/admin-workflow-views';
+import { findNodes } from '@/lib/admin-workflow-views/walker';
 import { CostLabel, ProviderSpendBlock, WorkflowCostValue } from '@/components/admin/AdminCost';
-import { FileList } from '@/components/admin/workflow-view/FileLink';
-import { ImageGrid, ImageThumb } from '@/components/admin/workflow-view/ImageThumb';
+import { FileLink } from '@/components/admin/workflow-view/FileLink';
+import { ImageThumb } from '@/components/admin/workflow-view/ImageThumb';
 import { JsonBlock } from '@/components/admin/workflow-view/JsonBlock';
-import { FieldGrid, LabelledValue } from '@/components/admin/workflow-view/LabelledValue';
+import { LabelledValue } from '@/components/admin/workflow-view/LabelledValue';
+import { NodeView } from '@/components/admin/workflow-view/NodeView';
 import { StepTimeline } from '@/components/admin/workflow-view/StepTimeline';
 
 function formatDateTime(value: string | null): string {
@@ -287,7 +289,7 @@ function StudioInputs({ inputs }: { inputs: AdminRunInputs }) {
           <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Images (Input)</p>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {inputs.images.map((image, index) => (
-              <ImageThumb key={`${image.url}-${index}`} url={image.url} label={image.label} zoomable />
+              <ImageThumb key={`${image.url}-${index}`} url={image.url} label={image.label} />
             ))}
           </div>
         </div>
@@ -338,9 +340,9 @@ function DesignHistorySection({ history }: { history: DesignHistory }) {
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {step.images.map((image, i) => (
-                <ImageThumb key={`${image.url}-${i}`} url={image.url} label={image.label} zoomable />
+                <ImageThumb key={`${image.url}-${i}`} url={image.url} label={image.label} />
               ))}
-              {step.outputUrl && <ImageThumb url={step.outputUrl} label="Design made" zoomable />}
+              {step.outputUrl && <ImageThumb url={step.outputUrl} label="Design made" />}
             </div>
           </li>
         ))}
@@ -519,7 +521,7 @@ export function RunInputsPanel({ detail }: { detail: AdminGenerationDetail }) {
       ) : jewelryInputUrls.length > 0 ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {jewelryInputUrls.map((url, index) => (
-            <ImageThumb key={`${url}-${index}`} url={url} label={`Uploaded Image ${index + 1}`} zoomable />
+            <ImageThumb key={`${url}-${index}`} url={url} label={`Uploaded Image ${index + 1}`} />
           ))}
         </div>
       ) : null}
@@ -545,28 +547,17 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-/** Fields, pictures and files of one side of a run, or a plain line when it recorded none. */
-function ViewSectionContent({ section, empty, fallbackStem }: { section: ViewSection; empty: string; fallbackStem: string }) {
-  if (!section.fields.length && !section.images.length && !section.files.length) {
-    return <p className="text-sm text-muted-foreground">{empty}</p>;
-  }
-  return (
-    <>
-      <FieldGrid fields={section.fields} />
-      <ImageGrid images={section.images} />
-      <FileList files={section.files} fallbackStem={fallbackStem} />
-    </>
-  );
-}
-
+/**
+ * Any run, any workflow: the request payload, every step's input and output, and the last
+ * successful step's output, all walked schema-free (admin-workflow-views). The family only
+ * adds labels and order. CAD runs also get the design trail behind them, and the /result
+ * 3DM / GLB as a fallback when no step output carries one.
+ */
 export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
-  // Both CAD families produce a GLB. Image-to-CAD (including ring_cad_nurbs_v1)
-  // was excluded here, so its runs always rendered
-  // "No 3D output" no matter what the pipeline returned.
   const {
-    cadSourceType, isCadModel: isCadSource, designHistory, designHistoryQuery, fromDoodle, cadInputs,
+    cadSourceType, isCadModel: isCadSource, designHistory, designHistoryQuery, fromDoodle,
   } = useCadRunInputs(detail);
-  const view = useMemo(() => extractWorkflowView(detail, isCadSource), [detail, isCadSource]);
+  const view = useMemo(() => buildRunView(detail, isCadSource), [detail, isCadSource]);
   // cad_to_catalog_* names contain "cad" but are not CAD models; the registry decides.
   const isCadModel = view.family === 'cad_model';
   const failedSteps = view.steps.filter((s) => s.failed).length;
@@ -596,21 +587,20 @@ export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
   });
   const appliedTiers = supervisedQuery.data?.supervision.tiers ?? null;
   // Files from the step outputs come first: /api/result/{id} answers 403 to an admin
-  // viewing another user's run (docs/admin-backend-handoff-2026-11-02.md), so its 3DM
-  // is only a fallback when no step published one.
-  const stepGlb = view.outputs.files.find((f) => f.label === 'GLB')?.url ?? null;
-  const cadGlbUrl = isCadModel
-    ? stepGlb ?? cadResultQuery.data?.glb_url ?? extractGlbFromSteps(detail.steps)
-    : null;
-  const resultThreedm = isCadModel ? cadResultQuery.data?.threedm_url ?? null : null;
-  const outputFiles = resultThreedm && !view.outputs.files.some((f) => f.label === '3DM')
-    ? [...view.outputs.files, { label: '3DM', url: resultThreedm, name: `${detail.workflow_id}.3dm`, bytes: null }]
-    : view.outputs.files;
+  // viewing another user's run (docs/admin-backend-handoff-2026-11-02.md), so it is only a
+  // fallback when the final output carries no 3DM / GLB.
+  const outputMedia = view.outputs ? findNodes(view.outputs.node, (n) => n.kind === 'media') : [];
+  const hasModel = outputMedia.some((n) => n.kind === 'media' && n.media === 'model3d');
+  const has3dm = outputMedia.some((n) => n.kind === 'media' && n.ext === '3dm');
+  const fallbackGlb = isCadModel && !hasModel ? cadResultQuery.data?.glb_url ?? extractGlbFromSteps(detail.steps) : null;
+  const fallback3dm = isCadModel && !has3dm ? cadResultQuery.data?.threedm_url ?? null : null;
+  const complaintOutput = !view.outputs ? detail.feedback?.output_image_url ?? null : null;
   const cadSourceLabel = !isCadModel ? null : fromDoodle ? 'CAD from Doodle' : cadFlowLabel(detail.input_payload) ?? (cadSourceType === 'text_to_cad'
     ? 'Text to CAD'
     : cadSourceType === 'image_to_cad'
       ? 'Image to CAD'
       : null);
+  const opts = { enh: view.enh, fallbackStem: detail.workflow_id };
 
   return (
     <div className="space-y-6">
@@ -659,63 +649,51 @@ export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
       </section>
 
       <Section title="Inputs">
-        {isCadModel ? (
-          <div className="space-y-4">
-            {designHistory ? (
-              <DesignHistorySection history={designHistory} />
-            ) : designHistoryQuery.isLoading ? (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" /> Loading design steps
-              </div>
-            ) : null}
-            {cadInputs && <StudioInputs inputs={cadInputs} />}
-            <FieldGrid fields={view.inputs.fields} />
+        {isCadModel && (designHistory ? (
+          <DesignHistorySection history={designHistory} />
+        ) : designHistoryQuery.isLoading ? (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading design steps
           </div>
-        ) : (
-          <ViewSectionContent section={view.inputs} empty="This run recorded no inputs." fallbackStem={detail.workflow_id} />
-        )}
+        ) : null)}
+        <NodeView node={view.inputs} opts={opts} />
       </Section>
 
       <Section title="Steps">
-        <StepTimeline steps={view.steps} />
+        <StepTimeline steps={view.steps} enh={view.enh} fallbackStem={detail.workflow_id} />
       </Section>
 
       <Section title="Outputs">
-        {isCadModel && (
+        {view.outputs ? (
+          <>
+            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              {`From step ${view.outputs.stepIndex}: ${view.outputs.tool}`}
+            </p>
+            <NodeView node={view.outputs.node} opts={{ ...opts, tool: view.outputs.tool, autoPreview3d: true }} />
+          </>
+        ) : complaintOutput ? (
+          <ImageThumb url={complaintOutput} label="Output image (from complaint)" />
+        ) : (
+          <p className="text-sm text-muted-foreground">This run recorded no successful step output.</p>
+        )}
+        {fallbackGlb && (
           <div className="space-y-2">
-            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">3D Preview</p>
-            {cadGlbUrl ? (
-              // Use the same shared renderer, studio lighting and jewelry
-              // palette as Generation History, at a useful inspection size.
-              <div className="w-full max-w-2xl">
-                <ScissorGLBGrid>
-                  <GLBPreviewSlot
-                    id={detail.workflow_id}
-                    glbUrl={cadGlbUrl}
-                    className="min-h-[360px] w-full aspect-[4/3] rounded-md border border-border bg-muted/20"
-                    forceJewelryPalette
-                  />
-                </ScissorGLBGrid>
-              </div>
-            ) : cadResultQuery.isLoading ? (
-              <div className="flex min-h-[360px] w-full max-w-2xl aspect-[4/3] items-center justify-center rounded-md border border-border bg-muted/20">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              </div>
-            ) : (
-              <div className="flex min-h-[200px] w-full max-w-2xl items-center justify-center rounded-md border border-border bg-muted/20">
-                <div className="flex flex-col items-center gap-2 text-muted-foreground/50">
-                  <ImageOff className="h-6 w-6" />
-                  <span className="font-mono text-[10px] uppercase tracking-widest text-center">No 3D output</span>
-                </div>
-              </div>
-            )}
+            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">3D preview (from the run result)</p>
+            <div className="w-full max-w-2xl">
+              <ScissorGLBGrid>
+                <GLBPreviewSlot
+                  id={detail.workflow_id}
+                  glbUrl={fallbackGlb}
+                  className="min-h-[320px] w-full aspect-[4/3] rounded-md border border-border bg-muted/20"
+                  forceJewelryPalette
+                />
+              </ScissorGLBGrid>
+            </div>
           </div>
         )}
-        <ViewSectionContent
-          section={{ ...view.outputs, files: outputFiles }}
-          empty={isCadModel ? 'No files were found in the step outputs.' : 'This run recorded no output.'}
-          fallbackStem={detail.workflow_id}
-        />
+        {fallback3dm && (
+          <FileLink file={{ label: '3DM (from the run result)', url: fallback3dm, name: `${detail.workflow_id}.3dm`, bytes: null, ext: '3dm' }} fallbackStem={detail.workflow_id} />
+        )}
       </Section>
 
       <CollapsibleCardSection title="Input Payload">
