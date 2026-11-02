@@ -81,6 +81,8 @@ export interface CadRingVersion {
    * it. Untrusted: read it through pickWeightSource, never directly.
    */
   metal_volume_mm3?: number | null;
+  /** The toolkit's casting-check flags for that volume, e.g. ["thin_walls"]; [] or null when none. */
+  metal_volume_flags?: string[] | null;
   /** The target weight the request was made with, stored on the version; absent when none was set. */
   weight_target?: { grams?: number; tolerance_pct?: number; alloy_id?: string | null } | null;
   /**

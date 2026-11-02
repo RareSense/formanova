@@ -161,6 +161,8 @@ export interface CadModelUrls {
   estimatedMetalMassG: number | null;
   /** The fused casting body's volume, mm³, when the result reports it. */
   metalVolumeMm3: number | null;
+  /** Casting-check flags for that volume; empty when none. */
+  metalVolumeFlags: string[];
   notAllSolid: boolean;
 }
 
@@ -223,7 +225,7 @@ export async function resolveCadModel(workflowId: string, raw: unknown): Promise
     // Backend contract: output_asset_id is the delivered version; null means nothing was saved.
     const assetId = outputAssetIdOf(raw);
     const vault = assetId ? await findVaultModelForWorkflow(null, assetId) : null;
-    return vault ? { ...vault, stlUrls: [], stepUrls: [], estimatedMetalMassG: null, metalVolumeMm3: null, notAllSolid: false } : null;
+    return vault ? { ...vault, stlUrls: [], stepUrls: [], estimatedMetalMassG: null, metalVolumeMm3: null, metalVolumeFlags: [], notAllSolid: false } : null;
   }
   try {
     const parsed = parseRingCadResult(raw);
@@ -234,12 +236,13 @@ export async function resolveCadModel(workflowId: string, raw: unknown): Promise
       stepUrls: parsed.stepArtifacts.map((artifact) => artifact.url),
       estimatedMetalMassG: parsed.estimatedMetalMassG,
       metalVolumeMm3: parsed.metalVolumeMm3,
+      metalVolumeFlags: parsed.metalVolumeFlags,
       notAllSolid: parsed.notAllSolid,
     };
   } catch {
     if (isExplicitCadFailure(raw)) return null;
     const vault = await findVaultModelForWorkflow(workflowId, outputAssetIdOf(raw));
-    return vault ? { ...vault, stlUrls: [], stepUrls: [], estimatedMetalMassG: null, metalVolumeMm3: null, notAllSolid: false } : null;
+    return vault ? { ...vault, stlUrls: [], stepUrls: [], estimatedMetalMassG: null, metalVolumeMm3: null, metalVolumeFlags: [], notAllSolid: false } : null;
   }
 }
 

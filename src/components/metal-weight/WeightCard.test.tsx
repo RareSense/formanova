@@ -128,6 +128,17 @@ describe('WeightCard', () => {
     expect(screen.getByText(/20\.70 g\/cm³/)).toBeInTheDocument();
   });
 
+  it('qualifies the weight with the casting check, without hiding it', () => {
+    renderCard({ volumeFlags: ['thin_walls', 'touching_edges'] });
+    expect(screen.getByText('Estimate. Casting check flagged: thin walls, touching edges.')).toBeInTheDocument();
+    expect(cells(rowOf('14K Yellow Gold'))).toEqual(['27.98', '17.99', '26.58']);
+  });
+
+  it('has no casting line when nothing was flagged', () => {
+    renderCard({ volumeFlags: [] });
+    expect(screen.queryByText(/Casting check/)).toBeNull();
+  });
+
   it('notes a two-tone piece: the total, weighed in the chosen metal', () => {
     renderCard({ twoTone: true });
     expect(screen.getByText('Two-tone: total of all metal parts, weighed in 14K Yellow Gold.')).toBeInTheDocument();

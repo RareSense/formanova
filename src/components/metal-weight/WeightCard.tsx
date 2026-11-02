@@ -26,7 +26,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ALLOY_GROUPS, COMMON_ALLOYS, type MetalAlloy } from '@/lib/metal-weight/alloys';
-import { FINISHING_TOOLTIP, formatFixed2, formatGrams, formatTargetChip, targetSummary } from '@/lib/metal-weight/format';
+import { FINISHING_TOOLTIP, castingCheckLine, formatFixed2, formatGrams, formatTargetChip, targetSummary } from '@/lib/metal-weight/format';
 import { dwtFromGrams, finishedGrams, gramsFromVolume } from '@/lib/metal-weight/weight';
 import { cn } from '@/lib/utils';
 
@@ -64,7 +64,7 @@ interface Row {
   after: string;
 }
 
-export function WeightCard({ source, target, alloy, setAlloyId, requestedUnavailable = false, twoTone = false }: WeightViewProps) {
+export function WeightCard({ source, target, alloy, setAlloyId, requestedUnavailable = false, twoTone = false, volumeFlags = [] }: WeightViewProps) {
   const [open, setOpen] = useState(true);
   const [showAll, setShowAll] = useState(false);
   const [showHint, setShowHint] = useState(() => !hintSeen());
@@ -74,6 +74,7 @@ export function WeightCard({ source, target, alloy, setAlloyId, requestedUnavail
   const grams = volume === null ? null : gramsFromVolume(volume, alloy);
   const summary = grams === null ? null : targetSummary(grams, target, alloy);
   const onTarget = summary?.status.kind === 'on';
+  const castingCheck = castingCheckLine(volumeFlags);
 
   const headerNote = !open
     ? (grams === null ? 'Not available' : `${formatGrams(grams)} · ${alloy.name}`)
@@ -212,6 +213,8 @@ export function WeightCard({ source, target, alloy, setAlloyId, requestedUnavail
               </Button>
 
               {showHint && <p className="mt-1 text-muted-foreground">Pick a metal to see its weight</p>}
+
+              {castingCheck && <p className="mt-2 text-muted-foreground">{castingCheck}</p>}
 
               {summary && (
                 <Tooltip>

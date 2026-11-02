@@ -9,6 +9,7 @@ const input: MetalWeightInput = {
   target: { grams: 28, tolerancePct: 5, alloyId: 'au14y' },
   requestedAlloyId: null,
   twoTone: false,
+  volumeFlags: [],
 };
 
 describe('useCadMetal', () => {

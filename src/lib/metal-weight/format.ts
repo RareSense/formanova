@@ -69,5 +69,24 @@ export function metalWeightLine(source: WeightSource, alloy: MetalAlloy): string
   return grams === null ? null : `${alloy.name} · ${formatGrams(grams)} (${formatDwt(dwtFromGrams(grams))})`;
 }
 
+/** Plain words for the toolkit's casting-check flags; unknown flags are humanised. */
+const FLAG_WORDS = new Map<string, string>([
+  ['thin_walls', 'thin walls'],
+  ['touching_edges', 'touching edges'],
+  ['self_intersections', 'self-intersections'],
+  ['self_intersections_not_checked', 'self-intersections not checked'],
+  ['stones_not_held', 'stones not held'],
+]);
+
+const flagWords = (flag: string): string =>
+  FLAG_WORDS.get(flag) ?? flag.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+
+/** "Estimate. Casting check flagged: thin walls, touching edges.", or null when nothing was flagged. */
+export function castingCheckLine(flags: readonly string[] | null | undefined): string | null {
+  if (!flags?.length) return null;
+  const words = [...new Set(flags.map(flagWords))].filter(Boolean);
+  return words.length ? `Estimate. Casting check flagged: ${words.join(', ')}.` : null;
+}
+
 /** "25.4 g", for the small version and history tag. */
 export const formatTagWeight = (grams: number): string => `${grams.toFixed(1)} g`;

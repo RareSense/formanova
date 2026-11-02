@@ -265,6 +265,12 @@ describe('ring_cad_nurbs_v1 result parsing', () => {
     expect(parseRingCadResult({ final_validated: [{ ...RESULT, postprocess: { metal_volume_mm3: 1500 } }] }).metalVolumeMm3).toBe(1500);
   });
 
+  it('reads metal_volume_flags next to the volume, flat or nested', () => {
+    expect(parseRingCadResult({ ...RESULT, metal_volume_mm3: 2192.4, metal_volume_flags: ['thin_walls'] }).metalVolumeFlags).toEqual(['thin_walls']);
+    expect(parseRingCadResult({ final_validated: [{ ...RESULT, postprocess: { metal_volume_mm3: 1500, metal_volume_flags: [] } }] }).metalVolumeFlags).toEqual([]);
+    expect(parseRingCadResult({ ...RESULT, metal_volume_flags: null }).metalVolumeFlags).toEqual([]);
+  });
+
   it('leaves metal_volume_mm3 null when absent or not a finite number', () => {
     expect(parseRingCadResult(RESULT).metalVolumeMm3).toBeNull();
     expect(parseRingCadResult({ ...RESULT, metal_volume_mm3: '2192.4' }).metalVolumeMm3).toBeNull();

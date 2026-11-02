@@ -185,6 +185,8 @@ export interface TrackedGeneration {
   estimatedMetalMassG?: number | null;
   /** CAD only: the fused metal casting body's volume (mm³), the input to every weight shown. */
   metalVolumeMm3?: number | null;
+  /** CAD only: casting-check flags for that volume. */
+  metalVolumeFlags?: string[];
   /** CAD only: label for the completion toast. */
   label?: string;
   /** CAD only: structured fail-step code, used for clear workspace copy. */
@@ -743,6 +745,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
               stepUrls: model.stepUrls,
               estimatedMetalMassG: model.estimatedMetalMassG,
               metalVolumeMm3: model.metalVolumeMm3,
+              metalVolumeFlags: model.metalVolumeFlags,
               notAllSolid: model.notAllSolid,
             }
           : g
@@ -882,6 +885,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
                   stepUrls: model?.stepUrls ?? [],
                   estimatedMetalMassG: model?.estimatedMetalMassG ?? null,
                   metalVolumeMm3: model?.metalVolumeMm3 ?? null,
+                  metalVolumeFlags: model?.metalVolumeFlags ?? [],
                   notAllSolid: model?.notAllSolid ?? false,
                 }
               : g

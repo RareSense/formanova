@@ -115,6 +115,7 @@ export function useImageToCADWorkflow({
   const [estimatedMetalMassG, setEstimatedMetalMassG] = useState<number | null>(null);
   /** The run result's fused metal volume (mm³), when it reports one. */
   const [metalVolumeMm3, setMetalVolumeMm3] = useState<number | null>(null);
+  const [metalVolumeFlags, setMetalVolumeFlags] = useState<string[]>([]);
   /**
    * The metal and target this page sent with its run. /result does not echo
    * the density, so this is the only way an older result's mass turns back
@@ -248,6 +249,7 @@ export function useImageToCADWorkflow({
       setStepArtifacts((trackedRun.stepUrls ?? []).map(url => ({ uri: url, url, type: 'model/step', bytes: 0, sha256: '' })));
       setEstimatedMetalMassG(trackedRun.estimatedMetalMassG ?? null);
       setMetalVolumeMm3(trackedRun.metalVolumeMm3 ?? null);
+      setMetalVolumeFlags(trackedRun.metalVolumeFlags ?? []);
       // cad_generation_completed is NOT emitted here. This effect does not run
       // once the page unmounts and bails out early on hasNavigatedAway, so
       // every run finishing after the user left was never counted.
@@ -256,7 +258,7 @@ export function useImageToCADWorkflow({
       setIsModelLoading(true);
       setHasModel(true);
     }
-  }, [trackedRun?.status, trackedRun?.glbUrl, trackedRun?.threedmUrl, trackedRun?.stlUrls, trackedRun?.stepUrls, trackedRun?.estimatedMetalMassG, trackedRun?.metalVolumeMm3, trackedRun?.generationStep, trackedRun?.cadFailureReasonCode]); // eslint-disable-line react-hooks/exhaustive-deps -- prompt/referenceImages/tier/cadRoute/cadSource and the trackedRun object are excluded: only the run's own transitions should re-drive the overlay, and including the object would re-fire on every progress tick. The analytics values are read from the closure of the render in which status changed, which is the correct moment for them. Regression to watch: if a future edit fires an event here on something other than a status transition, those values could be stale.
+  }, [trackedRun?.status, trackedRun?.glbUrl, trackedRun?.threedmUrl, trackedRun?.stlUrls, trackedRun?.stepUrls, trackedRun?.estimatedMetalMassG, trackedRun?.metalVolumeMm3, trackedRun?.metalVolumeFlags, trackedRun?.generationStep, trackedRun?.cadFailureReasonCode]); // eslint-disable-line react-hooks/exhaustive-deps -- prompt/referenceImages/tier/cadRoute/cadSource and the trackedRun object are excluded: only the run's own transitions should re-drive the overlay, and including the object would re-fire on every progress tick. The analytics values are read from the closure of the render in which status changed, which is the correct moment for them. Regression to watch: if a future edit fires an event here on something other than a status transition, those values could be stale.
 
   /**
    * Looks up the ring this run saved, which is what the Improve button needs.
@@ -385,6 +387,7 @@ export function useImageToCADWorkflow({
     shownVersion: activeVersion && activeVersion.glb_url === glbUrl ? activeVersion : null,
     workflowId: sourceWorkflowId,
     resultVolumeMm3: metalVolumeMm3,
+    resultVolumeFlags: metalVolumeFlags,
     resultMassG: estimatedMetalMassG,
     sent: sentMetal,
   });
@@ -541,6 +544,7 @@ export function useImageToCADWorkflow({
     setStepArtifacts([]);
     setEstimatedMetalMassG(null);
     setMetalVolumeMm3(null);
+    setMetalVolumeFlags([]);
     setSentMetal(null);
     setIsModelLoading(true);
     setProgressStep('_loading');
@@ -677,6 +681,7 @@ export function useImageToCADWorkflow({
     setStepArtifacts([]);
     setEstimatedMetalMassG(null);
     setMetalVolumeMm3(null);
+    setMetalVolumeFlags([]);
     setSentMetal(null);
     // Clear the previous ring's solidity result: a stale warning on a new run
     // is worse than none, because it trains people to ignore it.

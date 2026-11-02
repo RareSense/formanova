@@ -7,6 +7,7 @@ import {
   formatTagWeight,
   formatTargetStatus,
   formatWeight,
+  castingCheckLine,
   metalWeightLine,
   targetSummary,
 } from './format';
@@ -62,6 +63,18 @@ describe('format', () => {
     expect(metalWeightLine({ available: true, volumeMm3: 2192.4, from: 'version' }, findAlloy('pt950ru')!))
       .toBe('Platinum 950 · 45.38 g (29.18 dwt)');
     expect(metalWeightLine({ available: false, reason: 'x' }, findAlloy('au14y')!)).toBeNull();
+  });
+
+  it('words casting-check flags in plain jeweller language', () => {
+    expect(castingCheckLine(['thin_walls', 'touching_edges'])).toBe('Estimate. Casting check flagged: thin walls, touching edges.');
+    expect(castingCheckLine(['self_intersections_not_checked', 'self_intersections', 'stones_not_held']))
+      .toBe('Estimate. Casting check flagged: self-intersections not checked, self-intersections, stones not held.');
+  });
+
+  it('humanises unknown flags, drops repeats, and says nothing for none', () => {
+    expect(castingCheckLine(['sprue_too_thin', 'Porosity-Risk', 'thin_walls', 'thin_walls'])).toBe('Estimate. Casting check flagged: sprue too thin, porosity risk, thin walls.');
+    expect(castingCheckLine([])).toBeNull();
+    expect(castingCheckLine(null)).toBeNull();
   });
 
   it('shows the tag weight to 1 dp', () => {

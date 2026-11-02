@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NO_VOLUME_REASON, OUT_OF_RANGE_REASON, pickWeightSource, readWeightTarget, resolveMetalWeight, type SentMetal } from './source';
+import { NO_VOLUME_REASON, OUT_OF_RANGE_REASON, pickWeightSource, readVolumeFlags, readWeightTarget, resolveMetalWeight, type SentMetal } from './source';
 
 describe('pickWeightSource', () => {
   it('prefers the version volume, then the result volume, then mass ÷ density', () => {
@@ -34,6 +34,17 @@ describe('pickWeightSource', () => {
   it('is not available for a mass without the density it was computed with', () => {
     expect(pickWeightSource({ resultMassG: 25 })).toEqual({ available: false, reason: NO_VOLUME_REASON });
     expect(pickWeightSource({ resultMassG: 0, resultDensityGCm3: 12.76 })).toEqual({ available: false, reason: NO_VOLUME_REASON });
+  });
+});
+
+describe('readVolumeFlags', () => {
+  it('keeps the non-empty string flags', () => {
+    expect(readVolumeFlags(['thin_walls', 'touching_edges'])).toEqual(['thin_walls', 'touching_edges']);
+    expect(readVolumeFlags(['thin_walls', '', 7, null, ' ', 'stones_not_held'])).toEqual(['thin_walls', 'stones_not_held']);
+  });
+
+  it('is empty for [], null, or anything that is not a list', () => {
+    for (const raw of [[], null, undefined, 'thin_walls', { thin_walls: true }]) expect(readVolumeFlags(raw)).toEqual([]);
   });
 });
 
@@ -83,6 +94,7 @@ describe('resolveMetalWeight', () => {
       target: { grams: 28, tolerancePct: 5, alloyId: 'au14y' },
       requestedAlloyId: 'au10y',
       twoTone: false,
+      volumeFlags: [],
     });
   });
 
@@ -111,7 +123,19 @@ describe('resolveMetalWeight', () => {
 
   it('is not available for an old run with neither volume nor mass', () => {
     const resolved = resolveMetalWeight({ shownVersion: { asset_id: 'v1' }, workflowId: null, resultVolumeMm3: null, resultMassG: null, sent: null });
-    expect(resolved).toEqual({ key: 'v1', source: { available: false, reason: NO_VOLUME_REASON }, target: null, requestedAlloyId: null, twoTone: false });
+    expect(resolved).toEqual({ key: 'v1', source: { available: false, reason: NO_VOLUME_REASON }, target: null, requestedAlloyId: null, twoTone: false, volumeFlags: [] });
+  });
+
+  it('takes the casting flags from wherever the volume came from, and keeps the weight', () => {
+    const base = { workflowId: 'wf-1', resultMassG: null, sent: null };
+    const fromVersion = resolveMetalWeight({ ...base, shownVersion: { asset_id: 'v1', source_workflow_id: 'wf-1', metal_volume_mm3: 2192.4, metal_volume_flags: ['thin_walls'] }, resultVolumeMm3: 1500, resultVolumeFlags: ['touching_edges'] });
+    expect(fromVersion.volumeFlags).toEqual(['thin_walls']);
+    expect(fromVersion.source.available).toBe(true);
+    const fromResult = resolveMetalWeight({ ...base, shownVersion: null, resultVolumeMm3: 1500, resultVolumeFlags: ['touching_edges'] });
+    expect(fromResult.volumeFlags).toEqual(['touching_edges']);
+    expect(fromResult.source.available).toBe(true);
+    // No volume, no flags: nothing to qualify.
+    expect(resolveMetalWeight({ ...base, shownVersion: { asset_id: 'v1', metal_volume_flags: ['thin_walls'] }, resultVolumeMm3: null }).volumeFlags).toEqual([]);
   });
 
   it('flags a version made of more than one metal body as two-tone', () => {

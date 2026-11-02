@@ -151,7 +151,7 @@ describe('resolveCadModel', () => {
     const model = await resolveCadModel('wf-r', { supervised_delivery: [], output_asset_id: 'v1' });
     expect(model).toEqual({
       glbUrl: '/rep.glb', threedmUrl: '/rep.3dm', stlUrls: [], stepUrls: [],
-      estimatedMetalMassG: null, metalVolumeMm3: null, notAllSolid: false,
+      estimatedMetalMassG: null, metalVolumeMm3: null, metalVolumeFlags: [], notAllSolid: false,
     });
   });
 

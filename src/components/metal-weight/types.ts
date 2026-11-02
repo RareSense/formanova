@@ -11,4 +11,6 @@ export interface WeightViewProps {
   requestedUnavailable?: boolean;
   /** More than one metal body: the total is shown in the one chosen metal. */
   twoTone?: boolean;
+  /** Casting-check flags for the volume; a muted line, never a reason to hide the weight. */
+  volumeFlags?: string[];
 }

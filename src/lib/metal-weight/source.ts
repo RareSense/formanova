@@ -56,6 +56,16 @@ export function pickWeightSource(input: WeightSourceInput): WeightSource {
 }
 
 /**
+ * The toolkit's casting-check flags next to a volume (metal_volume_flags):
+ * e.g. ["thin_walls", "touching_edges"]. They qualify the weight, never hide
+ * it: the toolkit already returns no volume when a flag makes it unsafe.
+ */
+export function readVolumeFlags(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((flag): flag is string => typeof flag === 'string' && flag.trim() !== '');
+}
+
+/**
  * A stored weight_target ({grams, tolerance_pct, alloy_id}), or null when it
  * has no gram figure a piece could have (0.01 g to 10 kg). The tolerance is
  * clamped to 0–100 %.
@@ -88,6 +98,8 @@ export interface MetalWeightInput {
   requestedAlloyId: string | null;
   /** More than one metal body: the weight is their total, in the one metal shown. */
   twoTone: boolean;
+  /** Casting-check flags for the volume shown (from wherever it came); empty when none. */
+  volumeFlags: string[];
 }
 
 export interface ShownVersionWeight {
@@ -96,12 +108,14 @@ export interface ShownVersionWeight {
   metal_volume_mm3?: unknown;
   weight_target?: unknown;
   metal_body_count?: unknown;
+  metal_volume_flags?: unknown;
 }
 
-export function resolveMetalWeight({ shownVersion, workflowId, resultVolumeMm3, resultMassG, sent }: {
+export function resolveMetalWeight({ shownVersion, workflowId, resultVolumeMm3, resultVolumeFlags, resultMassG, sent }: {
   shownVersion: ShownVersionWeight | null;
   workflowId: string | null;
   resultVolumeMm3: unknown;
+  resultVolumeFlags?: unknown;
   resultMassG: unknown;
   sent: SentMetal | null;
 }): MetalWeightInput {
@@ -109,16 +123,22 @@ export function resolveMetalWeight({ shownVersion, workflowId, resultVolumeMm3, 
   // version picked from the strip must never borrow it.
   const resultIsShown = !shownVersion || (!!workflowId && shownVersion.source_workflow_id === workflowId);
   const sentHere = resultIsShown && sent && sent.workflowId === workflowId ? sent : null;
+  const source = pickWeightSource({
+    versionVolumeMm3: shownVersion?.metal_volume_mm3,
+    resultVolumeMm3: resultIsShown ? resultVolumeMm3 : null,
+    resultMassG: resultIsShown ? resultMassG : null,
+    resultDensityGCm3: sentHere?.densityGCm3,
+  });
+  // The flags belong to the volume they were measured with.
+  const volumeFlags = !source.available ? []
+    : source.from === 'version' ? readVolumeFlags(shownVersion?.metal_volume_flags)
+      : source.from === 'result' ? readVolumeFlags(resultVolumeFlags) : [];
   return {
     key: shownVersion?.asset_id ?? workflowId,
-    source: pickWeightSource({
-      versionVolumeMm3: shownVersion?.metal_volume_mm3,
-      resultVolumeMm3: resultIsShown ? resultVolumeMm3 : null,
-      resultMassG: resultIsShown ? resultMassG : null,
-      resultDensityGCm3: sentHere?.densityGCm3,
-    }),
+    source,
     target: readWeightTarget(shownVersion?.weight_target) ?? sentHere?.target ?? null,
     requestedAlloyId: sentHere?.alloyId ?? null,
     twoTone: Number.isInteger(shownVersion?.metal_body_count) && (shownVersion.metal_body_count as number) > 1,
+    volumeFlags,
   };
 }

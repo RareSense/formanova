@@ -2,6 +2,7 @@ import { azureUriToUrl } from '@/lib/azure-utils';
 import type { CadReferenceItem } from '@/lib/microservices-api';
 import { METAL_ALLOYS, materialPayload, type MetalAlloy } from '@/lib/metal-weight/alloys';
 import { clampTolerancePct, isTargetGrams } from '@/lib/metal-weight/weight';
+import { readVolumeFlags } from '@/lib/metal-weight/source';
 
 /**
  * ring-cad-nurbs-api.ts
@@ -402,6 +403,8 @@ export interface RingCadResult {
    * decided by pickWeightSource, not here.
    */
   metalVolumeMm3: number | null;
+  /** The toolkit's casting-check flags for that volume (metal_volume_flags); empty when none. */
+  metalVolumeFlags: string[];
   validationStatus: RingCadValidationStatus | null;
   diagnostics: RingCadDiagnostics;
   notAllSolid: boolean;
@@ -584,6 +587,8 @@ export function parseRingCadResult(data: unknown): RingCadResult {
   const volumeRaw = d.metal_volume_mm3
     ?? findKeyDeep(root, (key) => key === 'metal_volume_mm3');
   const metalVolumeMm3 = typeof volumeRaw === 'number' && Number.isFinite(volumeRaw) ? volumeRaw : null;
+  const metalVolumeFlags = readVolumeFlags(d.metal_volume_flags
+    ?? findKeyDeep(root, (key) => key === 'metal_volume_flags'));
 
   // cad_diagnostics is the documented flat-shape field; an unrecognised
   // sink-node shape nests the per-node tool output under a different key
@@ -623,6 +628,7 @@ export function parseRingCadResult(data: unknown): RingCadResult {
     stepArtifacts,
     estimatedMetalMassG,
     metalVolumeMm3,
+    metalVolumeFlags,
     validationStatus,
     diagnostics,
     notAllSolid: diagnostics.not_all_solid === true,
