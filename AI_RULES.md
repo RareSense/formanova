@@ -144,3 +144,14 @@ Do not push a partial fix that resolves one symptom but leaves other reads of th
 CAD/WebGL errors need local containment.
 
 Route-level workflow crashes should not white-screen the entire app.
+
+---
+
+## 13. Admin generation detail: new workflows
+
+The admin detail page (`/admin/generations/:id`) shows every workflow through a schema-free walker (`src/lib/admin-workflow-views/walker.ts`): the request payload, every step's input and output, the final output and the costs.
+
+- A new workflow needs NO admin code to be visible. Do not add per-workflow rendering to `AdminGenerationDetailPage.tsx`.
+- An optional family entry in `src/lib/admin-workflow-views/families.ts` may only add labels and order. It must not hide, drop, compute or reformat values.
+- Every new workflow must add a fixture to `src/lib/admin-workflow-views/__fixtures__/runs.ts` (`FIXTURES`), keyed by its workflow name, with realistic payload and step outputs. The completeness tests then check that every value is rendered, and `workflow-fixtures.test.ts` fails when a start-able workflow has no fixture.
+- Links and pictures come only through `url-safety.ts`. Never pass a cross-origin url to `authenticatedFetch`, because it attaches the admin's token.
