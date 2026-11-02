@@ -499,6 +499,88 @@ export function trackCatalogShootStarted(props: CatalogShootStartedProps) {
   capture('catalog_shoot_started', { ...props });
 }
 
+// Catalog from CAD funnel, mirroring the CAD funnel above one event for one:
+//   catalog_opened          ~ cad_studio_open
+//   catalog_file_uploaded   ~ cad_reference_uploaded
+//   catalog_model_loaded / _load_failed   the server fastload of a heavy .3dm
+//   catalog_shot_completed / _failed      ~ cad_generation_completed / _failed, per picture
+//   catalog_shoot_completed               the whole shoot settled
+// There is one tool here, so no `source`. Like the CAD failed event, failures
+// carry a stage and never the error text.
+
+/** The cad_to_catalog_shot run kind: "photo" is placed by AI, "white" is a drawn
+ *  picture (white or transparent) kept as it is. */
+export type CatalogShotKind = 'photo' | 'white';
+
+export function trackCatalogOpened() {
+  capture('catalog_opened');
+}
+
+export interface CatalogFileUploadedProps {
+  /** New pieces (CAD files) this one action added. */
+  piece_count: number;
+  /** Pieces in the list afterwards. */
+  total_after_add: number;
+}
+
+export function trackCatalogFileUploaded(props: CatalogFileUploadedProps) {
+  capture('catalog_file_uploaded', { ...props });
+}
+
+/** The cad_to_catalog_fastload run for a heavy .3dm. Its result carries no
+ *  timings or triangle counts, so only what the browser measured is sent. */
+export interface CatalogModelLoadedProps {
+  duration_ms: number;
+  file_bytes: number;
+}
+
+export function trackCatalogModelLoaded(props: CatalogModelLoadedProps) {
+  capture('catalog_model_loaded', { ...props });
+}
+
+export type CatalogModelLoadFailedProps = CatalogModelLoadedProps;
+
+export function trackCatalogModelLoadFailed(props: CatalogModelLoadFailedProps) {
+  capture('catalog_model_load_failed', { ...props });
+}
+
+export interface CatalogShotCompletedProps {
+  kind: CatalogShotKind;
+  /** Singular jewelry type of the piece ('ring', 'other', ...). */
+  category: string;
+  resolution: string;
+  /** From sending the paid run to its result. */
+  duration_ms: number;
+}
+
+export function trackCatalogShotCompleted(props: CatalogShotCompletedProps) {
+  capture('catalog_shot_completed', { ...props });
+}
+
+export interface CatalogShotFailedProps extends CatalogShotCompletedProps {
+  /** `draw`: the picture failed in the browser (render or background photo),
+   *  so no paid run was sent. `run`: the paid run was sent and failed. */
+  failure_stage: 'draw' | 'run';
+}
+
+export function trackCatalogShotFailed(props: CatalogShotFailedProps) {
+  capture('catalog_shot_failed', { ...props });
+}
+
+export interface CatalogShootCompletedProps {
+  /** catalog_shot_completed events in this shoot. */
+  succeeded: number;
+  /** catalog_shot_failed events in this shoot. */
+  failed: number;
+  /** Stopped by the user or by running out of credits. */
+  stopped: boolean;
+  duration_ms: number;
+}
+
+export function trackCatalogShootCompleted(props: CatalogShootCompletedProps) {
+  capture('catalog_shoot_completed', { ...props });
+}
+
 // Fired only on a confirmed successful export (draft product created in the
 // user's store) — not on button click — so unique-user counts answer
 // "how many people actually put an image into Shopify".

@@ -32,6 +32,13 @@ import {
   trackGenerationComplete,
   trackDownloadClicked,
   trackCatalogShootStarted,
+  trackCatalogOpened,
+  trackCatalogFileUploaded,
+  trackCatalogModelLoaded,
+  trackCatalogModelLoadFailed,
+  trackCatalogShotCompleted,
+  trackCatalogShotFailed,
+  trackCatalogShootCompleted,
   trackAIFixSubmitted,
   trackAIFixModalOpened,
   trackPaymentSuccess,
@@ -833,6 +840,87 @@ describe('trackCatalogShootStarted', () => {
       pictures: 30,
       photo_backgrounds: 1,
       metals: 2,
+    })
+  })
+})
+
+// ── Catalog from CAD funnel (mirrors the CAD funnel) ────────────────
+
+describe('trackCatalogOpened', () => {
+  it('captures catalog_opened with no properties, as the page has one tool', () => {
+    trackCatalogOpened()
+    expect(posthog.capture).toHaveBeenCalledWith('catalog_opened', undefined)
+  })
+})
+
+describe('trackCatalogFileUploaded', () => {
+  it('captures catalog_file_uploaded with the added and running piece counts', () => {
+    trackCatalogFileUploaded({ piece_count: 2, total_after_add: 5 })
+    expect(posthog.capture).toHaveBeenCalledWith('catalog_file_uploaded', {
+      piece_count: 2,
+      total_after_add: 5,
+    })
+  })
+})
+
+describe('trackCatalogModelLoaded', () => {
+  it('captures catalog_model_loaded with duration and file size', () => {
+    trackCatalogModelLoaded({ duration_ms: 4200, file_bytes: 52_000_000 })
+    expect(posthog.capture).toHaveBeenCalledWith('catalog_model_loaded', {
+      duration_ms: 4200,
+      file_bytes: 52_000_000,
+    })
+  })
+})
+
+describe('trackCatalogModelLoadFailed', () => {
+  it('captures catalog_model_load_failed with duration and file size, never the message', () => {
+    trackCatalogModelLoadFailed({ duration_ms: 900, file_bytes: 52_000_000 })
+    expect(posthog.capture).toHaveBeenCalledWith('catalog_model_load_failed', {
+      duration_ms: 900,
+      file_bytes: 52_000_000,
+    })
+  })
+})
+
+describe('trackCatalogShotCompleted', () => {
+  it('captures catalog_shot_completed with kind, category, resolution and duration', () => {
+    trackCatalogShotCompleted({ kind: 'photo', category: 'ring', resolution: '2K', duration_ms: 61000 })
+    expect(posthog.capture).toHaveBeenCalledWith('catalog_shot_completed', {
+      kind: 'photo',
+      category: 'ring',
+      resolution: '2K',
+      duration_ms: 61000,
+    })
+  })
+})
+
+describe('trackCatalogShotFailed', () => {
+  it('captures catalog_shot_failed with the failure stage and no error text', () => {
+    trackCatalogShotFailed({ kind: 'white', category: 'pendant', resolution: '1K', failure_stage: 'run', duration_ms: 3000 })
+    expect(posthog.capture).toHaveBeenCalledWith('catalog_shot_failed', {
+      kind: 'white',
+      category: 'pendant',
+      resolution: '1K',
+      failure_stage: 'run',
+      duration_ms: 3000,
+    })
+  })
+
+  it('supports the draw stage, where no paid run was sent', () => {
+    trackCatalogShotFailed({ kind: 'photo', category: 'ring', resolution: '1K', failure_stage: 'draw', duration_ms: 12 })
+    expect(posthog.capture).toHaveBeenCalledWith('catalog_shot_failed', expect.objectContaining({ failure_stage: 'draw' }))
+  })
+})
+
+describe('trackCatalogShootCompleted', () => {
+  it('captures catalog_shoot_completed with the settled counts', () => {
+    trackCatalogShootCompleted({ succeeded: 7, failed: 1, stopped: false, duration_ms: 120000 })
+    expect(posthog.capture).toHaveBeenCalledWith('catalog_shoot_completed', {
+      succeeded: 7,
+      failed: 1,
+      stopped: false,
+      duration_ms: 120000,
     })
   })
 })
