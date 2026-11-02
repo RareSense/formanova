@@ -83,6 +83,11 @@ export interface CadRingVersion {
   metal_volume_mm3?: number | null;
   /** The target weight the request was made with, stored on the version; absent when none was set. */
   weight_target?: { grams?: number; tolerance_pct?: number; alloy_id?: string | null } | null;
+  /**
+   * How many casting bodies (metals) the version has; above 1 it is two-tone.
+   * Proposed field, not yet sent by the backend: absent reads as one metal.
+   */
+  metal_body_count?: number | null;
 }
 
 export interface CadRing {

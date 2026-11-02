@@ -9,4 +9,6 @@ export interface WeightViewProps {
   alloy: MetalAlloy;
   setAlloyId: (id: string) => void;
   requestedUnavailable?: boolean;
+  /** More than one metal body: the total is shown in the one chosen metal. */
+  twoTone?: boolean;
 }

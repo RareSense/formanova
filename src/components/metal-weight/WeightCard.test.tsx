@@ -96,6 +96,16 @@ describe('WeightCard', () => {
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
   });
 
+  it('notes a two-tone piece: the total, weighed in the chosen metal', () => {
+    renderCard({ twoTone: true });
+    expect(screen.getByText('Two-tone: total of all metal parts, weighed in 14K Yellow Gold.')).toBeInTheDocument();
+  });
+
+  it('has no two-tone note otherwise', () => {
+    renderCard();
+    expect(screen.queryByText(/Two-tone/)).toBeNull();
+  });
+
   it('says when weight is not available, with no table or figures', () => {
     renderCard({ source: { available: false, reason: NO_VOLUME_REASON } });
     expect(screen.getByText(/Weight not available for this model/)).toBeInTheDocument();

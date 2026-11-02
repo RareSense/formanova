@@ -29,7 +29,7 @@ import type { WeightViewProps } from './types';
 
 const NUM = 'py-1.5 pl-3 text-right tabular-nums';
 
-export function WeightCard({ source, target, alloy, setAlloyId, requestedUnavailable = false }: WeightViewProps) {
+export function WeightCard({ source, target, alloy, setAlloyId, requestedUnavailable = false, twoTone = false }: WeightViewProps) {
   const [open, setOpen] = useState(true);
   const [showAll, setShowAll] = useState(false);
   const ids = useId();
@@ -155,6 +155,10 @@ export function WeightCard({ source, target, alloy, setAlloyId, requestedUnavail
                   {onTarget ? <Check aria-hidden="true" className="h-3.5 w-3.5 shrink-0" /> : <AlertTriangle aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />}
                   {summary.text}
                 </p>
+              )}
+
+              {twoTone && (
+                <p className="px-4 text-muted-foreground">{`Two-tone: total of all metal parts, weighed in ${alloy.label}.`}</p>
               )}
 
               <p className="px-4 text-[10px] leading-relaxed text-muted-foreground">

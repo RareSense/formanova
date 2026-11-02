@@ -86,6 +86,8 @@ export interface MetalWeightInput {
   source: WeightSource;
   target: WeightTarget | null;
   requestedAlloyId: string | null;
+  /** More than one metal body: the weight is their total, in the one metal shown. */
+  twoTone: boolean;
 }
 
 export interface ShownVersionWeight {
@@ -93,6 +95,7 @@ export interface ShownVersionWeight {
   source_workflow_id?: string | null;
   metal_volume_mm3?: unknown;
   weight_target?: unknown;
+  metal_body_count?: unknown;
 }
 
 export function resolveMetalWeight({ shownVersion, workflowId, resultVolumeMm3, resultMassG, sent }: {
@@ -116,5 +119,6 @@ export function resolveMetalWeight({ shownVersion, workflowId, resultVolumeMm3, 
     }),
     target: readWeightTarget(shownVersion?.weight_target) ?? sentHere?.target ?? null,
     requestedAlloyId: sentHere?.alloyId ?? null,
+    twoTone: Number.isInteger(shownVersion?.metal_body_count) && (shownVersion.metal_body_count as number) > 1,
   };
 }

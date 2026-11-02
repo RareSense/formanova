@@ -33,7 +33,7 @@ export function useCadMetal(input: MetalWeightInput, applyMetalToAll: (materialI
   }, [alloy, setAlloyId, applyMetalToAll]);
 
   return {
-    view: { source: input.source, target: input.target, alloy, setAlloyId: chooseAlloy, requestedUnavailable },
+    view: { source: input.source, target: input.target, alloy, setAlloyId: chooseAlloy, requestedUnavailable, twoTone: input.twoTone },
     chooseLook,
   };
 }

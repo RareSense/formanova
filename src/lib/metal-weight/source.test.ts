@@ -82,6 +82,7 @@ describe('resolveMetalWeight', () => {
       source: { available: true, volumeMm3: 2192.4, from: 'version' },
       target: { grams: 28, tolerancePct: 5, alloyId: 'au14y' },
       requestedAlloyId: 'au10y',
+      twoTone: false,
     });
   });
 
@@ -110,6 +111,14 @@ describe('resolveMetalWeight', () => {
 
   it('is not available for an old run with neither volume nor mass', () => {
     const resolved = resolveMetalWeight({ shownVersion: { asset_id: 'v1' }, workflowId: null, resultVolumeMm3: null, resultMassG: null, sent: null });
-    expect(resolved).toEqual({ key: 'v1', source: { available: false, reason: NO_VOLUME_REASON }, target: null, requestedAlloyId: null });
+    expect(resolved).toEqual({ key: 'v1', source: { available: false, reason: NO_VOLUME_REASON }, target: null, requestedAlloyId: null, twoTone: false });
+  });
+
+  it('flags a version made of more than one metal body as two-tone', () => {
+    const base = { workflowId: null, resultVolumeMm3: null, resultMassG: null, sent: null };
+    expect(resolveMetalWeight({ ...base, shownVersion: { asset_id: 'v1', metal_body_count: 2 } }).twoTone).toBe(true);
+    for (const count of [1, 0, -2, 1.5, '2', null, undefined]) {
+      expect(resolveMetalWeight({ ...base, shownVersion: { asset_id: 'v1', metal_body_count: count } }).twoTone).toBe(false);
+    }
   });
 });
