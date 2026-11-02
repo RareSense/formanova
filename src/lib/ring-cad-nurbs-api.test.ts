@@ -29,12 +29,22 @@ describe('ring_cad_nurbs_v1 start body', () => {
     expect((payload.material as { density_g_cm3: number }).density_g_cm3).toBe(15.49);
   });
 
+  it('clamps the weight_target tolerance to 0–100, defaulting a missing one to 5', () => {
+    const base = { referenceImages: [], userDescription: 'band' };
+    const tol = (tolerance_pct: number) =>
+      (buildRingCadStartBody({ ...base, weightTarget: { grams: 28, tolerance_pct, alloy_id: null } }).payload.weight_target as { tolerance_pct: number }).tolerance_pct;
+    expect(tol(-5)).toBe(0);
+    expect(tol(500)).toBe(100);
+    expect(tol(NaN)).toBe(5);
+    expect(tol(3)).toBe(3);
+  });
+
   it('sends weight_target only when it has a positive gram figure', () => {
     const weightTarget = { grams: 28, tolerance_pct: 5, alloy_id: 'au14y' };
     const base = { referenceImages: [], userDescription: 'band' };
     expect(buildRingCadStartBody({ ...base, weightTarget }).payload.weight_target).toEqual(weightTarget);
     expect(buildRingCadStartBody(base).payload).not.toHaveProperty('weight_target');
-    for (const grams of [0, -1, NaN, Infinity]) {
+    for (const grams of [0, -1, NaN, Infinity, 10_001, 1e-9]) {
       expect(buildRingCadStartBody({ ...base, weightTarget: { ...weightTarget, grams } }).payload).not.toHaveProperty('weight_target');
     }
   });

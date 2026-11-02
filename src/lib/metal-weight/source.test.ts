@@ -45,11 +45,17 @@ describe('readWeightTarget', () => {
 
   it('defaults the tolerance to 5 and a missing alloy to null', () => {
     expect(readWeightTarget({ grams: 28 })).toEqual({ grams: 28, tolerancePct: 5, alloyId: null });
-    expect(readWeightTarget({ grams: 28, tolerance_pct: -1, alloy_id: '' })).toEqual({ grams: 28, tolerancePct: 5, alloyId: null });
+    expect(readWeightTarget({ grams: 28, tolerance_pct: Infinity, alloy_id: '' })).toEqual({ grams: 28, tolerancePct: 5, alloyId: null });
   });
 
-  it('is null without a positive gram figure', () => {
-    for (const raw of [null, undefined, 'x', {}, { grams: 0 }, { grams: '28' }, { grams: NaN }, { grams: -2 }]) {
+  it('clamps the tolerance to 0–100', () => {
+    expect(readWeightTarget({ grams: 28, tolerance_pct: -1 })?.tolerancePct).toBe(0);
+    expect(readWeightTarget({ grams: 28, tolerance_pct: 1e12 })?.tolerancePct).toBe(100);
+  });
+
+  it('is null without a positive gram figure of at most 10 kg', () => {
+    expect(readWeightTarget({ grams: 10_000 })?.grams).toBe(10_000);
+    for (const raw of [null, undefined, 'x', {}, { grams: 0 }, { grams: '28' }, { grams: NaN }, { grams: -2 }, { grams: 10_001 }, { grams: 1e-300 }]) {
       expect(readWeightTarget(raw)).toBeNull();
     }
   });

@@ -24,6 +24,11 @@ export const DEFAULT_TOLERANCE_PCT = 5;
 export const MIN_WEIGHT_G = 0.01;
 export const MAX_WEIGHT_G = 10_000;
 
+/** A target weight a piece could have: 0.01 g to 10 kg. */
+export function isTargetGrams(value: unknown): value is number {
+  return isPositiveFinite(value) && value >= MIN_WEIGHT_G && value <= MAX_WEIGHT_G;
+}
+
 /** A tolerance in 0–100 %; a missing or non-numeric one is the default 5 %. */
 export function clampTolerancePct(value: unknown): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return DEFAULT_TOLERANCE_PCT;

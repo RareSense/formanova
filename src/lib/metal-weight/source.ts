@@ -13,7 +13,7 @@
  * than cast.
  */
 import { METAL_ALLOYS } from './alloys';
-import { DEFAULT_TOLERANCE_PCT, MAX_WEIGHT_G, MIN_WEIGHT_G, isPositiveFinite, volumeFromMass, type WeightTarget } from './weight';
+import { MAX_WEIGHT_G, MIN_WEIGHT_G, clampTolerancePct, isPositiveFinite, isTargetGrams, volumeFromMass, type WeightTarget } from './weight';
 
 export const NO_VOLUME_REASON = 'model has no closed metal volume';
 export const OUT_OF_RANGE_REASON = 'measured volume is out of range';
@@ -55,15 +55,18 @@ export function pickWeightSource(input: WeightSourceInput): WeightSource {
   return { available: false, reason: outOfRange ? OUT_OF_RANGE_REASON : NO_VOLUME_REASON };
 }
 
-/** A stored weight_target ({grams, tolerance_pct, alloy_id}), or null when it has no usable gram figure. */
+/**
+ * A stored weight_target ({grams, tolerance_pct, alloy_id}), or null when it
+ * has no gram figure a piece could have (0.01 g to 10 kg). The tolerance is
+ * clamped to 0–100 %.
+ */
 export function readWeightTarget(raw: unknown): WeightTarget | null {
   if (!raw || typeof raw !== 'object') return null;
   const record = raw as Record<string, unknown>;
-  if (!isPositiveFinite(record.grams)) return null;
-  const tolerance = record.tolerance_pct;
+  if (!isTargetGrams(record.grams)) return null;
   return {
     grams: record.grams,
-    tolerancePct: typeof tolerance === 'number' && Number.isFinite(tolerance) && tolerance >= 0 ? tolerance : DEFAULT_TOLERANCE_PCT,
+    tolerancePct: clampTolerancePct(record.tolerance_pct),
     alloyId: typeof record.alloy_id === 'string' && record.alloy_id ? record.alloy_id : null,
   };
 }

@@ -58,6 +58,13 @@ describe('MetalWeightStep', () => {
     expect(onChange.mock.calls.length).toBe(calls);
   });
 
+  it('clamps the tolerance to 0–100', () => {
+    const { last } = setup();
+    fireEvent.change(targetInput(), { target: { value: '28' } });
+    fireEvent.change(screen.getByLabelText('Tolerance (±%)'), { target: { value: '250' } });
+    expect(last().target?.tolerancePct).toBe(100);
+  });
+
   it('sends the tolerance', () => {
     const { last } = setup();
     fireEvent.change(targetInput(), { target: { value: '28' } });
@@ -67,7 +74,7 @@ describe('MetalWeightStep', () => {
 
   it('drops the target when it is cleared or not a positive number', () => {
     const { last } = setup();
-    for (const bad of ['', '0', '-2']) {
+    for (const bad of ['', '0', '-2', '10001', '0.001']) {
       fireEvent.change(targetInput(), { target: { value: '28' } });
       fireEvent.change(targetInput(), { target: { value: bad } });
       expect(last().target).toBeNull();

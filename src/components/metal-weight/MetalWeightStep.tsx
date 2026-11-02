@@ -8,7 +8,7 @@
 import { useId, useState } from 'react';
 
 import type { MetalRequest } from '@/lib/metal-weight/request';
-import { DEFAULT_TOLERANCE_PCT, dwtFromGrams, gramsFromDwt, isPositiveFinite } from '@/lib/metal-weight/weight';
+import { DEFAULT_TOLERANCE_PCT, clampTolerancePct, dwtFromGrams, gramsFromDwt, isPositiveFinite, isTargetGrams } from '@/lib/metal-weight/weight';
 import { cn } from '@/lib/utils';
 
 import { MetalSelect } from './MetalSelect';
@@ -37,10 +37,9 @@ export function MetalWeightStep({ value, onChange, disabled = false }: MetalWeig
 
   const emitTarget = (text: string, inUnit: Unit, tolText: string) => {
     const typed = readPositive(text);
-    const tol = Number(tolText);
-    const tolerancePct = tolText.trim() !== '' && Number.isFinite(tol) && tol >= 0 ? tol : DEFAULT_TOLERANCE_PCT;
+    const tolerancePct = clampTolerancePct(tolText.trim() === '' ? NaN : Number(tolText));
     const grams = typed === null ? null : inUnit === 'g' ? typed : gramsFromDwt(typed);
-    onChange({ ...value, target: grams === null ? null : { grams, tolerancePct } });
+    onChange({ ...value, target: isTargetGrams(grams) ? { grams, tolerancePct } : null });
   };
 
   const switchUnit = (next: Unit) => {

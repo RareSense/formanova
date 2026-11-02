@@ -1,6 +1,7 @@
 import { azureUriToUrl } from '@/lib/azure-utils';
 import type { CadReferenceItem } from '@/lib/microservices-api';
 import { METAL_ALLOYS, materialPayload, type MetalAlloy } from '@/lib/metal-weight/alloys';
+import { clampTolerancePct, isTargetGrams } from '@/lib/metal-weight/weight';
 
 /**
  * ring-cad-nurbs-api.ts
@@ -225,7 +226,7 @@ export interface RingCadStartParams {
   /** Product to build, from the Text/Image to CAD dropdown. Defaults to ring. */
   jewelryType?: CadJewelryType;
   material?: CadMaterialProfile | null;
-  /** Sent only with a positive gram figure. */
+  /** Sent only with a gram figure of 0.01 g to 10 kg; the tolerance is clamped to 0–100. */
   weightTarget?: WeightTargetPayload | null;
 }
 
@@ -355,10 +356,10 @@ export function buildRingCadStartBody({
   if (material) {
     payload.material = materialPayload(material);
   }
-  if (weightTarget && Number.isFinite(weightTarget.grams) && weightTarget.grams > 0) {
+  if (weightTarget && isTargetGrams(weightTarget.grams)) {
     payload.weight_target = {
       grams: weightTarget.grams,
-      tolerance_pct: weightTarget.tolerance_pct,
+      tolerance_pct: clampTolerancePct(weightTarget.tolerance_pct),
       alloy_id: weightTarget.alloy_id,
     };
   }

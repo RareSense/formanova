@@ -4,7 +4,7 @@
  */
 import type { WeightTargetPayload } from '@/lib/ring-cad-nurbs-api';
 import { findAlloy, type MetalAlloy } from './alloys';
-import { isPositiveFinite } from './weight';
+import { isTargetGrams } from './weight';
 
 export interface MetalRequest {
   /** Null: no metal chosen, so no material is sent. */
@@ -21,7 +21,7 @@ export function metalRequestPayload(request: MetalRequest): {
 } {
   const material = findAlloy(request.alloyId);
   const target = request.target;
-  const weightTarget = target && isPositiveFinite(target.grams)
+  const weightTarget = target && isTargetGrams(target.grams)
     ? { grams: target.grams, tolerance_pct: target.tolerancePct, alloy_id: material?.id ?? null }
     : null;
   return { material, weightTarget };
