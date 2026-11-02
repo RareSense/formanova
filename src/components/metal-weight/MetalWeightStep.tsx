@@ -1,26 +1,45 @@
 /**
- * The request form's "Metal & weight" step: which metal to build and weigh the
- * piece in, and an optional target weight with a tolerance.
+ * The request form's "Metal & weight" step: the metal to build and weigh the
+ * piece in, and an optional target weight with a tolerance. Three equal
+ * controls on one grid (one row on desktop, stacked on phone), all h-10:
+ *
+ *   Metal [● 14K Yellow Gold ▾]   Target weight [ 25 ][ g | dwt ]   Tolerance (±%) [ 5 ]
+ *   Optional. The model is built to land within this range.
  *
  * The target can be typed in grams or pennyweight; it is always held in grams.
  * Switching the unit converts the number on screen and leaves the grams alone.
  */
 import { useId, useState } from 'react';
 
+import MaterialSphere from '@/components/cad-studio/MaterialSphere';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ALLOY_GROUPS, type MetalAlloy } from '@/lib/metal-weight/alloys';
 import type { MetalRequest } from '@/lib/metal-weight/request';
 import { DEFAULT_TOLERANCE_PCT, clampTolerancePct, dwtFromGrams, gramsFromDwt, isPositiveFinite, isTargetGrams } from '@/lib/metal-weight/weight';
 import { cn } from '@/lib/utils';
 
-import { MetalSelect } from './MetalSelect';
+import { appearanceForAlloy } from './appearance';
 
 type Unit = 'g' | 'dwt';
 
-const INPUT = 'h-11 border border-border bg-background px-3 font-mono text-[14px] text-foreground outline-none transition-colors focus:border-foreground/60 focus:ring-1 focus:ring-border';
+/** Radix Select cannot hold an empty value, so "no metal" has its own. */
+const NONE = 'none';
+const LABEL = 'text-sm text-foreground';
+const FIELD = 'h-10 font-mono text-[13px]';
 
 /** A positive number typed in a field, or null. */
 function readPositive(text: string): number | null {
   const n = Number(text);
   return text.trim() !== '' && isPositiveFinite(n) ? n : null;
+}
+
+function Swatch({ alloy }: { alloy: MetalAlloy }) {
+  return (
+    <span data-metal-swatch className="inline-flex shrink-0">
+      <MaterialSphere category="metal" preview={appearanceForAlloy(alloy).preview} size={14} />
+    </span>
+  );
 }
 
 export interface MetalWeightStepProps {
@@ -54,39 +73,53 @@ export function MetalWeightStep({ value, onChange, disabled = false }: MetalWeig
 
   return (
     <fieldset disabled={disabled} className="min-w-0 space-y-2">
-      <legend className="block text-[15px] font-medium text-foreground">
-        Metal &amp; weight <span className="font-normal">(optional)</span>
-      </legend>
-      <p className="text-sm text-muted-foreground">
-        Choose the metal, and a target weight if the piece has to hit one.
-      </p>
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+      <legend className="mb-2 block text-[15px] font-medium text-foreground">Metal &amp; weight</legend>
+      <div data-testid="metal-weight-grid" className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="flex min-w-0 flex-col gap-1">
-          <label htmlFor={`${ids}-metal`} className="text-sm text-foreground">Metal</label>
-          <MetalSelect
-            id={`${ids}-metal`}
-            label="Metal"
-            noneLabel="Not set"
-            value={value.alloyId}
-            onChange={(alloyId) => onChange({ ...value, alloyId })}
-            className="h-11 w-full text-[13px] sm:w-64"
-          />
+          <label htmlFor={`${ids}-metal`} className={LABEL}>Metal</label>
+          <Select
+            value={value.alloyId ?? NONE}
+            onValueChange={(id) => onChange({ ...value, alloyId: id === NONE ? null : id })}
+            disabled={disabled}
+          >
+            <SelectTrigger id={`${ids}-metal`} aria-label="Metal" className={FIELD}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE} className="font-mono text-[12px]">Not set</SelectItem>
+              {ALLOY_GROUPS.map((group) => (
+                <SelectGroup key={group.family}>
+                  <SelectLabel className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{group.label}</SelectLabel>
+                  {group.alloys.map((alloy) => (
+                    <SelectItem key={alloy.id} value={alloy.id} className="font-mono text-[12px]">
+                      <span className="flex items-center gap-2">
+                        <Swatch alloy={alloy} />
+                        {alloy.label}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
+
         <div className="flex min-w-0 flex-col gap-1">
-          <label htmlFor={`${ids}-target`} className="text-sm text-foreground">Target weight</label>
-          <div className="flex">
-            <input
+          <label htmlFor={`${ids}-target`} className={LABEL}>Target weight</label>
+          <div className="flex min-w-0 gap-2">
+            <Input
               id={`${ids}-target`}
               type="number"
               inputMode="decimal"
               min="0"
+              max="10000"
               step="0.01"
               placeholder="—"
               value={targetText}
               onChange={(e) => { setTargetText(e.target.value); emitTarget(e.target.value, unit, toleranceText); }}
-              className={cn(INPUT, 'w-28 min-w-0')}
+              className={cn(FIELD, 'min-w-0 flex-1')}
             />
-            <div role="group" aria-label="Weight unit" className="flex">
+            <div role="group" aria-label="Weight unit" className="flex w-28 shrink-0 overflow-hidden rounded-md border border-input">
               {(['g', 'dwt'] as const).map((u) => (
                 <button
                   key={u}
@@ -94,7 +127,7 @@ export function MetalWeightStep({ value, onChange, disabled = false }: MetalWeig
                   aria-pressed={unit === u}
                   onClick={() => switchUnit(u)}
                   className={cn(
-                    'h-11 border border-l-0 border-border px-4 font-mono text-[12px] transition-colors',
+                    'h-10 flex-1 font-mono text-[13px] transition-colors',
                     unit === u ? 'bg-foreground text-background' : 'bg-background text-muted-foreground hover:text-foreground',
                   )}
                 >
@@ -104,20 +137,23 @@ export function MetalWeightStep({ value, onChange, disabled = false }: MetalWeig
             </div>
           </div>
         </div>
+
         <div className="flex min-w-0 flex-col gap-1">
-          <label htmlFor={`${ids}-tolerance`} className="text-sm text-foreground">Tolerance (±%)</label>
-          <input
+          <label htmlFor={`${ids}-tolerance`} className={LABEL}>Tolerance (±%)</label>
+          <Input
             id={`${ids}-tolerance`}
             type="number"
             inputMode="decimal"
             min="0"
+            max="100"
             step="0.5"
             value={toleranceText}
             onChange={(e) => { setToleranceText(e.target.value); emitTarget(targetText, unit, e.target.value); }}
-            className={cn(INPUT, 'w-24')}
+            className={FIELD}
           />
         </div>
       </div>
+      <p className="text-sm text-muted-foreground">Optional. The model is built to land within this range.</p>
     </fieldset>
   );
 }

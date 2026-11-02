@@ -1,10 +1,18 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { useState } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 
 import { EMPTY_METAL_REQUEST, type MetalRequest } from '@/lib/metal-weight/request';
 import { MetalWeightStep } from './MetalWeightStep';
+
+beforeAll(() => {
+  // Radix Select needs these in jsdom.
+  const proto = window.HTMLElement.prototype as unknown as Record<string, unknown>;
+  proto.hasPointerCapture ??= () => false;
+  proto.releasePointerCapture ??= () => undefined;
+  proto.scrollIntoView ??= () => undefined;
+});
 
 /** Holds the value like a page does, and reports every change. */
 function Harness({ onChange }: { onChange: (next: MetalRequest) => void }) {
@@ -19,20 +27,50 @@ function setup() {
   return { onChange, last };
 }
 
+const metal = () => screen.getByRole('combobox', { name: 'Metal' });
 const targetInput = () => screen.getByLabelText('Target weight');
+const toleranceInput = () => screen.getByLabelText('Tolerance (±%)');
+
+async function chooseMetal(name: string) {
+  fireEvent.keyDown(metal(), { key: 'Enter' });
+  fireEvent.click(await screen.findByRole('option', { name }));
+}
 
 describe('MetalWeightStep', () => {
-  it('starts with no metal and no target', () => {
+  it('starts with no metal and no target, tolerance 5', () => {
     setup();
-    expect(screen.getByRole('combobox', { name: 'Metal' })).toHaveValue('');
+    expect(metal()).toHaveTextContent('Not set');
     expect(targetInput()).toHaveValue(null);
-    expect(screen.getByLabelText('Tolerance (±%)')).toHaveValue(5);
+    expect(toleranceInput()).toHaveValue(5);
   });
 
-  it('picks a metal from the grouped list', () => {
+  it('lays the three controls out on one grid at one height, with the hint under them', () => {
+    setup();
+    const grid = screen.getByTestId('metal-weight-grid');
+    expect(grid).toHaveClass('grid', 'sm:grid-cols-3');
+    for (const control of [metal(), targetInput(), toleranceInput()]) expect(control).toHaveClass('h-10');
+    const halves = within(screen.getByRole('group', { name: 'Weight unit' })).getAllByRole('button');
+    expect(halves).toHaveLength(2);
+    for (const half of halves) expect(half).toHaveClass('h-10', 'flex-1');
+    expect(screen.getByText('Optional. The model is built to land within this range.')).toBeInTheDocument();
+  });
+
+  it('offers every cited alloy grouped by family, each with a colour swatch', async () => {
+    setup();
+    fireEvent.keyDown(metal(), { key: 'Enter' });
+    const listbox = await screen.findByRole('listbox');
+    expect(within(listbox).getAllByRole('option')).toHaveLength(22); // Not set + 21
+    expect(within(listbox).getAllByRole('group')).toHaveLength(4);
+    const option = within(listbox).getByRole('option', { name: '18K Rose Gold' });
+    expect(option.querySelector('[data-metal-swatch]')).not.toBeNull();
+  });
+
+  it('picks a metal', async () => {
     const { last } = setup();
-    fireEvent.change(screen.getByRole('combobox', { name: 'Metal' }), { target: { value: 'au18y' } });
+    await chooseMetal('18K Yellow Gold');
     expect(last()).toEqual({ alloyId: 'au18y', target: null });
+    await chooseMetal('Not set');
+    expect(last()).toEqual({ alloyId: null, target: null });
   });
 
   it('sends a gram target with the default tolerance', () => {
@@ -61,18 +99,18 @@ describe('MetalWeightStep', () => {
   it('clamps the tolerance to 0–100', () => {
     const { last } = setup();
     fireEvent.change(targetInput(), { target: { value: '28' } });
-    fireEvent.change(screen.getByLabelText('Tolerance (±%)'), { target: { value: '250' } });
+    fireEvent.change(toleranceInput(), { target: { value: '250' } });
     expect(last().target?.tolerancePct).toBe(100);
   });
 
   it('sends the tolerance', () => {
     const { last } = setup();
     fireEvent.change(targetInput(), { target: { value: '28' } });
-    fireEvent.change(screen.getByLabelText('Tolerance (±%)'), { target: { value: '3' } });
+    fireEvent.change(toleranceInput(), { target: { value: '3' } });
     expect(last().target).toEqual({ grams: 28, tolerancePct: 3 });
   });
 
-  it('drops the target when it is cleared or not a positive number', () => {
+  it('drops the target when it is cleared or not a weight a piece could have', () => {
     const { last } = setup();
     for (const bad of ['', '0', '-2', '10001', '0.001']) {
       fireEvent.change(targetInput(), { target: { value: '28' } });
