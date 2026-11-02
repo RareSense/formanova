@@ -14,7 +14,7 @@ const GALLERY_LIMIT = 24;
  * loaded (url-safety.ts); any other host becomes a link with a warning, so a payload cannot
  * make the admin's browser call a third party. A failed load says so instead of spinning.
  */
-export function ImageThumb({ url, label, path }: { url: string | null; label: string; path?: string }) {
+export function ImageThumb({ url, label, path, tile = false }: { url: string | null; label: string; path?: string; tile?: boolean }) {
   const normalized = url ? azureUriToUrl(url) || url : null;
   const trusted = isTrustedImageSrc(normalized);
   const { src, failed: fetchFailed } = useAuthenticatedImageState(trusted ? normalized : null);
@@ -27,13 +27,21 @@ export function ImageThumb({ url, label, path }: { url: string | null; label: st
   const painted = Boolean(src) && paintedSrc === src;
   const busy = Boolean(url) && trusted && !failed && !painted;
 
+  // tile: a small square for the Inputs -> Outputs strip, caption underneath.
+  const box = tile ? 'flex h-full w-full flex-col items-center justify-center gap-1 p-2 text-center' : '';
   let body;
   if (!url) {
-    body = <div className="flex h-40 items-center justify-center"><ImageOff className="h-5 w-5 text-muted-foreground/50" /></div>;
+    body = <div className={tile ? box : 'flex h-40 items-center justify-center'}><ImageOff className="h-5 w-5 text-muted-foreground/50" /></div>;
   } else if (!trusted) {
     const link = classifyUrl(url);
     const href = link && (link.kind === 'image' || link.kind === 'link') && /^https?:\/\//i.test(link.url) ? link.url : null;
-    body = (
+    body = tile ? (
+      <div className={`${box} text-[10px] leading-tight`}>
+        <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+        <span className="text-amber-600 dark:text-amber-400">External image, not loaded</span>
+        {href && <a href={href} target="_blank" rel="noopener noreferrer nofollow" title={href} className="underline">Open link</a>}
+      </div>
+    ) : (
       <div className="flex min-h-24 flex-col justify-center gap-1 p-3 text-xs">
         <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
           <AlertTriangle className="h-3.5 w-3.5" /> External image, not loaded
@@ -47,19 +55,19 @@ export function ImageThumb({ url, label, path }: { url: string | null; label: st
     );
   } else if (failed) {
     body = (
-      <div className="flex h-40 flex-col items-center justify-center gap-1 text-muted-foreground">
+      <div className={tile ? `${box} text-muted-foreground` : 'flex h-40 flex-col items-center justify-center gap-1 text-muted-foreground'}>
         <ImageOff className="h-5 w-5" />
         <span className="font-mono text-[10px] uppercase tracking-widest">Could not load</span>
       </div>
     );
   } else if (!src) {
-    body = <div className="flex h-40 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
+    body = <div className={tile ? box : 'flex h-40 items-center justify-center'}><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
   } else {
     body = (
       <>
         <button
           type="button"
-          className={`relative block w-full cursor-zoom-in ${painted ? '' : 'min-h-40'}`}
+          className={`relative block w-full cursor-zoom-in ${tile ? 'h-full' : painted ? '' : 'min-h-40'}`}
           onClick={() => setOpen(true)}
           aria-label={`Open ${label} full size`}
         >
@@ -70,7 +78,7 @@ export function ImageThumb({ url, label, path }: { url: string | null; label: st
             decoding="async"
             onLoad={() => setPaintedSrc(src)}
             onError={() => setImgFailed(true)}
-            className="max-h-72 w-full object-contain"
+            className={tile ? 'h-full w-full object-cover' : 'max-h-72 w-full object-contain'}
           />
           {!painted && (
             <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-muted-foreground">
@@ -86,6 +94,15 @@ export function ImageThumb({ url, label, path }: { url: string | null; label: st
           </DialogContent>
         </Dialog>
       </>
+    );
+  }
+
+  if (tile) {
+    return (
+      <figure className="w-[120px] shrink-0 space-y-1" aria-label={label} aria-busy={busy} data-url={url ?? ''} data-path={path}>
+        <div className="h-[120px] w-[120px] overflow-hidden rounded-md border border-border bg-muted/20">{body}</div>
+        <figcaption title={label} className="line-clamp-2 break-words text-[11px] leading-tight text-muted-foreground">{label}</figcaption>
+      </figure>
     );
   }
 

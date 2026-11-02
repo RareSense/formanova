@@ -11,7 +11,8 @@ vi.mock('@/components/generations/ScissorGLBGrid', () => ({
 }));
 
 import { DetailContent } from './AdminGenerationDetailPage';
-import { SUMMARY_PICTURES } from '@/lib/admin-workflow-views/io-summary';
+import { TILE_PAGE } from '@/lib/admin-workflow-views/io-summary';
+import { expandAll } from '@/lib/admin-workflow-views/__fixtures__/expand';
 import type { AdminGenerationDetail } from '@/lib/admin-generations-api';
 
 const SHA = 'f'.repeat(64);
@@ -23,16 +24,19 @@ function run(workflow_name: string, input_payload: unknown, steps: AdminGenerati
   };
 }
 
+/** Rendered with every section and step opened: the rules hold for the collapsed content too. */
 function renderDetail(detail: AdminGenerationDetail) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  const view = render(
     <QueryClientProvider client={client}>
       <MemoryRouter><DetailContent detail={detail} /></MemoryRouter>
     </QueryClientProvider>,
   );
+  expandAll(view.container);
+  return view;
 }
 
-// The same picture shows twice: in the Inputs -> Outputs summary and in its full section.
+// The same picture shows twice: in the Inputs -> Outputs strip and in the Input payload section.
 const inSection = (name: string) => within(screen.getByRole('region', { name }));
 const hrefs = (c: HTMLElement) => Array.from(c.querySelectorAll('a[href]')).map((a) => a.getAttribute('href') ?? '');
 const srcs = (c: HTMLElement) => Array.from(c.querySelectorAll('img[src], iframe, script, object, embed')).map((e) => e.getAttribute('src') ?? e.tagName);
@@ -83,7 +87,7 @@ describe('admin detail security', () => {
   it('external image hosts are not auto-loaded: a warned link instead', () => {
     const { container } = renderDetail(run('sec_hosts', { model_image_url: 'https://tracker.example.com/p.gif' }));
     expect(srcs(container).some((s) => s.includes('tracker.example.com'))).toBe(false);
-    expect(inSection('Inputs').getByText('External image, not loaded')).toBeTruthy();
+    expect(inSection('Input payload').getByText('External image, not loaded')).toBeTruthy();
     expect(inSection('Inputs → Outputs').getByText('External image, not loaded')).toBeTruthy();
     const link = container.querySelector('a[href="https://tracker.example.com/p.gif"]');
     expect(link?.getAttribute('rel')).toContain('noreferrer');
@@ -104,7 +108,7 @@ describe('admin detail security', () => {
 
   it('a picture that fails to load says so instead of spinning forever', async () => {
     renderDetail(run('sec_fail', { image: { uri: `/api/artifacts/${SHA}`, type: 'image/png', sha256: SHA } }));
-    expect(await inSection('Inputs').findByText('Could not load')).toBeTruthy();
+    expect(await inSection('Input payload').findByText('Could not load')).toBeTruthy();
     expect(await inSection('Inputs → Outputs').findByText('Could not load')).toBeTruthy();
   });
 
@@ -119,10 +123,10 @@ describe('admin detail security', () => {
     const ms = performance.now() - t0;
     expect(ms).toBeLessThan(5000);
     expect(container.querySelectorAll('[data-path]').length).toBeLessThan(400);
-    // 24 thumbnails in the full Inputs section, plus the summary's own bounded first page.
+    // 24 thumbnails in the Input payload section, plus the strip's own bounded first page.
     const summary = screen.getByRole('region', { name: 'Inputs → Outputs' });
     const summaryFigures = summary.querySelectorAll('figure').length;
-    expect(summaryFigures).toBeLessThanOrEqual(SUMMARY_PICTURES);
+    expect(summaryFigures).toBeLessThanOrEqual(TILE_PAGE);
     expect(container.querySelectorAll('figure').length - summaryFigures).toBeLessThanOrEqual(24);
     // Text queries, not role queries: role names are computed for every button, which is slow
     // on a big tree and would measure the test library rather than the page.

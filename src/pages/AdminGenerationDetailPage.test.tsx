@@ -52,7 +52,7 @@ describe('AdminGenerationDetailPage AI block', () => {
       .toBe('Applied at Start: Build AI GPT-6 Astra Pro · OpenRouter · Review AI Default');
     expect(screen.getByText(/^Submitted/).textContent)
       .toBe('Submitted: Build AI GPT-6 Astra · Direct API · Review AI Default');
-    fireEvent.click(screen.getByRole('button', { name: 'Input Payload' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Input payload' }));
     expect(await screen.findByText(/Raw JSON shows the submitted request/)).toBeTruthy();
     expect(String(authFetch.authenticatedFetch.mock.calls[0][0])).toContain('/wf-1');
   });

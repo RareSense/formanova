@@ -4,7 +4,7 @@
  * walker; these only make known workflows read better. Keys are payload keys, or
  * `<tool>.<key>` for one step's output.
  */
-import type { Enhancement } from './walker';
+import { humanize, type Enhancement } from './walker';
 
 export type WorkflowFamily = 'product_shot' | 'photoshoot' | 'design_image' | 'cad_fastload' | 'cad_shot' | 'cad_model' | 'generic';
 
@@ -57,7 +57,7 @@ export const ENHANCEMENTS: Record<WorkflowFamily, Enhancement> = {
     order: ['prompt', 'images', 'image_artifact', 'consistent', 'drift'],
   },
   cad_fastload: {
-    labels: { cad_file: 'Input .3dm', skeleton_3dm: 'Skeleton .3dm', meshes: 'Meshes', meshed: 'Surfaces meshed', unmeshed: 'Surfaces not meshed' },
+    labels: { cad_file: 'Input 3DM', skeleton_3dm: 'Skeleton 3DM', meshes: 'Meshes', meshed: 'Surfaces meshed', unmeshed: 'Surfaces not meshed' },
     order: ['cad_file', 'skeleton_3dm', 'meshes', 'triangles'],
   },
   cad_shot: {
@@ -70,6 +70,11 @@ export const ENHANCEMENTS: Record<WorkflowFamily, Enhancement> = {
       spec_sheet: 'Spec sheet', estimated_metal_mass_g: 'Estimated metal mass (g)', validation_status: 'Validation',
       cad_improve: 'Improve lineage', parent_asset_id: 'Improved from (parent asset)', root_asset_id: 'Root asset', set_id: 'Version set',
       user_description: 'Description (user)', reference_image_artifacts: 'Reference images',
+    },
+    // derivatives.<name>.files (e.g. casting_body) reads as the derivative's name, "Casting body".
+    label: ({ key, path }) => {
+      const m = key === 'files' ? /\.derivatives\.([A-Za-z0-9_]+)\.files$/.exec(path) : null;
+      return m ? humanize(m[1]) : undefined;
     },
     order: ['glb_artifact', 'threedm_artifact', 'stl_artifacts', 'step_artifacts', 'derivatives', 'spec_sheet', 'estimated_metal_mass_g', 'validation_status'],
   },

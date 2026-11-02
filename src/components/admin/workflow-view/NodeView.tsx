@@ -22,8 +22,8 @@ export interface NodeViewOptions {
   enh?: Enhancement;
   tool?: string;
   fallbackStem: string;
-  /** Show the first 3D model without a click (the Outputs section). */
-  autoPreview3d?: boolean;
+  /** Leave technical values (hashes, keys, base64) out: the page lists them in its Technical section. */
+  hideTechnical?: boolean;
 }
 
 const Label = ({ children }: { children: ReactNode }) => (
@@ -52,10 +52,10 @@ function TextValue({ value, block }: { value: string; block: boolean }) {
   );
 }
 
-function Model3d({ node, auto, fallbackStem }: { node: Extract<ViewNode, { kind: 'media' }>; auto: boolean; fallbackStem: string }) {
+function Model3d({ node, fallbackStem }: { node: Extract<ViewNode, { kind: 'media' }>; fallbackStem: string }) {
   // Same host policy as pictures: the viewer only loads models from the proxy / known storage.
   const trusted = isTrustedImageSrc(node.url);
-  const [show, setShow] = useState(auto && trusted);
+  const [show, setShow] = useState(false);
   return (
     <div className="space-y-2" data-path={node.meta ? undefined : node.path}>
       <Label>{node.label}</Label>
@@ -94,7 +94,7 @@ function Children({ nodes, opts }: { nodes: ViewNode[]; opts: NodeViewOptions })
   const [shown, setShown] = useState(CHILD_PAGE);
   const visible = nodes.slice(0, shown);
   const normal = visible.filter((n) => !n.technical);
-  const technical = visible.filter((n) => n.technical);
+  const technical = opts.hideTechnical ? [] : visible.filter((n) => n.technical);
   const scalars = normal.filter(isScalar);
   const images = normal.filter(isImage);
   const rest = normal.filter((n) => !isScalar(n) && !isImage(n));
@@ -169,7 +169,7 @@ export function NodeView({ node, opts }: { node: ViewNode; opts: NodeViewOptions
       if (node.media === 'model3d') {
         return (
           <div className="space-y-2">
-            <Model3d node={node} auto={Boolean(opts.autoPreview3d)} fallbackStem={opts.fallbackStem} />
+            <Model3d node={node} fallbackStem={opts.fallbackStem} />
             <MetaDetails node={node.meta} opts={opts} />
           </div>
         );

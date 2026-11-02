@@ -1,36 +1,37 @@
 /**
- * The "Inputs -> Outputs" summary at the top of the admin detail page: every picture and 3D
- * file (GLB / glTF, 3DM, STL) in the request payload, and in the final outputs (the last
- * successful step's output plus the /api/result files). Built only from the walker's nodes and
- * url-safety's rules, so it shows nothing the sections below do not; everything else (prompts,
- * settings, steps, raw JSON) stays below. Pure functions only.
+ * The "Inputs -> Outputs" strip at the top of the admin detail page: every picture, 3D file
+ * (GLB / glTF, 3DM, STL) and other stored file in the request payload, and in the final
+ * outputs (the last successful step's output plus the /api/result files). Built only from the
+ * walker's nodes and url-safety's rules; prompts, settings, steps and raw JSON stay in the
+ * collapsed sections below. Pure functions only.
  *
- * Preview policy (WebGL is expensive):
- *   - an untrusted host is never previewed ('none'), only linked with a warning;
- *   - a file over CLICK_ONLY_BYTES only loads on click;
- *   - at most MAX_AUTO_3D previews mount on their own, outputs first; the rest wait for a click.
+ * Order: inputs keep payload order (the family's order puts the primary picture first);
+ * outputs put the final deliverable first: pictures, then GLB, 3DM, STL, then other files.
+ * Nothing here loads WebGL: a 3D tile opens its viewer on click, and a file over
+ * LARGE_FILE_BYTES asks once more inside the viewer before it is fetched.
  */
 import type { RunView } from './index';
 import { classifyUrl, extOf, isTrustedImageSrc } from './url-safety';
 import { findNodes, type ViewNode } from './walker';
 
+export type IoKind = 'image' | 'model3d' | 'file';
 export type IoFormat = 'glb' | 'gltf' | '3dm' | 'stl';
-export type IoPreview = 'auto' | 'click' | 'none';
 
 export interface IoItem {
-  /** Unique within its column: the node path, or the result file's label. */
+  /** Unique within its group: the node path, or the result file's label. */
   key: string;
+  /** The walker's label (family labels: "Model", "Reference images", "Casting body"...). */
   label: string;
-  kind: 'image' | 'model3d';
-  /** The 3D format; null for pictures. */
-  format: IoFormat | null;
+  kind: IoKind;
+  /** 3D: glb / gltf / 3dm / stl. Files: the extension or a short type from the mime, if known. */
+  format: string | null;
   url: string;
   name: string | null;
   bytes: number | null;
   /** May the browser fetch it (same origin, artifact proxy, configured storage hosts). */
   trusted: boolean;
-  /** 3D only: mount on its own, wait for a click, or never (untrusted / picture). */
-  preview: IoPreview;
+  /** Over LARGE_FILE_BYTES: the 3D viewer waits for one more click before fetching it. */
+  large: boolean;
 }
 
 export interface IoSummary {
@@ -41,24 +42,29 @@ export interface IoSummary {
 export interface ResultFile {
   label: string;
   url: string | null;
-  format: IoFormat;
+  kind: 'image' | 'model3d';
+  format?: IoFormat;
 }
 
-export const MAX_AUTO_3D = 2;
-export const CLICK_ONLY_BYTES = 50 * 1024 * 1024;
-/** First page of each column in the summary; the full lists stay in the sections below. */
-export const SUMMARY_PICTURES = 8;
-export const SUMMARY_MODELS = 6;
+export const LARGE_FILE_BYTES = 50 * 1024 * 1024;
+/** Tiles shown per group before a "+N more" tile; the full lists are in the sections below. */
+export const TILE_PAGE = 12;
 
 type Media = Extract<ViewNode, { kind: 'media' }>;
 
-const FORMATS = new Set<IoFormat>(['glb', 'gltf', '3dm', 'stl']);
+const MODEL_FORMATS = new Set(['glb', 'gltf', '3dm', 'stl']);
 
-function mimeFormat(mime: string): IoFormat | null {
-  const m = mime.toLowerCase();
+function mimeFormat(mime: string): string | null {
+  const m = mime.toLowerCase().split(';')[0].trim();
   if (m.includes('gltf')) return 'glb';
   if (m.includes('3dm')) return '3dm';
   if (m.includes('stl') || m === 'application/sla') return 'stl';
+  if (m === 'application/pdf') return 'pdf';
+  if (m.includes('gzip')) return 'gz';
+  if (/^application\/(x-)?zip(-compressed)?$/.test(m)) return 'zip';
+  if (m.includes('json')) return 'json';
+  if (m.includes('step')) return 'step';
+  if (m.startsWith('video/')) return m.slice(6).replace(/^x-/, '');
   return null;
 }
 
@@ -69,23 +75,43 @@ function mimeOf(node: Media): string | null {
   return hit && hit.kind === 'text' ? hit.value : null;
 }
 
-function formatOf(node: Media): IoFormat | null {
-  const candidates = [node.ext, node.name ? extOf(node.name) : null];
-  for (const c of candidates) if (c && FORMATS.has(c as IoFormat)) return c as IoFormat;
+/** The ref's own uri (kept in its Details), whose last path segment is often the stored file name. */
+function uriOf(node: Media): string | null {
+  if (!node.meta || node.meta.kind !== 'group') return null;
+  const hit = node.meta.children.find((c) => (c.key === 'uri' || c.key === 'url') && c.kind === 'text');
+  return hit && hit.kind === 'text' ? hit.value : null;
+}
+
+/** The file name: the ref's name, else the last segment of its uri when that has an extension. */
+function nameOf(node: Media): string | null {
+  if (node.name) return node.name;
+  const source = uriOf(node) ?? node.source;
+  if (!source) return null;
+  const raw = source.split(/[?#]/)[0].split('/').pop() ?? '';
+  let last = raw;
+  try { last = decodeURIComponent(raw); } catch { /* keep it as written */ }
+  return /^[^/]{1,120}\.[A-Za-z0-9]{1,8}$/.test(last) && !/^[a-f0-9]{64}\./i.test(last) ? last : null;
+}
+
+function formatOf(node: Media): string | null {
   const mime = mimeOf(node);
-  return mime ? mimeFormat(mime) : null;
+  const fromMime = mime ? mimeFormat(mime) : null;
+  const name = nameOf(node);
+  const fromName = node.ext ?? (name ? extOf(name) : null);
+  // A known 3D type wins whichever source says it; else the extension, else the mime.
+  for (const f of [fromName, fromMime]) if (f && MODEL_FORMATS.has(f)) return f;
+  return fromName ?? fromMime;
 }
 
 function toItem(node: ViewNode): IoItem | null {
-  if (node.kind !== 'media') return null;
-  const base = { key: node.path, label: node.label, url: node.url, name: node.name, bytes: node.bytes, trusted: isTrustedImageSrc(node.url) };
-  if (node.media === 'image') return { ...base, kind: 'image', format: null, preview: 'none' };
-  if (node.media === 'model3d' || node.media === 'file') {
-    const format = node.media === 'model3d' ? (node.ext === 'gltf' ? 'gltf' : 'glb') : formatOf(node);
-    if (!format) return null;
-    return { ...base, kind: 'model3d', format, preview: 'none' };
-  }
-  return null;
+  if (node.kind !== 'media' || node.media === 'link') return null;
+  const base = {
+    key: node.path, label: node.label, url: node.url, name: nameOf(node), bytes: node.bytes,
+    trusted: isTrustedImageSrc(node.url), large: node.bytes !== null && node.bytes > LARGE_FILE_BYTES,
+  };
+  if (node.media === 'image') return { ...base, kind: 'image', format: null };
+  const format = node.media === 'model3d' ? (node.ext === 'gltf' ? 'gltf' : 'glb') : formatOf(node);
+  return { ...base, kind: format && MODEL_FORMATS.has(format) ? 'model3d' : 'file', format };
 }
 
 function collect(node: ViewNode | null): IoItem[] {
@@ -98,8 +124,8 @@ function resultItems(files: ResultFile[]): IoItem[] {
     const kind = f.url ? classifyUrl(f.url) : null;
     if (!kind || kind.kind === 'refused') return [];
     return [{
-      key: `result:${f.label}`, label: f.label, kind: 'model3d' as const, format: f.format, url: kind.url,
-      name: null, bytes: null, trusted: isTrustedImageSrc(kind.url), preview: 'none' as const,
+      key: `result:${f.label}`, label: f.label, kind: f.kind, format: f.format ?? null, url: kind.url,
+      name: null, bytes: null, trusted: isTrustedImageSrc(kind.url), large: false,
     }];
   });
 }
@@ -109,20 +135,14 @@ function dedupe(items: IoItem[]): IoItem[] {
   return items.filter((i) => (seen.has(i.url) ? false : (seen.add(i.url), true)));
 }
 
+const OUTPUT_RANK: Record<string, number> = { glb: 1, gltf: 1, '3dm': 2, stl: 3 };
+const outputRank = (i: IoItem) => (i.kind === 'image' ? 0 : i.kind === 'model3d' ? OUTPUT_RANK[i.format ?? ''] ?? 3 : 4);
+
 export function buildIoSummary(view: RunView, options: { resultFiles?: ResultFile[] } = {}): IoSummary {
   const inputs = dedupe(collect(view.inputs));
-  const outputs = dedupe([...collect(view.outputs?.node ?? null), ...resultItems(options.resultFiles ?? [])]);
-  let auto = 0;
-  const assign = (item: IoItem): IoItem => {
-    if (item.kind !== 'model3d' || !item.trusted) return item;
-    const big = item.bytes !== null && item.bytes > CLICK_ONLY_BYTES;
-    if (!big && auto < MAX_AUTO_3D) {
-      auto += 1;
-      return { ...item, preview: 'auto' };
-    }
-    return { ...item, preview: 'click' };
-  };
-  // Outputs get the auto slots first: they are what the admin opens the page to check.
-  const out = outputs.map(assign);
-  return { inputs: inputs.map(assign), outputs: out };
+  const outputs = dedupe([...collect(view.outputs?.node ?? null), ...resultItems(options.resultFiles ?? [])])
+    .map((item, i) => ({ item, i }))
+    .sort((a, b) => outputRank(a.item) - outputRank(b.item) || a.i - b.i)
+    .map(({ item }) => item);
+  return { inputs, outputs };
 }
