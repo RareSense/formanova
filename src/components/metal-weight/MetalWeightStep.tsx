@@ -28,7 +28,8 @@ type Unit = 'g' | 'dwt';
 /** Radix Select cannot hold an empty value, so the "No metal" item has its own. */
 const NONE = 'none';
 const LABEL = 'text-sm text-foreground';
-const FIELD = 'h-10 font-mono text-[13px]';
+/** The form's own field font (as Dimensions): body text at 14px. */
+const FIELD = 'h-10 font-body text-[14px]';
 
 /** A positive number typed in a field, or null. */
 function readPositive(text: string): number | null {
@@ -89,12 +90,12 @@ export function MetalWeightStep({ value, onChange, disabled = false }: MetalWeig
             </SelectTrigger>
             {/* Above the design editor's z-[120] backdrop, as CadModelPicker is. */}
             <SelectContent className="z-[200]">
-              <SelectItem value={NONE} className="font-mono text-[12px]">No metal</SelectItem>
+              <SelectItem value={NONE} className="font-body text-[14px]">No metal</SelectItem>
               {ALLOY_GROUPS.map((group) => (
                 <SelectGroup key={group.family}>
-                  <SelectLabel className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{group.label}</SelectLabel>
+                  <SelectLabel className="text-xs font-medium text-muted-foreground">{group.label}</SelectLabel>
                   {group.alloys.map((alloy) => (
-                    <SelectItem key={alloy.id} value={alloy.id} className="font-mono text-[12px]">
+                    <SelectItem key={alloy.id} value={alloy.id} className="font-body text-[14px]">
                       <span className="flex items-center gap-2">
                         <Swatch alloy={alloy} />
                         {alloy.name}
@@ -130,7 +131,7 @@ export function MetalWeightStep({ value, onChange, disabled = false }: MetalWeig
                   aria-pressed={unit === u}
                   onClick={() => switchUnit(u)}
                   className={cn(
-                    'h-full flex-1 font-mono text-[13px] transition-colors',
+                    'h-full flex-1 font-body text-[14px] transition-colors',
                     unit === u ? 'bg-foreground text-background' : 'bg-background text-muted-foreground hover:text-foreground',
                   )}
                 >

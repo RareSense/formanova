@@ -54,7 +54,11 @@ describe('MetalWeightStep', () => {
     // Equal columns of at least 13rem: three across in a wide form, fewer in a
     // narrow one (ReadyForCad is 460 px), one on a phone. Never squeezed.
     expect(grid).toHaveClass('grid', 'grid-cols-[repeat(auto-fit,minmax(13rem,1fr))]');
-    for (const control of [metal(), targetInput(), toleranceInput()]) expect(control).toHaveClass('h-10');
+    // Same height, and the same font as the form's other fields (Dimensions): body text at 14px.
+    for (const control of [metal(), targetInput(), toleranceInput()]) {
+      expect(control).toHaveClass('h-10', 'text-[14px]');
+      expect(control).not.toHaveClass('font-mono');
+    }
     // The toggle box itself is h-10 (its border inside it), halves fill it equally.
     const unit = screen.getByRole('group', { name: 'Weight unit' });
     expect(unit).toHaveClass('h-10', 'box-border');
