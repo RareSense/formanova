@@ -37,10 +37,18 @@ export function imagesIn(node: unknown): ViewImage[] {
   return dedupeImages(out);
 }
 
-/** Simple values of a record, leaving out links and pictures (they are shown as images). */
+/** A stored artifact ({ uri|url, type|sha256 }): shown as a picture or file, never as JSON text. */
+function isStoredFile(value: unknown): boolean {
+  const record = asRecord(value);
+  return Boolean(record && (typeof record.uri === 'string' || typeof record.url === 'string')
+    && (typeof record.type === 'string' || typeof record.sha256 === 'string'));
+}
+
+/** Simple values of a record, leaving out links, pictures and stored files. */
 export function plainFields(value: unknown): ViewField[] {
   const record = asRecord(value) ?? {};
-  const kept = Object.fromEntries(Object.entries(record).filter(([, v]) => !(typeof v === 'string' && LINK_VALUE.test(v.trim()))));
+  const kept = Object.fromEntries(Object.entries(record).filter(([, v]) =>
+    !(typeof v === 'string' && LINK_VALUE.test(v.trim())) && !isStoredFile(v)));
   return fieldsFromObject(kept);
 }
 

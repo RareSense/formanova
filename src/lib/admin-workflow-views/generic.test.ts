@@ -50,4 +50,12 @@ describe('genericStep', () => {
     const out = genericStep({ tool_name: 't', took_ms: null, at: null, input: {}, output: { prompt: 'p', image_b64: 'AAA', output_url: 'https://cdn.example.com/o.png' } });
     expect(out.fields).toEqual([{ label: 'prompt', value: 'p' }]);
   });
+
+  it('leaves stored files out of the fields (they are links in Outputs and in the raw JSON)', () => {
+    const out = genericStep({ tool_name: 't', took_ms: null, at: null, input: {}, output: {
+      skeleton_3dm: { uri: `https://api/artifacts/${'d'.repeat(64)}`, type: 'model/vnd.3dm', sha256: 'd'.repeat(64) },
+      triangles: 12,
+    } });
+    expect(out.fields).toEqual([{ label: 'triangles', value: '12' }]);
+  });
 });
