@@ -21,7 +21,7 @@ import type { CatalogEngine } from '@/components/cad-to-catalog/engine/engine';
 import type { FileEntry } from '@/components/cad-to-catalog/engine/package';
 import { useCadBreakpoint } from '@/hooks/use-cad-breakpoint';
 import { useCatalogShoot } from '@/hooks/useCatalogShoot';
-import { trackCatalogShootStarted, trackDownloadClicked, trackPaywallHit } from '@/lib/posthog-events';
+import { trackCatalogFileUploaded, trackCatalogOpened, trackDownloadClicked } from '@/lib/posthog-events';
 import { CATALOG_FALLBACK_PRICES, shootCredits, type CatalogAspect, type CatalogResolution } from '@/lib/cad-to-catalog-api';
 import { blobToDataUrl, picturePrice } from '@/lib/cad-to-catalog-run';
 import { anglesFor, hasOwnAngles, resetAngles, saveAngles } from '@/lib/cad-to-catalog-angles';
@@ -58,6 +58,11 @@ export default function CADToCatalog() {
   // Shown straight away from the page's prices, then replaced by the backend's price list.
   const [price, setPrice] = useState<number | null>(CATALOG_FALLBACK_PRICES['1K']);
   const [angleThumbs, setAngleThumbs] = useState<Record<string, string>>({});
+
+  // Top of the catalog funnel, once per page entry, as cad_studio_open is for the CAD tools.
+  useEffect(() => {
+    trackCatalogOpened();
+  }, []);
 
   // Credits per picture (white or photo) at the chosen size: the backend's price list, else the fallback.
   useEffect(() => {
@@ -111,6 +116,7 @@ export default function CADToCatalog() {
       if (!entries.some((e) => /\.(3dm|glb|gltf|step|stp|obj|ply|stl)$/i.test(e.file.name))) toast.error('Not a CAD file. Use 3DM, GLB, GLTF, STEP, OBJ, PLY or STL.');
       return;
     }
+    trackCatalogFileUploaded({ piece_count: fresh.length, total_after_add: shoot.queue.pieces.length + fresh.length });
     if (fresh.length > 1) toast(`${fresh.length} pieces added`);
     // Open the first new piece when nothing is open yet, so the view is never empty.
     if (!shoot.openId) void shoot.openPiece(fresh[0]);
@@ -140,11 +146,9 @@ export default function CADToCatalog() {
 
   const startShoot = async (ids: string[]) => {
     const pictures = ids.reduce((n, id) => n + perPictures(shoot.queue.pieces.find((p) => p.id === id)!.category), 0);
-    const photos = [...chosenBg].filter(isPhoto).length;
     if (!pictures) { toast.error('Tick at least one angle and one background'); return; }
-    trackCatalogShootStarted({ pieces: ids.length, pictures, photo_backgrounds: photos, metals: metals.size });
-    const started = await shoot.shoot(ids, settings, backgroundData, anglesOf);
-    if (!started && photos) trackPaywallHit({ category: category ?? 'ring', steps_completed: 4 });
+    // catalog_shoot_started and paywall_hit fire in the hook, after its credit and device checks.
+    await shoot.shoot(ids, settings, backgroundData, anglesOf);
   };
 
   const toggle = <T,>(set: Set<T>, v: T) => { const s = new Set(set); if (s.has(v)) s.delete(v); else s.add(v); return s; };

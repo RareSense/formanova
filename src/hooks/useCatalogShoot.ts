@@ -28,6 +28,10 @@ import {
 } from '@/lib/cad-to-catalog-queue';
 import { anglesFor } from '@/lib/cad-to-catalog-angles';
 import { buildZip } from '@/lib/cad-to-catalog-zip';
+import {
+  trackCatalogModelLoaded, trackCatalogModelLoadFailed, trackCatalogShootCompleted, trackCatalogShootStarted, trackCatalogShotCompleted,
+  trackCatalogShotFailed, trackPaywallHit, type CatalogShotKind,
+} from '@/lib/posthog-events';
 import { CatalogEngine } from '@/components/cad-to-catalog/engine/engine';
 import { unpackMeshes } from '@/components/cad-to-catalog/engine/fastpack';
 import { metalByName } from '@/components/cad-to-catalog/engine/materials';
@@ -47,10 +51,30 @@ interface PieceFiles {
   files: Map<string, File>;
 }
 
+/** One shoot, for its started/completed events. Results count into the shoot that made them. */
+interface ShootRun {
+  id: string;
+  startedAt: number;
+  /** Pictures are still being drawn. */
+  drawing: boolean;
+  /** Its runs queued or going. */
+  pending: number;
+  succeeded: number;
+  failed: number;
+  stopped: boolean;
+}
+
 /** A picture's paid run: placed in a photo by AI, or a drawn picture kept as it is. */
-type Job =
-  | { kind: 'place'; picture: Picture; render: string; background: string; materials: string; aspect: CatalogAspect; resolution: CatalogResolution }
-  | { kind: 'save'; picture: Picture; blob: Blob; piece: string; category: string; resolution: CatalogResolution };
+type Job = { shoot: ShootRun } & (
+  | { kind: 'place'; picture: Picture; render: string; background: string; materials: string; aspect: CatalogAspect; resolution: CatalogResolution; category: string }
+  | { kind: 'save'; picture: Picture; blob: Blob; piece: string; category: string; resolution: CatalogResolution });
+
+/** A shoot's one catalog_shoot_completed. */
+const closeShoot = (run: ShootRun, abandoned: boolean) => trackCatalogShootCompleted({
+  shoot_id: run.id, succeeded: run.succeeded, failed: run.failed, stopped: run.stopped, abandoned, duration_ms: Date.now() - run.startedAt,
+});
+
+const newShootId = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 export interface UseCatalogShoot {
   queue: QueueState;
@@ -99,11 +123,25 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
   const lastShoot = useRef<{ settings: ShootSettings; backgroundData: (id: string) => Promise<string>; anglesOf: (c: JewelryCategory) => PlannedAngle[] } | null>(null);
   const noticeRef = useRef(onNotice);
   noticeRef.current = onNotice;
+  // Shoots not yet completed: drawing, or with runs still going. More than one when a shoot
+  // starts while the last one's runs are still landing.
+  const shoots = useRef(new Set<ShootRun>());
+
+  // A shoot is over once all its pictures are drawn and none of its runs is queued or going.
+  const settleRef = useRef((run: ShootRun) => {
+    if (run.drawing || run.pending || !shoots.current.delete(run)) return;
+    closeShoot(run, false);
+  });
+  const settleShoot = settleRef.current;
 
   useEffect(() => {
     const ctrl = life.current;
     const made = urls.current;
+    const open = shoots.current;
     return () => {
+      // Leaving the page cancels every run; close each open shoot with what had settled.
+      open.forEach((run) => closeShoot(run, true));
+      open.clear();
       ctrl.abort();
       made.forEach((u) => URL.revokeObjectURL(u));
     };
@@ -145,7 +183,11 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
         fastload: (data) => {
           let job = prepared.current.get(id);
           if (!job) {
+            const startedAt = Date.now();
             job = fastloadFile(data, life.current.signal, setOpeningText).then(({ skeleton, packed }) => ({ skeleton, meshes: unpackMeshes(packed) }));
+            // Once per prepared file: a reopen reuses this job and fires nothing.
+            const load = () => ({ duration_ms: Date.now() - startedAt, file_bytes: data.byteLength });
+            job.then(() => trackCatalogModelLoaded(load()), () => { if (!life.current.signal.aborted) trackCatalogModelLoadFailed(load()); });
             job.catch(() => prepared.current.delete(id)); // try again next time
             prepared.current.set(id, job);
           }
@@ -215,10 +257,25 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
   const outOfCredits = useCallback(() => {
     if (control.current.stopped) return;
     control.current = { paused: false, stopped: true };
-    jobs.current.forEach((j) => dispatch({ type: 'picture', pictureId: j.picture.id, status: 'failed', error: 'Not enough credits' }));
+    shoots.current.forEach((run) => { if (run.drawing) run.stopped = true; });
+    jobs.current.forEach((j) => {
+      dispatch({ type: 'picture', pictureId: j.picture.id, status: 'failed', error: 'Not enough credits' });
+      j.shoot.pending--;
+      j.shoot.stopped = true;
+    });
+    const dropped = new Set(jobs.current.map((j) => j.shoot));
     jobs.current = [];
+    dropped.forEach(settleShoot);
     dispatch({ type: 'stop' });
     noticeRef.current('Not enough credits: the shoot stopped. Pictures already made are kept.', true);
+  }, [settleShoot]);
+
+  // A picture's outcome, counted towards the shoot it belongs to.
+  const shotSettled = useCallback((run: ShootRun, kind: CatalogShotKind, category: string, resolution: string, startedAt: number, failureStage?: 'draw' | 'run') => {
+    const props = { kind, category, resolution, duration_ms: Date.now() - startedAt };
+    if (failureStage) trackCatalogShotFailed({ ...props, failure_stage: failureStage });
+    else trackCatalogShotCompleted(props);
+    run[failureStage ? 'failed' : 'succeeded']++;
   }, []);
 
   // One job's run: an AI placement, or a drawn picture kept (and charged) as it is.
@@ -243,28 +300,37 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
       const job = jobs.current.shift()!;
       running.current++;
       dispatch({ type: 'picture', pictureId: job.picture.id, status: job.kind === 'place' ? 'placing' : 'saving' });
+      const kind: CatalogShotKind = job.kind === 'place' ? 'photo' : 'white';
+      const startedAt = Date.now();
       runJob(job)
-        .then((url) => { if (url) dispatch({ type: 'picture', pictureId: job.picture.id, status: 'done', url }); })
+        .then((url) => {
+          if (!url) return; // cancelled
+          dispatch({ type: 'picture', pictureId: job.picture.id, status: 'done', url });
+          shotSettled(job.shoot, kind, job.category, job.resolution, startedAt);
+        })
         .catch((e) => {
           if (life.current.signal.aborted) return;
           dispatch({ type: 'picture', pictureId: job.picture.id, status: 'failed', error: (e as Error).message });
+          shotSettled(job.shoot, kind, job.category, job.resolution, startedAt, 'run');
           if (e instanceof CatalogRunError && e.status === 402) outOfCredits();
         })
         .finally(() => {
           running.current--;
+          job.shoot.pending--;
           if (life.current.signal.aborted) return;
           if (!running.current && !jobs.current.length) refreshCredits().catch(() => {});
           pump();
+          settleShoot(job.shoot);
         });
     }
-  }, [refreshCredits, runJob, outOfCredits]);
+  }, [refreshCredits, runJob, outOfCredits, shotSettled, settleShoot]);
 
   const waitWhilePaused = async () => {
     while (control.current.paused && !control.current.stopped && !life.current.signal.aborted) await new Promise((r) => setTimeout(r, 250));
   };
 
   // Shoots one piece: open it (visible), draw every picture, queue its placements, keep its drawn pictures.
-  const shootPiece = useCallback(async (id: string, settings: ShootSettings, backgroundData: (bg: string) => Promise<string>) => {
+  const shootPiece = useCallback(async (id: string, settings: ShootSettings, backgroundData: (bg: string) => Promise<string>, run: ShootRun) => {
     const piece = queueRef.current.pieces.find((p) => p.id === id)!;
     dispatch({ type: 'piece', pieceId: id, status: 'opening' });
     try {
@@ -288,22 +354,26 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
           dispatch({ type: 'picture', pictureId: pic.id, status: 'drawing' });
           await new Promise((r) => requestAnimationFrame(() => r(null))); // let the tile show "drawing" first
           const photo = isPhoto(pic.background);
+          const drawStartedAt = Date.now();
           engine!.applyAngle(photo ? { ...pic.angle, dist: (pic.angle.dist || 1) * IN_PHOTO_DISTANCE } : pic.angle);
           try {
             // A photo's render goes to the AI at its working size; drawn pictures are made at the chosen size.
             const blob = await engine!.capture({ background: pic.background === 'white' ? 'white' : 'clear', long: photo ? 2048 : CATALOG_PICTURE_PX[resolution] });
-            jobs.current.push(photo
-              ? { kind: 'place', picture: pic, render: await blobToDataUrl(blob), background: await backgroundData(pic.background), materials, aspect: settings.aspect as CatalogAspect, resolution }
-              : { kind: 'save', picture: pic, blob, piece: piece.name, category: piece.category, resolution });
+            const job: Job = photo
+              ? { shoot: run, kind: 'place', picture: pic, render: await blobToDataUrl(blob), background: await backgroundData(pic.background), materials, aspect: settings.aspect as CatalogAspect, resolution, category: piece.category }
+              : { shoot: run, kind: 'save', picture: pic, blob, piece: piece.name, category: piece.category, resolution };
+            run.pending++;
+            jobs.current.push(job);
             pump();
           } catch (e) {
             dispatch({ type: 'picture', pictureId: pic.id, status: 'failed', error: (e as Error).message });
+            if (!life.current.signal.aborted) shotSettled(run, photo ? 'photo' : 'white', piece.category, resolution, drawStartedAt, 'draw');
           }
         }
       });
     }
     dispatch({ type: 'piece', pieceId: id, status: control.current.stopped ? 'stopped' : 'done' });
-  }, [engine, open, pump]);
+  }, [engine, open, pump, shotSettled]);
 
   const shoot = useCallback(async (pieceIds: string[], settings: ShootSettings, backgroundData: (id: string) => Promise<string>, anglesOf: (c: JewelryCategory) => PlannedAngle[] = anglesFor) => {
     if (!engine || queueRef.current.running || !pieceIds.length) return false;
@@ -312,29 +382,44 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
       noticeRef.current(`This device can't draw ${resolution} pictures. Choose a smaller size.`, true);
       return false;
     }
-    const counts = countShoot(queueRef.current.pieces.filter((p) => pieceIds.includes(p.id)), settings, anglesOf);
-    if (!(await checkCreditsFor(shootCredits(counts, await picturePrice(resolution)), CATALOG_SHOT_WORKFLOW))) return false;
+    const chosen = queueRef.current.pieces.filter((p) => pieceIds.includes(p.id));
+    const counts = countShoot(chosen, settings, anglesOf);
+    if (!(await checkCreditsFor(shootCredits(counts, await picturePrice(resolution)), CATALOG_SHOT_WORKFLOW))) {
+      trackPaywallHit({ category: chosen[0]?.category ?? 'ring', steps_completed: 4 });
+      return false;
+    }
     if (engine.hasModel && openRef.current) choices.current.set(openRef.current, engine.choices());
     // Every picture takes the chosen shape; each angle is fitted to it, the piece centred.
     const [aw, ah] = (settings.aspect || '1:1').split(':').map(Number);
     engine.pictureAspect = aw > 0 && ah > 0 ? aw / ah : 1;
     lastShoot.current = { settings, backgroundData, anglesOf };
     control.current = { paused: false, stopped: false };
+    const run: ShootRun = { id: newShootId(), startedAt: Date.now(), drawing: true, pending: 0, succeeded: 0, failed: 0, stopped: false };
+    shoots.current.add(run);
+    trackCatalogShootStarted({
+      shoot_id: run.id, pieces: chosen.length, pictures: counts.photos + counts.drawn,
+      photo_backgrounds: settings.backgrounds.filter(isPhoto).length, metals: settings.metals.length,
+    });
     dispatch({ type: 'start', pieceIds, settings, anglesFor: anglesOf });
     // The reducer runs before the next render; read the planned queue from it directly.
     queueRef.current = queueReducer(queueRef.current, { type: 'start', pieceIds, settings, anglesFor: anglesOf });
     try {
       for (let next = nextPiece(queueRef.current); next && !control.current.stopped && !life.current.signal.aborted; next = nextPiece(queueRef.current)) {
-        await shootPiece(next.id, settings, backgroundData);
+        await shootPiece(next.id, settings, backgroundData, run);
         queueRef.current = { ...queueRef.current, pieces: queueRef.current.pieces.map((p) => (p.id === next!.id && p.status === 'waiting' ? { ...p, status: 'done' } : p)) };
         await new Promise((r) => setTimeout(r, 0)); // let React apply this piece's updates before reading the next
       }
     } finally {
       engine.pictureAspect = 1; // back to the square view box for lining up angles
-      if (!life.current.signal.aborted) dispatch({ type: 'finished' });
+      if (!life.current.signal.aborted) {
+        dispatch({ type: 'finished' });
+        if (control.current.stopped) run.stopped = true;
+        run.drawing = false;
+        settleShoot(run);
+      }
     }
     return true;
-  }, [engine, checkCreditsFor, shootPiece]);
+  }, [engine, checkCreditsFor, shootPiece, settleShoot]);
 
   // Every picture's url is a blob: URL made here (AI_RULES 1 allows raw fetch for those).
   const downloadAll = useCallback(() => buildZip(queueRef.current.pieces, queueRef.current.pictures, async (p) => (await fetch(p.url!)).blob()), []);
@@ -347,7 +432,12 @@ export function useCatalogShoot(engine: CatalogEngine | null, onNotice: (message
     shoot,
     pause: () => { control.current.paused = true; dispatch({ type: 'pause' }); },
     resume: () => { control.current.paused = false; dispatch({ type: 'resume' }); },
-    stop: () => { control.current.stopped = true; control.current.paused = false; dispatch({ type: 'stop' }); },
+    stop: () => {
+      control.current.stopped = true;
+      control.current.paused = false;
+      shoots.current.forEach((run) => { if (run.drawing) run.stopped = true; });
+      dispatch({ type: 'stop' });
+    },
     // Shoots that piece again with the settings of the last shoot.
     retry: (id) => { const l = lastShoot.current; if (l) void shoot([id], l.settings, l.backgroundData, l.anglesOf); },
     downloadAll,
