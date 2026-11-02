@@ -374,6 +374,12 @@ export interface RingCadResult {
   stepArtifacts: ArtifactRef[];
   /** Calculated from validated solid volume and the explicitly selected alloy density. */
   estimatedMetalMassG: number | null;
+  /**
+   * Volume of the fused metal casting body, mm³ (casting_body union, gems
+   * excluded). Null until the toolkit reports it; whether it is usable is
+   * decided by pickWeightSource, not here.
+   */
+  metalVolumeMm3: number | null;
   validationStatus: RingCadValidationStatus | null;
   diagnostics: RingCadDiagnostics;
   notAllSolid: boolean;
@@ -552,6 +558,10 @@ export function parseRingCadResult(data: unknown): RingCadResult {
   const estimatedMetalMassG = typeof massRaw === 'number' && Number.isFinite(massRaw) && massRaw >= 0
     ? massRaw
     : null;
+  // Read like the mass: flat first, then anywhere in a sink-node shape.
+  const volumeRaw = d.metal_volume_mm3
+    ?? findKeyDeep(root, (key) => key === 'metal_volume_mm3');
+  const metalVolumeMm3 = typeof volumeRaw === 'number' && Number.isFinite(volumeRaw) ? volumeRaw : null;
 
   // cad_diagnostics is the documented flat-shape field; an unrecognised
   // sink-node shape nests the per-node tool output under a different key
@@ -590,6 +600,7 @@ export function parseRingCadResult(data: unknown): RingCadResult {
     stlArtifacts,
     stepArtifacts,
     estimatedMetalMassG,
+    metalVolumeMm3,
     validationStatus,
     diagnostics,
     notAllSolid: diagnostics.not_all_solid === true,

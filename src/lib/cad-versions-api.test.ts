@@ -103,6 +103,16 @@ describe('fetchCadRings', () => {
     expect(ring.versions[0].glb_url).toBe(`/api/artifacts/${sha}`);
   });
 
+  it('keeps the metal volume and weight target the vault sends on a version', async () => {
+    const weight_target = { grams: 28, tolerance_pct: 5, alloy_id: 'au14y' };
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, {
+      items: [{ set_id: 's', versions: [{ asset_id: 'a1', position: 0, metal_volume_mm3: 2192.4, weight_target }] }],
+    }));
+    const [ring] = await fetchCadRings();
+    expect(ring.versions[0].metal_volume_mm3).toBe(2192.4);
+    expect(ring.versions[0].weight_target).toEqual(weight_target);
+  });
+
   it('asks for page 0: paging starts there, so page 1 would skip the newest', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { items: [RING] }));
     await fetchCadRings();

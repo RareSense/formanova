@@ -183,6 +183,8 @@ export interface TrackedGeneration {
   stepUrls?: string[];
   /** CAD only: validated volume multiplied by the user-selected alloy density. */
   estimatedMetalMassG?: number | null;
+  /** CAD only: the fused metal casting body's volume (mm³), the input to every weight shown. */
+  metalVolumeMm3?: number | null;
   /** CAD only: label for the completion toast. */
   label?: string;
   /** CAD only: structured fail-step code, used for clear workspace copy. */
@@ -740,6 +742,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
               stlUrls: model.stlUrls,
               stepUrls: model.stepUrls,
               estimatedMetalMassG: model.estimatedMetalMassG,
+              metalVolumeMm3: model.metalVolumeMm3,
               notAllSolid: model.notAllSolid,
             }
           : g
@@ -878,6 +881,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
                   stlUrls: model?.stlUrls ?? [],
                   stepUrls: model?.stepUrls ?? [],
                   estimatedMetalMassG: model?.estimatedMetalMassG ?? null,
+                  metalVolumeMm3: model?.metalVolumeMm3 ?? null,
                   notAllSolid: model?.notAllSolid ?? false,
                 }
               : g

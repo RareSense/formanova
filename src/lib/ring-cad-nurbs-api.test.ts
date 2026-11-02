@@ -240,6 +240,17 @@ describe('ring_cad_nurbs_v1 result parsing', () => {
     expect(r.validationStatus).toBe('applied');
   });
 
+  it('reads metal_volume_mm3 flat, or anywhere in a sink-node shape', () => {
+    expect(parseRingCadResult({ ...RESULT, metal_volume_mm3: 2192.4 }).metalVolumeMm3).toBe(2192.4);
+    expect(parseRingCadResult({ final_validated: [{ ...RESULT, postprocess: { metal_volume_mm3: 1500 } }] }).metalVolumeMm3).toBe(1500);
+  });
+
+  it('leaves metal_volume_mm3 null when absent or not a finite number', () => {
+    expect(parseRingCadResult(RESULT).metalVolumeMm3).toBeNull();
+    expect(parseRingCadResult({ ...RESULT, metal_volume_mm3: '2192.4' }).metalVolumeMm3).toBeNull();
+    expect(parseRingCadResult({ ...RESULT, metal_volume_mm3: null }).metalVolumeMm3).toBeNull();
+  });
+
   it('exposes the signed url as glbUrl for the viewport', () => {
     const r = parseRingCadResult({
       ...RESULT,

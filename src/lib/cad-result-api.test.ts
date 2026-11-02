@@ -141,12 +141,17 @@ describe('resolveCadModel', () => {
     expect(mockFetchCadRings).not.toHaveBeenCalled();
   });
 
+  it('carries the metal volume from a /result body that has one', async () => {
+    const model = await resolveCadModel('wf-1', { ...nurbsResult(false), metal_volume_mm3: 2192.4 });
+    expect(model?.metalVolumeMm3).toBe(2192.4);
+  });
+
   it('falls back to the vault version named by output_asset_id', async () => {
     mockFetchCadRings.mockResolvedValue(vault('some-other-run'));
     const model = await resolveCadModel('wf-r', { supervised_delivery: [], output_asset_id: 'v1' });
     expect(model).toEqual({
       glbUrl: '/rep.glb', threedmUrl: '/rep.3dm', stlUrls: [], stepUrls: [],
-      estimatedMetalMassG: null, notAllSolid: false,
+      estimatedMetalMassG: null, metalVolumeMm3: null, notAllSolid: false,
     });
   });
 
