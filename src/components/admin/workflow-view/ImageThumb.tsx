@@ -20,7 +20,12 @@ export function ImageThumb({ url, label, path }: { url: string | null; label: st
   const { src, failed: fetchFailed } = useAuthenticatedImageState(trusted ? normalized : null);
   const [imgFailed, setImgFailed] = useState(false);
   const [open, setOpen] = useState(false);
+  // The src it last painted. A lazy <img> below the fold has a src but no size until the
+  // browser decodes it, so until onLoad it keeps a sized "Loading" placeholder (no empty strip).
+  const [paintedSrc, setPaintedSrc] = useState<string | null>(null);
   const failed = fetchFailed || imgFailed;
+  const painted = Boolean(src) && paintedSrc === src;
+  const busy = Boolean(url) && trusted && !failed && !painted;
 
   let body;
   if (!url) {
@@ -52,8 +57,27 @@ export function ImageThumb({ url, label, path }: { url: string | null; label: st
   } else {
     body = (
       <>
-        <button type="button" className="block w-full cursor-zoom-in" onClick={() => setOpen(true)} aria-label={`Open ${label} full size`}>
-          <img src={src} alt={label} loading="lazy" decoding="async" onError={() => setImgFailed(true)} className="max-h-72 w-full object-contain" />
+        <button
+          type="button"
+          className={`relative block w-full cursor-zoom-in ${painted ? '' : 'min-h-40'}`}
+          onClick={() => setOpen(true)}
+          aria-label={`Open ${label} full size`}
+        >
+          <img
+            src={src}
+            alt={label}
+            loading="lazy"
+            decoding="async"
+            onLoad={() => setPaintedSrc(src)}
+            onError={() => setImgFailed(true)}
+            className="max-h-72 w-full object-contain"
+          />
+          {!painted && (
+            <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span className="font-mono text-[10px] uppercase tracking-widest">Loading</span>
+            </span>
+          )}
         </button>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogContent className="max-w-[min(96vw,1400px)] p-3 sm:p-4">
@@ -66,7 +90,7 @@ export function ImageThumb({ url, label, path }: { url: string | null; label: st
   }
 
   return (
-    <figure className="min-w-0 space-y-2" aria-label={label} data-url={url ?? ''} data-path={path}>
+    <figure className="min-w-0 space-y-2" aria-label={label} aria-busy={busy} data-url={url ?? ''} data-path={path}>
       <figcaption className="break-words font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{label}</figcaption>
       <div className="overflow-hidden rounded-md border border-border bg-muted/20">{body}</div>
     </figure>

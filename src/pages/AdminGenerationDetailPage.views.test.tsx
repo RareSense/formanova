@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -135,5 +135,31 @@ describe('completeness in the DOM: every leaf of every fixture is rendered', () 
       ...detail.steps.flatMap((s, i) => [...leafPaths(s.input, `steps[${i}].input`), ...leafPaths(s.output, `steps[${i}].output`)]),
     ];
     expect(leaves.filter((p) => !rendered.has(p))).toEqual([]);
+  });
+});
+
+describe('a fetched picture that has not painted yet', () => {
+  // Regression: the reel's Poster (proxy(105)) was fetched fine, but its lazy <img> below the
+  // fold had not decoded, so the thumbnail collapsed to an empty strip with no placeholder.
+  it('keeps a sized loading placeholder until the image paints', async () => {
+    // jsdom has no object urls; stand in for the browser's.
+    const original = { create: URL.createObjectURL, revoke: URL.revokeObjectURL };
+    URL.createObjectURL = () => 'blob:poster';
+    URL.revokeObjectURL = () => {};
+    authFetch.authenticatedFetch.mockImplementation(async (url: string) => (
+      url === proxy(105) ? new Response(new Blob(['png'], { type: 'image/png' }), { status: 200 }) : new Response('{}', { status: 404 })
+    ));
+    const { unmount } = renderDetail(syntheticReelRun());
+    const poster = section('Outputs').getAllByRole('figure', { name: 'Poster' })[0];
+    const img = await within(poster).findByRole('img', { name: 'Poster' });
+    expect(img.getAttribute('src')).toBe('blob:poster');
+    expect(poster.getAttribute('aria-busy')).toBe('true');
+    expect(within(poster).getByText('Loading')).toBeTruthy();
+    fireEvent.load(img);
+    expect(poster.getAttribute('aria-busy')).toBe('false');
+    expect(within(poster).queryByText('Loading')).toBeNull();
+    unmount();
+    URL.createObjectURL = original.create;
+    URL.revokeObjectURL = original.revoke;
   });
 });
