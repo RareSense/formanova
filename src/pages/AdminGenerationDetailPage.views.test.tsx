@@ -119,7 +119,9 @@ describe('DetailContent: Inputs -> Steps -> Outputs for any workflow', () => {
     expect(inputs.getByText('six levels down')).toBeTruthy();
     expect(inputs.getByText('empty key')).toBeTruthy();
     expect(inputs.getByText('javascript:alert(1)')).toBeTruthy();
-    expect(section('Outputs').getByRole('button', { name: /Show 3D preview|Download Model url/ })).toBeTruthy();
+    // The model sits on an outside host: shown as a warned link, never previewed or token-fetched.
+    expect(section('Outputs').getByText(/External file, open at your own risk/)).toBeTruthy();
+    expect(screen.queryByTestId('glb')).toBeNull();
   });
 });
 

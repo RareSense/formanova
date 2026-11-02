@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Box, ExternalLink } from 'lucide-react';
 
 import { ScissorGLBGrid, GLBPreviewSlot } from '@/components/generations/ScissorGLBGrid';
+import { isTrustedImageSrc } from '@/lib/admin-workflow-views/url-safety';
 import { walkDeeper, type Enhancement, type ViewNode } from '@/lib/admin-workflow-views/walker';
 import { FileLink } from './FileLink';
 import { ImageGrid } from './ImageThumb';
@@ -52,11 +53,13 @@ function TextValue({ value, block }: { value: string; block: boolean }) {
 }
 
 function Model3d({ node, auto, fallbackStem }: { node: Extract<ViewNode, { kind: 'media' }>; auto: boolean; fallbackStem: string }) {
-  const [show, setShow] = useState(auto);
+  // Same host policy as pictures: the viewer only loads models from the proxy / known storage.
+  const trusted = isTrustedImageSrc(node.url);
+  const [show, setShow] = useState(auto && trusted);
   return (
     <div className="space-y-2" data-path={node.meta ? undefined : node.path}>
       <Label>{node.label}</Label>
-      {show ? (
+      {!trusted ? null : show ? (
         <div className="w-full max-w-2xl">
           <ScissorGLBGrid>
             <GLBPreviewSlot id={node.path} glbUrl={node.url} className="min-h-[320px] w-full aspect-[4/3] rounded-md border border-border bg-muted/20" forceJewelryPalette />

@@ -48,7 +48,8 @@ function compact(value: string): string {
 export function classifyUrl(raw: string, key = ''): UrlKind | null {
   const v = raw.trim();
   if (!v) return null;
-  const c = compact(v);
+  // A scheme sits at the start; looking at a short head keeps multi-MB strings cheap.
+  const c = compact(v.slice(0, 256));
   if (/(java|vb)script:/.test(c)) return { kind: 'refused', reason: 'script url' };
   if (/\s/.test(v)) return null;
   if (v.startsWith('//')) return { kind: 'refused', reason: 'protocol-relative url' };

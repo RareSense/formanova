@@ -29,12 +29,16 @@ function downloadName(file: FileRef, fallbackStem: string): string {
   return file.ext ? `${stem}.${file.ext.replace(/[^a-z0-9]/gi, '')}` : stem;
 }
 
-/** Same-origin paths and http(s) only; anything else is not fetched (url-safety.ts already refused it). */
-const fetchable = (url: string) => (url.startsWith('/') && !url.startsWith('//')) || /^https?:\/\//i.test(url);
+/**
+ * Only same-origin paths are fetched with the admin's token: authenticatedFetch attaches the
+ * Bearer token to whatever url it is given, so a cross-origin url must never reach it.
+ */
+const sameOrigin = (url: string) => url.startsWith('/') && !url.startsWith('//');
 
 /**
  * Download button for a stored file. /api/artifacts/<sha> is auth-gated, so the bytes are
- * fetched with the admin's token and saved from a blob.
+ * fetched with the admin's token and saved from a blob. A file on another host is a plain
+ * link (no token, no referrer) marked as external.
  */
 export function FileLink({ file, fallbackStem, path }: { file: FileRef; fallbackStem: string; path?: string }) {
   const [busy, setBusy] = useState(false);
@@ -42,8 +46,24 @@ export function FileLink({ file, fallbackStem, path }: { file: FileRef; fallback
   const name = downloadName(file, fallbackStem);
   const kind = file.ext ? file.ext.toUpperCase() : null;
 
+  if (!sameOrigin(file.url)) {
+    const href = /^https?:\/\//i.test(file.url) ? file.url : null;
+    return (
+      <span data-path={path} className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-md border border-dashed border-border px-3 py-2 text-sm">
+        <span className="font-medium">{file.label}</span>
+        {kind && <span className="shrink-0 rounded bg-muted px-1 font-mono text-[10px]">{kind}</span>}
+        <span className="text-[11px] text-amber-600 dark:text-amber-400">External file, open at your own risk:</span>
+        {href ? (
+          <a href={href} target="_blank" rel="noopener noreferrer nofollow" className="break-all underline">{href}</a>
+        ) : (
+          <span className="break-all text-muted-foreground">{file.url}</span>
+        )}
+      </span>
+    );
+  }
+
   async function onClick() {
-    if (busy || !fetchable(file.url)) return;
+    if (busy) return;
     setBusy(true);
     try {
       const response = await authenticatedFetch(file.url);
@@ -70,7 +90,7 @@ export function FileLink({ file, fallbackStem, path }: { file: FileRef; fallback
     <button
       type="button"
       onClick={onClick}
-      disabled={busy || !fetchable(file.url)}
+      disabled={busy}
       data-path={path}
       aria-label={`Download ${file.label}${file.name ? ` ${file.name}` : ''}${size ? ` ${size}` : ''}`}
       className="inline-flex max-w-full items-center gap-2 rounded-md border border-border px-3 py-2 text-left text-sm hover:bg-muted/40 disabled:opacity-60"
