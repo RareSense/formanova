@@ -115,12 +115,15 @@ describe('admin detail security', () => {
     expect(ms).toBeLessThan(5000);
     expect(container.querySelectorAll('[data-path]').length).toBeLessThan(400);
     expect(container.querySelectorAll('figure').length).toBeLessThanOrEqual(24);
-    expect(screen.getByRole('button', { name: /Show 100 more of 9,?900/ })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /Show all \(5,000,000 characters/ })).toBeTruthy();
+    // Text queries, not role queries: role names are computed for every button, which is slow
+    // on a big tree and would measure the test library rather than the page.
+    const buttons = Array.from(container.querySelectorAll('button')).map((b) => b.textContent ?? '');
+    expect(buttons.some((t) => /Show 100 more of 9900/.test(t))).toBe(true);
+    expect(buttons.some((t) => /Show all \(5,000,000 characters/.test(t))).toBe(true);
     // Galleries page twice: 100 children at a time, then 24 thumbnails at a time.
-    expect(screen.getByRole('button', { name: /Show 24 more of 76 pictures/ })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /Show 100 more of 1,?900/ })).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Show deeper levels' }));
-    expect(screen.getAllByRole('button', { name: 'Show deeper levels' }).length).toBe(1);
-  });
+    expect(buttons.some((t) => /Show 24 more of 76 pictures/.test(t))).toBe(true);
+    expect(buttons.some((t) => /Show 100 more of 1900/.test(t))).toBe(true);
+    fireEvent.click(screen.getByText('Show deeper levels'));
+    expect(screen.getAllByText('Show deeper levels').length).toBe(1);
+  }, 30_000);
 });
