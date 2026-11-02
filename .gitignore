@@ -181,3 +181,7 @@ vite.config.ts.timestamp-*
 .worktrees/
 mockup-*.html
 .gstack/
+
+# Playwright output
+/test-results/
+/playwright-report/
