@@ -205,24 +205,37 @@ export function collectFiles(node: unknown): ViewFile[] {
   return files;
 }
 
-/** The deepest-first search for a key, as the CAD result parsers do. */
-export function findKeyDeep(node: unknown, key: string, depth = 0): unknown {
-  if (depth > 8) return undefined;
+/**
+ * The first object (breadth of nesting, depth-limited) that holds a non-null `key`, so its
+ * sibling fields can be read with it. Tool outputs may be flat or nested under a node id.
+ */
+export function findNodeWithKey(node: unknown, key: string, depth = 0): Record<string, unknown> | null {
+  if (depth > 8) return null;
   if (Array.isArray(node)) {
     for (const child of node) {
-      const found = findKeyDeep(child, key, depth + 1);
-      if (found !== undefined) return found;
+      const found = findNodeWithKey(child, key, depth + 1);
+      if (found) return found;
     }
-    return undefined;
+    return null;
   }
   const record = asRecord(node);
-  if (!record) return undefined;
-  if (record[key] !== undefined && record[key] !== null) return record[key];
+  if (!record) return null;
+  if (record[key] !== undefined && record[key] !== null) return record;
   for (const child of Object.values(record)) {
-    const found = findKeyDeep(child, key, depth + 1);
-    if (found !== undefined) return found;
+    const found = findNodeWithKey(child, key, depth + 1);
+    if (found) return found;
   }
-  return undefined;
+  return null;
+}
+
+/** The node holding `key` in the last successful step that has one. */
+export function lastNodeWithKey(steps: AdminGenerationStep[], key: string): Record<string, unknown> | null {
+  for (let i = steps.length - 1; i >= 0; i -= 1) {
+    if (stepFailure(steps[i].output).failed) continue;
+    const found = findNodeWithKey(steps[i].output, key);
+    if (found) return found;
+  }
+  return null;
 }
 
 export type StepDescriber = (step: AdminGenerationStep) => { fields: ViewField[]; images: ViewImage[] };
@@ -255,4 +268,23 @@ export function lastOk(steps: AdminGenerationStep[], match: (tool: string) => bo
     if (match(steps[i].tool_name) && !stepFailure(steps[i].output).failed) return steps[i];
   }
   return null;
+}
+
+/** A stored file (artifact or url / data: string) as a download link, or null. */
+export function fileFrom(value: unknown, label: string): ViewFile | null {
+  if (typeof value === 'string') {
+    const v = value.trim();
+    const url = v.startsWith('data:') ? safeHref(v) : resolveRef(v);
+    return url ? { label, url, name: null, bytes: null } : null;
+  }
+  const record = asRecord(value);
+  if (!record) return null;
+  const ref = text(record.url) ?? text(record.uri);
+  const file = ref ? fileFrom(ref, label) : null;
+  if (!file) return null;
+  return {
+    ...file,
+    name: text(record.name) ?? text(record.filename),
+    bytes: typeof record.bytes === 'number' && record.bytes >= 0 ? record.bytes : null,
+  };
 }
