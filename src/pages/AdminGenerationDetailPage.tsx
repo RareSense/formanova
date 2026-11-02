@@ -39,7 +39,7 @@ import { parseServerTime } from '@/lib/server-time';
 import { costView, USER_PAID_HELP, WORKFLOW_COST_HELP } from '@/lib/admin-cost-display';
 import { readProviderSpend } from '@/lib/admin-provider-spend';
 import { buildRunView } from '@/lib/admin-workflow-views';
-import { findNodes, technicalNodes } from '@/lib/admin-workflow-views/walker';
+import { findNodes, technicalNodes, type ViewNode } from '@/lib/admin-workflow-views/walker';
 import { buildIoSummary } from '@/lib/admin-workflow-views/io-summary';
 import { CostLabel, ProviderSpendBlock, WorkflowCostValue } from '@/components/admin/AdminCost';
 import { ImageThumb } from '@/components/admin/workflow-view/ImageThumb';
@@ -235,6 +235,24 @@ function MetaItem({ label, value }: { label: string; value: string }) {
       <p className="text-sm">{value}</p>
     </div>
   );
+}
+
+/**
+ * The request value that holds the customer's prompt: the first text node whose text is the
+ * prompt. It is shown once, under the input pictures in the Inputs -> Outputs strip (which
+ * carries its data-path), so the Input payload section leaves it out.
+ */
+function findPromptNode(node: ViewNode, prompt: string | null): ViewNode | null {
+  if (!prompt) return null;
+  return findNodes(node, (n) => (n.kind === 'text' || n.kind === 'value') && n.value.trim() === prompt)[0] ?? null;
+}
+
+/** The tree without the node at `path`. Display only: the run view keeps every value, and the Raw JSON still has it. */
+function withoutPath(node: ViewNode, path: string | null): ViewNode {
+  if (!path) return node;
+  if (node.kind === 'group') return { ...node, children: node.children.filter((c) => c.path !== path).map((c) => withoutPath(c, path)) };
+  if (node.kind === 'list') return { ...node, items: node.items.filter((c) => c.path !== path).map((c) => withoutPath(c, path)) };
+  return node;
 }
 
 /** A section closed by default, as in the earlier simple layout; its title names the region. */
@@ -546,8 +564,10 @@ export function RunInputsPanel({ detail }: { detail: AdminGenerationDetail }) {
  */
 export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
   const {
-    cadSourceType, isCadModel: isCadSource, designHistory, designHistoryQuery, fromDoodle,
+    cadSourceType, isCadModel: isCadSource, designHistory, designHistoryQuery, fromDoodle, cadInputs, studioInputs,
   } = useCadRunInputs(detail);
+  // The customer's own words (CAD runs, and design-picture runs), trimmed as the readers return it.
+  const customerPrompt = cadInputs?.prompt ?? studioInputs?.prompt ?? null;
   const view = useMemo(() => buildRunView(detail, isCadSource), [detail, isCadSource]);
   // cad_to_catalog_* names contain "cad" but are not CAD models; the registry decides.
   const isCadModel = view.family === 'cad_model';
@@ -601,6 +621,8 @@ export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
       { label: 'Output image (from complaint)', url: complaintOutput, kind: 'image' },
     ],
   }), [view, fallbackGlb, fallback3dm, complaintOutput]);
+  const promptPath = useMemo(() => findPromptNode(view.inputs, customerPrompt)?.path ?? null, [view.inputs, customerPrompt]);
+  const inputsWithoutPrompt = useMemo(() => withoutPath(view.inputs, promptPath), [view.inputs, promptPath]);
   const technical = useMemo(() => [
     { where: 'Input payload', tool: undefined, nodes: technicalNodes(view.inputs) },
     ...view.steps.flatMap((s) => [
@@ -655,7 +677,7 @@ export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
         </Card>
       </section>
 
-      <IoStrip summary={ioSummary} fallbackStem={detail.workflow_id} />
+      <IoStrip summary={ioSummary} fallbackStem={detail.workflow_id} prompt={customerPrompt} promptPath={promptPath} />
 
       <CollapsibleCardSection title="Steps">
         <StepTimeline steps={view.steps} enh={view.enh} fallbackStem={detail.workflow_id} />
@@ -669,7 +691,7 @@ export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
             <Loader2 className="h-4 w-4 animate-spin" /> Loading design steps
           </div>
         ) : null)}
-        <NodeView node={view.inputs} opts={{ ...opts, hideTechnical: true }} />
+        <NodeView node={inputsWithoutPrompt} opts={{ ...opts, hideTechnical: true }} />
         <p className="text-xs text-muted-foreground">
           Raw JSON shows the submitted request; the AI actually used is under 'Applied at Start'.
         </p>
