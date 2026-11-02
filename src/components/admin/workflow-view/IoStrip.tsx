@@ -22,12 +22,12 @@ function Tile({ item, fallbackStem }: { item: IoItem; fallbackStem: string }) {
 const PROMPT_CLAMP_CHARS = 180;
 const PROMPT_LINES = 3;
 
-function InputPrompt({ prompt }: { prompt: string }) {
+function InputPrompt({ prompt, path }: { prompt: string; path: string | null }) {
   const [expanded, setExpanded] = useState(false);
   const clampable = prompt.length > PROMPT_CLAMP_CHARS || prompt.split('\n').length > PROMPT_LINES;
   const clamped = clampable && !expanded;
   return (
-    <div data-testid="admin-io-prompt" className="w-64 space-y-1 sm:w-auto sm:max-w-md">
+    <div data-testid="admin-io-prompt" data-path={path ?? undefined} className="w-64 space-y-1 sm:w-auto sm:max-w-md">
       <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Customer prompt</p>
       <p
         data-testid="admin-io-prompt-text"
@@ -48,11 +48,12 @@ function InputPrompt({ prompt }: { prompt: string }) {
   );
 }
 
-function Group({ title, items, fallbackStem, prompt }: {
+function Group({ title, items, fallbackStem, prompt, promptPath = null }: {
   title: 'Inputs' | 'Outputs';
   items: IoItem[];
   fallbackStem: string;
   prompt?: string | null;
+  promptPath?: string | null;
 }) {
   const [limit, setLimit] = useState(TILE_PAGE);
   const id = `admin-io-${title.toLowerCase()}`;
@@ -76,19 +77,28 @@ function Group({ title, items, fallbackStem, prompt }: {
           </button>
         )}
       </div>
-      {prompt && <InputPrompt prompt={prompt} />}
+      {prompt && <InputPrompt prompt={prompt} path={promptPath} />}
     </div>
   );
 }
 
-/** `prompt`: the customer's own words, shown under the input tiles (CAD and design-picture runs). */
-export function IoStrip({ summary, fallbackStem, prompt = null }: { summary: IoSummary; fallbackStem: string; prompt?: string | null }) {
+/**
+ * `prompt`: the customer's own words, shown under the input tiles (CAD and design-picture
+ * runs). `promptPath`: the request value it came from; the Input payload section leaves that
+ * value out, so the prompt carries its data-path here instead.
+ */
+export function IoStrip({ summary, fallbackStem, prompt = null, promptPath = null }: {
+  summary: IoSummary;
+  fallbackStem: string;
+  prompt?: string | null;
+  promptPath?: string | null;
+}) {
   return (
     <section aria-labelledby="admin-section-io" className="min-w-0 rounded-lg border border-border bg-card p-4 sm:p-6">
       <h2 id="admin-section-io" className="mb-3 font-display text-2xl font-semibold tracking-wide">Inputs → Outputs</h2>
       <div className="-mx-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:overflow-visible sm:px-0 sm:pb-0">
         <div className="flex w-max items-start gap-4 sm:w-auto sm:flex-wrap">
-          <Group title="Inputs" items={summary.inputs} fallbackStem={fallbackStem} prompt={prompt} />
+          <Group title="Inputs" items={summary.inputs} fallbackStem={fallbackStem} prompt={prompt} promptPath={promptPath} />
           <div className="flex h-[120px] shrink-0 items-center self-start pt-6 text-muted-foreground" aria-hidden>
             <ArrowRight className="h-6 w-6" />
           </div>

@@ -101,6 +101,8 @@ describe('AdminGenerationDetailPage customer prompt', () => {
     const group = inputsGroup();
     const prompt = within(group).getByTestId('admin-io-prompt');
     expect(prompt.textContent).toContain('a twisted gold band with a small oval diamond');
+    // It stands in for the request value it came from (admin-workflow-views completeness).
+    expect(prompt.getAttribute('data-path')).toBe('input_payload.prompt');
     const image = within(group).getByRole('figure');
     // The prompt follows the input image in document order, and is the group's last block.
     expect(image.compareDocumentPosition(prompt) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

@@ -238,15 +238,20 @@ function MetaItem({ label, value }: { label: string; value: string }) {
 }
 
 /**
- * The request tree without the customer's prompt, for the Input payload section: the prompt is
- * shown once, under the input pictures in the Inputs -> Outputs strip. Display only; the run
- * view itself keeps every value, and the Raw JSON still carries the prompt.
+ * The request value that holds the customer's prompt: the first text node whose text is the
+ * prompt. It is shown once, under the input pictures in the Inputs -> Outputs strip (which
+ * carries its data-path), so the Input payload section leaves it out.
  */
-function withoutPrompt(node: ViewNode, prompt: string | null): ViewNode {
-  if (!prompt) return node;
-  const isPrompt = (n: ViewNode) => (n.kind === 'text' || n.kind === 'value') && n.value.trim() === prompt;
-  if (node.kind === 'group') return { ...node, children: node.children.filter((c) => !isPrompt(c)).map((c) => withoutPrompt(c, prompt)) };
-  if (node.kind === 'list') return { ...node, items: node.items.filter((c) => !isPrompt(c)).map((c) => withoutPrompt(c, prompt)) };
+function findPromptNode(node: ViewNode, prompt: string | null): ViewNode | null {
+  if (!prompt) return null;
+  return findNodes(node, (n) => (n.kind === 'text' || n.kind === 'value') && n.value.trim() === prompt)[0] ?? null;
+}
+
+/** The tree without the node at `path`. Display only: the run view keeps every value, and the Raw JSON still has it. */
+function withoutPath(node: ViewNode, path: string | null): ViewNode {
+  if (!path) return node;
+  if (node.kind === 'group') return { ...node, children: node.children.filter((c) => c.path !== path).map((c) => withoutPath(c, path)) };
+  if (node.kind === 'list') return { ...node, items: node.items.filter((c) => c.path !== path).map((c) => withoutPath(c, path)) };
   return node;
 }
 
@@ -616,7 +621,8 @@ export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
       { label: 'Output image (from complaint)', url: complaintOutput, kind: 'image' },
     ],
   }), [view, fallbackGlb, fallback3dm, complaintOutput]);
-  const inputsWithoutPrompt = useMemo(() => withoutPrompt(view.inputs, customerPrompt), [view.inputs, customerPrompt]);
+  const promptPath = useMemo(() => findPromptNode(view.inputs, customerPrompt)?.path ?? null, [view.inputs, customerPrompt]);
+  const inputsWithoutPrompt = useMemo(() => withoutPath(view.inputs, promptPath), [view.inputs, promptPath]);
   const technical = useMemo(() => [
     { where: 'Input payload', tool: undefined, nodes: technicalNodes(view.inputs) },
     ...view.steps.flatMap((s) => [
@@ -671,7 +677,7 @@ export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
         </Card>
       </section>
 
-      <IoStrip summary={ioSummary} fallbackStem={detail.workflow_id} prompt={customerPrompt} />
+      <IoStrip summary={ioSummary} fallbackStem={detail.workflow_id} prompt={customerPrompt} promptPath={promptPath} />
 
       <CollapsibleCardSection title="Steps">
         <StepTimeline steps={view.steps} enh={view.enh} fallbackStem={detail.workflow_id} />
