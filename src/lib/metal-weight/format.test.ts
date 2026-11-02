@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { findAlloy } from './alloys';
 import {
-  FINISHING_NOTE,
+  FINISHING_NOTE_SHORT,
   formatPercent,
   formatTagWeight,
   formatTargetStatus,
@@ -23,18 +23,18 @@ describe('format', () => {
   });
 
   it('words the target status', () => {
-    expect(formatTargetStatus({ kind: 'on', deviation: 0.015 })).toBe('On target +1.5%');
+    expect(formatTargetStatus({ kind: 'on', deviation: 0.015 })).toBe('On target (+1.5%)');
     expect(formatTargetStatus({ kind: 'over', deviation: 0.146 })).toBe('14.6% over');
     expect(formatTargetStatus({ kind: 'under', deviation: -0.03 })).toBe('3.0% under');
   });
 
   it('notes the finishing loss', () => {
-    expect(FINISHING_NOTE).toBe('after finishing (−5%)');
+    expect(FINISHING_NOTE_SHORT).toBe('(−5%)');
   });
 
   it('names the previewed alloy when it is not the one the target was set in', () => {
     const target = { grams: 28, tolerancePct: 5, alloyId: 'au14y' };
-    expect(targetSummary(27.975024, target, findAlloy('au14y')!)?.text).toBe('On target −0.1%');
+    expect(targetSummary(27.975024, target, findAlloy('au14y')!)?.text).toBe('On target (−0.1%)');
     expect(targetSummary(33.960276, target, findAlloy('au18y')!)?.text).toBe('21.3% over in 18K Yellow Gold');
     expect(targetSummary(33.960276, { ...target, alloyId: null }, findAlloy('au18y')!)?.text).toBe('21.3% over');
     expect(targetSummary(20, null, findAlloy('au18y')!)).toBeNull();
@@ -42,7 +42,7 @@ describe('format', () => {
 
   it('treats a legacy target alloy id as the alloy it maps to', () => {
     const target = { grams: 28, tolerancePct: 5, alloyId: '14k_yellow_gold' };
-    expect(targetSummary(27.975024, target, findAlloy('au14y')!)?.text).toBe('On target −0.1%');
+    expect(targetSummary(27.975024, target, findAlloy('au14y')!)?.text).toBe('On target (−0.1%)');
   });
 
   it('builds the download line, or nothing when there is no weight', () => {

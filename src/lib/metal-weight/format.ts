@@ -23,14 +23,14 @@ export function formatPercent(fraction: number): string {
   return `${pct > 0 ? '+' : MINUS}${Math.abs(pct).toFixed(1)}%`;
 }
 
-/** "On target +1.5%", "14.6% over", "3.0% under" */
+/** "On target (+1.5%)", "14.6% over", "3.0% under" */
 export function formatTargetStatus(status: TargetStatus): string {
-  if (status.kind === 'on') return `On target ${formatPercent(status.deviation)}`;
+  if (status.kind === 'on') return `On target (${formatPercent(status.deviation)})`;
   return `${Math.abs(shownPercent(status.deviation)).toFixed(1)}% ${status.kind}`;
 }
 
-/** Follows "≈ 24.10 g". */
-export const FINISHING_NOTE = `after finishing (${MINUS}${FINISHING_LOSS * 100}%)`;
+/** "(−5%)", after "Finished". */
+export const FINISHING_NOTE_SHORT = `(${MINUS}${FINISHING_LOSS * 100}%)`;
 
 /**
  * The target status for the weight in the alloy on screen. When that alloy is

@@ -37,7 +37,7 @@ describe('WeightBar', () => {
 
   it('shows on target', () => {
     renderBar({ target });
-    expect(screen.getByText('On target −0.1%')).toBeInTheDocument();
+    expect(screen.getByText('On target (−0.1%)')).toBeInTheDocument();
   });
 
   it('shows off target in the previewed metal, with Adjust only when it can act', () => {
