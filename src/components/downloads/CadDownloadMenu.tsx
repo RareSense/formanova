@@ -13,7 +13,6 @@
  */
 
 import { Download, ChevronDown } from 'lucide-react';
-import { toast } from 'sonner';
 
 import {
   DropdownMenu,
@@ -23,15 +22,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { AuthExpiredError } from '@/lib/authenticated-fetch';
 import type { CadSource } from '@/lib/cad-analytics';
-import {
-  CadDownloadUnavailableError,
-  fetchVersionDownloadLink,
-  type CadDownloadKind,
-  type CadVersionDownload,
-} from '@/lib/cad-versions-api';
-import { trackDownloadClicked } from '@/lib/posthog-events';
+import type { CadDownloadKind, CadVersionDownload } from '@/lib/cad-versions-api';
+import { saveVersionFile } from '@/lib/cad-version-file';
 
 /**
  * The files the shown version lists as complete (GET /api/cad/models). Each is
@@ -178,24 +171,6 @@ const DOWNLOAD_ALL_GAP_MS = 400;
  * Asks for a fresh link and follows it. The link carries the filename, so the
  * browser saves the file itself; nothing is cached, since links expire.
  */
-async function saveVersionFile(assetId: string, kind: CadDownloadKind, source?: CadSource) {
-  try {
-    const link = await fetchVersionDownloadLink(assetId, kind);
-    const anchor = document.createElement('a');
-    anchor.href = link.url;
-    anchor.download = link.filename;
-    anchor.rel = 'noopener';
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    trackDownloadClicked({ file_name: link.filename, file_type: kind, context: source, source });
-  } catch (err) {
-    if (err instanceof AuthExpiredError) return;
-    toast.error(err instanceof CadDownloadUnavailableError
-      ? "That file isn't available for this model."
-      : "Couldn't get the download link. Try again.");
-  }
-}
 
 function FormatItem({ format, hint, onSelect, note }: FormatRow) {
   return (
