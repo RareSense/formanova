@@ -59,7 +59,7 @@ describe('useMetalChoice', () => {
     expect(result.current.alloy.id).toBe('pt950ru');
   });
 
-  it('remembers each model's pick across a reload, over its target', () => {
+  it("remembers each model's pick across a reload, over its target", () => {
     const first = renderHook(() => useMetalChoice({ key: 'v1', target: target('au14y'), requestedAlloyId: null }));
     act(() => first.result.current.setAlloyId('au18y'));
     first.unmount();
