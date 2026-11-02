@@ -1,5 +1,8 @@
 import { azureUriToUrl } from '@/lib/azure-utils';
 import type { CadReferenceItem } from '@/lib/microservices-api';
+import { METAL_ALLOYS, materialPayload, type MetalAlloy } from '@/lib/metal-weight/alloys';
+import { clampTolerancePct, isTargetGrams } from '@/lib/metal-weight/weight';
+import { readVolumeFlags } from '@/lib/metal-weight/source';
 
 /**
  * ring-cad-nurbs-api.ts
@@ -162,27 +165,24 @@ export function cadJewelryNoun(type: CadJewelryType): string {
   return CAD_JEWELRY_TYPES.find((t) => t.value === type)?.noun ?? 'piece';
 }
 
-export interface CadMaterialProfile {
-  id: string;
-  label: string;
-  alloy: string;
-  density_g_cm3: number;
-  density_source: string;
+/**
+ * The alloy sent as payload.material. Densities live in one cited table,
+ * src/lib/metal-weight/alloys.ts; these two names stay so existing imports keep
+ * working, and the request's material block keeps its three keys.
+ */
+export type CadMaterialProfile = MetalAlloy;
+export const CAD_MATERIAL_PROFILES: readonly CadMaterialProfile[] = METAL_ALLOYS;
+
+/**
+ * payload.weight_target: the weight the customer wants, in grams, in the alloy
+ * they chose (null: the shown one). The backend passes it into the build brief
+ * and stores it on the run and its versions.
+ */
+export interface WeightTargetPayload {
+  grams: number;
+  tolerance_pct: number;
+  alloy_id: string | null;
 }
-
-const STULLER_DENSITY_SOURCE = 'Stuller specific-gravity chart: https://www.stuller.com/articles/view/where-to-find-gravity-of-materials/';
-
-/** Explicit presets only. Alloy density varies by formulation, so no prompt inference is used. */
-export const CAD_MATERIAL_PROFILES: readonly CadMaterialProfile[] = [
-  { id: 'sterling_silver', label: 'Sterling silver', alloy: 'Sterling silver', density_g_cm3: 10.40, density_source: STULLER_DENSITY_SOURCE },
-  { id: '14k_yellow_gold', label: '14K yellow gold', alloy: '14K yellow gold', density_g_cm3: 13.07, density_source: STULLER_DENSITY_SOURCE },
-  { id: '14k_white_gold', label: '14K white gold', alloy: '14K white gold', density_g_cm3: 12.61, density_source: STULLER_DENSITY_SOURCE },
-  { id: '14k_rose_gold', label: '14K rose gold', alloy: '14K red/rose gold', density_g_cm3: 13.26, density_source: STULLER_DENSITY_SOURCE },
-  { id: '18k_yellow_gold', label: '18K yellow gold', alloy: '18K yellow gold', density_g_cm3: 15.58, density_source: STULLER_DENSITY_SOURCE },
-  { id: '18k_white_gold', label: '18K white gold', alloy: '18K white gold', density_g_cm3: 14.64, density_source: STULLER_DENSITY_SOURCE },
-  { id: '18k_rose_gold', label: '18K rose gold', alloy: '18K red/rose gold', density_g_cm3: 15.18, density_source: STULLER_DENSITY_SOURCE },
-  { id: 'platinum_cobalt', label: 'Platinum cobalt', alloy: 'Platinum cobalt', density_g_cm3: 20.80, density_source: STULLER_DENSITY_SOURCE },
-] as const;
 
 // -- Request ---------------------------------------------------------------
 
@@ -227,6 +227,8 @@ export interface RingCadStartParams {
   /** Product to build, from the Text/Image to CAD dropdown. Defaults to ring. */
   jewelryType?: CadJewelryType;
   material?: CadMaterialProfile | null;
+  /** Sent only with a gram figure of 0.01 g to 10 kg; the tolerance is clamped to 0–100. */
+  weightTarget?: WeightTargetPayload | null;
 }
 
 /**
@@ -308,6 +310,7 @@ export function buildRingCadStartBody({
   tier = RING_CAD_DEFAULT_TIER,
   jewelryType = DEFAULT_CAD_JEWELRY_TYPE,
   material = null,
+  weightTarget = null,
   clientFlow,
 }: RingCadStartParams): RingCadStartBody {
   const images = [...referenceImages];
@@ -352,10 +355,13 @@ export function buildRingCadStartBody({
     payload.analysis_tier = tier;
   }
   if (material) {
-    payload.material = {
-      alloy: material.alloy,
-      density_g_cm3: material.density_g_cm3,
-      density_source: material.density_source,
+    payload.material = materialPayload(material);
+  }
+  if (weightTarget && isTargetGrams(weightTarget.grams)) {
+    payload.weight_target = {
+      grams: weightTarget.grams,
+      tolerance_pct: clampTolerancePct(weightTarget.tolerance_pct),
+      alloy_id: weightTarget.alloy_id,
     };
   }
 
@@ -391,6 +397,14 @@ export interface RingCadResult {
   stepArtifacts: ArtifactRef[];
   /** Calculated from validated solid volume and the explicitly selected alloy density. */
   estimatedMetalMassG: number | null;
+  /**
+   * Volume of the fused metal casting body, mm³ (casting_body union, gems
+   * excluded). Null until the toolkit reports it; whether it is usable is
+   * decided by pickWeightSource, not here.
+   */
+  metalVolumeMm3: number | null;
+  /** The toolkit's casting-check flags for that volume (metal_volume_flags); empty when none. */
+  metalVolumeFlags: string[];
   validationStatus: RingCadValidationStatus | null;
   diagnostics: RingCadDiagnostics;
   notAllSolid: boolean;
@@ -569,6 +583,12 @@ export function parseRingCadResult(data: unknown): RingCadResult {
   const estimatedMetalMassG = typeof massRaw === 'number' && Number.isFinite(massRaw) && massRaw >= 0
     ? massRaw
     : null;
+  // Read like the mass: flat first, then anywhere in a sink-node shape.
+  const volumeRaw = d.metal_volume_mm3
+    ?? findKeyDeep(root, (key) => key === 'metal_volume_mm3');
+  const metalVolumeMm3 = typeof volumeRaw === 'number' && Number.isFinite(volumeRaw) ? volumeRaw : null;
+  const metalVolumeFlags = readVolumeFlags(d.metal_volume_flags
+    ?? findKeyDeep(root, (key) => key === 'metal_volume_flags'));
 
   // cad_diagnostics is the documented flat-shape field; an unrecognised
   // sink-node shape nests the per-node tool output under a different key
@@ -607,6 +627,8 @@ export function parseRingCadResult(data: unknown): RingCadResult {
     stlArtifacts,
     stepArtifacts,
     estimatedMetalMassG,
+    metalVolumeMm3,
+    metalVolumeFlags,
     validationStatus,
     diagnostics,
     notAllSolid: diagnostics.not_all_solid === true,

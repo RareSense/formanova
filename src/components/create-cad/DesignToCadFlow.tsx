@@ -29,6 +29,8 @@ interface DesignToCadFlowProps {
   cadCostLoading: boolean;
   /** Admin-only model choice, shown beside Generate CAD. */
   modelPicker?: ReactNode;
+  /** The "Metal & weight" step (MetalWeightStep), shown under the dimensions. */
+  metalStep?: ReactNode;
   creatingCad: boolean;
   /** Generate CAD from the approved pictures (main first); may resolve false when the run did not start. */
   onCreateCad: (files: File[]) => Promise<boolean | void> | void;
@@ -73,7 +75,7 @@ export function lowCreditsAfterDesign(balance: number | null, designCost: number
  * pick from, then the same editor as Image to CAD (edit, angles, Ready for
  * CAD). Generate CAD hands the approved pictures to the page's normal CAD run.
  */
-export default function DesignToCadFlow({ jewelryType, setJewelryType, onGlbUpload, dimensions, onDimensions, cadCost, cadCostLoading, creatingCad, onCreateCad, modelPicker, variant, onStartMode }: DesignToCadFlowProps) {
+export default function DesignToCadFlow({ jewelryType, setJewelryType, onGlbUpload, dimensions, onDimensions, cadCost, cadCostLoading, creatingCad, onCreateCad, modelPicker, metalStep, variant, onStartMode }: DesignToCadFlowProps) {
   const { generate } = useDesignImageRun();
   const { credits } = useCredits();
   const navigate = useNavigate();
@@ -186,6 +188,7 @@ export default function DesignToCadFlow({ jewelryType, setJewelryType, onGlbUplo
         cadCostLoading={cadCostLoading}
         creatingCad={creatingCad}
         modelPicker={modelPicker}
+        metalStep={metalStep}
       />
       <AlertDialog open={!!lowCredit} onOpenChange={(open) => { if (!open) setLowCredit(null); }}>
         <AlertDialogContent>

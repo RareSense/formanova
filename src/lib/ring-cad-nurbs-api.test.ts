@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildRingCadStartBody,
   CAD_JEWELRY_TYPES,
+  CAD_MATERIAL_PROFILES,
   cadJewelryNoun,
   DEFAULT_CAD_JEWELRY_TYPE,
   isRingCadSuccess,
@@ -18,6 +19,36 @@ import {
 const IMG = (n: number) => `data:image/jpeg;base64,IMG${n}`;
 
 describe('ring_cad_nurbs_v1 start body', () => {
+  it('sends the chosen alloy as material, with the same three keys as before', () => {
+    const { payload } = buildRingCadStartBody({
+      referenceImages: [],
+      userDescription: 'band',
+      material: CAD_MATERIAL_PROFILES.find((p) => p.id === 'au18y'),
+    });
+    expect(Object.keys(payload.material as object).sort()).toEqual(['alloy', 'density_g_cm3', 'density_source']);
+    expect((payload.material as { density_g_cm3: number }).density_g_cm3).toBe(15.49);
+  });
+
+  it('clamps the weight_target tolerance to 0–100, defaulting a missing one to 5', () => {
+    const base = { referenceImages: [], userDescription: 'band' };
+    const tol = (tolerance_pct: number) =>
+      (buildRingCadStartBody({ ...base, weightTarget: { grams: 28, tolerance_pct, alloy_id: null } }).payload.weight_target as { tolerance_pct: number }).tolerance_pct;
+    expect(tol(-5)).toBe(0);
+    expect(tol(500)).toBe(100);
+    expect(tol(NaN)).toBe(5);
+    expect(tol(3)).toBe(3);
+  });
+
+  it('sends weight_target only when it has a positive gram figure', () => {
+    const weightTarget = { grams: 28, tolerance_pct: 5, alloy_id: 'au14y' };
+    const base = { referenceImages: [], userDescription: 'band' };
+    expect(buildRingCadStartBody({ ...base, weightTarget }).payload.weight_target).toEqual(weightTarget);
+    expect(buildRingCadStartBody(base).payload).not.toHaveProperty('weight_target');
+    for (const grams of [0, -1, NaN, Infinity, 10_001, 1e-9]) {
+      expect(buildRingCadStartBody({ ...base, weightTarget: { ...weightTarget, grams } }).payload).not.toHaveProperty('weight_target');
+    }
+  });
+
   it('text-only mode sends count 0 and the description, with no artifact fields', () => {
     const { payload } = buildRingCadStartBody({
       referenceImages: [],
@@ -227,6 +258,23 @@ describe('ring_cad_nurbs_v1 result parsing', () => {
     expect(r.threedmArtifact?.uri).toBe('azure://a/ring.3dm');
     expect(r.glbArtifact?.uri).toBe('azure://a/ring.glb');
     expect(r.validationStatus).toBe('applied');
+  });
+
+  it('reads metal_volume_mm3 flat, or anywhere in a sink-node shape', () => {
+    expect(parseRingCadResult({ ...RESULT, metal_volume_mm3: 2192.4 }).metalVolumeMm3).toBe(2192.4);
+    expect(parseRingCadResult({ final_validated: [{ ...RESULT, postprocess: { metal_volume_mm3: 1500 } }] }).metalVolumeMm3).toBe(1500);
+  });
+
+  it('reads metal_volume_flags next to the volume, flat or nested', () => {
+    expect(parseRingCadResult({ ...RESULT, metal_volume_mm3: 2192.4, metal_volume_flags: ['thin_walls'] }).metalVolumeFlags).toEqual(['thin_walls']);
+    expect(parseRingCadResult({ final_validated: [{ ...RESULT, postprocess: { metal_volume_mm3: 1500, metal_volume_flags: [] } }] }).metalVolumeFlags).toEqual([]);
+    expect(parseRingCadResult({ ...RESULT, metal_volume_flags: null }).metalVolumeFlags).toEqual([]);
+  });
+
+  it('leaves metal_volume_mm3 null when absent or not a finite number', () => {
+    expect(parseRingCadResult(RESULT).metalVolumeMm3).toBeNull();
+    expect(parseRingCadResult({ ...RESULT, metal_volume_mm3: '2192.4' }).metalVolumeMm3).toBeNull();
+    expect(parseRingCadResult({ ...RESULT, metal_volume_mm3: null }).metalVolumeMm3).toBeNull();
   });
 
   it('exposes the signed url as glbUrl for the viewport', () => {

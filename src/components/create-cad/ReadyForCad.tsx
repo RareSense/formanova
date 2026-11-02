@@ -30,6 +30,8 @@ interface ReadyForCadProps {
   waiting?: boolean;
   /** Admin-only model choice, shown beside Create CAD. */
   modelPicker?: ReactNode;
+  /** The "Metal & weight" step (MetalWeightStep), shown under the dimensions. */
+  metalStep?: ReactNode;
   /** Why the last Create CAD press did not start a run. */
   error?: string | null;
 }
@@ -38,7 +40,7 @@ interface ReadyForCadProps {
  * One screen after "Looks right": the approved design with optional extra
  * views under it, and on the right optional dimensions and Create CAD.
  */
-export default function ReadyForCad({ approved, views, jewelryType, dimensions, onDimensions, cost, costLoading, onGenerate, generating, waiting, anglesOpen, modelPicker, error }: ReadyForCadProps) {
+export default function ReadyForCad({ approved, views, jewelryType, dimensions, onDimensions, cost, costLoading, onGenerate, generating, waiting, anglesOpen, modelPicker, metalStep, error }: ReadyForCadProps) {
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto p-4 sm:p-6">
       <div className={`flex w-full flex-col items-center gap-3 ${anglesOpen ? "max-w-[820px]" : "max-w-[460px]"}`}>
@@ -60,6 +62,7 @@ export default function ReadyForCad({ approved, views, jewelryType, dimensions, 
             className="mt-1.5 h-11 w-full border border-border bg-background px-3 text-[14px] text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-foreground/60"
           />
         </div>
+        {metalStep && <div className="w-full max-w-[460px]">{metalStep}</div>}
         <button
           type="button"
           onClick={onGenerate}

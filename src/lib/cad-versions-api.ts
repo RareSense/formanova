@@ -75,6 +75,21 @@ export interface CadRingVersion {
   user_note?: string | null;
   /** Open Review required flags on the version's spec sheet (kind 'spec_sheet'); absent when there is none. */
   spec_sheet_open_flags?: number | null;
+  /**
+   * Volume of this version's fused metal casting body, mm³ (gems excluded): the
+   * one measured input to its weight. Null or absent until the backend stores
+   * it. Untrusted: read it through pickWeightSource, never directly.
+   */
+  metal_volume_mm3?: number | null;
+  /** The toolkit's casting-check flags for that volume, e.g. ["thin_walls"]; [] or null when none. */
+  metal_volume_flags?: string[] | null;
+  /** The target weight the request was made with, stored on the version; absent when none was set. */
+  weight_target?: { grams?: number; tolerance_pct?: number; alloy_id?: string | null } | null;
+  /**
+   * How many casting bodies (metals) the version has; above 1 it is two-tone.
+   * Proposed field, not yet sent by the backend: absent reads as one metal.
+   */
+  metal_body_count?: number | null;
 }
 
 export interface CadRing {

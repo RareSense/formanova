@@ -160,6 +160,15 @@ describe("MeshPanel parts tree", () => {
     expect(screen.queryByLabelText("Apply one gem to all stones")).toBeNull();
   });
 
+  it("All metal parts shows the page's current metal when given one", () => {
+    render(<MeshPanel meshes={[]} onSelectMesh={vi.fn()} onAction={vi.fn()} onApplyMaterial={vi.fn()} onSceneAction={vi.fn()} onApplyMetalToAll={vi.fn()} metalToAllValue="gold-rose-polished" />);
+    expect(screen.getByLabelText("Apply one metal to all metal parts")).toHaveTextContent("Rose Gold");
+  });
+  it("All metal parts stays a plain prompt without a current metal", () => {
+    render(<MeshPanel meshes={[]} onSelectMesh={vi.fn()} onAction={vi.fn()} onApplyMaterial={vi.fn()} onSceneAction={vi.fn()} onApplyMetalToAll={vi.fn()} />);
+    expect(screen.getByLabelText("Apply one metal to all metal parts")).toHaveTextContent("Choose a metal…");
+  });
+
   it("shows the empty state", () => {
     render(<MeshPanel meshes={[]} onSelectMesh={vi.fn()} onAction={vi.fn()} onApplyMaterial={vi.fn()} onSceneAction={vi.fn()} />);
     expect(screen.getByText("Generate a piece to see its parts")).toBeInTheDocument();

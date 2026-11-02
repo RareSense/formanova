@@ -13,7 +13,6 @@
  */
 
 import { Download, ChevronDown } from 'lucide-react';
-import { toast } from 'sonner';
 
 import {
   DropdownMenu,
@@ -23,15 +22,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { AuthExpiredError } from '@/lib/authenticated-fetch';
 import type { CadSource } from '@/lib/cad-analytics';
-import {
-  CadDownloadUnavailableError,
-  fetchVersionDownloadLink,
-  type CadDownloadKind,
-  type CadVersionDownload,
-} from '@/lib/cad-versions-api';
-import { trackDownloadClicked } from '@/lib/posthog-events';
+import type { CadDownloadKind, CadVersionDownload } from '@/lib/cad-versions-api';
+import { saveVersionFile } from '@/lib/cad-version-file';
 
 /**
  * The files the shown version lists as complete (GET /api/cad/models). Each is
@@ -52,7 +45,12 @@ export interface CadDownloadMenuProps {
   onDownloadGlb?: () => void;
   onDownloadStl?: () => void;
   onDownloadStep?: () => void;
-  estimatedMetalMassG?: number | null;
+  /**
+   * The metal and estimated weight of the model on screen, e.g. "Metal: 10K
+   * Yellow Gold · Est. 25.37 g · 16.31 dwt" (metalWeightLine). Omit or null
+   * when there is no measured volume: no line beats a guessed one.
+   */
+  metalWeightLine?: string | null;
   /**
    * Omit when the version has no viewing copy. A mesh-only 3DM for generic
    * viewers, never the default action: the editable NURBS 3DM stays the lead.
@@ -173,24 +171,6 @@ const DOWNLOAD_ALL_GAP_MS = 400;
  * Asks for a fresh link and follows it. The link carries the filename, so the
  * browser saves the file itself; nothing is cached, since links expire.
  */
-async function saveVersionFile(assetId: string, kind: CadDownloadKind, source?: CadSource) {
-  try {
-    const link = await fetchVersionDownloadLink(assetId, kind);
-    const anchor = document.createElement('a');
-    anchor.href = link.url;
-    anchor.download = link.filename;
-    anchor.rel = 'noopener';
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    trackDownloadClicked({ file_name: link.filename, file_type: kind, context: source, source });
-  } catch (err) {
-    if (err instanceof AuthExpiredError) return;
-    toast.error(err instanceof CadDownloadUnavailableError
-      ? "That file isn't available for this model."
-      : "Couldn't get the download link. Try again.");
-  }
-}
 
 function FormatItem({ format, hint, onSelect, note }: FormatRow) {
   return (
@@ -225,7 +205,7 @@ export function CadDownloadMenu({
   onDownloadViewerThreedm,
   onDownloadStl,
   onDownloadStep,
-  estimatedMetalMassG,
+  metalWeightLine,
   onExportEdited,
   isBusy = false,
   variant = 'viewport',
@@ -283,9 +263,10 @@ export function CadDownloadMenu({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[15rem]">
-        {typeof estimatedMetalMassG === 'number' && (
-          <div className="px-2 py-2 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-            Est. metal weight: {estimatedMetalMassG.toFixed(2)} g
+        {/* Not upper-cased: "G" is not a gram. */}
+        {metalWeightLine && (
+          <div className="px-2 py-2 font-mono text-[10px] tracking-wider text-muted-foreground">
+            {metalWeightLine}
           </div>
         )}
         {formats.map((row) => (

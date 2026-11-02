@@ -16,7 +16,9 @@ import {
   type ArtifactRef,
   type CadJewelryType,
   type CadMaterialProfile,
+  type WeightTargetPayload,
 } from "@/lib/ring-cad-nurbs-api";
+import { readWeightTarget, resolveMetalWeight, type SentMetal } from "@/lib/metal-weight/source";
 import { buildReferenceInputs } from "@/lib/cad-reference-upload";
 import {
   trackPaywallHit,
@@ -64,6 +66,8 @@ interface WorkflowParams {
   /** Product to build, sent as payload.jewelry_type. Defaults to ring. */
   jewelryType?: CadJewelryType;
   material?: CadMaterialProfile | null;
+  /** The weight the customer wants, sent as payload.weight_target. */
+  weightTarget?: WeightTargetPayload | null;
   /** Which page owns this run, so the header/toast restore link returns here. */
   cadRoute: '/text-to-cad' | '/image-to-cad';
   /**
@@ -84,6 +88,7 @@ export function useImageToCADWorkflow({
   tier = RING_CAD_DEFAULT_TIER,
   jewelryType = DEFAULT_CAD_JEWELRY_TYPE,
   material = null,
+  weightTarget = null,
   clientFlow,
   cadRoute,
   restoringFromUrl = false,
@@ -108,6 +113,15 @@ export function useImageToCADWorkflow({
   const [stlArtifacts, setStlArtifacts] = useState<ArtifactRef[]>([]);
   const [stepArtifacts, setStepArtifacts] = useState<ArtifactRef[]>([]);
   const [estimatedMetalMassG, setEstimatedMetalMassG] = useState<number | null>(null);
+  /** The run result's fused metal volume (mm³), when it reports one. */
+  const [metalVolumeMm3, setMetalVolumeMm3] = useState<number | null>(null);
+  const [metalVolumeFlags, setMetalVolumeFlags] = useState<string[]>([]);
+  /**
+   * The metal and target this page sent with its run. /result does not echo
+   * the density, so this is the only way an older result's mass turns back
+   * into a volume, and it belongs to that one run only.
+   */
+  const [sentMetal, setSentMetal] = useState<SentMetal | null>(null);
   /** Backend-authored failure copy, safe to show the user directly. */
   const [failureMessage, setFailureMessage] = useState<string | null>(null);
   /** Exports fine but some part is not a closed solid - flag before manufacture. */
@@ -234,6 +248,8 @@ export function useImageToCADWorkflow({
       setStlArtifacts((trackedRun.stlUrls ?? []).map(url => ({ uri: url, url, type: 'model/stl', bytes: 0, sha256: '' })));
       setStepArtifacts((trackedRun.stepUrls ?? []).map(url => ({ uri: url, url, type: 'model/step', bytes: 0, sha256: '' })));
       setEstimatedMetalMassG(trackedRun.estimatedMetalMassG ?? null);
+      setMetalVolumeMm3(trackedRun.metalVolumeMm3 ?? null);
+      setMetalVolumeFlags(trackedRun.metalVolumeFlags ?? []);
       // cad_generation_completed is NOT emitted here. This effect does not run
       // once the page unmounts and bails out early on hasNavigatedAway, so
       // every run finishing after the user left was never counted.
@@ -242,7 +258,7 @@ export function useImageToCADWorkflow({
       setIsModelLoading(true);
       setHasModel(true);
     }
-  }, [trackedRun?.status, trackedRun?.glbUrl, trackedRun?.threedmUrl, trackedRun?.stlUrls, trackedRun?.stepUrls, trackedRun?.estimatedMetalMassG, trackedRun?.generationStep, trackedRun?.cadFailureReasonCode]); // eslint-disable-line react-hooks/exhaustive-deps -- prompt/referenceImages/tier/cadRoute/cadSource and the trackedRun object are excluded: only the run's own transitions should re-drive the overlay, and including the object would re-fire on every progress tick. The analytics values are read from the closure of the render in which status changed, which is the correct moment for them. Regression to watch: if a future edit fires an event here on something other than a status transition, those values could be stale.
+  }, [trackedRun?.status, trackedRun?.glbUrl, trackedRun?.threedmUrl, trackedRun?.stlUrls, trackedRun?.stepUrls, trackedRun?.estimatedMetalMassG, trackedRun?.metalVolumeMm3, trackedRun?.metalVolumeFlags, trackedRun?.generationStep, trackedRun?.cadFailureReasonCode]); // eslint-disable-line react-hooks/exhaustive-deps -- prompt/referenceImages/tier/cadRoute/cadSource and the trackedRun object are excluded: only the run's own transitions should re-drive the overlay, and including the object would re-fire on every progress tick. The analytics values are read from the closure of the render in which status changed, which is the correct moment for them. Regression to watch: if a future edit fires an event here on something other than a status transition, those values could be stale.
 
   /**
    * Looks up the ring this run saved, which is what the Improve button needs.
@@ -360,6 +376,21 @@ export function useImageToCADWorkflow({
   const versionNote = activeVersion?.user_note?.trim() && activeVersion.glb_url === glbUrl
     ? { assetId: activeVersion.asset_id, text: activeVersion.user_note }
     : null;
+
+  /**
+   * What the weight screens need for the model on screen: its version's
+   * measured volume (same rule as the downloads: only while the viewer shows
+   * that version's GLB), else this run's own result, plus the target and the
+   * metal it was requested in.
+   */
+  const metalWeight = resolveMetalWeight({
+    shownVersion: activeVersion && activeVersion.glb_url === glbUrl ? activeVersion : null,
+    workflowId: sourceWorkflowId,
+    resultVolumeMm3: metalVolumeMm3,
+    resultVolumeFlags: metalVolumeFlags,
+    resultMassG: estimatedMetalMassG,
+    sent: sentMetal,
+  });
 
   /** Opens an earlier version in the viewer. Its files are already published. */
   const selectVersion = useCallback((assetId: string) => {
@@ -512,6 +543,9 @@ export function useImageToCADWorkflow({
     setStlArtifacts([]);
     setStepArtifacts([]);
     setEstimatedMetalMassG(null);
+    setMetalVolumeMm3(null);
+    setMetalVolumeFlags([]);
+    setSentMetal(null);
     setIsModelLoading(true);
     setProgressStep('_loading');
 
@@ -646,6 +680,9 @@ export function useImageToCADWorkflow({
     setStlArtifacts([]);
     setStepArtifacts([]);
     setEstimatedMetalMassG(null);
+    setMetalVolumeMm3(null);
+    setMetalVolumeFlags([]);
+    setSentMetal(null);
     // Clear the previous ring's solidity result: a stale warning on a new run
     // is worse than none, because it trains people to ignore it.
     setNotAllSolid(false);
@@ -666,6 +703,7 @@ export function useImageToCADWorkflow({
         tier,
         jewelryType,
         material,
+        weightTarget,
         clientFlow,
       });
 
@@ -685,6 +723,12 @@ export function useImageToCADWorkflow({
       const { workflow_id, supervised } = await startRes.json();
       if (!workflow_id) throw new Error("No workflow_id returned");
       setSourceWorkflowId(workflow_id);
+      setSentMetal({
+        workflowId: workflow_id,
+        alloyId: material?.id ?? null,
+        densityGCm3: material?.density_g_cm3 ?? null,
+        target: readWeightTarget(weightTarget),
+      });
 
       // Fired only once a workflow_id exists, so a start that never reached
       // the backend counts as a failure rather than inflating the top of the
@@ -740,7 +784,7 @@ export function useImageToCADWorkflow({
       setGenerationFailed(true);
     }
     return true;
-  }, [prompt, referenceImages, tier, jewelryType, material, cadRoute, cadSource, isGenerating, onWorkspaceActivate, trackCadGeneration, checkCredits]);
+  }, [prompt, referenceImages, tier, jewelryType, material, weightTarget, cadRoute, cadSource, isGenerating, onWorkspaceActivate, trackCadGeneration, checkCredits]);
 
   /**
    * One press, one run. isGenerating only turns true after the credit check
@@ -808,6 +852,12 @@ export function useImageToCADWorkflow({
     viewerThreedmUrl,
     versionDownloads,
     stlArtifacts, stepArtifacts, estimatedMetalMassG,
+    metalWeight,
+    /** Names the weight CSV: the model and the version on screen ("V2"), when known. */
+    weightFile: {
+      modelName: ring?.name ?? null,
+      versionLabel: activeVersion && activeVersion.glb_url === glbUrl ? versionLabel(activeVersion) : null,
+    },
     failureMessage, notAllSolid,
     statusNotice,
     dismissStatusNotice: () => {

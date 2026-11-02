@@ -49,6 +49,23 @@ export interface CadWorkspaceLayoutProps {
   onPanelsOpenChange?: (open: boolean) => void;
 }
 
+/** Percent of the layout, rounded the way the panel library reports it. */
+const pct = (value: number) => Math.round(value * 100) / 100;
+
+/**
+ * The desktop left panel's sizes, in percent, from pixel targets: it opens at
+ * about 380 px (the version's metal weight table shows the common metal names
+ * whole) and never drags narrower than 300 px, keeping the old 22% / 15% on
+ * wide screens and the 35% maximum.
+ */
+export function leftPanelSizes(viewportWidth: number): { defaultSize: number; minSize: number } {
+  const of = (px: number) => (px / viewportWidth) * 100;
+  return {
+    defaultSize: pct(Math.min(35, Math.max(22, of(380)))),
+    minSize: pct(Math.min(35, Math.max(15, of(300)))),
+  };
+}
+
 const TOGGLE = 'absolute top-2 z-[60] w-8 h-8 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors';
 /** Phone dock height: a 48px button with 8px above and below, plus the home-indicator inset. */
 const PHONE_DOCK = 'calc(4rem + env(safe-area-inset-bottom, 0px))';
@@ -59,6 +76,7 @@ export function CadWorkspaceLayout({
   const isDesktop = mode === 'desktop';
   const isTablet = mode === 'tablet';
   const isPhone = mode === 'phone';
+  const leftSize = leftPanelSizes(typeof window === 'undefined' ? 1440 : window.innerWidth);
 
   // ── desktop: resizable columns ──
   const [leftCollapsed, setLeftCollapsed] = useState(false);
@@ -153,7 +171,7 @@ export function CadWorkspaceLayout({
     if (isTablet) { setLeftOpen(true); return; }
     const panel = leftPanelRef.current;
     if (!panel) return;
-    if (leftCollapsed) panel.expand(22);
+    if (leftCollapsed) panel.expand(leftSize.defaultSize);
     else panel.collapse();
   };
   const toggleRight = () => {
@@ -190,8 +208,8 @@ export function CadWorkspaceLayout({
             ref={leftPanelRef}
             id="left-panel"
             order={1}
-            defaultSize={22}
-            minSize={15}
+            defaultSize={leftSize.defaultSize}
+            minSize={leftSize.minSize}
             maxSize={35}
             collapsible
             collapsedSize={0}
@@ -205,7 +223,7 @@ export function CadWorkspaceLayout({
         {isDesktop && <ResizableHandle withHandle />}
 
         {/* Viewport */}
-        <ResizablePanel id="viewport-panel" order={2} defaultSize={isDesktop ? (hasModel ? 56 : 78) : 100} minSize={30}>
+        <ResizablePanel id="viewport-panel" order={2} defaultSize={isDesktop ? pct(100 - leftSize.defaultSize - (hasModel ? 22 : 0)) : 100} minSize={30}>
           <div ref={viewportRef} data-cad-viewport className="relative h-full border-x-2 border-primary/20 shadow-[inset_0_0_30px_-10px_hsl(var(--primary)/0.15)]" style={{ background: "#000000" }}>
             {/* Panel toggles. Hidden in fullscreen, except the tablet's right
                 drawer, which lives inside this element and so still works there. */}

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { Helmet } from "react-helmet-async";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -44,6 +44,12 @@ import type { GemMode } from "@/components/text-to-cad/CADCanvas";
 import { RING_CAD_DEFAULT_TIER, RING_CAD_NURBS_WORKFLOW, RING_CAD_TIERS, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
 import { recordStudioVisit } from '@/lib/studio-preference';
 import { useCadRestoreFromUrl } from "@/hooks/useCadRestoreFromUrl";
+import { useCadMetal } from "@/hooks/useCadMetal";
+import TechSpecSection, { hasSpecSheet } from "@/components/spec-sheet/TechSpecSection";
+import MetalWeightStep from "@/components/metal-weight/MetalWeightStep";
+import WeightCard from "@/components/metal-weight/WeightCard";
+import { metalWeightLine } from "@/lib/metal-weight/format";
+import { EMPTY_METAL_REQUEST, metalRequestPayload, type MetalRequest } from "@/lib/metal-weight/request";
 
 /** Touch gizmos are too fiddly on a phone: the view only orbits there. */
 const PHONE_TRANSFORM_MODES = ["orbit"] as const;
@@ -75,6 +81,9 @@ export default function TextToCAD({ variant = "idea" }: { variant?: DesignStartV
   const [model] = useState("gemini");
   const [prompt, setPrompt] = useState("");
   const [jewelryType, setJewelryType] = useState<CadJewelryType | null>(null);
+  /** The "Metal & weight" step: sent as payload.material and payload.weight_target. */
+  const [metalRequest, setMetalRequest] = useState<MetalRequest>(EMPTY_METAL_REQUEST);
+  const metalPayload = useMemo(() => metalRequestPayload(metalRequest), [metalRequest]);
   const [transformMode, setTransformMode] = useState("orbit");
   const wasManualUploadRef = useRef(false);
   const layoutMode = useCadBreakpoint();
@@ -132,12 +141,18 @@ export default function TextToCAD({ variant = "idea" }: { variant?: DesignStartV
     referenceImages,
     tier: activeTier,
     jewelryType: jewelryType ?? undefined,
+    material: metalPayload.material,
+    weightTarget: metalPayload.weightTarget,
     cadRoute: '/text-to-cad',
     // Read once, at first render, so arriving from the result email
     // paints the loading state instead of an empty workspace.
     restoringFromUrl: isRestoringFromUrl,
     onWorkspaceActivate: activateWorkspace,
   });
+
+  // One metal choice for the page: the weight table, the download line and the
+  // Material panel's "All metal parts" (which it keeps in step with the look).
+  const { view: weightView, chooseLook, look: metalLook } = useCadMetal(workflow.metalWeight, editor.handleApplyMetalToAll);
 
   /**
    * Create CAD from the design editor: the approved pictures (main first) go
@@ -266,7 +281,7 @@ export default function TextToCAD({ variant = "idea" }: { variant?: DesignStartV
       onDownloadViewerThreedm={workflow.viewerThreedmUrl ? downloads.downloadViewerThreedm : undefined}
       onDownloadStl={workflow.stlArtifacts.length ? downloads.downloadStl : undefined}
       onDownloadStep={workflow.stepArtifacts.length ? downloads.downloadStep : undefined}
-      estimatedMetalMassG={workflow.estimatedMetalMassG}
+      metalWeightLine={metalWeightLine(weightView.source, weightView.alloy)}
       onExportEdited={hasEdits ? downloads.exportEdited : undefined}
       versionDownloads={workflow.versionDownloads}
       latestVersionLabel={workflow.latestVersionLabel}
@@ -311,6 +326,7 @@ export default function TextToCAD({ variant = "idea" }: { variant?: DesignStartV
           cadCostLoading={cadCostLoading}
           creatingCad={workflow.isStarting || workflow.isGenerating}
           onCreateCad={createCadFromDesign}
+          metalStep={<MetalWeightStep value={metalRequest} onChange={setMetalRequest} disabled={workflow.isGenerating} />}
           onStartMode={setStartMode}
         />
       </div>
@@ -350,6 +366,18 @@ export default function TextToCAD({ variant = "idea" }: { variant?: DesignStartV
                 }
               }}
               onReset={workflow.hasModel ? handleReset : undefined}
+              versionSpec={workflow.hasModel && !workflow.isGenerating && (
+                <>
+                  <WeightCard {...weightView} modelName={workflow.weightFile.modelName} versionLabel={workflow.weightFile.versionLabel} />
+                  {workflow.versionDownloads && hasSpecSheet(workflow.versionDownloads.downloads) && (
+                    <TechSpecSection
+                      assetId={workflow.versionDownloads.assetId}
+                      openFlags={workflow.versionDownloads.specSheetOpenFlags}
+                      source={workflow.versionDownloads.source}
+                    />
+                  )}
+                </>
+              )}
             />
       }
       right={(section) => (
@@ -363,7 +391,8 @@ export default function TextToCAD({ variant = "idea" }: { variant?: DesignStartV
               onApplyGemToAll={editor.handleApplyGemToAll}
               onAction={editor.handleMeshAction}
               onApplyMaterial={editor.handleApplyMaterial}
-              onApplyMetalToAll={editor.handleApplyMetalToAll}
+              onApplyMetalToAll={chooseLook}
+              metalToAllValue={metalLook}
               onSceneAction={editor.handleSceneAction}
             />
       )}
