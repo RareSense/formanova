@@ -219,7 +219,7 @@ export function WeightCard({
                     {showAll ? 'Fewer metals' : 'More metals'}
                     {showAll ? <ChevronUp aria-hidden="true" /> : <ChevronDown aria-hidden="true" />}
                   </Button>
-                  <Button type="button" variant="outline" size="sm" onClick={download} className="font-mono text-[11px]">
+                  <Button type="button" variant="outline" size="sm" onClick={download} aria-label="Download weight table (CSV)" className="font-mono text-[11px]">
                     <Download aria-hidden="true" />
                     Download
                   </Button>

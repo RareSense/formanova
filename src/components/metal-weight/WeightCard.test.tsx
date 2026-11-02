@@ -138,20 +138,20 @@ describe('WeightCard', () => {
 
   it('downloads the listed metals as <model>_v<version>_metal_weight.csv', () => {
     renderCard();
-    fireEvent.click(screen.getByRole('button', { name: 'Download' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Download weight table (CSV)' }));
     const [filename, csv] = downloadCsv.mock.calls[0];
     expect(filename).toBe('Crest_Signet_v2_metal_weight.csv');
     expect(csv).toContain('Model,Crest Signet');
     expect(csv.split('\r\n').filter((l: string) => l.includes('http'))).toHaveLength(5);
 
     fireEvent.click(screen.getByRole('button', { name: 'More metals' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Download' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Download weight table (CSV)' }));
     expect(downloadCsv.mock.calls[1][1].split('\r\n').filter((l: string) => l.includes('http'))).toHaveLength(21);
   });
 
   it('puts the Download and More metals buttons at one size', () => {
     renderCard();
-    expect(screen.getByRole('button', { name: 'Download' })).toHaveClass('h-9');
+    expect(screen.getByRole('button', { name: 'Download weight table (CSV)' })).toHaveClass('h-9');
     expect(screen.getByRole('button', { name: 'More metals' })).toHaveClass('h-9');
   });
 
@@ -187,7 +187,7 @@ describe('WeightCard', () => {
     renderCard({ source: { available: false, reason: NO_VOLUME_REASON } });
     expect(screen.getByText('Weight not available for this model.')).toBeInTheDocument();
     expect(screen.queryByRole('table')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Download' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Download weight table (CSV)' })).toBeNull();
     fireEvent.click(header());
     expect(within(header()).getByText('Not available')).toBeInTheDocument();
   });

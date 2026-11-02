@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { CadWorkspaceLayout, rightPanelSizes, type CadWorkspaceLayoutProps } from './CadWorkspaceLayout';
+import { CadWorkspaceLayout, leftPanelSizes, type CadWorkspaceLayoutProps } from './CadWorkspaceLayout';
 import type { CadBreakpoint } from '@/hooks/use-cad-breakpoint';
 
 // The real panels render here, but their imperative expand()/collapse() need
@@ -49,18 +49,18 @@ function setup(mode: CadBreakpoint, over: Partial<CadWorkspaceLayoutProps> = {})
 
 const viewportEl = () => document.querySelector('[data-cad-viewport]') as HTMLElement;
 
-describe('rightPanelSizes', () => {
-  // The inspector holds a four-column weight table: about 360 px to show the
-  // common metal names whole, 300 px before it gets cramped.
-  it('opens the right panel at about 360 px and never narrower than 300 px', () => {
-    expect(rightPanelSizes(1440)).toEqual({ defaultSize: 25, minSize: 20.83 });
-    expect(rightPanelSizes(1280)).toEqual({ defaultSize: 28.13, minSize: 23.44 });
+describe('leftPanelSizes', () => {
+  // The left panel holds the version's spec: a five-column weight table needs
+  // about 380 px to show the common metal names whole, 300 px before it cramps.
+  it('opens the left panel at about 380 px and never narrower than 300 px', () => {
+    expect(leftPanelSizes(1440)).toEqual({ defaultSize: 26.39, minSize: 20.83 });
+    expect(leftPanelSizes(1280)).toEqual({ defaultSize: 29.69, minSize: 23.44 });
   });
 
   it('keeps the old 22% / 15% on wide screens, and caps at the 35% maximum', () => {
-    expect(rightPanelSizes(1920)).toEqual({ defaultSize: 22, minSize: 15.63 });
-    expect(rightPanelSizes(2560)).toEqual({ defaultSize: 22, minSize: 15 });
-    expect(rightPanelSizes(800)).toEqual({ defaultSize: 35, minSize: 35 });
+    expect(leftPanelSizes(1920)).toEqual({ defaultSize: 22, minSize: 15.63 });
+    expect(leftPanelSizes(2560)).toEqual({ defaultSize: 22, minSize: 15 });
+    expect(leftPanelSizes(800)).toEqual({ defaultSize: 35, minSize: 35 });
   });
 });
 
@@ -86,18 +86,6 @@ describe('CadWorkspaceLayout', () => {
     rerender('desktop');
     expect(screen.getByText('left panel')).toBeTruthy();
     expect(screen.getByText('right panel all')).toBeTruthy();
-  });
-
-  it('tablet opens the right drawer when told a model with a weight has loaded', () => {
-    const { rerender } = setup('tablet', { openRightPanel: false });
-    expect(viewportEl().querySelector('[data-cad-right-drawer]')).toBeNull();
-    rerender('tablet', { openRightPanel: true });
-    expect(viewportEl().querySelector('[data-cad-right-drawer]')?.textContent).toBe('right panel all');
-  });
-
-  it('tablet leaves the drawer closed without that signal', () => {
-    setup('tablet');
-    expect(viewportEl().querySelector('[data-cad-right-drawer]')).toBeNull();
   });
 
   it('never remounts the 3D view when crossing breakpoints', () => {

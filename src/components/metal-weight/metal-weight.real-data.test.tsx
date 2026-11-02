@@ -85,7 +85,7 @@ beforeEach(() => {
 const card = () => screen.getByRole('region', { name: 'Metal weight' });
 const rowCells = (label: string) =>
   within(within(card()).getByRole('radio', { name: label }).closest('tr') as HTMLElement)
-    .getAllByRole('cell').slice(1).map((c) => c.textContent);
+    .getAllByRole('cell').slice(2).map((c) => c.textContent);
 const openDownloads = () => fireEvent.keyDown(screen.getByRole('button', { name: /^download$/i }), { key: 'Enter' });
 
 /** The card and download line for one version, the way the result page wires them. */
@@ -213,6 +213,7 @@ describe('request → result round trip', () => {
     render(
       <MemoryRouter>
         <WorkflowCard
+          onClick={() => {}}
           workflow={{
             workflow_id: 'wf-rt', name: 'ring_cad_nurbs_v1', status: 'completed', source_type: 'text_to_cad',
             created_at: '2026-11-02T10:00:00Z', screenshots: [], glb_url: GLB,

@@ -95,11 +95,11 @@ export function TechSpecSection({ assetId, openFlags, source }: TechSpecSectionP
   const download = () => { void saveVersionFile(assetId, 'spec_sheet', source); };
   const buttons = (
     <div className="grid grid-cols-2 gap-2">
-      <Button type="button" variant="outline" size="sm" onClick={view} className="w-full font-mono text-[11px]">
+      <Button type="button" variant="outline" size="sm" onClick={view} aria-label="View spec sheet" className="w-full font-mono text-[11px]">
         <ExternalLink aria-hidden="true" />
         View
       </Button>
-      <Button type="button" variant="outline" size="sm" onClick={download} className="w-full font-mono text-[11px]">
+      <Button type="button" variant="outline" size="sm" onClick={download} aria-label="Download spec sheet" className="w-full font-mono text-[11px]">
         <Download aria-hidden="true" />
         Download
       </Button>

@@ -68,24 +68,24 @@ describe('TechSpecSection', () => {
     expect(await screen.findByTestId('spec-sheet-fallback')).toBeInTheDocument();
     expect(screen.queryByTestId('spec-sheet-skeleton')).toBeNull();
     expect(error).toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'View' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Download' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'View spec sheet' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Download spec sheet' })).toBeInTheDocument();
     error.mockRestore();
   });
 
   it('View opens the spec sheet and Download saves it, through the version file links', () => {
     loadSpecSheet.mockResolvedValue(sheet());
     render(<TechSpecSection assetId="v1" openFlags={0} source="image-to-cad" />);
-    fireEvent.click(screen.getByRole('button', { name: 'View' }));
+    fireEvent.click(screen.getByRole('button', { name: 'View spec sheet' }));
     expect(openVersionFile).toHaveBeenCalledWith('v1', 'spec_sheet');
-    fireEvent.click(screen.getByRole('button', { name: 'Download' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Download spec sheet' }));
     expect(saveVersionFile).toHaveBeenCalledWith('v1', 'spec_sheet', 'image-to-cad');
   });
 
   it('View and Download are one size', () => {
     loadSpecSheet.mockResolvedValue(sheet());
     render(<TechSpecSection assetId="v1" openFlags={0} />);
-    for (const name of ['View', 'Download']) expect(screen.getByRole('button', { name })).toHaveClass('h-9', 'w-full');
+    for (const name of ['View spec sheet', 'Download spec sheet']) expect(screen.getByRole('button', { name })).toHaveClass('h-9', 'w-full');
   });
 
   it('opens a larger preview with page navigation, and closes it', async () => {
@@ -100,8 +100,8 @@ describe('TechSpecSection', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Next page' }));
     await waitFor(() => expect(within(dialog).getByRole('img', { name: 'Spec sheet, page 2' })).toHaveAttribute('src', PAGE_2));
     expect(within(dialog).getByText('Page 2 of 2')).toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: 'View' })).toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: 'Download' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'View spec sheet' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Download spec sheet' })).toBeInTheDocument();
     fireEvent.keyDown(dialog, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });

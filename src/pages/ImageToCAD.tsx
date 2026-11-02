@@ -39,6 +39,7 @@ import { RING_CAD_DEFAULT_TIER, type CadJewelryType } from "@/lib/ring-cad-nurbs
 import { recordStudioVisit } from '@/lib/studio-preference';
 import { useCadRestoreFromUrl } from "@/hooks/useCadRestoreFromUrl";
 import { useCadMetal } from "@/hooks/useCadMetal";
+import TechSpecSection, { hasSpecSheet } from "@/components/spec-sheet/TechSpecSection";
 import MetalWeightStep from "@/components/metal-weight/MetalWeightStep";
 import WeightCard from "@/components/metal-weight/WeightCard";
 import { metalWeightLine } from "@/lib/metal-weight/format";
@@ -362,15 +363,21 @@ export default function ImageToCAD() {
               versions={workflow.versions}
               selectedVersionId={workflow.selectedVersionId}
               onSelectVersion={workflow.selectVersion}
+              versionSpec={workflow.hasModel && !workflow.isGenerating && (
+                <>
+                  <WeightCard {...weightView} modelName={workflow.weightFile.modelName} versionLabel={workflow.weightFile.versionLabel} />
+                  {workflow.versionDownloads && hasSpecSheet(workflow.versionDownloads.downloads) && (
+                    <TechSpecSection
+                      assetId={workflow.versionDownloads.assetId}
+                      openFlags={workflow.versionDownloads.specSheetOpenFlags}
+                      source={workflow.versionDownloads.source}
+                    />
+                  )}
+                </>
+              )}
             />
       }
       right={(section) => (
-          // One scroll for the whole inspector: the weight table at its natural height, then
-          // Material/Parts with room for both halves, so nothing is cut between sections.
-          <div className="flex h-full min-h-0 flex-col overflow-y-auto">
-            {/* Weight heads the inspector, above Material (and the phone's Material tab). */}
-            {section !== "parts" && <WeightCard {...weightView} />}
-            <div className="min-h-[36rem] flex-1">
             <MeshPanel
               section={section}
               meshes={editor.meshes}
@@ -385,10 +392,7 @@ export default function ImageToCAD() {
               metalToAllValue={metalLook}
               onSceneAction={editor.handleSceneAction}
             />
-            </div>
-          </div>
       )}
-      openRightPanel={workflow.metalWeight.source.available}
       phoneActions={layoutMode === "phone" ? resultActions : undefined}
       viewport={
           <>

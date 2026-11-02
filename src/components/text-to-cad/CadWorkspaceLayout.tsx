@@ -43,12 +43,6 @@ export interface CadWorkspaceLayoutProps {
   right: (section?: CadPanelSection) => ReactNode;
   /** Everything drawn inside the 3D view: canvas and overlays. */
   viewport: ReactNode;
-  /**
-   * Tablet only: opens the right drawer when this turns true, so the inspector
-   * (metal weight first) is on screen without a tap once a model with a
-   * weight has loaded. Desktop opens its right column on any model already.
-   */
-  openRightPanel?: boolean;
   /** Phone only: the dock under the sheet (Improve + Download). */
   phoneActions?: ReactNode;
   /** True while a sheet, drawer or the phone panel is open; keyboard shortcuts pause meanwhile. */
@@ -59,15 +53,15 @@ export interface CadWorkspaceLayoutProps {
 const pct = (value: number) => Math.round(value * 100) / 100;
 
 /**
- * The desktop right panel's sizes, in percent, from pixel targets: it opens
- * at about 360 px (the metal weight table shows the common metal names whole)
- * and never drags narrower than 300 px, keeping the old 22% / 15% on wide
- * screens and the 35% maximum.
+ * The desktop left panel's sizes, in percent, from pixel targets: it opens at
+ * about 380 px (the version's metal weight table shows the common metal names
+ * whole) and never drags narrower than 300 px, keeping the old 22% / 15% on
+ * wide screens and the 35% maximum.
  */
-export function rightPanelSizes(viewportWidth: number): { defaultSize: number; minSize: number } {
+export function leftPanelSizes(viewportWidth: number): { defaultSize: number; minSize: number } {
   const of = (px: number) => (px / viewportWidth) * 100;
   return {
-    defaultSize: pct(Math.min(35, Math.max(22, of(360)))),
+    defaultSize: pct(Math.min(35, Math.max(22, of(380)))),
     minSize: pct(Math.min(35, Math.max(15, of(300)))),
   };
 }
@@ -77,12 +71,12 @@ const TOGGLE = 'absolute top-2 z-[60] w-8 h-8 flex items-center justify-center b
 const PHONE_DOCK = 'calc(4rem + env(safe-area-inset-bottom, 0px))';
 
 export function CadWorkspaceLayout({
-  mode, hasModel, isFullscreen, before, left, leftLabel, right, viewport, openRightPanel = false, phoneActions, onPanelsOpenChange,
+  mode, hasModel, isFullscreen, before, left, leftLabel, right, viewport, phoneActions, onPanelsOpenChange,
 }: CadWorkspaceLayoutProps) {
   const isDesktop = mode === 'desktop';
   const isTablet = mode === 'tablet';
   const isPhone = mode === 'phone';
-  const rightSize = rightPanelSizes(typeof window === 'undefined' ? 1440 : window.innerWidth);
+  const leftSize = leftPanelSizes(typeof window === 'undefined' ? 1440 : window.innerWidth);
 
   // ── desktop: resizable columns ──
   const [leftCollapsed, setLeftCollapsed] = useState(false);
@@ -99,7 +93,7 @@ export function CadWorkspaceLayout({
     if (prevHasModel.current === hasModel) return;
     prevHasModel.current = hasModel;
     if (!isDesktop) return;
-    if (hasModel) rightPanelRef.current?.expand(rightSize.defaultSize);
+    if (hasModel) rightPanelRef.current?.expand(22);
     else rightPanelRef.current?.collapse();
   }, [hasModel, isDesktop]);
 
@@ -126,12 +120,6 @@ export function CadWorkspaceLayout({
     setTab(hasModel ? 'material' : 'left');
     if (!hasModel) setRightOpen(false);
   }, [hasModel]);
-
-  // Runs after the breakpoint reset above, so a tablet reached with a weighed
-  // model on screen still opens the drawer.
-  useEffect(() => {
-    if (isTablet && hasModel && openRightPanel) setRightOpen(true);
-  }, [isTablet, hasModel, openRightPanel]);
 
   const panelsOpen = isTablet ? leftOpen || rightOpen : isPhone ? snap !== 'peek' : false;
   const notify = useRef(onPanelsOpenChange);
@@ -183,14 +171,14 @@ export function CadWorkspaceLayout({
     if (isTablet) { setLeftOpen(true); return; }
     const panel = leftPanelRef.current;
     if (!panel) return;
-    if (leftCollapsed) panel.expand(22);
+    if (leftCollapsed) panel.expand(leftSize.defaultSize);
     else panel.collapse();
   };
   const toggleRight = () => {
     if (isTablet) { setRightOpen((o) => !o); return; }
     const panel = rightPanelRef.current;
     if (!panel) return;
-    if (rightCollapsed) panel.expand(rightSize.defaultSize);
+    if (rightCollapsed) panel.expand(22);
     else panel.collapse();
   };
   const leftShown = isTablet ? leftOpen : !leftCollapsed;
@@ -220,8 +208,8 @@ export function CadWorkspaceLayout({
             ref={leftPanelRef}
             id="left-panel"
             order={1}
-            defaultSize={22}
-            minSize={15}
+            defaultSize={leftSize.defaultSize}
+            minSize={leftSize.minSize}
             maxSize={35}
             collapsible
             collapsedSize={0}
@@ -235,7 +223,7 @@ export function CadWorkspaceLayout({
         {isDesktop && <ResizableHandle withHandle />}
 
         {/* Viewport */}
-        <ResizablePanel id="viewport-panel" order={2} defaultSize={isDesktop ? (hasModel ? pct(78 - rightSize.defaultSize) : 78) : 100} minSize={30}>
+        <ResizablePanel id="viewport-panel" order={2} defaultSize={isDesktop ? pct(100 - leftSize.defaultSize - (hasModel ? 22 : 0)) : 100} minSize={30}>
           <div ref={viewportRef} data-cad-viewport className="relative h-full border-x-2 border-primary/20 shadow-[inset_0_0_30px_-10px_hsl(var(--primary)/0.15)]" style={{ background: "#000000" }}>
             {/* Panel toggles. Hidden in fullscreen, except the tablet's right
                 drawer, which lives inside this element and so still works there. */}
@@ -291,8 +279,8 @@ export function CadWorkspaceLayout({
             // Starts collapsed while there is no model. With defaultSize 22 the
             // panel rendered empty on mount until the effect collapsed it, which
             // flashed a blank region during generation.
-            defaultSize={hasModel ? rightSize.defaultSize : 0}
-            minSize={rightSize.minSize}
+            defaultSize={hasModel ? 22 : 0}
+            minSize={15}
             maxSize={35}
             collapsible
             collapsedSize={0}

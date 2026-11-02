@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { RotateCcw, X, Maximize2 } from "lucide-react";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
@@ -24,6 +24,8 @@ interface LeftPanelProps {
   versions?: VersionCard[];
   selectedVersionId?: string | null;
   onSelectVersion?: (assetId: string) => void;
+  /** The shown version's spec (metal weight, tech spec), right under VERSIONS. */
+  versionSpec?: ReactNode;
 }
 
 /**
@@ -51,6 +53,7 @@ export default function LeftPanel({
   versions = [],
   selectedVersionId,
   onSelectVersion,
+  versionSpec,
 }: LeftPanelProps) {
   const { cost: generationCost, loading: generationCostLoading } = useEstimatedCost({ workflowName: RING_CAD_NURBS_WORKFLOW, model });
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -145,6 +148,9 @@ export default function LeftPanel({
             Renders nothing until a version exists, so a run from an older
             workflow shows no empty section. */}
         <VersionsPanel versions={versions} selectedAssetId={selectedVersionId} onSelect={onSelectVersion} />
+
+        {/* The version's spec: what it weighs, and its spec sheet. */}
+        {versionSpec}
 
         {/* AI Model - hidden until model selection is ready to ship.
         <section>

@@ -853,6 +853,11 @@ export function useImageToCADWorkflow({
     versionDownloads,
     stlArtifacts, stepArtifacts, estimatedMetalMassG,
     metalWeight,
+    /** Names the weight CSV: the model and the version on screen ("V2"), when known. */
+    weightFile: {
+      modelName: ring?.name ?? null,
+      versionLabel: activeVersion && activeVersion.glb_url === glbUrl ? versionLabel(activeVersion) : null,
+    },
     failureMessage, notAllSolid,
     statusNotice,
     dismissStatusNotice: () => {
