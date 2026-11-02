@@ -44,10 +44,11 @@ export interface CadWorkspaceLayoutProps {
   /** Everything drawn inside the 3D view: canvas and overlays. */
   viewport: ReactNode;
   /**
-   * A strip under the 3D view, outside it (the metal weight bar). Same place
-   * in every mode, so the view never remounts when it appears or goes.
+   * Tablet only: opens the right drawer when this turns true, so the inspector
+   * (metal weight first) is on screen without a tap once a model with a
+   * weight has loaded. Desktop opens its right column on any model already.
    */
-  viewportFooter?: ReactNode;
+  openRightPanel?: boolean;
   /** Phone only: the dock under the sheet (Improve + Download). */
   phoneActions?: ReactNode;
   /** True while a sheet, drawer or the phone panel is open; keyboard shortcuts pause meanwhile. */
@@ -59,7 +60,7 @@ const TOGGLE = 'absolute top-2 z-[60] w-8 h-8 flex items-center justify-center b
 const PHONE_DOCK = 'calc(4rem + env(safe-area-inset-bottom, 0px))';
 
 export function CadWorkspaceLayout({
-  mode, hasModel, isFullscreen, before, left, leftLabel, right, viewport, viewportFooter, phoneActions, onPanelsOpenChange,
+  mode, hasModel, isFullscreen, before, left, leftLabel, right, viewport, openRightPanel = false, phoneActions, onPanelsOpenChange,
 }: CadWorkspaceLayoutProps) {
   const isDesktop = mode === 'desktop';
   const isTablet = mode === 'tablet';
@@ -107,6 +108,12 @@ export function CadWorkspaceLayout({
     setTab(hasModel ? 'material' : 'left');
     if (!hasModel) setRightOpen(false);
   }, [hasModel]);
+
+  // Runs after the breakpoint reset above, so a tablet reached with a weighed
+  // model on screen still opens the drawer.
+  useEffect(() => {
+    if (isTablet && hasModel && openRightPanel) setRightOpen(true);
+  }, [isTablet, hasModel, openRightPanel]);
 
   const panelsOpen = isTablet ? leftOpen || rightOpen : isPhone ? snap !== 'peek' : false;
   const notify = useRef(onPanelsOpenChange);
@@ -211,10 +218,7 @@ export function CadWorkspaceLayout({
 
         {/* Viewport */}
         <ResizablePanel id="viewport-panel" order={2} defaultSize={isDesktop ? (hasModel ? 56 : 78) : 100} minSize={30}>
-          {/* Always this column, footer or not: wrapping the view only
-              sometimes would remount the canvas. */}
-          <div className="flex h-full min-h-0 flex-col">
-          <div ref={viewportRef} data-cad-viewport className="relative min-h-0 flex-1 border-x-2 border-primary/20 shadow-[inset_0_0_30px_-10px_hsl(var(--primary)/0.15)]" style={{ background: "#000000" }}>
+          <div ref={viewportRef} data-cad-viewport className="relative h-full border-x-2 border-primary/20 shadow-[inset_0_0_30px_-10px_hsl(var(--primary)/0.15)]" style={{ background: "#000000" }}>
             {/* Panel toggles. Hidden in fullscreen, except the tablet's right
                 drawer, which lives inside this element and so still works there. */}
             {!isPhone && (
@@ -253,8 +257,6 @@ export function CadWorkspaceLayout({
                 {right()}
               </div>
             )}
-          </div>
-          {viewportFooter}
           </div>
         </ResizablePanel>
 
