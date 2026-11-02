@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
-import { METAL_CHOICE_STORAGE_KEY, useMetalChoice } from './useMetalChoice';
+import { METAL_CHOICE_STORAGE_KEY, MODEL_PICKS_STORAGE_KEY, useMetalChoice } from './useMetalChoice';
 
 const target = (alloyId: string | null) => ({ grams: 28, tolerancePct: 5, alloyId });
 
@@ -57,6 +57,48 @@ describe('useMetalChoice', () => {
     expect(result.current.alloy.id).toBe('au10y');
     rerender({ key: 'v1', target: target('au14y'), requestedAlloyId: null });
     expect(result.current.alloy.id).toBe('pt950ru');
+  });
+
+  it('remembers each model's pick across a reload, over its target', () => {
+    const first = renderHook(() => useMetalChoice({ key: 'v1', target: target('au14y'), requestedAlloyId: null }));
+    act(() => first.result.current.setAlloyId('au18y'));
+    first.unmount();
+    // A fresh mount stands in for the reload.
+    expect(renderHook(() => useMetalChoice({ key: 'v1', target: target('au14y'), requestedAlloyId: null })).result.current.alloy.id).toBe('au18y');
+    // An untouched model still opens in its own target metal.
+    expect(renderHook(() => useMetalChoice({ key: 'v9', target: target('au10y'), requestedAlloyId: null })).result.current.alloy.id).toBe('au10y');
+  });
+
+  it('keeps a pick per model on both of two models', () => {
+    const { result, rerender } = renderHook((props) => useMetalChoice(props), {
+      initialProps: { key: 'v1', target: target('au14y'), requestedAlloyId: null },
+    });
+    act(() => result.current.setAlloyId('pt950ru'));
+    rerender({ key: 'v2', target: target('au10y'), requestedAlloyId: null });
+    act(() => result.current.setAlloyId('ag925'));
+    rerender({ key: 'v1', target: target('au14y'), requestedAlloyId: null });
+    expect(result.current.alloy.id).toBe('pt950ru');
+  });
+
+  it('ignores tampered per-model picks', () => {
+    for (const bad of ['{not json', '{"v1": "au18y"}', '[["v1", 42]]', '[["v1", "platinum_cobalt"]]', '[["v1"]]', '"v1"']) {
+      localStorage.setItem(MODEL_PICKS_STORAGE_KEY, bad);
+      expect(renderHook(() => useMetalChoice({ key: 'v1', target: null, requestedAlloyId: null })).result.current.alloy.id).toBe('au14y');
+    }
+  });
+
+  it('keeps at most the 100 most recent per-model picks', () => {
+    const { result, rerender } = renderHook((props) => useMetalChoice(props), {
+      initialProps: { key: 'm0', target: null, requestedAlloyId: null },
+    });
+    for (let i = 0; i < 105; i += 1) {
+      rerender({ key: `m${i}`, target: null, requestedAlloyId: null });
+      act(() => result.current.setAlloyId('au18y'));
+    }
+    const stored = Object.fromEntries(JSON.parse(localStorage.getItem(MODEL_PICKS_STORAGE_KEY) ?? '[]'));
+    expect(Object.keys(stored)).toHaveLength(100);
+    expect(stored).not.toHaveProperty('m0');
+    expect(stored).toHaveProperty('m104', 'au18y');
   });
 
   it('works in memory when storage throws', () => {

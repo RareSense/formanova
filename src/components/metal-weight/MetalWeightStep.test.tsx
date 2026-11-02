@@ -6,6 +6,9 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { EMPTY_METAL_REQUEST, type MetalRequest } from '@/lib/metal-weight/request';
 import { MetalWeightStep } from './MetalWeightStep';
 
+// Radix Select renders 22 options; give it room under full-suite load.
+vi.setConfig({ testTimeout: 20_000 });
+
 beforeAll(() => {
   // Radix Select needs these in jsdom.
   const proto = window.HTMLElement.prototype as unknown as Record<string, unknown>;
