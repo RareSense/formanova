@@ -56,9 +56,10 @@ function rememberHintSeen() {
 
 /** The left panel's section label style (VERSIONS, REFERENCE IMAGES). */
 export const SECTION_LABEL = 'font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground';
-const HEAD = 'h-8 px-2 font-mono text-[10px] font-normal text-muted-foreground';
-const NUM_HEAD = cn(HEAD, 'w-px whitespace-nowrap text-right');
-const NUM = 'h-8 w-px whitespace-nowrap px-2 py-0 text-right font-mono text-[11px] tabular-nums';
+const HEAD = 'h-8 px-1.5 font-mono text-[10px] font-normal text-muted-foreground';
+const NUM_HEAD = cn(HEAD, 'w-px whitespace-nowrap px-1 text-right last:pr-1.5');
+// Tight 4 px figure padding: at the panel's 300 px minimum the name column still fits "(palladium)" whole.
+const NUM = 'h-8 w-px whitespace-nowrap px-1 py-0 last:pr-1.5 text-right font-mono text-[11px] tabular-nums';
 const INFO_BUTTON = 'rounded-sm underline decoration-dotted underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
 
 function HeaderTip({ label, tip }: { label: string; tip: string }) {
@@ -137,7 +138,7 @@ export function WeightCard({
           selected ? 'bg-foreground/[0.07] font-semibold text-foreground hover:bg-foreground/[0.07]' : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground',
         )}
       >
-        <TableCell className="h-8 w-px px-2 py-0">
+        <TableCell className="h-8 w-px py-0 pl-2 pr-1">
           <input
             type="radio"
             name={`${ids}-metal`}
@@ -148,9 +149,9 @@ export function WeightCard({
             className="block h-3.5 w-3.5 cursor-pointer accent-foreground"
           />
         </TableCell>
-        <TableCell className="h-8 w-full max-w-0 px-2 py-1">
+        <TableCell className="h-8 w-full max-w-0 py-1 pl-1 pr-1.5">
           {/* The name wraps rather than cutting off: "(nickel)" vs "(palladium)" is the whole difference. */}
-          <span className="flex min-w-0 items-center gap-1.5">
+          <span className="flex min-w-0 items-center gap-1">
             <MaterialSphere category="metal" preview={appearanceForAlloy(item).preview} size={10} className="shrink-0" />
             <span className="min-w-0 break-words font-body text-[11px] leading-tight">{item.name}</span>
           </span>

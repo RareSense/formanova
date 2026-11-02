@@ -99,6 +99,22 @@ async function layoutProblems(page: Page): Promise<LayoutReport> {
       }
     }
 
+    // A metal name may wrap, but only between words: never "Yello / w" or "(palla / dium)".
+    for (const cell of document.querySelectorAll('[data-weight-table] tbody td:nth-child(2)')) {
+      const node = [...cell.querySelectorAll('span')].map((s) => s.firstChild).find((n) => n?.nodeType === Node.TEXT_NODE);
+      const text = node?.textContent ?? '';
+      let top: number | null = null;
+      for (let i = 0; node && i < text.length; i += 1) {
+        const range = document.createRange();
+        range.setStart(node, i);
+        range.setEnd(node, i + 1);
+        const rect = range.getClientRects()[0];
+        if (!rect || text[i] === ' ') continue;
+        if (top !== null && rect.top > top + 2 && text[i - 1] !== ' ') problems.push(`"${text}" breaks inside a word at "${text.slice(0, i)}|"`);
+        top = rect.top;
+      }
+    }
+
     // The selected row's tint and ring stay inside the table's border.
     const table = document.querySelector('[data-weight-table]');
     const selected = document.querySelector('[data-weight-table] tr[data-state="selected"]');
