@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NO_VOLUME_REASON, pickWeightSource, readWeightTarget, resolveMetalWeight, type SentMetal } from './source';
+import { NO_VOLUME_REASON, OUT_OF_RANGE_REASON, pickWeightSource, readWeightTarget, resolveMetalWeight, type SentMetal } from './source';
 
 describe('pickWeightSource', () => {
   it('prefers the version volume, then the result volume, then mass ÷ density', () => {
@@ -21,6 +21,14 @@ describe('pickWeightSource', () => {
     for (const v of [undefined, null, 0, -5, NaN, Infinity, '2192.4']) {
       expect(pickWeightSource({ versionVolumeMm3: v })).toEqual({ available: false, reason: NO_VOLUME_REASON });
     }
+  });
+
+  it('is not available, saying why, for a volume no piece could weigh', () => {
+    for (const v of [0.5, 1e-6, 500_000, 1e25]) {
+      expect(pickWeightSource({ versionVolumeMm3: v })).toEqual({ available: false, reason: OUT_OF_RANGE_REASON });
+    }
+    // A plausible fallback still wins over an implausible version value.
+    expect(pickWeightSource({ versionVolumeMm3: 1e25, resultVolumeMm3: 1500 }).available).toBe(true);
   });
 
   it('is not available for a mass without the density it was computed with', () => {

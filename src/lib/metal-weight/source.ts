@@ -12,9 +12,22 @@
  * Everything here reads untrusted payloads, so every value is checked rather
  * than cast.
  */
-import { DEFAULT_TOLERANCE_PCT, isPositiveFinite, volumeFromMass, type WeightTarget } from './weight';
+import { METAL_ALLOYS } from './alloys';
+import { DEFAULT_TOLERANCE_PCT, MAX_WEIGHT_G, MIN_WEIGHT_G, isPositiveFinite, volumeFromMass, type WeightTarget } from './weight';
 
 export const NO_VOLUME_REASON = 'model has no closed metal volume';
+export const OUT_OF_RANGE_REASON = 'measured volume is out of range';
+
+const LIGHTEST = Math.min(...METAL_ALLOYS.map((a) => a.density_g_cm3));
+const HEAVIEST = Math.max(...METAL_ALLOYS.map((a) => a.density_g_cm3));
+
+/**
+ * A volume that weighs between 0.01 g and 10 kg in EVERY metal in the table,
+ * so switching metal can never turn a shown weight into "not available".
+ */
+function isPlausibleVolume(volumeMm3: number): boolean {
+  return (volumeMm3 * LIGHTEST) / 1000 >= MIN_WEIGHT_G && (volumeMm3 * HEAVIEST) / 1000 <= MAX_WEIGHT_G;
+}
 
 export type WeightSource =
   | { available: true; volumeMm3: number; from: 'version' | 'result' | 'mass' }
@@ -28,11 +41,18 @@ export interface WeightSourceInput {
 }
 
 export function pickWeightSource(input: WeightSourceInput): WeightSource {
-  if (isPositiveFinite(input.versionVolumeMm3)) return { available: true, volumeMm3: input.versionVolumeMm3, from: 'version' };
-  if (isPositiveFinite(input.resultVolumeMm3)) return { available: true, volumeMm3: input.resultVolumeMm3, from: 'result' };
-  const fromMass = volumeFromMass(input.resultMassG, input.resultDensityGCm3);
-  if (fromMass !== null) return { available: true, volumeMm3: fromMass, from: 'mass' };
-  return { available: false, reason: NO_VOLUME_REASON };
+  const candidates: Array<[unknown, 'version' | 'result' | 'mass']> = [
+    [input.versionVolumeMm3, 'version'],
+    [input.resultVolumeMm3, 'result'],
+    [volumeFromMass(input.resultMassG, input.resultDensityGCm3), 'mass'],
+  ];
+  let outOfRange = false;
+  for (const [volume, from] of candidates) {
+    if (!isPositiveFinite(volume)) continue;
+    if (isPlausibleVolume(volume)) return { available: true, volumeMm3: volume, from };
+    outOfRange = true;
+  }
+  return { available: false, reason: outOfRange ? OUT_OF_RANGE_REASON : NO_VOLUME_REASON };
 }
 
 /** A stored weight_target ({grams, tolerance_pct, alloy_id}), or null when it has no usable gram figure. */

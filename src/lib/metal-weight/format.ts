@@ -5,7 +5,7 @@
  */
 import { findAlloy, type MetalAlloy } from './alloys';
 import type { WeightSource } from './source';
-import { FINISHING_LOSS, dwtFromGrams, gramsFromVolume, targetStatus, type TargetStatus, type WeightTarget } from './weight';
+import { FINISHING_LOSS, dwtFromGrams, gramsFromVolume, shownPercent, targetStatus, type TargetStatus, type WeightTarget } from './weight';
 
 const MINUS = '−';
 
@@ -18,7 +18,7 @@ export const formatWeight = (grams: number): string => `${formatGrams(grams)} ·
 
 /** "+1.5%", "−14.6%"; anything that rounds to zero reads "0.0%". */
 export function formatPercent(fraction: number): string {
-  const pct = Number((fraction * 100).toFixed(1));
+  const pct = shownPercent(fraction);
   if (pct === 0) return '0.0%';
   return `${pct > 0 ? '+' : MINUS}${Math.abs(pct).toFixed(1)}%`;
 }
@@ -26,7 +26,7 @@ export function formatPercent(fraction: number): string {
 /** "On target +1.5%", "14.6% over", "3.0% under" */
 export function formatTargetStatus(status: TargetStatus): string {
   if (status.kind === 'on') return `On target ${formatPercent(status.deviation)}`;
-  return `${Math.abs(status.deviation * 100).toFixed(1)}% ${status.kind}`;
+  return `${Math.abs(shownPercent(status.deviation)).toFixed(1)}% ${status.kind}`;
 }
 
 /** Follows "≈ 24.10 g". */
