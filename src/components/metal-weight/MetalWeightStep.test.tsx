@@ -32,7 +32,7 @@ function setup() {
 
 const metal = () => screen.getByRole('combobox', { name: 'Metal' });
 const targetInput = () => screen.getByLabelText('Target weight');
-const toleranceInput = () => screen.getByLabelText('Tolerance (±%)');
+const toleranceInput = () => screen.getByLabelText('Allowed difference (±%)');
 
 async function chooseMetal(name: string) {
   fireEvent.keyDown(metal(), { key: 'Enter' });
@@ -40,9 +40,10 @@ async function chooseMetal(name: string) {
 }
 
 describe('MetalWeightStep', () => {
-  it('starts with no metal and no target, tolerance 5', () => {
+  it('starts with no metal and no target, allowed difference 5', () => {
     setup();
-    expect(metal()).toHaveTextContent('Not set');
+    expect(screen.getByRole('group', { name: 'Metal & weight' })).toBeInTheDocument();
+    expect(metal()).toHaveTextContent('Choose metal');
     expect(targetInput()).toHaveValue(null);
     expect(toleranceInput()).toHaveValue(5);
   });
@@ -60,7 +61,7 @@ describe('MetalWeightStep', () => {
     const halves = within(unit).getAllByRole('button');
     expect(halves).toHaveLength(2);
     for (const half of halves) expect(half).toHaveClass('h-full', 'flex-1');
-    expect(screen.getByText('Optional. The model is built to land within this range.')).toBeInTheDocument();
+    expect(screen.getByText("Optional. We'll aim for this weight.")).toBeInTheDocument();
   });
 
   it('offers every cited alloy grouped by family, each with a colour swatch', async () => {
@@ -69,18 +70,27 @@ describe('MetalWeightStep', () => {
     const listbox = await screen.findByRole('listbox');
     // Above the design editor's z-[120] backdrop, as CadModelPicker is.
     expect(document.querySelector('[class~="z-[200]"]')).not.toBeNull();
-    expect(within(listbox).getAllByRole('option')).toHaveLength(22); // Not set + 21
+    expect(within(listbox).getAllByRole('option')).toHaveLength(22); // No metal + 21
     expect(within(listbox).getAllByRole('group')).toHaveLength(4);
     const option = within(listbox).getByRole('option', { name: '18K Rose Gold' });
     expect(option.querySelector('[data-metal-swatch]')).not.toBeNull();
+  });
+
+  it('lists jeweller names (Platinum 950, detail kept for iridium)', async () => {
+    setup();
+    fireEvent.keyDown(metal(), { key: 'Enter' });
+    const listbox = await screen.findByRole('listbox');
+    expect(within(listbox).getByRole('option', { name: 'Platinum 950' })).toBeInTheDocument();
+    expect(within(listbox).getByRole('option', { name: 'Platinum 950 (iridium)' })).toBeInTheDocument();
   });
 
   it('picks a metal', async () => {
     const { last } = setup();
     await chooseMetal('18K Yellow Gold');
     expect(last()).toEqual({ alloyId: 'au18y', target: null });
-    await chooseMetal('Not set');
+    await chooseMetal('No metal');
     expect(last()).toEqual({ alloyId: null, target: null });
+    expect(metal()).toHaveTextContent('Choose metal');
   });
 
   it('sends a gram target with the default tolerance', () => {
@@ -106,14 +116,14 @@ describe('MetalWeightStep', () => {
     expect(onChange.mock.calls.length).toBe(calls);
   });
 
-  it('clamps the tolerance to 0–100', () => {
+  it('clamps the allowed difference to 0–100', () => {
     const { last } = setup();
     fireEvent.change(targetInput(), { target: { value: '28' } });
     fireEvent.change(toleranceInput(), { target: { value: '250' } });
     expect(last().target?.tolerancePct).toBe(100);
   });
 
-  it('sends the tolerance', () => {
+  it('sends the allowed difference', () => {
     const { last } = setup();
     fireEvent.change(targetInput(), { target: { value: '28' } });
     fireEvent.change(toleranceInput(), { target: { value: '3' } });

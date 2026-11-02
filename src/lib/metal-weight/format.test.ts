@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { findAlloy } from './alloys';
 import {
-  FINISHING_NOTE_SHORT,
+  FINISHING_TOOLTIP,
+  formatTargetChip,
   formatPercent,
   formatTagWeight,
   formatTargetStatus,
@@ -22,32 +23,44 @@ describe('format', () => {
     expect(formatPercent(0)).toBe('0.0%');
   });
 
-  it('words the target status', () => {
-    expect(formatTargetStatus({ kind: 'on', deviation: 0.015 })).toBe('On target (+1.5%)');
-    expect(formatTargetStatus({ kind: 'over', deviation: 0.146 })).toBe('14.6% over');
-    expect(formatTargetStatus({ kind: 'under', deviation: -0.03 })).toBe('3.0% under');
+  it('words the target status the way jewellers say it', () => {
+    expect(formatTargetStatus({ kind: 'on', deviation: 0.015 })).toBe('On target');
+    expect(formatTargetStatus({ kind: 'over', deviation: 0.08 })).toBe('8% over target');
+    expect(formatTargetStatus({ kind: 'over', deviation: 0.2129 })).toBe('21.3% over target');
+    expect(formatTargetStatus({ kind: 'under', deviation: -0.03 })).toBe('3% under target');
   });
 
-  it('notes the finishing loss', () => {
-    expect(FINISHING_NOTE_SHORT).toBe('(−5%)');
+  it('shows target grams without trailing zeros', () => {
+    expect(formatTargetChip({ grams: 28, tolerancePct: 5, alloyId: null })).toBe('Target 28 g ±5%');
+    expect(formatTargetChip({ grams: 28.5, tolerancePct: 2.5, alloyId: null })).toBe('Target 28.5 g ±2.5%');
+    expect(formatTargetChip({ grams: 27.975, tolerancePct: 5, alloyId: null })).toBe('Target 27.98 g ±5%');
   });
 
-  it('names the previewed alloy when it is not the one the target was set in', () => {
+  it('notes the finishing loss for the After polish header', () => {
+    expect(FINISHING_TOOLTIP).toBe('About 5% lost in finishing');
+  });
+
+  it('gives the status, with the exact grams for its tooltip', () => {
     const target = { grams: 28, tolerancePct: 5, alloyId: 'au14y' };
-    expect(targetSummary(27.975024, target, findAlloy('au14y')!)?.text).toBe('On target (−0.1%)');
-    expect(targetSummary(33.960276, target, findAlloy('au18y')!)?.text).toBe('21.3% over in 18K Yellow Gold');
-    expect(targetSummary(33.960276, { ...target, alloyId: null }, findAlloy('au18y')!)?.text).toBe('21.3% over');
+    expect(targetSummary(27.975024, target, findAlloy('au14y')!)).toMatchObject({
+      text: 'On target', detail: '27.98 g against a 28 g target (±5%)',
+    });
+    expect(targetSummary(33.960276, target, findAlloy('au18y')!)).toMatchObject({
+      text: '21.3% over target', detail: '33.96 g in 18K Yellow Gold against a 28 g target set in 14K Yellow Gold (±5%)',
+    });
     expect(targetSummary(20, null, findAlloy('au18y')!)).toBeNull();
   });
 
   it('treats a legacy target alloy id as the alloy it maps to', () => {
     const target = { grams: 28, tolerancePct: 5, alloyId: '14k_yellow_gold' };
-    expect(targetSummary(27.975024, target, findAlloy('au14y')!)?.text).toBe('On target (−0.1%)');
+    expect(targetSummary(27.975024, target, findAlloy('au14y')!)?.detail).toBe('27.98 g against a 28 g target (±5%)');
   });
 
   it('builds the download line, or nothing when there is no weight', () => {
     expect(metalWeightLine({ available: true, volumeMm3: 2192.4, from: 'version' }, findAlloy('au14y')!))
-      .toBe('Metal: 14K Yellow Gold · Est. 27.98 g · 17.99 dwt');
+      .toBe('14K Yellow Gold · 27.98 g (17.99 dwt)');
+    expect(metalWeightLine({ available: true, volumeMm3: 2192.4, from: 'version' }, findAlloy('pt950ru')!))
+      .toBe('Platinum 950 · 45.38 g (29.18 dwt)');
     expect(metalWeightLine({ available: false, reason: 'x' }, findAlloy('au14y')!)).toBeNull();
   });
 

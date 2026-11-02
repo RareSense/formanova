@@ -54,10 +54,10 @@ describe('metal weight on the result screen', () => {
   it('card, download line and tag agree for a version with metal_volume_mm3', async () => {
     setup();
     expect(within(card()).getByRole('radio', { name: '14K Yellow Gold' })).toBeChecked();
-    expect(within(card()).getByText('On target (−0.1%)')).toBeInTheDocument();
+    expect(within(card()).getByText('On target')).toBeInTheDocument();
     expect(within(screen.getByTestId('tag')).getByText('28.0 g · 14K')).toBeInTheDocument();
     openDownloads();
-    expect(await screen.findByText('Metal: 14K Yellow Gold · Est. 27.98 g · 17.99 dwt')).toBeInTheDocument();
+    expect(await screen.findByText('14K Yellow Gold · 27.98 g (17.99 dwt)')).toBeInTheDocument();
   });
 
   it('picking a row moves every surface and the look, with no request', async () => {
@@ -66,11 +66,11 @@ describe('metal weight on the result screen', () => {
     fireEvent.click(within(card()).getByRole('radio', { name: '18K Yellow Gold' }));
 
     expect(within(card()).getByRole('radio', { name: '18K Yellow Gold' })).toBeChecked();
-    expect(within(card()).getByText('21.3% over in 18K Yellow Gold')).toBeInTheDocument();
+    expect(within(card()).getByText('21.3% over target')).toBeInTheDocument();
     expect(within(screen.getByTestId('tag')).getByText('34.0 g · 18K')).toBeInTheDocument();
     expect(applyMetalToAll).toHaveBeenCalledWith('gold-yellow-polished');
     openDownloads();
-    expect(await screen.findByText('Metal: 18K Yellow Gold · Est. 33.96 g · 21.84 dwt')).toBeInTheDocument();
+    expect(await screen.findByText('18K Yellow Gold · 33.96 g (21.84 dwt)')).toBeInTheDocument();
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -89,6 +89,6 @@ describe('metal weight on the result screen', () => {
     expect(screen.getByTestId('tag')).toBeEmptyDOMElement();
     openDownloads();
     await screen.findByText('3D preview');
-    expect(screen.queryByText(/^Metal:/)).toBeNull();
+    expect(screen.queryByText(/ g \(.* dwt\)$/)).toBeNull();
   });
 });

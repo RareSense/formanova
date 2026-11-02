@@ -16,7 +16,7 @@ export function WeightTag({ source, alloy, className }: { source: WeightSource; 
   if (grams === null) return null;
   return (
     <span
-      title={`${formatWeight(grams)}, ${alloy.label}`}
+      title={`${formatWeight(grams)}, ${alloy.name}`}
       className={cn('inline-flex items-center gap-1 whitespace-nowrap font-mono text-[10px] tracking-wider text-muted-foreground', className)}
     >
       <Scale aria-hidden="true" className="h-3 w-3 shrink-0" />

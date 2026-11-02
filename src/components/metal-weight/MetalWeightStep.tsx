@@ -5,8 +5,8 @@
  * form allows: one row in the wide image form, two then one in the 460 px
  * ReadyForCad form, stacked on a phone, so no control is ever squeezed:
  *
- *   Metal [● 14K Yellow Gold ▾]   Target weight [ 25 ][ g | dwt ]   Tolerance (±%) [ 5 ]
- *   Optional. The model is built to land within this range.
+ *   Metal [● 14K Yellow Gold ▾]   Target weight [ 25 ][ g | dwt ]   Allowed difference (±%) [ 5 ]
+ *   Optional. We'll aim for this weight.
  *
  * The target can be typed in grams or pennyweight; it is always held in grams.
  * Switching the unit converts the number on screen and leaves the grams alone.
@@ -25,7 +25,7 @@ import { appearanceForAlloy } from './appearance';
 
 type Unit = 'g' | 'dwt';
 
-/** Radix Select cannot hold an empty value, so "no metal" has its own. */
+/** Radix Select cannot hold an empty value, so the "No metal" item has its own. */
 const NONE = 'none';
 const LABEL = 'text-sm text-foreground';
 const FIELD = 'h-10 font-mono text-[13px]';
@@ -74,22 +74,22 @@ export function MetalWeightStep({ value, onChange, disabled = false }: MetalWeig
   };
 
   return (
-    <fieldset disabled={disabled} className="min-w-0 space-y-2">
+    <fieldset disabled={disabled} aria-label="Metal & weight" className="min-w-0 space-y-2">
       <legend className="mb-2 block text-[15px] font-medium text-foreground">Metal &amp; weight</legend>
       <div data-testid="metal-weight-grid" className="grid grid-cols-[repeat(auto-fit,minmax(13rem,1fr))] gap-3">
         <div className="flex min-w-0 flex-col gap-1">
           <label htmlFor={`${ids}-metal`} className={LABEL}>Metal</label>
           <Select
-            value={value.alloyId ?? NONE}
+            value={value.alloyId ?? ''}
             onValueChange={(id) => onChange({ ...value, alloyId: id === NONE ? null : id })}
             disabled={disabled}
           >
             <SelectTrigger id={`${ids}-metal`} aria-label="Metal" className={FIELD}>
-              <SelectValue />
+              <SelectValue placeholder="Choose metal" />
             </SelectTrigger>
             {/* Above the design editor's z-[120] backdrop, as CadModelPicker is. */}
             <SelectContent className="z-[200]">
-              <SelectItem value={NONE} className="font-mono text-[12px]">Not set</SelectItem>
+              <SelectItem value={NONE} className="font-mono text-[12px]">No metal</SelectItem>
               {ALLOY_GROUPS.map((group) => (
                 <SelectGroup key={group.family}>
                   <SelectLabel className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{group.label}</SelectLabel>
@@ -97,7 +97,7 @@ export function MetalWeightStep({ value, onChange, disabled = false }: MetalWeig
                     <SelectItem key={alloy.id} value={alloy.id} className="font-mono text-[12px]">
                       <span className="flex items-center gap-2">
                         <Swatch alloy={alloy} />
-                        {alloy.label}
+                        {alloy.name}
                       </span>
                     </SelectItem>
                   ))}
@@ -142,7 +142,7 @@ export function MetalWeightStep({ value, onChange, disabled = false }: MetalWeig
         </div>
 
         <div className="flex min-w-0 flex-col gap-1">
-          <label htmlFor={`${ids}-tolerance`} className={LABEL}>Tolerance (±%)</label>
+          <label htmlFor={`${ids}-tolerance`} className={LABEL}>Allowed difference (±%)</label>
           <Input
             id={`${ids}-tolerance`}
             type="number"
@@ -156,7 +156,7 @@ export function MetalWeightStep({ value, onChange, disabled = false }: MetalWeig
           />
         </div>
       </div>
-      <p className="text-sm text-muted-foreground">Optional. The model is built to land within this range.</p>
+      <p className="text-sm text-muted-foreground">Optional. We'll aim for this weight.</p>
     </fieldset>
   );
 }

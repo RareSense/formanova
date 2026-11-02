@@ -86,6 +86,15 @@ describe('alloy table', () => {
     expect(ALLOY_GROUPS.flatMap((g) => g.alloys)).toHaveLength(21);
   });
 
+  it('has jeweller names: the label, with platinum detail moved out of the default', () => {
+    for (const a of METAL_ALLOYS) {
+      if (a.family !== 'platinum') expect(a.name).toBe(a.label);
+    }
+    expect(findAlloy('pt950ru')?.name).toBe('Platinum 950');
+    // Kept so two rows never share a name in More metals.
+    expect(findAlloy('pt950ir')?.name).toBe('Platinum 950 (iridium)');
+  });
+
   it('gives a short label for tags', () => {
     expect(['au10y', 'au24', 'ag925', 'pt950ir', 'pd950'].map((id) => alloyShortLabel(findAlloy(id)!)))
       .toEqual(['10K', '24K', '925', 'Pt950', 'Pd950']);

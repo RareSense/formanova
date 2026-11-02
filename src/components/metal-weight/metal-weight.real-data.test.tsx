@@ -106,10 +106,10 @@ describe('real pieces: every cited alloy', () => {
     ['oval ring', OVAL_MM3],
   ])('%s: shown g = volume × cited density ÷ 1000 and dwt = g ÷ 1.55517384, for all 21 alloys', (_name, volume) => {
     render(<VersionScreen version={{ asset_id: 'v', metal_volume_mm3: volume }} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Show all metals' }));
+    fireEvent.click(screen.getByRole('button', { name: 'More metals' }));
     for (const alloy of METAL_ALLOYS) {
       const grams = (volume * Number(alloy.density_cited)) / 1000;
-      expect(rowCells(alloy.label), alloy.id).toEqual([
+      expect(rowCells(alloy.name), alloy.id).toEqual([
         grams.toFixed(2),
         (grams / GRAMS_PER_DWT).toFixed(2),
         (grams * 0.95).toFixed(2),
@@ -203,10 +203,10 @@ describe('request → result round trip', () => {
 
     await waitFor(() => expect(within(card()).getByRole('radio', { name: '14K Yellow Gold' })).toBeChecked());
     expect(rowCells('14K Yellow Gold')).toEqual(['27.98', '17.99', '26.58']);
-    expect(within(card()).getByText('11.9% over')).toBeInTheDocument();
-    expect(within(card()).getByRole('button', { name: /metal weight/i })).toHaveTextContent('Target 25.00 g ±5%');
+    expect(within(card()).getByText('11.9% over target')).toBeInTheDocument();
+    expect(within(card()).getByRole('button', { name: /metal weight/i })).toHaveTextContent('Target 25 g ±5%');
     openDownloads();
-    expect(await screen.findByText('Metal: 14K Yellow Gold · Est. 27.98 g · 17.99 dwt')).toBeInTheDocument();
+    expect(await screen.findByText('14K Yellow Gold · 27.98 g (17.99 dwt)')).toBeInTheDocument();
 
     // The history card for the same version: the tag is 1 dp by design, its
     // tooltip carries the same 2 dp figures as the table and download line.
@@ -249,7 +249,7 @@ describe('legacy and edge paths', () => {
     expect(within(card()).getByText(/Weight not available for this model/)).toBeInTheDocument();
     openDownloads();
     await screen.findByText('3D preview');
-    expect(screen.queryByText(/^Metal:/)).toBeNull();
+    expect(screen.queryByText(/ g \(.* dwt\)$/)).toBeNull();
   });
 
   it('a target in platinum_cobalt (no cited density) shows the default metal and says so', () => {
@@ -261,7 +261,7 @@ describe('legacy and edge paths', () => {
   it('a legacy target id resolves to its new alloy', () => {
     render(<VersionScreen version={{ asset_id: 'v', metal_volume_mm3: CREST_MM3, weight_target: { grams: 34, tolerance_pct: 5, alloy_id: '18k_yellow_gold' } }} />);
     expect(within(card()).getByRole('radio', { name: '18K Yellow Gold' })).toBeChecked();
-    expect(within(card()).getByText('On target (−0.1%)')).toBeInTheDocument();
+    expect(within(card()).getByText('On target')).toBeInTheDocument();
   });
 
   it('a two-tone version notes the total is in the chosen metal', () => {
@@ -274,7 +274,7 @@ describe('legacy and edge paths', () => {
     render(<VersionScreen version={{ asset_id: 'v', metal_volume_mm3: CREST_MM3 }} />);
     expect(within(card()).getByRole('radio', { name: '18K Yellow Gold' })).toBeChecked();
     openDownloads();
-    expect(await screen.findByText('Metal: 18K Yellow Gold · Est. 33.96 g · 21.84 dwt')).toBeInTheDocument();
+    expect(await screen.findByText('18K Yellow Gold · 33.96 g (21.84 dwt)')).toBeInTheDocument();
   });
 
   it('the table and the Material panel are one choice: each moves the other', async () => {

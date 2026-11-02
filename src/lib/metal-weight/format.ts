@@ -23,38 +23,50 @@ export function formatPercent(fraction: number): string {
   return `${pct > 0 ? '+' : MINUS}${Math.abs(pct).toFixed(1)}%`;
 }
 
-/** "On target (+1.5%)", "14.6% over", "3.0% under" */
+/** Grams without trailing zeros, for targets people typed: "28 g", "28.5 g". */
+export const formatGramsShort = (grams: number): string => `${Number(grams.toFixed(2))} g`;
+
+/** "On target", "8% over target", "21.3% under target": decided on the same 1 dp figure. */
 export function formatTargetStatus(status: TargetStatus): string {
-  if (status.kind === 'on') return `On target (${formatPercent(status.deviation)})`;
-  return `${Math.abs(shownPercent(status.deviation)).toFixed(1)}% ${status.kind}`;
+  if (status.kind === 'on') return 'On target';
+  return `${Math.abs(shownPercent(status.deviation))}% ${status.kind} target`;
 }
 
-/** "(−5%)", after "Finished". */
-export const FINISHING_NOTE_SHORT = `(${MINUS}${FINISHING_LOSS * 100}%)`;
+/** "Target 28 g ±5%" */
+export const formatTargetChip = (target: WeightTarget): string =>
+  `Target ${formatGramsShort(target.grams)} ±${target.tolerancePct}%`;
+
+/** The After polish header's tooltip. */
+export const FINISHING_TOOLTIP = `About ${FINISHING_LOSS * 100}% lost in finishing`;
 
 /**
- * The target status for the weight in the alloy on screen. When that alloy is
- * not the one the target was set in, the text says which metal it compares,
- * because a different metal moving the weight is the whole point of the preview.
+ * The target status for the weight in the alloy on screen, short, with the
+ * exact grams for its tooltip. When the shown metal is not the one the target
+ * was set in, the tooltip says so: a different metal moving the weight is the
+ * whole point of the preview.
  */
 export function targetSummary(
   weightG: number,
   target: WeightTarget | null,
   alloy: MetalAlloy,
-): { status: TargetStatus; text: string } | null {
+): { status: TargetStatus; text: string; detail: string } | null {
   if (!target) return null;
   const status = targetStatus(weightG, target);
   if (!status) return null;
-  const otherAlloy = target.alloyId !== null && findAlloy(target.alloyId)?.id !== alloy.id;
-  const text = formatTargetStatus(status);
-  return { status, text: otherAlloy ? `${text} in ${alloy.label}` : text };
+  const targetAlloy = target.alloyId === null ? null : findAlloy(target.alloyId);
+  const against = `against a ${formatGramsShort(target.grams)} target`;
+  const tol = `(±${target.tolerancePct}%)`;
+  const detail = targetAlloy && targetAlloy.id !== alloy.id
+    ? `${formatGrams(weightG)} in ${alloy.name} ${against} set in ${targetAlloy.name} ${tol}`
+    : `${formatGrams(weightG)} ${against} ${tol}`;
+  return { status, text: formatTargetStatus(status), detail };
 }
 
-/** "Metal: 10K Yellow Gold · Est. 25.37 g · 16.31 dwt", or null when there is no weight to stand behind. */
+/** "14K Yellow Gold · 27.98 g (17.99 dwt)", or null when there is no weight to stand behind. */
 export function metalWeightLine(source: WeightSource, alloy: MetalAlloy): string | null {
   if (!source.available) return null;
   const grams = gramsFromVolume(source.volumeMm3, alloy);
-  return grams === null ? null : `Metal: ${alloy.label} · Est. ${formatWeight(grams)}`;
+  return grams === null ? null : `${alloy.name} · ${formatGrams(grams)} (${formatDwt(dwtFromGrams(grams))})`;
 }
 
 /** "25.4 g", for the small version and history tag. */
