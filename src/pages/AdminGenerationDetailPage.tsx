@@ -5,14 +5,11 @@ import {
   AlertTriangle,
   ArrowLeft,
   ChevronDown,
-  Download,
   ImageOff,
   Loader2,
   MessageSquareWarning,
 } from 'lucide-react';
 
-import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
-import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { azureUriToUrl } from '@/lib/azure-utils';
 import {
   AdminGenerationsApiError,
@@ -39,9 +36,18 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import { toast } from 'sonner';
 import { parseServerTime } from '@/lib/server-time';
+import { costView, USER_PAID_HELP, WORKFLOW_COST_HELP } from '@/lib/admin-cost-display';
+import { readProviderSpend } from '@/lib/admin-provider-spend';
+import { buildRunView } from '@/lib/admin-workflow-views';
+import { findNodes } from '@/lib/admin-workflow-views/walker';
+import { CostLabel, ProviderSpendBlock, WorkflowCostValue } from '@/components/admin/AdminCost';
+import { FileLink } from '@/components/admin/workflow-view/FileLink';
+import { ImageThumb } from '@/components/admin/workflow-view/ImageThumb';
+import { JsonBlock } from '@/components/admin/workflow-view/JsonBlock';
+import { LabelledValue } from '@/components/admin/workflow-view/LabelledValue';
+import { NodeView } from '@/components/admin/workflow-view/NodeView';
+import { StepTimeline } from '@/components/admin/workflow-view/StepTimeline';
 
 function formatDateTime(value: string | null): string {
   if (!value) return '-';
@@ -54,64 +60,9 @@ function formatDateTime(value: string | null): string {
   }).format(parseServerTime(value));
 }
 
-function formatDuration(value: number | null): string {
-  if (value === null || value === undefined) return '-';
-  return `${value.toLocaleString()} ms`;
-}
-
-function formatCredits(value: number | null): string {
-  if (value === null || Number.isNaN(value)) return '-';
-  return `${new Intl.NumberFormat(undefined, {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 4,
-  }).format(value)} credits`;
-}
-
 function formatUserType(value: string | null): string {
   if (!value) return '-';
   return value.replace(/_/g, ' ');
-}
-
-function extractImageUrls(value: unknown): string[] {
-  const urls = new Set<string>();
-
-  function add(value: string) {
-    const normalized = value.toLowerCase();
-    if (
-      value.startsWith('data:image/') ||
-      /\.(png|jpg|jpeg|webp|gif|bmp|svg)(\?|$)/i.test(normalized)
-    ) {
-      urls.add(value);
-    }
-  }
-
-  function visit(node: unknown, key = '') {
-    if (typeof node === 'string') {
-      const imageKey = /(^|_)(image|thumbnail|preview|screenshot)(_|$)/i.test(key);
-      if (imageKey && isRenderableUrl(node)) {
-        urls.add(node);
-      } else {
-        add(node);
-      }
-      return;
-    }
-    if (Array.isArray(node)) {
-      node.forEach((item) => visit(item, key));
-      return;
-    }
-    if (node && typeof node === 'object') {
-      const record = node as Record<string, unknown>;
-      const mime = typeof record.type === 'string' ? record.type : typeof record.mime === 'string' ? record.mime : '';
-      const artifactUrl = typeof record.url === 'string' ? record.url : typeof record.uri === 'string' ? record.uri : null;
-      if (mime.toLowerCase().startsWith('image/') && artifactUrl && isRenderableUrl(artifactUrl)) {
-        urls.add(artifactUrl);
-      }
-      Object.entries(record).forEach(([childKey, child]) => visit(child, childKey));
-    }
-  }
-
-  visit(value);
-  return Array.from(urls);
 }
 
 function extractTypedImageArtifacts(value: unknown): string[] {
@@ -138,14 +89,6 @@ function normalizeRenderableUrl(value: string | null): string | null {
   if (!value) return null;
   if (!isRenderableUrl(value)) return null;
   return azureUriToUrl(value) || value;
-}
-
-function firstRenderableUrl(values: Array<string | null | undefined>): string | null {
-  for (const value of values) {
-    const normalized = normalizeRenderableUrl(value ?? null);
-    if (normalized) return normalized;
-  }
-  return null;
 }
 
 function findString(value: unknown, keys: string[]): string | null {
@@ -294,31 +237,6 @@ function MetaItem({ label, value }: { label: string; value: string }) {
   );
 }
 
-function JsonBlock({ title, value, defaultOpen = false }: { title: string; value: unknown; defaultOpen?: boolean }) {
-  const [open, setOpen] = useState(defaultOpen);
-  const formatted = useMemo(() => JSON.stringify(value ?? {}, null, 2), [value]);
-
-  return (
-    <Collapsible open={open} onOpenChange={setOpen}>
-      <div className="rounded-md border border-border">
-        <CollapsibleTrigger asChild>
-          <button type="button" className="flex w-full items-center justify-between px-4 py-3 text-left">
-            <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{title}</span>
-            <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
-          </button>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className="border-t border-border bg-muted/20 p-4">
-            <pre className="overflow-x-auto whitespace-pre-wrap break-all font-mono text-xs text-muted-foreground">
-              {formatted}
-            </pre>
-          </div>
-        </CollapsibleContent>
-      </div>
-    </Collapsible>
-  );
-}
-
 function CollapsibleCardSection({
   title,
   children,
@@ -349,46 +267,6 @@ function CollapsibleCardSection({
   );
 }
 
-function ImagePreview({ url, label, zoomable = false }: { url: string | null; label: string; zoomable?: boolean }) {
-  const resolvedUrl = useAuthenticatedImage(url);
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div className="space-y-2">
-      <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{label}</p>
-      <div className="overflow-hidden rounded-md border border-border bg-muted/20">
-        {url ? (
-          resolvedUrl ? (
-            zoomable ? (
-              <>
-                <button type="button" className="block w-full cursor-zoom-in" onClick={() => setOpen(true)} aria-label={`Open ${label} full size`}>
-                  <img src={resolvedUrl} alt={label} className="max-h-72 w-full object-contain" />
-                </button>
-                <Dialog open={open} onOpenChange={setOpen}>
-                  <DialogContent className="max-w-[min(96vw,1400px)] p-3 sm:p-4">
-                    <DialogTitle className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{label}</DialogTitle>
-                    <img src={resolvedUrl} alt={label} className="max-h-[85vh] w-full object-contain" />
-                  </DialogContent>
-                </Dialog>
-              </>
-            ) : (
-              <img src={resolvedUrl} alt={label} className="max-h-72 w-full object-contain" />
-            )
-          ) : (
-            <div className="flex h-40 items-center justify-center">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
-          )
-        ) : (
-          <div className="flex h-40 items-center justify-center">
-            <ImageOff className="h-5 w-5 text-muted-foreground/50" />
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 /** What the customer sent: prompt, details and every picture with its role. */
 function StudioInputs({ inputs }: { inputs: AdminRunInputs }) {
   return (
@@ -411,7 +289,7 @@ function StudioInputs({ inputs }: { inputs: AdminRunInputs }) {
           <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Images (Input)</p>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {inputs.images.map((image, index) => (
-              <ImagePreview key={`${image.url}-${index}`} url={image.url} label={image.label} zoomable />
+              <ImageThumb key={`${image.url}-${index}`} url={image.url} label={image.label} />
             ))}
           </div>
         </div>
@@ -462,9 +340,9 @@ function DesignHistorySection({ history }: { history: DesignHistory }) {
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {step.images.map((image, i) => (
-                <ImagePreview key={`${image.url}-${i}`} url={image.url} label={image.label} zoomable />
+                <ImageThumb key={`${image.url}-${i}`} url={image.url} label={image.label} />
               ))}
-              {step.outputUrl && <ImagePreview url={step.outputUrl} label="Design made" zoomable />}
+              {step.outputUrl && <ImageThumb url={step.outputUrl} label="Design made" />}
             </div>
           </li>
         ))}
@@ -643,7 +521,7 @@ export function RunInputsPanel({ detail }: { detail: AdminGenerationDetail }) {
       ) : jewelryInputUrls.length > 0 ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {jewelryInputUrls.map((url, index) => (
-            <ImagePreview key={`${url}-${index}`} url={url} label={`Uploaded Image ${index + 1}`} zoomable />
+            <ImageThumb key={`${url}-${index}`} url={url} label={`Uploaded Image ${index + 1}`} />
           ))}
         </div>
       ) : null}
@@ -654,14 +532,37 @@ export function RunInputsPanel({ detail }: { detail: AdminGenerationDetail }) {
   );
 }
 
+/** A titled page section; its title names the region (Inputs, Steps, Outputs). */
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  const id = `admin-section-${title.toLowerCase()}`;
+  return (
+    <section aria-labelledby={id}>
+      <Card>
+        <CardHeader>
+          <CardTitle id={id} className="font-display text-2xl tracking-wide">{title}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5">{children}</CardContent>
+      </Card>
+    </section>
+  );
+}
+
+/**
+ * Any run, any workflow: the request payload, every step's input and output, and the last
+ * successful step's output, all walked schema-free (admin-workflow-views). The family only
+ * adds labels and order. CAD runs also get the design trail behind them, and the /result
+ * 3DM / GLB as a fallback when no step output carries one.
+ */
 export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
-  // Both CAD families produce a GLB. Image-to-CAD (including ring_cad_nurbs_v1)
-  // was excluded here, so its runs always rendered
-  // "No 3D output" no matter what the pipeline returned.
   const {
-    cadSourceType, isCadModel, studioInputs, designHistory, designHistoryQuery, fromDoodle, payloadRoots,
-    jewelryInputUrls, cadInputs,
+    cadSourceType, isCadModel: isCadSource, designHistory, designHistoryQuery, fromDoodle,
   } = useCadRunInputs(detail);
+  const view = useMemo(() => buildRunView(detail, isCadSource), [detail, isCadSource]);
+  // cad_to_catalog_* names contain "cad" but are not CAD models; the registry decides.
+  const isCadModel = view.family === 'cad_model';
+  const failedSteps = view.steps.filter((s) => s.failed).length;
+  const cost = costView(detail.actual_cost, detail.total_provider_cost, { failedSteps });
+  const spend = useMemo(() => readProviderSpend(detail.steps), [detail.steps]);
   const cadResultQuery = useQuery({
     queryKey: ['admin-cad-result', detail.workflow_id],
     queryFn: () => fetchCadResult(detail.workflow_id),
@@ -685,247 +586,121 @@ export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
     retry: false,
   });
   const appliedTiers = supervisedQuery.data?.supervision.tiers ?? null;
-  const [downloading3dm, setDownloading3dm] = useState(false);
-  const isDesignImage = isDesignImageWorkflow(detail.workflow_name);
-  const cadGlbUrl = isCadModel
-    ? cadResultQuery.data?.glb_url ?? extractGlbFromSteps(detail.steps)
-    : null;
-  const cadThreedmUrl = isCadModel ? cadResultQuery.data?.threedm_url ?? null : null;
+  // Files from the step outputs come first: /api/result/{id} answers 403 to an admin
+  // viewing another user's run (docs/admin-backend-handoff-2026-11-02.md), so it is only a
+  // fallback when the final output carries no 3DM / GLB.
+  const outputMedia = view.outputs ? findNodes(view.outputs.node, (n) => n.kind === 'media') : [];
+  const hasModel = outputMedia.some((n) => n.kind === 'media' && n.media === 'model3d');
+  const has3dm = outputMedia.some((n) => n.kind === 'media' && n.ext === '3dm');
+  const fallbackGlb = isCadModel && !hasModel ? cadResultQuery.data?.glb_url ?? extractGlbFromSteps(detail.steps) : null;
+  const fallback3dm = isCadModel && !has3dm ? cadResultQuery.data?.threedm_url ?? null : null;
+  const complaintOutput = !view.outputs ? detail.feedback?.output_image_url ?? null : null;
   const cadSourceLabel = !isCadModel ? null : fromDoodle ? 'CAD from Doodle' : cadFlowLabel(detail.input_payload) ?? (cadSourceType === 'text_to_cad'
     ? 'Text to CAD'
     : cadSourceType === 'image_to_cad'
       ? 'Image to CAD'
       : null);
-
-  async function handleDownload3dm() {
-    if (!cadThreedmUrl || downloading3dm) return;
-    setDownloading3dm(true);
-    try {
-      const response = await authenticatedFetch(cadThreedmUrl);
-      if (!response.ok) throw new Error(`3DM download failed: ${response.status}`);
-      const blob = await response.blob();
-      if (blob.size === 0) throw new Error('3DM download was empty');
-      const blobUrl = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = blobUrl;
-      anchor.download = `${detail.workflow_id}.3dm`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
-    } catch (error) {
-      console.error('[Admin CAD 3DM download]', error);
-      toast.error('Failed to download the 3DM file');
-    } finally {
-      setDownloading3dm(false);
-    }
-  }
-
-  const stepOutputImageUrls = detail.steps.flatMap((step) =>
-    extractImageUrls(step.output)
-      .map((value) => normalizeRenderableUrl(value))
-      .filter((value): value is string => Boolean(value)),
-  );
-  const inspirationImageUrl = firstRenderableUrl(
-    payloadRoots.flatMap((root) => [
-      findString(root, ['inspiration_image_url']),
-      ...findStringArray(root, ['inspiration_image_urls']),
-    ]),
-  );
-  const modelImageUrl = firstRenderableUrl(
-    payloadRoots.map((root) => findString(root, ['model_image_url', 'model_url'])),
-  );
-  const outputImageUrl = firstRenderableUrl([
-    detail.feedback?.output_image_url ?? null,
-    findString(detail.input_payload, ['output_image_url', 'output_url', 'image_url', 'result_url']),
-    // Final render is the LAST image produced across steps; earlier steps now emit
-    // intermediate images (e.g. the model image), so [0] would mislabel them as output.
-    stepOutputImageUrls[stepOutputImageUrls.length - 1],
-  ]);
-  const category =
-    detail.feedback?.category ??
-    findText(detail.input_payload, ['category', 'jewelry_category', 'jewelry_type', 'product_category']) ??
-    '-';
-  const referenceImage = inspirationImageUrl
-    ? { url: inspirationImageUrl, label: 'Inspiration Image' }
-    : modelImageUrl
-      ? { url: modelImageUrl, label: 'Model Image' }
-      : null;
-  // Show every jewelry input the workflow received (High Effort sends up to 3),
-  // not just the cover. Keep a single labeled placeholder when none resolved.
-  const jewelryEntries = jewelryInputUrls.length
-    ? jewelryInputUrls.map((url, i) => ({
-        url,
-        label: jewelryInputUrls.length > 1 ? `Jewelry Input ${i + 1}` : 'Jewelry Input',
-      }))
-    : [{ url: null, label: 'Jewelry Input' }];
-  const visualSummaryImages = [
-    ...jewelryEntries,
-    ...(referenceImage ? [referenceImage] : []),
-    { url: outputImageUrl, label: 'Output Image' },
-  ];
+  const opts = { enh: view.enh, fallbackStem: detail.workflow_id };
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader className="space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="space-y-1">
-              <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Workflow</p>
-              <CardTitle className="font-display text-3xl tracking-wide">
-                {detail.workflow_name || detail.workflow_id}
-              </CardTitle>
+      <section aria-labelledby="admin-section-run">
+        <Card>
+          <CardHeader className="space-y-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="space-y-1">
+                <p id="admin-section-run" className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Run</p>
+                <CardTitle className="break-all font-display text-3xl tracking-wide">
+                  {detail.workflow_name || detail.workflow_id}
+                </CardTitle>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <StatusBadge status={detail.status} />
+                <PayingBadge isPaying={detail.is_paying} />
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <StatusBadge status={detail.status} />
-              <PayingBadge isPaying={detail.is_paying} />
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          <MetaItem label="User Email" value={detail.user_email || '-'} />
-          <MetaItem label="User Type" value={formatUserType(detail.user_type)} />
-          <MetaItem label="Created" value={formatDateTime(detail.created_at)} />
-          <MetaItem label="Finished" value={formatDateTime(detail.finished_at)} />
-          <MetaItem label="Actual Cost" value={formatCredits(detail.actual_cost)} />
-          <MetaItem label="Provider Cost" value={formatCredits(detail.total_provider_cost)} />
-          <MetaItem label="Workflow ID" value={detail.workflow_id} />
-          <MetaItem label="Status" value={detail.status.replace(/_/g, ' ')} />
-          {cadSourceLabel && <MetaItem label="CAD Source" value={cadSourceLabel} />}
-          {isCadModel && (
-            <div className="space-y-1 sm:col-span-2 lg:col-span-4">
-              <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">AI</p>
-              <p className="text-sm">
-                {`Submitted: ${tiersText(submittedTier(detail.input_payload, 'llm_tier'), submittedTier(detail.input_payload, 'analysis_tier'))}`}
-              </p>
-              {appliedTiers && (
-                <p className="text-sm">{`Applied at Start: ${tiersText(appliedTiers.llm_tier, appliedTiers.analysis_tier)}`}</p>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              <MetaItem label="User Email" value={detail.user_email || '-'} />
+              <MetaItem label="User Type" value={formatUserType(detail.user_type)} />
+              <MetaItem label="Created" value={formatDateTime(detail.created_at)} />
+              <MetaItem label="Finished" value={formatDateTime(detail.finished_at)} />
+              <LabelledValue label={<CostLabel label="User paid" help={USER_PAID_HELP} />} value={cost.userPaid} />
+              <LabelledValue label={<CostLabel label="Workflow cost" help={WORKFLOW_COST_HELP} />} value={<WorkflowCostValue view={cost} />} />
+              <MetaItem label="Workflow ID" value={detail.workflow_id} />
+              <MetaItem label="Status" value={detail.status.replace(/_/g, ' ')} />
+              {cadSourceLabel && <MetaItem label="CAD Source" value={cadSourceLabel} />}
+              {isCadModel && (
+                <div className="space-y-1 sm:col-span-2 lg:col-span-4">
+                  <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">AI</p>
+                  <p className="text-sm">
+                    {`Submitted: ${tiersText(submittedTier(detail.input_payload, 'llm_tier'), submittedTier(detail.input_payload, 'analysis_tier'))}`}
+                  </p>
+                  {appliedTiers && (
+                    <p className="text-sm">{`Applied at Start: ${tiersText(appliedTiers.llm_tier, appliedTiers.analysis_tier)}`}</p>
+                  )}
+                </div>
               )}
             </div>
-          )}
-        </CardContent>
-      </Card>
+            <ProviderSpendBlock spend={spend} />
+          </CardContent>
+        </Card>
+      </section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-display text-2xl tracking-wide">Visual Summary</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            <MetaItem label="Category" value={category} />
-            <MetaItem label="User Type" value={formatUserType(detail.user_type)} />
-            <MetaItem label="Plan" value={detail.is_paying ? 'Paying' : 'Free'} />
-            <MetaItem label="Complaint" value={detail.feedback ? 'Yes' : 'No'} />
+      <Section title="Inputs">
+        {isCadModel && (designHistory ? (
+          <DesignHistorySection history={designHistory} />
+        ) : designHistoryQuery.isLoading ? (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading design steps
           </div>
+        ) : null)}
+        <NodeView node={view.inputs} opts={opts} />
+      </Section>
 
-          {isCadModel ? (
-            <div className="space-y-4">
-              {designHistory ? (
-                <DesignHistorySection history={designHistory} />
-              ) : designHistoryQuery.isLoading ? (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" /> Loading design steps
-                </div>
-              ) : null}
-              {cadInputs && <StudioInputs inputs={cadInputs} />}
-              <div className="space-y-2">
-                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">3D Preview (Output)</p>
-                {cadGlbUrl ? (
-                  // Use the same shared renderer, studio lighting and jewelry
-                  // palette as Generation History, at a useful inspection size.
-                  <div className="w-full max-w-2xl">
-                    <ScissorGLBGrid>
-                      <GLBPreviewSlot
-                        id={detail.workflow_id}
-                        glbUrl={cadGlbUrl}
-                        className="min-h-[360px] w-full aspect-[4/3] rounded-md border border-border bg-muted/20"
-                        forceJewelryPalette
-                      />
-                    </ScissorGLBGrid>
-                  </div>
-                ) : cadResultQuery.isLoading ? (
-                  <div className="flex min-h-[360px] w-full max-w-2xl aspect-[4/3] items-center justify-center rounded-md border border-border bg-muted/20">
-                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                  </div>
-                ) : (
-                  <div className="flex min-h-[360px] w-full max-w-2xl aspect-[4/3] items-center justify-center rounded-md border border-border bg-muted/20">
-                    <div className="flex flex-col items-center gap-2 text-muted-foreground/50">
-                      <ImageOff className="h-6 w-6" />
-                      <span className="font-mono text-[10px] uppercase tracking-widest text-center">No 3D output</span>
-                    </div>
-                  </div>
-                )}
-                {cadThreedmUrl && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={handleDownload3dm}
-                    disabled={downloading3dm}
-                    className="font-mono text-[10px] uppercase tracking-widest"
-                  >
-                    {downloading3dm ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                    Download 3DM
-                  </Button>
-                )}
-              </div>
+      <Section title="Steps">
+        <StepTimeline steps={view.steps} enh={view.enh} fallbackStem={detail.workflow_id} />
+      </Section>
+
+      <Section title="Outputs">
+        {view.outputs ? (
+          <>
+            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              {`From step ${view.outputs.stepIndex}: ${view.outputs.tool}`}
+            </p>
+            <NodeView node={view.outputs.node} opts={{ ...opts, tool: view.outputs.tool, autoPreview3d: true }} />
+          </>
+        ) : complaintOutput ? (
+          <ImageThumb url={complaintOutput} label="Output image (from complaint)" />
+        ) : (
+          <p className="text-sm text-muted-foreground">This run recorded no successful step output.</p>
+        )}
+        {fallbackGlb && (
+          <div className="space-y-2">
+            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">3D preview (from the run result)</p>
+            <div className="w-full max-w-2xl">
+              <ScissorGLBGrid>
+                <GLBPreviewSlot
+                  id={detail.workflow_id}
+                  glbUrl={fallbackGlb}
+                  className="min-h-[320px] w-full aspect-[4/3] rounded-md border border-border bg-muted/20"
+                  forceJewelryPalette
+                />
+              </ScissorGLBGrid>
             </div>
-          ) : isDesignImage && studioInputs ? (
-            <div className="space-y-4">
-              <StudioInputs inputs={studioInputs} />
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <ImagePreview url={outputImageUrl} label="Output Image" />
-              </div>
-            </div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              {visualSummaryImages.map((image) => (
-                <ImagePreview key={`${image.label}-${image.url ?? 'missing'}`} url={image.url} label={image.label} />
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        )}
+        {fallback3dm && (
+          <FileLink file={{ label: '3DM (from the run result)', url: fallback3dm, name: `${detail.workflow_id}.3dm`, bytes: null, ext: '3dm' }} fallbackStem={detail.workflow_id} />
+        )}
+      </Section>
 
       <CollapsibleCardSection title="Input Payload">
         <p className="mb-2 text-xs text-muted-foreground">
           Raw JSON shows the submitted request; the AI actually used is under 'Applied at Start'.
         </p>
         <JsonBlock title="Raw JSON" value={detail.input_payload} />
-      </CollapsibleCardSection>
-
-      <CollapsibleCardSection title="Processing Steps">
-        <div className="space-y-4">
-          {detail.steps.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No processing steps were returned for this workflow.</p>
-          ) : (
-            detail.steps.map((step, index) => {
-              const stepImageUrls = extractImageUrls(step.output)
-                .map((value) => normalizeRenderableUrl(value))
-                .filter((value): value is string => Boolean(value));
-              return (
-                <div key={`${step.tool_name}-${index}`} className="rounded-md border border-border">
-                  <div className="grid gap-4 border-b border-border px-4 py-4 sm:grid-cols-4">
-                    <MetaItem label="Step" value={`${index + 1}. ${step.tool_name}`} />
-                    <MetaItem label="Duration" value={formatDuration(step.took_ms)} />
-                    <MetaItem label="Timestamp" value={formatDateTime(step.at)} />
-                    <MetaItem label="Tool" value={step.tool_name} />
-                  </div>
-                  <div className="space-y-3 p-4">
-                    <JsonBlock title="Input" value={step.input} />
-                    <JsonBlock title="Output" value={step.output} />
-                    {stepImageUrls.length > 0 && (
-                      <div className="grid gap-4 md:grid-cols-2">
-                        {stepImageUrls.map((url) => (
-                          <ImagePreview key={url} url={url} label="Step Output Image" />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
       </CollapsibleCardSection>
 
       {detail.feedback && (
@@ -939,13 +714,13 @@ export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
             </div>
             <div className="space-y-2">
               <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Complaint Text</p>
-              <p className="text-sm leading-relaxed">{detail.feedback.complaint || '-'}</p>
+              <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{detail.feedback.complaint || '-'}</p>
             </div>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {(detail.feedback.input_image_urls ?? []).map((url, index) => (
-                <ImagePreview key={`${url}-${index}`} url={url} label={`Input Image ${index + 1}`} />
+                <ImageThumb key={`${url}-${index}`} url={url} label={`Input Image ${index + 1}`} />
               ))}
-              <ImagePreview url={detail.feedback.output_image_url} label="Output Image" />
+              <ImageThumb url={detail.feedback.output_image_url} label="Output Image" />
             </div>
           </div>
         </CollapsibleCardSection>
