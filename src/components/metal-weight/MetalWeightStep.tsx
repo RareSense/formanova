@@ -1,7 +1,9 @@
 /**
  * The request form's "Metal & weight" step: the metal to build and weigh the
  * piece in, and an optional target weight with a tolerance. Three equal
- * controls on one grid (one row on desktop, stacked on phone), all h-10:
+ * controls on one grid, all h-10. The grid fits as many 13rem columns as the
+ * form allows: one row in the wide image form, two then one in the 460 px
+ * ReadyForCad form, stacked on a phone, so no control is ever squeezed:
  *
  *   Metal [● 14K Yellow Gold ▾]   Target weight [ 25 ][ g | dwt ]   Tolerance (±%) [ 5 ]
  *   Optional. The model is built to land within this range.
@@ -74,7 +76,7 @@ export function MetalWeightStep({ value, onChange, disabled = false }: MetalWeig
   return (
     <fieldset disabled={disabled} className="min-w-0 space-y-2">
       <legend className="mb-2 block text-[15px] font-medium text-foreground">Metal &amp; weight</legend>
-      <div data-testid="metal-weight-grid" className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div data-testid="metal-weight-grid" className="grid grid-cols-[repeat(auto-fit,minmax(13rem,1fr))] gap-3">
         <div className="flex min-w-0 flex-col gap-1">
           <label htmlFor={`${ids}-metal`} className={LABEL}>Metal</label>
           <Select
@@ -85,7 +87,8 @@ export function MetalWeightStep({ value, onChange, disabled = false }: MetalWeig
             <SelectTrigger id={`${ids}-metal`} aria-label="Metal" className={FIELD}>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            {/* Above the design editor's z-[120] backdrop, as CadModelPicker is. */}
+            <SelectContent className="z-[200]">
               <SelectItem value={NONE} className="font-mono text-[12px]">Not set</SelectItem>
               {ALLOY_GROUPS.map((group) => (
                 <SelectGroup key={group.family}>
@@ -119,7 +122,7 @@ export function MetalWeightStep({ value, onChange, disabled = false }: MetalWeig
               onChange={(e) => { setTargetText(e.target.value); emitTarget(e.target.value, unit, toleranceText); }}
               className={cn(FIELD, 'min-w-0 flex-1')}
             />
-            <div role="group" aria-label="Weight unit" className="flex w-28 shrink-0 overflow-hidden rounded-md border border-input">
+            <div role="group" aria-label="Weight unit" className="box-border flex h-10 w-24 shrink-0 overflow-hidden rounded-md border border-input">
               {(['g', 'dwt'] as const).map((u) => (
                 <button
                   key={u}
@@ -127,7 +130,7 @@ export function MetalWeightStep({ value, onChange, disabled = false }: MetalWeig
                   aria-pressed={unit === u}
                   onClick={() => switchUnit(u)}
                   className={cn(
-                    'h-10 flex-1 font-mono text-[13px] transition-colors',
+                    'h-full flex-1 font-mono text-[13px] transition-colors',
                     unit === u ? 'bg-foreground text-background' : 'bg-background text-muted-foreground hover:text-foreground',
                   )}
                 >

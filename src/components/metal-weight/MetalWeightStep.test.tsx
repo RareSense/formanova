@@ -50,11 +50,16 @@ describe('MetalWeightStep', () => {
   it('lays the three controls out on one grid at one height, with the hint under them', () => {
     setup();
     const grid = screen.getByTestId('metal-weight-grid');
-    expect(grid).toHaveClass('grid', 'sm:grid-cols-3');
+    // Equal columns of at least 13rem: three across in a wide form, fewer in a
+    // narrow one (ReadyForCad is 460 px), one on a phone. Never squeezed.
+    expect(grid).toHaveClass('grid', 'grid-cols-[repeat(auto-fit,minmax(13rem,1fr))]');
     for (const control of [metal(), targetInput(), toleranceInput()]) expect(control).toHaveClass('h-10');
-    const halves = within(screen.getByRole('group', { name: 'Weight unit' })).getAllByRole('button');
+    // The toggle box itself is h-10 (its border inside it), halves fill it equally.
+    const unit = screen.getByRole('group', { name: 'Weight unit' });
+    expect(unit).toHaveClass('h-10', 'box-border');
+    const halves = within(unit).getAllByRole('button');
     expect(halves).toHaveLength(2);
-    for (const half of halves) expect(half).toHaveClass('h-10', 'flex-1');
+    for (const half of halves) expect(half).toHaveClass('h-full', 'flex-1');
     expect(screen.getByText('Optional. The model is built to land within this range.')).toBeInTheDocument();
   });
 
@@ -62,6 +67,8 @@ describe('MetalWeightStep', () => {
     setup();
     fireEvent.keyDown(metal(), { key: 'Enter' });
     const listbox = await screen.findByRole('listbox');
+    // Above the design editor's z-[120] backdrop, as CadModelPicker is.
+    expect(document.querySelector('[class~="z-[200]"]')).not.toBeNull();
     expect(within(listbox).getAllByRole('option')).toHaveLength(22); // Not set + 21
     expect(within(listbox).getAllByRole('group')).toHaveLength(4);
     const option = within(listbox).getByRole('option', { name: '18K Rose Gold' });
