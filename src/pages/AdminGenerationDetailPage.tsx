@@ -41,9 +41,11 @@ import { costView, USER_PAID_HELP, WORKFLOW_COST_HELP } from '@/lib/admin-cost-d
 import { readProviderSpend } from '@/lib/admin-provider-spend';
 import { buildRunView } from '@/lib/admin-workflow-views';
 import { findNodes } from '@/lib/admin-workflow-views/walker';
+import { buildIoSummary } from '@/lib/admin-workflow-views/io-summary';
 import { CostLabel, ProviderSpendBlock, WorkflowCostValue } from '@/components/admin/AdminCost';
 import { FileLink } from '@/components/admin/workflow-view/FileLink';
 import { ImageThumb } from '@/components/admin/workflow-view/ImageThumb';
+import { IoSummarySection } from '@/components/admin/workflow-view/IoSummary';
 import { JsonBlock } from '@/components/admin/workflow-view/JsonBlock';
 import { LabelledValue } from '@/components/admin/workflow-view/LabelledValue';
 import { NodeView } from '@/components/admin/workflow-view/NodeView';
@@ -601,6 +603,12 @@ export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
       ? 'Image to CAD'
       : null);
   const opts = { enh: view.enh, fallbackStem: detail.workflow_id };
+  const ioSummary = useMemo(() => buildIoSummary(view, {
+    resultFiles: [
+      { label: '3D (from the run result)', url: fallbackGlb, format: 'glb' },
+      { label: '3DM (from the run result)', url: fallback3dm, format: '3dm' },
+    ],
+  }), [view, fallbackGlb, fallback3dm]);
 
   return (
     <div className="space-y-6">
@@ -647,6 +655,8 @@ export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
           </CardContent>
         </Card>
       </section>
+
+      <IoSummarySection summary={ioSummary} fallbackStem={detail.workflow_id} />
 
       <Section title="Inputs">
         {isCadModel && (designHistory ? (

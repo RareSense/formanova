@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -11,6 +11,7 @@ vi.mock('@/components/generations/ScissorGLBGrid', () => ({
 }));
 
 import { DetailContent } from './AdminGenerationDetailPage';
+import { SUMMARY_PICTURES } from '@/lib/admin-workflow-views/io-summary';
 import type { AdminGenerationDetail } from '@/lib/admin-generations-api';
 
 const SHA = 'f'.repeat(64);
@@ -31,6 +32,8 @@ function renderDetail(detail: AdminGenerationDetail) {
   );
 }
 
+// The same picture shows twice: in the Inputs -> Outputs summary and in its full section.
+const inSection = (name: string) => within(screen.getByRole('region', { name }));
 const hrefs = (c: HTMLElement) => Array.from(c.querySelectorAll('a[href]')).map((a) => a.getAttribute('href') ?? '');
 const srcs = (c: HTMLElement) => Array.from(c.querySelectorAll('img[src], iframe, script, object, embed')).map((e) => e.getAttribute('src') ?? e.tagName);
 
@@ -80,7 +83,8 @@ describe('admin detail security', () => {
   it('external image hosts are not auto-loaded: a warned link instead', () => {
     const { container } = renderDetail(run('sec_hosts', { model_image_url: 'https://tracker.example.com/p.gif' }));
     expect(srcs(container).some((s) => s.includes('tracker.example.com'))).toBe(false);
-    expect(screen.getByText('External image, not loaded')).toBeTruthy();
+    expect(inSection('Inputs').getByText('External image, not loaded')).toBeTruthy();
+    expect(inSection('Inputs → Outputs').getByText('External image, not loaded')).toBeTruthy();
     const link = container.querySelector('a[href="https://tracker.example.com/p.gif"]');
     expect(link?.getAttribute('rel')).toContain('noreferrer');
   });
@@ -100,7 +104,8 @@ describe('admin detail security', () => {
 
   it('a picture that fails to load says so instead of spinning forever', async () => {
     renderDetail(run('sec_fail', { image: { uri: `/api/artifacts/${SHA}`, type: 'image/png', sha256: SHA } }));
-    expect(await screen.findByText('Could not load')).toBeTruthy();
+    expect(await inSection('Inputs').findByText('Could not load')).toBeTruthy();
+    expect(await inSection('Inputs → Outputs').findByText('Could not load')).toBeTruthy();
   });
 
   it('huge payloads render bounded and fast: 10k keys, a 5 MB string, 1000-deep nesting, 2000 pictures', () => {
@@ -114,7 +119,11 @@ describe('admin detail security', () => {
     const ms = performance.now() - t0;
     expect(ms).toBeLessThan(5000);
     expect(container.querySelectorAll('[data-path]').length).toBeLessThan(400);
-    expect(container.querySelectorAll('figure').length).toBeLessThanOrEqual(24);
+    // 24 thumbnails in the full Inputs section, plus the summary's own bounded first page.
+    const summary = screen.getByRole('region', { name: 'Inputs → Outputs' });
+    const summaryFigures = summary.querySelectorAll('figure').length;
+    expect(summaryFigures).toBeLessThanOrEqual(SUMMARY_PICTURES);
+    expect(container.querySelectorAll('figure').length - summaryFigures).toBeLessThanOrEqual(24);
     // Text queries, not role queries: role names are computed for every button, which is slow
     // on a big tree and would measure the test library rather than the page.
     const buttons = Array.from(container.querySelectorAll('button')).map((b) => b.textContent ?? '');
