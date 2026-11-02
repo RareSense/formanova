@@ -94,8 +94,13 @@ export function TechSpecSection({ assetId, openFlags, source }: TechSpecSectionP
     return () => { cancelled = true; };
   }, [dialogOpen, pdf, page]);
 
-  const view = () => { void openVersionFile(assetId, 'spec_sheet'); };
   const download = () => { void saveVersionFile(assetId, 'spec_sheet', source); };
+  // The signed storage link is served as an attachment, so opening it in a tab only downloads it.
+  // View shows the sheet in-app (every page); if the PDF can't be read here, it falls back to the link.
+  const view = () => {
+    if (preview.status === 'ready') setDialogOpen(true);
+    else void openVersionFile(assetId, 'spec_sheet');
+  };
   const buttons = (
     <div className="grid grid-cols-2 gap-2">
       <Button type="button" variant="outline" size="sm" onClick={view} aria-label="View spec sheet" className="w-full font-mono text-[11px]">
