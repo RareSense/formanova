@@ -116,15 +116,15 @@ export default function MeshPanel({ meshes, onSelectMesh, onAction, onApplyMater
   return (
     <div className="flex flex-col bg-card border-l border-border h-full">
       <ResizablePanelGroup direction="vertical" className="flex-1 min-h-0">
-        {/* Material gets more of the height: its pickers and swatch grid were cut off at 50%. */}
-        <ResizablePanel defaultSize={60} minSize={20}>
+        {/* Material gets most of the height: its pickers and swatch rows were cut off at 50%. */}
+        <ResizablePanel defaultSize={75} minSize={20}>
           <div className="flex flex-col h-full">
             <MaterialSectionHeader collapsed={false} onToggle={() => setMaterialCollapsed(true)} hasSelection={hasSelection} selectedMeshes={selectedMeshes} />
             <MaterialContent hasSelection={hasSelection} matTab={matTab} setMatTab={setMatTab} filteredMaterials={filteredMaterials} onApplyMaterial={onApplyMaterial} onApplyMetalToAll={onApplyMetalToAll} metalToAllValue={metalToAllValue} onApplyGemToAll={onApplyGemToAll} />
           </div>
         </ResizablePanel>
         <ResizableHandle withHandle />
-        <ResizablePanel defaultSize={40} minSize={20}>
+        <ResizablePanel defaultSize={25} minSize={20}>
           <div className="flex flex-col h-full">
             <SectionHeader title="Parts" subtitle={meshSubtitle} collapsed={false} onToggle={() => setMeshCollapsed(true)} />
             <MeshList search={search} setSearch={setSearch} filtered={filtered} meshes={meshes} expanded={expanded} onToggleFamily={toggleFamily} onExpandFamily={expandFamily} hoveredNames={hoveredNames} onSelectMesh={onSelectMesh} onSelectFamily={onSelectFamily} onHoverPart={onHoverPart} />
