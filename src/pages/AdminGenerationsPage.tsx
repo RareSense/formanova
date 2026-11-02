@@ -29,6 +29,8 @@ import {
 } from '@/lib/admin-generations-api';
 import { matchesAdminGenerationSearch } from '@/lib/admin-generations-search';
 import { parseServerTime } from '@/lib/server-time';
+import { costView, USER_PAID_HELP, WORKFLOW_COST_HELP } from '@/lib/admin-cost-display';
+import { CostLabel, WorkflowCostValue } from '@/components/admin/AdminCost';
 
 const PAGE_SIZE = 20;
 // 'queued' intentionally absent: the backend never sets it (rows start at 'running').
@@ -50,14 +52,6 @@ function formatDateTime(value: string | null): string {
     hour: '2-digit',
     minute: '2-digit',
   }).format(parseServerTime(value));
-}
-
-function formatCredits(value: number | null): string {
-  if (value === null || Number.isNaN(value)) return '-';
-  return `${new Intl.NumberFormat(undefined, {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 4,
-  }).format(value)} credits`;
 }
 
 function formatUserType(value: string | null): string {
@@ -315,8 +309,12 @@ export default function AdminGenerationsPage() {
                     <TableHead className="font-mono text-[10px] uppercase tracking-widest">User</TableHead>
                     <TableHead className="font-mono text-[10px] uppercase tracking-widest">Workflow</TableHead>
                     <TableHead className="font-mono text-[10px] uppercase tracking-widest">Status</TableHead>
-                    <TableHead className="font-mono text-[10px] uppercase tracking-widest">Actual Cost</TableHead>
-                    <TableHead className="font-mono text-[10px] uppercase tracking-widest">Provider Cost</TableHead>
+                    <TableHead className="font-mono text-[10px] uppercase tracking-widest">
+                      <CostLabel label="User paid" help={USER_PAID_HELP} />
+                    </TableHead>
+                    <TableHead className="font-mono text-[10px] uppercase tracking-widest">
+                      <CostLabel label="Workflow cost" help={WORKFLOW_COST_HELP} />
+                    </TableHead>
                     <TableHead className="font-mono text-[10px] uppercase tracking-widest">User Type</TableHead>
                     <TableHead className="font-mono text-[10px] uppercase tracking-widest">Paying</TableHead>
                     <TableHead className="font-mono text-[10px] uppercase tracking-widest">Complaint</TableHead>
@@ -324,51 +322,54 @@ export default function AdminGenerationsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {items.map((item) => (
-                    <TableRow
-                      key={item.workflow_id}
-                      className="cursor-pointer"
-                      onClick={() => openDetail(item)}
-                    >
-                      <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">
-                        {formatDateTime(item.created_at)}
-                      </TableCell>
-                      <TableCell className="max-w-[220px] truncate text-sm">{item.user_email || '-'}</TableCell>
-                      <TableCell className="max-w-[280px] truncate text-sm">
-                        {item.workflow_name || item.workflow_id}
-                      </TableCell>
-                      <TableCell><StatusBadge status={item.status} /></TableCell>
-                      <TableCell className="font-mono text-xs">{formatCredits(item.actual_cost)}</TableCell>
-                      <TableCell className="font-mono text-xs">{formatCredits(item.provider_cost)}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground capitalize">
-                        {formatUserType(item.user_type)}
-                      </TableCell>
-                      <TableCell><PayingBadge isPaying={item.is_paying} /></TableCell>
-                      <TableCell>
-                        {item.feedback_id ? (
-                          <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
-                            <MessageSquareWarning className="h-4 w-4" />
-                            <span className="font-mono text-[10px] uppercase tracking-widest">Has Complaint</span>
-                          </span>
-                        ) : (
-                          <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          className="gap-1.5"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            openDetail(item);
-                          }}
-                        >
-                          View Details
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {items.map((item) => {
+                    const cost = costView(item.actual_cost, item.provider_cost);
+                    return (
+                      <TableRow
+                        key={item.workflow_id}
+                        className="cursor-pointer"
+                        onClick={() => openDetail(item)}
+                      >
+                        <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">
+                          {formatDateTime(item.created_at)}
+                        </TableCell>
+                        <TableCell className="max-w-[220px] truncate text-sm">{item.user_email || '-'}</TableCell>
+                        <TableCell className="max-w-[280px] truncate text-sm">
+                          {item.workflow_name || item.workflow_id}
+                        </TableCell>
+                        <TableCell><StatusBadge status={item.status} /></TableCell>
+                        <TableCell className="font-mono text-xs whitespace-nowrap">{cost.userPaid}</TableCell>
+                        <TableCell className="font-mono text-xs whitespace-nowrap"><WorkflowCostValue view={cost} /></TableCell>
+                        <TableCell className="text-sm text-muted-foreground capitalize">
+                          {formatUserType(item.user_type)}
+                        </TableCell>
+                        <TableCell><PayingBadge isPaying={item.is_paying} /></TableCell>
+                        <TableCell>
+                          {item.feedback_id ? (
+                            <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                              <MessageSquareWarning className="h-4 w-4" />
+                              <span className="font-mono text-[10px] uppercase tracking-widest">Has Complaint</span>
+                            </span>
+                          ) : (
+                            <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            className="gap-1.5"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openDetail(item);
+                            }}
+                          >
+                            View Details
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
