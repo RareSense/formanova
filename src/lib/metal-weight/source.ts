@@ -7,7 +7,8 @@
  *   3. a run that predates the field: its estimated_metal_mass_g divided back
  *      by the density that mass was computed with, known only for a run this
  *      session started, because /result does not echo the density.
- * With none of those the weight is "not available", and the screen says so.
+ * With none of those the weight is "not available", and the screen shows no
+ * weight at all (no section, tag or download line).
  *
  * Everything here reads untrusted payloads, so every value is checked rather
  * than cast.

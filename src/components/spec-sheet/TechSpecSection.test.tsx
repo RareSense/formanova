@@ -82,6 +82,39 @@ describe('TechSpecSection', () => {
     expect(saveVersionFile).toHaveBeenCalledWith('v1', 'spec_sheet', 'image-to-cad');
   });
 
+  it('keeps the card short in every state: the top of page 1 when it renders, the same height when it cannot', async () => {
+    let resolve: (v: ReturnType<typeof sheet>) => void = () => {};
+    loadSpecSheet.mockReturnValue(new Promise((r) => { resolve = r; }));
+    const { unmount } = render(<TechSpecSection assetId="v1" openFlags={0} />);
+    const short = (card: HTMLElement) => {
+      expect(card).toHaveClass('h-[200px]', 'w-full', 'overflow-hidden');
+      expect(card).not.toHaveClass('aspect-[210/297]');
+    };
+    short(thumbnail());
+    await act(async () => { resolve(sheet()); });
+    const image = await within(thumbnail()).findByRole('img', { name: 'Spec sheet, page 1' });
+    // Cropped from the top: the header and key facts, not the middle of the page.
+    expect(image).toHaveClass('object-cover', 'object-top');
+    short(thumbnail());
+    unmount();
+
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    loadSpecSheet.mockRejectedValue(new Error('worker failed'));
+    render(<TechSpecSection assetId="v2" openFlags={0} />);
+    const fallback = await screen.findByTestId('spec-sheet-fallback');
+    expect(thumbnail()).toContainElement(fallback);
+    short(thumbnail());
+    error.mockRestore();
+  });
+
+  it('renders page 1 wide enough for the panel at its widest', async () => {
+    const pdf = sheet();
+    loadSpecSheet.mockResolvedValue(pdf);
+    render(<TechSpecSection assetId="v1" openFlags={0} />);
+    await within(thumbnail()).findByRole('img');
+    expect(pdf.renderPage).toHaveBeenCalledWith(1, 504);
+  });
+
   it('View and Download are one size', () => {
     loadSpecSheet.mockResolvedValue(sheet());
     render(<TechSpecSection assetId="v1" openFlags={0} />);

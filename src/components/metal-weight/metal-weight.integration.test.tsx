@@ -83,9 +83,10 @@ describe('metal weight on the result screen', () => {
     expect(within(screen.getByTestId('tag')).getByText('28.9 g · 14K')).toBeInTheDocument();
   });
 
-  it('an old version without a volume is not available anywhere, with no figures', async () => {
+  it('an old version without a volume renders no weight anywhere: no section, no tag, no download line', async () => {
     setup({ asset_id: 'v0', source_workflow_id: 'wf-0' });
-    expect(within(card()).getByText(/Weight not available for this model/)).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Metal weight' })).toBeNull();
+    expect(screen.queryByText(/Weight not available/)).toBeNull();
     expect(screen.getByTestId('tag')).toBeEmptyDOMElement();
     openDownloads();
     await screen.findByText('3D preview');
