@@ -171,6 +171,31 @@ export function parseOpenFlags(text: string): { ok: true; value: number | null }
   return Number.isSafeInteger(value) ? { ok: true, value } : { ok: false };
 }
 
+/**
+ * The "Metal volume (mm³)" box: a plain decimal above 0, or null when left empty. Signs,
+ * exponents, thousands separators and numbers too large to be finite are refused.
+ */
+export function parseMetalVolume(text: string): { ok: true; value: number | null } | { ok: false } {
+  const trimmed = text.trim();
+  if (!trimmed) return { ok: true, value: null };
+  if (!/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(trimmed)) return { ok: false };
+  const value = Number(trimmed);
+  return Number.isFinite(value) && value > 0 ? { ok: true, value } : { ok: false };
+}
+
+const CASTING_FLAG = /^[a-z_]{1,40}$/;
+
+/**
+ * The "Casting flags" box: comma-separated tokens of a-z and _ (1 to 40 each), trimmed and
+ * de-duplicated in order, or null when there are none. Any other character refuses the whole box.
+ */
+export function parseCastingFlags(text: string): { ok: true; value: string[] | null } | { ok: false } {
+  const tokens = text.split(',').map((token) => token.trim()).filter(Boolean);
+  if (tokens.length === 0) return { ok: true, value: null };
+  if (!tokens.every((token) => CASTING_FLAG.test(token))) return { ok: false };
+  return { ok: true, value: [...new Set(tokens)] };
+}
+
 export class SupervisedRunsApiError extends Error {
   status: number;
   code: string;
@@ -319,11 +344,22 @@ export interface SendReplacementBody {
   user_note?: string;
   /** Only with a spec sheet: its open review items, a whole number of 0 or more, or null. */
   spec_sheet_open_flags?: number | null;
+  /** Only when measured: the casting metal volume in mm³, above 0. */
+  metal_volume_mm3?: number;
+  /** Only with a volume: casting flags such as thin_walls, or null. */
+  metal_volume_flags?: string[] | null;
+}
+
+/** The measured metal volume sent with a replacement; flags left undefined are not sent. */
+export interface ReplacementMetalVolume {
+  mm3: number;
+  flags?: string[] | null;
 }
 
 /**
- * Leave specSheetOpenFlags undefined for a run without a spec sheet: the field is then left out,
- * so the request is exactly what it was before spec sheets.
+ * Leave specSheetOpenFlags undefined for a run without a spec sheet, and metalVolume undefined
+ * when no volume was measured: those fields are then left out, so the request is exactly what it
+ * was before them.
  */
 export function sendSupervisedReplacement(
   workflowId: string,
@@ -331,12 +367,15 @@ export function sendSupervisedReplacement(
   jewelryType?: string,
   userNote?: string,
   specSheetOpenFlags?: number | null,
+  metalVolume?: ReplacementMetalVolume,
 ) {
   const body: SendReplacementBody = {
     acknowledge_missing: acknowledgeMissing,
     ...(jewelryType ? { jewelry_type: jewelryType } : {}),
     ...userNoteField(userNote),
     ...(specSheetOpenFlags !== undefined ? { spec_sheet_open_flags: specSheetOpenFlags } : {}),
+    ...(metalVolume ? { metal_volume_mm3: metalVolume.mm3 } : {}),
+    ...(metalVolume && metalVolume.flags !== undefined ? { metal_volume_flags: metalVolume.flags } : {}),
   };
   return request<{ accepted: boolean; phase: SupervisedPhase }>('POST', `${run(workflowId)}/send-replacement`, body);
 }
