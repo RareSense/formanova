@@ -9,8 +9,10 @@
  * Safety: the PDF is our own file, fetched through the version's signed
  * download link; pdf.js gets its bytes, never a URL, and no cMap or font URL,
  * so it fetches nothing itself. Annotations are not rendered (no links, forms
- * or actions). pdf.js 6 has no eval path (its isEvalSupported option is gone)
- * and runs no document scripts outside the viewer's sandbox, which is not used.
+ * or actions). isEvalSupported is passed as false: pdf.js 6 already has no
+ * eval path and ignores the option, but it keeps the intent explicit should
+ * the library ever be swapped for a version that reads it. No document
+ * scripts run outside the viewer's sandbox, which is not used.
  */
 import { AnnotationMode, GlobalWorkerOptions, getDocument, type PDFDocumentProxy } from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -43,7 +45,13 @@ async function open(assetId: string): Promise<SpecSheetPdf> {
   // Same-origin links go through the authenticated proxy; signed storage links are fetched as they are.
   const response = link.url.startsWith('/api/') ? await authenticatedFetch(link.url) : await fetch(link.url);
   if (!response.ok) throw new Error(`Spec sheet download failed (${response.status})`);
-  const pdf = await getDocument({ data: new Uint8Array(await response.arrayBuffer()), enableXfa: false }).promise;
+  // isEvalSupported is not in pdf.js 6's DocumentInitParameters type, hence the widened object.
+  const params: Parameters<typeof getDocument>[0] & { isEvalSupported: false } = {
+    data: new Uint8Array(await response.arrayBuffer()),
+    enableXfa: false,
+    isEvalSupported: false,
+  };
+  const pdf = await getDocument(params).promise;
   const pages = new Map<string, Promise<string>>();
   return {
     pageCount: pdf.numPages,
