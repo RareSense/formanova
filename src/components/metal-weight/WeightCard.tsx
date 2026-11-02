@@ -27,7 +27,8 @@ import { cn } from '@/lib/utils';
 import { appearanceForAlloy } from './appearance';
 import type { WeightViewProps } from './types';
 
-const NUM = 'py-1.5 pl-3 text-right tabular-nums';
+// Number columns shrink to their figures, so the metal name gets the rest of a narrow panel.
+const NUM = 'w-px whitespace-nowrap py-1.5 pl-3 text-right tabular-nums';
 
 export function WeightCard({ source, target, alloy, setAlloyId, requestedUnavailable = false, twoTone = false }: WeightViewProps) {
   const [open, setOpen] = useState(true);
@@ -61,7 +62,7 @@ export function WeightCard({ source, target, alloy, setAlloyId, requestedUnavail
         className={cn('cursor-pointer transition-colors', selected ? 'bg-accent/50 font-semibold text-foreground' : 'text-muted-foreground hover:bg-accent/20')}
       >
         <td className="py-1.5 pl-4 pr-2">
-          <span className="flex min-w-0 items-center gap-2">
+          <span className="flex min-w-0 items-center gap-2 leading-snug">
             <input
               type="radio"
               name={`${ids}-metal`}
@@ -72,7 +73,7 @@ export function WeightCard({ source, target, alloy, setAlloyId, requestedUnavail
               className="h-3.5 w-3.5 shrink-0 accent-foreground"
             />
             <MaterialSphere category="metal" preview={appearanceForAlloy(item).preview} size={12} />
-            <span className="truncate">{item.label}</span>
+            <span className="min-w-0 break-words">{item.label}</span>
           </span>
         </td>
         <td className={NUM}>{formatFixed2(rowGrams)}</td>
@@ -106,20 +107,14 @@ export function WeightCard({ source, target, alloy, setAlloyId, requestedUnavail
             </p>
           ) : (
             <>
-              <table className="w-full table-fixed">
+              <table className="w-full">
                 <caption className="sr-only">Metal weight in each metal</caption>
-                <colgroup>
-                  <col />
-                  <col className="w-[3.75rem]" />
-                  <col className="w-[3.25rem]" />
-                  <col className="w-[5.5rem]" />
-                </colgroup>
                 <thead className="text-[10px] text-muted-foreground">
                   <tr>
                     <th scope="col" className="py-1.5 pl-[3.25rem] text-left font-normal">Metal</th>
-                    <th scope="col" className="py-1.5 pl-3 text-right font-normal">g</th>
-                    <th scope="col" className="py-1.5 pl-3 text-right font-normal">dwt</th>
-                    <th scope="col" className="py-1.5 pl-3 pr-4 text-right font-normal">{`Finished ${FINISHING_NOTE_SHORT}`}</th>
+                    <th scope="col" className="w-px py-1.5 pl-3 text-right font-normal">g</th>
+                    <th scope="col" className="w-px py-1.5 pl-3 text-right font-normal">dwt</th>
+                    <th scope="col" className="w-px py-1.5 pl-3 pr-4 text-right font-normal">{`Finished ${FINISHING_NOTE_SHORT}`}</th>
                   </tr>
                 </thead>
                 <tbody role="radiogroup" aria-label="Metal">
