@@ -12,6 +12,7 @@ import { isStarterTier, type BillingTier } from '@/lib/starter-pack';
 import { CreditPlanGrid } from '@/components/pricing/CreditPlanGrid';
 import { resolveGridTiers } from '@/lib/credit-plans';
 import { DoneForYouCard } from '@/components/pricing/DoneForYouCard';
+import { RubyCallDialog } from '@/components/sales/RubyCallDialog';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
 
 const CHECKOUT_URL = '/billing/checkout';
@@ -62,6 +63,8 @@ export default function Pricing() {
   useEffect(() => {
     if (user) fetchTiers();
   }, [user, fetchTiers]);
+
+  const openCall = useCallback(() => setCallOpen(true), []);
 
   const handleCheckout = async (tierId: string) => {
     if (!user?.id) {
@@ -161,7 +164,8 @@ export default function Pricing() {
           />
         )}
 
-        <DoneForYouCard onOpenCall={() => setCallOpen(true)} />
+        <DoneForYouCard onOpenCall={openCall} />
+        <RubyCallDialog open={callOpen} onOpenChange={setCallOpen} />
 
       </div>
     </div>
