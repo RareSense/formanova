@@ -86,9 +86,9 @@ export function WeightCard({ source, target, alloy, setAlloyId, requestedUnavail
                 <thead className="text-muted-foreground">
                   <tr>
                     <th scope="col" className="py-1 font-normal">Metal</th>
-                    <th scope="col" className="py-1 text-right font-normal">g</th>
-                    <th scope="col" className="py-1 text-right font-normal">dwt</th>
-                    <th scope="col" className="py-1 text-right font-normal">Finished</th>
+                    <th scope="col" className="py-1 pl-3 text-right font-normal">g</th>
+                    <th scope="col" className="py-1 pl-3 text-right font-normal">dwt</th>
+                    <th scope="col" className="py-1 pl-3 text-right font-normal">Finished</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -99,9 +99,9 @@ export function WeightCard({ source, target, alloy, setAlloyId, requestedUnavail
                     return (
                       <tr key={row.id} aria-current={current ? 'true' : undefined} className={current ? 'text-foreground' : 'text-muted-foreground'}>
                         <th scope="row" className="py-1 pr-2 font-normal">{row.label}</th>
-                        <td className="py-1 text-right">{formatFixed2(rowGrams)}</td>
-                        <td className="py-1 text-right">{formatFixed2(dwtFromGrams(rowGrams))}</td>
-                        <td className="py-1 text-right">{formatFixed2(finishedGrams(rowGrams))}</td>
+                        <td className="py-1 pl-3 text-right">{formatFixed2(rowGrams)}</td>
+                        <td className="py-1 pl-3 text-right">{formatFixed2(dwtFromGrams(rowGrams))}</td>
+                        <td className="py-1 pl-3 text-right">{formatFixed2(finishedGrams(rowGrams))}</td>
                       </tr>
                     );
                   })}
