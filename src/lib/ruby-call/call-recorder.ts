@@ -110,6 +110,7 @@ export class CallRecorder {
   private merger: ChannelMergerNode | null = null;
   private rec: MediaRecorder | null = null;
   private analysers: AnalyserNode[] = [];
+  private remoteAnalyser: AnalyserNode | null = null;
   private levelTimer: ReturnType<typeof setInterval> | null = null;
   private parts: Part[] = [];
   private uploader: AudioUploader | null = null;
@@ -186,14 +187,14 @@ export class CallRecorder {
   addRemote(remote: MediaStream) {
     if (this.remoteAdded || !this.merger) return;
     try {
-      this.connect(remote, 1);
+      this.remoteAnalyser = this.connect(remote, 1);
       this.remoteAdded = true;
     } catch {
       /* the caller's side is still recorded */
     }
   }
 
-  private connect(stream: MediaStream, channel: number) {
+  private connect(stream: MediaStream, channel: number): AnalyserNode | null {
     const ctx = this.ctx as AudioContext;
     const source = ctx.createMediaStreamSource(stream);
     source.connect(this.merger as ChannelMergerNode, 0, channel);
@@ -202,8 +203,26 @@ export class CallRecorder {
       analyser.fftSize = 1024;
       source.connect(analyser);
       this.analysers.push(analyser);
+      return analyser;
     } catch {
-      /* silence detection is optional */
+      return null; /* silence detection is optional */
+    }
+  }
+
+  private static rms(a: AnalyserNode): number {
+    const buf = new Float32Array(a.fftSize);
+    a.getFloatTimeDomainData(buf);
+    let sum = 0;
+    for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+    return Math.sqrt(sum / buf.length);
+  }
+
+  /** Ruby's current loudness (RMS, 0..1); 0 when unknown. */
+  remoteLevel(): number {
+    try {
+      return this.remoteAnalyser && !this.stopping ? CallRecorder.rms(this.remoteAnalyser) : 0;
+    } catch {
+      return 0;
     }
   }
 
@@ -214,11 +233,7 @@ export class CallRecorder {
     if (this.audioSeen) return;
     for (const a of this.analysers) {
       try {
-        const buf = new Float32Array(a.fftSize);
-        a.getFloatTimeDomainData(buf);
-        let sum = 0;
-        for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
-        if (Math.sqrt(sum / buf.length) > AUDIO_SEEN_RMS) {
+        if (CallRecorder.rms(a) > AUDIO_SEEN_RMS) {
           this.audioSeen = true;
           return;
         }
