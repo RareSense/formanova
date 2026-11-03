@@ -127,11 +127,11 @@ describe('sales-call-api (GraphFlow workflows)', () => {
       if (url === '/api/status/wq') return json({ runtime: { state: 'completed' } });
       return json({ results: { quote: [{ approved: true, client: { totalCents: 100 } }] } });
     });
-    const out = await runQuote({ lines: [{ productId: 'p', quantity: 2 }], turnaround: 'rush', negotiation: { n: 1 } });
+    const out = await runQuote({ lines: [{ productId: 'p', quantity: 2 }], turnaround: 'rush', negotiation: { n: 1 }, installmentCount: 3 });
     expect(out).toEqual({ approved: true, client: { totalCents: 100 } });
     const body = JSON.parse(authFetch.authenticatedFetch.mock.calls[0][1].body);
     expect(body).toEqual({
-      payload: { lines: [{ productId: 'p', quantity: 2 }], turnaround: 'rush', negotiation: { n: 1 } },
+      payload: { lines: [{ productId: 'p', quantity: 2 }], turnaround: 'rush', negotiation: { n: 1 }, installmentCount: 3 },
       return_nodes: ['quote'],
     });
   });

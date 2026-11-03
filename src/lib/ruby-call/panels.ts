@@ -6,6 +6,17 @@ import { CREDIT_PLANS } from '@/lib/credit-plans';
 
 export type UploadPurpose = 'jewelry_photos' | 'references' | 'cad_files' | 'other';
 
+/** One payment of a plan (sales_price_quote `client.installments`). */
+export interface Installment {
+  n: number;
+  label: string;
+  amountCents: number;
+  amount: string;
+  due: string | null;
+}
+
+export type DealInstallment = Installment & { url: string };
+
 export type PanelSpec =
   | {
       kind: 'table';
@@ -16,6 +27,8 @@ export type PanelSpec =
       highlight?: number;
       total?: string;
       note?: string;
+      /** Payment plan shown under a quote. */
+      schedule?: Installment[];
     }
   | { kind: 'list'; title: string; kicker?: string; items: string[]; note?: string }
   | { kind: 'upload'; title: string; purpose: UploadPurpose; note?: string }
@@ -26,7 +39,9 @@ export type PanelSpec =
       title: string;
       rows: string[][];
       total: string;
+      /** The first payment's link (Pay now). */
       url: string;
+      installments: DealInstallment[];
       simulated: boolean;
     };
 
@@ -85,6 +100,7 @@ export function teamContactText(contact: unknown): string {
 }
 
 interface QuoteLine {
+  kind?: string;
   label?: string;
   quantity?: number;
   needsTeamQuote?: boolean;
@@ -92,20 +108,52 @@ interface QuoteLine {
   lineTotalCents?: number | null;
 }
 
+/** Client-facing wording: fixes are made by an expert AI creative editor. */
+export function clientWording(text: string): string {
+  return text
+    .replace(/\bhuman fix(es)?\b/gi, (_m, plural) => (plural ? 'fixes by an expert AI creative editor' : 'fix by an expert AI creative editor'))
+    .replace(/\b(a )?quote from (our|the) team\b/gi, 'a custom quote');
+}
+
+const CUSTOM_QUOTE = 'Custom quote';
+
+/** The payment plan in a client quote view; null when there is none. */
+export function installmentsOf(client: Record<string, unknown>): Installment[] | null {
+  if (!Array.isArray(client.installments) || !client.installments.length) return null;
+  const plan = (client.installments as Record<string, unknown>[])
+    .map((i, idx) => {
+      const cents = typeof i?.amountCents === 'number' ? i.amountCents : typeof i?.amount_cents === 'number' ? i.amount_cents : null;
+      if (cents === null) return null;
+      return {
+        n: idx + 1,
+        label: clientWording(text(i.label, `Payment ${idx + 1}`)),
+        amountCents: cents as number,
+        amount: money(cents),
+        due: text(i.due) || null,
+      };
+    })
+    .filter((i): i is Installment => !!i);
+  return plan.length ? plan : null;
+}
+
 /** Rows and total of a client quote view (sales_price_quote `client`). */
 export function quoteRows(client: Record<string, unknown>): { rows: string[][]; total: string } {
   const lines = Array.isArray(client.lines) ? (client.lines as QuoteLine[]) : [];
-  const rows = lines.map((l) => [
-    cell(l.label),
-    l.quantity ? String(l.quantity) : '',
-    l.needsTeamQuote ? 'Team quote' : money(l.unitPriceCents),
-    l.needsTeamQuote ? 'Team quote' : money(l.lineTotalCents),
-  ]);
+  const rows = lines.map((l) => {
+    // Bonus lines (AI revision rounds, coverage, fixes) are free extras of the order.
+    const bonus = l.kind === 'allowance' && !l.lineTotalCents;
+    return [
+      clientWording(cell(l.label)),
+      l.quantity ? String(l.quantity) : '',
+      l.needsTeamQuote ? CUSTOM_QUOTE : bonus ? 'Bonus' : money(l.unitPriceCents),
+      l.needsTeamQuote ? CUSTOM_QUOTE : bonus ? 'Free' : money(l.lineTotalCents),
+    ];
+  });
   if (percent(client.surchargeShare)) {
     rows.push([`Turnaround: ${text(client.turnaroundLabel, cell(client.turnaround))}`, '', `+${percent(client.surchargeShare)}`, '']);
   }
   if (percent(client.discountShare)) rows.push(['Discount', '', `-${percent(client.discountShare)}`, '']);
-  const total = typeof client.totalCents === 'number' ? money(client.totalCents) : 'Team quote';
+  const total = typeof client.totalCents === 'number' ? money(client.totalCents) : CUSTOM_QUOTE;
   return { rows, total };
 }
 
@@ -117,12 +165,12 @@ export function quotePanel(result: Record<string, unknown>): PanelSpec {
       kind: 'list',
       title: 'Your quote',
       kicker: 'Quote',
-      items: [text(client.message, 'This order needs a quote from our team'), `Contact: ${teamContactText(client.teamContact)}`],
+      items: [clientWording(text(client.message, 'This order needs a custom quote')), `Contact: ${teamContactText(client.teamContact)}`],
     };
   }
   const { rows, total } = quoteRows(client);
   const notes = [
-    client.partial ? 'Some items need a quote from our team.' : '',
+    client.partial ? 'Some items need a custom quote.' : '',
     client.forcesFullUpfront ? 'Paid in full upfront.' : '',
   ].filter(Boolean);
   return {
@@ -133,6 +181,7 @@ export function quotePanel(result: Record<string, unknown>): PanelSpec {
     rows,
     total,
     note: notes.join(' ') || undefined,
+    ...(installmentsOf(client) ? { schedule: installmentsOf(client) as Installment[] } : {}),
   };
 }
 

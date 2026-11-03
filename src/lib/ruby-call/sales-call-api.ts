@@ -60,8 +60,10 @@ export interface CallLink {
 export interface CallPayment {
   url: string;
   total: string | null;
+  totalCents?: number | null;
   simulated: boolean;
   email: string;
+  installments?: { n: number; label: string; amountCents: number; amount: string; due: string | null; url: string }[];
 }
 
 export interface EndCallArgs {
@@ -275,6 +277,8 @@ export interface QuoteRequest {
   lines: { productId: string; quantity: number }[];
   turnaround?: string;
   negotiation?: unknown;
+  /** 1 to 4 payments. */
+  installmentCount?: number;
 }
 
 /** ruby_quote (sales_price_quote): `{approved, needs_team_quote, client, internal}`. */
@@ -285,6 +289,7 @@ export function runQuote(req: QuoteRequest): Promise<Record<string, unknown>> {
       lines: req.lines,
       turnaround: req.turnaround || 'standard',
       ...(req.negotiation ? { negotiation: req.negotiation } : {}),
+      ...(req.installmentCount ? { installmentCount: req.installmentCount } : {}),
     },
     'quote',
     'approved',
