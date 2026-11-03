@@ -68,6 +68,25 @@ describe('RubyPanels', () => {
     expect(screen.getByText('Line 9')).toBeInTheDocument();
   });
 
+  it('renders a What / Before / Now comparison compactly: Now on the right, Before under the label', () => {
+    const panel: Panel = {
+      id: 'p6',
+      kind: 'table',
+      title: 'What changed',
+      columns: ['What', 'Before', 'Now'],
+      rows: [
+        ['Total for 500 images, 2K, rush', '$9,025.60', '$8,120'],
+        ['Deposit', '$3,158', '$2,842'],
+      ],
+      delivery: 'Delivery: within 5 working days, usually faster',
+    };
+    const { container } = render(<RubyStage panel={panel} {...noop} />);
+    expect(container.querySelector('table')).toBeNull();
+    expect(screen.getByText('$8,120')).toBeInTheDocument();
+    expect(screen.getByText('Before $9,025.60')).toBeInTheDocument();
+    expect(screen.getByText('Delivery: within 5 working days, usually faster')).toBeInTheDocument();
+  });
+
   it('compact mode shows fewer rows and no details', () => {
     const rows = Array.from({ length: 6 }, (_, i) => [`Line ${i + 1}`, String(i + 1), `$${i + 1}`]);
     const panel: Panel = { id: 'p4', kind: 'table', title: 'T', columns: ['Item', 'Qty', 'Total'], rows };

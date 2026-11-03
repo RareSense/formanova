@@ -76,6 +76,7 @@ function PanelBody({
       return (
         <>
           <Rows columns={panel.columns} rows={panel.rows} highlight={panel.highlight} total={panel.total} compact={compact} />
+          {panel.delivery && <p className="mt-3 break-words text-sm">{panel.delivery}</p>}
           {panel.schedule && <Schedule plan={panel.schedule} />}
           {panel.note && !compact && <Note text={panel.note} />}
         </>

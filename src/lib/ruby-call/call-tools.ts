@@ -82,9 +82,19 @@ export const LEAD_FIELDS = [
   'needs_curation',
   'photo_quality_notes',
   'photo_source',
+  'resolution',
+  'aspect_ratios',
+  'style',
+  'references',
+  'photos_link',
+  'models_source',
+  'model_looks',
 ] as const;
 
-const BOOLEAN_LEAD_FIELDS = new Set<string>(['shopify', 'data_sorted', 'needs_curation']);
+/** Unknown fields are kept too (the service may add more), within safe limits. */
+const LEAD_KEY = /^[a-z][a-z0-9_]{0,39}$/;
+const MAX_LEAD_KEYS = 60;
+
 
 const PURPOSES: UploadPurpose[] = ['jewelry_photos', 'references', 'cad_files', 'other'];
 const PURPOSE_TITLES: Record<UploadPurpose, string> = {
@@ -93,7 +103,7 @@ const PURPOSE_TITLES: Record<UploadPurpose, string> = {
   cad_files: 'Share your CAD files',
   other: 'Share your files',
 };
-const TURNAROUNDS = ['standard', 'priority', 'rush'];
+const TURNAROUNDS = ['standard', 'priority', 'rush', 'express'];
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
@@ -107,7 +117,7 @@ function quoteRequest(args: Record<string, unknown>): QuoteRequest | { error: st
   }));
   if (lines.some((l) => !l.productId || !Number.isFinite(l.quantity))) return { error: 'Each line needs productId and quantity.' };
   const turnaround = str(args.turnaround) || 'standard';
-  if (!TURNAROUNDS.includes(turnaround)) return { error: 'turnaround must be standard, priority or rush.' };
+  if (!TURNAROUNDS.includes(turnaround)) return { error: 'turnaround must be standard, priority, rush or express.' };
   let installmentCount: number | undefined;
   if (args.installmentCount !== undefined && args.installmentCount !== null) {
     installmentCount = Number(args.installmentCount);
@@ -181,10 +191,16 @@ export function createCallTools(host: ToolHost, api: ToolApi = DEFAULT_API): Too
     },
     update_lead: (args) => {
       const fields: Record<string, unknown> = {};
-      for (const key of LEAD_FIELDS) {
-        const v = args[key];
-        if (BOOLEAN_LEAD_FIELDS.has(key) && typeof v === 'boolean') fields[key] = v;
-        else if (v !== undefined && v !== null && String(v).trim()) fields[key] = String(v).trim().slice(0, 2000);
+      for (const [key, v] of Object.entries(args).slice(0, MAX_LEAD_KEYS)) {
+        if (!LEAD_KEY.test(key) || v === undefined || v === null) continue;
+        if (typeof v === 'boolean') fields[key] = v;
+        else if (typeof v === 'string' || typeof v === 'number') {
+          const text = String(v).trim().slice(0, 2000);
+          if (text) fields[key] = text;
+        } else if (Array.isArray(v)) {
+          const text = v.filter((x) => typeof x === 'string' || typeof x === 'number').join(', ').slice(0, 2000);
+          if (text) fields[key] = text;
+        }
       }
       host.updateLead(fields);
       return { saved: true };

@@ -29,6 +29,8 @@ export type PanelSpec =
       note?: string;
       /** Payment plan shown under a quote. */
       schedule?: Installment[];
+      /** "Delivery: within 5 days, usually faster" (kept in compact mode too). */
+      delivery?: string;
     }
   | { kind: 'list'; title: string; kicker?: string; items: string[]; note?: string }
   | { kind: 'upload'; title: string; purpose: UploadPurpose; note?: string }
@@ -186,6 +188,7 @@ export function quotePanel(result: Record<string, unknown>): PanelSpec {
     total,
     note: notes.join(' ') || undefined,
     ...(installmentsOf(client) ? { schedule: installmentsOf(client) as Installment[] } : {}),
+    ...(text(client.deliveryWithin) ? { delivery: `Delivery: within ${text(client.deliveryWithin)}, usually faster` } : {}),
   };
 }
 

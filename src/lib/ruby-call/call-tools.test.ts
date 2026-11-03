@@ -105,6 +105,11 @@ describe('panels', () => {
     expect(installmentsOf({ installments: [] })).toBeNull();
   });
 
+  it('shows the delivery promise from the quote', () => {
+    const p = quotePanel({ ...APPROVED, client: { ...APPROVED.client, deliveryWithin: '5 working days' } });
+    expect(p).toMatchObject({ delivery: 'Delivery: within 5 working days, usually faster' });
+  });
+
   it('shows a refused quote without numbers', () => {
     const p = quotePanel({ approved: false, client: { message: 'This order needs a quote from our team', teamContact: { email: 'studio@formanova.ai' } } });
     expect(p).toEqual({
@@ -205,7 +210,7 @@ describe('call tools', () => {
   it('update_lead keeps only known fields', async () => {
     const host = makeHost();
     await createCallTools(host, makeApi())('update_lead', { brand: ' Aura ', shopify: true, pieces: 120, hack: 'x', notes: '' });
-    expect(host.updateLead).toHaveBeenCalledWith({ brand: 'Aura', shopify: true, pieces: '120' });
+    expect(host.updateLead).toHaveBeenCalledWith({ brand: 'Aura', shopify: true, pieces: '120', hack: 'x' });
     await createCallTools(host, makeApi())('update_lead', {
       data_ready: 'partly',
       data_sorted: false,
@@ -220,6 +225,34 @@ describe('call tools', () => {
       photo_quality_notes: 'Some blurry shots',
       photo_source: 'link',
     });
+    await createCallTools(host, makeApi())('update_lead', {
+      resolution: '2K',
+      aspect_ratios: ['1:1', '4:5'],
+      style: 'clean white',
+      references: 'moodboard on Drive',
+      photos_link: 'https://drive.google.com/x',
+      future_field: true,
+      models_source: 'library',
+      model_looks: 'South Asian, 25-35, soft studio light',
+      'Bad Key': 'x',
+      nested: { a: 1 },
+    });
+    expect(host.updateLead).toHaveBeenLastCalledWith({
+      resolution: '2K',
+      aspect_ratios: '1:1, 4:5',
+      style: 'clean white',
+      references: 'moodboard on Drive',
+      photos_link: 'https://drive.google.com/x',
+      future_field: true,
+      models_source: 'library',
+      model_looks: 'South Asian, 25-35, soft studio light',
+    });
+  });
+
+  it('accepts express turnaround', async () => {
+    const api = makeApi();
+    await createCallTools(makeHost(), api)('quote_shoot', { lines: [{ productId: 'p', quantity: 1 }], turnaround: 'express' });
+    expect(api.runQuote).toHaveBeenCalledWith({ lines: [{ productId: 'p', quantity: 1 }], turnaround: 'express' });
   });
 
   it('set_call_view maps captions, text size and panel', async () => {
