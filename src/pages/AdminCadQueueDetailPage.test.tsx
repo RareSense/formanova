@@ -720,10 +720,14 @@ describe('AdminCadQueueDetailPage', () => {
 
     it('shows an error when the 3DM download fails', async () => {
       authFetch.authenticatedFetch.mockResolvedValue({ ok: false, status: 500 });
+      // With VITE_AZURE_BLOB_BASE_URL set, azure:// becomes an https URL fetched
+      // without auth, so stub plain fetch too; never reach the real network.
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: false, status: 500 } as Response);
       api.getSupervisedRun.mockResolvedValue(check({ glb_url: 'azure://a/m.glb', threedm_url: 'azure://a/m.3dm' }));
       renderPage();
       fireEvent.click(await screen.findByRole('button', { name: 'Download 3DM' }));
       expect(await screen.findByText("Couldn't download the 3DM.")).toBeTruthy();
+      fetchSpy.mockRestore();
     });
   });
 
