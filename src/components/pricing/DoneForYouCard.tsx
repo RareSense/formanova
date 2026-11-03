@@ -1,8 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Camera, Mic } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { isRubyCallConfigured, isRubyCallEnabled } from '@/lib/feature-flags';
+import { isRubyCallEnabled } from '@/lib/feature-flags';
+import { useDoneForYouVisible } from '@/hooks/use-done-for-you-visible';
 
 const TALK_RETURN_PATH = '/pricing?talk=ruby';
 
@@ -15,6 +17,7 @@ export function DoneForYouCard({ onOpenCall }: DoneForYouCardProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const visible = useDoneForYouVisible();
   const enabled = isRubyCallEnabled(user?.email);
   const autoOpened = useRef(false);
 
@@ -29,9 +32,7 @@ export function DoneForYouCard({ onOpenCall }: DoneForYouCardProps) {
     setSearchParams(next, { replace: true });
   }, [enabled, user, searchParams, setSearchParams, onOpenCall]);
 
-  // Signed-in: only allowlisted emails. Signed-out: email unknown, so show the
-  // card only while the feature is configured; login decides who keeps it.
-  if (user ? !enabled : !isRubyCallConfigured()) return null;
+  if (!visible) return null;
 
   const handleClick = () => {
     if (!user) {
@@ -41,31 +42,47 @@ export function DoneForYouCard({ onOpenCall }: DoneForYouCardProps) {
     onOpenCall();
   };
 
+  // Same box, rows and button size as the plan cards it sits beside, but
+  // filled in the foreground colour so it reads as the standout option.
   return (
     <section
       aria-labelledby="done-for-you-title"
-      className="mt-10 border border-border p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-6"
+      className="flex flex-col p-6 xl:p-8 border-2 border-foreground bg-foreground text-background"
     >
-      <div>
-        <p className="font-mono text-[9px] tracking-[0.3em] text-muted-foreground uppercase mb-2">
-          Custom
-        </p>
+      <div className="flex h-7 items-center gap-2">
+        <Camera className="h-4 w-4 shrink-0 text-[hsl(var(--formanova-hero-accent))]" aria-hidden="true" />
         <h2
           id="done-for-you-title"
-          className="font-display text-2xl md:text-3xl uppercase tracking-wide text-foreground leading-none"
+          className="font-mono text-xs tracking-[0.25em] uppercase text-[hsl(var(--formanova-hero-accent))]"
         >
           Done For You
         </h2>
-        <p className="mt-3 text-sm text-foreground">
-          Bulk shoots, editorial, CAD to catalog, website refresh.
-        </p>
-        <p className="mt-1 font-mono text-[9px] tracking-[0.2em] text-muted-foreground uppercase">
-          Get a deal built around you.
+      </div>
+
+      <div className="mt-6 flex items-baseline gap-1.5">
+        <span className="font-display text-5xl uppercase tracking-tight">Custom</span>
+        <span className="font-mono text-xs tracking-wider uppercase text-background/60">Quote</span>
+      </div>
+
+      <div className="mt-6 border-t border-background/20 pt-6">
+        <p className="font-mono text-2xl">Your whole catalog</p>
+        <p className="mt-2 font-mono text-sm leading-relaxed text-background/70">
+          We create it for you, in bulk.
+          <br />
+          Looks like a real studio shoot.
         </p>
       </div>
-      <Button onClick={handleClick} className="md:shrink-0">
-        Talk to Ruby
-      </Button>
+
+      <div className="mt-auto pt-8">
+        <Button
+          onClick={handleClick}
+          size="lg"
+          className="w-full px-4 font-mono text-xs tracking-[0.2em] uppercase bg-background text-foreground hover:bg-background/90"
+        >
+          <Mic className="mr-2 h-4 w-4" aria-hidden="true" />
+          Talk to Ruby
+        </Button>
+      </div>
     </section>
   );
 }

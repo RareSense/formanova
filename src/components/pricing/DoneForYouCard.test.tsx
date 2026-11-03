@@ -50,8 +50,8 @@ describe('DoneForYouCard', () => {
     mockUser = { email: 'Ruby@Example.com' };
     renderCard();
     expect(screen.getByText('Done For You')).toBeInTheDocument();
-    expect(screen.getByText('Bulk shoots, editorial, CAD to catalog, website refresh.')).toBeInTheDocument();
-    expect(screen.getByText('Get a deal built around you.')).toBeInTheDocument();
+    expect(screen.getByText('Your whole catalog')).toBeInTheDocument();
+    expect(screen.getByText(/We create it for you, in bulk\./)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Talk to Ruby' })).toBeInTheDocument();
   });
 
