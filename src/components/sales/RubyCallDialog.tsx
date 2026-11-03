@@ -221,7 +221,13 @@ export function RubyCallDialog({ open, onOpenChange, createCall }: RubyCallDialo
           <RubyOrb level={orbLevel} calm={orbCalm} className="w-44 sm:w-60" />
 
           <DialogHeader className="mt-6 space-y-2 text-center sm:text-center">
-            <DialogTitle className="font-display text-4xl uppercase leading-none tracking-wide text-foreground sm:text-5xl">
+            <DialogTitle
+              className={
+                inCall
+                  ? 'font-mono text-xs uppercase tracking-[0.25em] text-muted-foreground'
+                  : 'font-display text-4xl uppercase leading-none tracking-wide text-foreground sm:text-5xl'
+              }
+            >
               {inCall ? status : 'Tell Ruby what you need'}
             </DialogTitle>
             <DialogDescription className={inCall ? 'sr-only' : 'text-[15px] leading-normal text-muted-foreground'}>
