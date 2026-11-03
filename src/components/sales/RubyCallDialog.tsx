@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Mic, MicOff, PhoneOff } from 'lucide-react';
+import { Mic, MicOff, Phone, PhoneOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -190,129 +190,147 @@ export function RubyCallDialog({ open, onOpenChange, createCall }: RubyCallDialo
         ? 'Ruby is speaking'
         : 'Ruby is listening';
 
+  const orbActive = speaker === 'ruby' || phase === 'connecting';
+
+  // Layout follows the Eva call page: framed window, orb, one question,
+  // language, one big start button, AI note. FormaNova fonts and gold accent.
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <p className="font-mono text-[9px] tracking-[0.3em] text-muted-foreground uppercase">
-            Done For You
+      <DialogContent className="max-w-sm gap-0 overflow-hidden rounded-none border-2 border-foreground p-0 shadow-[6px_6px_0_hsl(var(--foreground))] sm:rounded-none">
+        <div className="flex items-center gap-2 border-b-2 border-foreground bg-[hsl(var(--formanova-hero-accent))]/10 px-4 py-3 pr-12">
+          <span className="h-2 w-2 rounded-full bg-[hsl(var(--formanova-success))]" aria-hidden="true" />
+          <p className="font-mono text-[10px] tracking-[0.25em] uppercase text-foreground">
+            Ruby · FormaNova Done For You
           </p>
-          <DialogTitle className="font-display text-2xl uppercase tracking-wide">
-            Talk to Ruby
-          </DialogTitle>
-          <DialogDescription>
-            Tell Ruby what you need and get a deal built around you.
-          </DialogDescription>
-        </DialogHeader>
+        </div>
 
-        {phase === 'idle' && (
-          <div className="space-y-5">
-            <div className="space-y-2">
-              <label
-                htmlFor="ruby-language"
-                className="font-mono text-[9px] tracking-[0.2em] text-muted-foreground uppercase"
+        <div className="flex flex-col items-center px-6 pb-6 pt-8 text-center">
+          <div
+            aria-hidden="true"
+            className={`h-28 w-28 rounded-full transition-transform duration-500 ${
+              orbActive ? 'scale-110 animate-pulse' : phase === 'live' ? 'scale-100' : 'scale-95'
+            }`}
+            style={{
+              background:
+                'radial-gradient(circle at 35% 30%, hsl(var(--background)) 0%, hsl(var(--formanova-hero-accent) / 0.55) 35%, hsl(var(--formanova-hero-accent)) 65%, hsl(var(--foreground) / 0.85) 100%)',
+              boxShadow: '0 0 40px hsl(var(--formanova-hero-accent) / 0.35)',
+            }}
+          />
+
+          <DialogHeader className="mt-6 space-y-2 text-center sm:text-center">
+            <DialogTitle className="font-display text-4xl uppercase leading-none tracking-wide text-foreground">
+              Get your custom package
+            </DialogTitle>
+            <DialogDescription className="font-mono text-sm leading-relaxed text-muted-foreground">
+              Ruby is FormaNova's AI sales advisor. Tell her what you sell and how many pieces, and get your price on the call. Any language.
+            </DialogDescription>
+          </DialogHeader>
+
+          {phase === 'idle' && (
+            <div className="mt-8 flex w-full max-w-[16rem] flex-col items-stretch gap-5">
+              <div className="space-y-2">
+                <label
+                  htmlFor="ruby-language"
+                  className="block font-mono text-[9px] tracking-[0.25em] text-muted-foreground uppercase"
+                >
+                  Language
+                </label>
+                <Select value={language} onValueChange={setLanguage}>
+                  <SelectTrigger id="ruby-language" aria-label="Language" className="rounded-none border-2 border-foreground">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {languages.map((l) => (
+                      <SelectItem key={l.code} value={l.code}>
+                        {l.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                size="lg"
+                className="w-full px-6 font-mono text-xs tracking-[0.2em] uppercase shadow-[4px_4px_0_hsl(var(--formanova-hero-accent))]"
+                onClick={startCall}
               >
-                Language
-              </label>
-              <Select value={language} onValueChange={setLanguage}>
-                <SelectTrigger id="ruby-language" aria-label="Language">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {languages.map((l) => (
-                    <SelectItem key={l.code} value={l.code}>
-                      {l.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <Phone className="mr-2 h-4 w-4" aria-hidden="true" />
+                Start talking
+              </Button>
             </div>
-            <Button className="w-full" onClick={startCall}>
-              Start call
-            </Button>
-          </div>
-        )}
+          )}
 
-        {inCall && (
-          <div className="space-y-5">
-            <div className="flex flex-col items-center gap-3 py-2">
-              <div
-                aria-hidden="true"
-                className={`h-16 w-16 rounded-full border border-border bg-primary/10 ${
-                  speaker === 'ruby' ? 'animate-pulse bg-primary/30' : phase === 'connecting' ? 'animate-pulse' : ''
-                }`}
-              />
-              <p
-                role="status"
-                className="font-mono text-[9px] tracking-[0.2em] text-muted-foreground uppercase"
-              >
+          {inCall && (
+            <div className="mt-6 w-full space-y-5">
+              <p role="status" className="font-mono text-[9px] tracking-[0.25em] text-muted-foreground uppercase">
                 {status}
               </p>
-            </div>
-
-            <div
-              aria-label="Live captions"
-              className="min-h-[5rem] space-y-2 border border-border p-3 text-sm"
-            >
-              {captions.map((t, i) => (
-                <p key={`${turns.length - captions.length + i}`}>
-                  <span className="font-mono text-[9px] tracking-[0.2em] text-muted-foreground uppercase mr-2">
-                    {t.role === 'ruby' ? 'Ruby' : 'You'}
-                  </span>
-                  {t.text}
-                </p>
-              ))}
-            </div>
-
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                className="flex-1"
-                disabled={phase !== 'live'}
-                aria-pressed={muted}
-                onClick={() => callRef.current?.toggleMute()}
+              <div
+                aria-label="Live captions"
+                className="min-h-[5rem] space-y-2 border-2 border-foreground/15 p-3 text-left text-sm"
               >
-                {muted ? <MicOff className="h-4 w-4 mr-2" /> : <Mic className="h-4 w-4 mr-2" />}
-                {muted ? 'Unmute' : 'Mute'}
-              </Button>
-              <Button
-                variant="destructive"
-                className="flex-1"
-                onClick={() => void callRef.current?.end()}
-              >
-                <PhoneOff className="h-4 w-4 mr-2" />
-                End call
-              </Button>
+                {captions.map((t, i) => (
+                  <p key={`${turns.length - captions.length + i}`}>
+                    <span className="mr-2 font-mono text-[9px] tracking-[0.2em] text-[hsl(var(--formanova-hero-accent))] uppercase">
+                      {t.role === 'ruby' ? 'Ruby' : 'You'}
+                    </span>
+                    {t.text}
+                  </p>
+                ))}
+              </div>
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1 px-4 rounded-none border-2 border-foreground"
+                  disabled={phase !== 'live'}
+                  aria-pressed={muted}
+                  onClick={() => callRef.current?.toggleMute()}
+                >
+                  {muted ? <MicOff className="mr-2 h-4 w-4" /> : <Mic className="mr-2 h-4 w-4" />}
+                  {muted ? 'Unmute' : 'Mute'}
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="flex-1 px-4 rounded-none"
+                  onClick={() => void callRef.current?.end()}
+                >
+                  <PhoneOff className="mr-2 h-4 w-4" />
+                  End call
+                </Button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {phase === 'ended' && (
-          <div className="space-y-5">
-            <p className="text-sm text-foreground">
-              {saved ? 'Thanks — your call is saved.' : 'Thanks for calling.'}
-            </p>
-            <Button className="w-full" onClick={() => handleOpenChange(false)}>
-              Close
-            </Button>
-          </div>
-        )}
-
-        {phase === 'error' && (
-          <div className="space-y-5">
-            <p role="alert" className="text-sm text-destructive">
-              {ERROR_COPY[error ?? 'start_failed']}
-            </p>
-            <div className="flex gap-3">
-              <Button variant="outline" className="flex-1" onClick={() => handleOpenChange(false)}>
+          {phase === 'ended' && (
+            <div className="mt-6 w-full space-y-5">
+              <p className="text-sm text-foreground">
+                {saved ? 'Thanks — your call is saved.' : 'Thanks for calling.'}
+              </p>
+              <Button className="w-full px-4" onClick={() => handleOpenChange(false)}>
                 Close
               </Button>
-              <Button className="flex-1" onClick={reset}>
-                Try again
-              </Button>
             </div>
-          </div>
-        )}
+          )}
+
+          {phase === 'error' && (
+            <div className="mt-6 w-full space-y-5">
+              <p role="alert" className="text-sm text-destructive">
+                {ERROR_COPY[error ?? 'start_failed']}
+              </p>
+              <div className="flex gap-3">
+                <Button variant="outline" className="flex-1 px-4" onClick={() => handleOpenChange(false)}>
+                  Close
+                </Button>
+                <Button className="flex-1 px-4" onClick={reset}>
+                  Try again
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <p className="mt-6 font-mono text-[9px] tracking-wider text-muted-foreground">
+            Ruby is an AI · calls are saved
+          </p>
+        </div>
       </DialogContent>
     </Dialog>
   );

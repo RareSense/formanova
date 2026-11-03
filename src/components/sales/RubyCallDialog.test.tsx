@@ -55,9 +55,9 @@ describe('RubyCallDialog', () => {
   it('goes idle -> connecting -> in call -> ended and saves the call', async () => {
     const f = fakeEngine();
     renderDialog(f.createCall);
-    expect(screen.getByRole('button', { name: 'Start call' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start talking' })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Start call' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Start talking' }));
     await waitFor(() => expect(f.engine.start).toHaveBeenCalled());
     expect(screen.getByText('Connecting to Ruby')).toBeInTheDocument();
 
@@ -106,7 +106,7 @@ describe('RubyCallDialog', () => {
   it('shows a friendly microphone-blocked message without internal details', async () => {
     const f = fakeEngine();
     renderDialog(f.createCall);
-    fireEvent.click(screen.getByRole('button', { name: 'Start call' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Start talking' }));
     await waitFor(() => expect(f.engine.start).toHaveBeenCalled());
 
     act(() => {
@@ -125,7 +125,7 @@ describe('RubyCallDialog', () => {
   it('shows connection lost copy', async () => {
     const f = fakeEngine();
     renderDialog(f.createCall);
-    fireEvent.click(screen.getByRole('button', { name: 'Start call' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Start talking' }));
     await waitFor(() => expect(f.engine.start).toHaveBeenCalled());
     act(() => {
       f.cbs().onError?.('connection_lost');
