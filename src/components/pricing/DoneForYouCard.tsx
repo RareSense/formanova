@@ -56,30 +56,24 @@ export function DoneForYouCard({ onOpenCall }: DoneForYouCardProps) {
       aria-labelledby="done-for-you-title"
       className="relative flex flex-col p-6 xl:p-8 border-2 border-[hsl(var(--formanova-hero-accent))] bg-gradient-to-b from-[hsl(var(--formanova-hero-accent))]/15 to-[hsl(var(--formanova-hero-accent))]/5 shadow-[6px_6px_0_hsl(var(--formanova-hero-accent))]"
     >
-      <div className="flex h-7 items-center justify-between gap-2">
-        <h2
-          id="done-for-you-title"
-          className="font-mono text-xs tracking-[0.25em] uppercase font-bold text-[hsl(var(--formanova-hero-accent))]"
-        >
-          Done For You
-        </h2>
-        <span className="inline-flex items-center gap-1.5 font-mono text-[9px] tracking-[0.2em] uppercase text-foreground">
-          <span className="relative flex h-2 w-2" aria-hidden="true">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[hsl(var(--formanova-success))] opacity-75" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-[hsl(var(--formanova-success))]" />
-          </span>
-          Live now
+      <div className="flex h-7 items-center">
+        <span className="font-mono text-xs tracking-[0.25em] uppercase font-bold text-[hsl(var(--formanova-hero-accent))]">
+          Custom
         </span>
       </div>
 
-      <div className="mt-6 flex items-baseline gap-1.5">
-        <span className="font-display text-5xl uppercase tracking-tight text-foreground">Custom</span>
-        <span className="font-mono text-xs tracking-wider uppercase text-muted-foreground">Package</span>
+      {/* Fixed line box at the price row's height, so the divider lines up with the plan cards. */}
+      <div className="mt-6 flex h-12 items-end">
+        <h2
+          id="done-for-you-title"
+          className="whitespace-nowrap font-display text-4xl uppercase leading-none tracking-tight text-foreground"
+        >
+          Done For You
+        </h2>
       </div>
 
       <div className="mt-6 border-t border-[hsl(var(--formanova-hero-accent))]/30 pt-6">
-        <p className="font-mono text-2xl text-foreground">Your whole catalog</p>
-        <ul className="mt-3 space-y-2 font-mono text-sm leading-snug text-muted-foreground">
+        <ul className="space-y-2 font-mono text-sm leading-snug text-muted-foreground">
           {SELLING_POINTS.map((point) => (
             <li key={point} className="flex items-start gap-2">
               <Check className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--formanova-hero-accent))]" aria-hidden="true" />
@@ -87,6 +81,9 @@ export function DoneForYouCard({ onOpenCall }: DoneForYouCardProps) {
             </li>
           ))}
         </ul>
+        <p className="mt-5 font-mono text-[10px] tracking-wider text-muted-foreground">
+          Instant AI call with Ruby · no booking
+        </p>
       </div>
 
       <div className="mt-auto pt-8">
@@ -98,11 +95,6 @@ export function DoneForYouCard({ onOpenCall }: DoneForYouCardProps) {
           <Phone className="mr-2 h-4 w-4" aria-hidden="true" />
           Get my price now
         </Button>
-        <p className="mt-2 text-center font-mono text-[9px] leading-relaxed tracking-wider text-muted-foreground">
-          Instant voice call with Ruby, our AI sales advisor.
-          <br />
-          In your browser · no booking · any language
-        </p>
       </div>
     </section>
   );
