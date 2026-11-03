@@ -42,6 +42,7 @@ import { buildRunView } from '@/lib/admin-workflow-views';
 import { findNodes, technicalNodes, type ViewNode } from '@/lib/admin-workflow-views/walker';
 import { buildIoSummary } from '@/lib/admin-workflow-views/io-summary';
 import { CostLabel, ProviderSpendBlock, WorkflowCostValue } from '@/components/admin/AdminCost';
+import { ClientBadge } from '@/components/admin/ClientBadge';
 import { ImageThumb } from '@/components/admin/workflow-view/ImageThumb';
 import { IoStrip } from '@/components/admin/workflow-view/IoStrip';
 import { JsonBlock } from '@/components/admin/workflow-view/JsonBlock';
@@ -646,6 +647,7 @@ export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
               <div className="flex flex-wrap gap-2">
                 <StatusBadge status={detail.status} />
                 <PayingBadge isPaying={detail.is_paying} />
+                <ClientBadge client={detail.client} version={detail.client_version} />
               </div>
             </div>
           </CardHeader>

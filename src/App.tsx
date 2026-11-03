@@ -82,6 +82,7 @@ const AdminAIFixesPage = lazyWithRetry(() => import("./pages/AdminAIFixesPage"))
 const AdminModelsPage = lazyWithRetry(() => import("./pages/AdminModelsPage"));
 const AdminInspirationsPage = lazyWithRetry(() => import("./pages/AdminInspirationsPage"));
 const AdminGenerationsPage = lazyWithRetry(() => import("./pages/AdminGenerationsPage"));
+const AdminRhinoUsersPage = lazyWithRetry(() => import("./pages/AdminRhinoUsersPage"));
 const AdminCadQueuePage = lazyWithRetry(() => import("./pages/AdminCadQueuePage"));
 const AdminBrandsPage = lazyWithRetry(() => import("./pages/AdminBrandsPage"));
 const AdminGenerationDetailPage = lazyWithRetry(() => import("./pages/AdminGenerationDetailPage"));
@@ -259,6 +260,7 @@ const MainApp = () => (
                     <Route index element={<Navigate to="/admin/promo-codes" replace />} />
                     <Route path="promo-codes" element={<PromoAdminPage />} />
                     <Route path="generations" element={<AdminGenerationsPage />} />
+                    <Route path="rhino-users" element={<AdminRhinoUsersPage />} />
                     <Route path="cad-queue" element={<AdminCadQueuePage />} />
                     <Route path="brands" element={<AdminBrandsPage />} />
                     <Route path="feedback" element={<AdminFeedbackPage />} />
