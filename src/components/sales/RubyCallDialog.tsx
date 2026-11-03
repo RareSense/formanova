@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Mic, MicOff, Phone, PhoneOff } from 'lucide-react';
+import { ArrowLeft, Mic, MicOff, Phone, PhoneOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -195,8 +195,20 @@ export function RubyCallDialog({ open, onOpenChange, createCall }: RubyCallDialo
   // stays to one line. Colours follow the active theme.
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="flex max-h-[92dvh] w-[calc(100vw-2rem)] max-w-[25rem] flex-col gap-0 overflow-y-auto p-0">
-        <div className="flex items-center px-6 py-4 pr-12">
+      <DialogContent
+        overlayClassName="bg-background/40 backdrop-blur-md"
+        className="flex max-h-[94dvh] w-[calc(100vw-2rem)] max-w-2xl flex-col gap-0 overflow-y-auto p-0"
+      >
+        <div className="flex items-center justify-between gap-3 px-4 py-3 pr-12 sm:px-6">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="px-3 font-mono text-[10px] uppercase tracking-[0.2em]"
+            onClick={() => handleOpenChange(false)}
+          >
+            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+            Back
+          </Button>
           <p className="flex items-center gap-2 font-mono text-[10px] tracking-[0.3em] uppercase text-muted-foreground">
             <span className="rounded-sm bg-[hsl(var(--formanova-hero-accent))] px-1.5 py-0.5 font-bold tracking-[0.15em] text-background">
               AI
@@ -205,11 +217,11 @@ export function RubyCallDialog({ open, onOpenChange, createCall }: RubyCallDialo
           </p>
         </div>
 
-        <div className="flex flex-col items-center px-6 pb-6 pt-2 text-center sm:px-10">
-          <RubyOrb level={orbLevel} calm={orbCalm} className="w-36 sm:w-44" />
+        <div className="flex flex-col items-center px-6 pb-8 pt-4 text-center sm:px-12 sm:pt-6">
+          <RubyOrb level={orbLevel} calm={orbCalm} className="w-44 sm:w-60" />
 
           <DialogHeader className="mt-6 space-y-2 text-center sm:text-center">
-            <DialogTitle className="font-display text-[2rem] uppercase leading-none tracking-wide text-foreground">
+            <DialogTitle className="font-display text-4xl uppercase leading-none tracking-wide text-foreground sm:text-5xl">
               {inCall ? status : 'Tell Ruby what you need'}
             </DialogTitle>
             <DialogDescription className={inCall ? 'sr-only' : 'text-[15px] leading-normal text-muted-foreground'}>
