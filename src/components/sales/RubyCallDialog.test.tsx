@@ -99,7 +99,7 @@ describe('RubyCallDialog', () => {
       turns: [{ role: 'client', text: 'Hi there', start_ms: 2, end_ms: 3 }],
       reason: 'user',
     });
-    expect(await screen.findByText('Thanks — your call is saved.')).toBeInTheDocument();
+    expect(await screen.findByText('Thanks for calling.')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Close' }).length).toBeGreaterThan(0);
   });
 
