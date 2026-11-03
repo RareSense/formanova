@@ -5,7 +5,9 @@ import { clientWording, installmentsOf, money, panelFromShowArgs, quotePanel } f
 
 function makeHost() {
   const host = {
-    showPanel: vi.fn(),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- tests read fields of any panel kind
+    showPanel: vi.fn(async (_panel: any) => true),
+    setLastQuote: vi.fn(),
     clearPanels: vi.fn(),
     setView: vi.fn(),
     updateLead: vi.fn(),
@@ -71,6 +73,8 @@ describe('panels', () => {
     expect(panelFromShowArgs({ kind: 'table', title: 'T', columns: ['a'], rows: [] })).toHaveProperty('error');
     expect(panelFromShowArgs({ kind: 'list', title: 'L', items: ['x'] })).toMatchObject({ kind: 'list', items: ['x'] });
     expect(panelFromShowArgs({ kind: 'chart', title: 'X' })).toHaveProperty('error');
+    // Wider than the compact layout can show: refused, so Ruby never claims it is on screen.
+    expect(panelFromShowArgs({ kind: 'table', title: 'T', columns: ['1', '2', '3', '4', '5', '6', '7'], rows: [['a']] })).toHaveProperty('error');
     expect(panelFromShowArgs({ kind: 'list', items: ['x'] })).toHaveProperty('error');
   });
 
@@ -101,6 +105,11 @@ describe('panels', () => {
     expect(installmentsOf({ installments: [] })).toBeNull();
   });
 
+  it('shows the delivery promise from the quote', () => {
+    const p = quotePanel({ ...APPROVED, client: { ...APPROVED.client, deliveryWithin: '5 working days' } });
+    expect(p).toMatchObject({ delivery: 'Delivery: within 5 working days, usually faster' });
+  });
+
   it('shows a refused quote without numbers', () => {
     const p = quotePanel({ approved: false, client: { message: 'This order needs a quote from our team', teamContact: { email: 'studio@formanova.ai' } } });
     expect(p).toEqual({
@@ -121,11 +130,17 @@ describe('call tools', () => {
   it('show_on_screen and clear_screen drive the panels', async () => {
     const host = makeHost();
     const run = createCallTools(host, makeApi());
-    expect(await run('show_on_screen', { kind: 'list', title: 'Steps', items: ['a'] })).toEqual({ shown: true });
+    expect(await run('show_on_screen', { kind: 'list', title: 'Steps', items: ['a'] })).toEqual({ shown: true, layout: 'compact' });
     expect(host.showPanel).toHaveBeenCalledWith(expect.objectContaining({ kind: 'list', title: 'Steps' }));
     expect(await run('show_on_screen', { kind: 'table', title: 'x' })).toHaveProperty('error');
     expect(await run('clear_screen', {})).toEqual({ cleared: true });
     expect(host.clearPanels).toHaveBeenCalled();
+  });
+
+  it('show_on_screen reports an error when the panel did not render', async () => {
+    const host = makeHost();
+    host.showPanel.mockResolvedValue(false);
+    expect(await createCallTools(host, makeApi())('show_on_screen', { kind: 'list', title: 'S', items: ['a'] })).toHaveProperty('error');
   });
 
   it('compare_plans shows the app plan data and returns it', async () => {
@@ -151,7 +166,12 @@ describe('call tools', () => {
       negotiation: { n: 1 },
       installmentCount: 2,
     });
-    expect(out).toEqual({ approved: true, needs_team_quote: false, client: APPROVED.client });
+    expect(out).toEqual({ approved: true, needs_team_quote: false, client: APPROVED.client, shown: true });
+    expect(host.setLastQuote).toHaveBeenCalledWith({
+      request: { lines: [{ productId: 'p2k', quantity: 120 }], turnaround: 'rush', negotiation: { n: 1 }, installmentCount: 2 },
+      total: '$1,350',
+      approved: true,
+    });
     expect(out).not.toHaveProperty('internal');
     expect(host.showPanel.mock.calls[0][0]).toMatchObject({ kind: 'table', total: '$1,350' });
   });
@@ -190,13 +210,57 @@ describe('call tools', () => {
   it('update_lead keeps only known fields', async () => {
     const host = makeHost();
     await createCallTools(host, makeApi())('update_lead', { brand: ' Aura ', shopify: true, pieces: 120, hack: 'x', notes: '' });
-    expect(host.updateLead).toHaveBeenCalledWith({ brand: 'Aura', shopify: true, pieces: '120' });
+    expect(host.updateLead).toHaveBeenCalledWith({ brand: 'Aura', shopify: true, pieces: '120', hack: 'x' });
+    await createCallTools(host, makeApi())('update_lead', {
+      data_ready: 'partly',
+      data_sorted: false,
+      needs_curation: true,
+      photo_quality_notes: 'Some blurry shots',
+      photo_source: 'link',
+    });
+    expect(host.updateLead).toHaveBeenLastCalledWith({
+      data_ready: 'partly',
+      data_sorted: false,
+      needs_curation: true,
+      photo_quality_notes: 'Some blurry shots',
+      photo_source: 'link',
+    });
+    await createCallTools(host, makeApi())('update_lead', {
+      resolution: '2K',
+      aspect_ratios: ['1:1', '4:5'],
+      style: 'clean white',
+      references: 'moodboard on Drive',
+      photos_link: 'https://drive.google.com/x',
+      future_field: true,
+      models_source: 'library',
+      model_looks: 'South Asian, 25-35, soft studio light',
+      'Bad Key': 'x',
+      nested: { a: 1 },
+    });
+    expect(host.updateLead).toHaveBeenLastCalledWith({
+      resolution: '2K',
+      aspect_ratios: '1:1, 4:5',
+      style: 'clean white',
+      references: 'moodboard on Drive',
+      photos_link: 'https://drive.google.com/x',
+      future_field: true,
+      models_source: 'library',
+      model_looks: 'South Asian, 25-35, soft studio light',
+    });
+  });
+
+  it('accepts express turnaround', async () => {
+    const api = makeApi();
+    await createCallTools(makeHost(), api)('quote_shoot', { lines: [{ productId: 'p', quantity: 1 }], turnaround: 'express' });
+    expect(api.runQuote).toHaveBeenCalledWith({ lines: [{ productId: 'p', quantity: 1 }], turnaround: 'express' });
   });
 
   it('set_call_view maps captions, text size and panel', async () => {
     const host = makeHost();
     expect(await createCallTools(host, makeApi())('set_call_view', { captions: 'on', text_size: 'large', panel: 'hide' })).toEqual({ done: true });
     expect(host.setView).toHaveBeenCalledWith({ captions: true, textSize: 'large', panel: 'hide' });
+    expect(await createCallTools(host, makeApi())('set_call_view', { compact: true })).toEqual({ done: true, layout: 'compact' });
+    expect(host.setView).toHaveBeenLastCalledWith({ compact: true });
   });
 
   it('end_call hangs up after the goodbye', async () => {

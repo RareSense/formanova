@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
+  DEAD_AIR_ANSWER,
   DEAD_AIR_CUE,
   WebRTCCall,
   deadAirCheckIn,
@@ -337,7 +338,20 @@ describe('WebRTCCall', () => {
 
   describe('dead air', () => {
     const cues = (s: ReturnType<typeof setup>) =>
-      s.pc.dc.sent.filter((m) => m.content === DEAD_AIR_CUE || m.content === deadAirCheckIn('Asha')).map((m) => m.content);
+      s.pc.dc.sent
+        .filter((m) => m.content === DEAD_AIR_CUE || m.content === DEAD_AIR_ANSWER || m.content === deadAirCheckIn('Asha'))
+        .map((m) => m.content);
+
+    it('when the caller spoke last, asks Ruby to answer and never checks in', async () => {
+      const s = setup();
+      await startLive(s, { clientName: 'Asha' });
+      s.pc.dc.message({ type: 'session.output_transcript.delta', delta: 'What do you sell?' });
+      s.pc.dc.message({ type: 'session.input_transcript.delta', delta: 'Rings. What is a deposit?' });
+      await vi.advanceTimersByTimeAsync(7000);
+      expect(cues(s)).toEqual([DEAD_AIR_ANSWER]);
+      await vi.advanceTimersByTimeAsync(10000);
+      expect(cues(s)).toEqual([DEAD_AIR_ANSWER]);
+    });
 
     it('cues Ruby after 6.5 s of silence and asks her to check in by name after 11.5 s', async () => {
       const s = setup();
@@ -371,7 +385,7 @@ describe('WebRTCCall', () => {
       release();
       s.pc.dc.message({ type: 'response.event', delegation_id: 'd1', event: { type: 'response.completed' } });
       await vi.advanceTimersByTimeAsync(7500);
-      expect(cues(s)).toEqual([DEAD_AIR_CUE]);
+      expect(cues(s)).toEqual([DEAD_AIR_ANSWER]); // the caller spoke last: Ruby owes an answer
     });
 
     it('stays quiet while Ruby is audibly speaking', async () => {

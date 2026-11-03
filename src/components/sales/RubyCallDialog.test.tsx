@@ -207,6 +207,50 @@ describe('RubyCallDialog', () => {
     );
   });
 
+  it('keeps one panel on screen: the newest replaces it, earlier ones stay reachable, clear_screen removes it', async () => {
+    const f = fakes();
+    await startCall(f);
+    act(() => f.cbs().onState?.('live'));
+    const runTool = f.opts().runTool!;
+    // The result waits for the real render, so start it and let React commit (sync act) before awaiting.
+    let pending: Promise<Record<string, unknown>> = Promise.resolve({});
+    await act(async () => {
+      pending = Promise.resolve(runTool('show_on_screen', { kind: 'list', title: 'Plans', items: ['Basic'] }));
+      await Promise.resolve();
+    });
+    expect(await pending).toEqual({ shown: true, layout: 'compact' });
+    await act(async () => {
+      await runTool('show_on_screen', { kind: 'list', title: 'Steps', items: ['Send photos'] });
+    });
+    expect(screen.queryByText('Basic')).not.toBeInTheDocument();
+    expect(screen.getByText('Send photos')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Plans' }));
+    expect(screen.getByText('Basic')).toBeInTheDocument();
+    expect(screen.queryByText('Send photos')).not.toBeInTheDocument();
+    await act(async () => {
+      await runTool('clear_screen', {});
+    });
+    expect(screen.queryByText('Basic')).not.toBeInTheDocument();
+  });
+
+  it('saves the lead Ruby collected and the last quote with the call', async () => {
+    const f = fakes();
+    await startCall(f);
+    act(() => f.cbs().onState?.('live'));
+    const runTool = f.opts().runTool!;
+    await act(async () => {
+      await runTool('update_lead', { brand: 'Aura', pieces: '500' });
+      await runTool('update_lead', { email: 'u@aura.co' });
+    });
+    await act(async () => {
+      await f.cbs().onEnded?.({ turns: [], reason: 'ruby_closed' });
+    });
+    expect(save.saveCallRecord).toHaveBeenCalledWith(
+      'u1',
+      expect.objectContaining({ lead: { brand: 'Aura', pieces: '500', email: 'u@aura.co' } }),
+    );
+  });
+
   it('saves the call even when it ends by a lost connection with no words', async () => {
     const f = fakes();
     await startCall(f);

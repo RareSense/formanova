@@ -29,6 +29,8 @@ export type PanelSpec =
       note?: string;
       /** Payment plan shown under a quote. */
       schedule?: Installment[];
+      /** "Delivery: within 5 days, usually faster" (kept in compact mode too). */
+      delivery?: string;
     }
   | { kind: 'list'; title: string; kicker?: string; items: string[]; note?: string }
   | { kind: 'upload'; title: string; purpose: UploadPurpose; note?: string }
@@ -49,7 +51,7 @@ export type Panel = PanelSpec & { id: string };
 
 export const TEAM_EMAIL = 'studio@formanova.ai';
 const MAX_ROWS = 30;
-const MAX_COLUMNS = 8;
+const MAX_COLUMNS = 6;
 const MAX_CELL = 200;
 
 const cell = (v: unknown): string => (v === null || v === undefined ? '' : String(v)).slice(0, MAX_CELL);
@@ -64,6 +66,9 @@ export function panelFromShowArgs(args: Record<string, unknown>): PanelSpec | { 
   if (args.kind === 'table') {
     if (!Array.isArray(args.columns) || !args.columns.length) return { error: 'A table needs columns.' };
     if (!Array.isArray(args.rows) || !args.rows.length) return { error: 'A table needs rows.' };
+    // Rows are shown compact (label left, amount right, the rest under the label): wider will not fit.
+    if (args.columns.length > MAX_COLUMNS) return { error: `Too wide to fit: use at most ${MAX_COLUMNS} columns.` };
+    if (args.rows.length > MAX_ROWS) return { error: `Too long to fit: use at most ${MAX_ROWS} rows.` };
     const columns = args.columns.slice(0, MAX_COLUMNS).map(cell);
     const rows = args.rows
       .slice(0, MAX_ROWS)
@@ -76,6 +81,7 @@ export function panelFromShowArgs(args: Record<string, unknown>): PanelSpec | { 
   }
   if (args.kind === 'list') {
     if (!Array.isArray(args.items) || !args.items.length) return { error: 'A list needs items.' };
+    if (args.items.length > MAX_ROWS) return { error: `Too long to fit: use at most ${MAX_ROWS} items.` };
     return { kind: 'list', title, kicker, items: args.items.slice(0, MAX_ROWS).map(cell), note };
   }
   return { error: 'kind must be "table" or "list".' };
@@ -182,6 +188,7 @@ export function quotePanel(result: Record<string, unknown>): PanelSpec {
     total,
     note: notes.join(' ') || undefined,
     ...(installmentsOf(client) ? { schedule: installmentsOf(client) as Installment[] } : {}),
+    ...(text(client.deliveryWithin) ? { delivery: `Delivery: within ${text(client.deliveryWithin)}, usually faster` } : {}),
   };
 }
 
@@ -204,4 +211,13 @@ export function plansPanel(): { panel: PanelSpec; plans: Record<string, unknown>
       rows: CREDIT_PLANS.map((p) => [p.name, `$${p.price}`, String(p.credits), `Up to ${p.photos}`, `Up to ${p.cads}`]),
     },
   };
+}
+
+const MONEY = /\$\s?\d|₹\s?\d|\d+%/;
+
+/** The column that carries the amount: the last one with money in it, else the last one. */
+export function amountColumn(columns: string[], rows: string[][]): number | null {
+  if (columns.length < 2) return null;
+  for (let c = columns.length - 1; c > 0; c--) if (rows.some((r) => MONEY.test(r[c] ?? ''))) return c;
+  return columns.length - 1;
 }

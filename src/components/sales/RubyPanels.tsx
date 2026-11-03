@@ -1,12 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Check, Copy, ExternalLink, Mail, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { TEAM_EMAIL, type Installment, type Panel } from '@/lib/ruby-call/panels';
+import { TEAM_EMAIL, amountColumn, type DealInstallment, type Installment, type Panel } from '@/lib/ruby-call/panels';
 import { LinkField, UploadCard, type UploadOutcome } from './RubyPanelInputs';
 
-interface RubyPanelsProps {
-  panels: Panel[];
+interface RubyStageProps {
+  /** The one panel on screen (newest replaces the previous). */
+  panel: Panel;
+  /** Fewer rows, no details: set by the caller or Ruby (set_call_view compact). */
+  compact?: boolean;
   onClose(panel: Panel): void;
+  /** Fired once the panel is on screen, so Ruby only claims what the caller can see. */
+  onRendered?(id: string): void;
   onUpload(panel: Panel, files: File[]): Promise<UploadOutcome[]>;
   onLink(url: string): void;
   onLinkTyping(): void;
@@ -14,98 +19,96 @@ interface RubyPanelsProps {
 
 const KICKER = 'font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground';
 const GOLD = 'hsl(var(--formanova-hero-accent))';
+const ROWS_SHOWN = 6;
+const ROWS_SHOWN_COMPACT = 4;
 
-/** What Ruby shows during a call, newest first, in FormaNova card style. */
-export function RubyPanels({ panels, onClose, onUpload, onLink, onLinkTyping }: RubyPanelsProps) {
+/**
+ * Ruby's stage (like Eva's): one calm card at a time, never scrolling sideways.
+ * Rows are compact: label left, amount right, details wrapped under the label.
+ */
+export function RubyStage({ panel, compact = false, onClose, onRendered, onUpload, onLink, onLinkTyping }: RubyStageProps) {
+  useEffect(() => {
+    onRendered?.(panel.id);
+  }, [panel.id, onRendered]);
+
   return (
-    <div className="flex w-full min-w-0 flex-col gap-4" aria-label="Shown by Ruby" aria-live="polite">
-      {panels.map((panel) => (
-        <section
-          key={panel.id}
-          aria-label={panel.title}
-          className="relative w-full min-w-0 animate-fade-in border-2 border-border bg-card p-4 text-left sm:p-5"
-        >
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute right-2 top-2 h-8 w-8"
-            aria-label={`Close ${panel.title}`}
-            onClick={() => onClose(panel)}
-          >
-            <X className="h-4 w-4" />
-          </Button>
-          {'kicker' in panel && panel.kicker && <p className={KICKER}>{panel.kicker}</p>}
-          {panel.kind === 'deal' && <p className={KICKER}>Ready to pay</p>}
-          <h3 className="mt-1 break-words pr-8 font-display text-2xl uppercase leading-none tracking-wide sm:text-3xl">
-            {panel.title}
-          </h3>
-          <div className="mt-4">
-            <PanelBody panel={panel} onUpload={onUpload} onLink={onLink} onLinkTyping={onLinkTyping} />
-          </div>
-        </section>
-      ))}
-    </div>
+    <section
+      key={panel.id}
+      aria-label={panel.title}
+      className="relative w-full min-w-0 animate-fade-in border-2 border-border bg-card p-4 text-left sm:p-6"
+    >
+      <Button
+        variant="ghost"
+        size="icon"
+        className="absolute right-2 top-2 h-8 w-8"
+        aria-label={`Close ${panel.title}`}
+        onClick={() => onClose(panel)}
+      >
+        <X className="h-4 w-4" />
+      </Button>
+      {'kicker' in panel && panel.kicker && <p className={`${KICKER} pr-8`}>{panel.kicker}</p>}
+      {panel.kind === 'deal' && <p className={KICKER}>Ready to pay</p>}
+      <h3 className="mt-1 break-words pr-8 font-display text-2xl uppercase leading-none tracking-wide sm:text-3xl">
+        {panel.title}
+      </h3>
+      <div className="mt-4 min-w-0">
+        <PanelBody panel={panel} compact={compact} onUpload={onUpload} onLink={onLink} onLinkTyping={onLinkTyping} />
+      </div>
+    </section>
   );
 }
 
 function PanelBody({
   panel,
+  compact,
   onUpload,
   onLink,
   onLinkTyping,
 }: {
   panel: Panel;
-  onUpload: RubyPanelsProps['onUpload'];
-  onLink: RubyPanelsProps['onLink'];
-  onLinkTyping: RubyPanelsProps['onLinkTyping'];
+  compact: boolean;
+  onUpload: RubyStageProps['onUpload'];
+  onLink: RubyStageProps['onLink'];
+  onLinkTyping: RubyStageProps['onLinkTyping'];
 }) {
   switch (panel.kind) {
     case 'table':
       return (
         <>
-          <Table columns={panel.columns} rows={panel.rows} highlight={panel.highlight} total={panel.total} />
-          {panel.note && <Note text={panel.note} />}
+          <Rows columns={panel.columns} rows={panel.rows} highlight={panel.highlight} total={panel.total} compact={compact} />
+          {panel.delivery && <p className="mt-3 break-words text-sm">{panel.delivery}</p>}
           {panel.schedule && <Schedule plan={panel.schedule} />}
+          {panel.note && !compact && <Note text={panel.note} />}
         </>
       );
     case 'list':
       return (
         <>
-          <ul className="space-y-2">
-            {panel.items.map((item, i) => (
-              <li key={i} className="flex gap-3 border-l-2 pl-3 text-sm" style={{ borderColor: GOLD }}>
-                <span className="min-w-0 break-words">{item}</span>
-              </li>
-            ))}
-          </ul>
-          {panel.note && <Note text={panel.note} />}
+          <Rows columns={['Item']} rows={panel.items.map((i) => [i])} compact={compact} />
+          {panel.note && !compact && <Note text={panel.note} />}
         </>
       );
     case 'upload':
       return (
-        <>
-          {panel.note && <p className="mb-3 text-justify text-sm text-muted-foreground">{panel.note}</p>}
-          <UploadCard
-            purpose={panel.purpose}
-            onUpload={(files) => onUpload(panel, files)}
-            onLink={onLink}
-            onLinkTyping={onLinkTyping}
-          />
-        </>
+        <UploadCard
+          purpose={panel.purpose}
+          note={panel.note}
+          onUpload={(files) => onUpload(panel, files)}
+          onLink={onLink}
+          onLinkTyping={onLinkTyping}
+        />
       );
     case 'link':
       return (
         <>
-          {panel.note && <p className="mb-3 text-justify text-sm text-muted-foreground">{panel.note}</p>}
+          {panel.note && <p className="mb-3 break-words text-sm text-muted-foreground">{panel.note}</p>}
           <LinkField onLink={onLink} onTyping={onLinkTyping} />
         </>
       );
     case 'contact':
       return (
         <div className="space-y-3">
-          <p className="text-justify text-sm text-muted-foreground">
-            Write to the FormaNova team and they will get back to you.
-          </p>
+          <p className="text-sm text-muted-foreground">Write to the FormaNova team and they will get back to you.</p>
           <p className="break-all font-mono text-sm">{TEAM_EMAIL}</p>
           <Button asChild size="lg" className="h-12 w-full px-6 sm:w-auto">
             <a href={`mailto:${TEAM_EMAIL}`}>
@@ -116,83 +119,94 @@ function PanelBody({
         </div>
       );
     case 'deal':
-      return <Deal panel={panel} />;
+      return <Deal panel={panel} compact={compact} />;
   }
 }
 
 function Note({ text }: { text: string }) {
-  return <p className="mt-3 text-justify text-xs leading-relaxed text-muted-foreground">{text}</p>;
+  return <p className="mt-3 break-words text-xs leading-relaxed text-muted-foreground">{text}</p>;
 }
 
-function Table({
+/** One compact row per line: label left, amount right, the other columns wrapped under the label. */
+function Rows({
   columns,
   rows,
   highlight,
   total,
+  compact,
 }: {
   columns: string[];
   rows: string[][];
   highlight?: number;
   total?: string;
+  compact: boolean;
 }) {
+  const [open, setOpen] = useState(false);
+  const limit = compact ? ROWS_SHOWN_COMPACT : ROWS_SHOWN;
+  const amountAt = amountColumn(columns, rows);
+  // The recommended row always stays in view.
+  const order = rows.map((_, i) => i);
+  const visible = open ? order : order.filter((i) => i < limit || i === highlight).slice(0, limit + 1);
+  const hidden = rows.length - visible.length;
+
   return (
-    // Wide tables scroll inside the card; the page never scrolls sideways.
-    <div className="-mx-1 overflow-x-auto px-1">
-      <table className="w-full min-w-max border-collapse text-sm">
-        <thead>
-          <tr className="border-b-2 border-border">
-            {columns.map((c, i) => (
-              <th
-                key={i}
-                scope="col"
-                className={`py-2 pr-4 font-mono text-[10px] font-normal uppercase tracking-[0.2em] text-muted-foreground last:pr-0 ${
-                  i === 0 ? 'text-left' : 'text-right'
-                }`}
-              >
-                {c}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, r) => {
-            const picked = r === highlight;
-            return (
-              <tr
-                key={r}
-                className="border-b border-border/60"
-                style={picked ? { background: 'hsl(var(--formanova-hero-accent) / 0.12)' } : undefined}
-              >
-                {row.map((v, i) => (
-                  <td key={i} className={`py-2 pr-4 last:pr-0 ${i === 0 ? 'text-left' : 'text-right tabular-nums'}`}>
-                    {v}
-                    {i === 0 && picked && (
-                      <span
-                        className="ml-2 whitespace-nowrap font-mono text-[9px] uppercase tracking-[0.15em]"
-                        style={{ color: GOLD }}
-                      >
-                        Recommended
-                      </span>
-                    )}
-                  </td>
-                ))}
-              </tr>
-            );
-          })}
-        </tbody>
-        {total && (
-          <tfoot>
-            <tr>
-              <td colSpan={Math.max(1, columns.length - 1)} className="pt-3 font-mono text-[10px] uppercase tracking-[0.2em]">
-                Total
-              </td>
-              <td className="pt-3 text-right font-display text-2xl leading-none tabular-nums" style={{ color: GOLD }}>
-                {total}
-              </td>
-            </tr>
-          </tfoot>
-        )}
-      </table>
+    <div className="min-w-0">
+      <ul className="divide-y divide-border/60">
+        {visible.map((r) => {
+          const row = rows[r];
+          const picked = r === highlight;
+          const details = compact
+            ? ''
+            : row
+                .map((v, i) => (i === 0 || i === amountAt || !v ? '' : `${columns[i]} ${v}`))
+                .filter(Boolean)
+                .join(' · ');
+          return (
+            <li
+              key={r}
+              className="flex min-w-0 items-start gap-3 py-2.5 pl-3"
+              style={{
+                borderLeft: `2px solid ${picked ? GOLD : 'transparent'}`,
+                background: picked ? 'hsl(var(--formanova-hero-accent) / 0.08)' : undefined,
+              }}
+            >
+              <div className="min-w-0 flex-1">
+                <p className="break-words text-sm leading-snug">
+                  {row[0]}
+                  {picked && (
+                    <span className="ml-2 font-mono text-[9px] uppercase tracking-[0.15em]" style={{ color: GOLD }}>
+                      Recommended
+                    </span>
+                  )}
+                </p>
+                {details && <p className="mt-0.5 break-words text-xs text-muted-foreground">{details}</p>}
+              </div>
+              {amountAt !== null && (
+                <span className="max-w-[45%] shrink-0 break-words text-right text-sm tabular-nums">{row[amountAt]}</span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      {(hidden > 0 || open) && rows.length > limit && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="mt-1 px-3 font-mono text-[10px] uppercase tracking-[0.2em]"
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+        >
+          {open ? 'Show fewer' : `${hidden} more item${hidden === 1 ? '' : 's'}`}
+        </Button>
+      )}
+      {total && (
+        <div className="mt-2 flex min-w-0 items-baseline justify-between gap-3 border-t-2 border-border pt-3">
+          <span className="font-mono text-[10px] uppercase tracking-[0.2em]">Total</span>
+          <span className="break-words text-right font-display text-2xl leading-none tabular-nums" style={{ color: GOLD }}>
+            {total}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -236,8 +250,8 @@ function CopyLinkButton({ url, label }: { url: string; label: string }) {
   );
 }
 
-function Deal({ panel }: { panel: Extract<Panel, { kind: 'deal' }> }) {
-  const plan = panel.installments?.length
+function Deal({ panel, compact }: { panel: Extract<Panel, { kind: 'deal' }>; compact: boolean }) {
+  const plan: DealInstallment[] = panel.installments?.length
     ? panel.installments
     : [{ n: 1, label: 'Full payment', amountCents: 0, amount: panel.total, due: null, url: panel.url }];
   return (
@@ -247,7 +261,7 @@ function Deal({ panel }: { panel: Extract<Panel, { kind: 'deal' }> }) {
           Test link
         </span>
       )}
-      <Table columns={['Item', 'Qty', 'Per unit', 'Total']} rows={panel.rows} total={panel.total} />
+      <Rows columns={['Item', 'Qty', 'Per unit', 'Total']} rows={panel.rows} total={panel.total} compact={compact} />
       <p className={KICKER}>{plan.length > 1 ? 'Payment plan' : 'Payment'}</p>
       <ol className="space-y-4">
         {plan.map((p) => (

@@ -20,7 +20,7 @@ import { getLanguages, type CallLanguage } from '@/lib/ruby-call/sales-call-api'
 import { currentCaption, formatClock } from '@/lib/ruby-call/call-view';
 import type { CallCallbacks, CallErrorCode, WebRTCCall } from '@/lib/ruby-call/webrtc-call';
 import { RubyOrb } from './RubyOrb';
-import { RubyPanels } from './RubyPanels';
+import { RubyStage } from './RubyPanels';
 import { useRubyCall } from './useRubyCall';
 
 const FALLBACK_LANGUAGES: CallLanguage[] = [{ code: 'en', name: 'English' }];
@@ -57,7 +57,7 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
   const [languages, setLanguages] = useState<CallLanguage[]>(FALLBACK_LANGUAGES);
   const [language, setLanguage] = useState('en');
   const call = useRubyCall({ createCall, createRecorder });
-  const { phase, muted, busy, reconnecting, seconds, panels, panelsHidden, captionsOn, textLarge, speaker } = call;
+  const { phase, muted, busy, reconnecting, seconds, panel, earlier, panelsHidden, captionsOn, textLarge, speaker } = call;
 
   // Load languages each time the window opens.
   useEffect(() => {
@@ -83,7 +83,8 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
   };
 
   const inCall = phase === 'connecting' || phase === 'live';
-  const showPanels = phase !== 'idle' && panels.length > 0 && !panelsHidden;
+  // One panel at a time, in its own card beside the call (Eva's stage).
+  const showPanels = phase !== 'idle' && !!panel && !panelsHidden;
   // Eva's status line: the call clock plus what is going on.
   const status =
     phase === 'connecting'
@@ -231,7 +232,7 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
                     End call
                   </Button>
                 </div>
-                {panels.length > 0 && (
+                {panel && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -247,6 +248,23 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
                     {panelsHidden ? 'Show panel' : 'Hide panel'}
                   </Button>
                 )}
+              </div>
+            )}
+
+            {phase !== 'idle' && earlier.length > 0 && (
+              <div className="mt-4 flex w-full min-w-0 flex-wrap items-center justify-center gap-2">
+                <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Earlier</span>
+                {earlier.map((p) => (
+                  <Button
+                    key={p.id}
+                    variant="outline"
+                    size="sm"
+                    className="h-8 max-w-[12rem] px-3 text-xs"
+                    onClick={() => call.reopenPanel(p)}
+                  >
+                    <span className="truncate">{p.title}</span>
+                  </Button>
+                ))}
               </div>
             )}
 
@@ -276,10 +294,13 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
             )}
           </div>
 
-          {showPanels && (
-            <div className="min-w-0 px-4 pb-6 sm:px-6 lg:max-h-[80dvh] lg:overflow-y-auto lg:py-6 lg:pl-0">
-              <RubyPanels
-                panels={panels}
+          {showPanels && panel && (
+            <div className="min-w-0 px-4 pb-6 sm:px-6 lg:py-6 lg:pl-0">
+              <RubyStage
+                key={panel.id}
+                panel={panel}
+                compact={call.compact}
+                onRendered={call.panelRendered}
                 onClose={call.closePanel}
                 onUpload={call.uploadFiles}
                 onLink={call.shareLink}

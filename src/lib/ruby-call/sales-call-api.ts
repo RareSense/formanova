@@ -76,6 +76,8 @@ export interface EndCallArgs {
   links?: CallLink[];
   recording?: RecordingSummary | null;
   payment?: CallPayment | null;
+  /** The last quote priced in the call (fallback record of the deal). */
+  quote?: Record<string, unknown> | null;
 }
 
 const devBase = (): string => {
@@ -217,6 +219,7 @@ export function buildPostCallPayload(args: EndCallArgs): Record<string, unknown>
     links: args.links ?? [],
     recording: args.recording ?? null,
     ...(args.payment ? { payment: args.payment } : {}),
+    ...(args.quote ? { quote: args.quote } : {}),
   };
 }
 

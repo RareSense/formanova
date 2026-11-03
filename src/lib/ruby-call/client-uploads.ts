@@ -69,3 +69,17 @@ export function uploadedMessage(purpose: UploadPurpose, names: string[]): string
 export function linkMessage(url: string): string {
   return `The client shared a link: ${url}. It is saved. Thank them briefly and continue.`;
 }
+
+export interface UploadOutcome {
+  name: string;
+  ok: boolean;
+  error?: string;
+}
+
+/** One status line for a batch of uploads (as on Nova's onboarding call). */
+export function uploadNote(total: number, outcomes: UploadOutcome[]): string {
+  const saved = outcomes.filter((o) => o.ok).length;
+  if (saved === total) return total === 1 ? 'Your image is in.' : `${saved} images are in.`;
+  const reason = outcomes.find((o) => !o.ok)?.error ?? 'Please try again.';
+  return saved === 0 ? `That didn't go through. ${reason}` : `${saved} of ${total} images are in. ${reason}`;
+}
