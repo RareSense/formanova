@@ -29,11 +29,12 @@ import {
   type CallRole,
   type CallTurn,
 } from '@/lib/ruby-call/webrtc-call';
+import { RubyOrb } from './RubyOrb';
 
 type Phase = 'idle' | 'connecting' | 'live' | 'ended' | 'error';
 
 const FALLBACK_LANGUAGES: CallLanguage[] = [{ code: 'en', name: 'English' }];
-const CAPTION_LINES = 4;
+const CAPTION_LINES = 2;
 const SPEAKER_HOLD_MS = 1500;
 
 const ERROR_COPY: Record<CallErrorCode, string> = {
@@ -190,69 +191,47 @@ export function RubyCallDialog({ open, onOpenChange, createCall }: RubyCallDialo
         ? 'Ruby is speaking'
         : 'Ruby is listening';
 
-  const orbActive = speaker === 'ruby' || phase === 'connecting';
+  const orbLevel = speaker === 'ruby' ? 0.6 : speaker === 'client' ? 0.25 : phase === 'connecting' ? 0.15 : 0;
+  const orbCalm = muted || phase === 'ended' || phase === 'error';
 
-  // Layout follows the Eva call page: framed window, orb, one question,
-  // language, one big start button, AI note. FormaNova fonts and gold accent.
+  // Full-screen call, laid out like the Eva call page: the orb carries the
+  // screen, copy stays to one line. Colours follow the active theme.
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-sm gap-0 overflow-hidden rounded-none border-2 border-foreground p-0 shadow-[6px_6px_0_hsl(var(--foreground))] sm:rounded-none">
-        <div className="flex items-center gap-2 border-b-2 border-foreground bg-[hsl(var(--formanova-hero-accent))]/10 px-4 py-3 pr-12">
-          <span className="h-2 w-2 rounded-full bg-[hsl(var(--formanova-success))]" aria-hidden="true" />
-          <p className="font-mono text-[10px] tracking-[0.25em] uppercase text-foreground">
-            Ruby · FormaNova Done For You
+      <DialogContent className="flex h-[100dvh] w-screen max-w-none flex-col gap-0 rounded-none border-0 p-0 sm:rounded-none data-[state=closed]:slide-out-to-top-[50%] data-[state=open]:slide-in-from-top-[50%]">
+        <div className="flex items-center px-6 py-5 pr-14 md:px-10">
+          <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-muted-foreground">
+            Ruby · AI sales advisor
           </p>
         </div>
 
-        <div className="flex flex-col items-center px-6 pb-6 pt-8 text-center">
-          <div
-            aria-hidden="true"
-            className={`h-28 w-28 rounded-full transition-transform duration-500 ${
-              orbActive ? 'scale-110 animate-pulse' : phase === 'live' ? 'scale-100' : 'scale-95'
-            }`}
-            style={{
-              background:
-                'radial-gradient(circle at 35% 30%, hsl(var(--background)) 0%, hsl(var(--formanova-hero-accent) / 0.55) 35%, hsl(var(--formanova-hero-accent)) 65%, hsl(var(--foreground) / 0.85) 100%)',
-              boxShadow: '0 0 40px hsl(var(--formanova-hero-accent) / 0.35)',
-            }}
-          />
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-6 pb-10 text-center">
+          <RubyOrb level={orbLevel} calm={orbCalm} className="w-[min(62vw,44vh,420px)]" />
 
-          <DialogHeader className="mt-6 space-y-2 text-center sm:text-center">
-            <DialogTitle className="font-display text-4xl uppercase leading-none tracking-wide text-foreground">
-              Get your custom package
+          <DialogHeader className="mt-8 space-y-3 text-center sm:text-center">
+            <DialogTitle className="font-display text-4xl uppercase leading-none tracking-wide text-foreground md:text-6xl">
+              {inCall ? status : 'Tell Ruby what you need'}
             </DialogTitle>
-            <DialogDescription className="font-mono text-sm leading-relaxed text-muted-foreground">
-              Ruby is FormaNova's AI sales advisor. Tell her what you sell and how many pieces, and get your price on the call. Any language.
+            <DialogDescription className={inCall ? 'sr-only' : 'font-mono text-sm text-muted-foreground'}>
+              Your custom package and price, on the call.
             </DialogDescription>
           </DialogHeader>
 
           {phase === 'idle' && (
-            <div className="mt-8 flex w-full max-w-[16rem] flex-col items-stretch gap-5">
-              <div className="space-y-2">
-                <label
-                  htmlFor="ruby-language"
-                  className="block font-mono text-[9px] tracking-[0.25em] text-muted-foreground uppercase"
-                >
-                  Language
-                </label>
-                <Select value={language} onValueChange={setLanguage}>
-                  <SelectTrigger id="ruby-language" aria-label="Language" className="rounded-none border-2 border-foreground">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {languages.map((l) => (
-                      <SelectItem key={l.code} value={l.code}>
-                        {l.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button
-                size="lg"
-                className="w-full px-6 font-mono text-xs tracking-[0.2em] uppercase shadow-[4px_4px_0_hsl(var(--formanova-hero-accent))]"
-                onClick={startCall}
-              >
+            <div className="mt-10 flex w-full max-w-[16rem] flex-col items-stretch gap-4">
+              <Select value={language} onValueChange={setLanguage}>
+                <SelectTrigger id="ruby-language" aria-label="Language">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {languages.map((l) => (
+                    <SelectItem key={l.code} value={l.code}>
+                      {l.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button size="lg" className="w-full px-6" onClick={startCall}>
                 <Phone className="mr-2 h-4 w-4" aria-hidden="true" />
                 Start talking
               </Button>
@@ -260,27 +239,25 @@ export function RubyCallDialog({ open, onOpenChange, createCall }: RubyCallDialo
           )}
 
           {inCall && (
-            <div className="mt-6 w-full space-y-5">
-              <p role="status" className="font-mono text-[9px] tracking-[0.25em] text-muted-foreground uppercase">
-                {status}
-              </p>
-              <div
-                aria-label="Live captions"
-                className="min-h-[5rem] space-y-2 border-2 border-foreground/15 p-3 text-left text-sm"
-              >
+            <div className="mt-8 w-full max-w-2xl space-y-8">
+              <div aria-label="Live captions" className="min-h-[4rem] space-y-2 text-base md:text-lg">
                 {captions.map((t, i) => (
-                  <p key={`${turns.length - captions.length + i}`}>
-                    <span className="mr-2 font-mono text-[9px] tracking-[0.2em] text-[hsl(var(--formanova-hero-accent))] uppercase">
+                  <p
+                    key={`${turns.length - captions.length + i}`}
+                    className={i === captions.length - 1 ? 'text-foreground' : 'text-muted-foreground'}
+                  >
+                    <span className="mr-2 font-mono text-[10px] tracking-[0.2em] uppercase text-[hsl(var(--formanova-hero-accent))]">
                       {t.role === 'ruby' ? 'Ruby' : 'You'}
                     </span>
                     {t.text}
                   </p>
                 ))}
               </div>
-              <div className="flex gap-3">
+              <div className="mx-auto flex max-w-sm gap-3">
                 <Button
                   variant="outline"
-                  className="flex-1 px-4 rounded-none border-2 border-foreground"
+                  size="lg"
+                  className="flex-1 px-4"
                   disabled={phase !== 'live'}
                   aria-pressed={muted}
                   onClick={() => callRef.current?.toggleMute()}
@@ -290,7 +267,8 @@ export function RubyCallDialog({ open, onOpenChange, createCall }: RubyCallDialo
                 </Button>
                 <Button
                   variant="destructive"
-                  className="flex-1 px-4 rounded-none"
+                  size="lg"
+                  className="flex-1 px-4"
                   onClick={() => void callRef.current?.end()}
                 >
                   <PhoneOff className="mr-2 h-4 w-4" />
@@ -301,36 +279,36 @@ export function RubyCallDialog({ open, onOpenChange, createCall }: RubyCallDialo
           )}
 
           {phase === 'ended' && (
-            <div className="mt-6 w-full space-y-5">
+            <div className="mt-8 w-full max-w-[16rem] space-y-4">
               <p className="text-sm text-foreground">
                 {saved ? 'Thanks — your call is saved.' : 'Thanks for calling.'}
               </p>
-              <Button className="w-full px-4" onClick={() => handleOpenChange(false)}>
+              <Button size="lg" className="w-full px-6" onClick={() => handleOpenChange(false)}>
                 Close
               </Button>
             </div>
           )}
 
           {phase === 'error' && (
-            <div className="mt-6 w-full space-y-5">
+            <div className="mt-8 w-full max-w-sm space-y-4">
               <p role="alert" className="text-sm text-destructive">
                 {ERROR_COPY[error ?? 'start_failed']}
               </p>
               <div className="flex gap-3">
-                <Button variant="outline" className="flex-1 px-4" onClick={() => handleOpenChange(false)}>
+                <Button variant="outline" size="lg" className="flex-1 px-4" onClick={() => handleOpenChange(false)}>
                   Close
                 </Button>
-                <Button className="flex-1 px-4" onClick={reset}>
+                <Button size="lg" className="flex-1 px-4" onClick={reset}>
                   Try again
                 </Button>
               </div>
             </div>
           )}
-
-          <p className="mt-6 font-mono text-[9px] tracking-wider text-muted-foreground">
-            Ruby is an AI · calls are saved
-          </p>
         </div>
+
+        <p className="pb-6 text-center font-mono text-[9px] tracking-wider text-muted-foreground">
+          Ruby is an AI · calls are saved
+        </p>
       </DialogContent>
     </Dialog>
   );
