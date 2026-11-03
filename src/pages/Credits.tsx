@@ -15,6 +15,9 @@ import { isStarterTier, type BillingTier } from '@/lib/starter-pack';
 import { getPostPurchaseReturn, clearPostPurchaseReturn } from '@/lib/post-purchase-return';
 import { CreditPlanGrid } from '@/components/pricing/CreditPlanGrid';
 import { isCadWorkflow, resolveGridTiers } from '@/lib/credit-plans';
+import { DoneForYouCard } from '@/components/pricing/DoneForYouCard';
+import { useDoneForYouVisible } from '@/hooks/use-done-for-you-visible';
+import { RubyCallDialog } from '@/components/sales/RubyCallDialog';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
 
 const CHECKOUT_URL = '/billing/checkout';
@@ -53,6 +56,9 @@ export default function Credits() {
   const [tiers, setTiers] = useState<BillingTier[]>([]);
   const [tiersLoading, setTiersLoading] = useState(true);
   const [unavailableTier, setUnavailableTier] = useState<string | null>(null);
+  const [callOpen, setCallOpen] = useState(false);
+  const openCall = useCallback(() => setCallOpen(true), []);
+  const doneForYouAllowed = useDoneForYouVisible();
 
   const fetchTiers = useCallback(async () => {
     setTiersLoading(true);
@@ -181,11 +187,15 @@ export default function Credits() {
   // Any other blocked run is a photo run: Plus (pitched at CAD) stays hidden.
   // A direct visit with nothing blocked shows every package.
   const photoShortfall = isShort && cadRequiredCredits === undefined;
+  // Done For You only on a normal visit, never on the CAD or photo shortfall views.
+  const showDoneForYou = doneForYouAllowed && !isShort;
 
   // 4 cards when the backend still returns the one-time Starter tier (user never
   // bought it), otherwise the 3 standard plans. Counted after the grid's own
   // filtering, since the backend list also carries packages that are not shown.
-  const maxWidthClass = resolveGridTiers(tiers, cadRequiredCredits, photoShortfall).length >= 4 ? 'max-w-7xl' : 'max-w-5xl';
+  // Done For You, when shown, is one more card in the same row (as on /pricing).
+  const cardCount = resolveGridTiers(tiers, cadRequiredCredits, photoShortfall).length + (showDoneForYou ? 1 : 0);
+  const maxWidthClass = cardCount >= 4 ? 'max-w-7xl' : 'max-w-5xl';
   // A normal visit (no requiredCredits) shows the balance instead.
   const insufficientNotice = (
     <div className="w-full">
@@ -280,6 +290,7 @@ export default function Credits() {
               unavailableTier={unavailableTier}
               errorTier={errorTier}
               onCheckout={handleCheckout}
+              extraCard={showDoneForYou ? <DoneForYouCard onOpenCall={openCall} /> : undefined}
             />
           )}
         </motion.div>
@@ -335,6 +346,7 @@ export default function Credits() {
         </motion.div>
       </motion.div>
     </div>
+    {showDoneForYou && <RubyCallDialog open={callOpen} onOpenChange={setCallOpen} />}
     </>
   );
 }
