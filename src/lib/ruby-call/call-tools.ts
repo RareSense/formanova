@@ -27,10 +27,21 @@ export interface CallView {
   captions?: boolean;
   textSize?: 'normal' | 'large';
   panel?: 'hide' | 'show';
+  /** Force the compact layout (fewer rows, no details). */
+  compact?: boolean;
+}
+
+/** The last quote Ruby priced, saved with the call as a fallback record of the deal. */
+export interface LastQuote {
+  request: QuoteRequest;
+  total: string | null;
+  approved: boolean;
 }
 
 export interface ToolHost {
-  showPanel(panel: PanelSpec): void;
+  /** Resolves true once the panel is actually on screen, false if it could not be shown. */
+  showPanel(panel: PanelSpec): Promise<boolean> | boolean;
+  setLastQuote(quote: LastQuote): void;
   clearPanels(): void;
   setView(view: CallView): void;
   updateLead(fields: Record<string, unknown>): void;
@@ -66,7 +77,14 @@ export const LEAD_FIELDS = [
   'budget',
   'project',
   'notes',
+  'data_ready',
+  'data_sorted',
+  'needs_curation',
+  'photo_quality_notes',
+  'photo_source',
 ] as const;
+
+const BOOLEAN_LEAD_FIELDS = new Set<string>(['shopify', 'data_sorted', 'needs_curation']);
 
 const PURPOSES: UploadPurpose[] = ['jewelry_photos', 'references', 'cad_files', 'other'];
 const PURPOSE_TITLES: Record<UploadPurpose, string> = {
@@ -112,28 +130,35 @@ function modelView(result: Record<string, unknown>): ToolOutput {
 
 export function createCallTools(host: ToolHost, api: ToolApi = DEFAULT_API): ToolRunner {
   const tools: Record<string, (args: Record<string, unknown>) => Promise<ToolOutput> | ToolOutput> = {
-    show_on_screen: (args) => {
+    show_on_screen: async (args) => {
       const panel = panelFromShowArgs(args);
       if ('error' in panel) return panel;
-      host.showPanel(panel);
-      return { shown: true };
+      // Only claim it once it is really on screen, so Ruby never describes a change that did not happen.
+      return (await host.showPanel(panel))
+        ? { shown: true, layout: 'compact' }
+        : { error: 'The panel could not be shown on screen. Say it out loud instead.' };
     },
     clear_screen: () => {
       host.clearPanels();
       return { cleared: true };
     },
-    compare_plans: () => {
+    compare_plans: async () => {
       const { panel, plans } = plansPanel();
-      host.showPanel(panel);
-      return { shown: true, plans };
+      return { shown: await host.showPanel(panel), plans };
     },
     quote_shoot: async (args) => {
       const req = quoteRequest(args);
       if ('error' in req) return req;
       try {
         const result = await api.runQuote(req);
-        host.showPanel(quotePanel(result));
-        return modelView(result);
+        const client = (result.client ?? {}) as Record<string, unknown>;
+        host.setLastQuote({
+          request: req,
+          total: typeof client.totalCents === 'number' ? money(client.totalCents) : null,
+          approved: !!result.approved,
+        });
+        const shown = await host.showPanel(quotePanel(result));
+        return { ...modelView(result), shown };
       } catch (e) {
         return { error: errorText(e, 'The quote could not be made right now.') };
       }
@@ -158,7 +183,7 @@ export function createCallTools(host: ToolHost, api: ToolApi = DEFAULT_API): Too
       const fields: Record<string, unknown> = {};
       for (const key of LEAD_FIELDS) {
         const v = args[key];
-        if (key === 'shopify' && typeof v === 'boolean') fields[key] = v;
+        if (BOOLEAN_LEAD_FIELDS.has(key) && typeof v === 'boolean') fields[key] = v;
         else if (v !== undefined && v !== null && String(v).trim()) fields[key] = String(v).trim().slice(0, 2000);
       }
       host.updateLead(fields);
@@ -169,8 +194,9 @@ export function createCallTools(host: ToolHost, api: ToolApi = DEFAULT_API): Too
       if (args.captions === 'on' || args.captions === 'off') view.captions = args.captions === 'on';
       if (args.text_size === 'normal' || args.text_size === 'large') view.textSize = args.text_size;
       if (args.panel === 'hide' || args.panel === 'show') view.panel = args.panel;
+      if (args.compact === true) view.compact = true;
       host.setView(view);
-      return { done: true };
+      return view.compact ? { done: true, layout: 'compact' } : { done: true };
     },
     contact_team: () => {
       host.showPanel({ kind: 'contact', title: 'Talk to the FormaNova team' });
@@ -193,6 +219,7 @@ export function createCallTools(host: ToolHost, api: ToolApi = DEFAULT_API): Too
           return { error: 'This order needs a custom quote, so no payment link can be made.', ...modelView(result) };
         }
         const totalCents = client.totalCents;
+        host.setLastQuote({ request: req, total: money(totalCents), approved: true });
         const { rows, total } = quoteRows(client);
         // A single payment is a one-step plan; every payment gets its own link.
         const plan = installmentsOf(client) ?? [

@@ -1,116 +1,97 @@
 import { useRef, useState, type DragEvent } from 'react';
-import { Check, Diamond, Loader2, X } from 'lucide-react';
+import { Check, Diamond } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { acceptsFiles, normalizeLink } from '@/lib/ruby-call/client-uploads';
+import { PURPOSE_LABELS, acceptsFiles, normalizeLink, uploadNote, type UploadOutcome } from '@/lib/ruby-call/client-uploads';
+
+export type { UploadOutcome };
 import type { UploadPurpose } from '@/lib/ruby-call/panels';
-
-export interface UploadOutcome {
-  name: string;
-  ok: boolean;
-  error?: string;
-}
-
-type FileRow = { name: string; state: 'uploading' | 'done' | 'failed'; error?: string };
 
 interface UploadCardProps {
   purpose: UploadPurpose;
+  note?: string;
   onUpload(files: File[]): Promise<UploadOutcome[]>;
   onLink(url: string): void;
   onLinkTyping(): void;
 }
 
-/** Drop zone for photos and references; CAD and other files are shared as links. */
-export function UploadCard({ purpose, onUpload, onLink, onLinkTyping }: UploadCardProps) {
+/**
+ * Nova-style upload row: what to send on the left, one button on the right, one
+ * status line under it; then a single field for any link. CAD and other large files
+ * come as links only.
+ */
+export function UploadCard({ purpose, note, onUpload, onLink, onLinkTyping }: UploadCardProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [rows, setRows] = useState<FileRow[]>([]);
+  const [status, setStatus] = useState('');
   const [over, setOver] = useState(false);
+  const files = acceptsFiles(purpose);
 
-  if (!acceptsFiles(purpose)) {
-    return (
-      <div className="space-y-3">
-        <p className="text-justify text-sm text-muted-foreground">
-          Files like these are too large to send here. Please share a link instead (Google Drive, Dropbox or WeTransfer).
-        </p>
-        <LinkField onLink={onLink} onTyping={onLinkTyping} />
-      </div>
-    );
-  }
-
-  const send = async (files: File[]) => {
-    if (!files.length) return;
-    setRows((r) => [...r, ...files.map((f) => ({ name: f.name, state: 'uploading' as const }))]);
-    const outcomes = await onUpload(files);
-    setRows((r) =>
-      r.map((row) => {
-        const out = outcomes.find((o) => o.name === row.name);
-        if (!out || row.state !== 'uploading') return row;
-        return { name: row.name, state: out.ok ? 'done' : 'failed', error: out.error };
-      }),
-    );
+  const send = async (list: File[]) => {
+    if (!list.length) return;
+    setStatus(list.length === 1 ? 'Sending your image…' : `Sending ${list.length} images…`);
+    try {
+      setStatus(uploadNote(list.length, await onUpload(list)));
+    } catch {
+      setStatus("That didn't go through. Please try again.");
+    }
   };
 
   const onDrop = (e: DragEvent) => {
     e.preventDefault();
     setOver(false);
-    void send(Array.from(e.dataTransfer.files ?? []));
+    if (files) void send(Array.from(e.dataTransfer.files ?? []));
   };
 
   return (
-    <div className="space-y-3">
-      <label
-        onDragOver={(e) => {
-          e.preventDefault();
-          setOver(true);
-        }}
-        onDragLeave={() => setOver(false)}
-        onDrop={onDrop}
-        className={`flex cursor-pointer flex-col items-center gap-3 border-2 border-dashed px-4 py-6 text-center transition-colors ${
-          over ? 'border-[hsl(var(--formanova-hero-accent))] bg-[hsl(var(--formanova-hero-accent)/0.08)]' : 'border-border'
-        }`}
-      >
-        <Diamond className="h-9 w-9 text-primary" aria-hidden="true" />
-        <span className="text-sm text-muted-foreground">Drop images here, or</span>
-        <Button
-          type="button"
-          size="lg"
-          className="h-12 px-6"
-          onClick={(e) => {
-            // The label would open the picker too; open it once.
+    <div className="space-y-4">
+      {files && (
+        <div
+          data-testid="ruby-upload"
+          onDragOver={(e) => {
             e.preventDefault();
-            inputRef.current?.click();
+            setOver(true);
           }}
+          onDragLeave={() => setOver(false)}
+          onDrop={onDrop}
+          className={`flex min-w-0 flex-col gap-3 border-2 p-3 sm:flex-row sm:items-center sm:gap-4 ${
+            over ? 'border-[hsl(var(--formanova-hero-accent))] bg-[hsl(var(--formanova-hero-accent)/0.08)]' : 'border-border'
+          }`}
         >
-          Choose images
-        </Button>
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          className="sr-only"
-          aria-label="Choose images to upload"
-          onChange={(e) => {
-            void send(Array.from(e.target.files ?? []));
-            e.target.value = '';
-          }}
-        />
-      </label>
-      {rows.length > 0 && (
-        <ul className="space-y-1.5 text-sm" aria-live="polite">
-          {rows.map((row, i) => (
-            <li key={`${row.name}-${i}`} className="flex min-w-0 items-center gap-2">
-              {row.state === 'uploading' && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />}
-              {row.state === 'done' && <Check className="h-4 w-4 shrink-0 text-[hsl(var(--formanova-hero-accent))]" />}
-              {row.state === 'failed' && <X className="h-4 w-4 shrink-0 text-destructive" />}
-              <span className="truncate">{row.name}</span>
-              {row.state === 'failed' && (
-                <span className="ml-auto shrink-0 text-xs text-destructive">{row.error || 'Failed, try again'}</span>
-              )}
-            </li>
-          ))}
-        </ul>
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <Diamond className="h-9 w-9 shrink-0 text-primary" aria-hidden="true" />
+            <div className="min-w-0">
+              <p className="break-words text-sm font-semibold">Send your {PURPOSE_LABELS[purpose]}</p>
+              <p className="mt-0.5 break-words text-xs text-muted-foreground">
+                {note || 'JPG, PNG, WebP or HEIC, up to 20 MB each. Drop them here or choose.'}
+              </p>
+            </div>
+          </div>
+          <Button type="button" className="h-11 shrink-0 px-5" onClick={() => inputRef.current?.click()}>
+            Choose images
+          </Button>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+            multiple
+            className="sr-only"
+            aria-label="Choose images to upload"
+            onChange={(e) => {
+              const list = Array.from(e.target.files ?? []);
+              // Cleared first, so picking the same file again still works.
+              e.target.value = '';
+              void send(list);
+            }}
+          />
+        </div>
       )}
+      {files && status && (
+        <p data-testid="upload-note" aria-live="polite" className="break-words text-xs text-muted-foreground">
+          {status}
+        </p>
+      )}
+      {!files && note && <p className="break-words text-sm text-muted-foreground">{note}</p>}
+      <LinkField onLink={onLink} onTyping={onLinkTyping} />
     </div>
   );
 }
@@ -120,6 +101,7 @@ interface LinkFieldProps {
   onTyping(): void;
 }
 
+/** One field for any link: Drive, Dropbox, WeTransfer or the store. */
 export function LinkField({ onLink, onTyping }: LinkFieldProps) {
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -129,7 +111,7 @@ export function LinkField({ onLink, onTyping }: LinkFieldProps) {
   const submit = () => {
     const url = normalizeLink(value);
     if (!url) {
-      setError('Please paste a web link, like https://drive.google.com/…');
+      setError('Please paste a web link, like drive.google.com/…');
       return;
     }
     setError(null);
@@ -147,11 +129,14 @@ export function LinkField({ onLink, onTyping }: LinkFieldProps) {
         submit();
       }}
     >
-      <div className="flex gap-2">
+      <label htmlFor="ruby-link" className="block text-xs text-muted-foreground">
+        Paste any link (Drive, Dropbox, WeTransfer, your store URL)
+      </label>
+      <div className="flex min-w-0 gap-2">
         <Input
+          id="ruby-link"
           value={value}
           inputMode="url"
-          aria-label="Link"
           placeholder="https://"
           className="h-11 min-w-0 flex-1"
           onChange={(e) => {
@@ -163,7 +148,7 @@ export function LinkField({ onLink, onTyping }: LinkFieldProps) {
           }}
         />
         <Button type="submit" className="h-11 shrink-0 px-5">
-          Send link
+          Send
         </Button>
       </div>
       {error && (
@@ -174,7 +159,7 @@ export function LinkField({ onLink, onTyping }: LinkFieldProps) {
       {sent && !error && (
         <p className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
           <Check className="h-3.5 w-3.5 shrink-0 text-[hsl(var(--formanova-hero-accent))]" />
-          <span className="truncate">Link received: {sent}</span>
+          <span className="min-w-0 break-all">Link received: {sent}</span>
         </p>
       )}
     </form>

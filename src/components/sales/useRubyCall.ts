@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { CallRecorder } from '@/lib/ruby-call/call-recorder';
 import { callerContext, fetchPastCalls } from '@/lib/ruby-call/call-memory';
-import { createCallTools, type ToolHost } from '@/lib/ruby-call/call-tools';
+import { createCallTools, type LastQuote, type ToolHost } from '@/lib/ruby-call/call-tools';
 import { linkMessage, linkRecord, uploadClientFile, uploadProblem, uploadedMessage } from '@/lib/ruby-call/client-uploads';
 import type { Panel, PanelSpec } from '@/lib/ruby-call/panels';
 import { keepLocally, retryUnsavedCalls, saveCallRecord, saveOnPageHide } from '@/lib/ruby-call/post-call-save';
@@ -32,7 +32,10 @@ import type { UploadOutcome } from './RubyPanelInputs';
 export type Phase = 'idle' | 'connecting' | 'live' | 'ended' | 'error';
 
 const SPEAKER_HOLD_MS = 1500;
-const MAX_PANELS = 3;
+/** Earlier panels kept reachable from a small list (the newest panel replaces them on screen). */
+const MAX_EARLIER = 3;
+/** A panel that is not on screen by then is reported to Ruby as not shown. */
+const RENDER_TIMEOUT_MS = 1500;
 
 export interface UseRubyCallOptions {
   /** Test seam: builds the call engine. */
@@ -51,8 +54,10 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
   const [busy, setBusy] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
   const [seconds, setSeconds] = useState(0);
-  const [panels, setPanels] = useState<Panel[]>([]);
+  const [panel, setPanel] = useState<Panel | null>(null);
+  const [earlier, setEarlier] = useState<Panel[]>([]);
   const [panelsHidden, setPanelsHidden] = useState(false);
+  const [compact, setCompact] = useState(false);
   const [captionsOn, setCaptionsOn] = useState(false);
   const [textLarge, setTextLarge] = useState(false);
 
@@ -67,6 +72,9 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
   const errorRef = useRef<CallErrorCode | null>(null);
   const speakerTimer = useRef<ReturnType<typeof setTimeout>>();
   const panelSeq = useRef(0);
+  const panelRef = useRef<Panel | null>(null);
+  const renderWaiters = useRef(new Map<string, (shown: boolean) => void>());
+  const quoteRef = useRef<LastQuote | null>(null);
   const owner = String(user?.id ?? user?.email ?? 'anonymous');
   const ownerRef = useRef(owner);
   ownerRef.current = owner;
@@ -82,6 +90,9 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
       uploads: [...uploadsRef.current],
       links: [...linksRef.current],
       payment: paymentRef.current,
+      quote: quoteRef.current
+        ? { ...quoteRef.current.request, total: quoteRef.current.total, approved: quoteRef.current.approved }
+        : null,
     }),
     [],
   );
@@ -147,8 +158,14 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
     setBusy(false);
     setReconnecting(false);
     setSeconds(0);
-    setPanels([]);
+    setPanel(null);
+    panelRef.current = null;
+    setEarlier([]);
     setPanelsHidden(false);
+    setCompact(false);
+    renderWaiters.current.forEach((done) => done(false));
+    renderWaiters.current.clear();
+    quoteRef.current = null;
     setTextLarge(false);
     errorRef.current = null;
     callRef.current = null;
@@ -159,13 +176,42 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
     paymentRef.current = null;
   }, []);
 
-  const showPanel = useCallback((spec: PanelSpec) => {
-    const panel = { ...spec, id: `p${++panelSeq.current}` } as Panel;
-    setPanels((prev) =>
-      [panel, ...prev.filter((p) => !(p.kind === spec.kind && p.title === spec.title))].slice(0, MAX_PANELS),
-    );
-    setPanelsHidden(false);
+  /** Puts a panel on screen in place of the current one (which moves to the earlier list). */
+  const putOnScreen = useCallback((next: Panel | null) => {
+    const prev = panelRef.current;
+    panelRef.current = next;
+    setPanel(next);
+    setEarlier((list) => {
+      const rest = list.filter((p) => p.id !== next?.id && !(prev && p.title === prev.title));
+      return (prev && prev.id !== next?.id ? [prev, ...rest] : rest)
+        .filter((p) => !(next && p.title === next.title))
+        .slice(0, MAX_EARLIER);
+    });
   }, []);
+
+  /** Resolves true once the panel has rendered (RubyStage reports it), false after a timeout. */
+  const showPanel = useCallback(
+    (spec: PanelSpec): Promise<boolean> => {
+      const next = { ...spec, id: `p${++panelSeq.current}` } as Panel;
+      const shown = new Promise<boolean>((resolve) => {
+        const timer = setTimeout(() => {
+          renderWaiters.current.delete(next.id);
+          resolve(false);
+        }, RENDER_TIMEOUT_MS);
+        renderWaiters.current.set(next.id, (ok) => {
+          clearTimeout(timer);
+          renderWaiters.current.delete(next.id);
+          resolve(ok);
+        });
+      });
+      putOnScreen(next);
+      setPanelsHidden(false);
+      return shown;
+    },
+    [putOnScreen],
+  );
+
+  const panelRendered = useCallback((id: string) => renderWaiters.current.get(id)?.(true), []);
 
   /** Saves the call whatever way it ended (error, closed window, empty transcript). */
   const saveCall = useCallback(
@@ -202,13 +248,19 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
       const isCurrent = () => callRef.current === call;
 
       const host: ToolHost = {
-        showPanel: (spec) => isCurrent() && showPanel(spec),
-        clearPanels: () => isCurrent() && setPanels([]),
+        showPanel: (spec) => (isCurrent() ? showPanel(spec) : false),
+        clearPanels: () => {
+          if (isCurrent()) putOnScreen(null);
+        },
+        setLastQuote: (q) => {
+          quoteRef.current = q;
+        },
         setView: (view) => {
           if (!isCurrent()) return;
           if (view.captions !== undefined) setCaptionsOn(view.captions);
           if (view.textSize) setTextLarge(view.textSize === 'large');
           if (view.panel) setPanelsHidden(view.panel === 'hide');
+          if (view.compact) setCompact(true);
         },
         updateLead: (fields) => {
           leadRef.current = { ...leadRef.current, ...fields };
@@ -282,7 +334,7 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
         },
       });
     },
-    [createCall, createRecorder, note, reset, saveCall, showPanel, user?.email, user?.full_name],
+    [createCall, createRecorder, note, putOnScreen, reset, saveCall, showPanel, user?.email, user?.full_name],
   );
 
   const end = useCallback(() => void callRef.current?.end(), []);
@@ -299,21 +351,30 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
   }, [note, panelsHidden]);
 
   const closePanel = useCallback(
-    (panel: Panel) => {
-      setPanels((prev) => prev.filter((p) => p.id !== panel.id));
-      note(`The client closed the ${panel.title} panel.`);
+    (closed: Panel) => {
+      if (panelRef.current?.id === closed.id) putOnScreen(null);
+      note(`The client closed the ${closed.title} panel.`);
     },
-    [note],
+    [note, putOnScreen],
+  );
+
+  const reopenPanel = useCallback(
+    (again: Panel) => {
+      putOnScreen(again);
+      setPanelsHidden(false);
+      note(`The client reopened the ${again.title} panel.`);
+    },
+    [note, putOnScreen],
   );
 
   const uploadFiles = useCallback(
-    async (panel: Panel, files: File[]): Promise<UploadOutcome[]> => {
-      if (panel.kind !== 'upload') return [];
+    async (target: Panel, files: File[]): Promise<UploadOutcome[]> => {
+      if (target.kind !== 'upload') return [];
       note(`The client is uploading ${files.length} file${files.length === 1 ? '' : 's'}…`);
       const outcomes: UploadOutcome[] = [];
       for (const file of files) {
         try {
-          uploadsRef.current = [...uploadsRef.current, await uploadClientFile(file, panel.purpose)];
+          uploadsRef.current = [...uploadsRef.current, await uploadClientFile(file, target.purpose)];
           outcomes.push({ name: file.name, ok: true });
         } catch {
           outcomes.push({ name: file.name, ok: false, error: uploadProblem(file) ?? undefined });
@@ -321,7 +382,7 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
         }
       }
       const names = outcomes.filter((o) => o.ok).map((o) => o.name);
-      if (names.length) callRef.current?.appendInstruction(uploadedMessage(panel.purpose, names));
+      if (names.length) callRef.current?.appendInstruction(uploadedMessage(target.purpose, names));
       return outcomes;
     },
     [note],
@@ -348,8 +409,12 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
     busy,
     reconnecting,
     seconds,
-    panels,
+    panel,
+    earlier,
     panelsHidden,
+    compact,
+    panelRendered,
+    reopenPanel,
     captionsOn,
     textLarge,
     startCall,
