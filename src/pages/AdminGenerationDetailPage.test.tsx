@@ -141,3 +141,21 @@ describe('AdminGenerationDetailPage customer prompt', () => {
     expect(screen.queryByTestId('admin-io-prompt')).toBeNull();
   });
 });
+
+describe('AdminGenerationDetailPage client chip', () => {
+  beforeEach(() => {
+    authFetch.authenticatedFetch.mockReset();
+    authFetch.authenticatedFetch.mockResolvedValue(new Response(JSON.stringify({ detail: 'Not found' }), { status: 404 }));
+  });
+
+  it('shows the Rhino client and version in the run header', () => {
+    renderDetail({ ...generation('some_image_workflow'), client: 'rhino', client_version: '0.6.2' });
+    const chip = screen.getByText('Rhino 0.6.2');
+    expect(chip.closest('section')?.getAttribute('aria-labelledby')).toBe('admin-section-run');
+  });
+
+  it('shows nothing for an untagged run', () => {
+    renderDetail({ ...generation('some_image_workflow'), client: null, client_version: null });
+    expect(screen.queryByText(/^Rhino/)).toBeNull();
+  });
+});

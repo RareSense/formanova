@@ -25,12 +25,14 @@ import { PaginationBar } from '@/components/generations/PaginationBar';
 import {
   AdminGenerationsApiError,
   listAdminGenerations,
+  type AdminGenerationClientFilter,
   type AdminGenerationListItem,
 } from '@/lib/admin-generations-api';
 import { matchesAdminGenerationSearch } from '@/lib/admin-generations-search';
 import { parseServerTime } from '@/lib/server-time';
 import { costView, USER_PAID_HELP, WORKFLOW_COST_HELP } from '@/lib/admin-cost-display';
 import { CostLabel, WorkflowCostValue } from '@/components/admin/AdminCost';
+import { ClientBadge } from '@/components/admin/ClientBadge';
 
 const PAGE_SIZE = 20;
 // 'queued' intentionally absent: the backend never sets it (rows start at 'running').
@@ -42,6 +44,11 @@ const USER_TYPE_OPTIONS = [
   'content_creator',
   'other',
 ] as const;
+// 'untagged' = no client header: the website, but also Rhino 0.5.x and older.
+const CLIENT_OPTIONS: { value: AdminGenerationClientFilter; label: string }[] = [
+  { value: 'rhino', label: 'Rhino' },
+  { value: 'untagged', label: 'Website / untagged' },
+];
 
 function formatDateTime(value: string | null): string {
   if (!value) return '-';
@@ -122,6 +129,7 @@ export default function AdminGenerationsPage() {
   const hasFeedback = searchParams.get('has_feedback') ?? '';
   const userType = searchParams.get('user_type') ?? '';
   const isPaying = searchParams.get('is_paying') ?? '';
+  const client = CLIENT_OPTIONS.find((o) => o.value === searchParams.get('client'))?.value ?? '';
   const offset = Number(searchParams.get('offset') ?? '0') || 0;
   const trimmedSearch = search.trim();
   const hasSearch = trimmedSearch.length > 0;
@@ -142,7 +150,7 @@ export default function AdminGenerationsPage() {
   }, [searchInput]);
 
   const query = useQuery({
-    queryKey: ['admin-generations', { status, search, searchField, hasFeedback, userType, isPaying, offset }],
+    queryKey: ['admin-generations', { status, search, searchField, hasFeedback, userType, isPaying, client, offset }],
     queryFn: () => listAdminGenerations({
       limit: PAGE_SIZE,
       offset,
@@ -153,6 +161,7 @@ export default function AdminGenerationsPage() {
       has_feedback: hasFeedback === '' ? undefined : hasFeedback === 'true',
       user_type: userType || undefined,
       is_paying: isPaying === '' ? undefined : isPaying === 'true',
+      client: client || undefined,
     }),
     retry: false,
   });
@@ -191,8 +200,8 @@ export default function AdminGenerationsPage() {
   }
 
   const hasFilters = useMemo(
-    () => Boolean(status || search || hasFeedback || userType || isPaying),
-    [status, search, hasFeedback, userType, isPaying],
+    () => Boolean(status || search || hasFeedback || userType || isPaying || client),
+    [status, search, hasFeedback, userType, isPaying, client],
   );
 
   function openDetail(item: AdminGenerationListItem) {
@@ -270,6 +279,18 @@ export default function AdminGenerationsPage() {
             </SelectContent>
           </Select>
 
+          <Select value={client || 'all'} onValueChange={(value) => updateParam('client', value === 'all' ? '' : value)}>
+            <SelectTrigger className="h-9 w-full shrink-0 text-sm sm:w-48" aria-label="Client">
+              <SelectValue placeholder="Client" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All clients</SelectItem>
+              {CLIENT_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           {hasFilters && (
             <Button variant="outline" size="sm" className="h-9" onClick={clearFilters}>
               Clear
@@ -334,8 +355,11 @@ export default function AdminGenerationsPage() {
                           {formatDateTime(item.created_at)}
                         </TableCell>
                         <TableCell className="max-w-[220px] truncate text-sm">{item.user_email || '-'}</TableCell>
-                        <TableCell className="max-w-[280px] truncate text-sm">
-                          {item.workflow_name || item.workflow_id}
+                        <TableCell className="max-w-[280px] text-sm">
+                          <div className="flex items-center gap-2">
+                            <span className="min-w-0 truncate">{item.workflow_name || item.workflow_id}</span>
+                            <ClientBadge client={item.client} version={item.client_version} />
+                          </div>
                         </TableCell>
                         <TableCell><StatusBadge status={item.status} /></TableCell>
                         <TableCell className="font-mono text-xs whitespace-nowrap">{cost.userPaid}</TableCell>
