@@ -96,9 +96,18 @@ async function loadPastCalls(): Promise<PastCall[]> {
   const data = await res.json();
   const runs: RawRun[] = Array.isArray(data) ? data : (data?.workflows ?? []);
   const date = (r: RawRun) => r.created_at ?? r.started_at ?? '';
+  // A call can be saved twice (keepalive on tab close, then the retry on the next visit).
+  const seen = new Set<string>();
   const newest = runs
     .filter((r) => r?.name === POST_CALL_WORKFLOW)
     .sort((a, b) => date(b).localeCompare(date(a)))
+    .filter((r) => {
+      const id = r.input?.call_session_id;
+      if (typeof id !== 'string' || !id) return true;
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    })
     .slice(0, PAST_CALLS_MAX);
   const calls = await Promise.all(newest.map(async (r) => pastCallFromRecord(date(r), await recordFor(r))));
   // Newest last.

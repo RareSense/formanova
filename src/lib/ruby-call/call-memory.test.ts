@@ -72,6 +72,16 @@ describe('call memory', () => {
     expect(history.getWorkflowDetails).toHaveBeenCalledWith('c');
   });
 
+  it('counts a call saved twice only once', async () => {
+    authFetch.authenticatedFetch.mockImplementation(() =>
+      json([
+        { name: 'ruby_post_call', created_at: '2026-11-02', input: { call_session_id: 's1', turns: [{ role: 'ruby', text: 'final' }] } },
+        { name: 'ruby_post_call', created_at: '2026-11-01', input: { call_session_id: 's1', turns: [{ role: 'ruby', text: 'early' }] } },
+      ]),
+    );
+    expect((await fetchPastCalls()).map((c) => c.transcript)).toEqual(['Ruby: final']);
+  });
+
   it('never blocks: failures and slow history give no past calls', async () => {
     authFetch.authenticatedFetch.mockRejectedValue(new Error('down'));
     expect(await fetchPastCalls()).toEqual([]);
