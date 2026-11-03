@@ -116,7 +116,8 @@ export function RubyOrb({ level, calm = false, className = '' }: RubyOrbProps) {
     themeWatch.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme', 'style'] });
 
     const fit = () => {
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      // Capped so the orb stays cheap and never competes with Ruby's audio.
+      const dpr = Math.min(1.5, window.devicePixelRatio || 1);
       const w = Math.round(canvas.clientWidth * dpr);
       if (w && canvas.width !== w) {
         canvas.width = canvas.height = w;
@@ -131,6 +132,12 @@ export function RubyOrb({ level, calm = false, className = '' }: RubyOrbProps) {
     let last = 0;
     let raf = 0;
     const draw = (time: number) => {
+      // Browsers throttle rAF in background tabs; skip the work entirely when hidden.
+      if (document.hidden) {
+        last = 0;
+        raf = requestAnimationFrame(draw);
+        return;
+      }
       fit();
       const dt = last ? Math.min(0.05, (time - last) / 1000) : 0;
       last = time;

@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { WebRTCCall, type CallDeps, type CallEndResult, type CallErrorCode } from './webrtc-call';
+import {
+  DEAD_AIR_CUE,
+  WebRTCCall,
+  deadAirCheckIn,
+  type CallDeps,
+  type CallEndResult,
+  type CallErrorCode,
+} from './webrtc-call';
 
 type Listener = (e: unknown) => void;
 
@@ -69,17 +76,12 @@ function makeMic() {
 function setup(overrides: Partial<CallDeps> = {}) {
   const pc = new FakePC();
   const { mic, track } = makeMic();
-  const recorder = { start: vi.fn(), stop: vi.fn(async () => {}), mimeType: 'audio/webm' };
-  let onChunk: (b: Blob) => void = () => {};
   const deps: CallDeps = {
     isSupported: () => true,
     getUserMedia: vi.fn(async () => mic),
     createPeerConnection: () => pc as unknown as RTCPeerConnection,
     playAudio: vi.fn(),
-    createRecorder: vi.fn((_m, _r, cb) => {
-      onChunk = cb;
-      return recorder;
-    }),
+    now: () => Date.now(),
     ...overrides,
   };
   const cbs = {
@@ -88,16 +90,19 @@ function setup(overrides: Partial<CallDeps> = {}) {
     onActivity: vi.fn(),
     onMuteChange: vi.fn(),
     onError: vi.fn(),
-    onRecordingChunk: vi.fn(),
+    onLocalStream: vi.fn(),
+    onRemoteStream: vi.fn(),
+    onBusy: vi.fn(),
+    onReconnecting: vi.fn(),
     onEnded: vi.fn(),
   };
   const call = new WebRTCCall(cbs, deps);
   const createSession = vi.fn(async () => ({ sdp: 'answer-sdp', greeting: 'Greet them' }));
-  return { call, pc, deps, cbs, track, recorder, createSession, chunk: (b: Blob) => onChunk(b) };
+  return { call, pc, deps, cbs, track, mic, createSession };
 }
 
-async function startLive(s: ReturnType<typeof setup>) {
-  await s.call.start({ language: 'en', createSession: s.createSession });
+async function startLive(s: ReturnType<typeof setup>, extra: Record<string, unknown> = {}) {
+  await s.call.start({ language: 'en', createSession: s.createSession, ...extra });
   s.pc.dc.message({ type: 'session.started' });
 }
 
@@ -174,33 +179,31 @@ describe('WebRTCCall', () => {
     expect(s.pc.dc.sent).not.toContainEqual({ type: 'session.input_audio.unmute' });
   });
 
-  it('records the remote+mic mix and forwards chunks', async () => {
+  it('hands out the mic and Ruby streams (once) for recording, and plays Ruby', async () => {
     const s = setup();
     await startLive(s);
-    s.pc.emit('track', { streams: [{} as MediaStream], track: {} });
+    expect(s.cbs.onLocalStream).toHaveBeenCalledWith(s.mic);
+    const remote = {} as MediaStream;
+    s.pc.emit('track', { streams: [remote], track: {} });
+    s.pc.emit('track', { streams: [remote], track: {} });
     expect(s.deps.playAudio).toHaveBeenCalled();
-    expect(s.recorder.start).toHaveBeenCalled();
-    const blob = new Blob(['x']);
-    s.chunk(blob);
-    expect(s.cbs.onRecordingChunk).toHaveBeenCalledWith(blob);
+    expect(s.cbs.onRemoteStream).toHaveBeenCalledTimes(1);
+    expect(s.cbs.onRemoteStream).toHaveBeenCalledWith(remote);
   });
 
-  it('end closes channel, connection, mic and recorder, and reports turns and recording', async () => {
+  it('end closes the session, channel, connection and mic, and reports turns', async () => {
     const s = setup();
     await startLive(s);
-    s.pc.emit('track', { streams: [{} as MediaStream], track: {} });
-    s.chunk(new Blob(['x']));
     s.pc.dc.message({ type: 'session.input_transcript.delta', delta: 'bye' });
     await s.call.end();
+    expect(s.pc.dc.sent).toContainEqual({ type: 'session.close' });
     expect(s.pc.dc.closed).toBe(true);
     expect(s.pc.closed).toBe(true);
     expect(s.track.stop).toHaveBeenCalled();
-    expect(s.recorder.stop).toHaveBeenCalled();
     expect(s.call.getState()).toBe('ended');
     const result = s.cbs.onEnded.mock.calls[0][0] as CallEndResult;
     expect(result.reason).toBe('user');
     expect(result.turns).toHaveLength(1);
-    expect(result.recording).toBeInstanceOf(Blob);
     // ending twice is a no-op
     await s.call.end();
     expect(s.cbs.onEnded).toHaveBeenCalledTimes(1);
@@ -260,5 +263,164 @@ describe('WebRTCCall', () => {
     await s.call.start({ language: 'en', createSession: s.createSession });
     await vi.advanceTimersByTimeAsync(15000);
     expect(s.cbs.onError).toHaveBeenCalledWith('no_answer');
+  });
+
+  it('treats a data channel that closes without session.closed as a lost connection', async () => {
+    const s = setup();
+    await startLive(s);
+    s.pc.dc.emit('close');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(s.cbs.onError).toHaveBeenCalledWith('connection_lost');
+    expect((s.cbs.onEnded.mock.calls[0][0] as CallEndResult).reason).toBe('connection_lost');
+  });
+
+  it('gives a disconnected line 5 s to come back before ending', async () => {
+    const s = setup();
+    await startLive(s);
+    s.pc.connectionState = 'disconnected';
+    s.pc.emit('connectionstatechange');
+    expect(s.cbs.onReconnecting).toHaveBeenLastCalledWith(true);
+    await vi.advanceTimersByTimeAsync(3000);
+    s.pc.connectionState = 'connected';
+    s.pc.emit('connectionstatechange');
+    expect(s.cbs.onReconnecting).toHaveBeenLastCalledWith(false);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(s.cbs.onError).not.toHaveBeenCalled();
+    s.pc.connectionState = 'disconnected';
+    s.pc.emit('connectionstatechange');
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(s.cbs.onError).toHaveBeenCalledWith('connection_lost');
+  });
+
+  it('runs delegated tools and sends the outputs back', async () => {
+    const s = setup();
+    const runTool = vi.fn(async () => ({ shown: true }));
+    await startLive(s, { runTool });
+    s.pc.dc.message({ type: 'session.delegation.created', delegation: { id: 'd1' } });
+    expect(s.cbs.onBusy).toHaveBeenLastCalledWith(true);
+    s.pc.dc.message({
+      type: 'response.event',
+      delegation_id: 'd1',
+      event: { type: 'response.output_item.done', item: { type: 'function_call', call_id: 'c1', name: 'show_on_screen', arguments: '{"kind":"list"}' } },
+    });
+    s.pc.dc.message({ type: 'response.event', delegation_id: 'd1', event: { type: 'response.completed' } });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(runTool).toHaveBeenCalledWith('show_on_screen', { kind: 'list' });
+    expect(s.pc.dc.sent).toContainEqual({
+      type: 'response.item.create',
+      item: { type: 'function_call_output', call_id: 'c1', output: '{"shown":true}' },
+    });
+    expect(s.pc.dc.sent.at(-1)).toEqual({ type: 'response.create' });
+  });
+
+  it('answers unknown tools with an error when no runner is given', async () => {
+    const s = setup();
+    await startLive(s);
+    s.pc.dc.message({
+      type: 'response.event',
+      delegation_id: 'd1',
+      event: { type: 'response.output_item.done', item: { type: 'function_call', call_id: 'c1', name: 'nope' } },
+    });
+    s.pc.dc.message({ type: 'response.event', delegation_id: 'd1', event: { type: 'response.done' } });
+    await vi.advanceTimersByTimeAsync(0);
+    const out = s.pc.dc.sent.find((m) => m.type === 'response.item.create') as { item: { output: string } };
+    expect(JSON.parse(out.item.output)).toHaveProperty('error');
+  });
+
+  it('appends instructions only during a live call', async () => {
+    const s = setup();
+    expect(s.call.appendInstruction('x')).toBe(false);
+    await startLive(s);
+    expect(s.call.appendInstruction('[Screen] hi')).toBe(true);
+    expect(s.pc.dc.sent).toContainEqual({ type: 'session.instructions.append', delegation_id: null, content: '[Screen] hi' });
+  });
+
+  describe('dead air', () => {
+    const cues = (s: ReturnType<typeof setup>) =>
+      s.pc.dc.sent.filter((m) => m.content === DEAD_AIR_CUE || m.content === deadAirCheckIn('Asha')).map((m) => m.content);
+
+    it('cues Ruby after 6.5 s of silence and asks her to check in by name after 11.5 s', async () => {
+      const s = setup();
+      await startLive(s, { clientName: 'Asha' });
+      s.pc.dc.message({ type: 'session.output_transcript.delta', delta: 'Hi' });
+      await vi.advanceTimersByTimeAsync(6000);
+      expect(cues(s)).toEqual([]);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(cues(s)).toEqual([DEAD_AIR_CUE]);
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(cues(s)).toEqual([DEAD_AIR_CUE, deadAirCheckIn('Asha')]);
+      expect(deadAirCheckIn('Asha')).toContain('Asha');
+    });
+
+    it('resets on any words and never fires while a tool runs', async () => {
+      const s = setup();
+      let release: () => void = () => {};
+      const runTool = vi.fn(() => new Promise<Record<string, unknown>>((r) => (release = () => r({}))));
+      await startLive(s, { runTool, clientName: 'Asha' });
+      await vi.advanceTimersByTimeAsync(5000);
+      s.pc.dc.message({ type: 'session.input_transcript.delta', delta: 'so' });
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(cues(s)).toEqual([]);
+      s.pc.dc.message({
+        type: 'response.event',
+        delegation_id: 'd1',
+        event: { type: 'response.output_item.done', item: { type: 'function_call', call_id: 'c1', name: 'quote_shoot' } },
+      });
+      await vi.advanceTimersByTimeAsync(15000);
+      expect(cues(s)).toEqual([]);
+      release();
+      s.pc.dc.message({ type: 'response.event', delegation_id: 'd1', event: { type: 'response.completed' } });
+      await vi.advanceTimersByTimeAsync(7500);
+      expect(cues(s)).toEqual([DEAD_AIR_CUE]);
+    });
+
+    it('stays quiet while Ruby is audibly speaking', async () => {
+      const s = setup();
+      await startLive(s, { rubyLevel: () => 0.2 });
+      await vi.advanceTimersByTimeAsync(20000);
+      expect(cues(s)).toEqual([]);
+    });
+
+    it('never fires after end_call', async () => {
+      const s = setup();
+      await startLive(s, { rubyLevel: () => 0.2 });
+      s.call.endAfterGoodbye();
+      await vi.advanceTimersByTimeAsync(7000);
+      expect(cues(s)).toEqual([]);
+    });
+  });
+
+  describe('end_call', () => {
+    it('hangs up 1.5 s after Ruby stops speaking', async () => {
+      const s = setup();
+      let level = 0.2;
+      await startLive(s, { rubyLevel: () => level });
+      s.call.endAfterGoodbye();
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(s.cbs.onEnded).not.toHaveBeenCalled();
+      level = 0;
+      await vi.advanceTimersByTimeAsync(1300);
+      expect(s.cbs.onEnded).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(400);
+      expect((s.cbs.onEnded.mock.calls[0][0] as CallEndResult).reason).toBe('ruby_closed');
+    });
+
+    it('waits for her last words too, and hangs up after 8 s at the latest', async () => {
+      const s = setup();
+      await startLive(s, { rubyLevel: () => 0.5 });
+      s.call.endAfterGoodbye();
+      await vi.advanceTimersByTimeAsync(7800);
+      expect(s.cbs.onEnded).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(300);
+      expect(s.cbs.onEnded).toHaveBeenCalledTimes(1);
+    });
+
+    it('hangs up quickly when Ruby is already silent', async () => {
+      const s = setup();
+      await startLive(s);
+      s.call.endAfterGoodbye();
+      await vi.advanceTimersByTimeAsync(1400);
+      expect(s.cbs.onEnded).toHaveBeenCalledTimes(1);
+    });
   });
 });
