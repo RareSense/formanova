@@ -4,8 +4,8 @@ import { hslTokenToRgb } from '@/lib/ruby-call/theme-color';
 /**
  * Ruby's orb: the same WebGL cloud orb as the Eva call page
  * (csp-call-analysis/eva/public/app.js), coloured from the active FormaNova
- * theme instead of fixed colours: highlight = --background, body =
- * --formanova-hero-accent, depth = --foreground. Re-reads the colours when the
+ * theme instead of fixed colours: pale --background highlight, a light tint
+ * of --formanova-hero-accent as the body, the accent itself in the folds. Re-reads the colours when the
  * theme changes (ThemeContext sets class and data-theme on <html>).
  * Falls back to a CSS gradient when WebGL is unavailable.
  */
@@ -102,10 +102,14 @@ export function RubyOrb({ level, calm = false, className = '' }: RubyOrbProps) {
     const U = (name: string) => gl.getUniformLocation(prog, name);
     const u = { res: U('res'), t: U('t'), lvl: U('lvl'), still: U('still'), flow: U('flow'), c1: U('c1'), c2: U('c2'), c3: U('c3') };
 
+    // Light like Eva's orb: mostly pale, the accent only in the deeper folds.
     const applyColors = () => {
-      gl.uniform3fv(u.c1, themeColor('--background', [1, 1, 1]));
-      gl.uniform3fv(u.c2, themeColor('--formanova-hero-accent', [0.7, 0.53, 0.06]));
-      gl.uniform3fv(u.c3, themeColor('--foreground', [0.04, 0.04, 0.04]));
+      const bg = themeColor('--background', [1, 1, 1]);
+      const accent = themeColor('--formanova-hero-accent', [0.7, 0.51, 0.06]);
+      const mix = (a: number[], b: number[], k: number) => a.map((v, i) => v + (b[i] - v) * k);
+      gl.uniform3fv(u.c1, mix(bg, accent, 0.06));
+      gl.uniform3fv(u.c2, mix(bg, accent, 0.38));
+      gl.uniform3fv(u.c3, accent);
     };
     applyColors();
     const themeWatch = new MutationObserver(applyColors);
@@ -164,7 +168,7 @@ export function RubyOrb({ level, calm = false, className = '' }: RubyOrbProps) {
     <div className={`relative aspect-square ${className}`} aria-hidden="true">
       <div
         className="pointer-events-none absolute -inset-[18%] -z-10 rounded-full opacity-50"
-        style={{ background: 'radial-gradient(circle, hsl(var(--formanova-hero-accent) / 0.35), transparent 65%)' }}
+        style={{ background: 'radial-gradient(circle, hsl(var(--formanova-hero-accent) / 0.22), transparent 65%)' }}
       />
       <canvas ref={canvasRef} className="block h-full w-full" />
       <div
@@ -172,7 +176,7 @@ export function RubyOrb({ level, calm = false, className = '' }: RubyOrbProps) {
         className="absolute inset-[7%] hidden rounded-full"
         style={{
           background:
-            'radial-gradient(circle at 34% 28%, hsl(var(--background)) 0%, hsl(var(--formanova-hero-accent)) 52%, hsl(var(--foreground)) 100%)',
+            'radial-gradient(circle at 34% 28%, hsl(var(--background)) 0%, hsl(var(--formanova-hero-accent) / 0.4) 52%, hsl(var(--formanova-hero-accent)) 100%)',
         }}
       />
     </div>

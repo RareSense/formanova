@@ -81,8 +81,8 @@ export function DoneForYouCard({ onOpenCall }: DoneForYouCardProps) {
             </li>
           ))}
         </ul>
-        <p className="mt-5 font-mono text-[10px] tracking-wider text-muted-foreground">
-          Instant AI call with Ruby · no booking
+        <p className="mt-5 font-mono text-[10px] leading-relaxed tracking-wider text-muted-foreground">
+          Get your custom plan and a great deal for your campaign or bulk order. Instant AI call with Ruby.
         </p>
       </div>
 
