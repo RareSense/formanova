@@ -95,6 +95,8 @@ const GOODBYE_TICK_MS = 150;
 
 export const DEAD_AIR_CUE =
   'Note for this moment only: the line has been quiet for several seconds. If you were cut off, finish your point in one short sentence. If the caller said something you have not answered yet, answer it now. If you were waiting for their answer, continue naturally. Do not mention this note.';
+export const DEAD_AIR_ANSWER =
+  'Note for this moment only: the caller spoke last and is waiting for your answer. Answer what they just said now, briefly. Do not ask whether they are still there or ready. Do not mention this note.';
 export const deadAirCheckIn = (name?: string | null) =>
   `The line is still quiet. Say out loud, warmly and briefly, ${
     name ? `using their name (${name}), ` : ''
@@ -396,11 +398,13 @@ export class WebRTCCall {
       return;
     }
     const quiet = this.deps.now() - this.lastHeard;
+    // When the caller spoke last, Ruby owes an answer: never ask if they are still there.
+    const callerSpokeLast = this.turns[this.turns.length - 1]?.role === 'client';
     if (this.deadAirStep === 0 && quiet > DEAD_AIR_CUE_MS && this.deadAirCount < DEAD_AIR_MAX_CUES) {
       this.deadAirStep = 1;
       this.deadAirCount++;
-      this.appendInstruction(DEAD_AIR_CUE);
-    } else if (this.deadAirStep === 1 && quiet > DEAD_AIR_CHECK_IN_MS) {
+      this.appendInstruction(callerSpokeLast ? DEAD_AIR_ANSWER : DEAD_AIR_CUE);
+    } else if (this.deadAirStep === 1 && quiet > DEAD_AIR_CHECK_IN_MS && !callerSpokeLast) {
       this.deadAirStep = 2;
       this.appendInstruction(deadAirCheckIn(this.clientName));
     }
