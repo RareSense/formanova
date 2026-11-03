@@ -11,13 +11,13 @@ describe('createPaymentLink (simulated until the backend Stripe endpoint exists)
     vi.useFakeTimers();
     vi.stubEnv('VITE_PUBLIC_SITE_URL', 'https://formanova.ai');
     let done = false;
-    const p = createPaymentLink({ callSessionId: 'cs-1', email: 'a@b.c', quote: {} }).then((r) => {
+    const p = createPaymentLink({ callSessionId: 'cs-1', email: 'a@b.c', quote: {}, installment: 2, amountCents: 500 }).then((r) => {
       done = true;
       return r;
     });
     await vi.advanceTimersByTimeAsync(500);
     expect(done).toBe(false);
     await vi.advanceTimersByTimeAsync(200);
-    expect(await p).toEqual({ url: 'https://formanova.ai/pay/test/cs-1', simulated: true });
+    expect(await p).toEqual({ url: 'https://formanova.ai/pay/test/cs-1-2', simulated: true });
   });
 });

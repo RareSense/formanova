@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { CREDIT_PLANS } from '@/lib/credit-plans';
 import { createCallTools, type ToolApi, type ToolHost } from './call-tools';
-import { money, panelFromShowArgs, quotePanel } from './panels';
+import { clientWording, installmentsOf, money, panelFromShowArgs, quotePanel } from './panels';
 
 function makeHost() {
   const host = {
@@ -30,6 +30,10 @@ const APPROVED = {
     discountShare: 0.1,
     totalCents: 135000,
     partial: false,
+    installments: [
+      { label: 'Deposit before work starts', amountCents: 67500 },
+      { label: 'Balance on delivery, before the final files are released', amountCents: 67500 },
+    ],
   },
   internal: { quote: { costCents: 1 } },
 };
@@ -38,7 +42,7 @@ function makeApi(over: Partial<ToolApi> = {}): ToolApi {
   return {
     runQuote: vi.fn(async () => APPROVED),
     runNegotiate: vi.fn(async () => ({ allowed: true, reason_for_ruby: null, negotiation: { n: 1 } })),
-    createPaymentLink: vi.fn(async () => ({ url: 'https://x/pay/test/cs-1', simulated: true })),
+    createPaymentLink: vi.fn(async (r: { installment: number }) => ({ url: `https://x/pay/test/cs-1-${r.installment}`, simulated: true })),
     ...over,
   };
 }
@@ -78,13 +82,23 @@ describe('panels', () => {
       columns: ['Item', 'Qty', 'Per unit', 'Total'],
       rows: [
         ['Images, 2K', '120', '$10', '$1,200'],
-        ['Revisions', '15', '$0', '$0'],
+        ['Revisions', '15', 'Bonus', 'Free'],
         ['Turnaround: Rush (3 days)', '', '+25%', ''],
         ['Discount', '', '-10%', ''],
       ],
       total: '$1,350',
       note: undefined,
+      schedule: [
+        { n: 1, label: 'Deposit before work starts', amountCents: 67500, amount: '$675', due: null },
+        { n: 2, label: 'Balance on delivery, before the final files are released', amountCents: 67500, amount: '$675', due: null },
+      ],
     });
+  });
+
+  it('uses client wording: no "team" and no "human fix"', () => {
+    expect(clientWording('15 human fixes in total')).toBe('15 fixes by an expert AI creative editor in total');
+    expect(clientWording('This order needs a quote from our team')).toBe('This order needs a custom quote');
+    expect(installmentsOf({ installments: [] })).toBeNull();
   });
 
   it('shows a refused quote without numbers', () => {
@@ -93,7 +107,7 @@ describe('panels', () => {
       kind: 'list',
       title: 'Your quote',
       kicker: 'Quote',
-      items: ['This order needs a quote from our team', 'Contact: studio@formanova.ai'],
+      items: ['This order needs a custom quote', 'Contact: studio@formanova.ai'],
     });
   });
 });
@@ -129,8 +143,14 @@ describe('call tools', () => {
       lines: [{ productId: 'p2k', quantity: 120 }],
       turnaround: 'rush',
       negotiation: { n: 1 },
+      installmentCount: 2,
     });
-    expect(api.runQuote).toHaveBeenCalledWith({ lines: [{ productId: 'p2k', quantity: 120 }], turnaround: 'rush', negotiation: { n: 1 } });
+    expect(api.runQuote).toHaveBeenCalledWith({
+      lines: [{ productId: 'p2k', quantity: 120 }],
+      turnaround: 'rush',
+      negotiation: { n: 1 },
+      installmentCount: 2,
+    });
     expect(out).toEqual({ approved: true, needs_team_quote: false, client: APPROVED.client });
     expect(out).not.toHaveProperty('internal');
     expect(host.showPanel.mock.calls[0][0]).toMatchObject({ kind: 'table', total: '$1,350' });
@@ -141,6 +161,7 @@ describe('call tools', () => {
     const run = createCallTools(makeHost(), api);
     expect(await run('quote_shoot', { lines: [] })).toHaveProperty('error');
     expect(await run('quote_shoot', { lines: [{ productId: 'p', quantity: 1 }], turnaround: 'tomorrow' })).toHaveProperty('error');
+    expect(await run('quote_shoot', { lines: [{ productId: 'p', quantity: 1 }], installmentCount: 5 })).toHaveProperty('error');
     expect(await run('quote_shoot', { lines: [{ productId: 'p', quantity: 1 }] })).toHaveProperty('error');
   });
 
@@ -185,18 +206,63 @@ describe('call tools', () => {
   });
 
   describe('send_payment_link', () => {
-    const args = { lines: [{ productId: 'p2k', quantity: 120 }], turnaround: 'rush', negotiation: { n: 1 }, email: 'a@b.co' };
+    const args = {
+      lines: [{ productId: 'p2k', quantity: 120 }],
+      turnaround: 'rush',
+      negotiation: { n: 1 },
+      installmentCount: 2,
+      email: 'a@b.co',
+    };
+    const INSTALLMENTS = [
+      { n: 1, label: 'Deposit before work starts', amountCents: 67500, amount: '$675', due: null, url: 'https://x/pay/test/cs-1-1' },
+      {
+        n: 2,
+        label: 'Balance on delivery, before the final files are released',
+        amountCents: 67500,
+        amount: '$675',
+        due: null,
+        url: 'https://x/pay/test/cs-1-2',
+      },
+    ];
 
-    it('re-prices, creates the link, shows the deal and saves the payment', async () => {
+    it('re-prices, creates a link per installment, shows the deal and saves the payment', async () => {
       const host = makeHost();
       const api = makeApi();
       const out = await createCallTools(host, api)('send_payment_link', args);
-      expect(api.runQuote).toHaveBeenCalledWith({ lines: args.lines, turnaround: 'rush', negotiation: { n: 1 } });
-      expect(api.createPaymentLink).toHaveBeenCalledWith({ callSessionId: 'cs-1', email: 'a@b.co', quote: APPROVED.client });
-      expect(out).toEqual({ url: 'https://x/pay/test/cs-1', total: '$1,350', simulated: true });
-      expect(host.showPanel.mock.calls[0][0]).toMatchObject({ kind: 'deal', total: '$1,350', simulated: true });
-      expect(host.setPayment).toHaveBeenCalledWith({ url: 'https://x/pay/test/cs-1', total: '$1,350', simulated: true, email: 'a@b.co' });
-      expect(host.updateLead).toHaveBeenCalledWith(expect.objectContaining({ email: 'a@b.co', payment_link: 'https://x/pay/test/cs-1' }));
+      expect(api.runQuote).toHaveBeenCalledWith({ lines: args.lines, turnaround: 'rush', negotiation: { n: 1 }, installmentCount: 2 });
+      expect(api.createPaymentLink).toHaveBeenCalledWith({
+        callSessionId: 'cs-1',
+        email: 'a@b.co',
+        quote: APPROVED.client,
+        installment: 2,
+        amountCents: 67500,
+      });
+      expect(out).toEqual({
+        url: 'https://x/pay/test/cs-1-1',
+        total: '$1,350',
+        totalCents: 135000,
+        simulated: true,
+        installments: INSTALLMENTS,
+      });
+      expect(host.showPanel.mock.calls[0][0]).toMatchObject({ kind: 'deal', total: '$1,350', simulated: true, installments: INSTALLMENTS });
+      expect(host.setPayment).toHaveBeenCalledWith({
+        url: 'https://x/pay/test/cs-1-1',
+        total: '$1,350',
+        totalCents: 135000,
+        simulated: true,
+        email: 'a@b.co',
+        installments: INSTALLMENTS,
+      });
+      expect(host.updateLead).toHaveBeenCalledWith(expect.objectContaining({ email: 'a@b.co', payment_link: 'https://x/pay/test/cs-1-1' }));
+    });
+
+    it('makes a one-payment plan when the quote has no installments', async () => {
+      const client = { ...APPROVED.client, installments: undefined };
+      const api = makeApi({ runQuote: vi.fn(async () => ({ ...APPROVED, client })) });
+      const out = await createCallTools(makeHost(), api)('send_payment_link', args);
+      expect(out.installments).toEqual([
+        { n: 1, label: 'Full payment before work starts', amountCents: 135000, amount: '$1,350', due: null, url: 'https://x/pay/test/cs-1-1' },
+      ]);
     });
 
     it('refuses without a valid email or when the order needs a team quote', async () => {

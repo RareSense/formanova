@@ -10,6 +10,9 @@ export interface PaymentLinkRequest {
   email: string;
   /** The client view of the re-priced quote (ruby_quote). */
   quote: Record<string, unknown>;
+  /** Which payment of the plan (1 = deposit or the full payment). */
+  installment: number;
+  amountCents: number;
 }
 
 export interface PaymentLink {
@@ -22,6 +25,6 @@ const SIMULATED_DELAY_MS = 600;
 export async function createPaymentLink(req: PaymentLinkRequest): Promise<PaymentLink> {
   // SIMULATED — swap for the backend Stripe endpoint (via authenticatedFetch) once it exists.
   await new Promise((r) => setTimeout(r, SIMULATED_DELAY_MS));
-  const id = encodeURIComponent(req.callSessionId || 'call');
+  const id = encodeURIComponent(`${req.callSessionId || 'call'}-${req.installment}`);
   return { url: `${getPublicSiteUrl()}/pay/test/${id}`, simulated: true };
 }

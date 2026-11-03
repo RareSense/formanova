@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Check, Copy, ExternalLink, Mail, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { TEAM_EMAIL, type Panel } from '@/lib/ruby-call/panels';
+import { TEAM_EMAIL, type Installment, type Panel } from '@/lib/ruby-call/panels';
 import { LinkField, UploadCard, type UploadOutcome } from './RubyPanelInputs';
 
 interface RubyPanelsProps {
@@ -65,6 +65,7 @@ function PanelBody({
         <>
           <Table columns={panel.columns} rows={panel.rows} highlight={panel.highlight} total={panel.total} />
           {panel.note && <Note text={panel.note} />}
+          {panel.schedule && <Schedule plan={panel.schedule} />}
         </>
       );
     case 'list':
@@ -196,17 +197,49 @@ function Table({
   );
 }
 
-function Deal({ panel }: { panel: Extract<Panel, { kind: 'deal' }> }) {
+/** The payment plan under a quote: what is paid, how much, and when. */
+function Schedule({ plan }: { plan: Installment[] }) {
+  return (
+    <div className="mt-4">
+      <p className={KICKER}>Payment plan</p>
+      <ol className="mt-2 space-y-2">
+        {plan.map((p) => (
+          <li key={p.n} className="flex min-w-0 items-baseline gap-3 border-l-2 pl-3 text-sm" style={{ borderColor: GOLD }}>
+            <span className="min-w-0 flex-1 break-words">
+              {p.label}
+              {p.due && <span className="block text-xs text-muted-foreground">{p.due}</span>}
+            </span>
+            <span className="shrink-0 tabular-nums">{p.amount}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+function CopyLinkButton({ url, label }: { url: string; label: string }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(panel.url);
+      await navigator.clipboard.writeText(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
       /* clipboard blocked: the link is still on the Pay button */
     }
   };
+  return (
+    <Button variant="outline" size="lg" className="h-12 w-full px-4" aria-label={label} onClick={() => void copy()}>
+      {copied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
+      {copied ? 'Copied' : 'Copy link'}
+    </Button>
+  );
+}
+
+function Deal({ panel }: { panel: Extract<Panel, { kind: 'deal' }> }) {
+  const plan = panel.installments?.length
+    ? panel.installments
+    : [{ n: 1, label: 'Full payment', amountCents: 0, amount: panel.total, due: null, url: panel.url }];
   return (
     <div className="space-y-4">
       {panel.simulated && (
@@ -215,18 +248,31 @@ function Deal({ panel }: { panel: Extract<Panel, { kind: 'deal' }> }) {
         </span>
       )}
       <Table columns={['Item', 'Qty', 'Per unit', 'Total']} rows={panel.rows} total={panel.total} />
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Button asChild size="lg" className="h-12 w-full px-6">
-          <a href={panel.url} target="_blank" rel="noopener noreferrer">
-            <ExternalLink className="mr-2 h-4 w-4" aria-hidden="true" />
-            Pay now
-          </a>
-        </Button>
-        <Button variant="outline" size="lg" className="h-12 w-full px-6" onClick={() => void copy()}>
-          {copied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
-          {copied ? 'Copied' : 'Copy link'}
-        </Button>
-      </div>
+      <p className={KICKER}>{plan.length > 1 ? 'Payment plan' : 'Payment'}</p>
+      <ol className="space-y-4">
+        {plan.map((p) => (
+          <li key={p.n} className="space-y-3 border-l-2 pl-3" style={{ borderColor: GOLD }}>
+            <div className="flex min-w-0 items-baseline gap-3 text-sm">
+              <span className="min-w-0 flex-1 break-words">
+                {p.label}
+                {p.due && <span className="block text-xs text-muted-foreground">{p.due}</span>}
+              </span>
+              <span className="shrink-0 font-display text-xl leading-none tabular-nums">{p.amount}</span>
+            </div>
+            <div className={`grid grid-cols-1 gap-3 ${p.n === 1 ? 'sm:grid-cols-2' : ''}`}>
+              {p.n === 1 && (
+                <Button asChild size="lg" className="h-12 w-full px-4">
+                  <a href={p.url} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="mr-2 h-4 w-4" aria-hidden="true" />
+                    Pay now
+                  </a>
+                </Button>
+              )}
+              <CopyLinkButton url={p.url} label={`Copy link for payment ${p.n}`} />
+            </div>
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }

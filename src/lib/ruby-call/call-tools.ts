@@ -5,7 +5,17 @@
  */
 import type { ToolOutput, ToolRunner } from './delegation';
 import { createPaymentLink as createPaymentLinkDefault } from './payment-link';
-import { panelFromShowArgs, plansPanel, quotePanel, quoteRows, type PanelSpec, type UploadPurpose } from './panels';
+import {
+  installmentsOf,
+  money,
+  panelFromShowArgs,
+  plansPanel,
+  quotePanel,
+  quoteRows,
+  type DealInstallment,
+  type PanelSpec,
+  type UploadPurpose,
+} from './panels';
 import {
   runNegotiate as runNegotiateDefault,
   runQuote as runQuoteDefault,
@@ -80,7 +90,19 @@ function quoteRequest(args: Record<string, unknown>): QuoteRequest | { error: st
   if (lines.some((l) => !l.productId || !Number.isFinite(l.quantity))) return { error: 'Each line needs productId and quantity.' };
   const turnaround = str(args.turnaround) || 'standard';
   if (!TURNAROUNDS.includes(turnaround)) return { error: 'turnaround must be standard, priority or rush.' };
-  return { lines, turnaround, ...(args.negotiation ? { negotiation: args.negotiation } : {}) };
+  let installmentCount: number | undefined;
+  if (args.installmentCount !== undefined && args.installmentCount !== null) {
+    installmentCount = Number(args.installmentCount);
+    if (!Number.isInteger(installmentCount) || installmentCount < 1 || installmentCount > 4) {
+      return { error: 'installmentCount must be a whole number from 1 to 4.' };
+    }
+  }
+  return {
+    lines,
+    turnaround,
+    ...(args.negotiation ? { negotiation: args.negotiation } : {}),
+    ...(installmentCount ? { installmentCount } : {}),
+  };
 }
 
 /** What the model may see of a quote: never the internal costs. */
@@ -168,14 +190,25 @@ export function createCallTools(host: ToolHost, api: ToolApi = DEFAULT_API): Too
         const result = await api.runQuote(req);
         const client = (result.client ?? {}) as Record<string, unknown>;
         if (!result.approved || typeof client.totalCents !== 'number') {
-          return { error: 'This order needs a quote from the team, so no payment link can be made.', ...modelView(result) };
+          return { error: 'This order needs a custom quote, so no payment link can be made.', ...modelView(result) };
         }
+        const totalCents = client.totalCents;
         const { rows, total } = quoteRows(client);
-        const link = await api.createPaymentLink({ callSessionId: host.callSessionId(), email, quote: client });
-        host.showPanel({ kind: 'deal', title: 'Your deal', rows, total, url: link.url, simulated: link.simulated });
-        host.setPayment({ url: link.url, total, simulated: link.simulated, email });
-        host.updateLead({ email, payment_link: link.url, payment_total: total });
-        return { url: link.url, total, simulated: link.simulated };
+        // A single payment is a one-step plan; every payment gets its own link.
+        const plan = installmentsOf(client) ?? [
+          { n: 1, label: 'Full payment before work starts', amountCents: totalCents, amount: money(totalCents), due: null },
+        ];
+        const callSessionId = host.callSessionId();
+        const links = await Promise.all(
+          plan.map((p) => api.createPaymentLink({ callSessionId, email, quote: client, installment: p.n, amountCents: p.amountCents })),
+        );
+        const installments: DealInstallment[] = plan.map((p, i) => ({ ...p, url: links[i].url }));
+        const simulated = links.some((l) => l.simulated);
+        const url = installments[0].url;
+        host.showPanel({ kind: 'deal', title: 'Your deal', rows, total, url, installments, simulated });
+        host.setPayment({ url, total, totalCents, simulated, email, installments });
+        host.updateLead({ email, payment_link: url, payment_total: total });
+        return { url, total, totalCents, simulated, installments };
       } catch (e) {
         return { error: errorText(e, 'The payment link could not be made right now.') };
       }
