@@ -42,6 +42,21 @@ export function isCadUploadEnabled(email: string | undefined | null): boolean {
 }
 
 /**
+ * Users allowed to see "Done For You" and talk to Ruby, the AI sales agent.
+ */
+export function isRubyCallEnabled(email: string | undefined | null): boolean {
+  return isAllowlistedEmail(email, 'VITE_RUBY_CALL_ALLOWLIST_EMAILS');
+}
+
+/**
+ * True when any allowlist is configured. Used only to decide whether a
+ * signed-out visitor can be offered a sign-in path (their email is unknown).
+ */
+export function isRubyCallConfigured(): boolean {
+  return getAllowlist('VITE_RUBY_CALL_ALLOWLIST_EMAILS').length > 0;
+}
+
+/**
  * Image to 3D shipped publicly — the flag was removed per its own removal
  * condition and the history section renders for everyone.
  * VITE_IMAGE_TO_CAD_ALLOWLIST_EMAILS is no longer read and can be dropped
