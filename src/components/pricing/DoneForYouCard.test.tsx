@@ -51,13 +51,14 @@ describe('DoneForYouCard', () => {
     renderCard();
     expect(screen.getByText('Done For You')).toBeInTheDocument();
     expect(screen.getByText('Your whole catalog')).toBeInTheDocument();
-    expect(screen.getByText(/We create it for you, in bulk\./)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Talk to Ruby' })).toBeInTheDocument();
+    expect(screen.getByText('Your price on the call, built for your volume')).toBeInTheDocument();
+    expect(screen.getByText(/Instant voice call with Ruby, our AI sales advisor/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Get my price now' })).toBeInTheDocument();
   });
 
   it('sends a signed-out click to login and keeps the return path', () => {
     const onOpen = renderCard();
-    fireEvent.click(screen.getByRole('button', { name: 'Talk to Ruby' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Get my price now' }));
     expect(onOpen).not.toHaveBeenCalled();
     expect(screen.getByTestId('where')).toHaveTextContent(
       `/login?redirect=${encodeURIComponent('/pricing?talk=ruby')}`,
@@ -67,7 +68,7 @@ describe('DoneForYouCard', () => {
   it('opens the call window on click when signed in', () => {
     mockUser = { email: 'ruby@example.com' };
     const onOpen = renderCard();
-    fireEvent.click(screen.getByRole('button', { name: 'Talk to Ruby' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Get my price now' }));
     expect(onOpen).toHaveBeenCalledTimes(1);
   });
 
