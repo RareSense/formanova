@@ -32,7 +32,7 @@ describe('post-call save', () => {
   });
 
   it('retries, then keeps the record for the next visit of the same user only', async () => {
-    const save = vi.fn(async () => {
+    const save = vi.fn<SaveDeps['save']>(async () => {
       throw new Error('down');
     });
     const { d } = deps(save);

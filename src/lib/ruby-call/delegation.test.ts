@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
-import { DelegationRunner } from './delegation';
+import { DelegationRunner, type ToolRunner } from './delegation';
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
-function make(runTool = vi.fn(async (name: string) => ({ ran: name }))) {
+function make(runTool: ToolRunner = vi.fn(async (name: string) => ({ ran: name }))) {
   const sent: Record<string, unknown>[] = [];
   const busy: boolean[] = [];
   let active = true;
@@ -23,7 +23,8 @@ const fnCall = (call_id: string, name: string, args: unknown = {}) => ({
 
 describe('DelegationRunner', () => {
   it('runs each function call once and answers with outputs then response.create', async () => {
-    const { runner, sent, runTool } = make();
+    const runTool = vi.fn(async (name: string) => ({ ran: name }));
+    const { runner, sent } = make(runTool);
     runner.handle('d1', { type: 'response.created' });
     runner.handle('d1', fnCall('c1', 'show_on_screen', { kind: 'list' }));
     runner.handle('d1', fnCall('c1', 'show_on_screen', { kind: 'list' }));
