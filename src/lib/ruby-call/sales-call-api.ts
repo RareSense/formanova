@@ -8,10 +8,15 @@
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { pollWorkflow } from '@/lib/poll-workflow';
 import bundledLanguages from './languages.json';
+import { AudioUploadError, type AudioUploader, type RecordingSummary } from './call-recorder';
 import type { CallEndReason, CallTurn, SessionAnswer } from './webrtc-call';
 
 export const VOICE_SESSION_WORKFLOW = 'ruby_voice_session';
 export const POST_CALL_WORKFLOW = 'ruby_post_call';
+export const QUOTE_WORKFLOW = 'ruby_quote';
+export const NEGOTIATE_WORKFLOW = 'ruby_negotiate';
+export const CALL_AUDIO_URL = '/api/brand/calls/audio';
+const TOOL_POLL_TIMEOUT_MS = 30_000;
 const SESSION_POLL_INTERVAL_MS = 700;
 const SESSION_POLL_TIMEOUT_MS = 60_000;
 
@@ -22,12 +27,53 @@ export interface CallLanguage {
 
 export interface VoiceSession extends SessionAnswer {
   callSessionId: string | null;
+  /** The ruby_voice_session run id (null in dev mode). */
+  workflowId: string | null;
+}
+
+export interface CallerContext {
+  timezone: string | null;
+  local_time: string;
+  browser_language: string | null;
+}
+
+export interface PastCall {
+  date: string;
+  lead: Record<string, unknown>;
+  transcript: string;
+  uploads: number;
+  links: number;
+}
+
+export interface CallUpload {
+  name: string;
+  uri: string;
+  sha256?: string;
+  purpose: string;
+}
+
+export interface CallLink {
+  url: string;
+  at: string;
+}
+
+export interface CallPayment {
+  url: string;
+  total: string | null;
+  simulated: boolean;
+  email: string;
 }
 
 export interface EndCallArgs {
   callSessionId: string | null;
   turns: CallTurn[];
   reason: CallEndReason;
+  sessionWorkflowId?: string | null;
+  lead?: Record<string, unknown>;
+  uploads?: CallUpload[];
+  links?: CallLink[];
+  recording?: RecordingSummary | null;
+  payment?: CallPayment | null;
 }
 
 const devBase = (): string => {
@@ -60,11 +106,19 @@ export async function getLanguages(): Promise<CallLanguage[]> {
   return list.map((l: CallLanguage) => ({ code: String(l.code), name: String(l.name) }));
 }
 
-async function startRun(workflow: string, payload: Record<string, unknown>, returnNodes: string[]): Promise<string> {
+async function startRun(
+  workflow: string,
+  payload: Record<string, unknown>,
+  returnNodes: string[],
+  keepalive = false,
+): Promise<string> {
+  const body = JSON.stringify({ payload, return_nodes: returnNodes });
   const res = await authenticatedFetch(`/api/run/state/${workflow}`, {
     method: 'POST',
     headers: JSON_HEADERS,
-    body: JSON.stringify({ payload, return_nodes: returnNodes }),
+    body,
+    // Browsers refuse keepalive bodies over 64 KB.
+    ...(keepalive && body.length < 60_000 ? { keepalive: true } : {}),
   });
   if (!res.ok) throw new Error(`${workflow}_start_failed`);
   const data = await res.json();
@@ -94,12 +148,22 @@ export async function startVoiceSession(args: {
   language: string;
   sdp: string;
   clientName?: string | null;
+  clientEmail?: string | null;
+  caller?: CallerContext | null;
+  pastCalls?: PastCall[];
 }): Promise<VoiceSession> {
   if (!isRubyDevMode()) {
     const callSessionId = crypto.randomUUID();
     const workflowId = await startRun(
       VOICE_SESSION_WORKFLOW,
-      { language: args.language, sdp: args.sdp, call_session_id: callSessionId, client: { name: args.clientName || null } },
+      {
+        language: args.language,
+        sdp: args.sdp,
+        call_session_id: callSessionId,
+        client: { name: args.clientName || null, email: args.clientEmail || null },
+        ...(args.caller ? { caller: args.caller } : {}),
+        past_calls: args.pastCalls ?? [],
+      },
       ['session'],
     );
     const polled = await pollWorkflow<SessionAnswer>({
@@ -118,7 +182,7 @@ export async function startVoiceSession(args: {
       maxResultRetries: 2,
     });
     if (polled.status !== 'completed') throw new Error('voice_session_failed');
-    return { ...polled.result, callSessionId };
+    return { ...polled.result, callSessionId, workflowId };
   }
   const res = await devRequest('voiceSession', {
     method: 'POST',
@@ -132,25 +196,136 @@ export async function startVoiceSession(args: {
     sdp: data.sdp,
     greeting: data.greeting ?? null,
     callSessionId: data.call_session_id ?? null,
+    workflowId: null,
   };
 }
 
-export async function endCall(args: EndCallArgs): Promise<void> {
-  const turns = args.turns.map((t) => ({
-    role: t.role,
-    text: t.text.trim(),
-    start_ms: t.start_ms,
-    end_ms: t.end_ms,
-  }));
-  if (!isRubyDevMode()) {
-    // The run is the saved record of the call (GraphFlow keeps its input and result).
-    await startRun(POST_CALL_WORKFLOW, { turns, call_session_id: args.callSessionId, reason: args.reason }, ['clean']);
+const cleanTurns = (turns: CallTurn[]) =>
+  turns.map((t) => ({ role: t.role, text: t.text.trim(), start_ms: t.start_ms, end_ms: t.end_ms }));
+
+/** The ruby_post_call payload (contract §4); the run's stored input is the saved record of the call. */
+export function buildPostCallPayload(args: EndCallArgs): Record<string, unknown> {
+  return {
+    turns: cleanTurns(args.turns),
+    call_session_id: args.callSessionId,
+    reason: args.reason,
+    session_workflow_id: args.sessionWorkflowId ?? null,
+    lead: args.lead ?? {},
+    uploads: args.uploads ?? [],
+    links: args.links ?? [],
+    recording: args.recording ?? null,
+    ...(args.payment ? { payment: args.payment } : {}),
+  };
+}
+
+/** Saves the call by starting ruby_post_call with an already built payload. */
+export async function savePostCall(payload: Record<string, unknown>, opts: { keepalive?: boolean } = {}): Promise<void> {
+  if (isRubyDevMode()) {
+    const res = await devRequest('callEnded', {
+      method: 'POST',
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ turns: payload.turns }),
+    });
+    if (!res.ok) throw new Error('call_end_failed');
     return;
   }
-  const res = await devRequest('callEnded', {
-    method: 'POST',
-    headers: JSON_HEADERS,
-    body: JSON.stringify({ turns }),
+  // The run is the saved record of the call (GraphFlow keeps its input and result).
+  await startRun(POST_CALL_WORKFLOW, payload, ['clean'], opts.keepalive);
+}
+
+export function endCall(args: EndCallArgs): Promise<void> {
+  return savePostCall(buildPostCallPayload(args));
+}
+
+const statusState = (statusData: unknown) => {
+  const st = statusData as { runtime?: { state?: string }; state?: string };
+  return (st.runtime?.state || st.state || 'unknown').toLowerCase();
+};
+
+/** Starts a short sales workflow and returns the object carrying `key` from its result. */
+async function runSalesWorkflow(
+  workflow: string,
+  payload: Record<string, unknown>,
+  returnNode: string,
+  key: string,
+): Promise<Record<string, unknown>> {
+  if (isRubyDevMode()) throw new Error('not_in_dev_mode');
+  const workflowId = await startRun(workflow, payload, [returnNode]);
+  const polled = await pollWorkflow<Record<string, unknown>>({
+    mode: 'status-then-result',
+    fetchStatus: () => authenticatedFetch(`/api/status/${workflowId}`),
+    fetchResult: () => authenticatedFetch(`/api/result/${workflowId}`),
+    resolveState: statusState,
+    parseResult: (data) => {
+      const node = findWithKey(data, key);
+      if (!node) throw new Error(`${workflow}_bad_result`);
+      return node;
+    },
+    intervalMs: SESSION_POLL_INTERVAL_MS,
+    timeoutMs: TOOL_POLL_TIMEOUT_MS,
+    max404s: 3,
+    maxPollErrors: 5,
+    maxResultRetries: 2,
   });
-  if (!res.ok) throw new Error('call_end_failed');
+  if (polled.status !== 'completed') throw new Error(`${workflow}_failed`);
+  return polled.result;
+}
+
+export interface QuoteRequest {
+  lines: { productId: string; quantity: number }[];
+  turnaround?: string;
+  negotiation?: unknown;
+}
+
+/** ruby_quote (sales_price_quote): `{approved, needs_team_quote, client, internal}`. */
+export function runQuote(req: QuoteRequest): Promise<Record<string, unknown>> {
+  return runSalesWorkflow(
+    QUOTE_WORKFLOW,
+    {
+      lines: req.lines,
+      turnaround: req.turnaround || 'standard',
+      ...(req.negotiation ? { negotiation: req.negotiation } : {}),
+    },
+    'quote',
+    'approved',
+  );
+}
+
+/** ruby_negotiate (sales_check_concession): `{allowed, reason_for_ruby, negotiation}`. */
+export function runNegotiate(args: Record<string, unknown>): Promise<Record<string, unknown>> {
+  return runSalesWorkflow(NEGOTIATE_WORKFLOW, args, 'concession', 'allowed');
+}
+
+/**
+ * Uploader for call audio (contract §5): multipart `file`, `workflow_id`, `call_id`.
+ * Null in dev mode or before the session exists, so recording stays local then.
+ */
+export function callAudioUploader(workflowId: string | null, callId: string | null): AudioUploader | null {
+  if (isRubyDevMode() || !workflowId || !callId) return null;
+  return async (file, filename, opts) => {
+    const form = new FormData();
+    form.append('file', file, filename);
+    form.append('workflow_id', workflowId);
+    form.append('call_id', callId);
+    let res: Response;
+    try {
+      res = await authenticatedFetch(CALL_AUDIO_URL, {
+        method: 'POST',
+        body: form,
+        ...(opts?.keepalive ? { keepalive: true } : {}),
+      });
+    } catch (e) {
+      // A signed-out user cannot upload; a network error is worth another try.
+      throw new AudioUploadError('upload_failed', (e as Error)?.name !== 'AuthExpiredError');
+    }
+    if (!res.ok) {
+      const retriable = res.status >= 500 || res.status === 408 || res.status === 429;
+      throw new AudioUploadError(`upload_${res.status}`, retriable);
+    }
+    const data = await res.json().catch(() => ({}));
+    return {
+      sha256: typeof data?.sha256 === 'string' ? data.sha256 : null,
+      bytes: typeof data?.bytes === 'number' ? data.bytes : file.size,
+    };
+  };
 }
