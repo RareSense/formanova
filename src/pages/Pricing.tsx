@@ -12,6 +12,7 @@ import { isStarterTier, type BillingTier } from '@/lib/starter-pack';
 import { CreditPlanGrid } from '@/components/pricing/CreditPlanGrid';
 import { resolveGridTiers } from '@/lib/credit-plans';
 import { DoneForYouCard } from '@/components/pricing/DoneForYouCard';
+import { useDoneForYouVisible } from '@/hooks/use-done-for-you-visible';
 import { RubyCallDialog } from '@/components/sales/RubyCallDialog';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
 
@@ -65,6 +66,7 @@ export default function Pricing() {
   }, [user, fetchTiers]);
 
   const openCall = useCallback(() => setCallOpen(true), []);
+  const showDoneForYou = useDoneForYouVisible();
 
   const handleCheckout = async (tierId: string) => {
     if (!user?.id) {
@@ -110,7 +112,9 @@ export default function Pricing() {
   // 4 cards when the backend still returns the one-time Starter tier (user never
   // bought it), otherwise the 3 standard plans. Counted after the grid's own
   // filtering, since the backend list also carries packages that are not shown.
-  const maxWidthClass = resolveGridTiers(tiers).length >= 4 ? 'max-w-7xl' : 'max-w-5xl';
+  // Done For You, when shown, is one more card in the same row.
+  const cardCount = resolveGridTiers(tiers).length + (showDoneForYou ? 1 : 0);
+  const maxWidthClass = cardCount >= 4 ? 'max-w-7xl' : 'max-w-5xl';
 
   return (
     <>
@@ -161,10 +165,10 @@ export default function Pricing() {
             unavailableTier={unavailableTier}
             errorTier={errorTier}
             onCheckout={handleCheckout}
+            extraCard={showDoneForYou ? <DoneForYouCard onOpenCall={openCall} /> : undefined}
           />
         )}
 
-        <DoneForYouCard onOpenCall={openCall} />
         <RubyCallDialog open={callOpen} onOpenChange={setCallOpen} />
 
       </div>
