@@ -121,7 +121,7 @@ export function CreditPlanGrid({
               {/* CTA */}
               <div className="mt-auto pt-8">
                 <Button
-                  className="w-full px-4 font-mono text-xs tracking-[0.2em] uppercase"
+                  className="h-auto min-h-11 w-full whitespace-normal px-3 py-2.5 font-mono text-xs uppercase leading-tight tracking-[0.2em] xl:tracking-[0.1em]"
                   size="lg"
                   variant="default"
                   disabled={loadingTier !== null}
