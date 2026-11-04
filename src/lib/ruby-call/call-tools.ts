@@ -3,6 +3,7 @@
  * gets back; nothing here throws (errors become `{error}`). The page supplies a
  * ToolHost for the screen and call state.
  */
+import { isReachChannel, reachField } from './reach-contact';
 import type { ToolOutput, ToolRunner } from './delegation';
 import { createPaymentLink as createPaymentLinkDefault } from './payment-link';
 import {
@@ -135,7 +136,13 @@ function quoteRequest(args: Record<string, unknown>): QuoteRequest | { error: st
 
 /** What the model may see of a quote: never the internal costs. */
 function modelView(result: Record<string, unknown>): ToolOutput {
-  return { approved: result.approved, needs_team_quote: result.needs_team_quote, client: result.client };
+  return {
+    approved: result.approved,
+    needs_team_quote: result.needs_team_quote,
+    client: result.client,
+    // Under the normal lowest: Ruby says it once as her final price, then hands over to the team.
+    ...(result.last_offer === true ? { last_offer: true } : {}),
+  };
 }
 
 export function createCallTools(host: ToolHost, api: ToolApi = DEFAULT_API): ToolRunner {
@@ -188,6 +195,13 @@ export function createCallTools(host: ToolHost, api: ToolApi = DEFAULT_API): Too
     request_link: (args) => {
       host.showPanel({ kind: 'link', title: str(args.title) || 'Share a link', note: str(args.note) || undefined });
       return { shown: true };
+    },
+    request_contact: async (args) => {
+      if (!isReachChannel(args.channel)) return { error: 'Use one of: WhatsApp, iMessage, text message, Instagram or email.' };
+      const channel = args.channel;
+      return (await host.showPanel({ kind: 'reach', title: `Your ${reachField(channel).name}`, channel }))
+        ? { shown: true }
+        : { error: 'The field could not be shown. Ask them to say it and read it back.' };
     },
     update_lead: (args) => {
       const fields: Record<string, unknown> = {};

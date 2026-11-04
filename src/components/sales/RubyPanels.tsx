@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Check, Copy, ExternalLink, Mail, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TEAM_EMAIL, amountColumn, type DealInstallment, type Installment, type Panel } from '@/lib/ruby-call/panels';
-import { LinkField, UploadCard, type UploadOutcome } from './RubyPanelInputs';
+import { ContactField, LinkField, UploadCard, type UploadOutcome } from './RubyPanelInputs';
+import type { ReachChannel } from '@/lib/ruby-call/reach-contact';
 
 interface RubyStageProps {
   /** The one panel on screen (newest replaces the previous). */
@@ -15,6 +16,8 @@ interface RubyStageProps {
   onUpload(panel: Panel, files: File[]): Promise<UploadOutcome[]>;
   onLink(url: string): void;
   onLinkTyping(): void;
+  /** The client shared where the creative team may text them. */
+  onReach?(channel: ReachChannel, value: string): void;
 }
 
 const KICKER = 'font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground';
@@ -26,7 +29,7 @@ const ROWS_SHOWN_COMPACT = 4;
  * Ruby's stage (like Eva's): one calm card at a time, never scrolling sideways.
  * Rows are compact: label left, amount right, details wrapped under the label.
  */
-export function RubyStage({ panel, compact = false, onClose, onRendered, onUpload, onLink, onLinkTyping }: RubyStageProps) {
+export function RubyStage({ panel, compact = false, onClose, onRendered, onUpload, onLink, onLinkTyping, onReach }: RubyStageProps) {
   useEffect(() => {
     onRendered?.(panel.id);
   }, [panel.id, onRendered]);
@@ -52,7 +55,7 @@ export function RubyStage({ panel, compact = false, onClose, onRendered, onUploa
         {panel.title}
       </h3>
       <div className="mt-4 min-w-0">
-        <PanelBody panel={panel} compact={compact} onUpload={onUpload} onLink={onLink} onLinkTyping={onLinkTyping} />
+        <PanelBody panel={panel} compact={compact} onUpload={onUpload} onLink={onLink} onLinkTyping={onLinkTyping} onReach={onReach} />
       </div>
     </section>
   );
@@ -64,12 +67,14 @@ function PanelBody({
   onUpload,
   onLink,
   onLinkTyping,
+  onReach,
 }: {
   panel: Panel;
   compact: boolean;
   onUpload: RubyStageProps['onUpload'];
   onLink: RubyStageProps['onLink'];
   onLinkTyping: RubyStageProps['onLinkTyping'];
+  onReach: RubyStageProps['onReach'];
 }) {
   switch (panel.kind) {
     case 'table':
@@ -105,6 +110,8 @@ function PanelBody({
           <LinkField onLink={onLink} onTyping={onLinkTyping} />
         </>
       );
+    case 'reach':
+      return <ContactField channel={panel.channel} onReach={(channel, value) => onReach?.(channel, value)} />;
     case 'contact':
       return (
         <div className="space-y-3">

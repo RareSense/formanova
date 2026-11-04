@@ -103,3 +103,29 @@ describe('RubyPanels', () => {
     expect(onRendered).toHaveBeenCalledWith('p5');
   });
 });
+
+describe('reach panel', () => {
+  const reach = (channel: 'whatsapp' | 'instagram'): Panel => ({ id: 'r1', kind: 'reach', title: 'Your WhatsApp', channel });
+
+  it('asks for the number with the country code and only sends a valid one', () => {
+    const onReach = vi.fn();
+    render(<RubyStage {...noop} onReach={onReach} panel={reach('whatsapp')} />);
+    const field = screen.getByLabelText(/WhatsApp number, with the country code/i);
+    fireEvent.change(field, { target: { value: '07700 900123' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+    expect(onReach).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent(/country code/i);
+    fireEvent.change(field, { target: { value: '+44 7700 900123' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+    expect(onReach).toHaveBeenCalledWith('whatsapp', '+447700900123');
+    expect(screen.getByText(/Saved: \+447700900123/)).toBeInTheDocument();
+  });
+
+  it('asks for the Instagram handle', () => {
+    const onReach = vi.fn();
+    render(<RubyStage {...noop} onReach={onReach} panel={reach('instagram')} />);
+    fireEvent.change(screen.getByLabelText(/Instagram handle/i), { target: { value: 'ruby.jewels' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+    expect(onReach).toHaveBeenCalledWith('instagram', '@ruby.jewels');
+  });
+});

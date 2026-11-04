@@ -2,6 +2,7 @@
  * What Ruby can put on screen during a call, and how tool results become panels.
  * Pure data; RubyPanels.tsx renders it.
  */
+import type { ReachChannel } from './reach-contact';
 import { CREDIT_PLANS } from '@/lib/credit-plans';
 
 export type UploadPurpose = 'jewelry_photos' | 'references' | 'cad_files' | 'other';
@@ -36,6 +37,8 @@ export type PanelSpec =
   | { kind: 'list'; title: string; kicker?: string; items: string[]; note?: string }
   | { kind: 'upload'; title: string; purpose: UploadPurpose; note?: string }
   | { kind: 'link'; title: string; note?: string }
+  /** Where the creative team may text the client: a field matching the channel they chose. */
+  | { kind: 'reach'; title: string; channel: ReachChannel }
   | { kind: 'contact'; title: string }
   | {
       kind: 'deal';

@@ -162,6 +162,8 @@ describe('RubyCallDialog', () => {
       call_session_id: 'cs1',
       reason: 'user',
       session_workflow_id: 'wf1',
+      started_at: expect.stringMatching(/^\d{4}-\d\d-\d\dT/),
+      ended_at: expect.stringMatching(/^\d{4}-\d\d-\d\dT/),
       lead: {},
       uploads: [],
       links: [],

@@ -121,6 +121,15 @@ describe('sales-call-api (GraphFlow workflows)', () => {
     });
   });
 
+  it('carries when the call started and ended, for the admin lists', () => {
+    const payload = buildPostCallPayload({
+      callSessionId: 'cs', reason: 'user', turns: [],
+      startedAt: '2026-11-04T06:50:00.000Z', endedAt: '2026-11-04T06:51:08.000Z',
+    });
+    expect(payload.started_at).toBe('2026-11-04T06:50:00.000Z');
+    expect(payload.ended_at).toBe('2026-11-04T06:51:08.000Z');
+  });
+
   it('runs ruby_quote with lines, turnaround and negotiation and returns the quote result', async () => {
     authFetch.authenticatedFetch.mockImplementation((url: string) => {
       if (url === `/api/run/state/${QUOTE_WORKFLOW}`) return json({ workflow_id: 'wq' });
