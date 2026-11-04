@@ -15,7 +15,8 @@ export interface Installment {
   due: string | null;
 }
 
-export type DealInstallment = Installment & { url: string };
+/** `url` is null for later payments: their link is made when that part is delivered. */
+export type DealInstallment = Installment & { url: string | null };
 
 export type PanelSpec =
   | {

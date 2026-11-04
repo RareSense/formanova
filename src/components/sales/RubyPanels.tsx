@@ -273,17 +273,21 @@ function Deal({ panel, compact }: { panel: Extract<Panel, { kind: 'deal' }>; com
               </span>
               <span className="shrink-0 font-display text-xl leading-none tabular-nums">{p.amount}</span>
             </div>
-            <div className={`grid grid-cols-1 gap-3 ${p.n === 1 ? 'sm:grid-cols-2' : ''}`}>
-              {p.n === 1 && (
-                <Button asChild size="lg" className="h-12 w-full px-4">
-                  <a href={p.url} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="mr-2 h-4 w-4" aria-hidden="true" />
-                    Pay now
-                  </a>
-                </Button>
-              )}
-              <CopyLinkButton url={p.url} label={`Copy link for payment ${p.n}`} />
-            </div>
+            {p.url ? (
+              <div className={`grid grid-cols-1 gap-3 ${p.n === 1 ? 'sm:grid-cols-2' : ''}`}>
+                {p.n === 1 && (
+                  <Button asChild size="lg" className="h-12 w-full px-4">
+                    <a href={p.url} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="mr-2 h-4 w-4" aria-hidden="true" />
+                      Pay now
+                    </a>
+                  </Button>
+                )}
+                <CopyLinkButton url={p.url} label={`Copy link for payment ${p.n}`} />
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">Link sent by email when we deliver</p>
+            )}
           </li>
         ))}
       </ol>

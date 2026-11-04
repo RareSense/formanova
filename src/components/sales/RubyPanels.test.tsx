@@ -23,7 +23,7 @@ describe('RubyPanels', () => {
       simulated: true,
       installments: [
         { n: 1, label: 'Deposit before work starts', amountCents: 60000, amount: '$600', due: null, url: 'https://x/pay/test/cs-1' },
-        { n: 2, label: 'Balance on delivery', amountCents: 60000, amount: '$600', due: 'On delivery', url: 'https://x/pay/test/cs-2' },
+        { n: 2, label: 'Balance on delivery', amountCents: 60000, amount: '$600', due: 'On delivery', url: null },
       ],
     };
     render(<RubyStage panel={deal} {...noop} />);
@@ -34,7 +34,8 @@ describe('RubyPanels', () => {
     expect(pay).toHaveLength(1);
     expect(pay[0]).toHaveAttribute('href', 'https://x/pay/test/cs-1');
     expect(screen.getByRole('button', { name: 'Copy link for payment 1' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Copy link for payment 2' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Copy link for payment 2' })).not.toBeInTheDocument();
+    expect(screen.getByText('Link sent by email when we deliver')).toBeInTheDocument();
   });
 
   it('shows the payment plan under a quote', () => {

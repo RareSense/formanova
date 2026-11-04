@@ -237,17 +237,21 @@ export function createCallTools(host: ToolHost, api: ToolApi = DEFAULT_API): Too
         const totalCents = client.totalCents;
         host.setLastQuote({ request: req, total: money(totalCents), approved: true });
         const { rows, total } = quoteRows(client);
-        // A single payment is a one-step plan; every payment gets its own link.
+        // A single payment is a one-step plan. Only the first payment gets a link on the call;
+        // later ones are created when the work (or a batch) is delivered, so nobody pays early.
         const plan = installmentsOf(client) ?? [
           { n: 1, label: 'Full payment before work starts', amountCents: totalCents, amount: money(totalCents), due: null },
         ];
-        const callSessionId = host.callSessionId();
-        const links = await Promise.all(
-          plan.map((p) => api.createPaymentLink({ callSessionId, email, quote: client, installment: p.n, amountCents: p.amountCents })),
-        );
-        const installments: DealInstallment[] = plan.map((p, i) => ({ ...p, url: links[i].url }));
-        const simulated = links.some((l) => l.simulated);
-        const url = installments[0].url;
+        const first = await api.createPaymentLink({
+          callSessionId: host.callSessionId(),
+          email,
+          quote: client,
+          installment: plan[0].n,
+          amountCents: plan[0].amountCents,
+        });
+        const installments: DealInstallment[] = plan.map((p, i) => ({ ...p, url: i === 0 ? first.url : null }));
+        const simulated = first.simulated;
+        const url = first.url;
         host.showPanel({ kind: 'deal', title: 'Your deal', rows, total, url, installments, simulated });
         host.setPayment({ url, total, totalCents, simulated, email, installments });
         host.updateLead({ email, payment_link: url, payment_total: total });

@@ -285,11 +285,11 @@ describe('call tools', () => {
         amountCents: 67500,
         amount: '$675',
         due: null,
-        url: 'https://x/pay/test/cs-1-2',
+        url: null,
       },
     ];
 
-    it('re-prices, creates a link per installment, shows the deal and saves the payment', async () => {
+    it('re-prices, creates a link for the first payment only, shows the deal and saves the payment', async () => {
       const host = makeHost();
       const api = makeApi();
       const out = await createCallTools(host, api)('send_payment_link', args);
@@ -298,9 +298,10 @@ describe('call tools', () => {
         callSessionId: 'cs-1',
         email: 'a@b.co',
         quote: APPROVED.client,
-        installment: 2,
+        installment: 1,
         amountCents: 67500,
       });
+      expect(api.createPaymentLink).toHaveBeenCalledTimes(1);
       expect(out).toEqual({
         url: 'https://x/pay/test/cs-1-1',
         total: '$1,350',
