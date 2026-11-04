@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { glbUrlNeedsAuth, resolveGlbUrl } from './ScissorGLBGrid';
 
 const SHA = 'b'.repeat(64);
@@ -19,8 +19,11 @@ describe('resolveGlbUrl', () => {
     }
   });
 
+  afterEach(() => vi.unstubAllEnvs());
+
   it('returns empty for an unresolvable reference so the caller shows the error state', () => {
-    // No sha segment and no VITE_AZURE_BLOB_BASE_URL configured in tests.
+    // No sha segment and no blob base URL: set here, so a developer's .env cannot change the answer.
+    vi.stubEnv('VITE_AZURE_BLOB_BASE_URL', '');
     expect(resolveGlbUrl('azure://container/runs/1/model.glb')).toBe('');
     expect(resolveGlbUrl('')).toBe('');
   });

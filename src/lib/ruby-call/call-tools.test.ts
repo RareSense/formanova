@@ -351,6 +351,41 @@ describe('call tools', () => {
       expect(host.setPayment).toHaveBeenLastCalledWith(expect.objectContaining({ linkId: 'plink_1', status: 'paid', paidAt: '2026-11-04T10:00:00Z' }));
     });
 
+    it('a changed order cancels the open link it replaces; the same order resent does not', async () => {
+      const host = { ...makeHost(), watchPayment: vi.fn() };
+      const createPaymentLink = vi.fn(async () => ({ url: 'https://buy.stripe.com/x', simulated: false, linkId: `plink_${createPaymentLink.mock.calls.length}` }));
+      const run = createCallTools(host, makeApi({ createPaymentLink }));
+      await run('send_payment_link', args);
+      await run('send_payment_link', args);
+      await run('send_payment_link', { ...args, lines: [{ productId: 'p2k', quantity: 100 }] });
+      const sent = createPaymentLink.mock.calls.map((c) => (c as unknown as [{ replacesLinkId?: string | null }])[0].replacesLinkId ?? null);
+      expect(sent).toEqual([null, null, 'plink_2']);
+    });
+
+    it('a paid link is never replaced', async () => {
+      const host = { ...makeHost(), watchPayment: vi.fn() };
+      const createPaymentLink = vi.fn(async () => ({ url: 'https://buy.stripe.com/x', simulated: false, linkId: 'plink_1' }));
+      const run = createCallTools(host, makeApi({ createPaymentLink }));
+      await run('send_payment_link', args);
+      await host.watchPayment.mock.calls[0][1]('2026-11-04T10:00:00Z');
+      await run('send_payment_link', { ...args, lines: [{ productId: 'p2k', quantity: 100 }] });
+      expect((createPaymentLink.mock.calls[1] as unknown as [{ replacesLinkId?: string | null }])[0].replacesLinkId ?? null).toBeNull();
+    });
+
+    it('when the old link turns out to be paid, no new link is shown and Ruby is told', async () => {
+      const host = { ...makeHost(), watchPayment: vi.fn() };
+      const createPaymentLink = vi
+        .fn()
+        .mockResolvedValueOnce({ url: 'https://buy.stripe.com/x', simulated: false, linkId: 'plink_1' })
+        .mockResolvedValueOnce({ url: null, simulated: false, linkId: 'plink_1', alreadyPaid: true });
+      const run = createCallTools(host, makeApi({ createPaymentLink }));
+      await run('send_payment_link', args);
+      const panels = host.showPanel.mock.calls.length;
+      const out = await run('send_payment_link', { ...args, lines: [{ productId: 'p2k', quantity: 100 }] });
+      expect(out).toMatchObject({ already_paid: true });
+      expect(host.showPanel.mock.calls.length).toBe(panels);
+    });
+
     it('a simulated link is never watched', async () => {
       const host = { ...makeHost(), watchPayment: vi.fn() };
       await createCallTools(host, makeApi())('send_payment_link', args);
