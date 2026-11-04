@@ -200,37 +200,38 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
                     )}
                   </div>
                 )}
-                <div className="mx-auto grid max-w-md grid-cols-3 gap-3">
+                {/* Eva's controls: round icon buttons (60 px, 48 px beside a panel), the end button a little wider. */}
+                <div className={`flex items-center justify-center ${showPanels ? 'gap-2.5' : 'gap-5'}`}>
                   <Button
                     variant="outline"
-                    size="lg"
-                    className="h-16 w-full flex-col gap-1 px-2 text-xs sm:flex-row sm:gap-2 sm:text-sm"
+                    title={muted ? 'Unmute' : 'Mute'}
+                    aria-label={muted ? 'Unmute' : 'Mute'}
+                    className={`${showPanels ? 'h-12 w-12' : 'h-[60px] w-[60px]'} shrink-0 rounded-full p-0`}
                     disabled={phase !== 'live'}
                     aria-pressed={muted}
                     onClick={call.toggleMute}
                   >
-                    {muted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                    {muted ? 'Unmute' : 'Mute'}
+                    {muted ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
                   </Button>
                   <Button
                     variant="outline"
-                    size="lg"
-                    className="h-16 w-full flex-col gap-1 px-2 text-xs sm:flex-row sm:gap-2 sm:text-sm"
+                    title="Captions"
+                    aria-label="Captions"
+                    className={`${showPanels ? 'h-12 w-12' : 'h-[60px] w-[60px]'} shrink-0 rounded-full p-0`}
                     disabled={phase !== 'live'}
                     aria-pressed={captionsOn}
                     onClick={call.toggleCaptions}
                   >
-                    <Captions className="h-4 w-4" />
-                    Captions
+                    <Captions className="h-6 w-6" />
                   </Button>
                   <Button
                     variant="destructive"
-                    size="lg"
-                    className="h-16 w-full flex-col gap-1 px-2 text-xs sm:flex-row sm:gap-2 sm:text-sm"
+                    title="End call"
+                    aria-label="End call"
+                    className={`${showPanels ? 'h-12 w-14' : 'h-[60px] w-[72px]'} shrink-0 rounded-full p-0`}
                     onClick={call.end}
                   >
-                    <PhoneOff className="h-4 w-4" />
-                    End call
+                    <PhoneOff className="h-6 w-6" />
                   </Button>
                 </div>
                 {panel && (

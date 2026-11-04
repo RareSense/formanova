@@ -129,3 +129,37 @@ describe('reach panel', () => {
     expect(onReach).toHaveBeenCalledWith('instagram', '@ruby.jewels');
   });
 });
+
+describe('upload panel', () => {
+  const panel: Panel = { id: 'u1', kind: 'upload', title: 'Your photos', purpose: 'jewelry_photos' };
+  const file = (name: string) => new File(['x'], name, { type: 'image/jpeg' });
+
+  it('shows every file it received, by name, with a clear summary, and offers to add more', async () => {
+    Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:preview'), revokeObjectURL: vi.fn() });
+    const onUpload = vi.fn(async () => [
+      { name: 'ring.jpg', ok: true },
+      { name: 'huge.jpg', ok: false, error: 'This image is over 20 MB.' },
+    ]);
+    render(<RubyStage {...noop} onUpload={onUpload} panel={panel} />);
+    fireEvent.change(screen.getByLabelText('Choose images to upload'), { target: { files: [file('ring.jpg'), file('huge.jpg')] } });
+    expect(await screen.findByText('1 of 2 images received')).toBeInTheDocument();
+    const list = screen.getByRole('list', { name: 'Your uploads' });
+    expect(list).toHaveTextContent('ring.jpg');
+    expect(list).toHaveTextContent('Received');
+    expect(list).toHaveTextContent('huge.jpg');
+    expect(list).toHaveTextContent('This image is over 20 MB.');
+    expect(screen.getByRole('button', { name: 'Add more images' })).toBeInTheDocument();
+  });
+
+  it('keeps earlier uploads listed when more are added', async () => {
+    Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:preview'), revokeObjectURL: vi.fn() });
+    const onUpload = vi.fn(async (_panel: unknown, files: File[]) => files.map((f) => ({ name: f.name, ok: true })));
+    render(<RubyStage {...noop} onUpload={onUpload} panel={panel} />);
+    const input = screen.getByLabelText('Choose images to upload');
+    fireEvent.change(input, { target: { files: [file('a.jpg')] } });
+    expect(await screen.findByText('1 image received')).toBeInTheDocument();
+    fireEvent.change(input, { target: { files: [file('b.jpg'), file('c.jpg')] } });
+    expect(await screen.findByText('3 images received')).toBeInTheDocument();
+    expect(screen.getAllByText('Received')).toHaveLength(3);
+  });
+});

@@ -1,8 +1,8 @@
-import { useRef, useState, type DragEvent } from 'react';
-import { Check, Diamond } from 'lucide-react';
+import { useEffect, useRef, useState, type DragEvent } from 'react';
+import { Check, Diamond, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { PURPOSE_LABELS, acceptsFiles, normalizeLink, uploadNote, type UploadOutcome } from '@/lib/ruby-call/client-uploads';
+import { PURPOSE_LABELS, acceptsFiles, normalizeLink, type UploadOutcome } from '@/lib/ruby-call/client-uploads';
 
 export type { UploadOutcome };
 import type { UploadPurpose } from '@/lib/ruby-call/panels';
@@ -21,19 +21,58 @@ interface UploadCardProps {
  * status line under it; then a single field for any link. CAD and other large files
  * come as links only.
  */
+interface UploadItem {
+  key: string;
+  name: string;
+  preview: string | null;
+  state: 'sending' | 'ok' | 'error';
+  error?: string;
+}
+
+/** "3 images received", "1 of 2 images received", or what is still on its way. */
+export function receivedSummary(items: UploadItem[]): string {
+  const sending = items.filter((i) => i.state === 'sending').length;
+  if (sending) return sending === 1 ? 'Sending your image…' : `Sending ${sending} images…`;
+  const ok = items.filter((i) => i.state === 'ok').length;
+  const noun = (k: number) => (k === 1 ? 'image' : 'images');
+  if (ok === items.length) return `${ok} ${noun(ok)} received`;
+  return ok === 0 ? "Nothing went through yet. Please try again." : `${ok} of ${items.length} ${noun(items.length)} received`;
+}
+
 export function UploadCard({ purpose, note, onUpload, onLink, onLinkTyping }: UploadCardProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [status, setStatus] = useState('');
+  const [items, setItems] = useState<UploadItem[]>([]);
   const [over, setOver] = useState(false);
   const files = acceptsFiles(purpose);
+  const previews = useRef<string[]>([]);
+  useEffect(() => () => previews.current.forEach((u) => URL.revokeObjectURL(u)), []);
 
   const send = async (list: File[]) => {
     if (!list.length) return;
-    setStatus(list.length === 1 ? 'Sending your image…' : `Sending ${list.length} images…`);
+    const batch: UploadItem[] = list.map((f, i) => {
+      let preview: string | null = null;
+      try {
+        preview = URL.createObjectURL(f);
+        previews.current.push(preview);
+      } catch {
+        preview = null; // no preview (e.g. HEIC in some browsers): the name still shows
+      }
+      return { key: `${Date.now()}-${i}-${f.name}`, name: f.name, preview, state: 'sending' };
+    });
+    setItems((prev) => [...prev, ...batch]);
+    const settle = (outcomes: UploadOutcome[] | null) =>
+      setItems((prev) =>
+        prev.map((item) => {
+          const at = batch.findIndex((b) => b.key === item.key);
+          if (at < 0) return item;
+          const o = outcomes?.[at];
+          return o?.ok ? { ...item, state: 'ok' } : { ...item, state: 'error', error: o?.error ?? "Didn't go through. Please try again." };
+        }),
+      );
     try {
-      setStatus(uploadNote(list.length, await onUpload(list)));
+      settle(await onUpload(list));
     } catch {
-      setStatus("That didn't go through. Please try again.");
+      settle(null);
     }
   };
 
@@ -68,7 +107,7 @@ export function UploadCard({ purpose, note, onUpload, onLink, onLinkTyping }: Up
             </div>
           </div>
           <Button type="button" className="h-11 shrink-0 px-5" onClick={() => inputRef.current?.click()}>
-            Choose images
+            {items.length ? 'Add more images' : 'Choose images'}
           </Button>
           <input
             ref={inputRef}
@@ -86,10 +125,44 @@ export function UploadCard({ purpose, note, onUpload, onLink, onLinkTyping }: Up
           />
         </div>
       )}
-      {files && status && (
-        <p data-testid="upload-note" aria-live="polite" className="break-words text-xs text-muted-foreground">
-          {status}
-        </p>
+      {files && items.length > 0 && (
+        <div className="space-y-2">
+          <p data-testid="upload-note" aria-live="polite" className="flex items-center gap-1.5 text-sm font-semibold">
+            {items.every((i) => i.state === 'ok') && (
+              <Check className="h-4 w-4 shrink-0 text-[hsl(var(--formanova-hero-accent))]" aria-hidden="true" />
+            )}
+            {receivedSummary(items)}
+          </p>
+          <ul aria-label="Your uploads" className="grid gap-2 sm:grid-cols-2">
+            {items.map((item) => (
+              <li key={item.key} className="flex min-w-0 items-center gap-2 border border-border p-1.5">
+                {item.preview ? (
+                  <img src={item.preview} alt="" className="h-10 w-10 shrink-0 object-cover" />
+                ) : (
+                  <Diamond className="h-10 w-10 shrink-0 p-2 text-muted-foreground" aria-hidden="true" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-medium">{item.name}</p>
+                  {item.state === 'sending' && (
+                    <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" /> Sending…
+                    </p>
+                  )}
+                  {item.state === 'ok' && (
+                    <p className="flex items-center gap-1 text-xs">
+                      <Check className="h-3 w-3 text-[hsl(var(--formanova-hero-accent))]" aria-hidden="true" /> Received
+                    </p>
+                  )}
+                  {item.state === 'error' && (
+                    <p className="flex items-start gap-1 break-words text-xs text-destructive">
+                      <X className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" /> {item.error}
+                    </p>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
       {!files && note && <p className="break-words text-sm text-muted-foreground">{note}</p>}
       <LinkField onLink={onLink} onTyping={onLinkTyping} />
