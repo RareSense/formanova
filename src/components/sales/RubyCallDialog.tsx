@@ -104,8 +104,8 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         overlayClassName="bg-background/40 backdrop-blur-md"
-        className={`flex max-h-[94dvh] w-[calc(100vw-2rem)] max-w-2xl flex-col gap-0 overflow-y-auto overflow-x-hidden p-0 ${
-          showPanels ? 'lg:max-w-5xl' : ''
+        className={`flex max-h-[94dvh] w-[calc(100vw-2rem)] max-w-3xl flex-col gap-0 overflow-y-auto overflow-x-hidden p-0 ${
+          showPanels ? 'lg:max-w-6xl' : ''
         }`}
       >
         <div className="flex items-center justify-between gap-3 px-4 py-3 pr-12 sm:px-6">
@@ -131,7 +131,7 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
             <RubyOrb
               level={orbLevel}
               calm={orbCalm}
-              className={showPanels ? 'w-28 sm:w-40 lg:w-52' : 'w-44 sm:w-60'}
+              className={showPanels ? 'w-28 sm:w-40 lg:w-52' : 'w-48 sm:w-64'}
             />
 
             <DialogHeader className="mt-6 space-y-2 text-center sm:text-center">
@@ -143,12 +143,12 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
                     : 'font-display text-4xl uppercase leading-none tracking-wide text-foreground sm:text-5xl'
                 }
               >
-                {inCall ? status : phase === 'ended' ? `Call ended · ${formatClock(seconds)}` : 'Tell Ruby what you need'}
+                {inCall ? status : phase === 'ended' ? `Call ended · ${formatClock(seconds)}` : 'Get your custom price'}
               </DialogTitle>
               <DialogDescription
-                className={inCall || phase === 'ended' ? 'sr-only' : 'text-[15px] leading-normal text-muted-foreground'}
+                className={inCall || phase === 'ended' ? 'sr-only' : 'mx-auto max-w-md text-base leading-relaxed text-muted-foreground'}
               >
-                Get your custom plan and a great deal for your campaign or bulk order.
+                A quick voice call with Ruby, our AI sales advisor. Describe your campaign or bulk order and get a plan and a price on this call.
               </DialogDescription>
             </DialogHeader>
 

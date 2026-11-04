@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   DEAD_AIR_ANSWER,
   DEAD_AIR_CUE,
+  STILL_WORKING_CUE,
   WebRTCCall,
   deadAirCheckIn,
   type CallDeps,
@@ -339,7 +340,13 @@ describe('WebRTCCall', () => {
   describe('dead air', () => {
     const cues = (s: ReturnType<typeof setup>) =>
       s.pc.dc.sent
-        .filter((m) => m.content === DEAD_AIR_CUE || m.content === DEAD_AIR_ANSWER || m.content === deadAirCheckIn('Asha'))
+        .filter(
+          (m) =>
+            m.content === DEAD_AIR_CUE ||
+            m.content === DEAD_AIR_ANSWER ||
+            m.content === deadAirCheckIn('Asha') ||
+            m.content === STILL_WORKING_CUE,
+        )
         .map((m) => m.content);
 
     it('when the caller spoke last, asks Ruby to answer and never checks in', async () => {
@@ -366,7 +373,7 @@ describe('WebRTCCall', () => {
       expect(deadAirCheckIn('Asha')).toContain('Asha');
     });
 
-    it('resets on any words and never fires while a tool runs', async () => {
+    it('resets on any words; during a slow tool Ruby says once that she is still on it', async () => {
       const s = setup();
       let release: () => void = () => {};
       const runTool = vi.fn(() => new Promise<Record<string, unknown>>((r) => (release = () => r({}))));
@@ -380,12 +387,16 @@ describe('WebRTCCall', () => {
         delegation_id: 'd1',
         event: { type: 'response.output_item.done', item: { type: 'function_call', call_id: 'c1', name: 'quote_shoot' } },
       });
-      await vi.advanceTimersByTimeAsync(15000);
+      await vi.advanceTimersByTimeAsync(6000);
       expect(cues(s)).toEqual([]);
+      await vi.advanceTimersByTimeAsync(9000);
+      expect(cues(s)).toEqual([STILL_WORKING_CUE]); // once per lookup, never a stream of them
       release();
       s.pc.dc.message({ type: 'response.event', delegation_id: 'd1', event: { type: 'response.completed' } });
-      await vi.advanceTimersByTimeAsync(7500);
-      expect(cues(s)).toEqual([DEAD_AIR_ANSWER]); // the caller spoke last: Ruby owes an answer
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(cues(s)).toEqual([STILL_WORKING_CUE]); // silence counts from the end of the lookup
+      await vi.advanceTimersByTimeAsync(3500);
+      expect(cues(s)).toEqual([STILL_WORKING_CUE, DEAD_AIR_ANSWER]); // the caller spoke last: Ruby owes an answer
     });
 
     it('stays quiet while Ruby is audibly speaking', async () => {
