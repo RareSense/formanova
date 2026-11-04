@@ -45,6 +45,8 @@ export function isCadUploadEnabled(email: string | undefined | null): boolean {
  * Users allowed to see "Done For You" and talk to Ruby, the AI sales agent.
  */
 export function isRubyCallEnabled(email: string | undefined | null): boolean {
+  // "*" opens Ruby to every signed-in user (staging, owner 2026-11-04); only this gate reads it.
+  if (email && getAllowlist('VITE_RUBY_CALL_ALLOWLIST_EMAILS').includes('*')) return true;
   return isAllowlistedEmail(email, 'VITE_RUBY_CALL_ALLOWLIST_EMAILS');
 }
 
