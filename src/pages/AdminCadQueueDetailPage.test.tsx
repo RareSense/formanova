@@ -718,12 +718,29 @@ describe('AdminCadQueueDetailPage', () => {
       click.mockRestore();
     });
 
+    // Real 3DM files are content-addressed, so they always go through the signed-in /api/artifacts route,
+    // whatever VITE_AZURE_BLOB_BASE_URL the machine has (a hash-less address depends on it).
     it('shows an error when the 3DM download fails', async () => {
       authFetch.authenticatedFetch.mockResolvedValue({ ok: false, status: 500 });
+      const threedm = `azure://agentic-artifacts/hashed/${'a'.repeat(64)}`;
+      api.getSupervisedRun.mockResolvedValue(check({ glb_url: 'azure://a/m.glb', threedm_url: threedm }));
+      renderPage();
+      fireEvent.click(await screen.findByRole('button', { name: 'Download 3DM' }));
+      expect(await screen.findByText("Couldn't download the 3DM.")).toBeTruthy();
+      expect(authFetch.authenticatedFetch).toHaveBeenCalledWith(`/api/artifacts/${'a'.repeat(64)}`);
+    });
+
+    // A hash-less address on public storage is fetched without the token; its failure must show the error too.
+    it('shows an error when a public 3DM download fails', async () => {
+      vi.stubEnv('VITE_AZURE_BLOB_BASE_URL', 'https://blob.example');
+      const failing = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('network down'));
       api.getSupervisedRun.mockResolvedValue(check({ glb_url: 'azure://a/m.glb', threedm_url: 'azure://a/m.3dm' }));
       renderPage();
       fireEvent.click(await screen.findByRole('button', { name: 'Download 3DM' }));
       expect(await screen.findByText("Couldn't download the 3DM.")).toBeTruthy();
+      expect(failing).toHaveBeenCalled();
+      failing.mockRestore();
+      vi.unstubAllEnvs();
     });
   });
 
