@@ -63,7 +63,7 @@ export interface CallPayment {
   totalCents?: number | null;
   simulated: boolean;
   email: string;
-  installments?: { n: number; label: string; amountCents: number; amount: string; due: string | null; url: string }[];
+  installments?: { n: number; label: string; amountCents: number; amount: string; due: string | null; url: string | null }[];
 }
 
 export interface EndCallArgs {
