@@ -97,6 +97,8 @@ export const DEAD_AIR_CUE =
   'Note for this moment only: the line has been quiet for several seconds. If you were cut off, finish your point in one short sentence. If the caller said something you have not answered yet, answer it now. If you were waiting for their answer, continue naturally. Do not mention this note.';
 export const DEAD_AIR_ANSWER =
   'Note for this moment only: the caller spoke last and is waiting for your answer. Answer what they just said now, briefly. Do not ask whether they are still there or ready. Do not mention this note.';
+export const STILL_WORKING_CUE =
+  'Note for this moment only: your lookup is still running and the line has been quiet for several seconds. Say one short, natural line out loud so the caller knows you are still on it (for example "still pulling that up, just a moment"), worded differently from before. Do not give any numbers yet. Do not mention this note.';
 export const deadAirCheckIn = (name?: string | null) =>
   `The line is still quiet. Say out loud, warmly and briefly, ${
     name ? `using their name (${name}), ` : ''
@@ -148,6 +150,8 @@ export class WebRTCCall {
   private lastRubyOut = 0;
   private deadAirStep = 0;
   private deadAirCount = 0;
+  /** Lookup phase: one spoken "still on it" per lookup, so a slow tool never leaves the line silent. */
+  private lookup: 'idle' | 'running' | 'cued' = 'idle';
 
   constructor(callbacks: CallCallbacks = {}, deps: Partial<CallDeps> = {}) {
     this.cb = callbacks;
@@ -393,7 +397,25 @@ export class WebRTCCall {
       this.heard();
       return;
     }
-    if (this.runner.isBusy() || this.rubyLevel() > SPEAKING_LEVEL) {
+    if (this.rubyLevel() > SPEAKING_LEVEL) {
+      this.heard();
+      return;
+    }
+    if (this.runner.isBusy()) {
+      if (this.lookup === 'idle') {
+        // The lookup just started: count its silence from now, not from the caller's last words.
+        this.lookup = 'running';
+        this.heard();
+      } else if (this.lookup === 'running' && this.deps.now() - this.lastHeard > DEAD_AIR_CUE_MS) {
+        this.lookup = 'cued';
+        this.appendInstruction(STILL_WORKING_CUE);
+        this.heard();
+      }
+      return;
+    }
+    if (this.lookup !== 'idle') {
+      // The lookup just finished: start the normal silence count from here.
+      this.lookup = 'idle';
       this.heard();
       return;
     }
