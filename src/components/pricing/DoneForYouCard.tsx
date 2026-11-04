@@ -66,7 +66,7 @@ export function DoneForYouCard({ onOpenCall }: DoneForYouCardProps) {
       <div className="mt-6 flex h-12 items-end">
         <h2
           id="done-for-you-title"
-          className="whitespace-nowrap font-display text-4xl uppercase leading-none tracking-tight text-foreground"
+          className="whitespace-nowrap font-display text-4xl uppercase leading-none tracking-tight text-foreground xl:text-3xl"
         >
           Done For You
         </h2>
@@ -90,7 +90,7 @@ export function DoneForYouCard({ onOpenCall }: DoneForYouCardProps) {
         <Button
           onClick={handleClick}
           size="lg"
-          className="w-full px-4 font-mono text-xs tracking-[0.2em] uppercase"
+          className="h-auto min-h-11 w-full whitespace-normal px-3 py-2.5 font-mono text-xs uppercase leading-tight tracking-[0.2em] xl:tracking-[0.1em]"
         >
           <Phone className="mr-2 h-4 w-4" aria-hidden="true" />
           Get my price now
