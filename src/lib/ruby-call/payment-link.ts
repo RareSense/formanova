@@ -17,6 +17,8 @@ export interface PaymentLinkRequest {
   amountCents: number;
   /** The agreed deal; the server prices the link from this. */
   deal?: QuoteRequest;
+  /** The open link this one replaces on the same call (the order changed); billing cancels it first. */
+  replacesLinkId?: string | null;
 }
 
 export interface PaymentLink {
@@ -24,6 +26,8 @@ export interface PaymentLink {
   simulated: boolean;
   /** The billing link id, to check for the payment; null when simulated. */
   linkId: string | null;
+  /** The replaced link was already paid, so no new link was made. */
+  alreadyPaid?: boolean;
 }
 
 const SIMULATED_DELAY_MS = 600;
@@ -42,7 +46,11 @@ export async function createPaymentLink(req: PaymentLinkRequest): Promise<Paymen
       customer_email: req.email,
       call_session_id: req.callSessionId,
       installment: req.installment,
+      ...(req.replacesLinkId ? { replaces_link_id: req.replacesLinkId } : {}),
     });
+    if (result.already_paid === true) {
+      return { url: '', simulated: false, linkId: typeof result.link_id === 'string' ? result.link_id : null, alreadyPaid: true };
+    }
     if (result.simulated === false && typeof result.url === 'string' && result.url.startsWith('https://')) {
       return { url: result.url, simulated: false, linkId: typeof result.link_id === 'string' ? result.link_id : null };
     }

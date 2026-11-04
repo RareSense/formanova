@@ -148,6 +148,8 @@ function modelView(result: Record<string, unknown>): ToolOutput {
 }
 
 export function createCallTools(host: ToolHost, api: ToolApi = DEFAULT_API): ToolRunner {
+  // The real link still open on this call, so a changed order cancels it before a new one is made.
+  let openLink: { linkId: string; deal: string } | null = null;
   const tools: Record<string, (args: Record<string, unknown>) => Promise<ToolOutput> | ToolOutput> = {
     show_on_screen: async (args) => {
       const panel = panelFromShowArgs(args);
@@ -258,6 +260,8 @@ export function createCallTools(host: ToolHost, api: ToolApi = DEFAULT_API): Too
         const plan = installmentsOf(client) ?? [
           { n: 1, label: 'Full payment before work starts', amountCents: totalCents, amount: money(totalCents), due: null },
         ];
+        const dealKey = JSON.stringify(req);
+        const replaces = openLink && openLink.deal !== dealKey ? openLink.linkId : null;
         const first = await api.createPaymentLink({
           callSessionId: host.callSessionId(),
           email,
@@ -265,7 +269,15 @@ export function createCallTools(host: ToolHost, api: ToolApi = DEFAULT_API): Too
           installment: plan[0].n,
           amountCents: plan[0].amountCents,
           deal: req,
+          ...(replaces ? { replacesLinkId: replaces } : {}),
         });
+        if (first.alreadyPaid) {
+          openLink = null;
+          return {
+            already_paid: true,
+            error: 'The client already paid the earlier link, so no new link was made. Tell them their earlier payment went through and the team will sort out the change by email.',
+          };
+        }
         const installments: DealInstallment[] = plan.map((p, i) => ({ ...p, url: i === 0 ? first.url : null }));
         const simulated = first.simulated;
         const url = first.url;
@@ -274,7 +286,10 @@ export function createCallTools(host: ToolHost, api: ToolApi = DEFAULT_API): Too
         host.showPanel(panel);
         host.setPayment(payment);
         if (!simulated && first.linkId) {
-          host.watchPayment?.(first.linkId, (paidAt) => {
+          const linkId = first.linkId;
+          openLink = { linkId, deal: dealKey };
+          host.watchPayment?.(linkId, (paidAt) => {
+            if (openLink?.linkId === linkId) openLink = null;
             void host.showPanel({ ...panel, paid: true });
             host.setPayment({ ...payment, status: 'paid', paidAt });
           });
