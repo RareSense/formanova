@@ -305,6 +305,7 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
                 onUpload={call.uploadFiles}
                 onLink={call.shareLink}
                 onLinkTyping={call.linkTyping}
+                onReach={call.shareReach}
               />
             </div>
           )}

@@ -176,6 +176,23 @@ describe('call tools', () => {
     expect(host.showPanel.mock.calls[0][0]).toMatchObject({ kind: 'table', total: '$1,350' });
   });
 
+  it('quote_shoot tells the model when a price is the last offer, and only then', async () => {
+    const api = makeApi({ runQuote: vi.fn(async () => ({ ...APPROVED, last_offer: true })) });
+    const out = await createCallTools(makeHost(), api)('quote_shoot', { lines: [{ productId: 'p', quantity: 300 }] });
+    expect(out).toMatchObject({ approved: true, last_offer: true });
+    const normal = await createCallTools(makeHost(), makeApi())('quote_shoot', { lines: [{ productId: 'p', quantity: 3 }] });
+    expect(normal).not.toHaveProperty('last_offer');
+  });
+
+  it('request_contact shows the field for the channel the client chose, text channels only', async () => {
+    const host = makeHost();
+    const run = createCallTools(host, makeApi());
+    expect(await run('request_contact', { channel: 'whatsapp' })).toEqual({ shown: true });
+    expect(host.showPanel.mock.calls[0][0]).toMatchObject({ kind: 'reach', channel: 'whatsapp' });
+    expect(await run('request_contact', { channel: 'phone' })).toHaveProperty('error');
+    expect(host.showPanel).toHaveBeenCalledTimes(1);
+  });
+
   it('quote_shoot reports bad input and failures as errors', async () => {
     const api = makeApi({ runQuote: vi.fn(async () => Promise.reject(new Error('down'))) });
     const run = createCallTools(makeHost(), api);

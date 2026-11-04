@@ -78,6 +78,9 @@ export interface EndCallArgs {
   payment?: CallPayment | null;
   /** The last quote priced in the call (fallback record of the deal). */
   quote?: Record<string, unknown> | null;
+  /** ISO times; the backend sorts its admin lists by them and keeps the record with the later ended_at. */
+  startedAt?: string | null;
+  endedAt?: string | null;
 }
 
 const devBase = (): string => {
@@ -218,6 +221,8 @@ export function buildPostCallPayload(args: EndCallArgs): Record<string, unknown>
     uploads: args.uploads ?? [],
     links: args.links ?? [],
     recording: args.recording ?? null,
+    ...(args.startedAt ? { started_at: args.startedAt } : {}),
+    ...(args.endedAt ? { ended_at: args.endedAt } : {}),
     ...(args.payment ? { payment: args.payment } : {}),
     ...(args.quote ? { quote: args.quote } : {}),
   };

@@ -6,6 +6,7 @@ import { PURPOSE_LABELS, acceptsFiles, normalizeLink, uploadNote, type UploadOut
 
 export type { UploadOutcome };
 import type { UploadPurpose } from '@/lib/ruby-call/panels';
+import { normalizeReach, reachField, type ReachChannel } from '@/lib/ruby-call/reach-contact';
 
 interface UploadCardProps {
   purpose: UploadPurpose;
@@ -160,6 +161,70 @@ export function LinkField({ onLink, onTyping }: LinkFieldProps) {
         <p className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
           <Check className="h-3.5 w-3.5 shrink-0 text-[hsl(var(--formanova-hero-accent))]" />
           <span className="min-w-0 break-all">Link received: {sent}</span>
+        </p>
+      )}
+    </form>
+  );
+}
+
+interface ContactFieldProps {
+  channel: ReachChannel;
+  onReach(channel: ReachChannel, value: string): void;
+}
+
+/** Where the creative team may text the client: the field matches the channel they chose. */
+export function ContactField({ channel, onReach }: ContactFieldProps) {
+  const spec = reachField(channel);
+  const [value, setValue] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState<string | null>(null);
+
+  const submit = () => {
+    const clean = normalizeReach(channel, value);
+    if (!clean) {
+      setError(spec.inputMode === 'tel' ? 'Please add the country code, like +44 7700 900123.' : `Please check your ${spec.name.toLowerCase()}.`);
+      return;
+    }
+    setError(null);
+    setSent(clean);
+    setValue('');
+    onReach(channel, clean);
+  };
+
+  return (
+    <form
+      className="space-y-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
+      }}
+    >
+      <label htmlFor="ruby-reach" className="block text-xs text-muted-foreground">
+        {spec.label}
+      </label>
+      <div className="flex min-w-0 gap-2">
+        <Input
+          id="ruby-reach"
+          value={value}
+          inputMode={spec.inputMode}
+          autoComplete={spec.inputMode === 'tel' ? 'tel' : spec.inputMode === 'email' ? 'email' : 'off'}
+          placeholder={spec.placeholder}
+          className="h-11 min-w-0 flex-1"
+          onChange={(e) => setValue(e.target.value)}
+        />
+        <Button type="submit" className="h-11 shrink-0 px-5">
+          Send
+        </Button>
+      </div>
+      {error && (
+        <p role="alert" className="text-xs text-destructive">
+          {error}
+        </p>
+      )}
+      {sent && !error && (
+        <p className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+          <Check className="h-3.5 w-3.5 shrink-0 text-[hsl(var(--formanova-hero-accent))]" />
+          <span className="min-w-0 break-all">Saved: {sent}</span>
         </p>
       )}
     </form>

@@ -2,6 +2,7 @@
  * Runs one Ruby call for RubyCallDialog: the engine, recording, tools and panels,
  * screen notes, and saving the call. Rendering stays in the dialog.
  */
+import { reachLead, reachMessage, type ReachChannel } from '@/lib/ruby-call/reach-contact';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { CallRecorder } from '@/lib/ruby-call/call-recorder';
@@ -64,7 +65,7 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
   const callRef = useRef<WebRTCCall | null>(null);
   const recorderRef = useRef<CallRecorder | null>(null);
   const notesRef = useRef<ScreenNotes | null>(null);
-  const sessionRef = useRef<{ callSessionId: string | null; workflowId: string | null } | null>(null);
+  const sessionRef = useRef<{ callSessionId: string | null; workflowId: string | null; startedAt: string } | null>(null);
   const leadRef = useRef<Record<string, unknown>>({});
   const uploadsRef = useRef<CallUpload[]>([]);
   const linksRef = useRef<CallLink[]>([]);
@@ -86,6 +87,9 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
     () => ({
       callSessionId: sessionRef.current?.callSessionId ?? null,
       sessionWorkflowId: sessionRef.current?.workflowId ?? null,
+      startedAt: sessionRef.current?.startedAt ?? null,
+      // Taken when the call is saved: the end, or the moment the tab closed.
+      endedAt: new Date().toISOString(),
       lead: { ...leadRef.current },
       uploads: [...uploadsRef.current],
       links: [...linksRef.current],
@@ -328,7 +332,7 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
             caller: callerContext(),
             pastCalls: await pastCalls,
           });
-          sessionRef.current = { callSessionId: session.callSessionId, workflowId: session.workflowId };
+          sessionRef.current = { callSessionId: session.callSessionId, workflowId: session.workflowId, startedAt: new Date().toISOString() };
           recorder.setUploader(callAudioUploader(session.workflowId, session.callSessionId));
           return session;
         },
@@ -395,6 +399,12 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
 
   const linkTyping = useCallback(() => note('The client opened the link field and is typing.'), [note]);
 
+  /** Saved straight into the lead, so it is kept even if the model forgets update_lead. */
+  const shareReach = useCallback((channel: ReachChannel, value: string) => {
+    leadRef.current = { ...leadRef.current, ...reachLead(channel, value) };
+    callRef.current?.appendInstruction(reachMessage(channel, value));
+  }, []);
+
   const close = useCallback(() => {
     void callRef.current?.end();
     reset();
@@ -428,5 +438,6 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
     uploadFiles,
     shareLink,
     linkTyping,
+    shareReach,
   };
 }
