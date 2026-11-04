@@ -108,7 +108,7 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
           showPanels ? 'lg:max-w-6xl' : ''
         }`}
       >
-        <div className="flex items-center justify-between gap-3 px-4 py-3 pr-12 sm:px-6">
+        <div className="flex items-center justify-between gap-3 py-3 pl-4 pr-14 sm:pl-6">
           <Button
             variant="ghost"
             size="sm"
