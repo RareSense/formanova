@@ -513,4 +513,111 @@ describe('SupervisedReplacementPanel', () => {
       expect(api.sendSupervisedReplacement.mock.calls[0]).toHaveLength(4);
     });
   });
+
+  describe('metal volume', () => {
+    const VOLUME_HINT = "From the package's measurements (casting STL volume). Leave empty if unknown.";
+    const VOLUME = 'Metal volume (mm³)';
+    const send = () => screen.getByRole('button', { name: 'Send replacement' });
+
+    it('shows the volume box with its hint, and Casting flags only once a volume is entered', () => {
+      renderPanel(detail());
+      expect(screen.getByLabelText(VOLUME)).toBeTruthy();
+      expect(screen.getByText(VOLUME_HINT)).toBeTruthy();
+      expect(screen.queryByLabelText('Casting flags')).toBeNull();
+      fireEvent.change(screen.getByLabelText(VOLUME), { target: { value: '412.5' } });
+      expect(screen.getByLabelText('Casting flags')).toBeTruthy();
+      fireEvent.change(screen.getByLabelText(VOLUME), { target: { value: '' } });
+      expect(screen.queryByLabelText('Casting flags')).toBeNull();
+    });
+
+    it('sends the volume and the parsed flags with the replacement', async () => {
+      api.sendSupervisedReplacement.mockResolvedValue({ accepted: true, phase: 'finalizing' });
+      renderPanel(detail());
+      fireEvent.change(screen.getByLabelText(VOLUME), { target: { value: ' 412.5 ' } });
+      fireEvent.change(screen.getByLabelText('Casting flags'), { target: { value: 'thin_walls, touching_edges, thin_walls' } });
+      fireEvent.click(send());
+      await waitFor(() => expect(api.sendSupervisedReplacement).toHaveBeenCalled());
+      expect(api.sendSupervisedReplacement.mock.calls[0]).toEqual([
+        'wf-1', [], undefined, undefined, undefined, { mm3: 412.5, flags: ['thin_walls', 'touching_edges'] },
+      ]);
+    });
+
+    it('sends the volume alone when no flags are given', async () => {
+      api.sendSupervisedReplacement.mockResolvedValue({ accepted: true, phase: 'finalizing' });
+      renderPanel(detail());
+      fireEvent.change(screen.getByLabelText(VOLUME), { target: { value: '80' } });
+      fireEvent.click(send());
+      await waitFor(() => expect(api.sendSupervisedReplacement).toHaveBeenCalled());
+      expect(api.sendSupervisedReplacement.mock.calls[0]).toEqual(['wf-1', [], undefined, undefined, undefined, { mm3: 80 }]);
+    });
+
+    it('sends the volume next to the open review items when there is a spec sheet', async () => {
+      api.sendSupervisedReplacement.mockResolvedValue({ accepted: true, phase: 'finalizing' });
+      renderPanel(detail({
+        uploads: [{
+          upload_id: 'u-sheet', role: 'spec_sheet', filename: 's.pdf', status: 'verified', bytes: 1, sha256: null,
+          uploaded_by_email: 'a@b.c', created_at: '2026-11-02T10:00:00Z', verified_at: '2026-11-02T10:01:00Z',
+        }],
+      }));
+      fireEvent.change(screen.getByLabelText('Open review items'), { target: { value: '2' } });
+      fireEvent.change(screen.getByLabelText(VOLUME), { target: { value: '80' } });
+      fireEvent.click(send());
+      await waitFor(() => expect(api.sendSupervisedReplacement).toHaveBeenCalled());
+      expect(api.sendSupervisedReplacement.mock.calls[0]).toEqual(['wf-1', [], undefined, undefined, 2, { mm3: 80 }]);
+    });
+
+    it('refuses 0, negatives and non-numbers inline and holds Send meanwhile', () => {
+      renderPanel(detail());
+      const box = screen.getByLabelText(VOLUME);
+      for (const bad of ['0', '-3', 'abc', '1e3']) {
+        fireEvent.change(box, { target: { value: bad } });
+        expect(screen.getByRole('alert').textContent).toBe('Enter a number above 0 (decimals allowed), or leave it empty.');
+        expect(send().hasAttribute('disabled')).toBe(true);
+      }
+      fireEvent.change(box, { target: { value: '0.25' } });
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(send().hasAttribute('disabled')).toBe(false);
+    });
+
+    it('refuses flags with other characters inline and holds Send meanwhile', () => {
+      renderPanel(detail());
+      fireEvent.change(screen.getByLabelText(VOLUME), { target: { value: '80' } });
+      const flags = screen.getByLabelText('Casting flags');
+      for (const bad of ['Thin_walls', 'thin-walls', 'thin walls']) {
+        fireEvent.change(flags, { target: { value: bad } });
+        expect(screen.getByRole('alert').textContent).toBe(
+          'Use lowercase letters and underscores, separated by commas (e.g. thin_walls, touching_edges).',
+        );
+        expect(send().hasAttribute('disabled')).toBe(true);
+      }
+      fireEvent.change(flags, { target: { value: 'thin_walls' } });
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(send().hasAttribute('disabled')).toBe(false);
+    });
+
+    it('drops the flags when the volume is cleared, so they are never sent alone', async () => {
+      api.sendSupervisedReplacement.mockResolvedValue({ accepted: true, phase: 'finalizing' });
+      renderPanel(detail());
+      const box = screen.getByLabelText(VOLUME);
+      fireEvent.change(box, { target: { value: '80' } });
+      fireEvent.change(screen.getByLabelText('Casting flags'), { target: { value: 'Bad-flag' } });
+      fireEvent.change(box, { target: { value: '' } });
+      expect(send().hasAttribute('disabled')).toBe(false);
+      fireEvent.change(box, { target: { value: '80' } });
+      expect((screen.getByLabelText('Casting flags') as HTMLInputElement).value).toBe('');
+      fireEvent.change(box, { target: { value: '' } });
+      fireEvent.click(send());
+      await waitFor(() => expect(api.sendSupervisedReplacement).toHaveBeenCalled());
+      expect(api.sendSupervisedReplacement.mock.calls[0]).toEqual(['wf-1', [], undefined, undefined]);
+    });
+
+    it('sends exactly the old four arguments without a volume', async () => {
+      api.sendSupervisedReplacement.mockResolvedValue({ accepted: true, phase: 'finalizing' });
+      renderPanel(detail());
+      fireEvent.click(send());
+      await waitFor(() => expect(api.sendSupervisedReplacement).toHaveBeenCalled());
+      expect(api.sendSupervisedReplacement.mock.calls[0]).toEqual(['wf-1', [], undefined, undefined]);
+      expect(api.sendSupervisedReplacement.mock.calls[0]).toHaveLength(4);
+    });
+  });
 });

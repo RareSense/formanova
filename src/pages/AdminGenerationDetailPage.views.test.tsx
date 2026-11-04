@@ -17,6 +17,7 @@ import {
   syntheticOddRun, syntheticReelRun,
 } from '@/lib/admin-workflow-views/__fixtures__/runs';
 import { leafPaths } from '@/lib/admin-workflow-views/__fixtures__/leaf-paths';
+import { expandAll, openSection } from '@/lib/admin-workflow-views/__fixtures__/expand';
 
 function renderDetail(detail: AdminGenerationDetail) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -28,6 +29,8 @@ function renderDetail(detail: AdminGenerationDetail) {
 }
 
 const section = (name: string) => within(screen.getByRole('region', { name }));
+const strip = () => section('Inputs → Outputs');
+const group = (name: 'Inputs' | 'Outputs') => within(strip().getByRole('group', { name }));
 const thumb = (scope: ReturnType<typeof section>, label: string) => scope.getAllByRole('figure', { name: label })[0].getAttribute('data-url');
 
 beforeEach(() => {
@@ -36,103 +39,128 @@ beforeEach(() => {
   authFetch.authenticatedFetch.mockResolvedValue(new Response(JSON.stringify({ detail: 'Not found' }), { status: 404 }));
 });
 
-describe('DetailContent: Inputs -> Steps -> Outputs for any workflow', () => {
-  it('product shot: labelled pictures and options in, failed retry marked, final image out, honest cost', () => {
+describe('default view: run header, Inputs -> Outputs strip, everything else closed', () => {
+  it('only the header and the strip are open; Steps, Input payload, Technical are closed sections', () => {
+    const { container } = renderDetail(productShotRun());
+    const regions = screen.getAllByRole('region').map((r) => r.getAttribute('aria-labelledby'));
+    expect(regions).toEqual(['admin-section-run', 'admin-section-io', 'admin-section-steps', 'admin-section-input-payload', 'admin-section-technical']);
+    for (const title of ['Steps', 'Input payload', 'Technical']) {
+      expect(screen.getByRole('button', { name: title }).getAttribute('aria-expanded')).toBe('false');
+    }
+    // Nothing of the walked payload or the steps is in the default view.
+    expect(container.querySelectorAll('[data-path]').length).toBe(0);
+    expect(screen.queryByText('warm white marble, soft morning light')).toBeNull();
+  });
+});
+
+describe('DetailContent for any workflow', () => {
+  it('product shot: pictures in the strip, one line per step, honest cost', () => {
     renderDetail(productShotRun());
-    const inputs = section('Inputs');
-    expect(thumb(inputs, 'Jewelry 1')).toBe(proxy(1));
-    expect(thumb(inputs, 'Inspiration')).toBe(proxy(3));
-    expect(inputs.getByText('warm white marble, soft morning light')).toBeTruthy();
+    expect(thumb(group('Inputs'), 'Jewelry 1')).toBe(proxy(1));
+    expect(thumb(group('Inputs'), 'Inspiration')).toBe(proxy(3));
+    expect(thumb(group('Outputs'), 'Generated image')).toBe(proxy(4));
+    openSection(document, 'Steps');
     const steps = section('Steps');
+    expect(steps.getAllByRole('listitem')).toHaveLength(4);
     expect(steps.getByText('Failed, retried')).toBeTruthy();
     expect(steps.getAllByText(/upstream timed out/).length).toBeGreaterThan(0);
+    // A step opens to its walked input and output.
+    fireEvent.click(steps.getByRole('button', { name: /^2\. prepare_jewelry_request_pdp_higher_tier/ }));
     expect(steps.getAllByText(/Product photograph of a pair of gold hoop earrings/).length).toBeGreaterThan(0);
-    const outputs = section('Outputs');
-    expect(outputs.getByText('From step 4: generate_jewelry_image_pdp_higher_tier')).toBeTruthy();
-    expect(thumb(outputs, 'Generated image')).toBe(proxy(4));
+    openSection(document, 'Input payload');
+    expect(section('Input payload').getByText('warm white marble, soft morning light')).toBeTruthy();
     const header = section('Run');
     expect(header.getByText('+28')).toBeTruthy();
     expect(header.getByText('incl. failed retries')).toBeTruthy();
     expect(header.getByText(/not reported by this workflow/)).toBeTruthy();
   });
 
-  it('photoshoot 4K: intermediate image in the timeline, upscaled image out', () => {
+  it('photoshoot 4K: model then jewelry in, the upscaled image out; the intermediate stays in its step', () => {
     renderDetail(photoshoot4kRun());
+    expect(group('Inputs').getAllByRole('figure').map((f) => f.getAttribute('aria-label'))).toEqual(['Model', 'Jewelry']);
+    expect(group('Outputs').getAllByRole('figure').map((f) => f.getAttribute('data-url'))).toEqual([proxy(14)]);
+    expandAll(document);
     expect(thumb(section('Steps'), 'Intermediate image')).toBe(proxy(12));
-    expect(thumb(section('Outputs'), 'Upscaled image')).toBe(proxy(14));
   });
 
   it('design image: role-named pictures, fixed price, reported spend', () => {
     renderDetail(designImageRun());
-    expect(thumb(section('Inputs'), 'Design with annotations')).toBe(proxy(21));
-    expect(thumb(section('Outputs'), 'Design picture')).toBe(proxy(23));
+    expect(thumb(group('Inputs'), 'Design with annotations')).toBe(proxy(21));
+    expect(thumb(group('Outputs'), 'Design picture')).toBe(proxy(23));
     const run = section('Run');
     expect(run.getByText('Fixed price: 14 credits')).toBeTruthy();
     expect(run.getByText("This workflow charges a flat price. Its tools have no per-call cost set, so what it cost us isn't tracked.")).toBeTruthy();
     expect(run.queryByText('not priced')).toBeNull();
     expect(run.queryByText('0 credits')).toBeNull();
-    expect(section('Run').getByText('Provider spend (reported): $0.07 across 1 step')).toBeTruthy();
+    expect(run.getByText('Provider spend (reported): $0.07 across 1 step')).toBeTruthy();
   });
 
-  it('fastload: file links in and out, no picture placeholders', () => {
+  it('fastload: 3D tiles, no pictures; the files and counts are in the open step', () => {
     renderDetail(fastloadRun());
     expect(screen.queryByRole('figure')).toBeNull();
-    expect(section('Inputs').getByRole('button', { name: /Download Input \.3dm pave-halo-ring\.3dm 74\.5 MB/ })).toBeTruthy();
-    expect(section('Outputs').getByRole('button', { name: /Download Skeleton \.3dm/ })).toBeTruthy();
-    expect(section('Outputs').getByText('4750000')).toBeTruthy();
+    expect(group('Inputs').getByRole('button', { name: /Open 3D preview of Input 3DM pave-halo-ring\.3dm/ })).toBeTruthy();
+    expect(group('Outputs').getByRole('button', { name: /Open 3D preview of Skeleton 3DM skeleton\.3dm/ })).toBeTruthy();
+    expect(group('Outputs').getByRole('button', { name: /^Download Meshes meshes\.bin\.gz 38\.1 MB/ })).toBeTruthy();
+    expandAll(document);
+    expect(section('Steps').getByText('4750000')).toBeTruthy();
+    expect(section('Input payload').getByRole('button', { name: /Download Input 3DM pave-halo-ring\.3dm 74\.5 MB/ })).toBeTruthy();
     expect(section('Run').getAllByText('Free')).toHaveLength(2);
   });
 
   it('catalog shot: render + background in, placed photo out', () => {
     renderDetail(catalogShotRun());
-    expect(thumb(section('Inputs'), 'Render')).toBe(proxy(40));
-    expect(thumb(section('Outputs'), 'Placed photo')).toBe(proxy(42));
+    expect(thumb(group('Inputs'), 'Render')).toBe(proxy(40));
+    expect(thumb(group('Outputs'), 'Placed photo')).toBe(proxy(42));
   });
 
-  it('CAD improve: lineage in, 3D preview and every file out, reported spend', () => {
+  it('CAD improve: reference in; GLB, 3DM, STL, casting, STEP, spec sheet out in that order; lineage in the payload', () => {
     renderDetail(cadImproveRun());
-    expect(section('Inputs').getByText('33333333-3333-4333-8333-333333333333')).toBeTruthy();
-    const outputs = section('Outputs');
-    expect(outputs.getByTestId('glb').getAttribute('data-url')).toBe(proxy(62));
-    for (const label of ['3DM', 'STL', 'STEP', 'Spec sheet']) {
-      expect(outputs.getByRole('button', { name: new RegExp(`^Download ${label}\\b`) })).toBeTruthy();
-    }
-    expect(outputs.getByRole('button', { name: /casting_body\.stl/ })).toBeTruthy();
-    expect(outputs.getByText('4.82')).toBeTruthy();
+    const tiles = strip().getAllByRole('group').filter((g) => g.getAttribute('data-testid'));
+    expect(tiles.map((t) => [t.getAttribute('aria-label'), t.getAttribute('data-format')])).toEqual([
+      ['GLB', 'glb'], ['3DM', '3dm'], ['STL', 'stl'], ['Casting body', 'stl'], ['STEP', 'step'], ['Spec sheet', 'pdf'],
+    ]);
+    expect(group('Outputs').getByRole('button', { name: /^Download Spec sheet/ })).toBeTruthy();
+    expandAll(document);
+    expect(section('Input payload').getByText('33333333-3333-4333-8333-333333333333')).toBeTruthy();
+    expect(section('Steps').getByText('4.82')).toBeTruthy();
     expect(section('Run').getByText('Provider spend (reported): $0.41 across 1 step')).toBeTruthy();
   });
 
   it('unknown workflow #1 (video reel): new artifact types shown with no admin code', () => {
     renderDetail(syntheticReelRun());
-    const inputs = section('Inputs');
-    expect(inputs.getByText(/Open on the ring turning slowly/)).toBeTruthy();
-    expect(thumb(inputs, 'Still')).toBe(proxy(100));
-    expect(inputs.getByRole('button', { name: /Download Brand kit brand-kit\.zip/ })).toBeTruthy();
-    const outputs = section('Outputs');
-    expect(outputs.getByRole('button', { name: /Download Video/ })).toBeTruthy();
-    expect(thumb(outputs, 'Poster')).toBe(proxy(105));
-    expect(outputs.getByText('240')).toBeTruthy();
+    expect(thumb(group('Inputs'), 'Still')).toBe(proxy(100));
+    expect(group('Inputs').getByRole('button', { name: /Download Brand kit brand-kit\.zip/ })).toBeTruthy();
+    expect(thumb(group('Outputs'), 'Poster')).toBe(proxy(105));
+    expect(group('Outputs').getByRole('button', { name: /Download Video/ })).toBeTruthy();
+    expandAll(document);
+    expect(section('Input payload').getAllByText(/Open on the ring turning slowly/).length).toBeGreaterThan(0);
+    expect(section('Steps').getByText('240')).toBeTruthy();
     expect(section('Steps').getByText('Failed, retried')).toBeTruthy();
+    expect(section('Technical').getByText('reel-1')).toBeTruthy();
     expect(section('Run').getByText('Provider spend (reported): $0.02 across 1 step')).toBeTruthy();
   });
 
-  it('unknown workflow #2 (odd payload): odd keys, unicode and deep values all visible', () => {
+  it('unknown workflow #2 (odd payload): odd keys, unicode and deep values all reachable', () => {
     renderDetail(syntheticOddRun());
-    const inputs = section('Inputs');
+    // The model sits on an outside host: a warned tile, never previewed or token-fetched.
+    expect(group('Outputs').getByText(/External file, open at your own risk/)).toBeTruthy();
+    expect(group('Outputs').queryByRole('button', { name: /Open 3D preview/ })).toBeNull();
+    expandAll(document);
+    const inputs = section('Input payload');
     expect(inputs.getByText('значение')).toBeTruthy();
     expect(inputs.getByText('six levels down')).toBeTruthy();
     expect(inputs.getByText('empty key')).toBeTruthy();
     expect(inputs.getByText('javascript:alert(1)')).toBeTruthy();
-    // The model sits on an outside host: shown as a warned link, never previewed or token-fetched.
-    expect(section('Outputs').getByText(/External file, open at your own risk/)).toBeTruthy();
+    expect(section('Technical').getByText('abc123')).toBeTruthy();
     expect(screen.queryByTestId('glb')).toBeNull();
   });
 });
 
-describe('completeness in the DOM: every leaf of every fixture is rendered', () => {
+describe('completeness in the DOM: every leaf of every fixture is reachable in the collapsed sections', () => {
   it.each(Object.keys(FIXTURES))('%s', (name) => {
     const detail = FIXTURES[name]();
     const { container } = renderDetail(detail);
+    expandAll(container);
     const rendered = new Set(Array.from(container.querySelectorAll('[data-path]')).map((el) => el.getAttribute('data-path')));
     const leaves = [
       ...leafPaths(detail.input_payload, 'input_payload'),
@@ -143,8 +171,8 @@ describe('completeness in the DOM: every leaf of every fixture is rendered', () 
 });
 
 describe('a fetched picture that has not painted yet', () => {
-  // Regression: the reel's Poster (proxy(105)) was fetched fine, but its lazy <img> below the
-  // fold had not decoded, so the thumbnail collapsed to an empty strip with no placeholder.
+  // Regression: the reel's Poster (proxy(105)) was fetched fine, but its lazy <img> had not
+  // decoded, so the thumbnail collapsed to an empty strip with no placeholder.
   it('keeps a sized loading placeholder until the image paints', async () => {
     // jsdom has no object urls; stand in for the browser's.
     const original = { create: URL.createObjectURL, revoke: URL.revokeObjectURL };
@@ -154,56 +182,27 @@ describe('a fetched picture that has not painted yet', () => {
       url === proxy(105) ? new Response(new Blob(['png'], { type: 'image/png' }), { status: 200 }) : new Response('{}', { status: 404 })
     ));
     const { unmount } = renderDetail(syntheticReelRun());
-    const poster = section('Outputs').getAllByRole('figure', { name: 'Poster' })[0];
-    const img = await within(poster).findByRole('img', { name: 'Poster' });
-    expect(img.getAttribute('src')).toBe('blob:poster');
-    expect(poster.getAttribute('aria-busy')).toBe('true');
-    expect(within(poster).getByText('Loading')).toBeTruthy();
-    fireEvent.load(img);
-    expect(poster.getAttribute('aria-busy')).toBe('false');
-    expect(within(poster).queryByText('Loading')).toBeNull();
-    unmount();
-    URL.createObjectURL = original.create;
-    URL.revokeObjectURL = original.revoke;
-  });
-});
-
-describe('the reel Poster is never an empty strip (step 3 and Outputs)', () => {
-  // Every state of every Poster thumbnail must show something: a loading placeholder, the
-  // picture, or "Could not load". An empty <div> or a 0-content figure is the bug.
-  const posters = () => [
-    ...section('Steps').getAllByRole('figure', { name: 'Poster' }),
-    ...section('Outputs').getAllByRole('figure', { name: 'Poster' }),
-  ];
-
-  it('shows Could not load in both places when the fetch fails', async () => {
-    renderDetail(syntheticReelRun());
-    expect(section('Steps').getAllByRole('figure', { name: 'Poster' }).length).toBeGreaterThan(0);
-    for (const poster of posters()) {
-      expect(await within(poster).findByText('Could not load')).toBeTruthy();
-    }
-  });
-
-  it('shows a Loading placeholder, then the picture, in both places', async () => {
-    const original = { create: URL.createObjectURL, revoke: URL.revokeObjectURL };
-    URL.createObjectURL = () => 'blob:poster';
-    URL.revokeObjectURL = () => {};
-    authFetch.authenticatedFetch.mockImplementation(async (url: string) => (
-      url === proxy(105) ? new Response(new Blob(['png'], { type: 'image/png' }), { status: 200 }) : new Response('{}', { status: 404 })
-    ));
-    const { unmount } = renderDetail(syntheticReelRun());
     try {
-      for (const poster of posters()) {
-        const img = await within(poster).findByRole('img', { name: 'Poster' });
-        expect(within(poster).getByText('Loading')).toBeTruthy();
-        fireEvent.load(img);
-        expect(within(poster).queryByText('Loading')).toBeNull();
-        expect(img.getAttribute('src')).toBe('blob:poster');
-      }
+      const poster = group('Outputs').getAllByRole('figure', { name: 'Poster' })[0];
+      const img = await within(poster).findByRole('img', { name: 'Poster' });
+      expect(img.getAttribute('src')).toBe('blob:poster');
+      expect(poster.getAttribute('aria-busy')).toBe('true');
+      expect(within(poster).getByText('Loading')).toBeTruthy();
+      fireEvent.load(img);
+      expect(poster.getAttribute('aria-busy')).toBe('false');
+      expect(within(poster).queryByText('Loading')).toBeNull();
     } finally {
       unmount();
       URL.createObjectURL = original.create;
       URL.revokeObjectURL = original.revoke;
     }
+  });
+
+  it('a Poster that fails says "Could not load", in the strip and in its step', async () => {
+    renderDetail(syntheticReelRun());
+    expandAll(document);
+    const posters = [...group('Outputs').getAllByRole('figure', { name: 'Poster' }), ...section('Steps').getAllByRole('figure', { name: 'Poster' })];
+    expect(posters.length).toBeGreaterThan(1);
+    for (const poster of posters) expect(await within(poster).findByText('Could not load')).toBeTruthy();
   });
 });

@@ -31,7 +31,6 @@ import {
   type DesignHistory,
 } from '@/lib/admin-design-history';
 import type { AdminGenerationStep } from '@/lib/admin-generations-api';
-import { ScissorGLBGrid, GLBPreviewSlot } from '@/components/generations/ScissorGLBGrid';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,12 +39,12 @@ import { parseServerTime } from '@/lib/server-time';
 import { costView, USER_PAID_HELP, WORKFLOW_COST_HELP } from '@/lib/admin-cost-display';
 import { readProviderSpend } from '@/lib/admin-provider-spend';
 import { buildRunView } from '@/lib/admin-workflow-views';
-import { findNodes } from '@/lib/admin-workflow-views/walker';
+import { findNodes, technicalNodes, type ViewNode } from '@/lib/admin-workflow-views/walker';
 import { buildIoSummary } from '@/lib/admin-workflow-views/io-summary';
 import { CostLabel, ProviderSpendBlock, WorkflowCostValue } from '@/components/admin/AdminCost';
-import { FileLink } from '@/components/admin/workflow-view/FileLink';
+import { ClientBadge } from '@/components/admin/ClientBadge';
 import { ImageThumb } from '@/components/admin/workflow-view/ImageThumb';
-import { IoSummarySection } from '@/components/admin/workflow-view/IoSummary';
+import { IoStrip } from '@/components/admin/workflow-view/IoStrip';
 import { JsonBlock } from '@/components/admin/workflow-view/JsonBlock';
 import { LabelledValue } from '@/components/admin/workflow-view/LabelledValue';
 import { NodeView } from '@/components/admin/workflow-view/NodeView';
@@ -239,6 +238,25 @@ function MetaItem({ label, value }: { label: string; value: string }) {
   );
 }
 
+/**
+ * The request value that holds the customer's prompt: the first text node whose text is the
+ * prompt. It is shown once, under the input pictures in the Inputs -> Outputs strip (which
+ * carries its data-path), so the Input payload section leaves it out.
+ */
+function findPromptNode(node: ViewNode, prompt: string | null): ViewNode | null {
+  if (!prompt) return null;
+  return findNodes(node, (n) => (n.kind === 'text' || n.kind === 'value') && n.value.trim() === prompt)[0] ?? null;
+}
+
+/** The tree without the node at `path`. Display only: the run view keeps every value, and the Raw JSON still has it. */
+function withoutPath(node: ViewNode, path: string | null): ViewNode {
+  if (!path) return node;
+  if (node.kind === 'group') return { ...node, children: node.children.filter((c) => c.path !== path).map((c) => withoutPath(c, path)) };
+  if (node.kind === 'list') return { ...node, items: node.items.filter((c) => c.path !== path).map((c) => withoutPath(c, path)) };
+  return node;
+}
+
+/** A section closed by default, as in the earlier simple layout; its title names the region. */
 function CollapsibleCardSection({
   title,
   children,
@@ -249,23 +267,26 @@ function CollapsibleCardSection({
   defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const id = `admin-section-${title.toLowerCase().replace(/[^a-z]+/g, '-')}`;
 
   return (
-    <Card>
-      <Collapsible open={open} onOpenChange={setOpen}>
-        <CardHeader>
-          <CollapsibleTrigger asChild>
-            <button type="button" className="flex w-full items-center justify-between text-left">
-              <CardTitle className="font-display text-2xl tracking-wide">{title}</CardTitle>
-              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
-            </button>
-          </CollapsibleTrigger>
-        </CardHeader>
-        <CollapsibleContent>
-          <CardContent>{children}</CardContent>
-        </CollapsibleContent>
-      </Collapsible>
-    </Card>
+    <section aria-labelledby={id}>
+      <Card>
+        <Collapsible open={open} onOpenChange={setOpen}>
+          <CardHeader>
+            <CollapsibleTrigger asChild>
+              <button type="button" className="flex w-full items-center justify-between text-left">
+                <CardTitle id={id} className="font-display text-2xl tracking-wide">{title}</CardTitle>
+                <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
+              </button>
+            </CollapsibleTrigger>
+          </CardHeader>
+          <CollapsibleContent>
+            <CardContent className="space-y-5">{children}</CardContent>
+          </CollapsibleContent>
+        </Collapsible>
+      </Card>
+    </section>
   );
 }
 
@@ -534,31 +555,20 @@ export function RunInputsPanel({ detail }: { detail: AdminGenerationDetail }) {
   );
 }
 
-/** A titled page section; its title names the region (Inputs, Steps, Outputs). */
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  const id = `admin-section-${title.toLowerCase()}`;
-  return (
-    <section aria-labelledby={id}>
-      <Card>
-        <CardHeader>
-          <CardTitle id={id} className="font-display text-2xl tracking-wide">{title}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-5">{children}</CardContent>
-      </Card>
-    </section>
-  );
-}
-
 /**
- * Any run, any workflow: the request payload, every step's input and output, and the last
- * successful step's output, all walked schema-free (admin-workflow-views). The family only
- * adds labels and order. CAD runs also get the design trail behind them, and the /result
- * 3DM / GLB as a fallback when no step output carries one.
+ * Any run, any workflow. Open by default: the run header (costs) and the Inputs -> Outputs
+ * strip (every picture, 3D file and stored file in the request and the final output, as small
+ * tiles). Closed by default: Steps (one line per tool call; open one for its walked input and
+ * output and raw JSON), Input payload (walked, plus raw JSON and the design trail behind a
+ * CAD), Complaint and Technical (hashes, keys, inline base64). Every value stays reachable in
+ * those sections (admin-workflow-views completeness).
  */
 export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
   const {
-    cadSourceType, isCadModel: isCadSource, designHistory, designHistoryQuery, fromDoodle,
+    cadSourceType, isCadModel: isCadSource, designHistory, designHistoryQuery, fromDoodle, cadInputs, studioInputs,
   } = useCadRunInputs(detail);
+  // The customer's own words (CAD runs, and design-picture runs), trimmed as the readers return it.
+  const customerPrompt = cadInputs?.prompt ?? studioInputs?.prompt ?? null;
   const view = useMemo(() => buildRunView(detail, isCadSource), [detail, isCadSource]);
   // cad_to_catalog_* names contain "cad" but are not CAD models; the registry decides.
   const isCadModel = view.family === 'cad_model';
@@ -603,12 +613,24 @@ export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
       ? 'Image to CAD'
       : null);
   const opts = { enh: view.enh, fallbackStem: detail.workflow_id };
+  // Outputs come from THIS run only: its last successful step, plus (CAD models only) the
+  // /result files of this workflow id, plus (no output at all) the complaint's output image.
   const ioSummary = useMemo(() => buildIoSummary(view, {
     resultFiles: [
-      { label: '3D (from the run result)', url: fallbackGlb, format: 'glb' },
-      { label: '3DM (from the run result)', url: fallback3dm, format: '3dm' },
+      { label: 'GLB (from the run result)', url: fallbackGlb, kind: 'model3d', format: 'glb' },
+      { label: '3DM (from the run result)', url: fallback3dm, kind: 'model3d', format: '3dm' },
+      { label: 'Output image (from complaint)', url: complaintOutput, kind: 'image' },
     ],
-  }), [view, fallbackGlb, fallback3dm]);
+  }), [view, fallbackGlb, fallback3dm, complaintOutput]);
+  const promptPath = useMemo(() => findPromptNode(view.inputs, customerPrompt)?.path ?? null, [view.inputs, customerPrompt]);
+  const inputsWithoutPrompt = useMemo(() => withoutPath(view.inputs, promptPath), [view.inputs, promptPath]);
+  const technical = useMemo(() => [
+    { where: 'Input payload', tool: undefined, nodes: technicalNodes(view.inputs) },
+    ...view.steps.flatMap((s) => [
+      { where: `Step ${s.index}: ${s.tool} (input)`, tool: s.tool, nodes: technicalNodes(s.input) },
+      { where: `Step ${s.index}: ${s.tool} (output)`, tool: s.tool, nodes: technicalNodes(s.output) },
+    ]),
+  ].filter((t) => t.nodes.length), [view]);
 
   return (
     <div className="space-y-6">
@@ -625,6 +647,7 @@ export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
               <div className="flex flex-wrap gap-2">
                 <StatusBadge status={detail.status} />
                 <PayingBadge isPaying={detail.is_paying} />
+                <ClientBadge client={detail.client} version={detail.client_version} />
               </div>
             </div>
           </CardHeader>
@@ -656,9 +679,13 @@ export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
         </Card>
       </section>
 
-      <IoSummarySection summary={ioSummary} fallbackStem={detail.workflow_id} />
+      <IoStrip summary={ioSummary} fallbackStem={detail.workflow_id} prompt={customerPrompt} promptPath={promptPath} />
 
-      <Section title="Inputs">
+      <CollapsibleCardSection title="Steps">
+        <StepTimeline steps={view.steps} enh={view.enh} fallbackStem={detail.workflow_id} />
+      </CollapsibleCardSection>
+
+      <CollapsibleCardSection title="Input payload">
         {isCadModel && (designHistory ? (
           <DesignHistorySection history={designHistory} />
         ) : designHistoryQuery.isLoading ? (
@@ -666,55 +693,15 @@ export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
             <Loader2 className="h-4 w-4 animate-spin" /> Loading design steps
           </div>
         ) : null)}
-        <NodeView node={view.inputs} opts={opts} />
-      </Section>
-
-      <Section title="Steps">
-        <StepTimeline steps={view.steps} enh={view.enh} fallbackStem={detail.workflow_id} />
-      </Section>
-
-      <Section title="Outputs">
-        {view.outputs ? (
-          <>
-            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-              {`From step ${view.outputs.stepIndex}: ${view.outputs.tool}`}
-            </p>
-            <NodeView node={view.outputs.node} opts={{ ...opts, tool: view.outputs.tool, autoPreview3d: true }} />
-          </>
-        ) : complaintOutput ? (
-          <ImageThumb url={complaintOutput} label="Output image (from complaint)" />
-        ) : (
-          <p className="text-sm text-muted-foreground">This run recorded no successful step output.</p>
-        )}
-        {fallbackGlb && (
-          <div className="space-y-2">
-            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">3D preview (from the run result)</p>
-            <div className="w-full max-w-2xl">
-              <ScissorGLBGrid>
-                <GLBPreviewSlot
-                  id={detail.workflow_id}
-                  glbUrl={fallbackGlb}
-                  className="min-h-[320px] w-full aspect-[4/3] rounded-md border border-border bg-muted/20"
-                  forceJewelryPalette
-                />
-              </ScissorGLBGrid>
-            </div>
-          </div>
-        )}
-        {fallback3dm && (
-          <FileLink file={{ label: '3DM (from the run result)', url: fallback3dm, name: `${detail.workflow_id}.3dm`, bytes: null, ext: '3dm' }} fallbackStem={detail.workflow_id} />
-        )}
-      </Section>
-
-      <CollapsibleCardSection title="Input Payload">
-        <p className="mb-2 text-xs text-muted-foreground">
+        <NodeView node={inputsWithoutPrompt} opts={{ ...opts, hideTechnical: true }} />
+        <p className="text-xs text-muted-foreground">
           Raw JSON shows the submitted request; the AI actually used is under 'Applied at Start'.
         </p>
         <JsonBlock title="Raw JSON" value={detail.input_payload} />
       </CollapsibleCardSection>
 
       {detail.feedback && (
-        <CollapsibleCardSection title="Complaint" defaultOpen>
+        <CollapsibleCardSection title="Complaint">
           <div className="space-y-5">
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
               <MetaItem label="Reporter Email" value={detail.feedback.reporter_email || '-'} />
@@ -733,6 +720,19 @@ export function DetailContent({ detail }: { detail: AdminGenerationDetail }) {
               <ImageThumb url={detail.feedback.output_image_url} label="Output Image" />
             </div>
           </div>
+        </CollapsibleCardSection>
+      )}
+
+      {technical.length > 0 && (
+        <CollapsibleCardSection title="Technical">
+          {technical.map((t) => (
+            <div key={t.where} className="space-y-3">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{t.where}</p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {t.nodes.map((n) => <NodeView key={n.path} node={n} opts={{ ...opts, tool: t.tool }} />)}
+              </div>
+            </div>
+          ))}
         </CollapsibleCardSection>
       )}
     </div>

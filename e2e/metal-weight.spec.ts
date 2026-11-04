@@ -27,7 +27,8 @@ async function openCad(page: Page, width: number, height: number, opts: MockOpti
   if (mode === 'tablet') await page.getByTitle('Show left panel').click();
   if (mode === 'phone') await page.getByRole('tab', { name: 'Versions' }).click();
   const weight = page.getByRole('region', { name: 'Metal weight' });
-  await expect(weight.locator('[data-weight-table]')).toBeVisible();
+  if (opts.noVolume) await expect(page.getByRole('heading', { name: 'Versions' })).toBeVisible();
+  else await expect(weight.locator('[data-weight-table]')).toBeVisible();
   if (opts.specSheet !== 'none' && opts.specSheet !== 'broken') {
     await expect(page.getByRole('img', { name: 'Spec sheet, page 1' })).toBeVisible();
   }
@@ -122,7 +123,7 @@ async function layoutProblems(page: Page): Promise<LayoutReport> {
       const t = table.getBoundingClientRect();
       const r = selected.getBoundingClientRect();
       if (r.left < t.left - 0.5 || r.right > t.right + 0.5) problems.push('selected row spills out of the table');
-    } else problems.push('no selected row');
+    } else if (table) problems.push('no selected row');
 
     // The left panel's blocks (versions, weight, tech spec, start over) never overlap.
     const weight = sections[0];
@@ -146,7 +147,7 @@ async function layoutProblems(page: Page): Promise<LayoutReport> {
 async function check(page: Page, shot: string) {
   const report = await layoutProblems(page);
   if (SHOTS) {
-    await page.getByRole('region', { name: 'Metal weight' }).scrollIntoViewIfNeeded();
+    await page.locator('section[aria-label="Metal weight"], section[aria-label="Tech spec"]').first().scrollIntoViewIfNeeded();
     await page.screenshot({ path: path.join(SHOTS, `${shot}.png`) });
   }
   expect(report.problems, `${shot} (section ${report.sectionWidth}px)`).toEqual([]);
@@ -197,9 +198,65 @@ test('casting-check flags show as plain words and the weight stays', async ({ pa
   await check(page, 'final-desktop-1440-flags');
 });
 
+/** The left panel's scrolling body: how far its content runs past the bottom, in px (0 = no scroll). */
+async function panelOverflow(page: Page): Promise<number> {
+  return page.getByRole('region', { name: 'Tech spec' }).evaluate((section) => {
+    let el: HTMLElement | null = section.parentElement;
+    while (el && getComputedStyle(el).overflowY !== 'auto') el = el.parentElement;
+    if (!el) throw new Error('no scrolling panel body');
+    return Math.max(0, el.scrollHeight - el.clientHeight);
+  });
+}
+
+// The owner's laptop screens. A version without a volume (the owner's
+// screenshot): Versions and Tech spec (card and buttons) all on screen, no
+// scrolling in the left panel.
+for (const [width, height] of [[1440, 900], [1280, 800]] as const) {
+  test(`${width}x${height}: no volume (versions + tech spec) fits without scrolling`, async ({ page }) => {
+    await openCad(page, width, height, { noVolume: true });
+    await expect(page.getByRole('region', { name: 'Metal weight' })).toHaveCount(0);
+    await expect(page.getByText(/Weight not available/)).toHaveCount(0);
+    expect(await panelOverflow(page)).toBe(0);
+    await expect(page.getByRole('button', { name: 'Download spec sheet' })).toBeInViewport({ ratio: 1 });
+    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `techspec-fix-${width}x${height}-no-volume.png`) });
+    expect((await layoutProblems(page)).problems).toEqual([]);
+  });
+
+  // With the full weight table (about 345 px) the three sections do NOT fit
+  // these heights with a 200 px card: the panel scrolls by about 150 px at
+  // 1440x900 and 250 px at 1280x800 (measured 2026-11-02). Open question for
+  // the owner, see the PR. Until then: the weight table is fully on screen,
+  // the Tech spec header shows under it, and the card and buttons are one
+  // short scroll away, laid out cleanly.
+  test(`${width}x${height}: weight table on screen, tech spec reachable in the panel`, async ({ page }) => {
+    await openCad(page, width, height);
+    test.info().annotations.push({ type: 'panel overflow px', description: String(await panelOverflow(page)) });
+    await expect(page.getByRole('region', { name: 'Metal weight' })).toBeInViewport({ ratio: 1 });
+    await expect(page.getByRole('heading', { name: 'Tech spec' })).toBeInViewport({ ratio: 1 });
+    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `techspec-fix-${width}x${height}-weight-and-spec.png`) });
+    await page.getByRole('button', { name: 'Download spec sheet' }).scrollIntoViewIfNeeded();
+    await expect(page.getByRole('button', { name: 'Download spec sheet' })).toBeInViewport({ ratio: 1 });
+    expect((await layoutProblems(page)).problems).toEqual([]);
+    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `techspec-fix-${width}x${height}-weight-and-spec-scrolled.png`) });
+  });
+}
+
+test('the spec card is short and shows the top of page 1', async ({ page }) => {
+  await openCad(page, 1440, 900);
+  const card = page.getByTestId('spec-sheet-card');
+  const box = await card.boundingBox();
+  expect(box?.height).toBeGreaterThanOrEqual(180);
+  expect(box?.height).toBeLessThanOrEqual(220);
+  const image = page.getByRole('img', { name: 'Spec sheet, page 1' }).first();
+  expect(await image.evaluate((img) => getComputedStyle(img).objectPosition)).toMatch(/^50% 0(%|px)$/);
+});
+
 test('a broken spec sheet shows the fallback card, still laid out', async ({ page }) => {
   await openCad(page, 1440, 900, { specSheet: 'broken' });
   await expect(page.getByTestId('spec-sheet-fallback')).toBeVisible();
+  const box = await page.getByTestId('spec-sheet-card').boundingBox();
+  expect(box?.height).toBeLessThanOrEqual(220);
+  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'techspec-fix-1440x900-fallback.png') });
   await check(page, 'final-desktop-1440-spec-fallback');
 });
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -52,7 +52,7 @@ describe('AdminGenerationDetailPage AI block', () => {
       .toBe('Applied at Start: Build AI GPT-6 Astra Pro · OpenRouter · Review AI Default');
     expect(screen.getByText(/^Submitted/).textContent)
       .toBe('Submitted: Build AI GPT-6 Astra · Direct API · Review AI Default');
-    fireEvent.click(screen.getByRole('button', { name: 'Input Payload' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Input payload' }));
     expect(await screen.findByText(/Raw JSON shows the submitted request/)).toBeTruthy();
     expect(String(authFetch.authenticatedFetch.mock.calls[0][0])).toContain('/wf-1');
   });
@@ -70,5 +70,92 @@ describe('AdminGenerationDetailPage AI block', () => {
     renderDetail(generation('some_image_workflow'));
     expect(authFetch.authenticatedFetch).not.toHaveBeenCalled();
     expect(screen.queryByText(/^Submitted/)).toBeNull();
+  });
+});
+
+describe('AdminGenerationDetailPage customer prompt', () => {
+  beforeEach(() => {
+    authFetch.authenticatedFetch.mockReset();
+    authFetch.authenticatedFetch.mockResolvedValue(new Response(JSON.stringify({ detail: 'Not found' }), { status: 404 }));
+  });
+
+  function cadRun(prompt: string): AdminGenerationDetail {
+    return {
+      ...generation('jewelry_cad_generate'),
+      input_payload: {
+        prompt,
+        client_flow: 'image',
+        image_artifact: 'https://example.com/uploads/ring-photo.png',
+        llm_tier: null,
+        analysis_tier: null,
+      },
+    };
+  }
+
+  function inputsGroup(): HTMLElement {
+    return screen.getByRole('group', { name: 'Inputs' });
+  }
+
+  it('renders the prompt right after the input images, inside the Inputs part of the strip', () => {
+    renderDetail(cadRun('a twisted gold band with a small oval diamond'));
+    const group = inputsGroup();
+    const prompt = within(group).getByTestId('admin-io-prompt');
+    expect(prompt.textContent).toContain('a twisted gold band with a small oval diamond');
+    // It stands in for the request value it came from (admin-workflow-views completeness).
+    expect(prompt.getAttribute('data-path')).toBe('input_payload.prompt');
+    const image = within(group).getByRole('figure');
+    // The prompt follows the input image in document order, and is the group's last block.
+    expect(image.compareDocumentPosition(prompt) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(group.lastElementChild).toBe(prompt);
+    // Not in the Outputs part.
+    expect(within(screen.getByRole('group', { name: 'Outputs' })).queryByTestId('admin-io-prompt')).toBeNull();
+  });
+
+  it('shows the prompt only once: not again in the Input payload section, raw JSON kept', () => {
+    renderDetail(cadRun('a twisted gold band with a small oval diamond'));
+    fireEvent.click(screen.getByRole('button', { name: 'Input payload' }));
+    const payload = screen.getByRole('region', { name: 'Input payload' });
+    expect(within(payload).getByText('Client flow')).toBeTruthy();
+    expect(within(payload).queryByText('a twisted gold band with a small oval diamond')).toBeNull();
+    expect(screen.getAllByText('a twisted gold band with a small oval diamond')).toHaveLength(1);
+    fireEvent.click(within(payload).getByRole('button', { name: /Raw JSON/ }));
+    expect(within(payload).getByText(/a twisted gold band with a small oval diamond/)).toBeTruthy();
+  });
+
+  it('clamps a long prompt to a few lines with a more / less toggle', () => {
+    const long = `${'a very long description of the ring '.repeat(12)}end`;
+    renderDetail(cadRun(long));
+    const text = within(inputsGroup()).getByTestId('admin-io-prompt-text');
+    expect(text.className).toContain('line-clamp-3');
+    fireEvent.click(within(inputsGroup()).getByRole('button', { name: 'more' }));
+    expect(text.className).not.toContain('line-clamp-3');
+    fireEvent.click(within(inputsGroup()).getByRole('button', { name: 'less' }));
+    expect(text.className).toContain('line-clamp-3');
+  });
+
+  it('has no toggle for a short prompt and no prompt block when there is none', () => {
+    const { unmount } = renderDetail(cadRun('a ring'));
+    expect(within(inputsGroup()).queryByRole('button', { name: 'more' })).toBeNull();
+    unmount();
+    renderDetail(generation('some_image_workflow'));
+    expect(screen.queryByTestId('admin-io-prompt')).toBeNull();
+  });
+});
+
+describe('AdminGenerationDetailPage client chip', () => {
+  beforeEach(() => {
+    authFetch.authenticatedFetch.mockReset();
+    authFetch.authenticatedFetch.mockResolvedValue(new Response(JSON.stringify({ detail: 'Not found' }), { status: 404 }));
+  });
+
+  it('shows the Rhino client and version in the run header', () => {
+    renderDetail({ ...generation('some_image_workflow'), client: 'rhino', client_version: '0.6.2' });
+    const chip = screen.getByText('Rhino 0.6.2');
+    expect(chip.closest('section')?.getAttribute('aria-labelledby')).toBe('admin-section-run');
+  });
+
+  it('shows nothing for an untagged run', () => {
+    renderDetail({ ...generation('some_image_workflow'), client: null, client_version: null });
+    expect(screen.queryByText(/^Rhino/)).toBeNull();
   });
 });

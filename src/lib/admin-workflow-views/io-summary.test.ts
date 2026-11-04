@@ -1,97 +1,94 @@
 import { describe, expect, it } from 'vitest';
 
 import { buildRunView } from './index';
-import { buildIoSummary, CLICK_ONLY_BYTES, MAX_AUTO_3D, type IoItem } from './io-summary';
+import { buildIoSummary, LARGE_FILE_BYTES, type IoItem } from './io-summary';
 import {
   cadImproveRun, catalogShotRun, designImageRun, fastloadRun, FIXTURES, photoshoot4kRun, productShotRun, proxy, syntheticOddRun,
+  syntheticReelRun,
 } from './__fixtures__/runs';
 
-const summarize = (name: keyof typeof FIXTURES | string, isCad = false, files = {}) => {
-  const detail = FIXTURES[name]();
-  return buildIoSummary(buildRunView(detail, isCad), files);
-};
-const brief = (items: IoItem[]) => items.map((i) => [i.kind, i.format, i.label, i.url]);
+const brief = (items: IoItem[]) => items.map((i) => [i.kind, i.format, i.label]);
 
-describe('buildIoSummary: the pictures and 3D files in and out of a run', () => {
-  it('product shot: every input picture once (duplicate urls folded), the generated image out', () => {
+describe('buildIoSummary: every picture, 3D file and stored file in and out of a run', () => {
+  it('product shot: input pictures once each (duplicate urls folded), the generated image out', () => {
     const s = buildIoSummary(buildRunView(productShotRun(), false));
-    expect(s.inputs.map((i) => i.url)).toEqual([proxy(1), proxy(2), proxy(3)]);
-    expect(s.inputs.every((i) => i.kind === 'image')).toBe(true);
-    expect(brief(s.outputs)).toEqual([['image', null, 'Generated image', proxy(4)]]);
+    expect(s.inputs.map((i) => [i.label, i.url])).toEqual([['Jewelry 1', proxy(1)], ['Jewelry 2', proxy(2)], ['Inspiration', proxy(3)]]);
+    expect(brief(s.outputs)).toEqual([['image', null, 'Generated image']]);
   });
 
-  it('photoshoot 4K: model + jewelry in, only the final upscaled picture out', () => {
+  it('photoshoot 4K: model first, then jewelry; only the final upscaled picture out', () => {
     const s = buildIoSummary(buildRunView(photoshoot4kRun(), false));
-    expect(s.inputs.map((i) => i.url)).toEqual([proxy(10), proxy(11)]);
-    expect(s.outputs.map((i) => i.url)).toEqual([proxy(14)]);
+    expect(s.inputs.map((i) => [i.label, i.url])).toEqual([['Model', proxy(10)], ['Jewelry', proxy(11)]]);
+    expect(s.outputs.map((i) => [i.label, i.url])).toEqual([['Upscaled image', proxy(14)]]);
   });
 
   it('design image: the role-labelled pictures in, the design picture out', () => {
     const s = buildIoSummary(buildRunView(designImageRun(), false));
     expect(s.inputs.map((i) => i.label)).toEqual(['Design being edited', 'Design with annotations', 'Inspiration / reference']);
-    expect(brief(s.outputs)).toEqual([['image', null, 'Design picture', proxy(23)]]);
+    expect(brief(s.outputs)).toEqual([['image', null, 'Design picture']]);
   });
 
-  it('catalog shot: render + background in, placed photo and AI picture out', () => {
+  it('catalog shot: render + background in, placed photo then AI picture out', () => {
     const s = buildIoSummary(buildRunView(catalogShotRun(), false));
     expect(s.inputs.map((i) => i.label)).toEqual(['Render', 'Background']);
     expect(s.outputs.map((i) => i.label)).toEqual(['Placed photo', 'AI picture (before paste-back)']);
   });
 
-  it('fastload: the 3DM in (78 MB, click only), the skeleton 3DM out; packed meshes are not 3D previews', () => {
+  it('fastload (realistic tool answer): outputs come ONLY from this run’s cad_fastload step, skeleton first, with the stored names', () => {
     const s = buildIoSummary(buildRunView(fastloadRun(), true));
-    expect(brief(s.inputs)).toEqual([['model3d', '3dm', 'Input .3dm', proxy(30)]]);
-    expect(s.inputs[0].preview).toBe('click');
-    expect(s.inputs[0].bytes).toBeGreaterThan(CLICK_ONLY_BYTES);
-    // skeleton_3dm has no name or extension: the format comes from its mime type.
-    expect(brief(s.outputs)).toEqual([['model3d', '3dm', 'Skeleton .3dm', proxy(31)]]);
-    expect(s.outputs[0].preview).toBe('auto');
+    expect(brief(s.inputs)).toEqual([['model3d', '3dm', 'Input 3DM']]);
+    expect(s.inputs[0]).toMatchObject({ large: true, name: 'pave-halo-ring.3dm', url: proxy(30) });
+    expect(s.inputs[0].bytes).toBeGreaterThan(LARGE_FILE_BYTES);
+    // Each tile's url is the sha256 the step recorded, through the same-origin proxy; the name
+    // is the one store() put in the blob path.
+    expect(s.outputs.map((i) => [i.kind, i.format, i.label, i.url, i.name])).toEqual([
+      ['model3d', '3dm', 'Skeleton 3DM', proxy(31), 'skeleton.3dm'],
+      ['file', 'gz', 'Meshes', proxy(32), 'meshes.bin.gz'],
+    ]);
+    expect(s.outputs[0].large).toBe(false);
   });
 
-  it('CAD improve: reference picture in; GLB, 3DM, STL and casting STL out; STEP and PDF stay below', () => {
+  it('CAD improve: reference in; GLB, 3DM, STL, casting, then STEP and the spec sheet out', () => {
     const s = buildIoSummary(buildRunView(cadImproveRun(), true));
-    expect(brief(s.inputs)).toEqual([['image', null, 'Reference images', proxy(60)]]);
-    expect(s.outputs.map((i) => [i.format, i.url])).toEqual([
-      ['glb', proxy(62)], ['3dm', proxy(61)], ['stl', proxy(63)], ['stl', proxy(65)],
+    expect(brief(s.inputs)).toEqual([['image', null, 'Reference images']]);
+    expect(brief(s.outputs)).toEqual([
+      ['model3d', 'glb', 'GLB'], ['model3d', '3dm', '3DM'], ['model3d', 'stl', 'STL'], ['model3d', 'stl', 'Casting body'],
+      ['file', 'step', 'STEP'], ['file', 'pdf', 'Spec sheet'],
     ]);
   });
 
-  it('WebGL cap: at most MAX_AUTO_3D previews mount on their own, outputs first; the rest wait for a click', () => {
-    const s = buildIoSummary(buildRunView(cadImproveRun(), true));
-    expect(MAX_AUTO_3D).toBe(2);
-    expect(s.outputs.map((i) => i.preview)).toEqual(['auto', 'auto', 'click', 'click']);
-    const all = [...s.inputs, ...s.outputs];
-    expect(all.filter((i) => i.preview === 'auto').length).toBeLessThanOrEqual(MAX_AUTO_3D);
+  it('final picture first when a run returns pictures and files (video reel)', () => {
+    const s = buildIoSummary(buildRunView(syntheticReelRun(), false));
+    expect(brief(s.outputs)).toEqual([['image', null, 'Poster'], ['file', 'mp4', 'Video'], ['file', 'json', 'Captions']]);
+    expect(brief(s.inputs)).toEqual([['image', null, 'Still'], ['image', null, 'Still'], ['file', 'zip', 'Brand kit']]);
   });
 
-  it('the cap holds for every fixture', () => {
-    for (const name of Object.keys(FIXTURES)) {
-      const s = summarize(name, /cad_(generate|improve|nurbs)|fastload/.test(name));
-      expect([...s.inputs, ...s.outputs].filter((i) => i.preview === 'auto').length).toBeLessThanOrEqual(MAX_AUTO_3D);
-    }
-  });
-
-  it('untrusted hosts are listed but never previewed', () => {
+  it('untrusted hosts are listed but marked untrusted; plain links are not tiles', () => {
     const s = buildIoSummary(buildRunView(syntheticOddRun(), false));
-    const model = s.outputs.find((i) => i.kind === 'model3d');
-    expect(model).toMatchObject({ url: 'https://cdn.example.com/m/ring.glb', trusted: false, preview: 'none' });
-    // The tracking-pixel gif is an input picture, but not trusted.
+    expect(s.outputs).toEqual([expect.objectContaining({ kind: 'model3d', url: 'https://cdn.example.com/m/ring.glb', trusted: false })]);
     expect(s.inputs.find((i) => i.url.includes('tracker.example.com'))?.trusted).toBe(false);
     expect(s.inputs.find((i) => i.url.startsWith('data:image/png'))?.trusted).toBe(true);
+    expect(s.inputs.some((i) => i.url.includes('example.com/docs'))).toBe(false);
   });
 
-  it('result files (/api/result fallback) join the outputs; refused or duplicate ones do not', () => {
-    const run = buildRunView(fastloadRun(), true);
-    const s = buildIoSummary(run, {
+  it('result files join the outputs in rank order; refused or duplicate ones do not', () => {
+    const s = buildIoSummary(buildRunView(fastloadRun(), true), {
       resultFiles: [
-        { label: '3D preview (from the run result)', url: proxy(99), format: 'glb' },
-        { label: 'dupe', url: proxy(31), format: '3dm' },
-        { label: 'bad', url: 'javascript:alert(1)', format: 'glb' },
-        { label: 'none', url: null, format: '3dm' },
+        { label: '3D (from the run result)', url: proxy(99), kind: 'model3d', format: 'glb' },
+        { label: 'dupe', url: proxy(31), kind: 'model3d', format: '3dm' },
+        { label: 'bad', url: 'javascript:alert(1)', kind: 'model3d', format: 'glb' },
+        { label: 'none', url: null, kind: 'model3d', format: '3dm' },
+        { label: 'Output image (from complaint)', url: proxy(98), kind: 'image' },
       ],
     });
-    expect(s.outputs.map((i) => i.url)).toEqual([proxy(31), proxy(99)]);
-    expect(s.outputs[1]).toMatchObject({ kind: 'model3d', format: 'glb', preview: 'auto' });
+    expect(s.outputs.map((i) => i.url)).toEqual([proxy(98), proxy(99), proxy(31), proxy(32)]);
+  });
+
+  it('every fixture: every tile has a label and a url', () => {
+    for (const name of Object.keys(FIXTURES)) {
+      const s = buildIoSummary(buildRunView(FIXTURES[name](), /cad_(generate|improve|nurbs)|fastload/.test(name)));
+      for (const i of [...s.inputs, ...s.outputs]) expect(i.label && i.url).toBeTruthy();
+    }
   });
 
   it('a run with no successful output has no outputs', () => {

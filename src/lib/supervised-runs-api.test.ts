@@ -14,7 +14,7 @@ import {
   PHASE_ACTIONS, SupervisedRunsApiError, addSupervisedRunNote, failSupervisedRun, getSupervisedRun,
   listSupervisedRuns, rejectSupervisedRun, removeSupervisedUpload, sameNames, sendSupervisedReplacement,
   sendSupervisedRun, startSupervisedRuns, uploadReplacementFile, isUncertainCheckFailure, userNoteLength, USER_NOTE_MAX_CHARS,
-  UPLOAD_ROLES, hasFileHeader, parseOpenFlags,
+  UPLOAD_ROLES, hasFileHeader, parseOpenFlags, parseMetalVolume, parseCastingFlags,
 } from './supervised-runs-api';
 
 const ok = (body: unknown, status = 200) => ({ ok: true, status, json: async () => body });
@@ -132,6 +132,27 @@ describe('supervised runs client', () => {
     expect(call(2).init.body).toBe('{"acknowledge_missing":[],"spec_sheet_open_flags":null}');
   });
 
+  it('sends metal_volume_mm3 and metal_volume_flags only when given, after the other fields', async () => {
+    mockFetch.mockResolvedValue(ok({ accepted: true, phase: 'finalizing' }, 202));
+    await sendSupervisedReplacement('a', [], 'ring', 'Hi', 3, { mm3: 412.5, flags: ['thin_walls', 'touching_edges'] });
+    await sendSupervisedReplacement('a', [], undefined, undefined, undefined, { mm3: 80 });
+    await sendSupervisedReplacement('a', [], undefined, undefined, undefined, { mm3: 80, flags: null });
+    expect(call(0).init.body).toBe(
+      '{"acknowledge_missing":[],"jewelry_type":"ring","user_note":"Hi","spec_sheet_open_flags":3,'
+      + '"metal_volume_mm3":412.5,"metal_volume_flags":["thin_walls","touching_edges"]}',
+    );
+    expect(call(1).init.body).toBe('{"acknowledge_missing":[],"metal_volume_mm3":80}');
+    expect(call(2).init.body).toBe('{"acknowledge_missing":[],"metal_volume_mm3":80,"metal_volume_flags":null}');
+  });
+
+  it('sends a replacement without a metal volume byte-for-byte as before', async () => {
+    mockFetch.mockResolvedValue(ok({ accepted: true, phase: 'finalizing' }, 202));
+    await sendSupervisedReplacement('a', ['loop_state_artifact'], 'ring', ' Hi ', 2, undefined);
+    await sendSupervisedReplacement('a', [], undefined, undefined, undefined, undefined);
+    expect(call(0).init.body).toBe('{"acknowledge_missing":["loop_state_artifact"],"jewelry_type":"ring","user_note":"Hi","spec_sheet_open_flags":2}');
+    expect(call(1).init.body).toBe('{"acknowledge_missing":[]}');
+  });
+
   it('removes an upload by role', async () => {
     mockFetch.mockResolvedValue(ok({ removed: true }));
     await removeSupervisedUpload('a', 'glb');
@@ -191,6 +212,29 @@ describe('helpers', () => {
     expect(parseOpenFlags(' 12 ')).toEqual({ ok: true, value: 12 });
     for (const bad of ['-1', '-0', '1.5', '2.0', 'abc', '1e2', '0x10', '+3', '3 4', 'NaN', 'Infinity', '99999999999999999999']) {
       expect(parseOpenFlags(bad)).toEqual({ ok: false });
+    }
+  });
+
+  it('reads the metal volume as a positive finite number, or null when empty', () => {
+    expect(parseMetalVolume('')).toEqual({ ok: true, value: null });
+    expect(parseMetalVolume('  ')).toEqual({ ok: true, value: null });
+    expect(parseMetalVolume('412')).toEqual({ ok: true, value: 412 });
+    expect(parseMetalVolume(' 412.75 ')).toEqual({ ok: true, value: 412.75 });
+    expect(parseMetalVolume('0.5')).toEqual({ ok: true, value: 0.5 });
+    expect(parseMetalVolume('.5')).toEqual({ ok: true, value: 0.5 });
+    for (const bad of ['0', '0.0', '-1', '-0.5', 'abc', '1e3', '1,5', '1 2', '+3', 'NaN', 'Infinity', '1.2.3', '.', '9'.repeat(400)]) {
+      expect(parseMetalVolume(bad)).toEqual({ ok: false });
+    }
+  });
+
+  it('reads casting flags as a trimmed, de-duplicated list of a-z_ tokens, or null when empty', () => {
+    expect(parseCastingFlags('')).toEqual({ ok: true, value: null });
+    expect(parseCastingFlags(' , ,')).toEqual({ ok: true, value: null });
+    expect(parseCastingFlags('thin_walls, touching_edges')).toEqual({ ok: true, value: ['thin_walls', 'touching_edges'] });
+    expect(parseCastingFlags(' thin_walls ,thin_walls,, porous ')).toEqual({ ok: true, value: ['thin_walls', 'porous'] });
+    expect(parseCastingFlags('a'.repeat(40))).toEqual({ ok: true, value: ['a'.repeat(40)] });
+    for (const bad of ['Thin_walls', 'thin-walls', 'thin walls', 'walls2', 'thin_walls; porous', 'a'.repeat(41), '\u00e9']) {
+      expect(parseCastingFlags(bad)).toEqual({ ok: false });
     }
   });
 

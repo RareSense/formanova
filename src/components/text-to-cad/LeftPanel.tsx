@@ -43,6 +43,36 @@ function ReferenceImage({ url, alt, className }: { url: string; alt: string; cla
   return <img src={src} alt={alt} className={className} />;
 }
 
+/** Briefs longer than this (or over BRIEF_LINES lines) start clamped, with a "more" toggle. */
+const BRIEF_CLAMP_CHARS = 180;
+const BRIEF_LINES = 3;
+
+/** The customer's description, read-only, clamped to three lines until "more". */
+function PanelBrief({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const clampable = text.length > BRIEF_CLAMP_CHARS || text.split('\n').length > BRIEF_LINES;
+  const clamped = clampable && !expanded;
+  return (
+    <section data-testid="cad-panel-brief" className="border border-border/40 bg-muted/20 px-3 py-2.5">
+      <p
+        data-testid="cad-panel-brief-text"
+        className={`whitespace-pre-wrap font-body text-[13px] leading-relaxed text-foreground/70 [overflow-wrap:anywhere] ${clamped ? 'line-clamp-3' : ''}`}
+      >
+        {text}
+      </p>
+      {clampable && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-1 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground"
+        >
+          {expanded ? 'less' : 'more'}
+        </button>
+      )}
+    </section>
+  );
+}
+
 export default function LeftPanel({
   model, setModel, prompt, setPrompt,
   isGenerating, hasModel,
@@ -144,6 +174,20 @@ export default function LeftPanel({
           </section>
         )}
 
+        {/* The brief this ring was made from, read-only, with no header, right
+            under the picture(s) it goes with and above Versions / Metal weight /
+            Tech spec, so the customer's input reads as one block.
+            Shown while an image-mode run is still building, and on a saved ring
+            whose original run had a description - that text is part of what the
+            ring is, so it stays visible beside its versions. A run made from
+            photos alone had no description, and then nothing is shown rather
+            than an empty box.
+            Clamped to three lines with a more / less toggle: a long brief would
+            otherwise push everything below it out of the panel. */}
+        {((isImageMode && !hasModel) || versions.length > 0) && prompt.trim() && (
+          <PanelBrief text={prompt} />
+        )}
+
         {/* The ring's own history, directly under what it was made from.
             Renders nothing until a version exists, so a run from an older
             workflow shows no empty section. */}
@@ -241,21 +285,6 @@ export default function LeftPanel({
         </section>
         )}
 
-        {/* The brief this ring was made from, read-only, with no header.
-            Shown while an image-mode run is still building, and on a saved ring
-            whose original run had a description - that text is part of what the
-            ring is, so it stays visible beside its versions. A run made from
-            photos alone had no description, and then nothing is shown rather
-            than an empty box.
-            Bounded and scrollable: a long brief would otherwise run for hundreds
-            of pixels and push everything below it out of the panel. */}
-        {((isImageMode && !hasModel) || versions.length > 0) && prompt.trim() && (
-          <section>
-            <div className="max-h-[140px] overflow-y-auto overscroll-contain border border-border/40 bg-muted/20 px-3 py-2.5">
-              <p className="font-body text-[13px] leading-relaxed text-foreground/70 [overflow-wrap:anywhere]">{prompt}</p>
-            </div>
-          </section>
-        )}
       </div>
 
 

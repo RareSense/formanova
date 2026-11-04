@@ -1,12 +1,15 @@
 /**
  * The version's tech spec, a section of the CAD left panel under Metal
- * weight, shown only when the version has a spec sheet: page 1 of the PDF as
- * an A4 card with the open review items as a chip, View and Download under
- * it, and a larger in-app preview with page navigation on a click.
+ * weight, shown only when the version has a spec sheet: the top of page 1
+ * (the sheet's header and key facts) in a short, full-width card with the
+ * open review items as a chip, View and Download under it, and the whole
+ * page in a larger in-app preview with page navigation on a click. The card
+ * is short so the panel's sections fit a laptop screen without scrolling.
  *
  * pdf.js is pulled in by a dynamic import here and nowhere else. While it
  * renders, a skeleton; if it cannot (corrupt file, blocked fetch, worker
- * error), a plain document card with the same buttons, and the error logged.
+ * error), a plain document card of the same height with the same buttons,
+ * and the error logged.
  */
 import { useEffect, useState } from 'react';
 import { Check, ChevronLeft, ChevronRight, Download, ExternalLink, FileText } from 'lucide-react';
@@ -25,8 +28,8 @@ export function hasSpecSheet(downloads: CadVersionDownload[] | null | undefined)
   return Boolean(downloads?.some((file) => file.kind === 'spec_sheet'));
 }
 
-/** Rendered widths, in CSS px: the panel thumbnail and the dialog page. */
-const THUMB_WIDTH = 360;
+/** Rendered widths, in CSS px: the panel thumbnail (the panel's widest) and the dialog page. */
+const THUMB_WIDTH = 504;
 const PAGE_WIDTH = 720;
 
 type Preview =
@@ -91,8 +94,13 @@ export function TechSpecSection({ assetId, openFlags, source }: TechSpecSectionP
     return () => { cancelled = true; };
   }, [dialogOpen, pdf, page]);
 
-  const view = () => { void openVersionFile(assetId, 'spec_sheet'); };
   const download = () => { void saveVersionFile(assetId, 'spec_sheet', source); };
+  // The signed storage link is served as an attachment, so opening it in a tab only downloads it.
+  // View shows the sheet in-app (every page); if the PDF can't be read here, it falls back to the link.
+  const view = () => {
+    if (preview.status === 'ready') setDialogOpen(true);
+    else void openVersionFile(assetId, 'spec_sheet');
+  };
   const buttons = (
     <div className="grid grid-cols-2 gap-2">
       <Button type="button" variant="outline" size="sm" onClick={view} aria-label="View spec sheet" className="w-full font-mono text-[11px]">
@@ -118,15 +126,16 @@ export function TechSpecSection({ assetId, openFlags, source }: TechSpecSectionP
           aria-label="Open spec sheet preview"
           onClick={() => (preview.status === 'error' ? view() : setDialogOpen(true))}
           disabled={preview.status === 'loading'}
-          className="relative block aspect-[210/297] w-full overflow-hidden border border-border bg-white shadow-sm transition-colors hover:border-foreground/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait"
+          data-testid="spec-sheet-card"
+          className="relative block h-[200px] w-full overflow-hidden border border-border bg-white shadow-sm transition-colors hover:border-foreground/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait"
         >
           {preview.status === 'loading' && <span data-testid="spec-sheet-skeleton" className="absolute inset-0 animate-pulse bg-muted" />}
           {preview.status === 'ready' && (
-            <img src={preview.thumbnail} alt="Spec sheet, page 1" className="h-full w-full object-contain" />
+            <img src={preview.thumbnail} alt="Spec sheet, page 1" className="h-full w-full object-cover object-top" />
           )}
           {preview.status === 'error' && (
             <span data-testid="spec-sheet-fallback" className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-card text-muted-foreground">
-              <FileText className="h-10 w-10" aria-hidden="true" />
+              <FileText className="h-8 w-8" aria-hidden="true" />
               <span className="font-mono text-[11px]">Spec sheet (PDF)</span>
             </span>
           )}

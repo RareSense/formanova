@@ -230,3 +230,18 @@ export function findNodes(node: ViewNode, match: (n: ViewNode) => boolean, out: 
   if (node.kind === 'list') node.items.forEach((c) => findNodes(c, match, out));
   return out;
 }
+
+/**
+ * The outermost technical nodes (hashes, idempotency keys, inline base64...) of a tree,
+ * including inside artifact Details, for the page's separate "Technical" section.
+ */
+export function technicalNodes(node: ViewNode, out: ViewNode[] = []): ViewNode[] {
+  if (node.technical) {
+    out.push(node);
+    return out;
+  }
+  if (node.kind === 'group') node.children.forEach((c) => technicalNodes(c, out));
+  if (node.kind === 'list') node.items.forEach((c) => technicalNodes(c, out));
+  if (node.kind === 'media' && node.meta) technicalNodes(node.meta, out);
+  return out;
+}

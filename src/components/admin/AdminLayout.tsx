@@ -5,6 +5,7 @@ import { ScanEye } from 'lucide-react';
 const TABS = [
   { label: 'Promo Codes', to: '/admin/promo-codes' },
   { label: 'Generations', to: '/admin/generations' },
+  { label: 'Rhino Users', to: '/admin/rhino-users' },
   { label: 'CAD Queue', to: '/admin/cad-queue' },
   { label: 'Ruby Calls', to: '/admin/ruby-calls' },
   { label: 'Feedback', to: '/admin/feedback' },

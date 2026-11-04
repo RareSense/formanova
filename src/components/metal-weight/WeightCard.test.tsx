@@ -186,12 +186,11 @@ describe('WeightCard', () => {
     expect(screen.getByText('Two-tone: total of all metal parts, weighed in 14K Yellow Gold.')).toBeInTheDocument();
   });
 
-  it('says when weight is not available, with no table, figures or download', () => {
-    renderCard({ source: { available: false, reason: NO_VOLUME_REASON } });
-    expect(screen.getByText('Weight not available for this model.')).toBeInTheDocument();
-    expect(screen.queryByRole('table')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Download weight table (CSV)' })).toBeNull();
-    fireEvent.click(header());
-    expect(within(header()).getByText('Not available')).toBeInTheDocument();
+  it('renders nothing when the weight is not available: no section, header, message, table or download', () => {
+    renderCard({ source: { available: false, reason: NO_VOLUME_REASON }, requestedUnavailable: true });
+    expect(document.body.textContent).toBe('');
+    expect(screen.queryByRole('region', { name: 'Metal weight' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /metal weight/i })).toBeNull();
+    expect(screen.queryByText(/not available|unavailable/i)).toBeNull();
   });
 });

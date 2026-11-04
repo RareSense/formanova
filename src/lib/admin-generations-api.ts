@@ -39,7 +39,11 @@ export interface AdminGenerationsListParams {
   is_paying?: boolean;
   /** false keeps supervised runs (the CAD queue) out of this list. */
   supervised?: boolean;
+  /** 'rhino', or 'untagged' = no client header (website, Rhino 0.5.x and older). */
+  client?: AdminGenerationClientFilter;
 }
+
+export type AdminGenerationClientFilter = 'rhino' | 'untagged';
 
 export interface AdminGenerationListItem {
   workflow_id: string;
@@ -53,6 +57,9 @@ export interface AdminGenerationListItem {
   user_type: AdminGenerationUserType | null;
   is_paying: boolean;
   feedback_id: string | null;
+  /** App that started the run ('rhino'), null when untagged. */
+  client?: string | null;
+  client_version?: string | null;
 }
 
 export interface AdminGenerationsListResponse {
@@ -97,6 +104,8 @@ export interface AdminGenerationDetail {
   input_payload: unknown;
   steps: AdminGenerationStep[];
   feedback: AdminGenerationFeedback | null;
+  client?: string | null;
+  client_version?: string | null;
 }
 
 function unwrapPayload(value: unknown): unknown {
@@ -186,6 +195,8 @@ function normalizeListItem(item: any): AdminGenerationListItem {
     user_type: item.user_type ?? null,
     is_paying: Boolean(item.is_paying),
     feedback_id: item.feedback_id ?? null,
+    client: item.client ?? null,
+    client_version: item.client_version ?? null,
   };
 }
 
@@ -212,7 +223,7 @@ function normalizeFeedback(feedback: any): AdminGenerationFeedback | null {
   };
 }
 
-async function adminGenerationsFetch(path: string): Promise<Response> {
+export async function adminGenerationsFetch(path: string): Promise<Response> {
   const response = await authenticatedFetch(path);
 
   if (!response.ok) {
@@ -244,6 +255,7 @@ export async function listAdminGenerations(
   if (params.user_type) q.set('user_type', params.user_type);
   if (params.is_paying !== undefined) q.set('is_paying', String(params.is_paying));
   if (params.supervised !== undefined) q.set('supervised', String(params.supervised));
+  if (params.client) q.set('client', params.client);
 
   const response = await adminGenerationsFetch(
     `${ADMIN_GENERATIONS_BASE}${q.toString() ? `?${q.toString()}` : ''}`,
@@ -294,5 +306,7 @@ export function normalizeAdminGenerationDetail(data: any, workflowId: string): A
     input_payload: unwrapPayload(payload.input_payload ?? payload.input ?? payload.payload ?? {}),
     steps: Array.isArray(payload.steps) ? payload.steps.map(normalizeStep) : [],
     feedback: normalizeFeedback(payload.feedback),
+    client: payload.client ?? null,
+    client_version: payload.client_version ?? null,
   };
 }

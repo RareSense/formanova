@@ -73,13 +73,58 @@ describe('TechSpecSection', () => {
     error.mockRestore();
   });
 
-  it('View opens the spec sheet and Download saves it, through the version file links', () => {
+  it('View shows the sheet in-app (the signed link only downloads), and Download saves it', async () => {
     loadSpecSheet.mockResolvedValue(sheet());
     render(<TechSpecSection assetId="v1" openFlags={0} source="image-to-cad" />);
+    await within(thumbnail()).findByRole('img', { name: 'Spec sheet, page 1' });
+    fireEvent.click(screen.getByRole('button', { name: 'View spec sheet' }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(openVersionFile).not.toHaveBeenCalled();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Download spec sheet' })[0]);
+    expect(saveVersionFile).toHaveBeenCalledWith('v1', 'spec_sheet', 'image-to-cad');
+  });
+
+  it('View falls back to the file link when the PDF cannot be read in-app', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    loadSpecSheet.mockRejectedValue(new Error('Invalid PDF structure'));
+    render(<TechSpecSection assetId="v1" openFlags={0} />);
+    await screen.findByTestId('spec-sheet-fallback');
     fireEvent.click(screen.getByRole('button', { name: 'View spec sheet' }));
     expect(openVersionFile).toHaveBeenCalledWith('v1', 'spec_sheet');
-    fireEvent.click(screen.getByRole('button', { name: 'Download spec sheet' }));
-    expect(saveVersionFile).toHaveBeenCalledWith('v1', 'spec_sheet', 'image-to-cad');
+    error.mockRestore();
+  });
+
+  it('keeps the card short in every state: the top of page 1 when it renders, the same height when it cannot', async () => {
+    let resolve: (v: ReturnType<typeof sheet>) => void = () => {};
+    loadSpecSheet.mockReturnValue(new Promise((r) => { resolve = r; }));
+    const { unmount } = render(<TechSpecSection assetId="v1" openFlags={0} />);
+    const short = (card: HTMLElement) => {
+      expect(card).toHaveClass('h-[200px]', 'w-full', 'overflow-hidden');
+      expect(card).not.toHaveClass('aspect-[210/297]');
+    };
+    short(thumbnail());
+    await act(async () => { resolve(sheet()); });
+    const image = await within(thumbnail()).findByRole('img', { name: 'Spec sheet, page 1' });
+    // Cropped from the top: the header and key facts, not the middle of the page.
+    expect(image).toHaveClass('object-cover', 'object-top');
+    short(thumbnail());
+    unmount();
+
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    loadSpecSheet.mockRejectedValue(new Error('worker failed'));
+    render(<TechSpecSection assetId="v2" openFlags={0} />);
+    const fallback = await screen.findByTestId('spec-sheet-fallback');
+    expect(thumbnail()).toContainElement(fallback);
+    short(thumbnail());
+    error.mockRestore();
+  });
+
+  it('renders page 1 wide enough for the panel at its widest', async () => {
+    const pdf = sheet();
+    loadSpecSheet.mockResolvedValue(pdf);
+    render(<TechSpecSection assetId="v1" openFlags={0} />);
+    await within(thumbnail()).findByRole('img');
+    expect(pdf.renderPage).toHaveBeenCalledWith(1, 504);
   });
 
   it('View and Download are one size', () => {
