@@ -15,6 +15,9 @@ export const VOICE_SESSION_WORKFLOW = 'ruby_voice_session';
 export const POST_CALL_WORKFLOW = 'ruby_post_call';
 export const QUOTE_WORKFLOW = 'ruby_quote';
 export const NEGOTIATE_WORKFLOW = 'ruby_negotiate';
+/** sales_create_payment_link / sales_payment_link_status: real Stripe links made on the server (STRIPE-LINK-HANDOFF v2). */
+export const PAYMENT_LINK_WORKFLOW = 'ruby_payment_link';
+export const PAYMENT_STATUS_WORKFLOW = 'ruby_payment_status';
 export const CALL_AUDIO_URL = '/api/brand/calls/audio';
 const TOOL_POLL_TIMEOUT_MS = 30_000;
 const SESSION_POLL_INTERVAL_MS = 700;
@@ -64,6 +67,11 @@ export interface CallPayment {
   simulated: boolean;
   email: string;
   installments?: { n: number; label: string; amountCents: number; amount: string; due: string | null; url: string | null }[];
+  /** The billing link id, to check whether it was paid; null for a simulated link. */
+  linkId?: string | null;
+  /** 'paid' once the client paid during the call (paidAt from billing). */
+  status?: 'open' | 'paid';
+  paidAt?: string | null;
 }
 
 export interface EndCallArgs {
@@ -302,6 +310,16 @@ export function runQuote(req: QuoteRequest): Promise<Record<string, unknown>> {
     'quote',
     'approved',
   );
+}
+
+/** ruby_payment_link: `{simulated, url, link_id, deal_id, installment, amount_cents, plan}`; the server re-prices the deal. */
+export function runPaymentLink(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+  return runSalesWorkflow(PAYMENT_LINK_WORKFLOW, payload, 'link', 'deal_id');
+}
+
+/** ruby_payment_status: `{status, paid_at, simulated}`. */
+export function runPaymentStatus(linkId: string): Promise<Record<string, unknown>> {
+  return runSalesWorkflow(PAYMENT_STATUS_WORKFLOW, { link_id: linkId }, 'status', 'status');
 }
 
 /** ruby_negotiate (sales_check_concession): `{allowed, reason_for_ruby, negotiation}`. */

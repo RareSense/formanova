@@ -317,6 +317,7 @@ describe('call tools', () => {
         quote: APPROVED.client,
         installment: 1,
         amountCents: 67500,
+        deal: { lines: args.lines, turnaround: 'rush', negotiation: { n: 1 }, installmentCount: 2 },
       });
       expect(api.createPaymentLink).toHaveBeenCalledTimes(1);
       expect(out).toEqual({
@@ -334,8 +335,26 @@ describe('call tools', () => {
         simulated: true,
         email: 'a@b.co',
         installments: INSTALLMENTS,
+        linkId: null,
       });
       expect(host.updateLead).toHaveBeenCalledWith(expect.objectContaining({ email: 'a@b.co', payment_link: 'https://x/pay/test/cs-1-1' }));
+    });
+
+    it('a real link is watched: when the client pays, the deal shows paid and the call records it', async () => {
+      const host = { ...makeHost(), watchPayment: vi.fn() };
+      const api = makeApi({ createPaymentLink: vi.fn(async () => ({ url: 'https://buy.stripe.com/x', simulated: false, linkId: 'plink_1' })) });
+      await createCallTools(host, api)('send_payment_link', args);
+      expect(host.watchPayment).toHaveBeenCalledWith('plink_1', expect.any(Function));
+      const onPaid = host.watchPayment.mock.calls[0][1];
+      await onPaid('2026-11-04T10:00:00Z');
+      expect(host.showPanel.mock.calls.at(-1)?.[0]).toMatchObject({ kind: 'deal', paid: true });
+      expect(host.setPayment).toHaveBeenLastCalledWith(expect.objectContaining({ linkId: 'plink_1', status: 'paid', paidAt: '2026-11-04T10:00:00Z' }));
+    });
+
+    it('a simulated link is never watched', async () => {
+      const host = { ...makeHost(), watchPayment: vi.fn() };
+      await createCallTools(host, makeApi())('send_payment_link', args);
+      expect(host.watchPayment).not.toHaveBeenCalled();
     });
 
     it('makes a one-payment plan when the quote has no installments', async () => {

@@ -38,6 +38,18 @@ describe('RubyPanels', () => {
     expect(screen.getByText('Link sent by email when we deliver')).toBeInTheDocument();
   });
 
+  it('once the deposit is paid, it says so instead of Pay now', () => {
+    const paid: Panel = {
+      id: 'p2', kind: 'deal', title: 'Your deal', rows: [['Images, 1K', '50', '$7', '$350']], total: '$350',
+      url: 'https://buy.stripe.com/x', simulated: false, paid: true,
+      installments: [{ n: 1, label: 'Full payment before work starts', amountCents: 35000, amount: '$350', due: null, url: 'https://buy.stripe.com/x' }],
+    };
+    render(<RubyStage panel={paid} {...noop} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Paid, thank you');
+    expect(screen.queryByRole('link', { name: /pay now/i })).not.toBeInTheDocument();
+    expect(screen.queryByText('Test link')).not.toBeInTheDocument();
+  });
+
   it('shows the payment plan under a quote', () => {
     const quote: Panel = {
       id: 'p2',

@@ -7,7 +7,7 @@ import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { getAdminGenerationDetail, listAdminGenerations, type AdminGenerationDetail } from '@/lib/admin-generations-api';
 import { POST_CALL_WORKFLOW } from './sales-call-api';
 
-export type CallOutcome = 'Deal' | 'Quoted' | 'No deal';
+export type CallOutcome = 'Paid' | 'Deal' | 'Quoted' | 'No deal';
 
 export interface AdminCallTurn {
   role: 'ruby' | 'client';
@@ -130,7 +130,7 @@ export function callRowFromDetail(detail: AdminGenerationDetail): RubyCallRow {
     email: lead.email ?? detail.user_email ?? '',
     contact: lead.contact_preference ?? lead.phone ?? lead.instagram ?? '',
     durationSeconds: ms === null ? null : Math.round(ms / 1000),
-    outcome: payment ? 'Deal' : quote ? 'Quoted' : 'No deal',
+    outcome: payment ? (payment.status === 'paid' ? 'Paid' : 'Deal') : quote ? 'Quoted' : 'No deal',
     recordingSha: recording?.finalSha ?? null,
     recording,
     uploads: Array.isArray(input.uploads) ? input.uploads.length : 0,

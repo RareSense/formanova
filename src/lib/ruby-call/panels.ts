@@ -49,6 +49,8 @@ export type PanelSpec =
       url: string;
       installments: DealInstallment[];
       simulated: boolean;
+      /** The first payment arrived during the call. */
+      paid?: boolean;
     };
 
 export type Panel = PanelSpec & { id: string };

@@ -20,6 +20,7 @@ import {
   type CallUpload,
 } from '@/lib/ruby-call/sales-call-api';
 import { ScreenNotes } from '@/lib/ruby-call/screen-notes';
+import { paymentLinkStatus, watchPayment } from '@/lib/ruby-call/payment-link';
 import {
   WebRTCCall,
   type CallCallbacks,
@@ -67,6 +68,8 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
   const notesRef = useRef<ScreenNotes | null>(null);
   const sessionRef = useRef<{ callSessionId: string | null; workflowId: string | null; startedAt: string } | null>(null);
   const leadRef = useRef<Record<string, unknown>>({});
+  /** Stops the payment check for the current deal (a new deal or a reset replaces it). */
+  const stopPaymentWatch = useRef<(() => void) | null>(null);
   const uploadsRef = useRef<CallUpload[]>([]);
   const linksRef = useRef<CallLink[]>([]);
   const paymentRef = useRef<CallPayment | null>(null);
@@ -154,6 +157,8 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
   }, [note, snapshot]);
 
   const reset = useCallback(() => {
+    stopPaymentWatch.current?.();
+    stopPaymentWatch.current = null;
     setPhase('idle');
     setTurns([]);
     setSpeaker(null);
@@ -271,6 +276,18 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
         },
         setPayment: (p) => {
           paymentRef.current = p;
+        },
+        watchPayment: (linkId, onPaid) => {
+          stopPaymentWatch.current?.();
+          stopPaymentWatch.current = watchPayment(() => paymentLinkStatus(linkId), {
+            isLive: () => isCurrent() && callRef.current?.getState() === 'live',
+            onPaid: (paidAt) => {
+              onPaid(paidAt);
+              callRef.current?.appendInstruction(
+                'The client just paid on screen: the payment was received. Thank them warmly in one sentence, say their order has started and the team will follow up by email, then ask if there is anything else.',
+              );
+            },
+          });
         },
         endAfterGoodbye: () => call?.endAfterGoodbye(),
         callSessionId: () => sessionRef.current?.callSessionId ?? null,

@@ -49,6 +49,8 @@ export interface ToolHost {
   setPayment(payment: CallPayment): void;
   endAfterGoodbye(): void;
   callSessionId(): string | null;
+  /** Checks a real link for the payment while the call is live; calls back once when it is paid. */
+  watchPayment?(linkId: string, onPaid: (paidAt: string | null) => void): void;
 }
 
 export interface ToolApi {
@@ -262,12 +264,21 @@ export function createCallTools(host: ToolHost, api: ToolApi = DEFAULT_API): Too
           quote: client,
           installment: plan[0].n,
           amountCents: plan[0].amountCents,
+          deal: req,
         });
         const installments: DealInstallment[] = plan.map((p, i) => ({ ...p, url: i === 0 ? first.url : null }));
         const simulated = first.simulated;
         const url = first.url;
-        host.showPanel({ kind: 'deal', title: 'Your deal', rows, total, url, installments, simulated });
-        host.setPayment({ url, total, totalCents, simulated, email, installments });
+        const panel = { kind: 'deal' as const, title: 'Your deal', rows, total, url, installments, simulated };
+        const payment = { url, total, totalCents, simulated, email, installments, linkId: first.linkId ?? null };
+        host.showPanel(panel);
+        host.setPayment(payment);
+        if (!simulated && first.linkId) {
+          host.watchPayment?.(first.linkId, (paidAt) => {
+            void host.showPanel({ ...panel, paid: true });
+            host.setPayment({ ...payment, status: 'paid', paidAt });
+          });
+        }
         host.updateLead({ email, payment_link: url, payment_total: total });
         return { url, total, totalCents, simulated, installments };
       } catch (e) {

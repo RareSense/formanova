@@ -280,7 +280,12 @@ function Deal({ panel, compact }: { panel: Extract<Panel, { kind: 'deal' }>; com
               </span>
               <span className="shrink-0 font-display text-xl leading-none tabular-nums">{p.amount}</span>
             </div>
-            {p.url ? (
+            {p.n === 1 && panel.paid ? (
+              <p role="status" className="flex items-center gap-2 text-sm font-semibold">
+                <Check className="h-4 w-4 shrink-0" style={{ color: GOLD }} aria-hidden="true" />
+                Paid, thank you. Your order has started.
+              </p>
+            ) : p.url ? (
               <div className={`grid grid-cols-1 gap-3 ${p.n === 1 ? 'sm:grid-cols-2' : ''}`}>
                 {p.n === 1 && (
                   <Button asChild size="lg" className="h-12 w-full px-4">
