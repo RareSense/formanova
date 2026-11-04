@@ -399,6 +399,14 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
 
   const linkTyping = useCallback(() => note('The client opened the link field and is typing.'), [note]);
 
+  /** Live loudness for the orb, read every frame: Ruby's voice, else a softer echo of the caller's. */
+  const voiceLevel = useCallback(() => {
+    const recorder = recorderRef.current;
+    if (!recorder) return 0;
+    const ruby = recorder.remoteLevel();
+    return ruby > 0.01 ? ruby : recorder.localLevel() * 0.5;
+  }, []);
+
   /** Saved straight into the lead, so it is kept even if the model forgets update_lead. */
   const shareReach = useCallback((channel: ReachChannel, value: string) => {
     leadRef.current = { ...leadRef.current, ...reachLead(channel, value) };
@@ -439,5 +447,6 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
     shareLink,
     linkTyping,
     shareReach,
+    voiceLevel,
   };
 }
