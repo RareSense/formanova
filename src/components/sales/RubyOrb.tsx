@@ -18,7 +18,7 @@ precision highp float;
 #else
 precision mediump float;
 #endif
-uniform vec2 res; uniform float t, lvl, still, amp;
+uniform vec2 res; uniform float t, lvl, still;
 uniform vec2 flow;
 uniform vec3 c1, c2, c3;
 float h(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
@@ -30,9 +30,7 @@ void main(){
   vec2 uv = (gl_FragCoord.xy - .5 * res) / min(res.x, res.y);
   float r = length(uv);
   vec2 dir = uv / max(r, 1e-4);
-  // Swells with each syllable (amp) and breathes when idle; the loudest edge stays inside the square.
-  float R = .40 + lvl * .015 + amp * .045 + sin(t * 1.1) * .004 * (1. - still)
-    + (n(dir * 1.4 + vec2(t * .06, -t * .045)) - .5) * (.006 + lvl * .012 + amp * .035);
+  float R = .43 + lvl * .03 + (n(dir * 1.4 + vec2(t * .06, -t * .045)) - .5) * (.004 + lvl * .022);
   float inside = 1. - smoothstep(R - 2.0 / res.x, R + 2.0 / res.x, r);
   if (inside <= 0.) { gl_FragColor = vec4(0.); return; }
   vec2 p = uv * 1.35;
@@ -44,7 +42,7 @@ void main(){
   float d = r / R;
   col *= .86 + .22 * (1. - smoothstep(-.4, .5, dot(uv, vec2(.6, -.8)) / R));
   col = mix(col, c1, pow(d, 5.) * .45);
-  col += lvl * .05 + amp * .07;
+  col += lvl * .06;
   float g = dot(col, vec3(.299, .587, .114));
   col = mix(col, vec3(g) * 1.04, still * .8);
   gl_FragColor = vec4(col * inside, inside);
@@ -110,7 +108,7 @@ export function RubyOrb({ level, calm = false, voice, className = '' }: RubyOrbP
     gl.enableVertexAttribArray(loc);
     gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
     const U = (name: string) => gl.getUniformLocation(prog, name);
-    const u = { res: U('res'), t: U('t'), lvl: U('lvl'), still: U('still'), amp: U('amp'), flow: U('flow'), c1: U('c1'), c2: U('c2'), c3: U('c3') };
+    const u = { res: U('res'), t: U('t'), lvl: U('lvl'), still: U('still'), flow: U('flow'), c1: U('c1'), c2: U('c2'), c3: U('c3') };
 
     // Light like Eva's orb: mostly pale, the accent only in the deeper folds.
     const applyColors = () => {
@@ -155,12 +153,13 @@ export function RubyOrb({ level, calm = false, voice, className = '' }: RubyOrbP
       const want = target.current;
       lvl += (want.level - lvl) * (want.level > lvl ? 0.08 : 0.04);
       still += ((want.calm ? 1 : 0) - still) * 0.05;
-      // Fast attack, slower release: it jumps with a syllable and settles between words.
+      // Fast attack, slower release: the clouds inside quicken with each syllable and settle between words.
+      // Only the inner flow follows the voice; the orb's size and edge stay as they were (owner, 2026-11-04).
       const loud = want.calm ? 0 : orbAmp(want.voice?.() ?? 0);
       amp += (loud - amp) * (loud > amp ? 0.35 : 0.1);
       const motion = !reduce?.matches;
       if (motion) {
-        const sp = 0.018 + lvl * 0.05 + amp * 0.22;
+        const sp = 0.018 + lvl * 0.05 + amp * 0.15;
         fy += dt * sp;
         fx += dt * sp * 0.6;
       }
@@ -172,7 +171,6 @@ export function RubyOrb({ level, calm = false, voice, className = '' }: RubyOrbP
       gl.uniform2f(u.flow, fx, fy);
       gl.uniform1f(u.t, motion ? (time / 1000) % 3600 : 12);
       gl.uniform1f(u.lvl, motion ? lvl : 0);
-      gl.uniform1f(u.amp, motion ? amp : 0);
       gl.uniform1f(u.still, still);
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
