@@ -83,6 +83,7 @@ const AdminModelsPage = lazyWithRetry(() => import("./pages/AdminModelsPage"));
 const AdminInspirationsPage = lazyWithRetry(() => import("./pages/AdminInspirationsPage"));
 const AdminGenerationsPage = lazyWithRetry(() => import("./pages/AdminGenerationsPage"));
 const AdminCadQueuePage = lazyWithRetry(() => import("./pages/AdminCadQueuePage"));
+const AdminRubyCallsPage = lazyWithRetry(() => import("./pages/AdminRubyCallsPage"));
 const AdminBrandsPage = lazyWithRetry(() => import("./pages/AdminBrandsPage"));
 const AdminGenerationDetailPage = lazyWithRetry(() => import("./pages/AdminGenerationDetailPage"));
 const AdminCadQueueDetailPage = lazyWithRetry(() => import("./pages/AdminCadQueueDetailPage"));
@@ -260,6 +261,7 @@ const MainApp = () => (
                     <Route path="promo-codes" element={<PromoAdminPage />} />
                     <Route path="generations" element={<AdminGenerationsPage />} />
                     <Route path="cad-queue" element={<AdminCadQueuePage />} />
+                    <Route path="ruby-calls" element={<AdminRubyCallsPage />} />
                     <Route path="brands" element={<AdminBrandsPage />} />
                     <Route path="feedback" element={<AdminFeedbackPage />} />
                     <Route path="ai-fixes" element={<AdminAIFixesPage />} />

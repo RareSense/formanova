@@ -6,6 +6,7 @@ const TABS = [
   { label: 'Promo Codes', to: '/admin/promo-codes' },
   { label: 'Generations', to: '/admin/generations' },
   { label: 'CAD Queue', to: '/admin/cad-queue' },
+  { label: 'Ruby Calls', to: '/admin/ruby-calls' },
   { label: 'Feedback', to: '/admin/feedback' },
   { label: 'AI Fixes', to: '/admin/ai-fixes' },
   { label: 'Brands', to: '/admin/brands' },
