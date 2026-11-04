@@ -54,10 +54,16 @@ export function transcriptFromTurns(turns: unknown, max = PAST_TRANSCRIPT_MAX): 
   return nl > 0 && nl < 200 ? tail.slice(nl + 1) : tail;
 }
 
-export function pastCallFromRecord(date: string, input: Record<string, unknown> | null | undefined): PastCall | null {
+export function pastCallFromRecord(
+  date: string,
+  input: Record<string, unknown> | null | undefined,
+  /** What the after-call step read from the transcript; what the call itself saved wins. */
+  extractedLead: Record<string, unknown> = {},
+): PastCall | null {
   if (!input || typeof input !== 'object') return null;
   const transcript = transcriptFromTurns(input.turns);
-  const lead = input.lead && typeof input.lead === 'object' ? (input.lead as Record<string, unknown>) : {};
+  const saved = input.lead && typeof input.lead === 'object' ? (input.lead as Record<string, unknown>) : {};
+  const lead = { ...extractedLead, ...saved };
   if (!transcript && !Object.keys(lead).length) return null;
   return {
     date,
@@ -77,17 +83,37 @@ interface RawRun {
   input?: Record<string, unknown>;
 }
 
-async function recordFor(run: RawRun): Promise<Record<string, unknown> | null> {
-  if (run.input && Array.isArray(run.input.turns)) return run.input;
-  const id = run.workflow_id ?? run.id;
-  if (!id) return null;
-  try {
-    const detail = await getWorkflowDetails(id);
-    const withTurns = detail.steps.find((s) => s.input && Array.isArray((s.input as Record<string, unknown>).turns));
-    return (withTurns?.input as Record<string, unknown>) ?? null;
-  } catch {
-    return null;
+/** Each run's details get their own short limit, so one slow lookup never costs the whole memory. */
+export const DETAIL_TIMEOUT_MS = 1500;
+
+type Details = Awaited<ReturnType<typeof getWorkflowDetails>>;
+
+function detailsWithin(id: string, ms: number): Promise<Details | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), ms);
+  });
+  return Promise.race([getWorkflowDetails(id).catch(() => null), late]).finally(() => clearTimeout(timer));
+}
+
+/** The lead in the clean step's output (sales_clean_transcript), however the step wraps it. */
+function leadFromSteps(details: Details | null): Record<string, unknown> {
+  for (const step of details?.steps ?? []) {
+    const out = step.output as Record<string, unknown> | undefined;
+    const result = (out?.result ?? out) as Record<string, unknown> | undefined;
+    const lead = result?.lead;
+    if (lead && typeof lead === 'object' && !Array.isArray(lead)) return lead as Record<string, unknown>;
   }
+  return {};
+}
+
+async function recordFor(run: RawRun): Promise<{ record: Record<string, unknown> | null; extracted: Record<string, unknown> }> {
+  const listed = run.input && Array.isArray(run.input.turns) ? run.input : null;
+  const id = run.workflow_id ?? run.id;
+  if (!id) return { record: listed, extracted: {} };
+  const details = await detailsWithin(id, DETAIL_TIMEOUT_MS);
+  const withTurns = details?.steps.find((s) => s.input && Array.isArray((s.input as Record<string, unknown>).turns));
+  return { record: listed ?? ((withTurns?.input as Record<string, unknown>) ?? null), extracted: leadFromSteps(details) };
 }
 
 async function loadPastCalls(): Promise<PastCall[]> {
@@ -109,7 +135,12 @@ async function loadPastCalls(): Promise<PastCall[]> {
       return true;
     })
     .slice(0, PAST_CALLS_MAX);
-  const calls = await Promise.all(newest.map(async (r) => pastCallFromRecord(date(r), await recordFor(r))));
+  const calls = await Promise.all(
+    newest.map(async (r) => {
+      const { record, extracted } = await recordFor(r);
+      return pastCallFromRecord(date(r), record, extracted);
+    }),
+  );
   // Newest last.
   return calls.filter((c): c is PastCall => !!c).reverse();
 }

@@ -72,6 +72,32 @@ describe('call memory', () => {
     expect(history.getWorkflowDetails).toHaveBeenCalledWith('c');
   });
 
+  it('fills the lead with what the after-call step read from the transcript; what the call saved wins', async () => {
+    authFetch.authenticatedFetch.mockImplementation(() =>
+      json([
+        { workflow_id: 'p1', name: 'ruby_post_call', created_at: '2026-11-04',
+          input: { turns: [{ role: 'client', text: 'Usha here' }], lead: { email: 'page@aura.com' } } },
+      ]),
+    );
+    history.getWorkflowDetails.mockResolvedValue({
+      steps: [{ input: { turns: [] }, output: { result: { turns: [], lead: { name: 'Usha', email: 'model@aura.com' } } } }],
+    });
+    const [call] = await fetchPastCalls();
+    expect(call.lead).toEqual({ name: 'Usha', email: 'page@aura.com' });
+  });
+
+  it('a slow details lookup never loses the call: it keeps what the call saved', async () => {
+    vi.useFakeTimers();
+    authFetch.authenticatedFetch.mockImplementation(() =>
+      json([{ workflow_id: 'p1', name: 'ruby_post_call', created_at: '2026-11-04', input: { turns: [{ role: 'ruby', text: 'Hi' }], lead: { brand: 'Aura' } } }]),
+    );
+    history.getWorkflowDetails.mockImplementation(() => new Promise(() => {}));
+    const p = fetchPastCalls(2500);
+    await vi.advanceTimersByTimeAsync(1600);
+    const calls = await p;
+    expect(calls.map((c) => c.lead)).toEqual([{ brand: 'Aura' }]);
+  });
+
   it('counts a call saved twice only once', async () => {
     authFetch.authenticatedFetch.mockImplementation(() =>
       json([
