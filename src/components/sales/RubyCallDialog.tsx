@@ -131,6 +131,7 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
             <RubyOrb
               level={orbLevel}
               calm={orbCalm}
+              voice={call.voiceLevel}
               className={showPanels ? 'w-28 sm:w-40 lg:w-52' : 'w-48 sm:w-64'}
             />
 

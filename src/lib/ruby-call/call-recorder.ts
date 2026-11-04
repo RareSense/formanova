@@ -111,6 +111,7 @@ export class CallRecorder {
   private rec: MediaRecorder | null = null;
   private analysers: AnalyserNode[] = [];
   private remoteAnalyser: AnalyserNode | null = null;
+  private localAnalyser: AnalyserNode | null = null;
   private levelTimer: ReturnType<typeof setInterval> | null = null;
   private parts: Part[] = [];
   private uploader: AudioUploader | null = null;
@@ -157,7 +158,7 @@ export class CallRecorder {
       const merger = ctx.createChannelMerger(2);
       merger.connect(dest);
       this.merger = merger;
-      this.connect(mic, 0);
+      this.localAnalyser = this.connect(mic, 0);
       this.mime = MIME_PREFERENCE.find((t) => this.deps.isTypeSupported(t)) || '';
       let rec: MediaRecorder | null = null;
       try {
@@ -221,6 +222,15 @@ export class CallRecorder {
   remoteLevel(): number {
     try {
       return this.remoteAnalyser && !this.stopping ? CallRecorder.rms(this.remoteAnalyser) : 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  /** The caller's current loudness (RMS, 0..1); 0 when unknown. */
+  localLevel(): number {
+    try {
+      return this.localAnalyser && !this.stopping ? CallRecorder.rms(this.localAnalyser) : 0;
     } catch {
       return 0;
     }
