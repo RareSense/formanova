@@ -68,6 +68,25 @@ describe('admin Ruby calls', () => {
     expect(row.turns).toHaveLength(2);
   });
 
+  it('keeps each upload with its purpose and the file hash to show it, from the hash or the proxied address', () => {
+    const row = callRowFromDetail(detail({ input: { uploads: [
+      { name: 'ring.jpg', sha256: 'a'.repeat(64), uri: 'azure://x', purpose: 'jewelry_photos' },
+      { name: 'mood.png', uri: `https://api.formanova.ai/artifacts/${'b'.repeat(64)}`, purpose: 'references' },
+      { name: 'odd.jpg', uri: 'not-an-address', purpose: 'other' },
+    ] } }));
+    expect(row.uploadList).toEqual([
+      { name: 'ring.jpg', purpose: 'jewelry_photos', sha: 'a'.repeat(64) },
+      { name: 'mood.png', purpose: 'references', sha: 'b'.repeat(64) },
+      { name: 'odd.jpg', purpose: 'other', sha: null },
+    ]);
+    expect(row.uploads).toBe(3);
+  });
+
+  it('keeps only web links as links', () => {
+    const row = callRowFromDetail(detail({ input: { links: [{ url: 'https://drive.google.com/x' }, { url: 'javascript:alert(1)' }, { url: 'http://shop.com' }] } }));
+    expect(row.links).toEqual(['https://drive.google.com/x', 'http://shop.com']);
+  });
+
   it('calls it a deal when a payment link was made, quoted when only a quote exists', () => {
     expect(callRowFromDetail(detail({ input: { payment: { total: '$260' } } })).outcome).toBe('Deal');
     expect(callRowFromDetail(detail({ input: { quote: { approved: true, total: '$260' } } })).outcome).toBe('Quoted');
