@@ -15,6 +15,13 @@ export interface AdminCallTurn {
   start_ms?: number;
 }
 
+export interface AdminUpload {
+  name: string;
+  purpose: string;
+  /** The stored file's sha256, to fetch it with the admin's token; null when unknown. */
+  sha: string | null;
+}
+
 export interface RecordingRef {
   finalSha: string | null;
   parts: { seq: number; sha256: string }[];
@@ -36,6 +43,8 @@ export interface RubyCallRow {
   recordingSha: string | null;
   recording: RecordingRef | null;
   uploads: number;
+  uploadList: AdminUpload[];
+  /** Web links only (http or https); anything else is dropped. */
   links: string[];
   lead: Record<string, string>;
   quote: Record<string, unknown> | null;
@@ -46,6 +55,16 @@ export interface RubyCallRow {
 const LIST_LIMIT = 50;
 const DETAIL_CONCURRENCY = 6;
 const SHA256 = /^[a-f0-9]{64}$/;
+const SHA_IN_ADDRESS = /(?:artifacts|hashed)\/([a-f0-9]{64})(?:[/?#]|$)/;
+
+const webLink = (v: string): boolean => {
+  try {
+    const u = new URL(v);
+    return u.protocol === 'https:' || u.protocol === 'http:';
+  } catch {
+    return false;
+  }
+};
 
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
 const text = (v: unknown): string => (typeof v === 'string' ? v.trim() : typeof v === 'number' ? String(v) : '');
@@ -81,6 +100,13 @@ function recordingOf(raw: unknown): RecordingRef | null {
   return { finalSha, parts, mime: text(rec.mime).split(';')[0] || 'audio/webm' };
 }
 
+function uploadOf(raw: unknown): AdminUpload {
+  const u = obj(raw);
+  const direct = typeof u.sha256 === 'string' && SHA256.test(u.sha256) ? u.sha256 : null;
+  const fromAddress = text(u.uri).match(SHA_IN_ADDRESS)?.[1] ?? null;
+  return { name: text(u.name) || 'file', purpose: text(u.purpose) || 'other', sha: direct ?? fromAddress };
+}
+
 export function callRowFromDetail(detail: AdminGenerationDetail): RubyCallRow {
   const input = obj(detail.input_payload);
   const lead = { ...extractedLead(detail), ...textFields(input.lead) };
@@ -108,7 +134,8 @@ export function callRowFromDetail(detail: AdminGenerationDetail): RubyCallRow {
     recordingSha: recording?.finalSha ?? null,
     recording,
     uploads: Array.isArray(input.uploads) ? input.uploads.length : 0,
-    links: (Array.isArray(input.links) ? input.links : []).map((l) => text(obj(l).url)).filter(Boolean),
+    uploadList: (Array.isArray(input.uploads) ? input.uploads : []).map(uploadOf),
+    links: (Array.isArray(input.links) ? input.links : []).map((l) => text(obj(l).url)).filter(webLink),
     lead,
     quote,
     payment,
@@ -156,6 +183,11 @@ export async function listRubyCalls(): Promise<RubyCallRow[]> {
     }
   });
   return latestPerCall(rows.filter((r): r is RubyCallRow => !!r)).sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+}
+
+/** A stored file (an upload) as a blob, fetched with the admin's token. */
+export async function fileBlob(sha: string, type = ''): Promise<Blob> {
+  return new Blob([await artifact(sha)], type ? { type } : {});
 }
 
 async function artifact(sha: string): Promise<ArrayBuffer> {
