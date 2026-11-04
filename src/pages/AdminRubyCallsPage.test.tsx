@@ -126,6 +126,21 @@ describe('Admin Ruby calls page', () => {
     expect(download.getAttribute('download')).toMatch(/^ruby-call-2026-11-04-usha\.webm$/);
   });
 
+  it('the deal says whether the client paid, is still to pay, or had a test link', async () => {
+    const paid = row({ workflowId: 'wf3', callSessionId: 'cs3', outcome: 'Paid', payment: { total: '$350', status: 'paid', paidAt: '2026-11-04T10:00:00Z', simulated: false } });
+    const open = row({ workflowId: 'wf4', callSessionId: 'cs4', outcome: 'Deal', payment: { total: '$350', simulated: false } });
+    const test = row({ workflowId: 'wf5', callSessionId: 'cs5', outcome: 'Deal', payment: { total: '$350', simulated: true } });
+    calls.listRubyCalls.mockResolvedValue([paid, open, test]);
+    const first = renderPage('/admin/ruby-calls?call=wf3');
+    expect(await screen.findByText(/Paid during the call/)).toBeInTheDocument();
+    first.unmount();
+    const second = renderPage('/admin/ruby-calls?call=wf4');
+    expect(await screen.findByText(/waiting for payment/i)).toBeInTheDocument();
+    second.unmount();
+    renderPage('/admin/ruby-calls?call=wf5');
+    expect(await screen.findByText(/test link/i)).toBeInTheDocument();
+  });
+
   it('says plainly when a call has no recording or no submissions', async () => {
     renderPage('/admin/ruby-calls?call=wf2');
     expect(await screen.findByText('No recording for this call.')).toBeInTheDocument();

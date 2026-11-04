@@ -35,6 +35,7 @@ export const clock = (seconds: number | null) =>
   seconds === null ? '-' : `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 
 const OUTCOME_STYLE: Record<RubyCallRow['outcome'], string> = {
+  Paid: 'bg-[hsl(var(--formanova-hero-accent)/0.3)] font-semibold text-foreground',
   Deal: 'bg-[hsl(var(--formanova-hero-accent)/0.15)] text-foreground',
   Quoted: 'bg-muted text-foreground',
   'No deal': 'text-muted-foreground',
@@ -372,7 +373,13 @@ function Deal({ call }: { call: RubyCallRow }) {
     <section aria-label="Deal" className={`${CARD} p-4 text-sm sm:p-5`}>
       <h3 className="mb-2 font-semibold">Deal</h3>
       {call.payment ? (
-        <p className="break-words">Payment link made · {String(call.payment.total ?? '')}</p>
+        <p className="break-words">
+          {call.payment.status === 'paid'
+            ? `Paid during the call${call.payment.paidAt ? ` (${when(String(call.payment.paidAt))})` : ''} · ${String(call.payment.total ?? '')}`
+            : call.payment.simulated
+              ? `Test link only (no real payment yet) · ${String(call.payment.total ?? '')}`
+              : `Payment link sent, waiting for payment · ${String(call.payment.total ?? '')}`}
+        </p>
       ) : call.quote ? (
         <p className="break-words">Last quote {String(call.quote.total ?? '')}, no payment link yet</p>
       ) : (

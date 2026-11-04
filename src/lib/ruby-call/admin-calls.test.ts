@@ -87,8 +87,9 @@ describe('admin Ruby calls', () => {
     expect(row.links).toEqual(['https://drive.google.com/x', 'http://shop.com']);
   });
 
-  it('calls it a deal when a payment link was made, quoted when only a quote exists', () => {
+  it('calls it a deal when a payment link was made, paid once the client paid, quoted when only a quote exists', () => {
     expect(callRowFromDetail(detail({ input: { payment: { total: '$260' } } })).outcome).toBe('Deal');
+    expect(callRowFromDetail(detail({ input: { payment: { total: '$260', status: 'paid', paidAt: 't' } } })).outcome).toBe('Paid');
     expect(callRowFromDetail(detail({ input: { quote: { approved: true, total: '$260' } } })).outcome).toBe('Quoted');
   });
 
