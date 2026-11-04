@@ -90,9 +90,9 @@ export function DoneForYouCard({ onOpenCall }: DoneForYouCardProps) {
         <Button
           onClick={handleClick}
           size="lg"
-          className="h-auto min-h-11 w-full whitespace-normal px-3 py-2.5 font-mono text-xs uppercase leading-tight tracking-[0.2em] xl:tracking-[0.1em]"
+          className="h-auto min-h-11 w-full whitespace-normal px-3 py-2.5 font-mono text-xs uppercase leading-tight tracking-[0.2em] xl:px-2 xl:text-[11px] xl:tracking-[0.06em]"
         >
-          <Phone className="mr-2 h-4 w-4" aria-hidden="true" />
+          <Phone className="mr-2 h-4 w-4 xl:hidden" aria-hidden="true" />
           Get my price now
         </Button>
       </div>
