@@ -8,6 +8,7 @@ const TABS = [
   { label: 'Rhino Users', to: '/admin/rhino-users' },
   { label: 'CAD Queue', to: '/admin/cad-queue' },
   { label: 'Ruby Calls', to: '/admin/ruby-calls' },
+  { label: 'Ruby Orders', to: '/admin/ruby-orders' },
   { label: 'Feedback', to: '/admin/feedback' },
   { label: 'AI Fixes', to: '/admin/ai-fixes' },
   { label: 'Brands', to: '/admin/brands' },
