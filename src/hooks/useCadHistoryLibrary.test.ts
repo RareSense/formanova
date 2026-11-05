@@ -120,7 +120,6 @@ describe('useCadHistoryLibrary — images (image_to_cad)', () => {
     expect(mockFetchUserAssets).toHaveBeenCalledWith(
       'cad_reference', 0, 10, undefined, undefined, undefined, undefined,
     );
-    expect(mockListMyWorkflows).not.toHaveBeenCalled();
 
     // Grouped into one entry per set, like Photo Studio's vault cards.
     expect(result.current.items.map((i) => i.id)).toEqual(['set-1']);
@@ -182,6 +181,53 @@ describe('useCadHistoryLibrary — images (image_to_cad)', () => {
 
     expect(result.current.error).toBe('HTTP 404');
     expect(result.current.hasHistory).toBe(false);
+  });
+});
+
+describe('useCadHistoryLibrary — prompts used with past images', () => {
+  const imageRun = (over: Partial<WorkflowSummary>) => wf({ source_type: 'image_to_cad', client_flow: 'image', ...over });
+
+  it('attaches the prompts of the runs that used a set, newest first, with prompt as the newest', async () => {
+    mockFetchUserAssets.mockResolvedValue(assetPage([
+      asset({ id: 'a', set_ids: ['set-1'], artifact_sha256: 'f'.repeat(64) }),
+      asset({ id: 'b', set_ids: ['set-2'] }),
+    ]));
+    mockListMyWorkflows.mockResolvedValue([
+      imageRun({ workflow_id: 'r1', created_at: '2026-08-01T00:00:00Z', prompt: 'US 6', reference_image_keys: ['a'] }),
+      imageRun({ workflow_id: 'r2', created_at: '2026-08-20T00:00:00Z', prompt: 'US 7, band 2 mm', reference_image_keys: ['f'.repeat(64)] }),
+    ]);
+
+    const { result } = renderHook(() => useCadHistoryLibrary('image_to_cad'));
+    await waitFor(() => expect(result.current.items[0]?.runPrompts).toHaveLength(2));
+
+    const [withRuns, without] = result.current.items;
+    expect(withRuns.runPrompts).toEqual([
+      { text: 'US 7, band 2 mm', createdAt: '2026-08-20T00:00:00Z' },
+      { text: 'US 6', createdAt: '2026-08-01T00:00:00Z' },
+    ]);
+    expect(withRuns.prompt).toBe('US 7, band 2 mm');
+    expect(without.runPrompts).toEqual([]);
+    expect(without.prompt).toBeNull();
+  });
+
+  it('reads the runs once, not again on every page of images', async () => {
+    mockFetchUserAssets.mockResolvedValue(assetPage([asset({ id: 'a' })], 25));
+    mockListMyWorkflows.mockResolvedValue([]);
+    const { result } = renderHook(() => useCadHistoryLibrary('image_to_cad'));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    act(() => result.current.setPage(1));
+    await waitFor(() => expect(mockFetchUserAssets).toHaveBeenCalledTimes(2));
+    expect(mockListMyWorkflows).toHaveBeenCalledTimes(1);
+  });
+
+  it('still shows the images when the run history cannot be read', async () => {
+    mockFetchUserAssets.mockResolvedValue(assetPage([asset({ id: 'a' })]));
+    mockListMyWorkflows.mockRejectedValue(new Error('500'));
+    const { result } = renderHook(() => useCadHistoryLibrary('image_to_cad'));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.error).toBeNull();
+    expect(result.current.items).toHaveLength(1);
+    expect(result.current.items[0].prompt).toBeNull();
   });
 });
 
