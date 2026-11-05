@@ -147,6 +147,14 @@ export function useImageToCADWorkflow({
    */
   const [restoredReferenceUrls, setRestoredReferenceUrls] = useState<string[]>([]);
   const [restoredPrompt, setRestoredPrompt] = useState<string | null>(null);
+  /**
+   * Bumped by every restore. The page keys "this is a restore, show the run's
+   * prompt and photos" on it, which a change of restoredPrompt alone cannot
+   * say: two runs can share a prompt, and a run can have none.
+   */
+  const [restoreCount, setRestoreCount] = useState(0);
+  /** The restore whose inputs may still land; a slower lookup for an earlier one is dropped. */
+  const restoreTokenRef = useRef(0);
   /** Which version the panel is showing; the newest until the user picks another. */
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   /**
@@ -528,6 +536,8 @@ export function useImageToCADWorkflow({
     // report every internal restore as external.
     const entry = resolveRestoreEntry(window.location.search);
 
+    const restoreToken = ++restoreTokenRef.current;
+    setRestoreCount((n) => n + 1);
     hasNavigatedAway.current = false;
     onWorkspaceActivate();
     setIsGenerating(false);
@@ -594,9 +604,15 @@ export function useImageToCADWorkflow({
     if (workflowId) {
       // After the model, never before it: the ring is what the user came for,
       // and this is only the brief beside it.
+      //
+      // Fills only what is still empty: the seed (from history) and the ring's
+      // root run (an improve run's own inputs are saved files, not the user's
+      // photos) are better sources, and an empty or failed lookup must never
+      // blank them.
       void fetchCadRunInputs(workflowId).then(({ referenceImageUrls, prompt }) => {
-        setRestoredReferenceUrls(referenceImageUrls);
-        setRestoredPrompt(prompt);
+        if (restoreToken !== restoreTokenRef.current) return;
+        if (referenceImageUrls.length) setRestoredReferenceUrls((prev) => (prev.length ? prev : referenceImageUrls));
+        if (prompt) setRestoredPrompt((prev) => prev ?? prompt);
       });
     }
     return true;
@@ -893,6 +909,7 @@ export function useImageToCADWorkflow({
     improveMessage,
     restoredReferenceUrls,
     restoredPrompt,
+    restoreCount,
     /** True once, for the model that a run started here has just produced. */
     consumeGeneratedToast,
     simulateGeneration,

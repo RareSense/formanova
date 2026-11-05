@@ -38,6 +38,7 @@ import type { GemMode } from "@/components/text-to-cad/CADCanvas";
 import { RING_CAD_DEFAULT_TIER, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
 import { recordStudioVisit } from '@/lib/studio-preference';
 import { useCadRestoreFromUrl } from "@/hooks/useCadRestoreFromUrl";
+import { useRestoredRunPrompt } from "@/hooks/useRestoredRunPrompt";
 import { useCadMetal } from "@/hooks/useCadMetal";
 import TechSpecSection, { hasSpecSheet } from "@/components/spec-sheet/TechSpecSection";
 import MetalWeightStep from "@/components/metal-weight/MetalWeightStep";
@@ -166,12 +167,17 @@ export default function ImageToCAD() {
     return () => document.removeEventListener('fullscreenchange', handler);
   }, []);
 
-  // A ring opened from history shows the description it was made from. A run
-  // that used none leaves this null, and the panel shows no prompt at all
-  // rather than an empty box implying the user forgot to type something.
-  useEffect(() => {
-    if (workflow.restoredPrompt && !prompt) setPrompt(workflow.restoredPrompt);
-  }, [workflow.restoredPrompt]); // eslint-disable-line react-hooks/exhaustive-deps -- runs when a restore resolves, and must not fight the user's own typing afterwards
+  // A ring opened from history shows the description and photos it was made
+  // from, never this session's leftovers: the photos uploaded here are dropped
+  // so the panel falls back to the run's own, and the prompt box takes the
+  // run's prompt (empty when it had none). Typing afterwards is never undone.
+  useRestoredRunPrompt({
+    restoreCount: workflow.restoreCount,
+    restoredPrompt: workflow.restoredPrompt,
+    prompt,
+    setPrompt,
+    onRestore: clearReferenceImages,
+  });
 
   // What the left panel shows: this session's uploads, or, for a ring opened
   // from history, the photos that run was actually made from.
