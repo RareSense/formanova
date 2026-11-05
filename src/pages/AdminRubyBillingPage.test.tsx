@@ -86,7 +86,7 @@ beforeEach(() => {
 describe('Admin Ruby orders page', () => {
   it('lists orders with paid / total and flags review and dispute rows', async () => {
     renderPage();
-    expect(await screen.findAllByText('$250.00 / $500.00', { exact: false })).toHaveLength(2);
+    expect(await screen.findAllByText('of $500.00 · 1/2 paid')).toHaveLength(2);
     const rows = document.querySelectorAll('tr[data-flagged="true"]');
     expect(rows).toHaveLength(1);
     expect(within(rows[0] as HTMLElement).getByText('Needs review')).toBeInTheDocument();

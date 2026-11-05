@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useIsFetching, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, ArrowLeft, Copy, Download, Loader2, Play, RefreshCw } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -34,6 +34,7 @@ import { parseServerTime } from '@/lib/server-time';
  * (?view=calls, ?deal=<id>, ?call=<id>) so Back works and a page can be linked.
  * Everything that came from a call is rendered as text, never as HTML.
  */
+const WRAP = 'mx-auto max-w-5xl space-y-4 px-4 py-6 md:px-8'; // same width and gutters as the Admin header and tabs
 const WIDE = 'hidden md:table-cell';
 const CARD = 'border border-border bg-card';
 
@@ -88,23 +89,48 @@ export default function AdminRubyBillingPage() {
 
   const dealId = params.get('deal');
   const callId = params.get('call');
+  const listKey = view === 'orders' ? 'admin-sales-deals' : 'admin-sales-calls';
   if (dealId) return <DealView dealId={dealId} onBack={() => go({})} onCall={(id) => go({ view: 'calls', call: id })} />;
   if (callId) return <CallView callId={callId} onBack={() => go({ view: 'calls' })} onDeal={(id) => go({ deal: id })} />;
 
   return (
-    <div className="space-y-4">
+    <div className={WRAP}>
       <div>
         <h2 className="text-lg font-semibold">Ruby orders</h2>
-        <p className="text-sm text-muted-foreground">Orders and calls as billing holds them. Newest first.</p>
+        <p className="text-sm text-muted-foreground">What clients agreed on calls with Ruby, and what they paid. Newest first.</p>
       </div>
-      <div role="tablist" className="flex gap-1">
-        {(['orders', 'calls'] as const).map((v) => (
-          <Button key={v} role="tab" aria-selected={view === v} size="sm" variant={view === v ? 'default' : 'outline'} onClick={() => go({ view: v === 'calls' ? 'calls' : null })}>
-            {v === 'orders' ? 'Orders' : 'Calls'}
-          </Button>
-        ))}
+      <div className="flex items-center justify-between gap-3">
+        <div role="tablist" className="flex gap-1">
+          {(['orders', 'calls'] as const).map((v) => (
+            <Button key={v} role="tab" aria-selected={view === v} size="sm" variant={view === v ? 'default' : 'outline'} onClick={() => go({ view: v === 'calls' ? 'calls' : null })}>
+              {v === 'orders' ? 'Orders' : 'Calls'}
+            </Button>
+          ))}
+        </div>
+        <RefreshButton queryKey={listKey} />
       </div>
       {view === 'orders' ? <OrdersList onOpen={(id) => go({ deal: id })} /> : <CallsList onOpen={(id) => go({ view: 'calls', call: id })} />}
+    </div>
+  );
+}
+
+function RefreshButton({ queryKey }: { queryKey: string }) {
+  const qc = useQueryClient();
+  const busy = useIsFetching({ queryKey: [queryKey] }) > 0;
+  return (
+    <Button variant="outline" size="sm" onClick={() => void qc.refetchQueries({ queryKey: [queryKey] })} disabled={busy}>
+      <RefreshCw className={`mr-2 h-4 w-4 ${busy ? 'animate-spin' : ''}`} /> Refresh
+    </Button>
+  );
+}
+
+function BackBar({ label, onBack, queryKey }: { label: string; onBack(): void; queryKey: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <Button variant="ghost" size="sm" className="-ml-2" onClick={onBack}>
+        <ArrowLeft className="mr-2 h-4 w-4" /> {label}
+      </Button>
+      <RefreshButton queryKey={queryKey} />
     </div>
   );
 }
@@ -126,14 +152,9 @@ function Pager({ offset, total, onPage }: { offset: number; total: number; onPag
   );
 }
 
-function Status({ loading, error, onRetry, fetching }: { loading: boolean; error: unknown; onRetry(): void; fetching: boolean }) {
+function Status({ loading, error }: { loading: boolean; error: unknown }) {
   return (
     <>
-      <div className="flex justify-end">
-        <Button variant="outline" size="sm" onClick={onRetry} disabled={fetching}>
-          <RefreshCw className={`mr-2 h-4 w-4 ${fetching ? 'animate-spin' : ''}`} /> Refresh
-        </Button>
-      </div>
       {loading && (
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" /> Loading…
@@ -153,13 +174,13 @@ function OrdersList({ onOpen }: { onOpen(id: string): void }) {
   const q = useQuery({ queryKey: ['admin-sales-deals', offset], queryFn: () => listSalesDeals(offset) });
   return (
     <div className="space-y-3">
-      <Status loading={q.isLoading} error={q.error} fetching={q.isFetching} onRetry={() => void q.refetch()} />
+      <Status loading={q.isLoading} error={q.error} />
       {q.data && (
         <div className={CARD}>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Date</TableHead>
+                <TableHead className={WIDE}>Date</TableHead>
                 <TableHead>Client</TableHead>
                 <TableHead className={WIDE}>Project</TableHead>
                 <TableHead>Paid</TableHead>
@@ -181,20 +202,21 @@ function OrdersList({ onOpen }: { onOpen(id: string): void }) {
                   className={`cursor-pointer ${d.needs_review || d.has_open_dispute ? 'bg-destructive/5' : ''}`}
                   onClick={() => onOpen(d.deal_id)}
                 >
-                  <TableCell className="whitespace-nowrap text-sm">{when(d.created_at)}</TableCell>
+                  <TableCell className={`${WIDE} whitespace-nowrap text-sm`}>{when(d.created_at)}</TableCell>
                   <TableCell className="min-w-0">
                     <div className="font-medium">{d.client.name || 'Unknown'}</div>
-                    <div className="break-all text-xs text-muted-foreground">{d.client.email}</div>
+                    <div className="text-xs text-muted-foreground [overflow-wrap:anywhere] md:whitespace-nowrap">{d.client.email}</div>
+                    <div className="text-xs text-muted-foreground md:hidden">{when(d.created_at)}</div>
                   </TableCell>
                   <TableCell className={`${WIDE} break-words text-sm`}>{d.project_name}</TableCell>
-                  <TableCell className="whitespace-nowrap text-sm tabular-nums">
-                    {money(d.paid_cents)} / {money(d.total_cents)}
-                    <div className="text-xs text-muted-foreground">
-                      {d.installments_paid} of {d.installments_total} payments
+                  <TableCell className="text-sm tabular-nums">
+                    <div className="whitespace-nowrap">{money(d.paid_cents)}</div>
+                    <div className="text-xs text-muted-foreground md:whitespace-nowrap">
+                      of {money(d.total_cents)} · {d.installments_paid}/{d.installments_total} paid
                     </div>
                   </TableCell>
                   <TableCell>
-                    <span className={`px-2 py-0.5 text-xs ${PAY_STYLE[d.payment_status]}`}>{PAY_LABEL[d.payment_status]}</span>
+                    <span className={`whitespace-nowrap px-2 py-0.5 text-xs ${PAY_STYLE[d.payment_status]}`}>{PAY_LABEL[d.payment_status]}</span>
                     <Flags review={d.needs_review} dispute={d.has_open_dispute} refunds={d.has_refunds} />
                   </TableCell>
                 </TableRow>
@@ -213,13 +235,13 @@ function CallsList({ onOpen }: { onOpen(id: string): void }) {
   const q = useQuery({ queryKey: ['admin-sales-calls', offset], queryFn: () => listSalesCalls(offset) });
   return (
     <div className="space-y-3">
-      <Status loading={q.isLoading} error={q.error} fetching={q.isFetching} onRetry={() => void q.refetch()} />
+      <Status loading={q.isLoading} error={q.error} />
       {q.data && (
         <div className={CARD}>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Date</TableHead>
+                <TableHead className={WIDE}>Date</TableHead>
                 <TableHead>Client</TableHead>
                 <TableHead>Length</TableHead>
                 <TableHead>Deal</TableHead>
@@ -235,10 +257,11 @@ function CallsList({ onOpen }: { onOpen(id: string): void }) {
               )}
               {q.data.items.map((c) => (
                 <TableRow key={c.call_session_id} className="cursor-pointer" onClick={() => onOpen(c.call_session_id)}>
-                  <TableCell className="whitespace-nowrap text-sm">{when(c.started_at)}</TableCell>
+                  <TableCell className={`${WIDE} whitespace-nowrap text-sm`}>{when(c.started_at)}</TableCell>
                   <TableCell className="min-w-0">
                     <div className="font-medium">{c.client.name || 'Unknown'}</div>
-                    <div className="break-all text-xs text-muted-foreground">{c.client.email || c.client.account_email}</div>
+                    <div className="text-xs text-muted-foreground [overflow-wrap:anywhere] md:whitespace-nowrap">{c.client.email || c.client.account_email}</div>
+                    <div className="text-xs text-muted-foreground md:hidden">{when(c.started_at)}</div>
                   </TableCell>
                   <TableCell className="text-sm tabular-nums">{clock(c.duration_seconds)}</TableCell>
                   <TableCell className="text-sm">{c.made_deal ? 'Yes' : 'No'}</TableCell>
@@ -257,23 +280,21 @@ function DealView({ dealId, onBack, onCall }: { dealId: string; onBack(): void; 
   const q = useQuery({ queryKey: ['admin-sales-deal', dealId], queryFn: () => getSalesDeal(dealId) });
   const deal = q.data;
   return (
-    <div className="space-y-4">
-      <Button variant="ghost" size="sm" className="-ml-2" onClick={onBack}>
-        <ArrowLeft className="mr-2 h-4 w-4" /> All orders
-      </Button>
-      <Status loading={q.isLoading} error={q.error} fetching={q.isFetching} onRetry={() => void q.refetch()} />
+    <div className={WRAP}>
+      <BackBar label="All orders" onBack={onBack} queryKey="admin-sales-deal" />
+      <Status loading={q.isLoading} error={q.error} />
       {deal && (
         <>
           <section className={`${CARD} space-y-2 p-4 sm:p-5`}>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="break-words text-xl font-semibold">{deal.project_name}</h2>
-                <p className="break-all text-sm text-muted-foreground">
+                <p className="break-words text-sm text-muted-foreground [overflow-wrap:anywhere]">
                   {[deal.client.name, deal.client.email].filter(Boolean).join(' · ')}
                   {deal.customer_email && deal.customer_email !== deal.client.email ? ` · pays as ${deal.customer_email}` : ''}
                 </p>
               </div>
-              <div className="text-right text-sm">
+              <div className="text-sm sm:text-right">
                 <span className={`px-2 py-0.5 text-xs ${PAY_STYLE[deal.payment_status]}`}>{PAY_LABEL[deal.payment_status]}</span>
                 <p className="mt-1 tabular-nums">
                   {money(deal.paid_cents, deal.currency)} of {money(deal.total_cents, deal.currency)}
@@ -296,11 +317,7 @@ function DealView({ dealId, onBack, onCall }: { dealId: string; onBack(): void; 
           <div className="grid gap-4 lg:grid-cols-2">
             <section aria-label="Package" className={`${CARD} min-w-0 p-4 sm:p-5`}>
               <h3 className="mb-2 text-sm font-semibold">Package</h3>
-              {deal.package == null ? (
-                <p className="text-sm text-muted-foreground">Nothing stored.</p>
-              ) : (
-                <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words text-xs">{asText(deal.package)}</pre>
-              )}
+              <PackageView pkg={deal.package} currency={deal.currency} />
             </section>
             <section aria-label="Calls" className={`${CARD} min-w-0 p-4 sm:p-5`}>
               <h3 className="mb-2 text-sm font-semibold">Calls with this client</h3>
@@ -318,6 +335,65 @@ function DealView({ dealId, onBack, onCall }: { dealId: string; onBack(): void; 
             </section>
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+const plain = (v: unknown) => (typeof v === 'string' || typeof v === 'number' ? String(v) : asText(v));
+const human = (key: string) => key.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+
+/** What was agreed, readable: one line per item, then the terms. Plain text only; unknown parts are shown as text. */
+function PackageView({ pkg, currency }: { pkg: unknown; currency: string }) {
+  if (pkg == null) return <p className="text-sm text-muted-foreground">Nothing stored.</p>;
+  if (!isObj(pkg)) return <p className="whitespace-pre-wrap break-words text-sm">{plain(pkg)}</p>;
+  const { lines, included, discount, ...rest } = pkg;
+  const items = Array.isArray(lines) ? lines.filter(isObj) : [];
+  const extras = Array.isArray(included) ? included : [];
+  return (
+    <div className="space-y-3 text-sm">
+      {items.length > 0 && (
+        <ul className="divide-y divide-border">
+          {items.map((l, i) => (
+            <li key={i} className="flex items-baseline justify-between gap-3 py-1.5">
+              <span className="min-w-0 break-words">
+                {typeof l.qty === 'number' ? `${l.qty} × ` : ''}
+                {plain(l.item ?? '')}
+                {typeof l.unit_cents === 'number' && <span className="ml-1.5 text-xs text-muted-foreground">at {money(l.unit_cents, currency)}</span>}
+              </span>
+              {typeof l.total_cents === 'number' && <span className="shrink-0 tabular-nums">{money(l.total_cents, currency)}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+      {isObj(discount) && (
+        <p className="break-words">
+          Discount: {plain(discount.what ?? '')}
+          {discount.for ? ` for ${plain(discount.for)}` : ''}
+        </p>
+      )}
+      {extras.length > 0 && (
+        <div>
+          <p className="text-xs text-muted-foreground">Included free</p>
+          <ul className="list-disc pl-5">
+            {extras.map((x, i) => (
+              <li key={i} className="break-words">
+                {plain(x)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {Object.keys(rest).length > 0 && (
+        <dl className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] gap-x-3 gap-y-1">
+          {Object.entries(rest).map(([k, v]) => (
+            <div key={k} className="contents">
+              <dt className="break-words text-muted-foreground">{human(k)}</dt>
+              <dd className="min-w-0 whitespace-pre-wrap break-words">{plain(v)}</dd>
+            </div>
+          ))}
+        </dl>
       )}
     </div>
   );
@@ -412,18 +488,16 @@ function CallView({ callId, onBack, onDeal }: { callId: string; onBack(): void; 
   const call = q.data;
   const turns = call ? recordTurns(call.record) : [];
   return (
-    <div className="space-y-4">
-      <Button variant="ghost" size="sm" className="-ml-2" onClick={onBack}>
-        <ArrowLeft className="mr-2 h-4 w-4" /> All calls
-      </Button>
-      <Status loading={q.isLoading} error={q.error} fetching={q.isFetching} onRetry={() => void q.refetch()} />
+    <div className={WRAP}>
+      <BackBar label="All calls" onBack={onBack} queryKey="admin-sales-call" />
+      <Status loading={q.isLoading} error={q.error} />
       {call && (
         <>
           <section className={`${CARD} space-y-4 p-4 sm:p-5`}>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="text-xl font-semibold">{call.client.name || 'Unknown caller'}</h2>
-                <p className="break-all text-sm text-muted-foreground">
+                <p className="break-words text-sm text-muted-foreground [overflow-wrap:anywhere]">
                   {[call.client.email, call.client.account_email !== call.client.email ? call.client.account_email : null].filter(Boolean).join(' · ')}
                 </p>
               </div>

@@ -59,7 +59,7 @@ export default function AdminRubyCallsPage() {
   if (open) return <CallView call={open} onBack={() => show(null)} />;
 
   return (
-    <div className="space-y-4">
+    <div className="mx-auto max-w-5xl space-y-4 px-4 py-6 md:px-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Ruby calls</h2>
@@ -146,7 +146,7 @@ export default function AdminRubyCallsPage() {
 
 function CallView({ call, onBack }: { call: RubyCallRow; onBack(): void }) {
   return (
-    <div className="space-y-4">
+    <div className="mx-auto max-w-5xl space-y-4 px-4 py-6 md:px-8">
       <Button variant="ghost" size="sm" className="-ml-2" onClick={onBack}>
         <ArrowLeft className="mr-2 h-4 w-4" /> All calls
       </Button>
