@@ -6,7 +6,7 @@ import { useEstimatedCost } from "@/hooks/use-estimated-cost";
 import { RING_CAD_NURBS_WORKFLOW, cadJewelryNoun, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
 import CadJewelryTypeCards from "@/components/text-to-cad/CadJewelryTypeCards";
 import { useJewelryTypeGate } from "@/components/text-to-cad/useJewelryTypeGate";
-import { authenticatedFetch } from "@/lib/authenticated-fetch";
+import { fetchReferenceFiles } from "@/lib/reference-url-files";
 import { loadExampleImage, revealElement } from "@/lib/example-image";
 import { toast } from "sonner";
 import ReferenceImageUploader from "./ReferenceImageUploader";
@@ -148,13 +148,7 @@ export default function ImagePromptScreen({
         .catch(() => { /* no past run found: the box stays empty */ });
     }
     try {
-      const files = await Promise.all(urls.map(async (url, index) => {
-        const res = await authenticatedFetch(url);
-        if (!res.ok) throw new Error(`${res.status}`);
-        const blob = await res.blob();
-        return new File([blob], `reused-reference-${index}.webp`, { type: blob.type || "image/webp" });
-      }));
-      onReplaceReferenceImages(files);
+      onReplaceReferenceImages(await fetchReferenceFiles(urls));
     } catch {
       // reuse failed -- silently no-op, same as the example-click failure path
     }

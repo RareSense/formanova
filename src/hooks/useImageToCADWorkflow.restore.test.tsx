@@ -23,11 +23,15 @@ vi.mock('@/lib/cad-result-api', async () => {
   return { ...actual, fetchCadRunInputs };
 });
 
+const fetchReferenceFiles = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/reference-url-files', () => ({ fetchReferenceFiles }));
+
+import { toast } from 'sonner';
 import { useImageToCADWorkflow } from '@/hooks/useImageToCADWorkflow';
 
-function renderWorkflow() {
+function renderWorkflow(referenceImages: File[] = []) {
   return renderHook(() => useImageToCADWorkflow({
-    model: 'test', prompt: '', referenceImages: [], cadRoute: '/image-to-cad', onWorkspaceActivate: vi.fn(),
+    model: 'test', prompt: '', referenceImages, cadRoute: '/image-to-cad', onWorkspaceActivate: vi.fn(),
   }));
 }
 
@@ -35,7 +39,7 @@ const ring = { set_id: 'set-1', versions: [{ asset_id: 'v1', position: 0, glb_ur
 
 const flush = () => act(async () => { await new Promise((r) => setTimeout(r, 0)); });
 
-beforeEach(() => fetchCadRunInputs.mockReset());
+beforeEach(() => { fetchCadRunInputs.mockReset(); fetchReferenceFiles.mockReset(); vi.mocked(toast.error).mockClear(); });
 
 describe('useImageToCADWorkflow restoring a run\'s inputs', () => {
   it('fills the photos and prompt from the run when nothing was seeded', async () => {
@@ -92,5 +96,41 @@ describe('useImageToCADWorkflow restoring a run\'s inputs', () => {
     expect(result.current.restoreCount).toBe(1);
     await act(async () => { await result.current.restoreCompletedWorkflow('wf-1', '/m.glb'); });
     expect(result.current.restoreCount).toBe(2);
+  });
+});
+
+describe('generating again after a restore', () => {
+  it("sends the restored run's own photos when the session has none", async () => {
+    fetchCadRunInputs.mockResolvedValue({ referenceImageUrls: [], prompt: null });
+    fetchReferenceFiles.mockResolvedValue([new File(['x'], 'r.webp')]);
+    const { result } = renderWorkflow();
+    await act(async () => {
+      await result.current.restoreCompletedWorkflow('wf-1', '/m.glb', { ring, referenceImageUrls: ['/seed.webp'], prompt: 'seeded' });
+    });
+    await flush();
+    await act(async () => { await result.current.simulateGeneration(); });
+    expect(fetchReferenceFiles).toHaveBeenCalledWith(['/seed.webp']);
+    expect(toast.error).not.toHaveBeenCalledWith('Upload an image or describe your ring first');
+  });
+
+  it('uses the photos attached this session when there are some', async () => {
+    fetchCadRunInputs.mockResolvedValue({ referenceImageUrls: ['/run.webp'], prompt: null });
+    const { result } = renderWorkflow([new File(['s'], 'session.png')]);
+    await act(async () => { await result.current.restoreCompletedWorkflow('wf-1', '/m.glb'); });
+    await flush();
+    await act(async () => { await result.current.simulateGeneration(); });
+    expect(fetchReferenceFiles).not.toHaveBeenCalled();
+  });
+
+  it("stops with a message when the run's photos cannot be loaded", async () => {
+    fetchCadRunInputs.mockResolvedValue({ referenceImageUrls: ['/run.webp'], prompt: null });
+    fetchReferenceFiles.mockRejectedValue(new Error('403'));
+    const { result } = renderWorkflow();
+    await act(async () => { await result.current.restoreCompletedWorkflow('wf-1', '/m.glb'); });
+    await flush();
+    let started: boolean | undefined;
+    await act(async () => { started = await result.current.simulateGeneration(); });
+    expect(started).toBe(false);
+    expect(toast.error).toHaveBeenCalledWith("We couldn't load this design's photos. Add them again to generate.");
   });
 });

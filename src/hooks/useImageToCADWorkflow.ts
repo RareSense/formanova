@@ -20,6 +20,7 @@ import {
 } from "@/lib/ring-cad-nurbs-api";
 import { readWeightTarget, resolveMetalWeight, type SentMetal } from "@/lib/metal-weight/source";
 import { buildReferenceInputs } from "@/lib/cad-reference-upload";
+import { fetchReferenceFiles } from "@/lib/reference-url-files";
 import {
   trackPaywallHit,
   trackCadGenerationStarted,
@@ -629,7 +630,17 @@ export function useImageToCADWorkflow({
   const startGeneration = useCallback(async (files?: File[]): Promise<boolean> => {
     if (isGenerating) return false;
     if (blockIfCadDown()) return false;
-    const images = files ?? referenceImages;
+    let images = files ?? referenceImages;
+    // After a restore the session photos are cleared and the panel shows the
+    // run's own photos, so generating again must send those same photos.
+    if (!files && images.length === 0 && restoredReferenceUrls.length > 0) {
+      try {
+        images = await fetchReferenceFiles(restoredReferenceUrls);
+      } catch {
+        toast.error("We couldn't load this design's photos. Add them again to generate.");
+        return false;
+      }
+    }
     const imageCount = images.length;
     const hasPrompt = !!prompt.trim();
     if (imageCount === 0 && !hasPrompt) {
@@ -802,7 +813,7 @@ export function useImageToCADWorkflow({
       setGenerationFailed(true);
     }
     return true;
-  }, [prompt, referenceImages, tier, jewelryType, material, weightTarget, cadRoute, cadSource, isGenerating, onWorkspaceActivate, trackCadGeneration, checkCredits]);
+  }, [prompt, referenceImages, restoredReferenceUrls, tier, jewelryType, material, weightTarget, cadRoute, cadSource, isGenerating, onWorkspaceActivate, trackCadGeneration, checkCredits]);
 
   /**
    * One press, one run. isGenerating only turns true after the credit check
