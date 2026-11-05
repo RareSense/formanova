@@ -51,7 +51,8 @@ describe('DoneForYouCard', () => {
     renderCard();
     expect(screen.getByText('Done For You')).toBeInTheDocument();
     expect(screen.getByText('Your price on the call, built for your volume')).toBeInTheDocument();
-    expect(screen.getByText(/Instant AI call with Ruby/)).toBeInTheDocument();
+    expect(screen.getByText(/We create the images for you/)).toBeInTheDocument();
+    expect(screen.getByText('A quick call with our AI sales agent')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Get my price now' })).toBeInTheDocument();
   });
 

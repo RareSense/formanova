@@ -26,6 +26,7 @@ const visible = vi.hoisted(() => ({ value: true }));
 vi.mock('@/hooks/use-done-for-you-visible', () => ({ useDoneForYouVisible: () => visible.value }));
 vi.mock('@/components/pricing/DoneForYouCard', () => ({
   DoneForYouCard: () => <div>Done For You card</div>,
+  DoItYourselfHeading: () => <div>Do it yourself heading</div>,
 }));
 vi.mock('@/components/sales/RubyCallDialog', () => ({
   RubyCallDialog: () => <div>Ruby call dialog</div>,
@@ -48,6 +49,7 @@ describe('Done For You card on the plan pages', () => {
   it('shows on /pricing', async () => {
     renderPage(<Pricing />);
     await waitFor(() => expect(screen.getByText('Done For You card')).toBeInTheDocument());
+    expect(screen.getByText('Do it yourself heading')).toBeInTheDocument();
   });
 
   it('shows on a normal /credits visit, with the call window', async () => {

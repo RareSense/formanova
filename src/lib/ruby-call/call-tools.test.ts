@@ -44,7 +44,7 @@ function makeApi(over: Partial<ToolApi> = {}): ToolApi {
   return {
     runQuote: vi.fn(async () => APPROVED),
     runNegotiate: vi.fn(async () => ({ allowed: true, reason_for_ruby: null, negotiation: { n: 1 } })),
-    createPaymentLink: vi.fn(async (r: { installment: number }) => ({ url: `https://x/pay/test/cs-1-${r.installment}`, simulated: true })),
+    createPaymentLink: vi.fn(async (r: { installment: number }) => ({ url: `https://x/pay/test/cs-1-${r.installment}`, simulated: true, linkId: null })),
     ...over,
   };
 }

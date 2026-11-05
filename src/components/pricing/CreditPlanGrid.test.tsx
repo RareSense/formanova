@@ -106,26 +106,4 @@ describe('CreditPlanGrid', () => {
     expect(screen.queryByText('One-time offer')).not.toBeInTheDocument();
     expect(screen.getByText('$9')).toBeInTheDocument();
   });
-
-  it('puts an extra card in the same row, after the plans', () => {
-    render(
-      <CreditPlanGrid
-        tiers={TIERS.slice(1)}
-        isINR={false}
-        symbol="$"
-        currency="USD"
-        loadingTier={null}
-        unavailableTier={null}
-        errorTier={null}
-        onCheckout={vi.fn()}
-        extraCard={<div data-testid="extra">Extra</div>}
-      />,
-    );
-    const extra = screen.getByTestId('extra');
-    const grid = extra.parentElement as HTMLElement;
-    expect(grid).toContainElement(screen.getByText('$9'));
-    expect(grid.lastElementChild).toBe(extra);
-    // 4 plans + the extra card = 5 columns on wide screens.
-    expect(grid.className).toContain('xl:grid-cols-5');
-  });
 });
