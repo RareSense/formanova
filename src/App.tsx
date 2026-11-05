@@ -85,6 +85,7 @@ const AdminGenerationsPage = lazyWithRetry(() => import("./pages/AdminGeneration
 const AdminRhinoUsersPage = lazyWithRetry(() => import("./pages/AdminRhinoUsersPage"));
 const AdminCadQueuePage = lazyWithRetry(() => import("./pages/AdminCadQueuePage"));
 const AdminRubyCallsPage = lazyWithRetry(() => import("./pages/AdminRubyCallsPage"));
+const AdminRubyBillingPage = lazyWithRetry(() => import("./pages/AdminRubyBillingPage"));
 const AdminBrandsPage = lazyWithRetry(() => import("./pages/AdminBrandsPage"));
 const AdminGenerationDetailPage = lazyWithRetry(() => import("./pages/AdminGenerationDetailPage"));
 const AdminCadQueueDetailPage = lazyWithRetry(() => import("./pages/AdminCadQueueDetailPage"));
@@ -264,6 +265,7 @@ const MainApp = () => (
                     <Route path="rhino-users" element={<AdminRhinoUsersPage />} />
                     <Route path="cad-queue" element={<AdminCadQueuePage />} />
                     <Route path="ruby-calls" element={<AdminRubyCallsPage />} />
+                    <Route path="ruby-orders" element={<AdminRubyBillingPage />} />
                     <Route path="brands" element={<AdminBrandsPage />} />
                     <Route path="feedback" element={<AdminFeedbackPage />} />
                     <Route path="ai-fixes" element={<AdminAIFixesPage />} />
