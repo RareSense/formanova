@@ -4,6 +4,7 @@
 // backend while the user is still eligible) plus Basic / Standard / Pro. Both
 // pages render this same component so the two grids cannot drift apart.
 
+import type { ReactNode } from 'react';
 import { Info, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { isStarterTier, type BillingTier } from '@/lib/starter-pack';
@@ -22,6 +23,8 @@ interface CreditPlanGridProps {
   unavailableTier: string | null;
   errorTier: string | null;
   onCheckout: (tierId: string) => void;
+  /** The Done For You card: when set, the page shows two labelled paths, Self service and We do it for you. */
+  doneForYou?: ReactNode;
 }
 
 export function CreditPlanGrid({
@@ -35,17 +38,19 @@ export function CreditPlanGrid({
   unavailableTier,
   errorTier,
   onCheckout,
+  doneForYou,
 }: CreditPlanGridProps) {
   const gridTiers = resolveGridTiers(tiers, cadRequiredCredits, photoShortfall);
   const cardCount = gridTiers.length;
-  const colsClass = cardCount >= 5
-    ? 'lg:grid-cols-3 xl:grid-cols-5'
+  // Beside Done For You the plans wrap 3 per row (layout B); alone they keep one row.
+  const colsClass = doneForYou
+    ? 'lg:grid-cols-3'
+    : cardCount >= 5 ? 'lg:grid-cols-3 xl:grid-cols-5'
     : cardCount === 4 ? 'xl:grid-cols-4' : 'md:grid-cols-3';
   const formatPrice = (usd: number, inr: number) =>
     isINR ? `${symbol}${inr.toLocaleString('en-IN')}` : `$${usd}`;
 
-  return (
-    <>
+  const plans = (
       <div className={`grid grid-cols-1 sm:grid-cols-2 ${colsClass} gap-6`}>
         {gridTiers.map((tier) => {
           const starter = isStarterTier(tier);
@@ -144,9 +149,44 @@ export function CreditPlanGrid({
           );
         })}
       </div>
-      <p className="font-mono text-sm tracking-wider text-muted-foreground mt-6 text-center">
-        Use your credits across Photo Studio and CAD Studio.
-      </p>
-    </>
+  );
+  const creditsNote = (
+    <p className="font-mono text-sm tracking-wider text-muted-foreground mt-6 text-center">
+      Use your credits across Photo Studio and CAD Studio.
+    </p>
+  );
+
+  if (!doneForYou) {
+    return (
+      <>
+        {plans}
+        {creditsNote}
+      </>
+    );
+  }
+
+  // Layout B (owner with Hassan, 2026-11-05): two ways to buy, side by side and both visible, like "do it yourself"
+  // next to "full service". On narrower screens the Done For You path follows the plans.
+  return (
+    <div className="grid grid-cols-1 gap-10 xl:grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)] xl:gap-8">
+      <section aria-labelledby="path-self-service" className="flex flex-col">
+        <PathHeading id="path-self-service" title="Self service" note="Buy credits and make the images yourself." />
+        {plans}
+        {creditsNote}
+      </section>
+      <section aria-labelledby="path-done-for-you" className="flex flex-col">
+        <PathHeading id="path-done-for-you" title="We do it for you" note="We make the images for you." />
+        <div className="flex-1">{doneForYou}</div>
+      </section>
+    </div>
+  );
+}
+
+function PathHeading({ id, title, note }: { id: string; title: string; note: string }) {
+  return (
+    <div className="mb-5 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+      <h2 id={id} className="font-mono text-xs font-bold uppercase tracking-[0.3em] text-foreground">{title}</h2>
+      <p className="text-sm text-muted-foreground">{note}</p>
+    </div>
   );
 }

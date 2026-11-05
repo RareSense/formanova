@@ -9,14 +9,15 @@ import { useDoneForYouVisible } from '@/hooks/use-done-for-you-visible';
 const TALK_RETURN_PATH = '/pricing?talk=ruby';
 
 /** Said first, so nobody has to guess what Done For You is. */
-export const DEFINITION =
-  'We create the images for you. Tell us what you need on a quick call and get your price, for any order size.';
+export const DEFINITION = 'We create the images for you. Get your price on a quick call with our AI sales agent.';
+
+/** Done For You orders start at $30 (Ruby's price book, minimumOrderTotal). */
+export const MINIMUM_ORDER = 'Orders from $30';
 
 const SELLING_POINTS = [
   'Bulk product, model & editorial shots',
   'Catalog photos straight from your CAD',
   'Website & catalog refresh',
-  'Your price on the call, built for your volume',
 ] as const;
 
 interface DoneForYouCardProps {
@@ -53,54 +54,45 @@ export function DoneForYouCard({ onOpenCall }: DoneForYouCardProps) {
     onOpenCall();
   };
 
-  // Its own panel above the plans, not a fifth card after them: in that row it read as a tier above the
-  // biggest plan, while it suits any order size. The gold border and tint are FormaNova's accent.
+  // The "We do it for you" path, beside the Self service plans (layout B, 2026-11-05). Same box and button style as
+  // the plans; it fills its column so its button lines up with the bottom of the plans.
   return (
-    <section
-      aria-labelledby="done-for-you-title"
-      className="grid gap-6 border-2 border-[hsl(var(--formanova-hero-accent))] bg-gradient-to-b from-[hsl(var(--formanova-hero-accent))]/15 to-[hsl(var(--formanova-hero-accent))]/5 p-6 shadow-[6px_6px_0_hsl(var(--formanova-hero-accent))] md:grid-cols-[minmax(0,1fr)_16rem] md:items-center md:gap-10 xl:p-8"
-    >
-      <div className="min-w-0">
-        <h2
-          id="done-for-you-title"
-          className="font-display text-4xl uppercase leading-none tracking-tight text-foreground"
-        >
+    <section aria-labelledby="done-for-you-title" className="flex h-full flex-col border-2 border-foreground p-6 xl:p-8">
+      <div className="flex h-7 items-center">
+        <span className="font-mono text-xs uppercase tracking-[0.25em] text-muted-foreground">Custom</span>
+      </div>
+
+      <div className="mt-6 flex h-12 items-end">
+        <h2 id="done-for-you-title" className="font-display text-3xl uppercase leading-[0.95] tracking-tight text-foreground">
           Done For You
         </h2>
-        <p className="mt-3 max-w-2xl text-base leading-relaxed text-foreground">
-          {DEFINITION}
-        </p>
-        <ul className="mt-5 grid gap-x-6 gap-y-2 font-mono text-sm leading-snug text-muted-foreground sm:grid-cols-2">
+      </div>
+
+      <div className="mt-6 border-t border-border/40 pt-6">
+        <p className="text-sm leading-relaxed text-foreground">{DEFINITION}</p>
+        <ul className="mt-4 space-y-2 font-mono text-xs leading-snug text-muted-foreground">
           {SELLING_POINTS.map((point) => (
             <li key={point} className="flex items-start gap-2">
-              <Check className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--formanova-hero-accent))]" aria-hidden="true" />
+              <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[hsl(var(--formanova-hero-accent))]" aria-hidden="true" />
               <span>{point}</span>
             </li>
           ))}
         </ul>
+        <p className="mt-5 rounded-md bg-[hsl(var(--formanova-hero-accent))]/15 px-4 py-3 text-sm leading-snug text-[hsl(var(--formanova-hero-accent))]">
+          {MINIMUM_ORDER}
+        </p>
       </div>
 
-      <div className="flex flex-col gap-2">
+      <div className="mt-auto pt-8">
         <Button
           onClick={handleClick}
           size="lg"
-          className="h-auto min-h-12 w-full whitespace-normal px-4 py-3 font-mono text-xs uppercase leading-tight tracking-[0.2em]"
+          className="h-auto min-h-11 w-full whitespace-normal px-3 py-2.5 font-mono text-xs uppercase leading-tight tracking-[0.2em] xl:px-2 xl:text-[11px] xl:tracking-[0.06em]"
         >
-          <Phone className="mr-2 h-4 w-4" aria-hidden="true" />
+          <Phone className="mr-2 h-4 w-4 xl:hidden" aria-hidden="true" />
           Get my price now
         </Button>
-        <p className="text-center text-sm text-muted-foreground">A quick call with our AI sales agent</p>
       </div>
     </section>
-  );
-}
-
-/** Heads the credit plans when Done For You is shown above them, so the page reads as two choices. */
-export function DoItYourselfHeading() {
-  return (
-    <div className="mb-6 mt-12">
-      <h2 className="font-display text-3xl uppercase leading-none tracking-tight text-foreground">Do It Yourself</h2>
-      <p className="mt-2 text-base text-muted-foreground">Buy credits and create the images yourself in Photo Studio and CAD Studio.</p>
-    </div>
   );
 }

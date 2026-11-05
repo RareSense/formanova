@@ -386,6 +386,19 @@ describe('call tools', () => {
       expect(host.showPanel.mock.calls.length).toBe(panels);
     });
 
+    it('a sample link refused by the sample rules shows nothing and tells Ruby why', async () => {
+      const host = { ...makeHost(), watchPayment: vi.fn() };
+      const createPaymentLink = vi.fn()
+        .mockResolvedValueOnce({ url: '', simulated: false, linkId: null, samplesRefused: { left: 0 } });
+      const run = createCallTools(host, makeApi({ createPaymentLink }));
+      const usedUp = await run('send_payment_link', args);
+      expect(usedUp).toMatchObject({ samples_refused: true, samples_left: 0 });
+      expect(String(usedUp.error)).toContain('already had its sample pack');
+      expect(String(usedUp.error)).toContain('Done For You orders start at $30');
+      expect(host.showPanel).not.toHaveBeenCalled();
+      expect(host.watchPayment).not.toHaveBeenCalled();
+    });
+
     it('a simulated link is never watched', async () => {
       const host = { ...makeHost(), watchPayment: vi.fn() };
       await createCallTools(host, makeApi())('send_payment_link', args);
