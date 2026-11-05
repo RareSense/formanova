@@ -51,7 +51,7 @@ export function CreditPlanGrid({
     isINR ? `${symbol}${inr.toLocaleString('en-IN')}` : `$${usd}`;
 
   const plans = (
-      <div className={`grid grid-cols-1 sm:grid-cols-2 ${colsClass} gap-6`}>
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${colsClass} gap-6${doneForYou ? ' flex-1' : ''}`}>
         {gridTiers.map((tier) => {
           const starter = isStarterTier(tier);
           const plan = starter ? null : PLAN_BY_CREDITS[tier.credits];
@@ -168,18 +168,21 @@ export function CreditPlanGrid({
   // Two ways to buy (owner, 2026-11-05): "We do it for you" first, then "Do it yourself", each under a heading in the
   // Dashboard's Photography / CAD style. One shared column grid with one gap, so the Done For You card is exactly one
   // plan card wide. On xl it all sits in one row; narrower, Done For You takes the first row and the plans wrap below.
+  // The credits note sits under the whole row, never inside a column, so both columns end at the same height.
   return (
-    <div className={`grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 ${XL_COLS[cardCount + 1] ?? ''}`}>
-      <section aria-labelledby="path-done-for-you" className="flex flex-col">
-        <PathHeading id="path-done-for-you" title="We do it for you" />
-        <div className="flex-1">{doneForYou}</div>
-      </section>
-      <section aria-labelledby="path-do-it-yourself" className={`flex flex-col sm:col-span-2 lg:col-span-3 ${XL_SPAN[cardCount] ?? ''}`}>
-        <PathHeading id="path-do-it-yourself" title="Do it yourself" />
-        {plans}
-        {creditsNote}
-      </section>
-    </div>
+    <>
+      <div className={`grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 ${XL_COLS[cardCount + 1] ?? ''}`}>
+        <section aria-labelledby="path-done-for-you" className="flex flex-col">
+          <PathHeading id="path-done-for-you" title="We do it for you" />
+          <div className="flex-1">{doneForYou}</div>
+        </section>
+        <section aria-labelledby="path-do-it-yourself" className={`flex flex-col sm:col-span-2 lg:col-span-3 ${XL_SPAN[cardCount] ?? ''}`}>
+          <PathHeading id="path-do-it-yourself" title="Do it yourself" />
+          {plans}
+        </section>
+      </div>
+      {creditsNote}
+    </>
   );
 }
 
