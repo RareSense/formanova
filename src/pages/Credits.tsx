@@ -15,7 +15,7 @@ import { isStarterTier, type BillingTier } from '@/lib/starter-pack';
 import { getPostPurchaseReturn, clearPostPurchaseReturn } from '@/lib/post-purchase-return';
 import { CreditPlanGrid } from '@/components/pricing/CreditPlanGrid';
 import { isCadWorkflow, resolveGridTiers } from '@/lib/credit-plans';
-import { DoneForYouCard } from '@/components/pricing/DoneForYouCard';
+import { DoItYourselfHeading, DoneForYouCard } from '@/components/pricing/DoneForYouCard';
 import { useDoneForYouVisible } from '@/hooks/use-done-for-you-visible';
 import { RubyCallDialog } from '@/components/sales/RubyCallDialog';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
@@ -193,8 +193,8 @@ export default function Credits() {
   // 4 cards when the backend still returns the one-time Starter tier (user never
   // bought it), otherwise the 3 standard plans. Counted after the grid's own
   // filtering, since the backend list also carries packages that are not shown.
-  // Done For You, when shown, is one more card in the same row (as on /pricing).
-  const cardCount = resolveGridTiers(tiers, cadRequiredCredits, photoShortfall).length + (showDoneForYou ? 1 : 0);
+  // Done For You, when shown, is its own panel above the plans (as on /pricing).
+  const cardCount = resolveGridTiers(tiers, cadRequiredCredits, photoShortfall).length;
   const maxWidthClass = cardCount >= 4 ? 'max-w-7xl' : 'max-w-5xl';
   // A normal visit (no requiredCredits) shows the balance instead.
   const insufficientNotice = (
@@ -271,9 +271,16 @@ export default function Credits() {
 
         {/* Plans */}
         <motion.div variants={itemVariants} className="mb-12">
-          <span className="font-mono text-[9px] tracking-[0.3em] text-muted-foreground uppercase block mb-6">
-            Get More Credits
-          </span>
+          {showDoneForYou ? (
+            <>
+              <DoneForYouCard onOpenCall={openCall} />
+              <DoItYourselfHeading />
+            </>
+          ) : (
+            <span className="font-mono text-[9px] tracking-[0.3em] text-muted-foreground uppercase block mb-6">
+              Get More Credits
+            </span>
+          )}
           {tiersLoading ? (
             <div className="flex justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -290,7 +297,6 @@ export default function Credits() {
               unavailableTier={unavailableTier}
               errorTier={errorTier}
               onCheckout={handleCheckout}
-              extraCard={showDoneForYou ? <DoneForYouCard onOpenCall={openCall} /> : undefined}
             />
           )}
         </motion.div>

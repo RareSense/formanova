@@ -77,7 +77,7 @@ function renderDialog(f: ReturnType<typeof fakes>) {
 
 async function startCall(f: ReturnType<typeof fakes>, withSession = true) {
   renderDialog(f);
-  fireEvent.click(screen.getByRole('button', { name: 'Start talking' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Start call' }));
   await waitFor(() => expect(f.engine.start).toHaveBeenCalled());
   if (withSession) {
     api.startVoiceSession.mockResolvedValue({ sdp: 'a', greeting: null, callSessionId: 'cs1', workflowId: 'wf1' });

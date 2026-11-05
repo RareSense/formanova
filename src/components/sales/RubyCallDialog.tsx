@@ -118,12 +118,6 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
             <ArrowLeft className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
             Back
           </Button>
-          <p className="flex items-center gap-2 font-mono text-[10px] tracking-[0.3em] uppercase text-muted-foreground">
-            <span className="rounded-sm bg-[hsl(var(--formanova-hero-accent))] px-1.5 py-0.5 font-bold tracking-[0.15em] text-background">
-              AI
-            </span>
-            Ruby · Sales advisor
-          </p>
         </div>
 
         <div className={showPanels ? 'lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:items-start' : ''}>
@@ -144,12 +138,12 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
                     : 'font-display text-4xl uppercase leading-none tracking-wide text-foreground sm:text-5xl'
                 }
               >
-                {inCall ? status : phase === 'ended' ? `Call ended · ${formatClock(seconds)}` : 'Get your custom price'}
+                {inCall ? status : phase === 'ended' ? `Call ended · ${formatClock(seconds)}` : 'Call our AI sales agent now'}
               </DialogTitle>
               <DialogDescription
                 className={inCall || phase === 'ended' ? 'sr-only' : 'mx-auto max-w-md text-base leading-relaxed text-muted-foreground'}
               >
-                A quick voice call with Ruby, our AI sales advisor. Describe your campaign or bulk order and get a plan and a price on this call.
+                Get your custom price
               </DialogDescription>
             </DialogHeader>
 
@@ -169,7 +163,7 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
                 </Select>
                 <Button size="lg" className="h-14 w-full px-6 text-base" onClick={() => void call.startCall(language)}>
                   <Phone className="mr-2 h-5 w-5" aria-hidden="true" />
-                  Start talking
+                  Start call
                 </Button>
               </div>
             )}
@@ -313,9 +307,6 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
           )}
         </div>
 
-        <p className="pb-5 text-center font-mono text-[9px] tracking-wider text-muted-foreground">
-          Ruby is an AI
-        </p>
       </DialogContent>
     </Dialog>
   );

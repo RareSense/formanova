@@ -4,7 +4,6 @@
 // backend while the user is still eligible) plus Basic / Standard / Pro. Both
 // pages render this same component so the two grids cannot drift apart.
 
-import type { ReactNode } from 'react';
 import { Info, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { isStarterTier, type BillingTier } from '@/lib/starter-pack';
@@ -23,8 +22,6 @@ interface CreditPlanGridProps {
   unavailableTier: string | null;
   errorTier: string | null;
   onCheckout: (tierId: string) => void;
-  /** Optional extra card shown last in the same row (e.g. Done For You on /pricing). */
-  extraCard?: ReactNode;
 }
 
 export function CreditPlanGrid({
@@ -38,10 +35,9 @@ export function CreditPlanGrid({
   unavailableTier,
   errorTier,
   onCheckout,
-  extraCard,
 }: CreditPlanGridProps) {
   const gridTiers = resolveGridTiers(tiers, cadRequiredCredits, photoShortfall);
-  const cardCount = gridTiers.length + (extraCard ? 1 : 0);
+  const cardCount = gridTiers.length;
   const colsClass = cardCount >= 5
     ? 'lg:grid-cols-3 xl:grid-cols-5'
     : cardCount === 4 ? 'xl:grid-cols-4' : 'md:grid-cols-3';
@@ -147,7 +143,6 @@ export function CreditPlanGrid({
             </div>
           );
         })}
-        {extraCard}
       </div>
       <p className="font-mono text-sm tracking-wider text-muted-foreground mt-6 text-center">
         Use your credits across Photo Studio and CAD Studio.
