@@ -133,4 +133,16 @@ describe('generating again after a restore', () => {
     expect(started).toBe(false);
     expect(toast.error).toHaveBeenCalledWith("We couldn't load this design's photos. Add them again to generate.");
   });
+
+  it('sends the first 5 when the restored run had more, and says so', async () => {
+    const urls = ['/1', '/2', '/3', '/4', '/5', '/6'];
+    fetchCadRunInputs.mockResolvedValue({ referenceImageUrls: urls, prompt: null });
+    fetchReferenceFiles.mockResolvedValue([1, 2, 3, 4, 5].map((n) => new File([String(n)], `${n}.webp`)));
+    const { result } = renderWorkflow();
+    await act(async () => { await result.current.restoreCompletedWorkflow('wf-1', '/m.glb'); });
+    await flush();
+    await act(async () => { await result.current.simulateGeneration(); });
+    expect(fetchReferenceFiles).toHaveBeenCalledWith(urls.slice(0, 5));
+    expect(toast.info).toHaveBeenCalledWith('Using the first 5 of 6 photos: a run takes at most 5.');
+  });
 });

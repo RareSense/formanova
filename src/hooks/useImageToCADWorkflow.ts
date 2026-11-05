@@ -13,6 +13,7 @@ import {
   parseRingCadFailure,
   ringCadProgressFraction,
   isRingCadRepairing,
+  MAX_RING_CAD_REFERENCE_IMAGES,
   type ArtifactRef,
   type CadJewelryType,
   type CadMaterialProfile,
@@ -634,8 +635,13 @@ export function useImageToCADWorkflow({
     // After a restore the session photos are cleared and the panel shows the
     // run's own photos, so generating again must send those same photos.
     if (!files && images.length === 0 && restoredReferenceUrls.length > 0) {
+      // A run can take at most MAX_RING_CAD_REFERENCE_IMAGES; an older run may hold more.
+      const urls = restoredReferenceUrls.slice(0, MAX_RING_CAD_REFERENCE_IMAGES);
+      if (urls.length < restoredReferenceUrls.length) {
+        toast.info(`Using the first ${urls.length} of ${restoredReferenceUrls.length} photos: a run takes at most ${MAX_RING_CAD_REFERENCE_IMAGES}.`);
+      }
       try {
-        images = await fetchReferenceFiles(restoredReferenceUrls);
+        images = await fetchReferenceFiles(urls);
       } catch {
         toast.error("We couldn't load this design's photos. Add them again to generate.");
         return false;

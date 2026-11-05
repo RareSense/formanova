@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 vi.mock('@/hooks/use-estimated-cost', () => ({ useEstimatedCost: () => ({ cost: 70, loading: false }) }));
-vi.mock('@/hooks/useAuthenticatedImage', () => ({ useAuthenticatedImage: () => null }));
+const useAuthenticatedImage = vi.hoisted(() => vi.fn((_url: string): string | null => null));
+vi.mock('@/hooks/useAuthenticatedImage', () => ({ useAuthenticatedImage }));
 vi.mock('@/components/generations/ScissorGLBGrid', () => ({
   ScissorGLBGrid: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
   GLBPreviewSlot: () => <div data-testid="glb" />,
@@ -149,6 +150,30 @@ describe('LeftPanel', () => {
       render(<LeftPanel {...props} isGenerating hasModel={false} versions={[]} prompt="a ring" referenceImagePreviewUrls={['blob:photo-1']} />);
       expect(screen.getByTestId('cad-panel-brief')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Edit dimensions' })).toBeNull();
+    });
+  });
+
+  describe('reference images of a loaded design', () => {
+    const six = ['/a', '/b', '/c', '/d', '/e', '/f'].map((u) => `/api/artifacts${u}`);
+
+    it('shows every photo the run had, with its real count', () => {
+      render(<LeftPanel {...props} referenceImagePreviewUrls={six} />);
+      expect(screen.getAllByRole('button', { name: /Expand reference image/ })).toHaveLength(6);
+      expect(screen.getByText('6')).toBeInTheDocument();
+      expect(screen.queryByText('6/5')).toBeNull();
+    });
+
+    it('keeps the n/5 count while within the limit', () => {
+      render(<LeftPanel {...props} referenceImagePreviewUrls={six.slice(0, 3)} />);
+      expect(screen.getByText('3/5')).toBeInTheDocument();
+    });
+
+    it('opens a restored photo through the signed-in image, not the bare link', () => {
+      useAuthenticatedImage.mockImplementation((url: string) => `blob:signed${url}`);
+      render(<LeftPanel {...props} referenceImagePreviewUrls={six.slice(0, 2)} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Expand reference image 2' }));
+      expect(screen.getByAltText('Inspiration image')).toHaveAttribute('src', 'blob:signed/api/artifacts/b');
+      useAuthenticatedImage.mockImplementation(() => null);
     });
   });
 });

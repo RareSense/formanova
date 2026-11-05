@@ -43,6 +43,24 @@ function ReferenceImage({ url, alt, className }: { url: string; alt: string; cla
   return <img src={src} alt={alt} className={className} />;
 }
 
+/** The enlarged photo. Restored photos are auth-gated links, so it goes
+ *  through the same signed-in fetch as the thumbnails. */
+function LightboxImage({ url }: { url: string }) {
+  const src = useAuthenticatedImage(url);
+  if (!src) return null;
+  return (
+    <motion.img
+      initial={{ scale: 0.9 }}
+      animate={{ scale: 1 }}
+      exit={{ scale: 0.9 }}
+      src={src}
+      alt="Inspiration image"
+      className="max-w-full max-h-full object-contain"
+      onClick={(e) => e.stopPropagation()}
+    />
+  );
+}
+
 /** Briefs longer than this (or over BRIEF_LINES lines) start clamped, with a "more" toggle. */
 const BRIEF_CLAMP_CHARS = 180;
 const BRIEF_LINES = 3;
@@ -175,15 +193,7 @@ export default function LeftPanel({
             className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
             onClick={() => setLightboxIndex(null)}
           >
-            <motion.img
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.9 }}
-              src={referenceImagePreviewUrls[lightboxIndex]}
-              alt="Inspiration image"
-              className="max-w-full max-h-full object-contain"
-              onClick={(e) => e.stopPropagation()}
-            />
+            <LightboxImage url={referenceImagePreviewUrls[lightboxIndex]} />
             <button
               onClick={() => setLightboxIndex(null)}
               className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
@@ -214,7 +224,8 @@ export default function LeftPanel({
             <div className="flex items-baseline justify-between mb-2">
               <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Reference Images</h3>
               <span className="font-mono text-[10px] tracking-[0.15em] text-muted-foreground/60 tabular-nums">
-                {imageCount}/{MAX_RING_CAD_REFERENCE_IMAGES}
+                {/* A run restored from history can hold more than a new upload allows. */}
+                {imageCount > MAX_RING_CAD_REFERENCE_IMAGES ? imageCount : `${imageCount}/${MAX_RING_CAD_REFERENCE_IMAGES}`}
               </span>
             </div>
             <div className="grid grid-cols-4 gap-2">
