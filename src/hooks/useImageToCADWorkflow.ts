@@ -35,6 +35,7 @@ import {
 } from "@/lib/cad-analytics";
 import { fetchCadResult } from "@/lib/generation-history-api";
 import { fetchCadRunInputs } from "@/lib/cad-result-api";
+import { previewPrompt } from "@/lib/prompt-preview";
 import {
   CadImproveError,
   fetchCadRingBySetId,
@@ -762,7 +763,8 @@ export function useImageToCADWorkflow({
       // poll below only drives the on-page overlay while they stay.
       trackCadGeneration({
         workflowId: workflow_id,
-        label: prompt.trim() ? prompt.trim().slice(0, 40) : 'Image to CAD',
+        // Short for the completion toast; the full prompt is restored with the run.
+        label: prompt.trim() ? previewPrompt(prompt, 40) : 'Image to CAD',
         cadRoute,
         // The same bundle the started event just reported, handed over so the
         // completion event can be emitted by the context when the run settles.

@@ -4,12 +4,22 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 // The real library fetches; we only care that it gets MOUNTED, since that is
 // what reports whether any history exists.
 const mountSpy = vi.hoisted(() => vi.fn());
+/** What a click on a My Pieces card hands the screen, set per test. */
+const libraryPick = vi.hoisted(() => ({ urls: [] as string[], entry: null as unknown }));
 vi.mock('./CadHistoryLibrary', () => ({
-  default: (props: { variant: string }) => {
+  default: (props: { variant: string; onSelectImages?: (urls: string[], entry: unknown) => void }) => {
     mountSpy(props.variant);
-    return <div data-testid="cad-history-library" />;
+    return (
+      <div data-testid="cad-history-library">
+        <button type="button" onClick={() => props.onSelectImages?.(libraryPick.urls, libraryPick.entry)}>pick library card</button>
+      </div>
+    );
   },
 }));
+const mockAuthFetch = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/authenticated-fetch', () => ({ authenticatedFetch: mockAuthFetch }));
+const mockFindReused = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/cad-reuse-dimensions', () => ({ findReusedDimensions: mockFindReused }));
 const mockToast = vi.hoisted(() => ({ error: vi.fn(), success: vi.fn() }));
 vi.mock('sonner', () => ({ toast: mockToast }));
 vi.mock('@/hooks/use-estimated-cost', () => ({
@@ -255,6 +265,66 @@ describe('ImagePromptScreen', () => {
       fireEvent.click(screen.getByRole('button', { name: /edit design/i }));
       expect(onEditFirst).not.toHaveBeenCalled();
       expect(screen.getByRole('alert').textContent).toMatch(/select what you're making/i);
+    });
+  });
+
+  describe('choosing a My Pieces card', () => {
+    const fullPrompt = 'Ring size US 7 with a 2 mm band, a 9 by 7 mm oval centre stone in a four claw setting, pave shoulders and a hidden halo';
+    afterEach(() => { mockAuthFetch.mockReset(); mockFindReused.mockReset(); });
+
+    function renderPick(prompt: string, entry: Record<string, unknown>, { urls = ['/api/artifacts/a', '/api/artifacts/b'], fetchOk = true } = {}) {
+      libraryPick.urls = urls;
+      libraryPick.entry = { id: 'set-1', createdAt: '', referenceImageUrls: urls, assetIds: ['a', 'b'], assetId: 'a', name: null, ...entry };
+      mockAuthFetch.mockResolvedValue({ ok: fetchOk, status: fetchOk ? 200 : 404, blob: async () => new Blob(['x'], { type: 'image/webp' }) });
+      const setPrompt = vi.fn();
+      const onAdd = vi.fn();
+      const onReplace = vi.fn();
+      render(
+        <ImagePromptScreen
+          model="gemini" tier="claude_opus_5_openrouter" prompt={prompt} setPrompt={setPrompt}
+          jewelryType="ring" setJewelryType={vi.fn()} isGenerating={false} onGenerate={vi.fn()}
+          referenceImagePreviewUrls={['blob:current']} onAddReferenceImages={onAdd} onRemoveReferenceImage={vi.fn()}
+          onReplaceReferenceImages={onReplace}
+        />,
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'pick library card' }));
+      return { setPrompt, onAdd, onReplace };
+    }
+
+    it('replaces the current pictures with the whole set, instead of adding to them', async () => {
+      const { onAdd, onReplace } = renderPick('', { prompt: null, runPrompts: [] });
+      await waitFor(() => expect(onReplace).toHaveBeenCalledTimes(1));
+      expect((onReplace.mock.calls[0][0] as File[])).toHaveLength(2);
+      expect(onAdd).not.toHaveBeenCalled();
+    });
+
+    it('puts the full newest prompt in the box, over what was there, so it can be edited', async () => {
+      const { setPrompt } = renderPick('something typed earlier', {
+        prompt: fullPrompt,
+        runPrompts: [{ text: fullPrompt, createdAt: '2026-08-15' }, { text: 'US 6', createdAt: '2026-08-01' }],
+      });
+      expect(setPrompt).toHaveBeenCalledWith(fullPrompt);
+      expect(mockFindReused).not.toHaveBeenCalled();
+      await waitFor(() => expect(mockAuthFetch).toHaveBeenCalledTimes(2));
+    });
+
+    it('leaves the box alone when no run has a prompt for these images', async () => {
+      const { setPrompt, onReplace } = renderPick('my words', { prompt: null, runPrompts: [] });
+      await waitFor(() => expect(onReplace).toHaveBeenCalled());
+      expect(setPrompt).not.toHaveBeenCalled();
+    });
+
+    it('keeps the current pictures when the set cannot be fetched', async () => {
+      const { onReplace } = renderPick('', { prompt: null, runPrompts: [] }, { fetchOk: false });
+      await waitFor(() => expect(mockAuthFetch).toHaveBeenCalledTimes(2));
+      await new Promise((r) => setTimeout(r, 0));
+      expect(onReplace).not.toHaveBeenCalled();
+    });
+
+    it('falls back to the dimensions lookup for an entry that carries no run prompts', async () => {
+      mockFindReused.mockResolvedValue('US 8');
+      const { setPrompt } = renderPick('', { prompt: null });
+      await waitFor(() => expect(setPrompt).toHaveBeenCalledWith('US 8'));
     });
   });
 });

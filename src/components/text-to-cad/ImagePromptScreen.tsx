@@ -129,14 +129,21 @@ export default function ImagePromptScreen({
 
   // "My Pieces" reuse — urls are same-origin, auth-gated /api/artifacts proxy
   // URLs (see useCadHistoryLibrary), so these must go through authenticatedFetch,
-  // unlike the bundled example assets above. A multi-angle entry reuses as a
-  // whole set in one call, so all its images land together (respecting the
-  // existing 5-image cap in useReferenceImages).
+  // unlike the bundled example assets above. Choosing a card replaces the
+  // current pictures with that set (capped at 5 by useReferenceImages): it is
+  // a different piece, not more angles of this one.
+  //
+  // The prompt box takes the full newest prompt typed with these images, over
+  // what was there, so the customer can edit it before generating. The card
+  // only previews it; the box is where the whole text lives. With no prompt on
+  // record the box is left as it is.
   const handleLibraryImageSelect = useCallback(async (urls: string[], entry?: CadLibraryEntry) => {
-    // An empty dimensions box takes what was used with these images last time.
-    // Never overwrites the customer's own words, even typed while this loads.
-    if (entry && !promptRef.current.trim()) {
-      findReusedDimensions(entry)
+    if (entry?.prompt) {
+      setPrompt(entry.prompt);
+    } else if (entry && !entry.runPrompts && !promptRef.current.trim()) {
+      // An entry whose runs were not read: look them up, into an empty box only.
+      Promise.resolve()
+        .then(() => findReusedDimensions(entry))
         .then((dims) => { if (dims && !promptRef.current.trim()) setPrompt(dims); })
         .catch(() => { /* no past run found: the box stays empty */ });
     }
@@ -147,11 +154,11 @@ export default function ImagePromptScreen({
         const blob = await res.blob();
         return new File([blob], `reused-reference-${index}.webp`, { type: blob.type || "image/webp" });
       }));
-      onAddReferenceImages(files);
+      onReplaceReferenceImages(files);
     } catch {
       // reuse failed -- silently no-op, same as the example-click failure path
     }
-  }, [onAddReferenceImages, setPrompt]);
+  }, [onReplaceReferenceImages, setPrompt]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {

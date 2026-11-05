@@ -62,3 +62,30 @@ describe('useRestoredRunPrompt', () => {
     expect(onRestore).toHaveBeenCalledTimes(2);
   });
 });
+
+vi.mock('@/lib/image-normalize', () => ({ normalizeImageFiles: async (files: File[]) => files }));
+import { useReferenceImages } from './useReferenceImages';
+
+describe('useRestoredRunPrompt with the page\'s reference photos', () => {
+  it('drops this session\'s photos and prompt when a run is restored, as Image to CAD wires it', async () => {
+    let n = 0;
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: () => `blob:${++n}`, revokeObjectURL: () => {} }));
+    const { result, rerender } = renderHook(
+      ({ restoreCount, restoredPrompt }: { restoreCount: number; restoredPrompt: string | null }) => {
+        const images = useReferenceImages();
+        const [prompt, setPrompt] = useState('');
+        useRestoredRunPrompt({ restoreCount, restoredPrompt, prompt, setPrompt, onRestore: images.clearReferenceImages });
+        return { images, prompt, setPrompt };
+      },
+      { initialProps: { restoreCount: 0, restoredPrompt: null as string | null } },
+    );
+    await act(async () => { await result.current.images.addReferenceImages([new File(['x'], 'session.png', { type: 'image/png' })]); });
+    act(() => result.current.setPrompt('typed this session'));
+    expect(result.current.images.referenceImagePreviewUrls).toHaveLength(1);
+
+    rerender({ restoreCount: 1, restoredPrompt: 'the run\'s own prompt' });
+    expect(result.current.images.referenceImagePreviewUrls).toEqual([]);
+    expect(result.current.prompt).toBe('the run\'s own prompt');
+    vi.unstubAllGlobals();
+  });
+});

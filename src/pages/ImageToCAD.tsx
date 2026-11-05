@@ -297,7 +297,7 @@ export default function ImageToCAD() {
           referenceImagePreviewUrls={panelReferenceUrls}
           onAddReferenceImages={(files) => { editBeforeCad.picturesChanged(); addReferenceImages(files); }}
           onRemoveReferenceImage={(index) => { editBeforeCad.picturesChanged(); removeReferenceImage(index); }}
-          onReplaceReferenceImages={replaceReferenceImages}
+          onReplaceReferenceImages={(files) => { editBeforeCad.picturesChanged(); void replaceReferenceImages(files); }}
           onEditFirst={editBeforeCad.openEditor}
           designUse={editBeforeCad.designUse}
           onDesignUseChange={editBeforeCad.setDesignUse}

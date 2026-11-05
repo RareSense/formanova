@@ -12,6 +12,8 @@ import { useAuthenticatedImage } from "@/hooks/useAuthenticatedImage";
 import { useCadHistoryLibrary, type CadLibraryEntry } from "@/hooks/useCadHistoryLibrary";
 import { Search, ChevronLeft, ChevronRight, Diamond, Layers, Pencil, Check, X } from "lucide-react";
 import { parseServerTime } from "@/lib/server-time";
+import { stripMarkdownEmphasis } from "@/lib/prompt-preview";
+import PromptHoverPreview from "./PromptHoverPreview";
 
 const localDateFmt = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
 
@@ -20,13 +22,6 @@ const localDateFmt = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", t
 function formatLocalTimestamp(ts: string): string {
   const date = parseServerTime(ts);
   return Number.isNaN(date.getTime()) ? "" : localDateFmt.format(date);
-}
-
-/** Prompts come back from the backend with raw markdown emphasis (e.g.
- * `**spider-shaped**`) meant for a chat surface, not this card — strip it so
- * the literal asterisks don't render. */
-function stripMarkdownEmphasis(text: string): string {
-  return text.replace(/\*\*(.*?)\*\*/g, "$1").replace(/(?<!\*)\*(?!\*)(.*?)\*(?!\*)/g, "$1");
 }
 
 interface CadHistoryLibraryProps {
@@ -92,10 +87,19 @@ function RingCard({ entry, onSelect, onRename }: {
 
   return (
     <div className="mb-2 break-inside-avoid">
+      {/* Hover or focus previews what was typed with these images; choosing
+          the card puts the full prompt in the box (see ImagePromptScreen). */}
+      <PromptHoverPreview
+        prompt={entry.prompt}
+        moreCount={Math.max(0, (entry.runPrompts?.length ?? 0) - 1)}
+        positionClassName="inset-x-1 bottom-1"
+      >
+      {(describedBy) => (
       <button
         type="button"
         onClick={() => onSelect(urls)}
         aria-label={urls.length > 1 ? `Reuse these ${urls.length} inspiration images` : 'Reuse this inspiration image'}
+        aria-describedby={describedBy}
         className="group relative block w-full overflow-hidden border border-border/20 transition-colors hover:border-[hsl(var(--formanova-hero-accent))]/50"
       >
         <RingThumb url={urls[activeIndex] ?? urls[0]} className="block w-full" />
@@ -110,6 +114,8 @@ function RingCard({ entry, onSelect, onRename }: {
           </span>
         </div>
       </button>
+      )}
+      </PromptHoverPreview>
 
       {urls.length > 1 && (
         <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1.5">
@@ -181,9 +187,12 @@ function RingCard({ entry, onSelect, onRename }: {
 
 function PromptCard({ entry, onSelect }: { entry: CadLibraryEntry; onSelect: () => void }) {
   return (
+    <PromptHoverPreview prompt={entry.prompt} positionClassName="inset-x-2 top-full mt-1">
+    {(describedBy) => (
     <button
       type="button"
       onClick={onSelect}
+      aria-describedby={describedBy}
       className="flex w-full flex-col items-start gap-1.5 border border-border/20 bg-background px-3.5 py-3 text-left transition-colors hover:border-[hsl(var(--formanova-hero-accent))]/50 hover:bg-[hsl(var(--formanova-hero-accent))]/5"
     >
       <p className="line-clamp-2 font-body text-[13px] italic leading-relaxed text-foreground">
@@ -193,6 +202,8 @@ function PromptCard({ entry, onSelect }: { entry: CadLibraryEntry; onSelect: () 
         {formatLocalTimestamp(entry.createdAt)}
       </p>
     </button>
+    )}
+    </PromptHoverPreview>
   );
 }
 
