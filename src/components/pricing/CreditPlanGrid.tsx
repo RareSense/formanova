@@ -42,9 +42,9 @@ export function CreditPlanGrid({
 }: CreditPlanGridProps) {
   const gridTiers = resolveGridTiers(tiers, cadRequiredCredits, photoShortfall);
   const cardCount = gridTiers.length;
-  // Beside Done For You the plans wrap 3 per row (layout B); alone they keep one row.
+  // With Done For You the plans keep one card column each on xl (see the layout below); alone they keep one row.
   const colsClass = doneForYou
-    ? 'lg:grid-cols-3'
+    ? `lg:grid-cols-3 ${XL_COLS[cardCount] ?? ''}`
     : cardCount >= 5 ? 'lg:grid-cols-3 xl:grid-cols-5'
     : cardCount === 4 ? 'xl:grid-cols-4' : 'md:grid-cols-3';
   const formatPrice = (usd: number, inr: number) =>
@@ -165,28 +165,41 @@ export function CreditPlanGrid({
     );
   }
 
-  // Layout B (owner with Hassan, 2026-11-05): two ways to buy, side by side and both visible, like "do it yourself"
-  // next to "full service". On narrower screens the Done For You path follows the plans.
+  // Two ways to buy (owner, 2026-11-05): "We do it for you" first, then "Do it yourself", each under a heading in the
+  // Dashboard's Photography / CAD style. One shared column grid with one gap, so the Done For You card is exactly one
+  // plan card wide. On xl it all sits in one row; narrower, Done For You takes the first row and the plans wrap below.
   return (
-    <div className="grid grid-cols-1 gap-10 xl:grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)] xl:gap-8">
-      <section aria-labelledby="path-self-service" className="flex flex-col">
-        <PathHeading id="path-self-service" title="Self service" note="Buy credits and make the images yourself." />
+    <div className={`grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 ${XL_COLS[cardCount + 1] ?? ''}`}>
+      <section aria-labelledby="path-done-for-you" className="flex flex-col">
+        <PathHeading id="path-done-for-you" title="We do it for you" />
+        <div className="flex-1">{doneForYou}</div>
+      </section>
+      <section aria-labelledby="path-do-it-yourself" className={`flex flex-col sm:col-span-2 lg:col-span-3 ${XL_SPAN[cardCount] ?? ''}`}>
+        <PathHeading id="path-do-it-yourself" title="Do it yourself" />
         {plans}
         {creditsNote}
-      </section>
-      <section aria-labelledby="path-done-for-you" className="flex flex-col">
-        <PathHeading id="path-done-for-you" title="We do it for you" note="We make the images for you." />
-        <div className="flex-1">{doneForYou}</div>
       </section>
     </div>
   );
 }
 
-function PathHeading({ id, title, note }: { id: string; title: string; note: string }) {
+// Literal class names so Tailwind keeps them.
+const XL_COLS: Record<number, string> = {
+  2: 'xl:grid-cols-2', 3: 'xl:grid-cols-3', 4: 'xl:grid-cols-4', 5: 'xl:grid-cols-5', 6: 'xl:grid-cols-6',
+};
+const XL_SPAN: Record<number, string> = {
+  1: 'xl:col-span-1', 2: 'xl:col-span-2', 3: 'xl:col-span-3', 4: 'xl:col-span-4', 5: 'xl:col-span-5',
+};
+
+/** Same look as the Dashboard's Photography / CAD dividers. */
+function PathHeading({ id, title }: { id: string; title: string }) {
   return (
-    <div className="mb-5 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-      <h2 id={id} className="font-mono text-xs font-bold uppercase tracking-[0.3em] text-foreground">{title}</h2>
-      <p className="text-sm text-muted-foreground">{note}</p>
+    <div className="mb-4 flex min-h-10 items-center gap-3">
+      <span aria-hidden="true" className="h-px flex-1 bg-border" />
+      <h2 id={id} className="shrink-0 text-center font-display text-xl uppercase leading-none tracking-wide text-formanova-hero-accent md:text-2xl">
+        {title}
+      </h2>
+      <span aria-hidden="true" className="h-px flex-1 bg-border" />
     </div>
   );
 }

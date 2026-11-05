@@ -11,8 +11,6 @@ const TALK_RETURN_PATH = '/pricing?talk=ruby';
 /** Said first, so nobody has to guess what Done For You is. */
 export const DEFINITION = 'We create the images for you. Get your price on a quick call with our AI sales agent.';
 
-/** Done For You orders start at $30 (Ruby's price book, minimumOrderTotal). */
-export const MINIMUM_ORDER = 'Orders from $30';
 
 const SELLING_POINTS = [
   'Bulk product, model & editorial shots',
@@ -78,9 +76,6 @@ export function DoneForYouCard({ onOpenCall }: DoneForYouCardProps) {
             </li>
           ))}
         </ul>
-        <p className="mt-5 rounded-md bg-[hsl(var(--formanova-hero-accent))]/15 px-4 py-3 text-sm leading-snug text-[hsl(var(--formanova-hero-accent))]">
-          {MINIMUM_ORDER}
-        </p>
       </div>
 
       <div className="mt-auto pt-8">
