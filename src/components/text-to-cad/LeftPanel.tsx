@@ -55,6 +55,8 @@ interface PanelBriefEdit {
   onGenerate: () => void;
   canGenerate: (text: string) => boolean;
   cost: ReactNode;
+  /** What the box holds: "dimensions" (optional) for a design from photos, "prompt" for one from text. */
+  noun: 'dimensions' | 'prompt';
 }
 
 /**
@@ -72,8 +74,13 @@ function PanelBrief({ text, edit }: { text: string; edit?: PanelBriefEdit }) {
   if (editing) {
     return (
       <section data-testid="cad-panel-brief" className="border border-border/40 bg-muted/20 px-3 py-2.5">
+        {edit.noun === 'dimensions' && (
+          <p className="mb-1.5 font-body text-[12px] font-medium text-foreground">
+            Dimensions <span className="font-normal text-muted-foreground">(optional)</span>
+          </p>
+        )}
         <textarea
-          aria-label="Edit prompt"
+          aria-label={`Edit ${edit.noun}`}
           autoFocus
           value={text}
           onChange={(e) => edit.setText(e.target.value)}
@@ -108,8 +115,8 @@ function PanelBrief({ text, edit }: { text: string; edit?: PanelBriefEdit }) {
       {edit && (
         <button
           type="button"
-          aria-label="Edit prompt"
-          title="Edit prompt"
+          aria-label={`Edit ${edit.noun}`}
+          title={`Edit ${edit.noun}`}
           onClick={() => { edit.setOriginal(text); setExpanded(true); }}
           className="absolute right-1.5 top-1.5 inline-flex items-center gap-1 border border-border bg-card/90 px-1.5 py-1 font-mono text-[9px] uppercase tracking-[0.15em] text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
         >
@@ -248,6 +255,17 @@ export default function LeftPanel({
             than an empty box.
             Clamped to three lines with a more / less toggle: a long brief would
             otherwise push everything below it out of the panel. */}
+        {/* A design made from photos alone had no dimensions: offer to add them. */}
+        {isImageMode && versions.length > 0 && !prompt.trim() && briefOriginal === null && !isGenerating && (
+          <button
+            type="button"
+            aria-label="Add dimensions"
+            onClick={() => setBriefOriginal('')}
+            className="w-full border border-dashed border-border/60 px-3 py-2 text-left font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground hover:border-border"
+          >
+            + Add dimensions
+          </button>
+        )}
         {((isImageMode && !hasModel) || versions.length > 0) && (prompt.trim() || (briefOriginal !== null && !isGenerating)) && (
           <PanelBrief
             text={prompt}
@@ -257,6 +275,7 @@ export default function LeftPanel({
               setText: setPrompt,
               onGenerate,
               canGenerate: (t) => !!t.trim() || !!primaryPreviewUrl,
+              noun: isImageMode ? 'dimensions' : 'prompt',
               cost: (
                 <span className="inline-flex items-center gap-1 opacity-80">
                   <img src={creditCoinIcon} alt="" className="h-4 w-4" />
