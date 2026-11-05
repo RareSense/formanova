@@ -278,6 +278,13 @@ export function createCallTools(host: ToolHost, api: ToolApi = DEFAULT_API): Too
             error: 'The client already paid the earlier link, so no new link was made. Tell them their earlier payment went through and the team will sort out the change by email.',
           };
         }
+        if (first.samplesRefused) {
+          return {
+            samples_refused: true,
+            samples_left: first.samplesRefused.left,
+            error: 'No link was made: this account has already had its sample pack (once per account). Tell them kindly and offer a real order instead (Done For You orders start at $30).',
+          };
+        }
         const installments: DealInstallment[] = plan.map((p, i) => ({ ...p, url: i === 0 ? first.url : null }));
         const simulated = first.simulated;
         const url = first.url;

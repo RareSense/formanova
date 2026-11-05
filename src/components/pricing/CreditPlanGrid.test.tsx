@@ -106,4 +106,34 @@ describe('CreditPlanGrid', () => {
     expect(screen.queryByText('One-time offer')).not.toBeInTheDocument();
     expect(screen.getByText('$9')).toBeInTheDocument();
   });
+
+  it('with Done For You, shows two labelled paths: Self service plans and We do it for you', () => {
+    render(
+      <CreditPlanGrid
+        tiers={TIERS}
+        isINR={false}
+        symbol="$"
+        currency="USD"
+        loadingTier={null}
+        unavailableTier={null}
+        errorTier={null}
+        onCheckout={vi.fn()}
+        doneForYou={<div data-testid="dfy">Done For You</div>}
+      />,
+    );
+    const selfService = screen.getByRole('region', { name: 'Self service' });
+    const forYou = screen.getByRole('region', { name: 'We do it for you' });
+    expect(selfService).toContainElement(screen.getByText('$99'));
+    expect(selfService).not.toContainElement(screen.getByTestId('dfy'));
+    expect(forYou).toContainElement(screen.getByTestId('dfy'));
+    // Self service comes first, and its plans wrap (3 per row), never squeezed into one line with Done For You.
+    expect(selfService.compareDocumentPosition(forYou) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(selfService.querySelector('.lg\\:grid-cols-3')).not.toBeNull();
+  });
+
+  it('without Done For You, shows the plans alone with no path labels', () => {
+    renderGrid(TIERS);
+    expect(screen.queryByRole('region', { name: 'Self service' })).not.toBeInTheDocument();
+    expect(screen.queryByText('We do it for you')).not.toBeInTheDocument();
+  });
 });

@@ -28,6 +28,8 @@ export interface PaymentLink {
   linkId: string | null;
   /** The replaced link was already paid, so no new link was made. */
   alreadyPaid?: boolean;
+  /** Ruby's sample rules refused it: the sample pack (5 for $30) is once per account. */
+  samplesRefused?: { left: number };
 }
 
 const SIMULATED_DELAY_MS = 600;
@@ -50,6 +52,10 @@ export async function createPaymentLink(req: PaymentLinkRequest): Promise<Paymen
     });
     if (result.already_paid === true) {
       return { url: '', simulated: false, linkId: typeof result.link_id === 'string' ? result.link_id : null, alreadyPaid: true };
+    }
+    if (result.samples_used === true) {
+      const left = typeof result.samples_left === 'number' ? result.samples_left : 0;
+      return { url: '', simulated: false, linkId: null, samplesRefused: { left } };
     }
     if (result.simulated === false && typeof result.url === 'string' && result.url.startsWith('https://')) {
       return { url: result.url, simulated: false, linkId: typeof result.link_id === 'string' ? result.link_id : null };

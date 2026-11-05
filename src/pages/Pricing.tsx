@@ -11,7 +11,7 @@ import { useBillingLocale } from '@/hooks/use-billing-locale';
 import { isStarterTier, type BillingTier } from '@/lib/starter-pack';
 import { CreditPlanGrid } from '@/components/pricing/CreditPlanGrid';
 import { resolveGridTiers } from '@/lib/credit-plans';
-import { DoItYourselfHeading, DoneForYouCard } from '@/components/pricing/DoneForYouCard';
+import { DoneForYouCard } from '@/components/pricing/DoneForYouCard';
 import { useDoneForYouVisible } from '@/hooks/use-done-for-you-visible';
 import { RubyCallDialog } from '@/components/sales/RubyCallDialog';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
@@ -112,8 +112,8 @@ export default function Pricing() {
   // 4 cards when the backend still returns the one-time Starter tier (user never
   // bought it), otherwise the 3 standard plans. Counted after the grid's own
   // filtering, since the backend list also carries packages that are not shown.
-  // Done For You, when shown, is its own panel above the plans, not a card in their row.
-  const cardCount = resolveGridTiers(tiers).length;
+  // Done For You, when shown, is its own path beside the plans (layout B), so the page uses the wide width.
+  const cardCount = resolveGridTiers(tiers).length + (showDoneForYou ? 1 : 0);
   const maxWidthClass = cardCount >= 4 ? 'max-w-7xl' : 'max-w-5xl';
 
   return (
@@ -150,13 +150,6 @@ export default function Pricing() {
           )}
         </div>
 
-        {showDoneForYou && (
-          <>
-            <DoneForYouCard onOpenCall={openCall} />
-            <DoItYourselfHeading />
-          </>
-        )}
-
         {/* Plans */}
         {tiersLoading ? (
           <div className="flex justify-center py-12">
@@ -172,6 +165,7 @@ export default function Pricing() {
             unavailableTier={unavailableTier}
             errorTier={errorTier}
             onCheckout={handleCheckout}
+            doneForYou={showDoneForYou ? <DoneForYouCard onOpenCall={openCall} /> : undefined}
           />
         )}
 
