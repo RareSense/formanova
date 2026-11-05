@@ -57,7 +57,7 @@ export function DoneForYouCard({ onOpenCall }: DoneForYouCardProps) {
   return (
     <section
       aria-labelledby="done-for-you-title"
-      className="flex h-full flex-col border-2 border-[hsl(var(--formanova-hero-accent))] bg-gradient-to-b from-[hsl(var(--formanova-hero-accent))]/10 to-transparent p-6 shadow-[4px_4px_0_hsl(var(--formanova-hero-accent)/0.6)] xl:p-8"
+      className="flex h-full flex-col border-2 border-[hsl(var(--formanova-hero-accent))] bg-gradient-to-b from-[hsl(var(--formanova-hero-accent))]/12 to-[hsl(var(--formanova-hero-accent))]/5 p-6 shadow-[4px_4px_0_hsl(var(--formanova-hero-accent)/0.6)] xl:p-8"
     >
       <div className="flex h-7 items-center">
         <span className="font-mono text-xs uppercase tracking-[0.25em] text-[hsl(var(--formanova-hero-accent))]">Custom</span>
