@@ -52,7 +52,7 @@ describe('DoneForYouCard', () => {
     expect(screen.getByText('Done For You')).toBeInTheDocument();
     expect(screen.getByText('Catalog photos straight from your CAD')).toBeInTheDocument();
     expect(screen.getByText(/Get your price on a quick call with our AI sales agent/)).toBeInTheDocument();
-    expect(screen.getByText('Orders from $30')).toBeInTheDocument();
+    expect(screen.queryByText(/Orders from/)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Get my price now' })).toBeInTheDocument();
   });
 
