@@ -122,12 +122,13 @@ describe('CreditPlanGrid', () => {
       />,
     );
 
-  it('with Done For You, every plan card carries a "Do it yourself" band and Done For You comes first', () => {
+  it('with Done For You, every plan card carries a "Do it yourself" line on top and Done For You comes first', () => {
     renderWithDfy();
     const grid = screen.getByTestId('dfy').closest('.grid') as HTMLElement;
     expect(screen.getAllByText('Do it yourself')).toHaveLength(grid.children.length - 1);
-    // No section headings: the bands say it.
+    // No section headings or colour bands: the small line on each card says it.
     expect(screen.queryByText('We do it for you')).not.toBeInTheDocument();
+    for (const el of screen.getAllByText('Do it yourself')) expect(el.className).toContain('italic');
     expect(grid.firstElementChild).toContainElement(screen.getByTestId('dfy'));
   });
 
