@@ -106,7 +106,7 @@ const PURPOSE_TITLES: Record<UploadPurpose, string> = {
   cad_files: 'Share your CAD files',
   other: 'Share your files',
 };
-const TURNAROUNDS = ['standard', 'priority', 'rush', 'express'];
+const TURNAROUNDS = ['standard', 'express'];
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
@@ -120,12 +120,12 @@ function quoteRequest(args: Record<string, unknown>): QuoteRequest | { error: st
   }));
   if (lines.some((l) => !l.productId || !Number.isFinite(l.quantity))) return { error: 'Each line needs productId and quantity.' };
   const turnaround = str(args.turnaround) || 'standard';
-  if (!TURNAROUNDS.includes(turnaround)) return { error: 'turnaround must be standard, priority, rush or express.' };
+  if (!TURNAROUNDS.includes(turnaround)) return { error: 'turnaround must be standard or express.' };
   let installmentCount: number | undefined;
   if (args.installmentCount !== undefined && args.installmentCount !== null) {
     installmentCount = Number(args.installmentCount);
-    if (!Number.isInteger(installmentCount) || installmentCount < 1 || installmentCount > 4) {
-      return { error: 'installmentCount must be a whole number from 1 to 4.' };
+    if (!Number.isInteger(installmentCount) || installmentCount < 1 || installmentCount > 3) {
+      return { error: 'installmentCount must be a whole number from 1 to 3.' };
     }
   }
   return {

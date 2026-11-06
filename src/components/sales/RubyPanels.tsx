@@ -26,8 +26,7 @@ const ROWS_SHOWN = 6;
 const ROWS_SHOWN_COMPACT = 4;
 
 /**
- * Ruby's stage (like Eva's): one calm card at a time, never scrolling sideways.
- * Rows are compact: label left, amount right, details wrapped under the label.
+ * Ruby's stage (like Eva's): one calm card at a time. Prices are a real table that scrolls sideways only inside its box.
  */
 export function RubyStage({ panel, compact = false, onClose, onRendered, onUpload, onLink, onLinkTyping, onReach }: RubyStageProps) {
   useEffect(() => {
@@ -134,7 +133,8 @@ function Note({ text }: { text: string }) {
   return <p className="mt-3 break-words text-xs leading-relaxed text-muted-foreground">{text}</p>;
 }
 
-/** One compact row per line: label left, amount right, the other columns wrapped under the label. */
+/** A real table: a header per column and a boxed cell per value, like a spreadsheet. It scrolls sideways
+ * only inside its own box, so 1K to 12K fit side by side on a phone. The recommended row is highlighted. */
 function Rows({
   columns,
   rows,
@@ -155,46 +155,47 @@ function Rows({
   const order = rows.map((_, i) => i);
   const visible = open ? order : order.filter((i) => i < limit || i === highlight).slice(0, limit + 1);
   const hidden = rows.length - visible.length;
+  const cellBase = 'border border-border/70 px-2.5 py-2 align-top text-sm';
 
   return (
     <div className="min-w-0">
-      <ul className="divide-y divide-border/60">
-        {visible.map((r) => {
-          const row = rows[r];
-          const picked = r === highlight;
-          const details = compact
-            ? ''
-            : row
-                .map((v, i) => (i === 0 || i === amountAt || !v ? '' : `${columns[i]} ${v}`))
-                .filter(Boolean)
-                .join(' · ');
-          return (
-            <li
-              key={r}
-              className="flex min-w-0 items-start gap-3 py-2.5 pl-3"
-              style={{
-                borderLeft: `2px solid ${picked ? GOLD : 'transparent'}`,
-                background: picked ? 'hsl(var(--formanova-hero-accent) / 0.08)' : undefined,
-              }}
-            >
-              <div className="min-w-0 flex-1">
-                <p className="break-words text-sm leading-snug">
-                  {row[0]}
-                  {picked && (
-                    <span className="ml-2 font-mono text-[9px] uppercase tracking-[0.15em]" style={{ color: GOLD }}>
-                      Recommended
-                    </span>
-                  )}
-                </p>
-                {details && <p className="mt-0.5 break-words text-xs text-muted-foreground">{details}</p>}
-              </div>
-              {amountAt !== null && (
-                <span className="max-w-[45%] shrink-0 break-words text-right text-sm tabular-nums">{row[amountAt]}</span>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr>
+              {columns.map((c, i) => (
+                <th key={i} scope="col" className={`${cellBase} whitespace-nowrap bg-muted/60 text-left font-mono text-[10px] uppercase tracking-[0.12em]`}>
+                  {c}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {visible.map((r) => {
+              const row = rows[r];
+              const picked = r === highlight;
+              return (
+                <tr key={r} style={{ background: picked ? 'hsl(var(--formanova-hero-accent) / 0.08)' : undefined }}>
+                  {columns.map((_, i) => (
+                    <td
+                      key={i}
+                      className={`${cellBase} ${i === 0 ? 'min-w-[9rem] break-words' : 'whitespace-nowrap tabular-nums'} ${i === amountAt ? 'text-right' : ''}`}
+                      style={i === 0 && picked ? { boxShadow: `inset 3px 0 0 ${GOLD}` } : undefined}
+                    >
+                      {row[i]}
+                      {i === 0 && picked && (
+                        <span className="ml-2 font-mono text-[9px] uppercase tracking-[0.15em]" style={{ color: GOLD }}>
+                          Recommended
+                        </span>
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
       {(hidden > 0 || open) && rows.length > limit && (
         <Button
           variant="ghost"

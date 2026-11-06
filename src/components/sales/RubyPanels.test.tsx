@@ -63,17 +63,18 @@ describe('RubyPanels', () => {
     render(<RubyStage panel={quote} {...noop} />);
     expect(screen.getByText('Payment plan')).toBeInTheDocument();
     expect(screen.getByText('Full payment before work starts')).toBeInTheDocument();
-    // Compact row: amount on the right, the other columns wrapped under the label.
-    expect(screen.getByText('Free')).toBeInTheDocument();
-    expect(screen.getByText('Qty 120 · Per unit Bonus')).toBeInTheDocument();
+    // A real grid: every column has its own header and cell.
+    expect(screen.getByRole('columnheader', { name: 'Per unit' })).toBeInTheDocument();
+    expect(screen.getByRole('cell', { name: 'Free' })).toBeInTheDocument();
+    expect(screen.getByRole('cell', { name: 'Bonus' })).toBeInTheDocument();
   });
 
-  it('never uses a table (no sideways scrolling) and collapses long lists behind "N more items"', () => {
+  it('shows a real table (scrolling sideways only inside its own box) and collapses long lists behind "N more items"', () => {
     const rows = Array.from({ length: 9 }, (_, i) => [`Line ${i + 1}`, String(i + 1), `$${i + 1}`]);
     const quote: Panel = { id: 'p3', kind: 'table', title: 'Long', columns: ['Item', 'Qty', 'Total'], rows, total: '$45' };
     const { container } = render(<RubyStage panel={quote} {...noop} />);
-    expect(container.querySelector('table')).toBeNull();
-    expect(container.querySelector('[class*="overflow-x"]')).toBeNull();
+    expect(container.querySelector('table')).not.toBeNull();
+    expect(container.querySelector('table')?.parentElement?.className).toContain('overflow-x-auto');
     expect(screen.getByText('Line 6')).toBeInTheDocument();
     expect(screen.queryByText('Line 7')).not.toBeInTheDocument();
     expect(screen.getByText('$45')).toBeInTheDocument(); // total stays pinned
@@ -81,7 +82,7 @@ describe('RubyPanels', () => {
     expect(screen.getByText('Line 9')).toBeInTheDocument();
   });
 
-  it('renders a What / Before / Now comparison compactly: Now on the right, Before under the label', () => {
+  it('renders a What / Before / Now comparison as columns side by side', () => {
     const panel: Panel = {
       id: 'p6',
       kind: 'table',
@@ -93,19 +94,30 @@ describe('RubyPanels', () => {
       ],
       delivery: 'Delivery: within 5 working days, usually faster',
     };
-    const { container } = render(<RubyStage panel={panel} {...noop} />);
-    expect(container.querySelector('table')).toBeNull();
-    expect(screen.getByText('$8,120')).toBeInTheDocument();
-    expect(screen.getByText('Before $9,025.60')).toBeInTheDocument();
+    render(<RubyStage panel={panel} {...noop} />);
+    expect(screen.getByRole('columnheader', { name: 'Before' })).toBeInTheDocument();
+    expect(screen.getByRole('cell', { name: '$9,025.60' })).toBeInTheDocument();
+    expect(screen.getByRole('cell', { name: '$8,120' })).toBeInTheDocument();
     expect(screen.getByText('Delivery: within 5 working days, usually faster')).toBeInTheDocument();
   });
 
-  it('compact mode shows fewer rows and no details', () => {
+  it('compact mode shows fewer rows', () => {
     const rows = Array.from({ length: 6 }, (_, i) => [`Line ${i + 1}`, String(i + 1), `$${i + 1}`]);
     const panel: Panel = { id: 'p4', kind: 'table', title: 'T', columns: ['Item', 'Qty', 'Total'], rows };
     render(<RubyStage panel={panel} compact {...noop} />);
+    expect(screen.getByText('Line 4')).toBeInTheDocument();
     expect(screen.queryByText('Line 5')).not.toBeInTheDocument();
-    expect(screen.queryByText(/^Qty/)).not.toBeInTheDocument();
+  });
+
+  it('shows 1K to 12K side by side in one table', () => {
+    const panel: Panel = {
+      id: 'p7', kind: 'table', title: 'Your options',
+      columns: ['', '1K', '2K', '4K', '8K', '12K'],
+      rows: [['Per image', '$5', '$6.50', '$8.45', '$11', '$14.30'], ['Total (60 images)', '$300', '$390', '$507', '$660', '$858']],
+    };
+    render(<RubyStage panel={panel} {...noop} />);
+    for (const size of ['1K', '2K', '4K', '8K', '12K']) expect(screen.getByRole('columnheader', { name: size })).toBeInTheDocument();
+    expect(screen.getByRole('cell', { name: '$858' })).toBeInTheDocument();
   });
 
   it('reports when it is on screen', () => {
