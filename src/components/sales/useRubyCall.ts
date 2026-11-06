@@ -284,7 +284,7 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
             onPaid: (paidAt) => {
               onPaid(paidAt);
               callRef.current?.appendInstruction(
-                'The client just paid on screen: the payment was received. Thank them warmly in one sentence, say their order has started and the team will follow up by email, then ask if there is anything else.',
+                'The client just paid on screen: the payment was received. Thank them warmly in one sentence, say their project has started, then go straight to the production brief and their uploads.',
               );
             },
           });
