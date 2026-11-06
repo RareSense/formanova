@@ -114,7 +114,7 @@ export default function Pricing() {
   // filtering, since the backend list also carries packages that are not shown.
   // Done For You, when shown, is its own path beside the plans (layout B), so the page uses the wide width.
   const cardCount = resolveGridTiers(tiers).length + (showDoneForYou ? 1 : 0);
-  const maxWidthClass = cardCount >= 4 ? 'max-w-7xl' : 'max-w-5xl';
+  const maxWidthClass = cardCount >= 6 ? 'max-w-7xl 2xl:max-w-screen-2xl' : cardCount >= 4 ? 'max-w-7xl' : 'max-w-5xl';
 
   return (
     <>

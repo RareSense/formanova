@@ -114,30 +114,22 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
         <section
           data-testid="ruby-phone"
           aria-label="Call with Ruby"
-          className={`${frame} flex min-w-0 flex-col overflow-hidden ${
+          className={`${frame} relative flex min-w-0 flex-col overflow-hidden ${
             staged
               ? 'sticky top-0 z-10 w-full lg:static lg:h-[min(760px,92dvh)] lg:w-[380px] lg:shrink-0'
               : 'mx-auto my-auto w-[calc(100%-2rem)] max-w-[400px] lg:h-[min(760px,92dvh)]'
           }`}
         >
-          {/* Title bar like Eva's: who you are talking to, always in view. */}
-          <div className={`items-center gap-3 border-b-2 border-foreground bg-muted/60 px-4 py-2.5 ${staged ? 'hidden lg:flex' : 'flex'}`}>
-            <span className="flex gap-1.5" aria-hidden="true">
-              <span className="h-2.5 w-2.5 bg-foreground" />
-              <span className="h-2.5 w-2.5 bg-[hsl(var(--formanova-hero-accent))]" />
-              <span className="h-2.5 w-2.5 border border-foreground" />
-            </span>
-            <span className="flex-1 truncate text-center font-mono text-[11px] uppercase tracking-[0.12em] sm:tracking-[0.25em]">Ruby · AI sales agent</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="-my-1 h-7 px-2 font-mono text-[10px] uppercase tracking-[0.2em]"
-              onClick={() => handleOpenChange(false)}
-            >
-              <ArrowLeft className="h-3.5 w-3.5 sm:mr-1" aria-hidden="true" />
-              <span className="sr-only sm:not-sr-only">Back</span>
-            </Button>
-          </div>
+          {/* Owner, 2026-11-06: no title-bar text; only a way back. */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className={`absolute left-2 top-2 z-10 h-8 rounded-none px-2 font-mono text-[10px] uppercase tracking-[0.2em] ${staged ? 'hidden lg:inline-flex' : ''}`}
+            onClick={() => handleOpenChange(false)}
+          >
+            <ArrowLeft className="h-3.5 w-3.5 sm:mr-1" aria-hidden="true" />
+            <span className="sr-only sm:not-sr-only">Back</span>
+          </Button>
 
           <div
             className={`flex min-w-0 flex-1 ${
@@ -163,12 +155,12 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
                     : 'font-display text-4xl uppercase leading-none tracking-wide text-foreground'
                 }
               >
-                {inCall ? status : phase === 'ended' ? `Call ended · ${formatClock(seconds)}` : 'Talk to Ruby'}
+                {inCall ? status : phase === 'ended' ? `Call ended · ${formatClock(seconds)}` : 'Call our AI now'}
               </DialogTitle>
               <DialogDescription
                 className={inCall || phase === 'ended' ? 'sr-only' : 'mx-auto max-w-xs text-base leading-relaxed text-muted-foreground'}
               >
-                Ruby is our AI sales agent, not a person. She answers right away: no booking, no prep. Get your custom price in about 2 minutes.
+                Get your custom price.
               </DialogDescription>
             </DialogHeader>
 
@@ -188,9 +180,8 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
                 </Select>
                 <Button size="lg" className="h-14 w-full px-6 text-base" onClick={() => void call.startCall(language)}>
                   <Phone className="mr-2 h-5 w-5" aria-hidden="true" />
-                  Start talking
+                  Start call
                 </Button>
-                <p className="font-mono text-[10px] tracking-wide text-muted-foreground">Ruby is an AI · any language · calls are recorded</p>
               </div>
             )}
 
