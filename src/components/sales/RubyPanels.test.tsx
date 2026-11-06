@@ -70,16 +70,16 @@ describe('RubyPanels', () => {
   });
 
   it('shows a real table (scrolling sideways only inside its own box) and collapses long lists behind "N more items"', () => {
-    const rows = Array.from({ length: 9 }, (_, i) => [`Line ${i + 1}`, String(i + 1), `$${i + 1}`]);
+    const rows = Array.from({ length: 11 }, (_, i) => [`Line ${i + 1}`, String(i + 1), `$${i + 1}`]);
     const quote: Panel = { id: 'p3', kind: 'table', title: 'Long', columns: ['Item', 'Qty', 'Total'], rows, total: '$45' };
     const { container } = render(<RubyStage panel={quote} {...noop} />);
     expect(container.querySelector('table')).not.toBeNull();
     expect(container.querySelector('table')?.parentElement?.className).toContain('overflow-x-auto');
-    expect(screen.getByText('Line 6')).toBeInTheDocument();
-    expect(screen.queryByText('Line 7')).not.toBeInTheDocument();
+    expect(screen.getByText('Line 8')).toBeInTheDocument();
+    expect(screen.queryByText('Line 9')).not.toBeInTheDocument();
     expect(screen.getByText('$45')).toBeInTheDocument(); // total stays pinned
     fireEvent.click(screen.getByRole('button', { name: '3 more items' }));
-    expect(screen.getByText('Line 9')).toBeInTheDocument();
+    expect(screen.getByText('Line 11')).toBeInTheDocument();
   });
 
   it('renders a What / Before / Now comparison as columns side by side', () => {
