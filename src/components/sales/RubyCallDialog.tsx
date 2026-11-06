@@ -98,52 +98,76 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
     speaker === 'ruby' ? 0.6 : busy ? 0.3 : speaker === 'client' ? 0.25 : phase === 'connecting' ? 0.15 : 0;
   const orbCalm = muted || phase === 'ended' || phase === 'error';
 
-  // Big centred modal laid out like the Eva call page; panels sit beside the call on
-  // wide screens (the modal widens) and below it on phones.
+  // Eva's layout (owner, 2026-11-06): a phone-shaped call card; prices and uploads in their own card beside it.
+  // On a phone, once a card is up, the call shrinks to a bar at the top and the card fills the screen below.
+  const staged = showPanels;
+  const roundBtn = staged ? 'h-11 w-11 lg:h-12 lg:w-12' : 'h-[60px] w-[60px]';
+  const endBtn = staged ? 'h-11 w-14 lg:h-12' : 'h-[60px] w-[72px]';
+  const frame = 'border-2 border-foreground bg-background shadow-[6px_6px_0_hsl(var(--foreground))]';
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        overlayClassName="bg-background/40 backdrop-blur-md"
-        className={`flex max-h-[94dvh] w-[calc(100vw-2rem)] max-w-3xl flex-col gap-0 overflow-y-auto overflow-x-hidden p-0 ${
-          showPanels ? 'lg:max-w-6xl' : ''
-        }`}
+        overlayClassName="bg-[hsl(var(--formanova-hero-accent)/0.12)] backdrop-blur-md"
+        className="flex h-[100dvh] max-h-none w-screen max-w-none flex-col gap-0 overflow-y-auto overflow-x-hidden border-0 bg-transparent p-0 shadow-none sm:rounded-none lg:flex-row lg:items-center lg:justify-center lg:gap-8 lg:p-6"
       >
-        <div className="flex items-center justify-between gap-3 py-3 pl-4 pr-14 sm:pl-6">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="px-3 font-mono text-[10px] uppercase tracking-[0.2em]"
-            onClick={() => handleOpenChange(false)}
-          >
-            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-            Back
-          </Button>
-        </div>
+        <section
+          data-testid="ruby-phone"
+          aria-label="Call with Ruby"
+          className={`${frame} flex min-w-0 flex-col overflow-hidden ${
+            staged
+              ? 'sticky top-0 z-10 w-full rounded-b-3xl lg:static lg:h-[min(760px,92dvh)] lg:w-[380px] lg:shrink-0 lg:rounded-3xl'
+              : 'mx-auto my-auto w-[calc(100%-2rem)] max-w-[400px] rounded-3xl lg:h-[min(760px,92dvh)]'
+          }`}
+        >
+          {/* Title bar like Eva's: who you are talking to, always in view. */}
+          <div className={`items-center gap-3 border-b-2 border-foreground bg-muted/60 px-4 py-2.5 ${staged ? 'hidden lg:flex' : 'flex'}`}>
+            <span className="flex gap-1.5" aria-hidden="true">
+              <span className="h-3 w-3 rounded-full border border-foreground/40 bg-[#ef6461]" />
+              <span className="h-3 w-3 rounded-full border border-foreground/40 bg-[#f5bf4f]" />
+              <span className="h-3 w-3 rounded-full border border-foreground/40 bg-[#5fc05a]" />
+            </span>
+            <span className="flex-1 truncate text-center font-mono text-[11px] uppercase tracking-[0.12em] sm:tracking-[0.25em]">Ruby · AI sales agent</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="-my-1 h-7 px-2 font-mono text-[10px] uppercase tracking-[0.2em]"
+              onClick={() => handleOpenChange(false)}
+            >
+              <ArrowLeft className="h-3.5 w-3.5 sm:mr-1" aria-hidden="true" />
+              <span className="sr-only sm:not-sr-only">Back</span>
+            </Button>
+          </div>
 
-        <div className={showPanels ? 'lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:items-start' : ''}>
-          <div className="flex min-w-0 flex-col items-center px-6 pb-8 pt-4 text-center sm:px-12 sm:pt-6">
+          <div
+            className={`flex min-w-0 flex-1 ${
+              staged
+                ? 'flex-row items-center gap-3 px-4 py-3 lg:flex-col lg:justify-center lg:gap-0 lg:px-8 lg:py-6'
+                : 'flex-col items-center justify-center px-6 py-8 text-center sm:px-8'
+            }`}
+          >
             <RubyOrb
               level={orbLevel}
               calm={orbCalm}
               voice={call.voiceLevel}
-              className={showPanels ? 'w-28 sm:w-40 lg:w-52' : 'w-48 sm:w-64'}
+              className={staged ? 'w-12 shrink-0 lg:w-40' : 'w-44 sm:w-52'}
             />
 
-            <DialogHeader className="mt-6 space-y-2 text-center sm:text-center">
+            <DialogHeader className={`space-y-2 ${staged ? 'min-w-0 flex-1 text-left lg:mt-6 lg:flex-none lg:text-center' : 'mt-6 text-center sm:text-center'}`}>
+              {staged && <p className="font-display text-lg uppercase leading-none tracking-wide lg:hidden">Ruby · AI</p>}
               <DialogTitle
                 role={inCall ? 'status' : undefined}
                 className={
                   inCall || phase === 'ended'
                     ? `font-mono text-xs uppercase tracking-[0.25em] ${reconnecting ? 'text-destructive' : 'text-muted-foreground'}`
-                    : 'font-display text-4xl uppercase leading-none tracking-wide text-foreground sm:text-5xl'
+                    : 'font-display text-4xl uppercase leading-none tracking-wide text-foreground'
                 }
               >
-                {inCall ? status : phase === 'ended' ? `Call ended · ${formatClock(seconds)}` : 'Call our AI sales agent now'}
+                {inCall ? status : phase === 'ended' ? `Call ended · ${formatClock(seconds)}` : 'Talk to Ruby'}
               </DialogTitle>
               <DialogDescription
-                className={inCall || phase === 'ended' ? 'sr-only' : 'mx-auto max-w-md text-base leading-relaxed text-muted-foreground'}
+                className={inCall || phase === 'ended' ? 'sr-only' : 'mx-auto max-w-xs text-base leading-relaxed text-muted-foreground'}
               >
-                Get your custom price
+                Ruby is our AI sales agent, not a person. She answers right away: no booking, no prep. Get your custom price in about 2 minutes.
               </DialogDescription>
             </DialogHeader>
 
@@ -165,16 +189,17 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
                   <Phone className="mr-2 h-5 w-5" aria-hidden="true" />
                   Start call
                 </Button>
+                <p className="font-mono text-[10px] tracking-wide text-muted-foreground">Ruby is an AI · any language · calls are recorded</p>
               </div>
             )}
 
             {inCall && (
-              <div className="mt-4 w-full space-y-6">
+              <div className={staged ? 'shrink-0 lg:mt-4 lg:w-full lg:space-y-6' : 'mt-4 w-full space-y-6'}>
                 {captionsOn && (
                   <div
                     aria-label="Live captions"
                     aria-live="polite"
-                    className={`flex h-28 flex-col justify-end overflow-hidden leading-relaxed ${
+                    className={`${staged ? 'hidden lg:flex' : 'flex'} h-28 flex-col justify-end overflow-hidden leading-relaxed ${
                       textLarge ? 'text-lg sm:text-xl' : 'text-sm sm:text-base'
                     }`}
                     style={{
@@ -194,13 +219,13 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
                     )}
                   </div>
                 )}
-                {/* Eva's controls: round icon buttons (60 px, 48 px beside a panel), the end button a little wider. */}
-                <div className={`flex items-center justify-center ${showPanels ? 'gap-2.5' : 'gap-5'}`}>
+                {/* Eva's controls: round icon buttons, the end button a little wider. */}
+                <div className={`flex items-center justify-center ${staged ? 'gap-2' : 'gap-5'}`}>
                   <Button
                     variant="outline"
                     title={muted ? 'Unmute' : 'Mute'}
                     aria-label={muted ? 'Unmute' : 'Mute'}
-                    className={`${showPanels ? 'h-12 w-12' : 'h-[60px] w-[60px]'} shrink-0 rounded-full p-0`}
+                    className={`${roundBtn} shrink-0 rounded-full p-0`}
                     disabled={phase !== 'live'}
                     aria-pressed={muted}
                     onClick={call.toggleMute}
@@ -211,7 +236,7 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
                     variant="outline"
                     title="Captions"
                     aria-label="Captions"
-                    className={`${showPanels ? 'h-12 w-12' : 'h-[60px] w-[60px]'} shrink-0 rounded-full p-0`}
+                    className={`${roundBtn} shrink-0 rounded-full p-0 ${staged ? 'hidden lg:inline-flex' : ''}`}
                     disabled={phase !== 'live'}
                     aria-pressed={captionsOn}
                     onClick={call.toggleCaptions}
@@ -222,33 +247,35 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
                     variant="destructive"
                     title="End call"
                     aria-label="End call"
-                    className={`${showPanels ? 'h-12 w-14' : 'h-[60px] w-[72px]'} shrink-0 rounded-full p-0`}
+                    className={`${endBtn} shrink-0 rounded-full p-0`}
                     onClick={call.end}
                   >
                     <PhoneOff className="h-6 w-6" />
                   </Button>
                 </div>
                 {panel && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="px-4 font-mono text-[10px] uppercase tracking-[0.2em]"
-                    aria-pressed={!panelsHidden}
-                    onClick={call.togglePanels}
-                  >
-                    {panelsHidden ? (
-                      <PanelRight className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-                    ) : (
-                      <PanelRightClose className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-                    )}
-                    {panelsHidden ? 'Show panel' : 'Hide panel'}
-                  </Button>
+                  <div className={`justify-center ${staged ? 'hidden lg:flex' : 'flex'}`}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="px-4 font-mono text-[10px] uppercase tracking-[0.2em]"
+                      aria-pressed={!panelsHidden}
+                      onClick={call.togglePanels}
+                    >
+                      {panelsHidden ? (
+                        <PanelRight className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                      ) : (
+                        <PanelRightClose className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                      )}
+                      {panelsHidden ? 'Show panel' : 'Hide panel'}
+                    </Button>
+                  </div>
                 )}
               </div>
             )}
 
             {phase !== 'idle' && earlier.length > 0 && (
-              <div className="mt-4 flex w-full min-w-0 flex-wrap items-center justify-center gap-2">
+              <div className={`mt-4 w-full min-w-0 flex-wrap items-center justify-center gap-2 ${staged ? 'hidden lg:flex' : 'flex'}`}>
                 <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Earlier</span>
                 {earlier.map((p) => (
                   <Button
@@ -289,24 +316,26 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
               </div>
             )}
           </div>
+        </section>
 
-          {showPanels && panel && (
-            <div className="min-w-0 px-4 pb-6 sm:px-6 lg:py-6 lg:pl-0">
-              <RubyStage
-                key={panel.id}
-                panel={panel}
-                compact={call.compact}
-                onRendered={call.panelRendered}
-                onClose={call.closePanel}
-                onUpload={call.uploadFiles}
-                onLink={call.shareLink}
-                onLinkTyping={call.linkTyping}
-                onReach={call.shareReach}
-              />
-            </div>
-          )}
-        </div>
-
+        {staged && panel && (
+          <section
+            data-testid="ruby-stage"
+            className={`${frame} m-4 min-w-0 rounded-3xl p-4 sm:p-6 lg:m-0 lg:h-[min(760px,92dvh)] lg:w-[min(600px,calc(100vw-380px-6rem))] lg:overflow-y-auto`}
+          >
+            <RubyStage
+              key={panel.id}
+              panel={panel}
+              compact={call.compact}
+              onRendered={call.panelRendered}
+              onClose={call.closePanel}
+              onUpload={call.uploadFiles}
+              onLink={call.shareLink}
+              onLinkTyping={call.linkTyping}
+              onReach={call.shareReach}
+            />
+          </section>
+        )}
       </DialogContent>
     </Dialog>
   );

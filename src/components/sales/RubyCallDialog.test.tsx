@@ -182,6 +182,29 @@ describe('RubyCallDialog', () => {
     expect(screen.getByText('00:00 · Ruby is checking…')).toBeInTheDocument();
   });
 
+  it('looks like Eva: a phone-shaped call card that says plainly Ruby is an AI', () => {
+    const f = fakes();
+    renderDialog(f);
+    const phone = screen.getByTestId('ruby-phone');
+    expect(phone).toHaveTextContent('Ruby · AI sales agent');
+    expect(phone).toHaveTextContent(/not a person/i);
+    expect(phone).toHaveTextContent(/Ruby is an AI/);
+    expect(screen.queryByTestId('ruby-stage')).not.toBeInTheDocument();
+  });
+
+  it('puts prices and uploads in their own card beside the call, not inside it', async () => {
+    const f = fakes();
+    await startCall(f);
+    act(() => f.cbs().onState?.('live'));
+    await act(async () => {
+      await f.opts().runTool!('show_on_screen', { kind: 'list', title: 'Next steps', items: ['Send photos'] });
+    });
+    const phone = screen.getByTestId('ruby-phone');
+    const stage = screen.getByTestId('ruby-stage');
+    expect(stage).toHaveTextContent('Send photos');
+    expect(phone.contains(stage)).toBe(false);
+  });
+
   it('shows panels beside the call, closes and hides them, and tells Ruby', async () => {
     const f = fakes();
     await startCall(f);
