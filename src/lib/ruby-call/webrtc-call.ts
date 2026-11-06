@@ -94,6 +94,13 @@ const MAX_CHECK_INS = 2;
 export const LOOKUP_CUE_MS = 6000;
 export const LOOKUP_SECOND_CUE_MS = 14000;
 const DEAD_AIR_MAX_CUES = 8;
+// Owner, 2026-11-07: a caller who walked away and left the call open. After 40 s with no words from them Ruby
+// asks if they are still there, then again every 20 s, 3 times in all; still nothing: a warm goodbye and she hangs up.
+export const AWAY_FIRST_MS = 40000;
+export const AWAY_REPEAT_MS = 20000;
+const AWAY_MAX_ASKS = 3;
+/** She is told to say goodbye; if she never does, the call still ends after this long. */
+const AWAY_CLOSE_MAX_MS = 15000;
 export const GOODBYE_QUIET_MS = 1500;
 export const GOODBYE_MAX_MS = 8000;
 const GOODBYE_MIN_MS = 1200;
@@ -109,6 +116,13 @@ export const deadAirCheckIn = (name?: string | null) =>
   `The line is still quiet. Say out loud, warmly and briefly, ${
     name ? `using their name (${name}), ` : ''
   }that you are right here and they can take their time (for example "Take your time, I'm right here"). Never ask "are you still there?" or "can you hear me?". Do not mention this note.`;
+
+export const awayCheck = (name?: string | null) =>
+  `Note for this moment only, and it replaces the rule about never asking this: the caller has not said anything for a long time and may have stepped away. Ask briefly and warmly if they are still there${
+    name ? `, using their name (${name})` : ''
+  }, in different words from any earlier time, then wait. Do not mention this note.`;
+export const AWAY_GOODBYE =
+  "Note for this moment only: the caller has not answered for a long time and seems to be away. In one or two short, warm sentences say it seems they have stepped away, that you will end the call now, and that they can call again any time. Then say goodbye and end the call. Do not mention this note.";
 
 function defaultDeps(): CallDeps {
   return {
@@ -158,6 +172,11 @@ export class WebRTCCall {
   private deadAirCount = 0;
   /** Lookup phase: one spoken "still on it" per lookup, so a slow tool never leaves the line silent. */
   private lookup: 'idle' | 'running' | 'cued' | 'cued2' = 'idle';
+  /** Caller away: counted from their last words or action (or the end of a lookup). */
+  private awayFrom = 0;
+  private awayAsks = 0;
+  private awayAskedAt = 0;
+  private awayClosingAt = 0;
 
   constructor(callbacks: CallCallbacks = {}, deps: Partial<CallDeps> = {}) {
     this.cb = callbacks;
@@ -396,6 +415,7 @@ export class WebRTCCall {
   private startWatch() {
     if (this.watchTimer) return;
     this.heard();
+    this.awayFrom = this.deps.now();
     this.watchTimer = setInterval(() => this.watch(), WATCH_MS);
   }
 
@@ -403,8 +423,10 @@ export class WebRTCCall {
     this.runner.tick();
     if (this.state !== 'live' || this.finishing || this.ending || this.muted) {
       this.heard();
+      if (this.muted) this.awayFrom = this.deps.now(); // on mute by choice: not away
       return;
     }
+    if (this.watchAway()) return;
     if (this.rubyLevel() > SPEAKING_LEVEL) {
       this.heard();
       return;
@@ -429,6 +451,7 @@ export class WebRTCCall {
       // The lookup just finished: start the normal silence count from here.
       this.lookup = 'idle';
       this.heard();
+      if (!this.awayAsks) this.awayFrom = this.deps.now();
       return;
     }
     const quiet = this.deps.now() - this.lastHeard;
@@ -445,6 +468,40 @@ export class WebRTCCall {
     }
   }
 
+  /** The caller did something on screen (typed, uploaded, shared a link): they are there. */
+  clientActive() {
+    this.awayFrom = this.deps.now();
+    this.awayAsks = 0;
+    this.awayClosingAt = 0;
+  }
+
+  /** Caller away (owner, 2026-11-07). True while it owns the moment, so the normal quiet cues stay out of the way. */
+  private watchAway(): boolean {
+    const now = this.deps.now();
+    if (this.awayClosingAt) {
+      if (this.rubyLevel() > SPEAKING_LEVEL) {
+        this.endAfterGoodbye(); // she is saying goodbye: hang up once she is done
+      } else if (now - this.awayClosingAt > AWAY_CLOSE_MAX_MS) {
+        void this.finish('ruby_closed');
+      }
+      return true;
+    }
+    if (this.runner.isBusy() || this.lookup !== 'idle') return false; // a lookup: they are waiting, not away
+    const waited = this.awayAsks ? now - this.awayAskedAt : now - this.awayFrom;
+    if (waited < (this.awayAsks ? AWAY_REPEAT_MS : AWAY_FIRST_MS)) return this.awayAsks > 0;
+    if (this.rubyLevel() > SPEAKING_LEVEL) return true;
+    if (this.awayAsks < AWAY_MAX_ASKS) {
+      this.awayAsks++;
+      this.awayAskedAt = now;
+      this.appendInstruction(awayCheck(this.clientName));
+    } else {
+      this.awayClosingAt = now;
+      this.appendInstruction(AWAY_GOODBYE);
+    }
+    this.heard();
+    return true;
+  }
+
   private openMic() {
     if (this.micOpen || this.finishing) return;
     this.micOpen = true;
@@ -454,6 +511,7 @@ export class WebRTCCall {
   private addTurn(role: CallRole, text?: string, start?: number, end?: number) {
     if (!text) return;
     this.heard();
+    if (role === 'client') this.clientActive();
     const last = this.turns[this.turns.length - 1];
     if (last && last.role === role) {
       last.text += text;
@@ -468,6 +526,7 @@ export class WebRTCCall {
   setMuted(muted: boolean) {
     if (this.state !== 'live' && this.state !== 'waiting') return;
     this.muted = muted;
+    this.clientActive();
     this.mic?.getAudioTracks().forEach((t) => (t.enabled = !muted));
     // Never open the input before the greeting phase is over.
     if (muted) this.send({ type: 'session.input_audio.mute' });

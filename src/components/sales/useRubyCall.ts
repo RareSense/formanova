@@ -106,7 +106,11 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
   const ownerRef = useRef(owner);
   ownerRef.current = owner;
 
-  const note = useCallback((text: string) => notesRef.current?.note(text), []);
+  // Every screen action is the caller being there: it also restarts the "are you still there?" count.
+  const note = useCallback((text: string) => {
+    callRef.current?.clientActive();
+    notesRef.current?.note(text);
+  }, []);
 
   /** Everything known about the call now; taken before any await, since the window may reset. */
   const snapshot = useCallback(
@@ -521,6 +525,7 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
 
   const shareLink = useCallback((url: string) => {
     linksRef.current = [...linksRef.current, linkRecord(url)];
+    callRef.current?.clientActive();
     callRef.current?.appendInstruction(linkMessage(url));
   }, []);
 
@@ -537,6 +542,7 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
   /** Saved straight into the lead, so it is kept even if the model forgets update_lead. */
   const shareReach = useCallback((channel: ReachChannel, value: string) => {
     leadRef.current = { ...leadRef.current, ...reachLead(channel, value) };
+    callRef.current?.clientActive();
     callRef.current?.appendInstruction(reachMessage(channel, value));
   }, []);
 
@@ -544,6 +550,7 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
   const shareBrief = useCallback((text: string) => {
     const before = typeof leadRef.current.brief_notes === 'string' ? leadRef.current.brief_notes : '';
     leadRef.current = { ...leadRef.current, brief_notes: before ? `${before}\n\n${text}` : text };
+    callRef.current?.clientActive();
     callRef.current?.appendInstruction(
       `[Screen] The client typed this in the brief box, and it is saved: "${text}". Thank them in one short sentence, don't read it back, and ask only about what it leaves out.`,
     );
