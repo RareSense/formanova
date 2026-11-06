@@ -150,6 +150,9 @@ describe('CreditPlanGrid', () => {
     expect(grid.className).toContain('lg:grid-cols-3');
     expect(grid.className).not.toContain('grid-cols-6');
     expect(grid.className).not.toMatch(/(^| )(xl|2xl):grid-cols/);
+    // tall cards, not square: each card the size it has when the page shows just 3 plans
+    expect(grid.className).toContain('lg:max-w-5xl');
+    expect(grid.className).toContain('lg:mx-auto');
   });
 
   it('with four cards (staging: no $2 or $14), sits 2 + 2 and one row from xl', () => {
