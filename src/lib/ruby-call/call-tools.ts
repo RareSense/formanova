@@ -23,6 +23,7 @@ import {
   type CallPayment,
   type QuoteRequest,
 } from './sales-call-api';
+import { trackRubyPaymentLinkCreated, trackRubyQuoteShown, trackRubyTeamContactShown } from '@/lib/posthog-events';
 
 export interface CallView {
   captions?: boolean;
@@ -51,6 +52,8 @@ export interface ToolHost {
   callSessionId(): string | null;
   /** Checks a real link for the payment while the call is live; calls back once when it is paid. */
   watchPayment?(linkId: string, onPaid: (paidAt: string | null) => void): void;
+  /** A price was put on screen (for the call's analytics summary). */
+  quoteShown?(): void;
 }
 
 export interface ToolApi {
@@ -147,6 +150,13 @@ function quoteRequest(args: Record<string, unknown>): QuoteRequest | { error: st
   };
 }
 
+/** Sizes on a quote, from the product ids ("ecommerce-2k" gives "2k"), in a fixed order. */
+const SIZE_ORDER = ['1k', '2k', '4k', '8k', '12k'];
+function quoteSizes(req: QuoteRequest): string {
+  const found = new Set(req.lines.map((l) => /-(\d+k)$/.exec(l.productId)?.[1]).filter((s): s is string => !!s));
+  return SIZE_ORDER.filter((s) => found.has(s)).join(',');
+}
+
 /** What the model may see of a quote: never the internal costs. */
 function modelView(result: Record<string, unknown>): ToolOutput {
   return {
@@ -161,6 +171,7 @@ function modelView(result: Record<string, unknown>): ToolOutput {
 export function createCallTools(host: ToolHost, api: ToolApi = DEFAULT_API): ToolRunner {
   // The real link still open on this call, so a changed order cancels it before a new one is made.
   let openLink: { linkId: string; deal: string } | null = null;
+  let quotesShown = 0;
   const tools: Record<string, (args: Record<string, unknown>) => Promise<ToolOutput> | ToolOutput> = {
     show_on_screen: async (args) => {
       const panel = panelFromShowArgs(args);
@@ -190,6 +201,18 @@ export function createCallTools(host: ToolHost, api: ToolApi = DEFAULT_API): Too
           approved: !!result.approved,
         });
         const shown = await host.showPanel(quotePanel(result));
+        quotesShown += 1;
+        host.quoteShown?.();
+        trackRubyQuoteShown({
+          approved: !!result.approved,
+          total_cents: typeof client.totalCents === 'number' ? client.totalCents : null,
+          image_count: req.lines.reduce((sum, l) => sum + l.quantity, 0),
+          sizes: quoteSizes(req),
+          turnaround: req.turnaround ?? 'standard',
+          installments: installmentsOf(client)?.length ?? 1,
+          last_offer: result.last_offer === true,
+          quote_number: quotesShown,
+        });
         return { ...modelView(result), shown };
       } catch (e) {
         return { error: errorText(e, 'The quote could not be made right now.') };
@@ -245,6 +268,7 @@ export function createCallTools(host: ToolHost, api: ToolApi = DEFAULT_API): Too
     },
     contact_team: () => {
       host.showPanel({ kind: 'contact', title: 'Talk to the FormaNova team' });
+      trackRubyTeamContactShown();
       return { shown: true };
     },
     end_call: () => {
@@ -303,6 +327,12 @@ export function createCallTools(host: ToolHost, api: ToolApi = DEFAULT_API): Too
         const payment = { url, total, totalCents, simulated, email, installments, linkId: first.linkId ?? null };
         host.showPanel(panel);
         host.setPayment(payment);
+        trackRubyPaymentLinkCreated({
+          total_cents: totalCents,
+          first_payment_cents: plan[0].amountCents,
+          installments: plan.length,
+          simulated: !!simulated,
+        });
         if (!simulated && first.linkId) {
           const linkId = first.linkId;
           openLink = { linkId, deal: dealKey };

@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Check, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CardBand } from '@/components/pricing/CardBand';
+import { trackRubyCtaClicked } from '@/lib/posthog-events';
 import { useAuth } from '@/contexts/AuthContext';
 import { isRubyCallEnabled } from '@/lib/feature-flags';
 import { useDoneForYouVisible } from '@/hooks/use-done-for-you-visible';
@@ -49,6 +50,7 @@ export function DoneForYouCard({ onOpenCall }: DoneForYouCardProps) {
   if (!visible) return null;
 
   const handleClick = () => {
+    trackRubyCtaClicked({ signed_in: !!user });
     if (!user) {
       navigate(`/login?redirect=${encodeURIComponent(TALK_RETURN_PATH)}`);
       return;

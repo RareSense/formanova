@@ -22,6 +22,14 @@ import {
 import { ScreenNotes } from '@/lib/ruby-call/screen-notes';
 import { paymentLinkStatus, watchPayment } from '@/lib/ruby-call/payment-link';
 import {
+  trackRubyCallConnected,
+  trackRubyCallEnded,
+  trackRubyCallFailed,
+  trackRubyCallStarted,
+  trackRubyFilesUploaded,
+  trackRubyPaymentReceived,
+} from '@/lib/posthog-events';
+import {
   WebRTCCall,
   type CallCallbacks,
   type CallEndReason,
@@ -30,6 +38,18 @@ import {
   type CallTurn,
 } from '@/lib/ruby-call/webrtc-call';
 import type { UploadOutcome } from './RubyPanelInputs';
+
+interface CallStats {
+  startedAt: number;
+  liveAt: number | null;
+  quotes: number;
+  linkCreated: boolean;
+  paid: boolean;
+  files: number;
+  ended?: boolean;
+}
+
+const secondsSince = (t: number) => Math.round((Date.now() - t) / 1000);
 
 export type Phase = 'idle' | 'connecting' | 'live' | 'ended' | 'error';
 
@@ -74,6 +94,8 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
   const linksRef = useRef<CallLink[]>([]);
   const paymentRef = useRef<CallPayment | null>(null);
   const errorRef = useRef<CallErrorCode | null>(null);
+  /** This call's numbers for analytics: no personal data. */
+  const statsRef = useRef<CallStats | null>(null);
   const speakerTimer = useRef<ReturnType<typeof setTimeout>>();
   const panelSeq = useRef(0);
   const panelRef = useRef<Panel | null>(null);
@@ -244,6 +266,9 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
     async (language: string) => {
       reset();
       setPhase('connecting');
+      const stats: CallStats = { startedAt: Date.now(), liveAt: null, quotes: 0, linkCreated: false, paid: false, files: 0 };
+      statsRef.current = stats;
+      trackRubyCallStarted({ language });
       // Created inside the click so the browser lets its audio run.
       const recorder = createRecorder ? createRecorder() : new CallRecorder();
       recorder.prepare();
@@ -276,12 +301,24 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
         },
         setPayment: (p) => {
           paymentRef.current = p;
+          stats.linkCreated = true;
+        },
+        quoteShown: () => {
+          stats.quotes += 1;
         },
         watchPayment: (linkId, onPaid) => {
           stopPaymentWatch.current?.();
           stopPaymentWatch.current = watchPayment(() => paymentLinkStatus(linkId), {
             isLive: () => isCurrent() && callRef.current?.getState() === 'live',
             onPaid: (paidAt) => {
+              const p = paymentRef.current;
+              if (!stats.paid) {
+                stats.paid = true;
+                trackRubyPaymentReceived({
+                  amount_cents: p?.installments?.[0]?.amountCents ?? p?.totalCents ?? 0,
+                  seconds_into_call: secondsSince(stats.liveAt ?? stats.startedAt),
+                });
+              }
               onPaid(paidAt);
               callRef.current?.appendInstruction(
                 'The client just paid on screen: the payment was received. Thank them warmly in one sentence, say their project has started, then go straight to the production brief and their uploads.',
@@ -295,7 +332,13 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
 
       const callbacks: CallCallbacks = {
         onState: (s) => {
-          if (s === 'live' && isCurrent()) setPhase('live');
+          if (s === 'live' && isCurrent()) {
+            setPhase('live');
+            if (stats.liveAt === null) {
+              stats.liveAt = Date.now();
+              trackRubyCallConnected({ language, connect_ms: stats.liveAt - stats.startedAt });
+            }
+          }
         },
         onTranscript: (t) => isCurrent() && setTurns(t),
         onActivity: (who) => {
@@ -310,6 +353,7 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
           note(m ? 'The client muted their microphone.' : 'The client unmuted their microphone.');
         },
         onError: (code) => {
+          if (errorRef.current === null) trackRubyCallFailed({ error_code: code, stage: stats.liveAt === null ? 'connecting' : 'live' });
           errorRef.current = code;
           if (isCurrent()) setError(code);
         },
@@ -319,6 +363,18 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
         onReconnecting: (r) => isCurrent() && setReconnecting(r),
         onEnded: async (result) => {
           notes.stop();
+          if (!stats.ended) {
+            stats.ended = true;
+            trackRubyCallEnded({
+              duration_s: stats.liveAt === null ? 0 : secondsSince(stats.liveAt),
+              reason: result.reason,
+              quotes_shown: stats.quotes,
+              link_created: stats.linkCreated,
+              paid: stats.paid,
+              files_uploaded: stats.files,
+              error_code: errorRef.current,
+            });
+          }
           if (isCurrent()) {
             clearTimeout(speakerTimer.current);
             setSpeaker(null);
@@ -403,6 +459,8 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
         }
       }
       const names = outcomes.filter((o) => o.ok).map((o) => o.name);
+      if (statsRef.current) statsRef.current.files += names.length;
+      trackRubyFilesUploaded({ purpose: target.purpose, uploaded: names.length, failed: outcomes.length - names.length });
       if (names.length) callRef.current?.appendInstruction(uploadedMessage(target.purpose, names));
       return outcomes;
     },
