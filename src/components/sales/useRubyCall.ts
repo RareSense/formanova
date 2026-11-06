@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { CallRecorder } from '@/lib/ruby-call/call-recorder';
 import { callerContext, fetchPastCalls } from '@/lib/ruby-call/call-memory';
 import { createCallTools, type LastQuote, type ToolHost } from '@/lib/ruby-call/call-tools';
+import { claimsOnScreen, falseScreenClaim, SCREEN_CLAIM_GRACE_MS, SCREEN_CLAIM_NOTE } from '@/lib/ruby-call/screen-claims';
 import { linkMessage, linkRecord, uploadClientFile, uploadProblem, uploadedMessage } from '@/lib/ruby-call/client-uploads';
 import type { Panel, PanelSpec } from '@/lib/ruby-call/panels';
 import { keepLocally, retryUnsavedCalls, saveCallRecord, saveOnPageHide } from '@/lib/ruby-call/post-call-save';
@@ -281,8 +282,51 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
       notesRef.current = notes;
       const isCurrent = () => callRef.current === call;
 
+      // Owner, 2026-11-06: Ruby must never say something is on screen when it is not. The page knows what it showed.
+      const claims = {
+        lastClientAt: 0,
+        lastShownAt: 0,
+        busy: false,
+        checkedTurn: -1,
+        clientTurn: -1,
+        clientText: '',
+        timer: undefined as ReturnType<typeof setTimeout> | undefined,
+      };
+      const checkClaim = (tries: number) => {
+        claims.timer = setTimeout(() => {
+          if (!isCurrent() || call?.getState() !== 'live') return;
+          if (claims.busy && tries < 6) return checkClaim(tries + 1); // a tool may be about to show it
+          if (falseScreenClaim(claims)) call?.appendInstruction(SCREEN_CLAIM_NOTE);
+        }, SCREEN_CLAIM_GRACE_MS);
+      };
+      const watchClaims = (turns: CallTurn[]) => {
+        const i = turns.length - 1;
+        const last = turns[i];
+        if (!last) return;
+        // The caller's newest words (a new turn, or more words in it) mark "since the caller last spoke".
+        const ci = turns.map((t) => t.role).lastIndexOf('client');
+        if (ci >= 0 && (ci !== claims.clientTurn || turns[ci].text !== claims.clientText)) {
+          claims.clientTurn = ci;
+          claims.clientText = turns[ci].text;
+          claims.lastClientAt = Date.now();
+        }
+        if (last.role === 'ruby' && i !== claims.checkedTurn && claimsOnScreen(last.text)) {
+          claims.checkedTurn = i;
+          clearTimeout(claims.timer);
+          checkClaim(0);
+        }
+      };
+
       const host: ToolHost = {
-        showPanel: (spec) => (isCurrent() ? showPanel(spec) : false),
+        showPanel: (spec) => {
+          if (!isCurrent()) return false;
+          const shown = showPanel(spec);
+          void shown.then((ok) => {
+            if (ok) claims.lastShownAt = Date.now();
+          });
+          return shown;
+        },
+        accountEmail: () => user?.email ?? null,
         clearPanels: () => {
           if (isCurrent()) putOnScreen(null);
         },
@@ -340,7 +384,11 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
             }
           }
         },
-        onTranscript: (t) => isCurrent() && setTurns(t),
+        onTranscript: (t) => {
+          if (!isCurrent()) return;
+          setTurns(t);
+          watchClaims(t);
+        },
         onActivity: (who) => {
           if (!isCurrent()) return;
           setSpeaker(who);
@@ -359,10 +407,14 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
         },
         onLocalStream: (mic) => recorder.start(mic),
         onRemoteStream: (remote) => recorder.addRemote(remote),
-        onBusy: (b) => isCurrent() && setBusy(b),
+        onBusy: (b) => {
+          claims.busy = b;
+          if (isCurrent()) setBusy(b);
+        },
         onReconnecting: (r) => isCurrent() && setReconnecting(r),
         onEnded: async (result) => {
           notes.stop();
+          clearTimeout(claims.timer);
           if (!stats.ended) {
             stats.ended = true;
             trackRubyCallEnded({
@@ -488,6 +540,15 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
     callRef.current?.appendInstruction(reachMessage(channel, value));
   }, []);
 
+  /** The typed brief goes straight into the lead (kept even if the model forgets update_lead), and Ruby is told. */
+  const shareBrief = useCallback((text: string) => {
+    const before = typeof leadRef.current.brief_notes === 'string' ? leadRef.current.brief_notes : '';
+    leadRef.current = { ...leadRef.current, brief_notes: before ? `${before}\n\n${text}` : text };
+    callRef.current?.appendInstruction(
+      `[Screen] The client typed this in the brief box, and it is saved: "${text}". Thank them in one short sentence, don't read it back, and ask only about what it leaves out.`,
+    );
+  }, []);
+
   const close = useCallback(() => {
     void callRef.current?.end();
     reset();
@@ -522,6 +583,7 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
     shareLink,
     linkTyping,
     shareReach,
+    shareBrief,
     voiceLevel,
   };
 }

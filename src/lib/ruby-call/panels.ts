@@ -39,6 +39,8 @@ export type PanelSpec =
   | { kind: 'link'; title: string; note?: string }
   /** Where the creative team may text the client: a field matching the channel they chose. */
   | { kind: 'reach'; title: string; channel: ReachChannel }
+  /** A box where the client types their brief and creative direction; saved to the lead (owner, 2026-11-06). */
+  | { kind: 'brief'; title: string; note?: string }
   | { kind: 'contact'; title: string }
   | {
       kind: 'deal';

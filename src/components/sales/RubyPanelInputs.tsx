@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type DragEvent } from 'react';
 import { Check, Diamond, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { PURPOSE_LABELS, acceptsFiles, normalizeLink, type UploadOutcome } from '@/lib/ruby-call/client-uploads';
 
 export type { UploadOutcome };
@@ -300,6 +301,64 @@ export function ContactField({ channel, onReach }: ContactFieldProps) {
           <span className="min-w-0 break-all">Saved: {sent}</span>
         </p>
       )}
+    </form>
+  );
+}
+
+/** Longest brief the box keeps, so one paste can't flood the call or the record. */
+export const BRIEF_MAX = 2000;
+
+interface BriefFieldProps {
+  note?: string;
+  onBrief(text: string): void;
+}
+
+/** The client types their brief and creative direction here, or just says it to Ruby (owner, 2026-11-06). */
+export function BriefField({ note, onBrief }: BriefFieldProps) {
+  const [value, setValue] = useState('');
+  const [saved, setSaved] = useState(0);
+
+  const submit = () => {
+    const clean = value.trim();
+    if (!clean) return;
+    onBrief(clean.slice(0, BRIEF_MAX));
+    setSaved((n) => n + 1);
+    setValue('');
+  };
+
+  return (
+    <form
+      className="space-y-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
+      }}
+    >
+      <label htmlFor="ruby-brief" className="block text-sm text-muted-foreground">
+        {note || 'Type anything you want us to know: the look, backgrounds, models, examples you like. Or just tell Ruby.'}
+      </label>
+      <Textarea
+        id="ruby-brief"
+        value={value}
+        maxLength={BRIEF_MAX}
+        rows={6}
+        placeholder="For example: plain white background, portrait 3:4, tight crops, warm and minimal"
+        className="min-h-32 resize-y text-base"
+        onChange={(e) => setValue(e.target.value)}
+      />
+      <div className="flex items-center justify-between gap-3">
+        <p className="min-w-0 text-xs text-muted-foreground">
+          {saved > 0 && (
+            <span className="inline-flex items-center gap-1.5">
+              <Check className="h-3.5 w-3.5 shrink-0 text-[hsl(var(--formanova-hero-accent))]" />
+              Saved. Add more any time.
+            </span>
+          )}
+        </p>
+        <Button type="submit" className="h-11 shrink-0 px-6" disabled={!value.trim()}>
+          Save
+        </Button>
+      </div>
     </form>
   );
 }

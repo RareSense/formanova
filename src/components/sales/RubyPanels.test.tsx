@@ -128,6 +128,21 @@ describe('RubyPanels', () => {
   });
 });
 
+describe('brief panel', () => {
+  it('saves what the client types, then clears for more; empty text cannot be saved', () => {
+    const onBrief = vi.fn();
+    render(<RubyStage {...noop} onBrief={onBrief} panel={{ id: 'b1', kind: 'brief', title: 'Your brief' }} />);
+    const save = screen.getByRole('button', { name: 'Save' });
+    expect(save).toBeDisabled();
+    const box = screen.getByLabelText(/Or just tell Ruby/);
+    fireEvent.change(box, { target: { value: '  White background, 3:4, tight crops  ' } });
+    fireEvent.click(save);
+    expect(onBrief).toHaveBeenCalledWith('White background, 3:4, tight crops');
+    expect(box).toHaveValue('');
+    expect(screen.getByText(/Saved\. Add more any time\./)).toBeInTheDocument();
+  });
+});
+
 describe('reach panel', () => {
   const reach = (channel: 'whatsapp' | 'instagram'): Panel => ({ id: 'r1', kind: 'reach', title: 'Your WhatsApp', channel });
 
