@@ -360,7 +360,7 @@ describe('WebRTCCall', () => {
       expect(cues(s)).toEqual([DEAD_AIR_ANSWER]);
     });
 
-    it('cues Ruby after 6.5 s of silence and asks her to check in by name after 11.5 s', async () => {
+    it('never leaves dead air: cue at 6.5 s, a reassuring check-in at 12 s, at most twice per call', async () => {
       const s = setup();
       await startLive(s, { clientName: 'Asha' });
       s.pc.dc.message({ type: 'session.output_transcript.delta', delta: 'Hi' });
@@ -368,9 +368,21 @@ describe('WebRTCCall', () => {
       expect(cues(s)).toEqual([]);
       await vi.advanceTimersByTimeAsync(1000);
       expect(cues(s)).toEqual([DEAD_AIR_CUE]);
-      await vi.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(6000); // 13 s
       expect(cues(s)).toEqual([DEAD_AIR_CUE, deadAirCheckIn('Asha')]);
       expect(deadAirCheckIn('Asha')).toContain('Asha');
+      for (let i = 0; i < 3; i++) {
+        s.pc.dc.message({ type: 'session.output_transcript.delta', delta: 'Take your time.' });
+        await vi.advanceTimersByTimeAsync(14000);
+      }
+      expect(cues(s).filter((c) => c === deadAirCheckIn('Asha'))).toHaveLength(2);
+    });
+
+    it('never tells Ruby to ask "are you still there?"', () => {
+      for (const note of [deadAirCheckIn('Asha'), STILL_WORKING_CUE]) {
+        expect(note).toContain('Never ask');
+        expect(note.toLowerCase()).not.toMatch(/ask if they can hear you|ask whether they are still/);
+      }
     });
 
     it('resets on any words; during a slow tool Ruby says once that she is still on it', async () => {
@@ -389,14 +401,18 @@ describe('WebRTCCall', () => {
       });
       await vi.advanceTimersByTimeAsync(6000);
       expect(cues(s)).toEqual([]);
+      await vi.advanceTimersByTimeAsync(2500);
+      expect(cues(s)).toEqual([STILL_WORKING_CUE]); // about 6 s into the lookup (checked once a second): a short spoken update, no dead air
       await vi.advanceTimersByTimeAsync(9000);
-      expect(cues(s)).toEqual([STILL_WORKING_CUE]); // once per lookup, never a stream of them
+      expect(cues(s)).toEqual([STILL_WORKING_CUE, STILL_WORKING_CUE]); // about 14 s: one more, never a stream
+      await vi.advanceTimersByTimeAsync(20000);
+      expect(cues(s)).toEqual([STILL_WORKING_CUE, STILL_WORKING_CUE]);
       release();
       s.pc.dc.message({ type: 'response.event', delegation_id: 'd1', event: { type: 'response.completed' } });
       await vi.advanceTimersByTimeAsync(5000);
-      expect(cues(s)).toEqual([STILL_WORKING_CUE]); // silence counts from the end of the lookup
+      expect(cues(s)).toEqual([STILL_WORKING_CUE, STILL_WORKING_CUE]); // silence counts from the end of the lookup
       await vi.advanceTimersByTimeAsync(3500);
-      expect(cues(s)).toEqual([STILL_WORKING_CUE, DEAD_AIR_ANSWER]); // the caller spoke last: Ruby owes an answer
+      expect(cues(s)).toEqual([STILL_WORKING_CUE, STILL_WORKING_CUE, DEAD_AIR_ANSWER]); // the caller spoke last: Ruby owes an answer
     });
 
     it('stays quiet while Ruby is audibly speaking', async () => {

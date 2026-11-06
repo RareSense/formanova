@@ -86,7 +86,13 @@ const RECONNECT_GRACE_MS = 5000;
 const SPEAKING_LEVEL = 0.012;
 const WATCH_MS = 1000;
 export const DEAD_AIR_CUE_MS = 6500;
-export const DEAD_AIR_CHECK_IN_MS = 11500;
+// Owner, 2026-11-06: never dead air (the caller thinks the call dropped), but never nag "are you still there?".
+// A reassuring check-in after 12 s of quiet, at most twice per call.
+export const DEAD_AIR_CHECK_IN_MS = 12000;
+const MAX_CHECK_INS = 2;
+// A lookup gets a short spoken update after 6 s and one more after 14 s, never more.
+export const LOOKUP_CUE_MS = 6000;
+export const LOOKUP_SECOND_CUE_MS = 14000;
 const DEAD_AIR_MAX_CUES = 8;
 export const GOODBYE_QUIET_MS = 1500;
 export const GOODBYE_MAX_MS = 8000;
@@ -98,11 +104,11 @@ export const DEAD_AIR_CUE =
 export const DEAD_AIR_ANSWER =
   'Note for this moment only: the caller spoke last and is waiting for your answer. Answer what they just said now, briefly. Do not ask whether they are still there or ready. Do not mention this note.';
 export const STILL_WORKING_CUE =
-  'Note for this moment only: your lookup is still running and the line has been quiet for several seconds. Say one short, natural line out loud so the caller knows you are still on it (for example "still pulling that up, just a moment"), worded differently from before. Do not give any numbers yet. Do not mention this note.';
+  'Note for this moment only: your lookup is still running and the line is quiet. Say one short, natural line so the caller knows you are working on it (for example "just getting that for you" or "almost there"), never the same words as before, then wait for the result. Never ask if they are still there. Do not give any numbers yet. Do not mention this note.';
 export const deadAirCheckIn = (name?: string | null) =>
   `The line is still quiet. Say out loud, warmly and briefly, ${
     name ? `using their name (${name}), ` : ''
-  }that you are still here and ask if they can hear you. Do not mention this note.`;
+  }that you are right here and they can take their time (for example "Take your time, I'm right here"). Never ask "are you still there?" or "can you hear me?". Do not mention this note.`;
 
 function defaultDeps(): CallDeps {
   return {
@@ -151,7 +157,7 @@ export class WebRTCCall {
   private deadAirStep = 0;
   private deadAirCount = 0;
   /** Lookup phase: one spoken "still on it" per lookup, so a slow tool never leaves the line silent. */
-  private lookup: 'idle' | 'running' | 'cued' = 'idle';
+  private lookup: 'idle' | 'running' | 'cued' | 'cued2' = 'idle';
 
   constructor(callbacks: CallCallbacks = {}, deps: Partial<CallDeps> = {}) {
     this.cb = callbacks;
@@ -379,6 +385,8 @@ export class WebRTCCall {
     }
   }
 
+  private checkIns = 0;
+
   private heard() {
     this.lastHeard = this.deps.now();
     this.deadAirStep = 0;
@@ -406,8 +414,12 @@ export class WebRTCCall {
         // The lookup just started: count its silence from now, not from the caller's last words.
         this.lookup = 'running';
         this.heard();
-      } else if (this.lookup === 'running' && this.deps.now() - this.lastHeard > DEAD_AIR_CUE_MS) {
+      } else if (this.lookup === 'running' && this.deps.now() - this.lastHeard > LOOKUP_CUE_MS) {
         this.lookup = 'cued';
+        this.appendInstruction(STILL_WORKING_CUE);
+        this.heard();
+      } else if (this.lookup === 'cued' && this.deps.now() - this.lastHeard > LOOKUP_SECOND_CUE_MS - LOOKUP_CUE_MS) {
+        this.lookup = 'cued2';
         this.appendInstruction(STILL_WORKING_CUE);
         this.heard();
       }
@@ -426,8 +438,9 @@ export class WebRTCCall {
       this.deadAirStep = 1;
       this.deadAirCount++;
       this.appendInstruction(callerSpokeLast ? DEAD_AIR_ANSWER : DEAD_AIR_CUE);
-    } else if (this.deadAirStep === 1 && quiet > DEAD_AIR_CHECK_IN_MS && !callerSpokeLast) {
+    } else if (this.deadAirStep === 1 && quiet > DEAD_AIR_CHECK_IN_MS && !callerSpokeLast && this.checkIns < MAX_CHECK_INS) {
       this.deadAirStep = 2;
+      this.checkIns++;
       this.appendInstruction(deadAirCheckIn(this.clientName));
     }
   }

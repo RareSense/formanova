@@ -1,3 +1,4 @@
+import { CallAudio } from '@/components/sales/CallAudio';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -219,7 +220,7 @@ function Recording({ call }: { call: RubyCallRow }) {
   if (url)
     return (
       <div className="flex flex-wrap items-center gap-3">
-        <audio controls autoPlay src={url} className="min-w-0 flex-1" />
+        <CallAudio autoPlay src={url} className="min-w-0 flex-1" />
         <a href={url} download={fileName} className="inline-flex items-center gap-1.5 text-sm font-medium underline-offset-4 hover:underline">
           <Download className="h-4 w-4" /> Download
         </a>

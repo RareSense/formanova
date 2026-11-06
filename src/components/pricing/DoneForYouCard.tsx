@@ -52,12 +52,15 @@ export function DoneForYouCard({ onOpenCall }: DoneForYouCardProps) {
     onOpenCall();
   };
 
-  // The "We do it for you" path, beside the Self service plans (layout B, 2026-11-05). Same box and button style as
-  // the plans; it fills its column so its button lines up with the bottom of the plans.
+  // The "We do it for you" path, first in the row (2026-11-05). Same size and button as the plans, set apart subtly
+  // like the earlier panel: gold border, soft gold wash and a small gold offset shadow (the shadow takes no layout space).
   return (
-    <section aria-labelledby="done-for-you-title" className="flex h-full flex-col border-2 border-foreground p-6 xl:p-8">
+    <section
+      aria-labelledby="done-for-you-title"
+      className="flex h-full flex-col border-2 border-[hsl(var(--formanova-hero-accent))] bg-gradient-to-b from-[hsl(var(--formanova-hero-accent))]/12 to-[hsl(var(--formanova-hero-accent))]/5 p-6 shadow-[4px_4px_0_hsl(var(--formanova-hero-accent)/0.6)] xl:p-8"
+    >
       <div className="flex h-7 items-center">
-        <span className="font-mono text-xs uppercase tracking-[0.25em] text-muted-foreground">Custom</span>
+        <span className="font-mono text-xs uppercase tracking-[0.25em] text-[hsl(var(--formanova-hero-accent))]">Custom</span>
       </div>
 
       <div className="mt-6 flex h-12 items-end">

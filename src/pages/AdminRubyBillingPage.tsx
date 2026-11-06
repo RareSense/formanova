@@ -1,3 +1,4 @@
+import { CallAudio } from '@/components/sales/CallAudio';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useIsFetching, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -103,12 +104,13 @@ export default function AdminRubyBillingPage() {
         <div role="tablist" className="flex gap-1">
           {(['orders', 'calls'] as const).map((v) => (
             <Button key={v} role="tab" aria-selected={view === v} size="sm" variant={view === v ? 'default' : 'outline'} onClick={() => go({ view: v === 'calls' ? 'calls' : null })}>
-              {v === 'orders' ? 'Orders' : 'Calls'}
+              {v === 'orders' ? 'Orders' : 'Calls (with recordings)'}
             </Button>
           ))}
         </div>
         <RefreshButton queryKey={listKey} />
       </div>
+      {view === 'orders' && <p className="text-sm text-muted-foreground">Calls without an order are under Calls (with recordings).</p>}
       {view === 'orders' ? <OrdersList onOpen={(id) => go({ deal: id })} /> : <CallsList onOpen={(id) => go({ view: 'calls', call: id })} />}
     </div>
   );
@@ -569,7 +571,7 @@ function SalesRecording({ call }: { call: SalesCall }) {
   if (url)
     return (
       <div className="flex flex-wrap items-center gap-3">
-        <audio controls autoPlay src={url} className="min-w-0 flex-1" />
+        <CallAudio autoPlay src={url} className="min-w-0 flex-1" />
         <a href={url} download={`ruby-call-${call.call_session_id}.webm`} className="inline-flex items-center gap-1.5 text-sm font-medium underline-offset-4 hover:underline">
           <Download className="h-4 w-4" /> Download
         </a>

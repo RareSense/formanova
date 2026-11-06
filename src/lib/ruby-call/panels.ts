@@ -31,7 +31,7 @@ export type PanelSpec =
       note?: string;
       /** Payment plan shown under a quote. */
       schedule?: Installment[];
-      /** "Delivery: within 5 days, usually faster" (kept in compact mode too). */
+      /** "Delivery: usually within 2 business days, depending on our queue" (kept in compact mode too). */
       delivery?: string;
     }
   | { kind: 'list'; title: string; kicker?: string; items: string[]; note?: string }
@@ -57,7 +57,8 @@ export type Panel = PanelSpec & { id: string };
 
 export const TEAM_EMAIL = 'studio@formanova.ai';
 const MAX_ROWS = 30;
-const MAX_COLUMNS = 6;
+// A label column plus 1K, 2K, 4K, 8K and 12K side by side, and one more.
+const MAX_COLUMNS = 7;
 const MAX_CELL = 200;
 
 const cell = (v: unknown): string => (v === null || v === undefined ? '' : String(v)).slice(0, MAX_CELL);
@@ -72,7 +73,7 @@ export function panelFromShowArgs(args: Record<string, unknown>): PanelSpec | { 
   if (args.kind === 'table') {
     if (!Array.isArray(args.columns) || !args.columns.length) return { error: 'A table needs columns.' };
     if (!Array.isArray(args.rows) || !args.rows.length) return { error: 'A table needs rows.' };
-    // Rows are shown compact (label left, amount right, the rest under the label): wider will not fit.
+    // Shown as a real table that scrolls sideways inside its own box; wider than this is unreadable on a phone.
     if (args.columns.length > MAX_COLUMNS) return { error: `Too wide to fit: use at most ${MAX_COLUMNS} columns.` };
     if (args.rows.length > MAX_ROWS) return { error: `Too long to fit: use at most ${MAX_ROWS} rows.` };
     const columns = args.columns.slice(0, MAX_COLUMNS).map(cell);
@@ -194,7 +195,7 @@ export function quotePanel(result: Record<string, unknown>): PanelSpec {
     total,
     note: notes.join(' ') || undefined,
     ...(installmentsOf(client) ? { schedule: installmentsOf(client) as Installment[] } : {}),
-    ...(text(client.deliveryWithin) ? { delivery: `Delivery: within ${text(client.deliveryWithin)}, usually faster` } : {}),
+    ...(text(client.deliveryWithin) ? { delivery: `Delivery: usually within ${text(client.deliveryWithin)}, depending on our queue` } : {}),
   };
 }
 

@@ -73,8 +73,9 @@ describe('panels', () => {
     expect(panelFromShowArgs({ kind: 'table', title: 'T', columns: ['a'], rows: [] })).toHaveProperty('error');
     expect(panelFromShowArgs({ kind: 'list', title: 'L', items: ['x'] })).toMatchObject({ kind: 'list', items: ['x'] });
     expect(panelFromShowArgs({ kind: 'chart', title: 'X' })).toHaveProperty('error');
-    // Wider than the compact layout can show: refused, so Ruby never claims it is on screen.
-    expect(panelFromShowArgs({ kind: 'table', title: 'T', columns: ['1', '2', '3', '4', '5', '6', '7'], rows: [['a']] })).toHaveProperty('error');
+    // A label plus 1K, 2K, 4K, 8K, 12K and one more column fits; wider is refused, so Ruby never claims it is on screen.
+    expect(panelFromShowArgs({ kind: 'table', title: 'T', columns: ['1', '2', '3', '4', '5', '6', '7'], rows: [['a']] })).not.toHaveProperty('error');
+    expect(panelFromShowArgs({ kind: 'table', title: 'T', columns: ['1', '2', '3', '4', '5', '6', '7', '8'], rows: [['a']] })).toHaveProperty('error');
     expect(panelFromShowArgs({ kind: 'list', items: ['x'] })).toHaveProperty('error');
   });
 
@@ -107,7 +108,7 @@ describe('panels', () => {
 
   it('shows the delivery promise from the quote', () => {
     const p = quotePanel({ ...APPROVED, client: { ...APPROVED.client, deliveryWithin: '5 working days' } });
-    expect(p).toMatchObject({ delivery: 'Delivery: within 5 working days, usually faster' });
+    expect(p).toMatchObject({ delivery: 'Delivery: usually within 5 working days, depending on our queue' });
   });
 
   it('shows a refused quote without numbers', () => {
@@ -156,19 +157,19 @@ describe('call tools', () => {
     const api = makeApi();
     const out = await createCallTools(host, api)('quote_shoot', {
       lines: [{ productId: 'p2k', quantity: 120 }],
-      turnaround: 'rush',
+      turnaround: 'express',
       negotiation: { n: 1 },
       installmentCount: 2,
     });
     expect(api.runQuote).toHaveBeenCalledWith({
       lines: [{ productId: 'p2k', quantity: 120 }],
-      turnaround: 'rush',
+      turnaround: 'express',
       negotiation: { n: 1 },
       installmentCount: 2,
     });
     expect(out).toEqual({ approved: true, needs_team_quote: false, client: APPROVED.client, shown: true });
     expect(host.setLastQuote).toHaveBeenCalledWith({
-      request: { lines: [{ productId: 'p2k', quantity: 120 }], turnaround: 'rush', negotiation: { n: 1 }, installmentCount: 2 },
+      request: { lines: [{ productId: 'p2k', quantity: 120 }], turnaround: 'express', negotiation: { n: 1 }, installmentCount: 2 },
       total: '$1,350',
       approved: true,
     });
@@ -289,7 +290,7 @@ describe('call tools', () => {
   describe('send_payment_link', () => {
     const args = {
       lines: [{ productId: 'p2k', quantity: 120 }],
-      turnaround: 'rush',
+      turnaround: 'express',
       negotiation: { n: 1 },
       installmentCount: 2,
       email: 'a@b.co',
@@ -310,14 +311,14 @@ describe('call tools', () => {
       const host = makeHost();
       const api = makeApi();
       const out = await createCallTools(host, api)('send_payment_link', args);
-      expect(api.runQuote).toHaveBeenCalledWith({ lines: args.lines, turnaround: 'rush', negotiation: { n: 1 }, installmentCount: 2 });
+      expect(api.runQuote).toHaveBeenCalledWith({ lines: args.lines, turnaround: 'express', negotiation: { n: 1 }, installmentCount: 2 });
       expect(api.createPaymentLink).toHaveBeenCalledWith({
         callSessionId: 'cs-1',
         email: 'a@b.co',
         quote: APPROVED.client,
         installment: 1,
         amountCents: 67500,
-        deal: { lines: args.lines, turnaround: 'rush', negotiation: { n: 1 }, installmentCount: 2 },
+        deal: { lines: args.lines, turnaround: 'express', negotiation: { n: 1 }, installmentCount: 2 },
       });
       expect(api.createPaymentLink).toHaveBeenCalledTimes(1);
       expect(out).toEqual({
