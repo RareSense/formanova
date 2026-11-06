@@ -36,33 +36,36 @@ describe('DoneForYouCard', () => {
   it('is hidden for a signed-in user who is not allowlisted', () => {
     mockUser = { email: 'other@example.com' };
     renderCard();
-    expect(screen.queryByText('Done For You')).not.toBeInTheDocument();
+    expect(screen.queryByText('Done for you')).not.toBeInTheDocument();
   });
 
   it('is hidden when no allowlist is configured', () => {
     vi.stubEnv('VITE_RUBY_CALL_ALLOWLIST_EMAILS', '');
     mockUser = { email: 'ruby@example.com' };
     renderCard();
-    expect(screen.queryByText('Done For You')).not.toBeInTheDocument();
+    expect(screen.queryByText('Done for you')).not.toBeInTheDocument();
   });
 
   it('is shown for an allowlisted user', () => {
     mockUser = { email: 'Ruby@Example.com' };
     renderCard();
-    expect(screen.getByText('Done For You')).toBeInTheDocument();
-    expect(screen.getByText('Catalog photos straight from your CAD')).toBeInTheDocument();
-    // Anyone, even someone who is not tech savvy, can tell the call is with an AI, instant, with no booking.
-    expect(screen.getByText('Talk to Ruby, our AI sales agent')).toBeInTheDocument();
-    expect(screen.getByText(/Not a person: an AI/)).toBeInTheDocument();
+    // The band names the card; the line under it says what Done for you means.
+    expect(screen.getByRole('region', { name: 'Done for you' })).toBeInTheDocument();
+    expect(screen.getByText('We make the photos for you.')).toBeInTheDocument();
+    expect(screen.getByText('Bulk product, model & editorial shots')).toBeInTheDocument();
+    expect(screen.getByText('Photos from your CAD files')).toBeInTheDocument();
+    // Anyone can tell the call is with an AI, not a person, with no booking. Plain "our AI", never "sales agent".
+    expect(screen.getByText(/from our AI, not a person/)).toBeInTheDocument();
     expect(screen.getByText(/no booking/i)).toBeInTheDocument();
-    expect(screen.getByText(/Ruby is an AI/)).toBeInTheDocument();
-    expect(screen.queryByText(/Orders from/)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Talk to Ruby now' })).toBeInTheDocument();
+    expect(screen.queryByText(/sales agent/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\$30/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/recorded/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Get my price' })).toBeInTheDocument();
   });
 
   it('sends a signed-out click to login and keeps the return path', () => {
     const onOpen = renderCard();
-    fireEvent.click(screen.getByRole('button', { name: 'Talk to Ruby now' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Get my price' }));
     expect(onOpen).not.toHaveBeenCalled();
     expect(screen.getByTestId('where')).toHaveTextContent(
       `/login?redirect=${encodeURIComponent('/pricing?talk=ruby')}`,
@@ -72,7 +75,7 @@ describe('DoneForYouCard', () => {
   it('opens the call window on click when signed in', () => {
     mockUser = { email: 'ruby@example.com' };
     const onOpen = renderCard();
-    fireEvent.click(screen.getByRole('button', { name: 'Talk to Ruby now' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Get my price' }));
     expect(onOpen).toHaveBeenCalledTimes(1);
   });
 

@@ -77,7 +77,7 @@ function renderDialog(f: ReturnType<typeof fakes>) {
 
 async function startCall(f: ReturnType<typeof fakes>, withSession = true) {
   renderDialog(f);
-  fireEvent.click(screen.getByRole('button', { name: 'Start talking' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Start call' }));
   await waitFor(() => expect(f.engine.start).toHaveBeenCalled());
   if (withSession) {
     api.startVoiceSession.mockResolvedValue({ sdp: 'a', greeting: null, callSessionId: 'cs1', workflowId: 'wf1' });
@@ -182,13 +182,16 @@ describe('RubyCallDialog', () => {
     expect(screen.getByText('00:00 · Ruby is checking…')).toBeInTheDocument();
   });
 
-  it('looks like Eva: a phone-shaped call card that says plainly Ruby is an AI', () => {
+  it('looks like Eva: a phone-shaped call card that says plainly it is our AI, with no extra text', () => {
     const f = fakes();
     renderDialog(f);
     const phone = screen.getByTestId('ruby-phone');
-    expect(phone).toHaveTextContent('Ruby · AI sales agent');
-    expect(phone).toHaveTextContent(/not a person/i);
-    expect(phone).toHaveTextContent(/Ruby is an AI/);
+    expect(screen.getByRole('heading', { name: 'Call our AI now' })).toBeInTheDocument();
+    expect(phone).toHaveTextContent('Get your custom price.');
+    expect(screen.getByRole('button', { name: 'Start call' })).toBeInTheDocument();
+    expect(phone).not.toHaveTextContent(/sales agent/i);
+    expect(phone).not.toHaveTextContent(/recorded/i);
+    expect(screen.getByRole('button', { name: /back/i })).toBeInTheDocument();
     expect(screen.queryByTestId('ruby-stage')).not.toBeInTheDocument();
   });
 

@@ -107,10 +107,10 @@ describe('CreditPlanGrid', () => {
     expect(screen.getByText('$9')).toBeInTheDocument();
   });
 
-  it('with Done For You, shows two labelled paths: We do it for you, then Do it yourself', () => {
+  const renderWithDfy = (tiers = TIERS) =>
     render(
       <CreditPlanGrid
-        tiers={TIERS}
+        tiers={tiers}
         isINR={false}
         symbol="$"
         currency="USD"
@@ -118,48 +118,50 @@ describe('CreditPlanGrid', () => {
         unavailableTier={null}
         errorTier={null}
         onCheckout={vi.fn()}
-        doneForYou={<div data-testid="dfy">Done For You</div>}
+        doneForYou={<div data-testid="dfy">Done for you</div>}
       />,
     );
-    const selfService = screen.getByRole('region', { name: 'Do it yourself' });
-    const forYou = screen.getByRole('region', { name: 'We do it for you' });
-    expect(selfService).toContainElement(screen.getByText('$99'));
-    expect(selfService).not.toContainElement(screen.getByTestId('dfy'));
-    expect(forYou).toContainElement(screen.getByTestId('dfy'));
-    // Done For You comes first, before the plans.
-    expect(forYou.compareDocumentPosition(selfService) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+  it('with Done For You, every plan card carries a "Do it yourself" band and Done For You comes first', () => {
+    renderWithDfy();
+    const grid = screen.getByTestId('dfy').closest('.grid') as HTMLElement;
+    expect(screen.getAllByText('Do it yourself')).toHaveLength(grid.children.length - 1);
+    // No section headings: the bands say it.
+    expect(screen.queryByText('We do it for you')).not.toBeInTheDocument();
+    expect(grid.firstElementChild).toContainElement(screen.getByTestId('dfy'));
   });
 
-  it('gives Done For You exactly one plan-card column: same width as every plan', () => {
-    render(
-      <CreditPlanGrid
-        tiers={TIERS}
-        isINR={false}
-        symbol="$"
-        currency="USD"
-        loadingTier={null}
-        unavailableTier={null}
-        errorTier={null}
-        onCheckout={vi.fn()}
-        doneForYou={<div data-testid="dfy">Done For You</div>}
-      />,
-    );
-    const forYou = screen.getByRole('region', { name: 'We do it for you' });
-    const selfService = screen.getByRole('region', { name: 'Do it yourself' });
-    const outer = forYou.parentElement as HTMLElement;
-    const plans = selfService.querySelector('.grid') as HTMLElement;
-    const planCount = plans.children.length;
-    // outer grid = Done For You + every plan; the plans span the rest with the same gap, so each card is one column
-    expect(outer.className).toContain(`xl:grid-cols-${planCount + 1}`);
-    expect(selfService.className).toContain(`xl:col-span-${planCount}`);
-    expect(plans.className).toContain(`xl:grid-cols-${planCount}`);
-    expect(outer.className).toContain('gap-6');
-    expect(plans.className).toContain('gap-6');
+  it('puts Done For You and the plans in one grid, so every card is the same width', () => {
+    renderWithDfy(TIERS.slice(1)); // 4 plans + Done For You: one row of 5 from xl
+    const grid = screen.getByTestId('dfy').closest('.grid') as HTMLElement;
+    expect(grid.children).toHaveLength(5);
+    expect(grid.className).toContain('xl:grid-cols-5');
+    expect(grid.className).toContain('gap-6');
+    // odd count: Done For You spans the row on 2-column screens, so no card is left alone
+    expect(grid.firstElementChild?.className).toContain('sm:col-span-2');
+    expect(grid.firstElementChild?.className).toContain('xl:col-span-1');
+  });
+
+  it('with six cards, sits 3 + 3 and only goes to one row from 2xl, so prices never overflow', () => {
+    renderWithDfy(TIERS); // $2 starter + 4 plans + Done For You
+    const grid = screen.getByTestId('dfy').closest('.grid') as HTMLElement;
+    expect(grid.children).toHaveLength(6);
+    expect(grid.className).toContain('lg:grid-cols-3');
+    expect(grid.className).toContain('2xl:grid-cols-6');
+    expect(grid.className).not.toMatch(/(^| )xl:grid-cols/);
+  });
+
+  it('with four cards (staging: no $2 or $14), sits 2 + 2 and one row from xl', () => {
+    renderWithDfy(TIERS.filter((t) => ![50, 160].includes(t.credits)));
+    const grid = screen.getByTestId('dfy').closest('.grid') as HTMLElement;
+    expect(grid.children).toHaveLength(4);
+    expect(grid.className).toContain('sm:grid-cols-2');
+    expect(grid.className).toContain('xl:grid-cols-4');
   });
 
   it('without Done For You, shows the plans alone with no path labels', () => {
     renderGrid(TIERS);
-    expect(screen.queryByRole('region', { name: 'Do it yourself' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Do it yourself')).not.toBeInTheDocument();
     expect(screen.queryByText('We do it for you')).not.toBeInTheDocument();
   });
 });
