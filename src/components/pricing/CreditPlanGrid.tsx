@@ -186,5 +186,5 @@ const WITH_DFY: Record<number, { cols: string; first: string }> = {
   3: { cols: 'sm:grid-cols-2 lg:grid-cols-3', first: 'sm:col-span-2 lg:col-span-1' },
   4: { cols: 'sm:grid-cols-2 xl:grid-cols-4', first: '' },
   5: { cols: 'sm:grid-cols-2 xl:grid-cols-5', first: 'sm:col-span-2 xl:col-span-1' },
-  6: { cols: 'sm:grid-cols-2 lg:mx-auto lg:max-w-5xl lg:grid-cols-3', first: '' },
+  6: { cols: 'sm:grid-cols-2 lg:mx-auto lg:max-w-5xl lg:auto-rows-fr lg:grid-cols-3', first: '' },
 };
