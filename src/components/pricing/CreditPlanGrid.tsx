@@ -64,11 +64,8 @@ export function CreditPlanGrid({
       return (
         <div
           key={tier.tier_id}
-          className={
-            starter
-              ? 'flex flex-col p-6 xl:p-8 border-2 border-[hsl(var(--formanova-hero-accent))]'
-              : 'flex flex-col p-6 xl:p-8 border-2 border-foreground'
-          }
+          // Every plan card looks the same; the $2 offer is marked only by its gold "One-time offer" line (owner, 2026-11-07).
+          className="flex flex-col p-6 xl:p-8 border-2 border-foreground"
         >
           {doneForYou && <CardKicker>Do it yourself</CardKicker>}
           {/* Label - fixed line box so every card's price and divider line up */}
