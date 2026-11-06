@@ -56,6 +56,16 @@ import {
   trackUpscaleStarted,
   trackUpscaleCompleted,
   trackUpscalePaywallHit,
+  trackRubyCtaClicked,
+  trackRubyCallStarted,
+  trackRubyCallConnected,
+  trackRubyCallFailed,
+  trackRubyQuoteShown,
+  trackRubyPaymentLinkCreated,
+  trackRubyPaymentReceived,
+  trackRubyFilesUploaded,
+  trackRubyTeamContactShown,
+  trackRubyCallEnded,
 } from './posthog-events'
 
 beforeEach(() => {
@@ -930,5 +940,34 @@ describe('trackCatalogShootCompleted', () => {
   it('reports a shoot cut off by leaving the page as abandoned', () => {
     trackCatalogShootCompleted({ shoot_id: 's2', succeeded: 1, failed: 0, stopped: false, abandoned: true, duration_ms: 5000 })
     expect(posthog.capture).toHaveBeenCalledWith('catalog_shoot_completed', expect.objectContaining({ shoot_id: 's2', abandoned: true }))
+  })
+})
+
+// ── Ruby (Done For You) funnel ──────────────────────────────────────
+
+describe('Ruby funnel events', () => {
+  it('each captures its own event with exactly the props given', () => {
+    trackRubyCtaClicked({ signed_in: false })
+    trackRubyCallStarted({ language: 'en' })
+    trackRubyCallConnected({ language: 'en', connect_ms: 1200 })
+    trackRubyCallFailed({ error_code: 'mic_denied', stage: 'connecting' })
+    trackRubyQuoteShown({ approved: true, total_cents: 3400, image_count: 5, sizes: '2k', turnaround: 'standard', installments: 1, last_offer: false, quote_number: 1 })
+    trackRubyPaymentLinkCreated({ total_cents: 3400, first_payment_cents: 3400, installments: 1, simulated: false })
+    trackRubyPaymentReceived({ amount_cents: 3400, seconds_into_call: 95 })
+    trackRubyFilesUploaded({ purpose: 'jewelry_photos', uploaded: 3, failed: 1 })
+    trackRubyTeamContactShown()
+    trackRubyCallEnded({ duration_s: 140, reason: 'ruby_closed', quotes_shown: 2, link_created: true, paid: true, files_uploaded: 3, error_code: null })
+    expect(vi.mocked(posthog.capture).mock.calls).toEqual([
+      ['ruby_cta_clicked', { signed_in: false }],
+      ['ruby_call_started', { language: 'en' }],
+      ['ruby_call_connected', { language: 'en', connect_ms: 1200 }],
+      ['ruby_call_failed', { error_code: 'mic_denied', stage: 'connecting' }],
+      ['ruby_quote_shown', { approved: true, total_cents: 3400, image_count: 5, sizes: '2k', turnaround: 'standard', installments: 1, last_offer: false, quote_number: 1 }],
+      ['ruby_payment_link_created', { total_cents: 3400, first_payment_cents: 3400, installments: 1, simulated: false }],
+      ['ruby_payment_received', { amount_cents: 3400, seconds_into_call: 95 }],
+      ['ruby_files_uploaded', { purpose: 'jewelry_photos', uploaded: 3, failed: 1 }],
+      ['ruby_team_contact_shown', undefined],
+      ['ruby_call_ended', { duration_s: 140, reason: 'ruby_closed', quotes_shown: 2, link_created: true, paid: true, files_uploaded: 3, error_code: null }],
+    ])
   })
 })

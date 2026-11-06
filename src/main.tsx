@@ -104,6 +104,9 @@ if (hostRedirect.shouldRedirect && hostRedirect.redirectUrl) {
     capture_pageleave: true,
     capture_exceptions: true,
     enable_heatmaps: true,
+    // Owner, 2026-11-06: recordings show everything typed, so we can see exactly where people get stuck.
+    // Passwords stay hidden. Card details are typed on Stripe's own page, never here.
+    session_recording: { maskAllInputs: false, maskInputOptions: { password: true } },
     bootstrap: storedUser
       ? { distinctID: storedUser.id, isIdentifiedID: true }
       : undefined,
