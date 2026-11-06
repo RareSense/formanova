@@ -61,7 +61,7 @@ export function DoneForYouCard({ onOpenCall }: DoneForYouCardProps) {
   return (
     <section
       aria-labelledby="done-for-you-title"
-      className="flex h-full flex-col border-2 border-[hsl(var(--formanova-hero-accent))] bg-gradient-to-b from-[hsl(var(--formanova-hero-accent))]/12 to-[hsl(var(--formanova-hero-accent))]/5 p-6 shadow-[4px_4px_0_hsl(var(--formanova-hero-accent)/0.6)] xl:p-8"
+      className="flex h-full flex-col border-2 border-[hsl(var(--formanova-hero-accent))] bg-[hsl(var(--formanova-hero-accent))]/10 p-6 shadow-[4px_4px_0_hsl(var(--formanova-hero-accent)/0.6)] xl:p-8"
     >
       <CardKicker gold>We do it for you</CardKicker>
       <div className="flex h-7 items-center">
