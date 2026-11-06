@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { listMyWorkflows, type SourceType } from '@/lib/generation-history-api';
+import { listMyWorkflows, type SourceType, type WorkflowSummary } from '@/lib/generation-history-api';
 import { fetchUserAssets, getAssetDisplayName, renameAsset, type UserAsset } from '@/lib/assets-api';
+import { matchRunPrompts, type RunPrompt } from '@/lib/cad-reuse-dimensions';
 
 export interface CadLibraryEntry {
   /** Stable react key. Workflow id for prompts, set id (or asset id when
    * ungrouped) for images. */
   id: string;
   createdAt: string;
-  /** Design brief text — text_to_cad only. */
+  /** Design brief text. For image entries, the newest of runPrompts. */
   prompt: string | null;
+  /** Image entries only: every distinct prompt typed for a finished run that
+   * used these images, newest first. Empty until the runs have been read. */
+  runPrompts?: RunPrompt[];
   /** Every image in this set, as same-origin artifact-proxy URLs. Index 0 is
    * the cover — image_to_cad only. */
   referenceImageUrls: string[];
@@ -102,6 +106,20 @@ export function useCadHistoryLibrary(sourceType: Extract<SourceType, 'text_to_ca
 
   useEffect(() => { setPage(0); }, [search]);
 
+  // Images only: the runs that used them, read once for the panel, so each
+  // card can say what was typed with it. The vault keeps pictures only.
+  // A failed read just leaves the cards without prompts.
+  const [runs, setRuns] = useState<WorkflowSummary[]>([]);
+  useEffect(() => {
+    if (!isImages) return;
+    let cancelled = false;
+    Promise.resolve()
+      .then(() => listMyWorkflows(100, 0))
+      .then((rows) => { if (!cancelled && Array.isArray(rows)) setRuns(rows); })
+      .catch(() => { /* cards show no prompts */ });
+    return () => { cancelled = true; };
+  }, [isImages]);
+
   // Only images refetch when the page changes; prompts hold one batch and
   // slice it in memory, so pinning this to 0 keeps page changes from
   // needlessly re-firing (and blanking) the prompt list.
@@ -150,11 +168,16 @@ export function useCadHistoryLibrary(sourceType: Extract<SourceType, 'text_to_ca
   // Prompts filter in memory; images are already filtered server-side.
   const filtered = useMemo(() => {
     if (!entries) return [];
-    if (isImages) return entries;
+    if (isImages) {
+      return entries.map((e) => {
+        const runPrompts = matchRunPrompts(e, runs);
+        return { ...e, runPrompts, prompt: runPrompts[0]?.text ?? null };
+      });
+    }
     const term = search.trim().toLowerCase();
     if (!term) return entries;
     return entries.filter((e) => (e.prompt ?? '').toLowerCase().includes(term));
-  }, [entries, search, isImages]);
+  }, [entries, search, isImages, runs]);
 
   /** Renames a vault asset, updating the local entry so the new name shows
    * without a refetch (which would also reset the user's page and search). */

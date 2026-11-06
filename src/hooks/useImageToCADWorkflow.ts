@@ -13,6 +13,7 @@ import {
   parseRingCadFailure,
   ringCadProgressFraction,
   isRingCadRepairing,
+  MAX_RING_CAD_REFERENCE_IMAGES,
   type ArtifactRef,
   type CadJewelryType,
   type CadMaterialProfile,
@@ -20,6 +21,7 @@ import {
 } from "@/lib/ring-cad-nurbs-api";
 import { readWeightTarget, resolveMetalWeight, type SentMetal } from "@/lib/metal-weight/source";
 import { buildReferenceInputs } from "@/lib/cad-reference-upload";
+import { fetchReferenceFiles } from "@/lib/reference-url-files";
 import {
   trackPaywallHit,
   trackCadGenerationStarted,
@@ -35,6 +37,7 @@ import {
 } from "@/lib/cad-analytics";
 import { fetchCadResult } from "@/lib/generation-history-api";
 import { fetchCadRunInputs } from "@/lib/cad-result-api";
+import { previewPrompt } from "@/lib/prompt-preview";
 import {
   CadImproveError,
   fetchCadRingBySetId,
@@ -147,6 +150,14 @@ export function useImageToCADWorkflow({
    */
   const [restoredReferenceUrls, setRestoredReferenceUrls] = useState<string[]>([]);
   const [restoredPrompt, setRestoredPrompt] = useState<string | null>(null);
+  /**
+   * Bumped by every restore. The page keys "this is a restore, show the run's
+   * prompt and photos" on it, which a change of restoredPrompt alone cannot
+   * say: two runs can share a prompt, and a run can have none.
+   */
+  const [restoreCount, setRestoreCount] = useState(0);
+  /** The restore whose inputs may still land; a slower lookup for an earlier one is dropped. */
+  const restoreTokenRef = useRef(0);
   /** Which version the panel is showing; the newest until the user picks another. */
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   /**
@@ -528,6 +539,8 @@ export function useImageToCADWorkflow({
     // report every internal restore as external.
     const entry = resolveRestoreEntry(window.location.search);
 
+    const restoreToken = ++restoreTokenRef.current;
+    setRestoreCount((n) => n + 1);
     hasNavigatedAway.current = false;
     onWorkspaceActivate();
     setIsGenerating(false);
@@ -594,9 +607,15 @@ export function useImageToCADWorkflow({
     if (workflowId) {
       // After the model, never before it: the ring is what the user came for,
       // and this is only the brief beside it.
+      //
+      // Fills only what is still empty: the seed (from history) and the ring's
+      // root run (an improve run's own inputs are saved files, not the user's
+      // photos) are better sources, and an empty or failed lookup must never
+      // blank them.
       void fetchCadRunInputs(workflowId).then(({ referenceImageUrls, prompt }) => {
-        setRestoredReferenceUrls(referenceImageUrls);
-        setRestoredPrompt(prompt);
+        if (restoreToken !== restoreTokenRef.current) return;
+        if (referenceImageUrls.length) setRestoredReferenceUrls((prev) => (prev.length ? prev : referenceImageUrls));
+        if (prompt) setRestoredPrompt((prev) => prev ?? prompt);
       });
     }
     return true;
@@ -612,7 +631,22 @@ export function useImageToCADWorkflow({
   const startGeneration = useCallback(async (files?: File[]): Promise<boolean> => {
     if (isGenerating) return false;
     if (blockIfCadDown()) return false;
-    const images = files ?? referenceImages;
+    let images = files ?? referenceImages;
+    // After a restore the session photos are cleared and the panel shows the
+    // run's own photos, so generating again must send those same photos.
+    if (!files && images.length === 0 && restoredReferenceUrls.length > 0) {
+      // A run can take at most MAX_RING_CAD_REFERENCE_IMAGES; an older run may hold more.
+      const urls = restoredReferenceUrls.slice(0, MAX_RING_CAD_REFERENCE_IMAGES);
+      if (urls.length < restoredReferenceUrls.length) {
+        toast.info(`Using the first ${urls.length} of ${restoredReferenceUrls.length} photos: a run takes at most ${MAX_RING_CAD_REFERENCE_IMAGES}.`);
+      }
+      try {
+        images = await fetchReferenceFiles(urls);
+      } catch {
+        toast.error("We couldn't load this design's photos. Add them again to generate.");
+        return false;
+      }
+    }
     const imageCount = images.length;
     const hasPrompt = !!prompt.trim();
     if (imageCount === 0 && !hasPrompt) {
@@ -746,7 +780,8 @@ export function useImageToCADWorkflow({
       // poll below only drives the on-page overlay while they stay.
       trackCadGeneration({
         workflowId: workflow_id,
-        label: prompt.trim() ? prompt.trim().slice(0, 40) : 'Image to CAD',
+        // Short for the completion toast; the full prompt is restored with the run.
+        label: prompt.trim() ? previewPrompt(prompt, 40) : 'Image to CAD',
         cadRoute,
         // The same bundle the started event just reported, handed over so the
         // completion event can be emitted by the context when the run settles.
@@ -784,7 +819,7 @@ export function useImageToCADWorkflow({
       setGenerationFailed(true);
     }
     return true;
-  }, [prompt, referenceImages, tier, jewelryType, material, weightTarget, cadRoute, cadSource, isGenerating, onWorkspaceActivate, trackCadGeneration, checkCredits]);
+  }, [prompt, referenceImages, restoredReferenceUrls, tier, jewelryType, material, weightTarget, cadRoute, cadSource, isGenerating, onWorkspaceActivate, trackCadGeneration, checkCredits]);
 
   /**
    * One press, one run. isGenerating only turns true after the credit check
@@ -893,6 +928,7 @@ export function useImageToCADWorkflow({
     improveMessage,
     restoredReferenceUrls,
     restoredPrompt,
+    restoreCount,
     /** True once, for the model that a run started here has just produced. */
     consumeGeneratedToast,
     simulateGeneration,

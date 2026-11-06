@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { RotateCcw, X, Maximize2 } from "lucide-react";
+import { RotateCcw, X, Maximize2, Pencil } from "lucide-react";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { useEstimatedCost } from "@/hooks/use-estimated-cost";
 import { RING_CAD_NURBS_WORKFLOW, MAX_RING_CAD_REFERENCE_IMAGES } from "@/lib/ring-cad-nurbs-api";
@@ -43,20 +43,108 @@ function ReferenceImage({ url, alt, className }: { url: string; alt: string; cla
   return <img src={src} alt={alt} className={className} />;
 }
 
+/** The enlarged photo. Restored photos are auth-gated links, so it goes
+ *  through the same signed-in fetch as the thumbnails. */
+function LightboxImage({ url }: { url: string }) {
+  const src = useAuthenticatedImage(url);
+  if (!src) return null;
+  return (
+    <motion.img
+      initial={{ scale: 0.9 }}
+      animate={{ scale: 1 }}
+      exit={{ scale: 0.9 }}
+      src={src}
+      alt="Inspiration image"
+      className="max-w-full max-h-full object-contain"
+      onClick={(e) => e.stopPropagation()}
+    />
+  );
+}
+
 /** Briefs longer than this (or over BRIEF_LINES lines) start clamped, with a "more" toggle. */
 const BRIEF_CLAMP_CHARS = 180;
 const BRIEF_LINES = 3;
 
-/** The customer's description, read-only, clamped to three lines until "more". */
-function PanelBrief({ text }: { text: string }) {
+interface PanelBriefEdit {
+  /** The text before editing began, or null when not editing. Owned by the panel so the editor stays open even if the box is emptied. */
+  original: string | null;
+  setOriginal: (text: string | null) => void;
+  setText: (text: string) => void;
+  onGenerate: () => void;
+  canGenerate: (text: string) => boolean;
+  cost: ReactNode;
+  /** What the box holds: "dimensions" (optional) for a design from photos, "prompt" for one from text. */
+  noun: 'dimensions' | 'prompt';
+}
+
+/**
+ * The customer's description, clamped to three lines until "more".
+ * With `edit`, hovering (or focusing) shows an Edit button; editing opens the
+ * full text in a box, and Generate new CAD starts a new design from the same
+ * photos with the edited prompt. Cancel puts the original text back.
+ */
+function PanelBrief({ text, edit }: { text: string; edit?: PanelBriefEdit }) {
   const [expanded, setExpanded] = useState(false);
+  const editing = !!edit && edit.original !== null;
   const clampable = text.length > BRIEF_CLAMP_CHARS || text.split('\n').length > BRIEF_LINES;
   const clamped = clampable && !expanded;
+
+  if (editing) {
+    return (
+      <section data-testid="cad-panel-brief" className="border border-border/40 bg-muted/20 px-3 py-2.5">
+        {edit.noun === 'dimensions' && (
+          <p className="mb-1.5 font-body text-[12px] font-medium text-foreground">
+            Dimensions <span className="font-normal text-muted-foreground">(optional)</span>
+          </p>
+        )}
+        <textarea
+          aria-label={`Edit ${edit.noun}`}
+          autoFocus
+          value={text}
+          onChange={(e) => edit.setText(e.target.value)}
+          rows={5}
+          className="w-full min-h-[110px] max-h-[260px] resize-y overflow-y-auto border border-border bg-background px-3 py-2 font-body text-[16px] md:text-[13px] leading-relaxed text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+        />
+        <p className="mt-1.5 font-body text-[11px] text-muted-foreground">Makes a new design from the same photos.</p>
+        <div className="mt-2 flex gap-2">
+          <button
+            type="button"
+            onClick={() => { edit.setText(edit.original ?? text); edit.setOriginal(null); }}
+            className="flex-1 border border-border py-2 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground hover:bg-accent/50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={!edit.canGenerate(text)}
+            onClick={() => { edit.setOriginal(null); edit.onGenerate(); }}
+            className="flex-[2] bg-primary py-2 text-[11px] font-bold uppercase tracking-[0.1em] text-primary-foreground hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
+          >
+            <span>Generate new CAD</span>
+            {edit.cost}
+          </button>
+        </div>
+      </section>
+    );
+  }
+
   return (
-    <section data-testid="cad-panel-brief" className="border border-border/40 bg-muted/20 px-3 py-2.5">
+    <section data-testid="cad-panel-brief" className="group relative border border-border/40 bg-muted/20 px-3 py-2.5">
+      {edit && (
+        <button
+          type="button"
+          aria-label={`Edit ${edit.noun}`}
+          title={`Edit ${edit.noun}`}
+          onClick={() => { edit.setOriginal(text); setExpanded(true); }}
+          className="absolute right-1.5 top-1.5 inline-flex items-center gap-1 border border-border bg-card/90 px-1.5 py-1 font-mono text-[9px] uppercase tracking-[0.15em] text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
+        >
+          <Pencil className="h-3 w-3" aria-hidden="true" />
+          Edit
+        </button>
+      )}
       <p
         data-testid="cad-panel-brief-text"
-        className={`whitespace-pre-wrap font-body text-[13px] leading-relaxed text-foreground/70 [overflow-wrap:anywhere] ${clamped ? 'line-clamp-3' : ''}`}
+        className={`whitespace-pre-wrap font-body text-[13px] leading-relaxed text-foreground/70 [overflow-wrap:anywhere] ${edit ? 'pr-12' : ''} ${clamped ? 'line-clamp-3' : ''}`}
       >
         {text}
       </p>
@@ -87,6 +175,7 @@ export default function LeftPanel({
 }: LeftPanelProps) {
   const { cost: generationCost, loading: generationCostLoading } = useEstimatedCost({ workflowName: RING_CAD_NURBS_WORKFLOW, model });
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [briefOriginal, setBriefOriginal] = useState<string | null>(null);
 
   const primaryPreviewUrl = referenceImagePreviewUrls[0] ?? null;
   const imageCount = referenceImagePreviewUrls.length;
@@ -104,15 +193,7 @@ export default function LeftPanel({
             className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
             onClick={() => setLightboxIndex(null)}
           >
-            <motion.img
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.9 }}
-              src={referenceImagePreviewUrls[lightboxIndex]}
-              alt="Inspiration image"
-              className="max-w-full max-h-full object-contain"
-              onClick={(e) => e.stopPropagation()}
-            />
+            <LightboxImage url={referenceImagePreviewUrls[lightboxIndex]} />
             <button
               onClick={() => setLightboxIndex(null)}
               className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-card/80 border border-border hover:bg-accent/60 transition-colors"
@@ -143,7 +224,8 @@ export default function LeftPanel({
             <div className="flex items-baseline justify-between mb-2">
               <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Reference Images</h3>
               <span className="font-mono text-[10px] tracking-[0.15em] text-muted-foreground/60 tabular-nums">
-                {imageCount}/{MAX_RING_CAD_REFERENCE_IMAGES}
+                {/* A run restored from history can hold more than a new upload allows. */}
+                {imageCount > MAX_RING_CAD_REFERENCE_IMAGES ? imageCount : `${imageCount}/${MAX_RING_CAD_REFERENCE_IMAGES}`}
               </span>
             </div>
             <div className="grid grid-cols-4 gap-2">
@@ -184,8 +266,35 @@ export default function LeftPanel({
             than an empty box.
             Clamped to three lines with a more / less toggle: a long brief would
             otherwise push everything below it out of the panel. */}
-        {((isImageMode && !hasModel) || versions.length > 0) && prompt.trim() && (
-          <PanelBrief text={prompt} />
+        {/* A design made from photos alone had no dimensions: offer to add them. */}
+        {isImageMode && versions.length > 0 && !prompt.trim() && briefOriginal === null && !isGenerating && (
+          <button
+            type="button"
+            aria-label="Add dimensions"
+            onClick={() => setBriefOriginal('')}
+            className="w-full border border-dashed border-border/60 px-3 py-2 text-left font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground hover:border-border"
+          >
+            + Add dimensions
+          </button>
+        )}
+        {((isImageMode && !hasModel) || versions.length > 0) && (prompt.trim() || (briefOriginal !== null && !isGenerating)) && (
+          <PanelBrief
+            text={prompt}
+            edit={isGenerating ? undefined : {
+              original: briefOriginal,
+              setOriginal: setBriefOriginal,
+              setText: setPrompt,
+              onGenerate,
+              canGenerate: (t) => !!t.trim() || !!primaryPreviewUrl,
+              noun: isImageMode ? 'dimensions' : 'prompt',
+              cost: (
+                <span className="inline-flex items-center gap-1 opacity-80">
+                  <img src={creditCoinIcon} alt="" className="h-4 w-4" />
+                  <span className="font-mono">{generationCostLoading ? '…' : (generationCost ?? '—')}</span>
+                </span>
+              ),
+            }}
+          />
         )}
 
         {/* The ring's own history, directly under what it was made from.
