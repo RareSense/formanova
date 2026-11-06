@@ -66,7 +66,7 @@ export function CreditPlanGrid({
           key={tier.tier_id}
           className={
             starter
-              ? 'flex flex-col p-6 xl:p-8 border-2 border-[hsl(var(--formanova-hero-accent))] bg-[hsl(var(--formanova-hero-accent))]/10'
+              ? 'flex flex-col p-6 xl:p-8 border-2 border-[hsl(var(--formanova-hero-accent))]'
               : 'flex flex-col p-6 xl:p-8 border-2 border-foreground'
           }
         >

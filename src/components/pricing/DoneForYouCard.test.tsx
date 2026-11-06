@@ -46,6 +46,14 @@ describe('DoneForYouCard', () => {
     expect(screen.queryByText('Done for you')).not.toBeInTheDocument();
   });
 
+  it('is the only tinted card: a flat gold tint, no fade (owner, 2026-11-07)', () => {
+    mockUser = { email: 'ruby@example.com' };
+    renderCard();
+    const card = screen.getByRole('region', { name: 'Done for you' });
+    expect(card.className).toContain('bg-[hsl(var(--formanova-hero-accent))]/10');
+    expect(card.className).not.toContain('bg-gradient');
+  });
+
   it('is shown for an allowlisted user', () => {
     mockUser = { email: 'Ruby@Example.com' };
     renderCard();
