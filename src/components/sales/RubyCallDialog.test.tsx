@@ -42,6 +42,7 @@ function fakes() {
     toggleMute: vi.fn(),
     appendInstruction: vi.fn(() => true),
     endAfterGoodbye: vi.fn(),
+    clientActive: vi.fn(),
     getTurns: () => [],
     getState: () => 'live',
   };

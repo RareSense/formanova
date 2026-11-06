@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
+  AWAY_GOODBYE,
+  awayCheck,
   DEAD_AIR_ANSWER,
   DEAD_AIR_CUE,
   STILL_WORKING_CUE,
@@ -428,6 +430,87 @@ describe('WebRTCCall', () => {
       s.call.endAfterGoodbye();
       await vi.advanceTimersByTimeAsync(7000);
       expect(cues(s)).toEqual([]);
+    });
+  });
+
+  describe('caller away (owner, 2026-11-07)', () => {
+    const away = (s: ReturnType<typeof setup>) =>
+      s.pc.dc.sent
+        .filter((m) => m.content === awayCheck('Asha') || m.content === AWAY_GOODBYE)
+        .map((m) => (m.content === AWAY_GOODBYE ? 'bye' : 'ask'));
+
+    it('after 40 s of no words asks if they are still there, 3 times 20 s apart, then says goodbye and hangs up', async () => {
+      const s = setup();
+      let level = 0;
+      await startLive(s, { clientName: 'Asha', rubyLevel: () => level });
+      s.pc.dc.message({ type: 'session.output_transcript.delta', delta: 'What do you sell?' });
+      await vi.advanceTimersByTimeAsync(39000);
+      expect(away(s)).toEqual([]);
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(away(s)).toEqual(['ask']);
+      expect(awayCheck('Asha').toLowerCase()).toContain('still there');
+      await vi.advanceTimersByTimeAsync(21000);
+      expect(away(s)).toEqual(['ask', 'ask']);
+      await vi.advanceTimersByTimeAsync(20000);
+      expect(away(s)).toEqual(['ask', 'ask', 'ask']);
+      await vi.advanceTimersByTimeAsync(20000);
+      expect(away(s)).toEqual(['ask', 'ask', 'ask', 'bye']);
+      expect(s.cbs.onEnded).not.toHaveBeenCalled();
+      level = 0.3; // she says goodbye
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(s.cbs.onEnded).not.toHaveBeenCalled();
+      level = 0;
+      await vi.advanceTimersByTimeAsync(3000);
+      expect((s.cbs.onEnded.mock.calls[0][0] as CallEndResult).reason).toBe('ruby_closed');
+    });
+
+    it('hangs up anyway if she never says the goodbye', async () => {
+      const s = setup();
+      await startLive(s, { clientName: 'Asha' });
+      await vi.advanceTimersByTimeAsync(41000 + 3 * 20000 + 1000);
+      expect(away(s)).toEqual(['ask', 'ask', 'ask', 'bye']);
+      await vi.advanceTimersByTimeAsync(12000);
+      expect(s.cbs.onEnded).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(s.cbs.onEnded).toHaveBeenCalledTimes(1);
+    });
+
+    it('starts over when the caller answers or does something on screen', async () => {
+      const s = setup();
+      await startLive(s, { clientName: 'Asha' });
+      await vi.advanceTimersByTimeAsync(41000);
+      expect(away(s)).toEqual(['ask']);
+      s.pc.dc.message({ type: 'session.input_transcript.delta', delta: "Yes, I'm here." });
+      await vi.advanceTimersByTimeAsync(39000);
+      expect(away(s)).toEqual(['ask']);
+      s.call.clientActive(); // typed in a box
+      await vi.advanceTimersByTimeAsync(39000);
+      expect(away(s)).toEqual(['ask']);
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(away(s)).toEqual(['ask', 'ask']); // a fresh first ask after a fresh 40 s, never a goodbye early
+      expect(s.cbs.onEnded).not.toHaveBeenCalled();
+    });
+
+    it('never asks while she is looking something up, or while the caller is on mute', async () => {
+      const s = setup();
+      let release: () => void = () => {};
+      const runTool = vi.fn(() => new Promise<Record<string, unknown>>((r) => (release = () => r({}))));
+      await startLive(s, { runTool, clientName: 'Asha' });
+      s.pc.dc.message({
+        type: 'response.event',
+        delegation_id: 'd1',
+        event: { type: 'response.output_item.done', item: { type: 'function_call', call_id: 'c1', name: 'quote_shoot' } },
+      });
+      await vi.advanceTimersByTimeAsync(60000);
+      expect(away(s)).toEqual([]);
+      release();
+      s.pc.dc.message({ type: 'response.event', delegation_id: 'd1', event: { type: 'response.completed' } });
+      await vi.advanceTimersByTimeAsync(30000);
+      expect(away(s)).toEqual([]); // counts from the end of the lookup
+      s.call.setMuted(true);
+      await vi.advanceTimersByTimeAsync(120000);
+      expect(away(s)).toEqual([]);
+      expect(s.cbs.onEnded).not.toHaveBeenCalled();
     });
   });
 
