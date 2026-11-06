@@ -103,7 +103,7 @@ export function CreditPlanGrid({
                   {credits.toLocaleString()} credits
                 </p>
                 <p className="mt-2 font-mono text-sm leading-relaxed text-muted-foreground">
-                  Up to {photos} standard photos
+                  Up to {photos} photos at 1K
                   {!noCad && (
                     <>
                       <br />

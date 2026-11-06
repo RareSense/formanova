@@ -62,7 +62,7 @@ describe('CreditPlanGrid', () => {
 
   it('shows photo and CAD capacity per plan', () => {
     renderGrid();
-    expect(screen.getByText(/^Up to 12 standard photos$/)).toBeInTheDocument();
+    expect(screen.getByText(/^Up to 12 photos at 1K$/)).toBeInTheDocument();
     expect(screen.getByText(/or 3 CAD generations/)).toBeInTheDocument();
     expect(screen.getByText(/or 10 CAD generations/)).toBeInTheDocument();
   });
@@ -76,7 +76,7 @@ describe('CreditPlanGrid', () => {
     expect(screen.queryByText('Not suitable for CAD')).not.toBeInTheDocument();
     expect(screen.getByText('Essential')).toBeInTheDocument();
     expect(screen.getByText('160 credits')).toBeInTheDocument();
-    expect(screen.getByText(/^Up to 20 standard photos\s*or 1 CAD generation$/)).toBeInTheDocument();
+    expect(screen.getByText(/^Up to 20 photos at 1K\s*or 1 CAD generation$/)).toBeInTheDocument();
   });
 
   it('CAD shortfall of 100: Basic can still fund it, so it stays', () => {

@@ -16,7 +16,7 @@ describe('RubyPanels', () => {
     const deal: Panel = {
       id: 'p1',
       kind: 'deal',
-      title: 'Your deal',
+      title: 'Your order',
       rows: [['Images, 2K', '120', '$10', '$1,200']],
       total: '$1,200',
       url: 'https://x/pay/test/cs-1',
@@ -40,12 +40,12 @@ describe('RubyPanels', () => {
 
   it('once the deposit is paid, it says so instead of Pay now', () => {
     const paid: Panel = {
-      id: 'p2', kind: 'deal', title: 'Your deal', rows: [['Images, 1K', '50', '$7', '$350']], total: '$350',
+      id: 'p2', kind: 'deal', title: 'Your order', rows: [['Images, 1K', '50', '$7', '$350']], total: '$350',
       url: 'https://buy.stripe.com/x', simulated: false, paid: true,
       installments: [{ n: 1, label: 'Full payment before work starts', amountCents: 35000, amount: '$350', due: null, url: 'https://buy.stripe.com/x' }],
     };
     render(<RubyStage panel={paid} {...noop} />);
-    expect(screen.getByRole('status')).toHaveTextContent('Paid, thank you');
+    expect(screen.getByRole('status')).toHaveTextContent('Paid. Your project has started.');
     expect(screen.queryByRole('link', { name: /pay now/i })).not.toBeInTheDocument();
     expect(screen.queryByText('Test link')).not.toBeInTheDocument();
   });
@@ -54,14 +54,14 @@ describe('RubyPanels', () => {
     const quote: Panel = {
       id: 'p2',
       kind: 'table',
-      title: 'Your quote',
+      title: 'Your price',
       columns: ['Item', 'Qty', 'Per unit', 'Total'],
       rows: [['AI revision round on up to 120 images', '120', 'Bonus', 'Free']],
       total: '$1,200',
       schedule: [{ n: 1, label: 'Full payment before work starts', amountCents: 120000, amount: '$1,200', due: null }],
     };
     render(<RubyStage panel={quote} {...noop} />);
-    expect(screen.getByText('Payment plan')).toBeInTheDocument();
+    expect(screen.getByText('How you pay')).toBeInTheDocument();
     expect(screen.getByText('Full payment before work starts')).toBeInTheDocument();
     // A real grid: every column has its own header and cell.
     expect(screen.getByRole('columnheader', { name: 'Per unit' })).toBeInTheDocument();

@@ -11,7 +11,7 @@ export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'image/gif'];
 
 export const PURPOSE_LABELS: Record<UploadPurpose, string> = {
-  jewelry_photos: 'jewellery photos',
+  jewelry_photos: 'jewelry photos',
   references: 'references',
   cad_files: 'CAD files',
   other: 'other files',
