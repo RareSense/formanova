@@ -3,7 +3,7 @@
 export function CardKicker({ gold, children }: { gold?: boolean; children: string }) {
   return (
     <p
-      className={`mb-3 whitespace-nowrap font-mono text-sm font-bold italic uppercase tracking-[0.12em] 2xl:text-[13px] 2xl:tracking-[0.08em] ${
+      className={`mb-3 whitespace-nowrap font-mono text-sm font-bold italic uppercase tracking-[0.12em] xl:text-xs xl:tracking-[0.06em] ${
         gold ? 'text-[hsl(var(--formanova-hero-accent))]' : 'text-foreground'
       }`}
     >

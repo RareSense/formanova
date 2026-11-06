@@ -143,13 +143,13 @@ describe('CreditPlanGrid', () => {
     expect(grid.firstElementChild?.className).toContain('xl:col-span-1');
   });
 
-  it('with six cards, sits 3 + 3 and only goes to one row from 2xl, so prices never overflow', () => {
+  it('with six cards, always sits 3 + 3, even on wide screens (owner, 2026-11-07)', () => {
     renderWithDfy(TIERS); // $2 starter + 4 plans + Done For You
     const grid = screen.getByTestId('dfy').closest('.grid') as HTMLElement;
     expect(grid.children).toHaveLength(6);
     expect(grid.className).toContain('lg:grid-cols-3');
-    expect(grid.className).toContain('2xl:grid-cols-6');
-    expect(grid.className).not.toMatch(/(^| )xl:grid-cols/);
+    expect(grid.className).not.toContain('grid-cols-6');
+    expect(grid.className).not.toMatch(/(^| )(xl|2xl):grid-cols/);
   });
 
   it('with four cards (staging: no $2 or $14), sits 2 + 2 and one row from xl', () => {
