@@ -2,7 +2,7 @@ import { CallAudio } from '@/components/sales/CallAudio';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useIsFetching, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, ArrowLeft, Copy, Download, Loader2, Play, RefreshCw } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Copy, Download, Loader2, Mail, Play, RefreshCw } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -30,7 +30,7 @@ import { parseServerTime } from '@/lib/server-time';
 
 /**
  * Ruby's orders and call records as billing holds them (separate from "Ruby Calls", which reads
- * GraphFlow runs). Orders: what was agreed, what is paid, and "Generate link N" for an unpaid
+ * GraphFlow runs). Orders: what was agreed, what is paid, and "Create payment N link" + "Email client" for an unpaid
  * installment. Calls: the stored record with transcript and recording. Views live in the address
  * (?view=calls, ?deal=<id>, ?call=<id>) so Back works and a page can be linked.
  * Everything that came from a call is rendered as text, never as HTML.
@@ -401,6 +401,32 @@ function PackageView({ pkg, currency }: { pkg: unknown; currency: string }) {
   );
 }
 
+/** A ready email for one payment link: the admin's own mail app opens with it filled in (owner, 2026-11-06: keep
+ *  delivery and the next payment simple). The last of several payments is the one due at delivery. */
+export function paymentEmailHref(deal: SalesDeal, inst: Installment, url: string): string | null {
+  const to = deal.customer_email || deal.client.email;
+  if (!to) return null;
+  const count = deal.installments.length;
+  const first = (deal.client.name ?? '').trim().split(/\s+/)[0];
+  const amount = money(inst.amount_cents, deal.currency);
+  const atDelivery = count > 1 && inst.n === count;
+  const lines = [
+    first ? `Hi ${first},` : 'Hi,',
+    '',
+    atDelivery
+      ? `Your images are ready. Please pay the remaining ${amount} here to get your final files:`
+      : `Here is your payment link for ${amount} (${inst.label}):`,
+    url,
+    '',
+    'Thank you,',
+    'FormaNova Studio',
+  ];
+  const subject = count > 1 ? `Your FormaNova order: payment ${inst.n} of ${count}` : 'Your FormaNova order: payment';
+  // mailto wants %20 for spaces, not URLSearchParams' "+".
+  const query = new URLSearchParams({ subject, body: lines.join('\n') }).toString().replace(/\+/g, '%20');
+  return `mailto:${encodeURIComponent(to)}?${query}`;
+}
+
 function InstallmentRow({ deal, inst }: { deal: SalesDeal; inst: Installment }) {
   const qc = useQueryClient();
   const [copied, setCopied] = useState(false);
@@ -417,6 +443,7 @@ function InstallmentRow({ deal, inst }: { deal: SalesDeal; inst: Installment }) 
   });
   const link = inst.current_link;
   const openUrl = inst.state === 'open' && link ? link.url : make.data?.url ?? null;
+  const mailHref = openUrl ? paymentEmailHref(deal, inst, openUrl) : null;
   const copy = async (url: string) => {
     try {
       await navigator.clipboard.writeText(url);
@@ -448,10 +475,13 @@ function InstallmentRow({ deal, inst }: { deal: SalesDeal; inst: Installment }) 
           )}
         </div>
         {canGenerate(inst.state) && !make.data && (
-          <Button size="sm" disabled={make.isPending} onClick={() => make.mutate()}>
-            {make.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Generate link {inst.n}
-          </Button>
+          <div className="flex flex-col items-end gap-1">
+            <Button size="sm" disabled={make.isPending} onClick={() => make.mutate()}>
+              {make.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Create payment {inst.n} link
+            </Button>
+            {inst.n > 1 && <p className="text-xs text-muted-foreground">Create it once the work is delivered.</p>}
+          </div>
         )}
       </div>
       {openUrl && (
@@ -462,6 +492,13 @@ function InstallmentRow({ deal, inst }: { deal: SalesDeal; inst: Installment }) 
           <Button size="sm" variant="outline" className="shrink-0" onClick={() => void copy(openUrl)}>
             <Copy className="mr-1.5 h-3.5 w-3.5" /> {copied ? 'Copied' : 'Copy'}
           </Button>
+          {mailHref && (
+            <Button asChild size="sm" className="shrink-0">
+              <a href={mailHref}>
+                <Mail className="mr-1.5 h-3.5 w-3.5" /> Email client
+              </a>
+            </Button>
+          )}
         </div>
       )}
       {make.isError && (
