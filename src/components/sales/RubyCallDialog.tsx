@@ -103,7 +103,8 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
   const staged = showPanels;
   const roundBtn = staged ? 'h-11 w-11 lg:h-12 lg:w-12' : 'h-[60px] w-[60px]';
   const endBtn = staged ? 'h-11 w-14 lg:h-12' : 'h-[60px] w-[72px]';
-  const frame = 'border-2 border-foreground bg-background shadow-[6px_6px_0_hsl(var(--foreground))]';
+  // FormaNova look: square corners and a plain black border, no shadow (owner, 2026-11-06).
+  const frame = 'border-2 border-foreground bg-background';
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
@@ -115,16 +116,16 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
           aria-label="Call with Ruby"
           className={`${frame} flex min-w-0 flex-col overflow-hidden ${
             staged
-              ? 'sticky top-0 z-10 w-full rounded-b-3xl lg:static lg:h-[min(760px,92dvh)] lg:w-[380px] lg:shrink-0 lg:rounded-3xl'
-              : 'mx-auto my-auto w-[calc(100%-2rem)] max-w-[400px] rounded-3xl lg:h-[min(760px,92dvh)]'
+              ? 'sticky top-0 z-10 w-full lg:static lg:h-[min(760px,92dvh)] lg:w-[380px] lg:shrink-0'
+              : 'mx-auto my-auto w-[calc(100%-2rem)] max-w-[400px] lg:h-[min(760px,92dvh)]'
           }`}
         >
           {/* Title bar like Eva's: who you are talking to, always in view. */}
           <div className={`items-center gap-3 border-b-2 border-foreground bg-muted/60 px-4 py-2.5 ${staged ? 'hidden lg:flex' : 'flex'}`}>
             <span className="flex gap-1.5" aria-hidden="true">
-              <span className="h-3 w-3 rounded-full border border-foreground/40 bg-[#ef6461]" />
-              <span className="h-3 w-3 rounded-full border border-foreground/40 bg-[#f5bf4f]" />
-              <span className="h-3 w-3 rounded-full border border-foreground/40 bg-[#5fc05a]" />
+              <span className="h-2.5 w-2.5 bg-foreground" />
+              <span className="h-2.5 w-2.5 bg-[hsl(var(--formanova-hero-accent))]" />
+              <span className="h-2.5 w-2.5 border border-foreground" />
             </span>
             <span className="flex-1 truncate text-center font-mono text-[11px] uppercase tracking-[0.12em] sm:tracking-[0.25em]">Ruby · AI sales agent</span>
             <Button
@@ -225,7 +226,7 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
                     variant="outline"
                     title={muted ? 'Unmute' : 'Mute'}
                     aria-label={muted ? 'Unmute' : 'Mute'}
-                    className={`${roundBtn} shrink-0 rounded-full p-0`}
+                    className={`${roundBtn} shrink-0 rounded-none p-0`}
                     disabled={phase !== 'live'}
                     aria-pressed={muted}
                     onClick={call.toggleMute}
@@ -236,7 +237,7 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
                     variant="outline"
                     title="Captions"
                     aria-label="Captions"
-                    className={`${roundBtn} shrink-0 rounded-full p-0 ${staged ? 'hidden lg:inline-flex' : ''}`}
+                    className={`${roundBtn} shrink-0 rounded-none p-0 ${staged ? 'hidden lg:inline-flex' : ''}`}
                     disabled={phase !== 'live'}
                     aria-pressed={captionsOn}
                     onClick={call.toggleCaptions}
@@ -247,7 +248,7 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
                     variant="destructive"
                     title="End call"
                     aria-label="End call"
-                    className={`${endBtn} shrink-0 rounded-full p-0`}
+                    className={`${endBtn} shrink-0 rounded-none p-0`}
                     onClick={call.end}
                   >
                     <PhoneOff className="h-6 w-6" />
@@ -321,7 +322,7 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
         {staged && panel && (
           <section
             data-testid="ruby-stage"
-            className={`${frame} m-4 min-w-0 rounded-3xl p-4 sm:p-6 lg:m-0 lg:h-[min(760px,92dvh)] lg:w-[min(600px,calc(100vw-380px-6rem))] lg:overflow-y-auto`}
+            className={`${frame} m-4 min-w-0 p-4 sm:p-6 lg:m-0 lg:h-[min(760px,92dvh)] lg:w-[min(600px,calc(100vw-380px-6rem))] lg:overflow-y-auto`}
           >
             <RubyStage
               key={panel.id}
