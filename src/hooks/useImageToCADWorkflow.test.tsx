@@ -115,17 +115,6 @@ describe('useImageToCADWorkflow start', () => {
     expect(startCalls()).toHaveLength(1);
   });
 
-  it('labels the run with a short preview of the prompt, cut at a word and marked with an ellipsis', async () => {
-    checkCredits.mockResolvedValue(true);
-    trackCadGenerationMock.mockClear();
-    const { result } = renderHook(() => useImageToCADWorkflow({
-      model: 'test', prompt: 'Ring size US 7 with a two millimetre band and an oval stone', referenceImages: [],
-      cadRoute: '/image-to-cad', onWorkspaceActivate: vi.fn(),
-    }));
-    await act(async () => { await result.current.simulateGeneration(); });
-    expect(trackCadGenerationMock).toHaveBeenCalledWith(expect.objectContaining({ label: 'Ring size US 7 with a two millimetre…' }));
-  });
-
   it('ignores a click event passed as the argument', async () => {
     checkCredits.mockResolvedValue(true);
     buildReferenceInputs.mockClear();

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mockList = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/generation-history-api', () => ({ listMyWorkflows: mockList }));
 
-import { findReusedDimensions, matchRunPrompts } from './cad-reuse-dimensions';
+import { findReusedDimensions } from './cad-reuse-dimensions';
 
 const run = (over: Record<string, unknown>) => ({
   workflow_id: 'w', name: 'ring_cad_nurbs_v1', status: 'completed', created_at: '2026-10-01T00:00:00Z',
@@ -48,33 +48,5 @@ describe('findReusedDimensions', () => {
     mockList.mockClear();
     expect(await findReusedDimensions({ assetIds: [] })).toBeNull();
     expect(mockList).not.toHaveBeenCalled();
-  });
-});
-
-describe('matchRunPrompts', () => {
-  it('lists every distinct prompt used with the images, newest first, with its date', () => {
-    const runs = [
-      run({ prompt: 'old', created_at: '2026-09-01T00:00:00Z', reference_image_keys: ['a'] }),
-      run({ prompt: 'new', created_at: '2026-10-02T00:00:00Z', reference_image_keys: ['h'.repeat(64)] }),
-      run({ prompt: 'new', created_at: '2026-09-15T00:00:00Z', reference_image_keys: ['a'] }),
-      run({ prompt: 'other images', reference_image_keys: ['z'] }),
-    ];
-    expect(matchRunPrompts({ assetIds: ['a'], sha256s: ['h'.repeat(64)] }, runs as never)).toEqual([
-      { text: 'new', createdAt: '2026-10-02T00:00:00Z' },
-      { text: 'old', createdAt: '2026-09-01T00:00:00Z' },
-    ]);
-  });
-
-  it('keeps the same rules as the dimensions lookup: finished CAD from Image runs with a prompt', () => {
-    const runs = [
-      run({ prompt: 'inspiration words', client_flow: 'inspiration', reference_image_keys: ['a'] }),
-      run({ prompt: 'failed', status: 'failed', reference_image_keys: ['a'] }),
-      run({ prompt: null, reference_image_keys: ['a'] }),
-    ];
-    expect(matchRunPrompts({ assetIds: ['a'] }, runs as never)).toEqual([]);
-  });
-
-  it('matches nothing for an entry with no keys', () => {
-    expect(matchRunPrompts({ assetIds: [] }, [run({ reference_image_keys: [''] })] as never)).toEqual([]);
   });
 });

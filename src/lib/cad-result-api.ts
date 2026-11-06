@@ -247,10 +247,6 @@ export async function resolveCadModel(workflowId: string, raw: unknown): Promise
 }
 
 
-/** One history page (the backend's cap), and how many to walk before giving up. */
-const RUN_INPUTS_PAGE_SIZE = 100;
-const RUN_INPUTS_MAX_PAGES = 5;
-
 /**
  * The inputs a finished run was made from: its reference photos and its text.
  *
@@ -268,14 +264,8 @@ export async function fetchCadRunInputs(
 ): Promise<{ referenceImageUrls: string[]; prompt: string | null }> {
   const { listMyWorkflows } = await import('@/lib/generation-history-api');
   try {
-    // The history has no per-run lookup, so walk it newest first. Bounded:
-    // a run older than this many is not worth the requests to find.
-    let row: Awaited<ReturnType<typeof listMyWorkflows>>[number] | undefined;
-    for (let page = 0; page < RUN_INPUTS_MAX_PAGES && !row; page++) {
-      const rows = await listMyWorkflows(RUN_INPUTS_PAGE_SIZE, page * RUN_INPUTS_PAGE_SIZE);
-      row = rows.find((w) => w.workflow_id === workflowId);
-      if (rows.length < RUN_INPUTS_PAGE_SIZE) break;
-    }
+    const rows = await listMyWorkflows(100, 0);
+    const row = rows.find((w) => w.workflow_id === workflowId);
     return {
       referenceImageUrls: row?.reference_image_urls ?? [],
       prompt: row?.prompt ?? null,

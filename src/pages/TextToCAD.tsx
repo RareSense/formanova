@@ -44,7 +44,6 @@ import type { GemMode } from "@/components/text-to-cad/CADCanvas";
 import { RING_CAD_DEFAULT_TIER, RING_CAD_NURBS_WORKFLOW, RING_CAD_TIERS, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
 import { recordStudioVisit } from '@/lib/studio-preference';
 import { useCadRestoreFromUrl } from "@/hooks/useCadRestoreFromUrl";
-import { useRestoredRunPrompt } from "@/hooks/useRestoredRunPrompt";
 import { useCadMetal } from "@/hooks/useCadMetal";
 import TechSpecSection, { hasSpecSheet } from "@/components/spec-sheet/TechSpecSection";
 import MetalWeightStep from "@/components/metal-weight/MetalWeightStep";
@@ -181,15 +180,6 @@ export default function TextToCAD({ variant = "idea" }: { variant?: DesignStartV
 
   // Phones offer Orbit only; never leave a Move/Rotate/Scale gizmo behind on one.
   useEffect(() => { if (layoutMode === "phone") setTransformMode("orbit"); }, [layoutMode]);
-
-  // A run opened from history shows the prompt it was made from, replacing
-  // whatever was typed this session (empty when the run had none).
-  useRestoredRunPrompt({
-    restoreCount: workflow.restoreCount,
-    restoredPrompt: workflow.restoredPrompt,
-    prompt,
-    setPrompt,
-  });
 
   // Boot directly into the workspace from a stable workflow result link. The
   // optional GLB param renders eagerly; the workflow id restores the full
