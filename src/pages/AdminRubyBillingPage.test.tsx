@@ -93,28 +93,54 @@ describe('Admin Ruby orders page', () => {
     expect(within(rows[0] as HTMLElement).getByText('Dispute')).toBeInTheDocument();
   });
 
-  it('shows Generate link only for an installment without a usable link, and shows the new link', async () => {
+  it('shows Create payment link only for an installment without a usable link, and shows the new link', async () => {
     api.generateLink.mockResolvedValue({ link_id: 'slink_2', url: 'https://buy.stripe.com/new', status: 'open' });
     renderPage('/admin/ruby-orders?deal=deal_1');
-    const btn = await screen.findByRole('button', { name: 'Generate link 2' });
-    expect(screen.queryByRole('button', { name: 'Generate link 1' })).not.toBeInTheDocument();
+    const btn = await screen.findByRole('button', { name: 'Create payment 2 link' });
+    expect(screen.queryByRole('button', { name: 'Create payment 1 link' })).not.toBeInTheDocument();
     fireEvent.click(btn);
     await waitFor(() => expect(api.generateLink).toHaveBeenCalledWith('deal_1', 2));
     expect(await screen.findByText('https://buy.stripe.com/new')).toBeInTheDocument();
   });
 
-  it.each(['open', 'paid', 'refunded'] as const)('no Generate button when installment 2 is %s', async (state) => {
+  it.each(['open', 'paid', 'refunded'] as const)('no Create button when installment 2 is %s', async (state) => {
     api.getSalesDeal.mockResolvedValue(deal(state));
     renderPage('/admin/ruby-orders?deal=deal_1');
     await screen.findByText('Payment 2 of 2: on delivery');
-    expect(screen.queryByRole('button', { name: /Generate link/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Create payment/ })).not.toBeInTheDocument();
   });
 
-  it('shows billing\'s message when Generate fails', async () => {
+  it('after delivery: one click makes the link, then Email client opens a ready email with the amount and link', async () => {
+    api.generateLink.mockResolvedValue({ link_id: 'slink_2', url: 'https://buy.stripe.com/new', status: 'open' });
+    renderPage('/admin/ruby-orders?deal=deal_1');
+    expect(await screen.findByText('Create it once the work is delivered.')).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'Create payment 2 link' }));
+    const mail = await screen.findByRole('link', { name: /Email client/ });
+    const href = mail.getAttribute('href') ?? '';
+    expect(href.startsWith('mailto:billing%40brand.com?')).toBe(true);
+    const params = new URLSearchParams(href.split('?')[1]);
+    expect(params.get('subject')).toBe('Your FormaNova order: payment 2 of 2');
+    const body = params.get('body') ?? '';
+    expect(body).toContain('Hi Sara,');
+    expect(body).toContain('Your images are ready.');
+    expect(body).toContain('$250.00');
+    expect(body).toContain('https://buy.stripe.com/new');
+  });
+
+  it('an open link already made shows Email client too; a paid one does not', async () => {
+    const open = deal('open');
+    open.installments[1].current_link = { ...open.installments[0].current_link!, link_id: 'slink_2', status: 'open', url: 'https://buy.stripe.com/two', paid_at: null };
+    api.getSalesDeal.mockResolvedValue(open);
+    renderPage('/admin/ruby-orders?deal=deal_1');
+    expect(await screen.findByRole('link', { name: /Email client/ })).toHaveAttribute('href', expect.stringContaining('buy.stripe.com%2Ftwo'));
+    expect(screen.getAllByRole('link', { name: /Email client/ })).toHaveLength(1); // payment 1 is paid: nothing to send
+  });
+
+  it('shows billing\'s message when Create fails', async () => {
     const { BillingError } = await import('@/lib/ruby-call/admin-billing');
     api.generateLink.mockRejectedValue(new BillingError(409, 'installment_already_paid', 'Already paid.', 'slink_9'));
     renderPage('/admin/ruby-orders?deal=deal_1');
-    fireEvent.click(await screen.findByRole('button', { name: 'Generate link 2' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Create payment 2 link' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Already paid.');
   });
 
