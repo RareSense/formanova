@@ -165,7 +165,12 @@ export function quoteRows(client: Record<string, unknown>): { rows: string[][]; 
   if (percent(client.surchargeShare)) {
     rows.push([`Turnaround: ${text(client.turnaroundLabel, cell(client.turnaround))}`, '', `+${percent(client.surchargeShare)}`, '']);
   }
-  if (percent(client.discountShare)) rows.push(['Discount', '', `-${percent(client.discountShare)}`, '']);
+  if (percent(client.discountShare)) {
+    // The discount comes off the images only; add-ons, packages and samples keep their price (owner, 2026-11-06).
+    const cents = typeof client.discountCents === 'number' ? client.discountCents : null;
+    if (cents === null) rows.push(['Discount', '', `-${percent(client.discountShare)}`, '']);
+    else if (cents > 0) rows.push(['Discount on images', '', `-${percent(client.discountShare)}`, `-${money(cents)}`]);
+  }
   const total = typeof client.totalCents === 'number' ? money(client.totalCents) : CUSTOM_QUOTE;
   return { rows, total };
 }
