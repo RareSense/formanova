@@ -181,7 +181,7 @@ export function quotePanel(result: Record<string, unknown>): PanelSpec {
   if (!result.approved || !Array.isArray(client.lines)) {
     return {
       kind: 'list',
-      title: 'Your quote',
+      title: 'Your price',
       kicker: 'Quote',
       items: [clientWording(text(client.message, 'This order needs a custom quote')), `Contact: ${teamContactText(client.teamContact)}`],
     };
@@ -193,7 +193,7 @@ export function quotePanel(result: Record<string, unknown>): PanelSpec {
   ].filter(Boolean);
   return {
     kind: 'table',
-    title: 'Your quote',
+    title: 'Your price',
     kicker: text(client.turnaroundLabel, 'Quote'),
     columns: ['Item', 'Qty', 'Per unit', 'Total'],
     rows,
@@ -217,7 +217,7 @@ export function plansPanel(): { panel: PanelSpec; plans: Record<string, unknown>
     plans,
     panel: {
       kind: 'table',
-      title: 'Self-serve credit plans',
+      title: 'Do it yourself: credit packages',
       kicker: 'Plans',
       columns: ['Plan', 'Price', 'Credits', 'Photos', 'CAD runs'],
       rows: CREDIT_PLANS.map((p) => [p.name, `$${p.price}`, String(p.credits), `Up to ${p.photos}`, `Up to ${p.cads}`]),

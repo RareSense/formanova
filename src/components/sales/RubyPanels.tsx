@@ -223,7 +223,7 @@ function Rows({
 function Schedule({ plan }: { plan: Installment[] }) {
   return (
     <div className="mt-4">
-      <p className={KICKER}>Payment plan</p>
+      <p className={KICKER}>How you pay</p>
       <ol className="mt-2 space-y-2">
         {plan.map((p) => (
           <li key={p.n} className="flex min-w-0 items-baseline gap-3 border-l-2 pl-3 text-sm" style={{ borderColor: GOLD }}>
@@ -270,7 +270,7 @@ function Deal({ panel, compact }: { panel: Extract<Panel, { kind: 'deal' }>; com
         </span>
       )}
       <Rows columns={['Item', 'Qty', 'Per unit', 'Total']} rows={panel.rows} total={panel.total} compact={compact} />
-      <p className={KICKER}>{plan.length > 1 ? 'Payment plan' : 'Payment'}</p>
+      <p className={KICKER}>How you pay</p>
       <ol className="space-y-4">
         {plan.map((p) => (
           <li key={p.n} className="space-y-3 border-l-2 pl-3" style={{ borderColor: GOLD }}>
@@ -284,15 +284,15 @@ function Deal({ panel, compact }: { panel: Extract<Panel, { kind: 'deal' }>; com
             {p.n === 1 && panel.paid ? (
               <p role="status" className="flex items-center gap-2 text-sm font-semibold">
                 <Check className="h-4 w-4 shrink-0" style={{ color: GOLD }} aria-hidden="true" />
-                Paid, thank you. Your order has started.
+                Paid. Your project has started.
               </p>
             ) : p.url ? (
-              <div className={`grid grid-cols-1 gap-3 ${p.n === 1 ? 'sm:grid-cols-2' : ''}`}>
+              <div className="grid grid-cols-1 gap-3">
                 {p.n === 1 && (
                   <Button asChild size="lg" className="h-12 w-full px-4">
                     <a href={p.url} target="_blank" rel="noopener noreferrer">
                       <ExternalLink className="mr-2 h-4 w-4" aria-hidden="true" />
-                      Pay now
+                      Pay now and start your project
                     </a>
                   </Button>
                 )}

@@ -188,7 +188,7 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
                 </Select>
                 <Button size="lg" className="h-14 w-full px-6 text-base" onClick={() => void call.startCall(language)}>
                   <Phone className="mr-2 h-5 w-5" aria-hidden="true" />
-                  Start call
+                  Start talking
                 </Button>
                 <p className="font-mono text-[10px] tracking-wide text-muted-foreground">Ruby is an AI · any language · calls are recorded</p>
               </div>

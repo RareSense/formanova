@@ -101,8 +101,8 @@ const MAX_LEAD_KEYS = 60;
 
 const PURPOSES: UploadPurpose[] = ['jewelry_photos', 'references', 'cad_files', 'other'];
 const PURPOSE_TITLES: Record<UploadPurpose, string> = {
-  jewelry_photos: 'Upload your jewellery photos',
-  references: 'Upload your references',
+  jewelry_photos: 'Upload your jewelry photos',
+  references: 'Upload images you like',
   cad_files: 'Share your CAD files',
   other: 'Share your files',
 };
@@ -110,6 +110,17 @@ const TURNAROUNDS = ['standard', 'express'];
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+const TITLE_MAX = 40;
+const NOTE_MAX = 120;
+/** Cuts text at a word so a card heading or note never runs off the card. */
+export const clip = (text: string, max: number) => {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max - 1);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > max / 2 ? cut.slice(0, space) : cut).trimEnd()}…`;
+};
+const title = (v: unknown, fallback: string) => clip(str(v) || fallback, TITLE_MAX);
+const note = (v: unknown) => (str(v) ? clip(str(v), NOTE_MAX) : undefined);
 const errorText = (e: unknown, fallback: string) => (e instanceof Error && e.message ? `${fallback} (${e.message})` : fallback);
 
 function quoteRequest(args: Record<string, unknown>): QuoteRequest | { error: string } {
@@ -193,11 +204,11 @@ export function createCallTools(host: ToolHost, api: ToolApi = DEFAULT_API): Too
     },
     request_upload: (args) => {
       const purpose = PURPOSES.includes(args.purpose as UploadPurpose) ? (args.purpose as UploadPurpose) : 'other';
-      host.showPanel({ kind: 'upload', title: str(args.title) || PURPOSE_TITLES[purpose], purpose, note: str(args.note) || undefined });
+      host.showPanel({ kind: 'upload', title: title(args.title, PURPOSE_TITLES[purpose]), purpose, note: note(args.note) });
       return { shown: true };
     },
     request_link: (args) => {
-      host.showPanel({ kind: 'link', title: str(args.title) || 'Share a link', note: str(args.note) || undefined });
+      host.showPanel({ kind: 'link', title: title(args.title, 'Share a link'), note: note(args.note) });
       return { shown: true };
     },
     request_contact: async (args) => {
@@ -288,7 +299,7 @@ export function createCallTools(host: ToolHost, api: ToolApi = DEFAULT_API): Too
         const installments: DealInstallment[] = plan.map((p, i) => ({ ...p, url: i === 0 ? first.url : null }));
         const simulated = first.simulated;
         const url = first.url;
-        const panel = { kind: 'deal' as const, title: 'Your deal', rows, total, url, installments, simulated };
+        const panel = { kind: 'deal' as const, title: 'Your order', rows, total, url, installments, simulated };
         const payment = { url, total, totalCents, simulated, email, installments, linkId: first.linkId ?? null };
         host.showPanel(panel);
         host.setPayment(payment);

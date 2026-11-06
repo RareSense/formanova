@@ -42,7 +42,7 @@ describe('client uploads', () => {
 
   it('writes the messages Ruby gets (contract section 3)', () => {
     expect(uploadedMessage('jewelry_photos', ['a.jpg', 'b.jpg'])).toBe(
-      'The client just uploaded 2 file(s) for jewellery photos (a.jpg, b.jpg). They are saved. Thank them briefly and continue.',
+      'The client just uploaded 2 file(s) for jewelry photos (a.jpg, b.jpg). They are saved. Thank them briefly and continue.',
     );
     expect(linkMessage('https://x.y')).toBe('The client shared a link: https://x.y. It is saved. Thank them briefly and continue.');
   });

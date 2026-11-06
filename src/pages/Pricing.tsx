@@ -139,7 +139,7 @@ export default function Pricing() {
             <div className="flex items-center gap-4 mt-1">
               <img src={creditCoinIcon} alt="" className="h-10 w-10 object-contain" />
               <h1 className="font-display text-4xl md:text-5xl lg:text-6xl uppercase tracking-wide text-foreground leading-none">
-                Get Credits
+                Pricing
               </h1>
             </div>
           </div>

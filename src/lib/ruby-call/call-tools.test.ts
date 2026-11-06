@@ -82,7 +82,7 @@ describe('panels', () => {
   it('turns a quote into a table with turnaround, discount and total', () => {
     expect(quotePanel(APPROVED)).toEqual({
       kind: 'table',
-      title: 'Your quote',
+      title: 'Your price',
       kicker: 'Rush (3 days)',
       columns: ['Item', 'Qty', 'Per unit', 'Total'],
       rows: [
@@ -120,7 +120,7 @@ describe('panels', () => {
     const p = quotePanel({ approved: false, client: { message: 'This order needs a quote from our team', teamContact: { email: 'studio@formanova.ai' } } });
     expect(p).toEqual({
       kind: 'list',
-      title: 'Your quote',
+      title: 'Your price',
       kicker: 'Quote',
       items: ['This order needs a custom quote', 'Contact: studio@formanova.ai'],
     });
@@ -213,6 +213,24 @@ describe('call tools', () => {
     const args = { negotiation: { a: 1 }, proposal: { share: 0.05, inExchangeFor: 'case_study' } };
     expect(await createCallTools(makeHost(), api)('check_concession', args)).toMatchObject({ allowed: true });
     expect(api.runNegotiate).toHaveBeenCalledWith(args);
+  });
+
+  it('upload and link cards are titled with what Ruby asks for, kept short so nothing overflows', async () => {
+    const host = makeHost();
+    const run = createCallTools(host, makeApi());
+    await run('request_upload', { title: 'Upload a size chart', purpose: 'other' });
+    await run('request_upload', { purpose: 'jewelry_photos' });
+    await run('request_upload', { purpose: 'references' });
+    await run('request_upload', { title: 'Upload photos of every ring you want shot for the new collection', purpose: 'jewelry_photos', note: 'x '.repeat(100) });
+    await run('request_link', {});
+    const shown = host.showPanel.mock.calls.map((c) => c[0]);
+    expect(shown[0].title).toBe('Upload a size chart');
+    expect(shown[1].title).toBe('Upload your jewelry photos');
+    expect(shown[2].title).toBe('Upload images you like');
+    expect(shown[3].title.length).toBeLessThanOrEqual(40);
+    expect(shown[3].title).toBe('Upload photos of every ring you want…');
+    expect(shown[3].note.length).toBeLessThanOrEqual(120);
+    expect(shown[4].title).toBe('Share a link');
   });
 
   it('request_upload, request_link and contact_team show their cards', async () => {
