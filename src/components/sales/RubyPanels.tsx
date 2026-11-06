@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Check, Copy, ExternalLink, Mail, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TEAM_EMAIL, amountColumn, type DealInstallment, type Installment, type Panel } from '@/lib/ruby-call/panels';
-import { ContactField, LinkField, UploadCard, type UploadOutcome } from './RubyPanelInputs';
+import { BriefField, ContactField, LinkField, UploadCard, type UploadOutcome } from './RubyPanelInputs';
 import type { ReachChannel } from '@/lib/ruby-call/reach-contact';
 
 interface RubyStageProps {
@@ -18,6 +18,8 @@ interface RubyStageProps {
   onLinkTyping(): void;
   /** The client shared where the creative team may text them. */
   onReach?(channel: ReachChannel, value: string): void;
+  /** The client saved their typed brief. */
+  onBrief?(text: string): void;
 }
 
 const KICKER = 'font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground';
@@ -28,7 +30,7 @@ const ROWS_SHOWN_COMPACT = 4;
 /**
  * Ruby's stage (like Eva's): one calm card at a time. Prices are a real table that scrolls sideways only inside its box.
  */
-export function RubyStage({ panel, compact = false, onClose, onRendered, onUpload, onLink, onLinkTyping, onReach }: RubyStageProps) {
+export function RubyStage({ panel, compact = false, onClose, onRendered, onUpload, onLink, onLinkTyping, onReach, onBrief }: RubyStageProps) {
   useEffect(() => {
     onRendered?.(panel.id);
   }, [panel.id, onRendered]);
@@ -54,7 +56,7 @@ export function RubyStage({ panel, compact = false, onClose, onRendered, onUploa
         {panel.title}
       </h3>
       <div className="mt-4 min-w-0">
-        <PanelBody panel={panel} compact={compact} onUpload={onUpload} onLink={onLink} onLinkTyping={onLinkTyping} onReach={onReach} />
+        <PanelBody panel={panel} compact={compact} onUpload={onUpload} onLink={onLink} onLinkTyping={onLinkTyping} onReach={onReach} onBrief={onBrief} />
       </div>
     </section>
   );
@@ -67,6 +69,7 @@ function PanelBody({
   onLink,
   onLinkTyping,
   onReach,
+  onBrief,
 }: {
   panel: Panel;
   compact: boolean;
@@ -74,6 +77,7 @@ function PanelBody({
   onLink: RubyStageProps['onLink'];
   onLinkTyping: RubyStageProps['onLinkTyping'];
   onReach: RubyStageProps['onReach'];
+  onBrief: RubyStageProps['onBrief'];
 }) {
   switch (panel.kind) {
     case 'table':
@@ -109,6 +113,8 @@ function PanelBody({
           <LinkField onLink={onLink} onTyping={onLinkTyping} />
         </>
       );
+    case 'brief':
+      return <BriefField note={panel.note} onBrief={(text) => onBrief?.(text)} />;
     case 'reach':
       return <ContactField channel={panel.channel} onReach={(channel, value) => onReach?.(channel, value)} />;
     case 'contact':

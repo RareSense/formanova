@@ -11,6 +11,7 @@ import { RubyCallDialog } from './RubyCallDialog';
 import { DoneForYouCard } from '@/components/pricing/DoneForYouCard';
 import type { CallCallbacks, StartOptions, WebRTCCall } from '@/lib/ruby-call/webrtc-call';
 import type { CallRecorder } from '@/lib/ruby-call/call-recorder';
+import { SCREEN_CLAIM_NOTE } from '@/lib/ruby-call/screen-claims';
 
 vi.mock('posthog-js', () => ({
   default: { capture: vi.fn(), people: { set: vi.fn(), set_once: vi.fn() }, identify: vi.fn(), reset: vi.fn(), __loaded: true },
@@ -68,7 +69,7 @@ function fakes() {
     start: vi.fn(async (_o: StartOptions) => {}),
     end: vi.fn(async () => {}),
     toggleMute: vi.fn(),
-    appendInstruction: vi.fn(() => true),
+    appendInstruction: vi.fn((_content: string) => true),
     endAfterGoodbye: vi.fn(),
     getTurns: () => [],
     getState: () => 'live',
@@ -218,6 +219,57 @@ describe('Ruby call analytics (integration)', () => {
     // No personal data in any Ruby event: no email, name, payment link or call ids.
     const all = JSON.stringify(rubyCalls());
     for (const secret of ['asha@brand.com', 'Asha', 'https://pay/x', 'cs1', 'wf1']) expect(all).not.toContain(secret);
+  });
+
+  it('Ruby saying "it is on your screen" when nothing new was shown gets a note to correct herself; a real panel does not', async () => {
+    const f = fakes();
+    renderCall(f);
+    fireEvent.click(screen.getByRole('button', { name: 'Start call' }));
+    await waitFor(() => expect(f.engine.start).toHaveBeenCalled());
+    await act(async () => {
+      await f.opts().createSession({ sdp: 'offer', language: 'en' });
+    });
+    act(() => f.cbs().onState?.('live'));
+    const notes = () => f.engine.appendInstruction.mock.calls.filter((c) => c[0] === SCREEN_CLAIM_NOTE).length;
+
+    // The call in question: "put it" -> "Done, it's on your screen." with nothing shown.
+    act(() => f.cbs().onTranscript?.([{ role: 'client', text: 'Put it.' }, { role: 'ruby', text: "Done, it's on your screen." }] as never));
+    await waitFor(() => expect(notes()).toBe(1), { timeout: 4000 });
+
+    // A real quote on screen after the caller spoke: the claim is true, no note.
+    act(() => f.cbs().onTranscript?.([{ role: 'client', text: 'Show me the price.' }] as never));
+    await act(async () => {
+      await f.opts().runTool!('quote_shoot', { lines: [{ productId: 'ecommerce-2k', quantity: 5 }] });
+    });
+    act(() =>
+      f.cbs().onTranscript?.([{ role: 'client', text: 'Show me the price.' }, { role: 'ruby', text: "I've put your price on your screen." }] as never),
+    );
+    await new Promise((r) => setTimeout(r, 3000));
+    expect(notes()).toBe(1);
+  }, 10000);
+
+  it('a typed brief is saved with the call and Ruby is told', async () => {
+    const { saveCallRecord } = await import('@/lib/ruby-call/post-call-save');
+    const f = fakes();
+    renderCall(f);
+    fireEvent.click(screen.getByRole('button', { name: 'Start call' }));
+    await waitFor(() => expect(f.engine.start).toHaveBeenCalled());
+    await act(async () => {
+      await f.opts().createSession({ sdp: 'offer', language: 'en' });
+    });
+    act(() => f.cbs().onState?.('live'));
+    await act(async () => {
+      await f.opts().runTool!('request_brief', {});
+    });
+    const box = await screen.findByLabelText(/Or just tell Ruby/);
+    fireEvent.change(box, { target: { value: 'Black models, tight crops' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(f.engine.appendInstruction).toHaveBeenCalledWith(expect.stringContaining('Black models, tight crops'));
+    await act(async () => {
+      await f.cbs().onEnded?.({ turns: [], reason: 'ruby_closed' } as never);
+    });
+    const saved = JSON.stringify(vi.mocked(saveCallRecord).mock.calls.at(-1));
+    expect(saved).toContain('Black models, tight crops');
   });
 
   it('a call that fails before connecting records the failure and the end, never "connected"', async () => {

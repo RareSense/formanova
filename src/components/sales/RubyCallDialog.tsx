@@ -325,6 +325,7 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
               onLink={call.shareLink}
               onLinkTyping={call.linkTyping}
               onReach={call.shareReach}
+              onBrief={call.shareBrief}
             />
           </section>
         )}

@@ -190,6 +190,14 @@ describe('call tools', () => {
     expect(normal).not.toHaveProperty('last_offer');
   });
 
+  it('request_brief shows the brief box with a short title', async () => {
+    const host = makeHost();
+    expect(await createCallTools(host, makeApi())('request_brief', {})).toEqual({ shown: true });
+    expect(host.showPanel.mock.calls[0][0]).toMatchObject({ kind: 'brief', title: 'Your brief' });
+    const failing = { ...makeHost(), showPanel: vi.fn(async () => false) };
+    expect(await createCallTools(failing, makeApi())('request_brief', {})).toHaveProperty('error');
+  });
+
   it('request_contact shows the field for the channel the client chose, text channels only', async () => {
     const host = makeHost();
     const run = createCallTools(host, makeApi());
@@ -329,6 +337,18 @@ describe('call tools', () => {
         url: null,
       },
     ];
+
+    it('always uses the email the caller is logged in with, never asking for it (owner, 2026-11-06)', async () => {
+      const host = { ...makeHost(), accountEmail: () => 'owner@brand.com' };
+      const api = makeApi();
+      await createCallTools(host, api)('send_payment_link', { ...args, email: 'misheard@wrong.co' });
+      expect(api.createPaymentLink).toHaveBeenCalledWith(expect.objectContaining({ email: 'owner@brand.com' }));
+      const noEmail = { ...args } as Record<string, unknown>;
+      delete noEmail.email;
+      const api2 = makeApi();
+      await createCallTools({ ...makeHost(), accountEmail: () => 'owner@brand.com' }, api2)('send_payment_link', noEmail);
+      expect(api2.createPaymentLink).toHaveBeenCalledWith(expect.objectContaining({ email: 'owner@brand.com' }));
+    });
 
     it('re-prices, creates a link for the first payment only, shows the deal and saves the payment', async () => {
       const host = makeHost();

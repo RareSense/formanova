@@ -54,6 +54,8 @@ export interface ToolHost {
   watchPayment?(linkId: string, onPaid: (paidAt: string | null) => void): void;
   /** A price was put on screen (for the call's analytics summary). */
   quoteShown?(): void;
+  /** The email the caller is logged in with. The payment link always uses it, so Ruby never asks (owner, 2026-11-06). */
+  accountEmail?(): string | null;
 }
 
 export interface ToolApi {
@@ -234,6 +236,10 @@ export function createCallTools(host: ToolHost, api: ToolApi = DEFAULT_API): Too
       host.showPanel({ kind: 'link', title: title(args.title, 'Share a link'), note: note(args.note) });
       return { shown: true };
     },
+    request_brief: async (args) =>
+      (await host.showPanel({ kind: 'brief', title: title(args.title, 'Your brief'), note: note(args.note) }))
+        ? { shown: true }
+        : { error: 'The box could not be shown. Ask them to tell you instead.' },
     request_contact: async (args) => {
       if (!isReachChannel(args.channel)) return { error: 'Use one of: WhatsApp, iMessage, text message, Instagram or email.' };
       const channel = args.channel;
@@ -276,7 +282,8 @@ export function createCallTools(host: ToolHost, api: ToolApi = DEFAULT_API): Too
       return { ending: true };
     },
     send_payment_link: async (args) => {
-      const email = str(args.email);
+      // The logged-in email wins; what the model passed is only a fallback for a page without one.
+      const email = host.accountEmail?.() || str(args.email);
       if (!EMAIL_RE.test(email)) return { error: 'A valid email is needed for the payment link.' };
       const req = quoteRequest(args);
       if ('error' in req) return req;
