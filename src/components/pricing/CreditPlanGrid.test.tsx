@@ -156,11 +156,13 @@ describe('CreditPlanGrid', () => {
     expect(grid.className).toContain('lg:auto-rows-fr'); // both rows the same height: all six cards match
   });
 
-  it('the $2 offer keeps its gold border but has no tint: only Done For You is tinted (owner, 2026-11-07)', () => {
+  it('the $2 offer looks like the other plans: same black border, no tint; only Done For You stands out (owner, 2026-11-07)', () => {
     renderWithDfy(TIERS);
-    const offer = screen.getByText('One-time offer').closest('.card-pad, .flex.flex-col.border-2') as HTMLElement;
-    expect(offer.className).toContain('border-[hsl(var(--formanova-hero-accent))]');
-    expect(offer.className).not.toMatch(/bg-\[hsl\(var\(--formanova-hero-accent\)\)\]/);
+    const offer = screen.getByText('One-time offer').closest('.flex.flex-col.border-2') as HTMLElement;
+    const basic = screen.getByText('Basic').closest('.flex.flex-col.border-2') as HTMLElement;
+    expect(offer.className).toBe(basic.className);
+    expect(offer.className).toContain('border-foreground');
+    expect(offer.className).not.toMatch(/hero-accent/);
   });
 
   it('with four cards (staging: no $2 or $14), sits 2 + 2 and one row from xl', () => {
