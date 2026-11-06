@@ -108,16 +108,16 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        overlayClassName="bg-[hsl(var(--formanova-hero-accent)/0.12)] backdrop-blur-md"
-        className="flex h-[100dvh] max-h-none w-screen max-w-none flex-col gap-0 overflow-y-auto overflow-x-hidden border-0 bg-transparent p-0 shadow-none sm:rounded-none lg:flex-row lg:items-center lg:justify-center lg:gap-8 lg:p-6"
+        overlayClassName="bg-background/70 backdrop-blur-2xl"
+        className="flex h-[100dvh] max-h-none w-screen max-w-none flex-col gap-0 overflow-y-auto overflow-x-hidden border-0 bg-transparent p-0 shadow-none sm:rounded-none lg:flex-row lg:items-center lg:justify-center lg:gap-6 lg:p-4"
       >
         <section
           data-testid="ruby-phone"
           aria-label="Call with Ruby"
           className={`${frame} relative flex min-w-0 flex-col overflow-hidden ${
             staged
-              ? 'sticky top-0 z-10 w-full lg:static lg:h-[min(760px,92dvh)] lg:w-[380px] lg:shrink-0'
-              : 'mx-auto my-auto w-[calc(100%-2rem)] max-w-[400px] lg:h-[min(760px,92dvh)]'
+              ? 'sticky top-0 z-10 w-full lg:static lg:h-[min(900px,94dvh)] lg:w-[340px] lg:shrink-0'
+              : 'mx-auto my-auto w-[calc(100%-2rem)] max-w-[400px] lg:h-[min(900px,94dvh)]'
           }`}
         >
           {/* Owner, 2026-11-06: no title-bar text; only a way back. */}
@@ -313,7 +313,7 @@ export function RubyCallDialog({ open, onOpenChange, createCall, createRecorder 
         {staged && panel && (
           <section
             data-testid="ruby-stage"
-            className={`${frame} m-4 min-w-0 p-4 sm:p-6 lg:m-0 lg:h-[min(760px,92dvh)] lg:w-[min(600px,calc(100vw-380px-6rem))] lg:overflow-y-auto`}
+            className={`${frame} m-4 min-w-0 p-4 sm:p-6 lg:m-0 lg:h-[min(900px,94dvh)] lg:w-[min(1040px,calc(100vw-340px-5rem))] lg:overflow-y-auto lg:p-4`}
           >
             <RubyStage
               key={panel.id}

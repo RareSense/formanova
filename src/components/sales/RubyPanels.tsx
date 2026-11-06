@@ -22,7 +22,7 @@ interface RubyStageProps {
 
 const KICKER = 'font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground';
 const GOLD = 'hsl(var(--formanova-hero-accent))';
-const ROWS_SHOWN = 6;
+const ROWS_SHOWN = 8;
 const ROWS_SHOWN_COMPACT = 4;
 
 /**
@@ -155,7 +155,8 @@ function Rows({
   const order = rows.map((_, i) => i);
   const visible = open ? order : order.filter((i) => i < limit || i === highlight).slice(0, limit + 1);
   const hidden = rows.length - visible.length;
-  const cellBase = 'border border-border/70 px-2.5 py-2 align-top text-sm';
+  // Bigger on a desktop, where the panel has the room: easy to read at a glance during the call.
+  const cellBase = 'border border-border/70 px-2.5 py-2 align-top text-sm lg:px-3.5 lg:py-2.5 lg:text-base lg:[@media(max-height:760px)]:py-1.5';
 
   return (
     <div className="min-w-0">
@@ -164,7 +165,7 @@ function Rows({
           <thead>
             <tr>
               {columns.map((c, i) => (
-                <th key={i} scope="col" className={`${cellBase} whitespace-nowrap bg-muted/60 text-left font-mono text-[10px] uppercase tracking-[0.12em]`}>
+                <th key={i} scope="col" className={`${cellBase} whitespace-nowrap bg-muted/60 text-left font-mono text-[10px] uppercase tracking-[0.12em] lg:text-xs`}>
                   {c}
                 </th>
               ))}
