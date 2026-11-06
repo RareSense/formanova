@@ -653,3 +653,85 @@ export interface UpscalePaywallHitProps {
 export function trackUpscalePaywallHit(props: UpscalePaywallHitProps) {
   capture('upscale_paywall_hit', { ...props });
 }
+
+// ═══════ Ruby (Done For You) Funnel ══════════════════════════════════
+// card click → call started → connected → price shown → payment link → paid → uploads → ended.
+// Numbers and labels only: never an email, name, link, transcript or call id.
+
+export function trackRubyCtaClicked(props: { signed_in: boolean }) {
+  capture('ruby_cta_clicked', { ...props });
+}
+
+export function trackRubyCallStarted(props: { language: string }) {
+  capture('ruby_call_started', { ...props });
+}
+
+export function trackRubyCallConnected(props: { language: string; connect_ms: number }) {
+  capture('ruby_call_connected', { ...props });
+}
+
+export interface RubyCallFailedProps {
+  error_code: string;
+  /** Whether the call had connected before it failed. */
+  stage: 'connecting' | 'live';
+}
+
+export function trackRubyCallFailed(props: RubyCallFailedProps) {
+  capture('ruby_call_failed', { ...props });
+}
+
+export interface RubyQuoteShownProps {
+  approved: boolean;
+  total_cents: number | null;
+  /** All items on the quote added up (images, models, add-ons). */
+  image_count: number;
+  /** Sizes on the quote, e.g. "1k,4k". Empty when none. */
+  sizes: string;
+  turnaround: string;
+  installments: number;
+  last_offer: boolean;
+  /** 1 for the first price on the call, 2 for the next, and so on. */
+  quote_number: number;
+}
+
+export function trackRubyQuoteShown(props: RubyQuoteShownProps) {
+  capture('ruby_quote_shown', { ...props });
+}
+
+export interface RubyPaymentLinkCreatedProps {
+  total_cents: number;
+  first_payment_cents: number;
+  installments: number;
+  /** A test link (no real payment possible). */
+  simulated: boolean;
+}
+
+export function trackRubyPaymentLinkCreated(props: RubyPaymentLinkCreatedProps) {
+  capture('ruby_payment_link_created', { ...props });
+}
+
+export function trackRubyPaymentReceived(props: { amount_cents: number; seconds_into_call: number }) {
+  capture('ruby_payment_received', { ...props });
+}
+
+export function trackRubyFilesUploaded(props: { purpose: string; uploaded: number; failed: number }) {
+  capture('ruby_files_uploaded', { ...props });
+}
+
+export function trackRubyTeamContactShown() {
+  capture('ruby_team_contact_shown');
+}
+
+export interface RubyCallEndedProps {
+  duration_s: number;
+  reason: string;
+  quotes_shown: number;
+  link_created: boolean;
+  paid: boolean;
+  files_uploaded: number;
+  error_code: string | null;
+}
+
+export function trackRubyCallEnded(props: RubyCallEndedProps) {
+  capture('ruby_call_ended', { ...props });
+}

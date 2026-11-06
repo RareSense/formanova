@@ -11,6 +11,9 @@ import { useBillingLocale } from '@/hooks/use-billing-locale';
 import { isStarterTier, type BillingTier } from '@/lib/starter-pack';
 import { CreditPlanGrid } from '@/components/pricing/CreditPlanGrid';
 import { resolveGridTiers } from '@/lib/credit-plans';
+import { DoneForYouCard } from '@/components/pricing/DoneForYouCard';
+import { useDoneForYouVisible } from '@/hooks/use-done-for-you-visible';
+import { RubyCallDialog } from '@/components/sales/RubyCallDialog';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
 
 const CHECKOUT_URL = '/billing/checkout';
@@ -24,6 +27,7 @@ export default function Pricing() {
   const [tiers, setTiers] = useState<BillingTier[]>([]);
   const [tiersLoading, setTiersLoading] = useState(true);
   const [unavailableTier, setUnavailableTier] = useState<string | null>(null);
+  const [callOpen, setCallOpen] = useState(false);
   const { currency, symbol, country } = useBillingLocale();
   const isINR = currency === 'INR';
 
@@ -60,6 +64,9 @@ export default function Pricing() {
   useEffect(() => {
     if (user) fetchTiers();
   }, [user, fetchTiers]);
+
+  const openCall = useCallback(() => setCallOpen(true), []);
+  const showDoneForYou = useDoneForYouVisible();
 
   const handleCheckout = async (tierId: string) => {
     if (!user?.id) {
@@ -105,7 +112,9 @@ export default function Pricing() {
   // 4 cards when the backend still returns the one-time Starter tier (user never
   // bought it), otherwise the 3 standard plans. Counted after the grid's own
   // filtering, since the backend list also carries packages that are not shown.
-  const maxWidthClass = resolveGridTiers(tiers).length >= 4 ? 'max-w-7xl' : 'max-w-5xl';
+  // Done For You, when shown, is its own path beside the plans (layout B), so the page uses the wide width.
+  const cardCount = resolveGridTiers(tiers).length + (showDoneForYou ? 1 : 0);
+  const maxWidthClass = cardCount >= 6 ? 'max-w-7xl 2xl:max-w-screen-2xl' : cardCount >= 4 ? 'max-w-7xl' : 'max-w-5xl';
 
   return (
     <>
@@ -130,7 +139,7 @@ export default function Pricing() {
             <div className="flex items-center gap-4 mt-1">
               <img src={creditCoinIcon} alt="" className="h-10 w-10 object-contain" />
               <h1 className="font-display text-4xl md:text-5xl lg:text-6xl uppercase tracking-wide text-foreground leading-none">
-                Get Credits
+                Pricing
               </h1>
             </div>
           </div>
@@ -156,8 +165,11 @@ export default function Pricing() {
             unavailableTier={unavailableTier}
             errorTier={errorTier}
             onCheckout={handleCheckout}
+            doneForYou={showDoneForYou ? <DoneForYouCard onOpenCall={openCall} /> : undefined}
           />
         )}
+
+        <RubyCallDialog open={callOpen} onOpenChange={setCallOpen} />
 
       </div>
     </div>

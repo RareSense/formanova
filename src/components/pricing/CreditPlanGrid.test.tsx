@@ -62,7 +62,7 @@ describe('CreditPlanGrid', () => {
 
   it('shows photo and CAD capacity per plan', () => {
     renderGrid();
-    expect(screen.getByText(/^Up to 12 standard photos$/)).toBeInTheDocument();
+    expect(screen.getByText(/^Up to 12 photos at 1K$/)).toBeInTheDocument();
     expect(screen.getByText(/or 3 CAD generations/)).toBeInTheDocument();
     expect(screen.getByText(/or 10 CAD generations/)).toBeInTheDocument();
   });
@@ -76,7 +76,7 @@ describe('CreditPlanGrid', () => {
     expect(screen.queryByText('Not suitable for CAD')).not.toBeInTheDocument();
     expect(screen.getByText('Essential')).toBeInTheDocument();
     expect(screen.getByText('160 credits')).toBeInTheDocument();
-    expect(screen.getByText(/^Up to 20 standard photos\s*or 1 CAD generation$/)).toBeInTheDocument();
+    expect(screen.getByText(/^Up to 20 photos at 1K\s*or 1 CAD generation$/)).toBeInTheDocument();
   });
 
   it('CAD shortfall of 100: Basic can still fund it, so it stays', () => {
@@ -105,5 +105,64 @@ describe('CreditPlanGrid', () => {
     renderGrid(TIERS.slice(1));
     expect(screen.queryByText('One-time offer')).not.toBeInTheDocument();
     expect(screen.getByText('$9')).toBeInTheDocument();
+  });
+
+  const renderWithDfy = (tiers = TIERS) =>
+    render(
+      <CreditPlanGrid
+        tiers={tiers}
+        isINR={false}
+        symbol="$"
+        currency="USD"
+        loadingTier={null}
+        unavailableTier={null}
+        errorTier={null}
+        onCheckout={vi.fn()}
+        doneForYou={<div data-testid="dfy">Done for you</div>}
+      />,
+    );
+
+  it('with Done For You, every plan card carries a "Do it yourself" line on top and Done For You comes first', () => {
+    renderWithDfy();
+    const grid = screen.getByTestId('dfy').closest('.grid') as HTMLElement;
+    expect(screen.getAllByText('Do it yourself')).toHaveLength(grid.children.length - 1);
+    // No section headings or colour bands: the small line on each card says it.
+    expect(screen.queryByText('We do it for you')).not.toBeInTheDocument();
+    for (const el of screen.getAllByText('Do it yourself')) expect(el.className).toContain('italic');
+    expect(grid.firstElementChild).toContainElement(screen.getByTestId('dfy'));
+  });
+
+  it('puts Done For You and the plans in one grid, so every card is the same width', () => {
+    renderWithDfy(TIERS.slice(1)); // 4 plans + Done For You: one row of 5 from xl
+    const grid = screen.getByTestId('dfy').closest('.grid') as HTMLElement;
+    expect(grid.children).toHaveLength(5);
+    expect(grid.className).toContain('xl:grid-cols-5');
+    expect(grid.className).toContain('gap-6');
+    // odd count: Done For You spans the row on 2-column screens, so no card is left alone
+    expect(grid.firstElementChild?.className).toContain('sm:col-span-2');
+    expect(grid.firstElementChild?.className).toContain('xl:col-span-1');
+  });
+
+  it('with six cards, sits 3 + 3 and only goes to one row from 2xl, so prices never overflow', () => {
+    renderWithDfy(TIERS); // $2 starter + 4 plans + Done For You
+    const grid = screen.getByTestId('dfy').closest('.grid') as HTMLElement;
+    expect(grid.children).toHaveLength(6);
+    expect(grid.className).toContain('lg:grid-cols-3');
+    expect(grid.className).toContain('2xl:grid-cols-6');
+    expect(grid.className).not.toMatch(/(^| )xl:grid-cols/);
+  });
+
+  it('with four cards (staging: no $2 or $14), sits 2 + 2 and one row from xl', () => {
+    renderWithDfy(TIERS.filter((t) => ![50, 160].includes(t.credits)));
+    const grid = screen.getByTestId('dfy').closest('.grid') as HTMLElement;
+    expect(grid.children).toHaveLength(4);
+    expect(grid.className).toContain('sm:grid-cols-2');
+    expect(grid.className).toContain('xl:grid-cols-4');
+  });
+
+  it('without Done For You, shows the plans alone with no path labels', () => {
+    renderGrid(TIERS);
+    expect(screen.queryByText('Do it yourself')).not.toBeInTheDocument();
+    expect(screen.queryByText('We do it for you')).not.toBeInTheDocument();
   });
 });
