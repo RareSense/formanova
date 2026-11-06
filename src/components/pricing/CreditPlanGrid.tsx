@@ -180,11 +180,11 @@ export function CreditPlanGrid({
 }
 
 // Literal class names so Tailwind keeps them. Odd counts let the first card span the row on 2-column screens.
-// Six cards only fit one row from 2xl (1536px); below that they sit 3 + 3.
+// Six cards always sit 3 + 3, even on wide screens (owner, 2026-11-07).
 const WITH_DFY: Record<number, { cols: string; first: string }> = {
   2: { cols: 'sm:grid-cols-2', first: '' },
   3: { cols: 'sm:grid-cols-2 lg:grid-cols-3', first: 'sm:col-span-2 lg:col-span-1' },
   4: { cols: 'sm:grid-cols-2 xl:grid-cols-4', first: '' },
   5: { cols: 'sm:grid-cols-2 xl:grid-cols-5', first: 'sm:col-span-2 xl:col-span-1' },
-  6: { cols: 'sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6', first: '' },
+  6: { cols: 'sm:grid-cols-2 lg:grid-cols-3', first: '' },
 };
