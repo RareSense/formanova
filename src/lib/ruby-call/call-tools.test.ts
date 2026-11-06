@@ -106,6 +106,11 @@ describe('panels', () => {
     expect(installmentsOf({ installments: [] })).toBeNull();
   });
 
+  it('says the discount is on the images only, in dollars, when the quote gives it', () => {
+    const p = quotePanel({ ...APPROVED, client: { ...APPROVED.client, discountShare: 0.075, discountCents: 2250 } }) as { rows: string[][] };
+    expect(p.rows).toContainEqual(['Discount on images', '', '-7.5%', '-$22.50']);
+  });
+
   it('shows the delivery promise from the quote', () => {
     const p = quotePanel({ ...APPROVED, client: { ...APPROVED.client, deliveryWithin: '5 working days' } });
     expect(p).toMatchObject({ delivery: 'Delivery: usually within 5 working days, depending on our queue' });
