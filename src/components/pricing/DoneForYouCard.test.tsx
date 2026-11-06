@@ -49,9 +49,11 @@ describe('DoneForYouCard', () => {
   it('is shown for an allowlisted user', () => {
     mockUser = { email: 'Ruby@Example.com' };
     renderCard();
-    // The band names the card; the line under it says what Done for you means.
+    // Laid out like a plan: italic kicker, "Custom" where the plan name goes, "Done for you" where the price goes.
     expect(screen.getByRole('region', { name: 'Done for you' })).toBeInTheDocument();
-    expect(screen.getByText('We make the photos for you.')).toBeInTheDocument();
+    expect(screen.getByText('We do it for you')).toBeInTheDocument();
+    expect(screen.getByText('Custom')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Done for you' })).toBeInTheDocument();
     expect(screen.getByText('Bulk product, model & editorial shots')).toBeInTheDocument();
     expect(screen.getByText('Photos from your CAD files')).toBeInTheDocument();
     // Anyone can tell the call is with an AI, not a person, with no booking. Plain "our AI", never "sales agent".

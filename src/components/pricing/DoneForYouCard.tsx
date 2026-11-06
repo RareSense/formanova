@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Check, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { CardBand } from '@/components/pricing/CardBand';
+import { CardKicker } from '@/components/pricing/CardKicker';
 import { trackRubyCtaClicked } from '@/lib/posthog-events';
 import { useAuth } from '@/contexts/AuthContext';
 import { isRubyCallEnabled } from '@/lib/feature-flags';
@@ -10,8 +10,6 @@ import { useDoneForYouVisible } from '@/hooks/use-done-for-you-visible';
 
 const TALK_RETURN_PATH = '/pricing?talk=ruby';
 
-/** Said first, so nobody has to guess what Done For You is. */
-export const DEFINITION = 'We make the photos for you.';
 /** Owner, 2026-11-06: anyone must see the call is with an AI, not a person. "Our AI", not "sales agent": lay people read
  *  "sales agent" as a person making a pitch. */
 export const AI_LINE = 'Get your custom price from our AI, not a person, on a 2-minute call. No booking, no prep.';
@@ -58,17 +56,26 @@ export function DoneForYouCard({ onOpenCall }: DoneForYouCardProps) {
     onOpenCall();
   };
 
-  // First in the row, same size and button line as the plans. Flat: gold border and band, no shadow (FormaNova look).
+  // First in the row, laid out like a plan card: kicker, name slot ("Custom"), then "Done for you" where the price
+  // sits, so the dividers and buttons line up. Gold border, soft gradient, hard offset shadow, sharp corners.
   return (
     <section
       aria-labelledby="done-for-you-title"
-      className="flex h-full flex-col border-2 border-[hsl(var(--formanova-hero-accent))] bg-[hsl(var(--formanova-hero-accent))]/5 p-6 xl:p-8"
+      className="flex h-full flex-col border-2 border-[hsl(var(--formanova-hero-accent))] bg-gradient-to-b from-[hsl(var(--formanova-hero-accent))]/12 to-[hsl(var(--formanova-hero-accent))]/5 p-6 shadow-[4px_4px_0_hsl(var(--formanova-hero-accent)/0.6)] xl:p-8"
     >
-      <CardBand id="done-for-you-title" tone="gold">Done for you</CardBand>
+      <CardKicker gold>We do it for you</CardKicker>
+      <div className="flex h-7 items-center">
+        <span className="font-mono text-xs uppercase tracking-[0.25em] text-muted-foreground">Custom</span>
+      </div>
 
-      {/* Same height as a plan's name and price, so the dividers line up. */}
-      <div className="flex h-[100px] items-end">
-        <p className="font-display text-2xl uppercase leading-[0.95] tracking-tight text-foreground">{DEFINITION}</p>
+      {/* Same height as a plan's price (text-5xl, one line). */}
+      <div className="mt-6 flex h-12 items-end">
+        <h2
+          id="done-for-you-title"
+          className="whitespace-nowrap font-display text-4xl uppercase leading-none tracking-tight text-foreground xl:text-3xl 2xl:text-4xl"
+        >
+          Done for you
+        </h2>
       </div>
 
       <div className="mt-6 border-t border-border/40 pt-6">

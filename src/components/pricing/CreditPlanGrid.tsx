@@ -7,7 +7,7 @@
 import type { ReactNode } from 'react';
 import { Info, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { CardBand } from '@/components/pricing/CardBand';
+import { CardKicker } from '@/components/pricing/CardKicker';
 import { isStarterTier, type BillingTier } from '@/lib/starter-pack';
 import { PLAN_BY_CREDITS, STARTER_OFFER, resolveGridTiers } from '@/lib/credit-plans';
 
@@ -70,7 +70,7 @@ export function CreditPlanGrid({
               : 'flex flex-col p-6 xl:p-8 border-2 border-foreground'
           }
         >
-          {doneForYou && <CardBand tone="dark">Do it yourself</CardBand>}
+          {doneForYou && <CardKicker>Do it yourself</CardKicker>}
           {/* Label - fixed line box so every card's price and divider line up */}
           <div className="flex h-7 items-center">
             {starter ? (
@@ -161,7 +161,7 @@ export function CreditPlanGrid({
     );
   }
 
-  // Two ways to buy (owner, 2026-11-06): every card says on its band which one it is, "Done for you" or "Do it
+  // Two ways to buy (owner, 2026-11-06): every card says in a small italic line on top which one it is, "Done for you" or "Do it
   // yourself", so there are no section headings. Done For You is simply the first card of one shared grid, so every
   // card is the same width, rows stay even (never a lone card beside empty space) and the buttons line up per row.
   const total = cardCount + 1;
