@@ -37,7 +37,7 @@ void main(){
   vec2 q = vec2(fbm(p + vec2(0., -flow.y)), fbm(p + vec2(5.2, 1.3) + vec2(flow.x, 0.)));
   float w = fbm(p + 1.6 * q + vec2(t * .007, -flow.y * 1.4));
   vec3 col = mix(c2, c1, smoothstep(.3, .72, w + .1 * q.y));
-  col = mix(col, c3, smoothstep(.42, .18, w) * .55);
+  col = mix(col, c3, smoothstep(.42, .18, w) * .85);
   col = mix(col, c1, smoothstep(.1, -.45, uv.y / R) * .35);
   float d = r / R;
   col *= .86 + .22 * (1. - smoothstep(-.4, .5, dot(uv, vec2(.6, -.8)) / R));
@@ -110,13 +110,13 @@ export function RubyOrb({ level, calm = false, voice, className = '' }: RubyOrbP
     const U = (name: string) => gl.getUniformLocation(prog, name);
     const u = { res: U('res'), t: U('t'), lvl: U('lvl'), still: U('still'), flow: U('flow'), c1: U('c1'), c2: U('c2'), c3: U('c3') };
 
-    // Light like Eva's orb: mostly pale, the accent only in the deeper folds.
+    // Light like Eva's orb, with the accent clearly visible in the moving folds (owner, 2026-11-06).
     const applyColors = () => {
       const bg = themeColor('--background', [1, 1, 1]);
       const accent = themeColor('--formanova-hero-accent', [0.7, 0.51, 0.06]);
       const mix = (a: number[], b: number[], k: number) => a.map((v, i) => v + (b[i] - v) * k);
       gl.uniform3fv(u.c1, mix(bg, accent, 0.06));
-      gl.uniform3fv(u.c2, mix(bg, accent, 0.38));
+      gl.uniform3fv(u.c2, mix(bg, accent, 0.5));
       gl.uniform3fv(u.c3, accent);
     };
     applyColors();
@@ -159,7 +159,8 @@ export function RubyOrb({ level, calm = false, voice, className = '' }: RubyOrbP
       amp += (loud - amp) * (loud > amp ? 0.35 : 0.1);
       const motion = !reduce?.matches;
       if (motion) {
-        const sp = 0.018 + lvl * 0.05 + amp * 0.15;
+        // Owner 2026-11-06: the moving clouds inside should be clearly visible and follow her voice.
+        const sp = 0.03 + lvl * 0.09 + amp * 0.4;
         fy += dt * sp;
         fx += dt * sp * 0.6;
       }
