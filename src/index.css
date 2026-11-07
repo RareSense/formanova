@@ -633,6 +633,27 @@
     color: #ffffff;
   }
 
+  /* Secondary hero CTA: the same box as .marta-button-hero (padding, type,
+     1px border), outlined. White in every theme because the hero photo is
+     always dark under its overlay. */
+  .marta-button-hero-ghost {
+    @apply px-8 py-4 inline-flex items-center justify-center gap-3;
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    background: transparent;
+    color: #ffffff;
+    border: 1px solid #ffffff;
+  }
+
+  .marta-button-hero-ghost:hover {
+    background: #ffffff;
+    color: #111111;
+  }
+
   /* Marta-style section padding */
   .marta-section {
     @apply py-24 md:py-32 lg:py-40;

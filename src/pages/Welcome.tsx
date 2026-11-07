@@ -1,6 +1,6 @@
 import React, { lazy, Suspense } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { Link, useNavigate, Navigate } from 'react-router-dom';
 import { ArrowRight, Play } from 'lucide-react';
 import { ScrollRevealSection, StaggerContainer } from '@/components/ScrollRevealSection';
 import { KineticText } from '@/components/KineticText';
@@ -125,11 +125,16 @@ export default function Welcome() {
               Your jewelry accurately shown.
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-4">
+            {/* Two equal columns so both buttons are the same size; stacked full
+                width on phones, as Start Creating was before. */}
+            <div className="grid gap-4 sm:w-max sm:grid-cols-2">
               <button onClick={handleStart} className="marta-button-hero magnetic-button">
                 <span>Start Creating</span>
                 <ArrowRight className="h-4 w-4" />
               </button>
+              <Link to="/pricing" className="marta-button-hero-ghost magnetic-button">
+                See pricing
+              </Link>
             </div>
           </div>
         </div>

@@ -184,7 +184,8 @@ export function Header() {
   const navLinks: NavLink[] = [
     { path: '/', label: 'Home' },
     // Dashboard needs an account, so logged-out visitors don't get a link
-    // that only bounces them to the login page.
+    // that only bounces them to the login page. They get the public Pricing
+    // page instead; signed-in users buy from the credits pill (/credits).
     ...(user
       ? [{
           // Photo Studio and CAD Studio are one page now, so the studio entry
@@ -193,7 +194,7 @@ export function Header() {
           label: 'Dashboard',
           activePaths: ['/dashboard', '/studio', '/studio-cad', '/text-to-cad', '/image-to-cad', '/cad-to-catalog'],
         }]
-      : []),
+      : [{ path: '/pricing', label: 'Pricing' }]),
     // { path: '/tutorial', label: 'Tutorial' }, // hidden for now
   ];
 
