@@ -120,7 +120,7 @@ export default function Pricing() {
     <>
       <Helmet>
         <title>Pricing | FormaNova AI Jewelry Studio</title>
-        <meta name="description" content="Choose a credit plan for AI jewelry photoshoots and CAD generation. Plans from $9. Upgrade or cancel anytime." />
+        <meta name="description" content="One-time credit packs for AI jewelry photoshoots and CAD, from $2. No subscription." />
         <link rel="canonical" href="/pricing" />
       </Helmet>
     <div className="min-h-[calc(100vh-5rem)] bg-background py-6 px-6 md:px-12 lg:px-16">
