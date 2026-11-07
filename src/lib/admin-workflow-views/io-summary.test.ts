@@ -48,6 +48,13 @@ describe('buildIoSummary: every picture, 3D file and stored file in and out of a
     expect(s.outputs[0].large).toBe(false);
   });
 
+  it('fastload: the Skeleton 3DM tile carries its Meshes file, so View 3D shows the real model, not placeholder triangles', () => {
+    const s = buildIoSummary(buildRunView(fastloadRun(), true));
+    expect(s.outputs[0].meshesUrl).toBe(proxy(32));
+    expect(s.outputs[1].meshesUrl).toBeUndefined();
+    expect(s.inputs[0].meshesUrl).toBeUndefined();
+  });
+
   it('CAD improve: reference in; GLB, 3DM, STL, casting, then STEP and the spec sheet out', () => {
     const s = buildIoSummary(buildRunView(cadImproveRun(), true));
     expect(brief(s.inputs)).toEqual([['image', null, 'Reference images']]);

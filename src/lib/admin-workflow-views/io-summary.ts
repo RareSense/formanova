@@ -32,6 +32,11 @@ export interface IoItem {
   trusted: boolean;
   /** Over LARGE_FILE_BYTES: the 3D viewer waits for one more click before fetching it. */
   large: boolean;
+  /**
+   * A fastload Skeleton 3DM: its "Meshes" file from the same step. The skeleton holds a
+   * one-triangle placeholder per surface, so the viewer swaps these real meshes in.
+   */
+  meshesUrl?: string;
 }
 
 export interface IoSummary {
@@ -138,11 +143,21 @@ function dedupe(items: IoItem[]): IoItem[] {
 const OUTPUT_RANK: Record<string, number> = { glb: 1, gltf: 1, '3dm': 2, stl: 3 };
 const outputRank = (i: IoItem) => (i.kind === 'image' ? 0 : i.kind === 'model3d' ? OUTPUT_RANK[i.format ?? ''] ?? 3 : 4);
 
+/** Give each fastload skeleton the url of its sibling meshes file (same step, key "meshes"). */
+function linkFastloadMeshes(items: IoItem[]): IoItem[] {
+  const byKey = new Map(items.map((i) => [i.key, i]));
+  return items.map((item) => {
+    if (item.kind !== 'model3d' || item.format !== '3dm' || !item.key.endsWith('.skeleton_3dm')) return item;
+    const meshes = byKey.get(`${item.key.slice(0, -'skeleton_3dm'.length)}meshes`);
+    return meshes?.trusted ? { ...item, meshesUrl: meshes.url } : item;
+  });
+}
+
 export function buildIoSummary(view: RunView, options: { resultFiles?: ResultFile[] } = {}): IoSummary {
   const inputs = dedupe(collect(view.inputs));
-  const outputs = dedupe([...collect(view.outputs?.node ?? null), ...resultItems(options.resultFiles ?? [])])
+  const outputs = linkFastloadMeshes(dedupe([...collect(view.outputs?.node ?? null), ...resultItems(options.resultFiles ?? [])])
     .map((item, i) => ({ item, i }))
     .sort((a, b) => outputRank(a.item) - outputRank(b.item) || a.i - b.i)
-    .map(({ item }) => item);
+    .map(({ item }) => item));
   return { inputs, outputs };
 }

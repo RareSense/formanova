@@ -4,7 +4,7 @@ import { AlertTriangle, Box, Download, FileArchive, FileText, FileVideo, File as
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import type { IoItem } from '@/lib/admin-workflow-views/io-summary';
 import { externalHref, formatBytes, isSameOrigin, useFileDownload } from './use-file-download';
-import { fetchModelBytes, openModel, type OpenedModel } from './model-viewer';
+import { fetchModelBytes, fetchPackedMeshes, openModel, type OpenedModel } from './model-viewer';
 
 /**
  * Small, equal tiles for the Inputs -> Outputs strip (pictures use ImageThumb's tile).
@@ -96,7 +96,7 @@ export function FileTile({ item, fallbackStem }: { item: IoItem; fallbackStem: s
   );
 }
 
-function Viewport({ url, name, onFail }: { url: string; name: string; onFail: (reason: string) => void }) {
+function Viewport({ url, meshesUrl, name, onFail }: { url: string; meshesUrl?: string; name: string; onFail: (reason: string) => void }) {
   const host = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
   const onFailRef = useRef(onFail);
@@ -108,9 +108,13 @@ function Viewport({ url, name, onFail }: { url: string; name: string; onFail: (r
     let live = true;
     (async () => {
       try {
-        const data = await fetchModelBytes(url, abort.signal);
+        // A fastload skeleton only holds placeholder triangles: fetch its real meshes too.
+        const [data, packed] = await Promise.all([
+          fetchModelBytes(url, abort.signal),
+          meshesUrl ? fetchPackedMeshes(meshesUrl, abort.signal) : Promise.resolve(undefined),
+        ]);
         if (!live || !host.current) return;
-        const model = await openModel(host.current, data, name);
+        const model = await openModel(host.current, data, name, packed);
         if (!live) { model.dispose(); return; }
         opened = model;
         setReady(true);
@@ -123,7 +127,7 @@ function Viewport({ url, name, onFail }: { url: string; name: string; onFail: (r
       abort.abort();
       opened?.dispose();
     };
-  }, [url, name]);
+  }, [url, meshesUrl, name]);
 
   return (
     <div className="relative h-full w-full" data-testid="model-viewport" style={{ touchAction: 'none' }}>
@@ -179,7 +183,7 @@ function ModelDialog({ item, fallbackStem, open, onOpenChange }: { item: IoItem;
               </button>
             </div>
           ) : open ? (
-            <Viewport url={item.url} name={viewerFileName(item, fallbackStem)} onFail={setFailed} />
+            <Viewport url={item.url} meshesUrl={item.meshesUrl} name={viewerFileName(item, fallbackStem)} onFail={setFailed} />
           ) : null}
         </div>
         {local && (
