@@ -102,9 +102,14 @@ export default function Welcome() {
             </div>
 
             <div className="mb-8">
-              <h1 className="marta-headline text-white leading-[0.85]">Your</h1>
-              <h1 className="marta-headline text-white leading-[0.85]">Jewelry</h1>
-              <h1 className="marta-headline hero-accent-text leading-[0.85]">Unchanged</h1>
+              {/* One h1 for the page; each word keeps its own line. The {' '}
+                  spaces keep the text "Your Jewelry Unchanged" for search
+                  engines and screen readers, and don't render between blocks. */}
+              <h1>
+                <span className="block marta-headline text-white leading-[0.85]">Your</span>{' '}
+                <span className="block marta-headline text-white leading-[0.85]">Jewelry</span>{' '}
+                <span className="block marta-headline hero-accent-text leading-[0.85]">Unchanged</span>
+              </h1>
             </div>
 
             <p className="marta-body text-white/90 max-w-md mb-12 leading-relaxed">
