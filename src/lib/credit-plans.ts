@@ -4,7 +4,7 @@
 // visible prices, so the display data lives here, shared by /pricing, /credits
 // and the plan grid so the surfaces cannot drift apart.
 
-import { isStarterTier, type BillingTier } from '@/lib/starter-pack';
+import { STARTER_TIER_ID, isStarterTier, type BillingTier } from '@/lib/starter-pack';
 
 /** Backend tier ID of the Plus package (160 credits). Hidden only in the photo shortfall view. */
 export const PLUS_TIER_ID = 'tier_a15d8b06';
@@ -26,6 +26,18 @@ export const CREDIT_PLANS = [
 ];
 
 export const STARTER_OFFER = { price: 2, inrPrice: 200, credits: 50, ...capacity(50) };
+
+const PLAN_TIERS: BillingTier[] = CREDIT_PLANS.map(p => ({ tier_id: p.tierId, name: p.name, type: 'subscription', credits: p.credits }));
+
+/**
+ * Tiers for a visitor who isn't signed in (public /pricing): the $2 Starter
+ * offer, which every new account can buy, plus every plan. Signed-in users get
+ * their own list from GET /billing/tiers, which drops Starter once it's bought.
+ */
+export const PUBLIC_TIERS: BillingTier[] = [
+  { tier_id: STARTER_TIER_ID, name: 'Starter', type: 'one_time', credits: STARTER_OFFER.credits },
+  ...PLAN_TIERS,
+];
 
 export const PLAN_BY_CREDITS = Object.fromEntries(CREDIT_PLANS.map(p => [p.credits, p])) as Record<
   number,
@@ -62,10 +74,7 @@ export function resolveGridTiers(
   cadRequiredCredits?: number,
   photoShortfall = false,
 ): BillingTier[] {
-  const source =
-    tiers.length > 0
-      ? tiers
-      : CREDIT_PLANS.map(p => ({ tier_id: p.tierId, name: p.name, type: 'subscription', credits: p.credits }));
+  const source = tiers.length > 0 ? tiers : PLAN_TIERS;
   const known = source.filter(t => isStarterTier(t) || t.credits in PLAN_BY_CREDITS);
 
   let shown: BillingTier[];
