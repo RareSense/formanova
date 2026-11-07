@@ -40,6 +40,8 @@ export interface LoadOptions {
   status?: (text: string) => void;
   /** Split a heavy .3dm on the server; null/undefined = open directly. */
   fastload?: ((data: ArrayBuffer) => Promise<{ skeleton: ArrayBuffer; meshes: PackedMeshes }>) | null;
+  /** A fastload skeleton's real meshes, already fetched (admin preview of a fastload run): swapped into its placeholders. */
+  packedMeshes?: PackedMeshes | null;
   /** Mesh surfaces saved without render meshes (Rhino on a server); null = not available. */
   rhinoMesh?: ((data: ArrayBuffer) => Promise<ArrayBuffer>) | null;
 }
@@ -115,7 +117,9 @@ async function load3dm(file: File, manager: THREE.LoadingManager, info: LoadInfo
   // The server also meshes shown surfaces saved without a display mesh ("Save small"),
   // which a browser cannot draw, so such files go through it whatever their size.
   const big = data.byteLength > FASTLOAD_ABOVE;
-  if (opts.fastload && (big || (await inspect3dm(data)).noMesh)) {
+  if (opts.packedMeshes) {
+    fast = { skeleton: data, meshes: opts.packedMeshes };
+  } else if (opts.fastload && (big || (await inspect3dm(data)).noMesh)) {
     opts.status?.(big ? 'Preparing a large file…' : 'Meshing parts saved without a display mesh…');
     try {
       fast = await opts.fastload(data);
@@ -144,7 +148,7 @@ async function load3dm(file: File, manager: THREE.LoadingManager, info: LoadInfo
   if (fast && swapInMeshes(obj, fast.meshes) !== fast.meshes.byId.size) {
     // A mesh found no placeholder: never show a model with parts missing.
     info.warnings.push('Large-file preparation did not match this file; opened it directly');
-    return load3dm(file, manager, info, { ...opts, fastload: null });
+    return load3dm(file, manager, info, { ...opts, fastload: null, packedMeshes: null });
   }
   info.fastload = !!fast;
   Object.assign(info, matchRhino(obj, rh, !!opts.showHidden));
