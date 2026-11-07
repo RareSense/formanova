@@ -9,6 +9,8 @@ vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: null }) }));
 vi.mock('@/components/CinematicHero', () => ({ CinematicHero: () => null }));
 vi.mock('@/components/CinematicShowcase', () => ({ CinematicShowcase: () => null }));
 vi.mock('@/components/ThemeLogo', () => ({ ThemeLogo: () => null }));
+// The page loads web-vitals on mount; without this it resolves after the test environment is gone.
+vi.mock('@/lib/web-vitals', () => ({ initWebVitals: () => {} }));
 
 // jsdom has no IntersectionObserver; the scroll-reveal animations only need it to exist.
 vi.stubGlobal('IntersectionObserver', class { observe() {} unobserve() {} disconnect() {} takeRecords() { return []; } });
@@ -42,5 +44,15 @@ describe('Welcome footer spacing (owner, 2026-11-07: less empty space around Par
     const partners = screen.getByText('Partnerships').nextElementSibling as HTMLElement;
     expect(partners.className).toMatch(/\bmt-8\b/);
     expect(partners.className).toMatch(/\bmb-12\b/);
+  });
+});
+
+describe('Welcome hero', () => {
+  it('offers a See pricing link to the public pricing page, next to Start Creating', () => {
+    renderPage();
+    const pricing = screen.getByRole('link', { name: 'See pricing' });
+    expect(pricing).toHaveAttribute('href', '/pricing');
+    const start = screen.getByRole('button', { name: /start creating/i });
+    expect(pricing.parentElement).toBe(start.parentElement);
   });
 });
