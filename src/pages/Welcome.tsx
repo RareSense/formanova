@@ -92,7 +92,8 @@ export default function Welcome() {
                 it can never dangle orphaned at a line end. */}
             <div className="mb-8 flex flex-wrap items-center gap-x-4 gap-y-2 lg:w-max lg:flex-nowrap">
               <span className="marta-label text-white text-base tracking-[0.3em] uppercase font-medium">
-                Trustable AI Photography for Jewelry
+                {/* Non-breaking space keeps "& Designers" together when the line wraps on phones. */}
+                For Jewelry Brands &{'\u00A0'}Designers
               </span>
               <span aria-hidden="true" className="hidden h-4 w-px bg-white/40 lg:block" />
               <span className="flex items-center gap-2 text-white/85 text-base tracking-[0.3em] uppercase font-medium">
