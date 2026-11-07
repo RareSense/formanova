@@ -166,8 +166,8 @@ export default function Welcome() {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="marta-section content-deferred">
+      {/* CTA Section. A shorter bottom so the Partnerships band follows closely (owner, 2026-11-07). */}
+      <section className="marta-section pb-16 md:pb-20 lg:pb-24 content-deferred">
         <ScrollRevealSection animation="zoom" className="marta-container text-center">
           <div className="max-w-4xl mx-auto">
             <span className="marta-label mb-12 block">Start Now</span>
@@ -187,11 +187,12 @@ export default function Welcome() {
 
       {/* Footer */}
       <footer className="border-t border-border/20 content-deferred">
-        <div className="marta-section border-b border-border/20">
+        {/* A compact band, not a full page section: two partner names and one line need less room than a hero. */}
+        <div className="py-12 md:py-16 lg:py-20 border-b border-border/20">
           <div className="marta-container text-center">
             <span className="marta-label">Partnerships</span>
             {/* Each partner links to our dated press release about it. */}
-            <div className="flex flex-wrap items-start justify-center gap-8 md:gap-16 mt-12 mb-16">
+            <div className="flex flex-wrap items-start justify-center gap-8 md:gap-16 mt-8 mb-12">
               {PARTNERS.map((partner) => (
                 <a
                   key={partner.name}
