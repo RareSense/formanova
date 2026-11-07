@@ -2,13 +2,25 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
-import { GenerationIndicator, isNavLinkActivePath } from './Header';
+import { GenerationIndicator, Header, isNavLinkActivePath } from './Header';
 
 const mockGenerations = vi.hoisted(() => ({ list: [] as unknown[] }));
 vi.mock('@/contexts/GenerationsContext', () => ({
   useGenerations: () => ({ generations: mockGenerations.list }),
   buildCadRestorePath: vi.fn(),
 }));
+
+const mockAuth = vi.hoisted(() => ({ user: null as null | { id: string; email: string } }));
+vi.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({ user: mockAuth.user, signOut: vi.fn(), signInWithGoogle: vi.fn() }),
+}));
+vi.mock('@/contexts/CreditsContext', () => ({
+  useCredits: () => ({ credits: 10, lastDelta: null }),
+}));
+vi.mock('@/hooks/useIsAdmin', () => ({ useIsAdmin: () => false }));
+vi.mock('@/hooks/useUserType', () => ({ useUserType: () => null }));
+vi.mock('@/components/ThemeSwitcher', () => ({ ThemeSwitcher: () => null }));
+vi.mock('@/components/ThemeLogo', () => ({ ThemeLogo: () => null }));
 
 const running = (extra: Record<string, unknown> = {}) => ({
   workflowId: 'w1',
@@ -51,6 +63,33 @@ describe('GenerationIndicator', () => {
     mockGenerations.list = [running({ supervised: true }), running({ workflowId: 'w2' })];
     renderPill();
     expect(screen.getByText('2 Generating…')).toBeTruthy();
+  });
+});
+
+// Both the desktop nav and the mobile menu render the same links, so each
+// label appears twice when it is shown.
+function renderHeader() {
+  return render(
+    <MemoryRouter>
+      <Header />
+    </MemoryRouter>,
+  );
+}
+
+describe('Header nav links', () => {
+  it('does not offer Dashboard to a logged-out visitor, in either menu', () => {
+    mockAuth.user = null;
+    renderHeader();
+    expect(screen.queryAllByRole('link', { name: 'Dashboard' })).toHaveLength(0);
+    expect(screen.getAllByRole('link', { name: 'Home' })).toHaveLength(2);
+  });
+
+  it('keeps Dashboard for a signed-in user, in both menus', () => {
+    mockAuth.user = { id: 'u1', email: 'user@example.com' };
+    renderHeader();
+    const dashboard = screen.getAllByRole('link', { name: 'Dashboard' });
+    expect(dashboard).toHaveLength(2);
+    dashboard.forEach((link) => expect(link.getAttribute('href')).toBe('/dashboard'));
   });
 });
 
