@@ -183,13 +183,17 @@ export function Header() {
 
   const navLinks: NavLink[] = [
     { path: '/', label: 'Home' },
-    {
-      // Photo Studio and CAD Studio are one page now, so the studio entry
-      // paths stay active links rather than getting their own nav items.
-      path: '/dashboard',
-      label: 'Dashboard',
-      activePaths: ['/dashboard', '/studio', '/studio-cad', '/text-to-cad', '/image-to-cad', '/cad-to-catalog'],
-    },
+    // Dashboard needs an account, so logged-out visitors don't get a link
+    // that only bounces them to the login page.
+    ...(user
+      ? [{
+          // Photo Studio and CAD Studio are one page now, so the studio entry
+          // paths stay active links rather than getting their own nav items.
+          path: '/dashboard',
+          label: 'Dashboard',
+          activePaths: ['/dashboard', '/studio', '/studio-cad', '/text-to-cad', '/image-to-cad', '/cad-to-catalog'],
+        }]
+      : []),
     // { path: '/tutorial', label: 'Tutorial' }, // hidden for now
   ];
 

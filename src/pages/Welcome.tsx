@@ -1,6 +1,6 @@
 import React, { lazy, Suspense } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Link, useNavigate, Navigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { ArrowRight, Play } from 'lucide-react';
 import { ScrollRevealSection, StaggerContainer } from '@/components/ScrollRevealSection';
 import { KineticText } from '@/components/KineticText';
@@ -25,6 +25,13 @@ import heroEmeraldEarrings from '@/assets/jewelry/hero-emerald-earrings.webp';
 import heroGemstoneRings from '@/assets/jewelry/hero-gemstone-rings.webp';
 import heroAquamarineRings from '@/assets/jewelry/hero-aquamarine-rings.webp';
 import heroDiamondBracelets from '@/assets/jewelry/hero-diamond-bracelets.webp';
+
+// Partnerships shown in the footer. Each links to its press release on the
+// public (Astro) site, the same way the footer's About link does.
+const PARTNERS = [
+  { name: "Women's Jewelry Association", detail: 'New York · May 2026', href: 'https://formanova.ai/press/wja-partnership/' },
+  { name: 'Dubai Jewellery Group', detail: 'Dubai · July 2026', href: 'https://formanova.ai/press/djg-partnership/' },
+];
 
 export default function Welcome() {
   const navigate = useNavigate();
@@ -70,7 +77,7 @@ export default function Welcome() {
     <>
       <Helmet>
         <title>FormaNova | AI Jewelry Photoshoot Studio & CAD Generator</title>
-        <meta name="description" content="AI jewelry photoshoot studio & CAD generator. Upload product images for professional model photos, or generate 3D jewelry models from text. Starter pack from $2." />
+        <meta name="description" content="AI jewelry photoshoot studio & CAD generator. Upload product images for professional model photos, or generate 3D jewelry models from text. Packs from $2." />
         <link rel="canonical" href="/" />
       </Helmet>
     <div className="min-h-screen bg-background overflow-x-hidden scroll-smooth">
@@ -92,7 +99,8 @@ export default function Welcome() {
                 it can never dangle orphaned at a line end. */}
             <div className="mb-8 flex flex-wrap items-center gap-x-4 gap-y-2 lg:w-max lg:flex-nowrap">
               <span className="marta-label text-white text-base tracking-[0.3em] uppercase font-medium">
-                Trustable AI Photography for Jewelry
+                {/* Non-breaking space keeps "& Designers" together when the line wraps on phones. */}
+                For Jewelry Brands &{'\u00A0'}Designers
               </span>
               <span aria-hidden="true" className="hidden h-4 w-px bg-white/40 lg:block" />
               <span className="flex items-center gap-2 text-white/85 text-base tracking-[0.3em] uppercase font-medium">
@@ -102,9 +110,14 @@ export default function Welcome() {
             </div>
 
             <div className="mb-8">
-              <h1 className="marta-headline text-white leading-[0.85]">Your</h1>
-              <h1 className="marta-headline text-white leading-[0.85]">Jewelry</h1>
-              <h1 className="marta-headline hero-accent-text leading-[0.85]">Unchanged</h1>
+              {/* One h1 for the page; each word keeps its own line. The {' '}
+                  spaces keep the text "Your Jewelry Unchanged" for search
+                  engines and screen readers, and don't render between blocks. */}
+              <h1>
+                <span className="block marta-headline text-white leading-[0.85]">Your</span>{' '}
+                <span className="block marta-headline text-white leading-[0.85]">Jewelry</span>{' '}
+                <span className="block marta-headline hero-accent-text leading-[0.85]">Unchanged</span>
+              </h1>
             </div>
 
             <p className="marta-body text-white/90 max-w-md mb-12 leading-relaxed">
@@ -176,56 +189,37 @@ export default function Welcome() {
       <footer className="border-t border-border/20 content-deferred">
         <div className="marta-section border-b border-border/20">
           <div className="marta-container text-center">
-            <span className="marta-label">Featured In</span>
-            <div className="flex flex-wrap items-center justify-center gap-8 md:gap-16 mt-12 mb-16">
-              {[
-                { name: 'CNN', url: 'https://cnn.com' },
-                { name: 'TECHCRUNCH', url: 'https://techcrunch.com' },
-                { name: 'THE TELEGRAPH', url: 'https://telegraph.co.uk' },
-                { name: 'HUFFPOST', url: 'https://huffpost.com' },
-              ].map((brand) => (
-                <a 
-                  key={brand.name} 
-                  href={brand.url} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="font-display text-2xl md:text-3xl text-foreground/50 hover:text-foreground/70 transition-colors duration-300 cursor-pointer"
+            <span className="marta-label">Partnerships</span>
+            {/* Each partner links to our dated press release about it. */}
+            <div className="flex flex-wrap items-start justify-center gap-8 md:gap-16 mt-12 mb-16">
+              {PARTNERS.map((partner) => (
+                <a
+                  key={partner.name}
+                  href={partner.href}
+                  className="group flex flex-col items-center gap-3 text-center"
                 >
-                  {brand.name}
+                  <span className="font-display text-2xl md:text-3xl text-foreground/50 group-hover:text-foreground/70 transition-colors duration-300">
+                    {partner.name}
+                  </span>
+                  <span className="marta-label">{partner.detail}</span>
                 </a>
               ))}
             </div>
-            <p className="font-display text-3xl md:text-4xl mb-12">
-              Trusted by <span className="hero-accent-text">70+</span> Brands
+            <p className="font-display text-3xl md:text-4xl">
+              Trusted by <span className="hero-accent-text">4,000+</span> Jewelers
             </p>
-            <div className="flex flex-wrap items-center justify-center gap-8 md:gap-16">
-              {[
-                { name: 'HUGO BOSS', url: 'https://hugoboss.com' },
-                { name: 'ATOIR', url: 'https://atoirthelabel.com' },
-                { name: 'TULLEEN', url: 'https://tulleen.com' },
-                { name: 'MANGO', url: 'https://mango.com' },
-              ].map((brand) => (
-                <a 
-                  key={brand.name} 
-                  href={brand.url} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="font-display text-2xl md:text-3xl text-foreground/50 hover:text-foreground/70 transition-colors duration-300 cursor-pointer"
-                >
-                  {brand.name}
-                </a>
-              ))}
-            </div>
           </div>
         </div>
         
         <div className="marta-container py-8">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
             <ThemeLogo className="h-8" />
-            <nav className="flex items-center gap-8">
-              <Link to="/studio" className="marta-label marta-link hover:text-foreground">Studio</Link>
+            {/* Photoshoots, CAD and About are pages on the public (Astro) site, so
+                they are plain links, not router links. */}
+            <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-4 lg:flex-nowrap lg:gap-x-8">
+              <a href="https://formanova.ai/ai-jewelry-photoshoot/" className="marta-label marta-link hover:text-foreground">Photoshoots</a>
+              <a href="https://formanova.ai/ai-jewelry-cad/" className="marta-label marta-link hover:text-foreground">CAD</a>
               <a href="https://formanova.ai/about/" className="marta-label marta-link hover:text-foreground">About</a>
-              <Link to="/tutorial" className="marta-label marta-link hover:text-foreground">Tutorial</Link>
               <a href="https://linkedin.com/company/rare-sense-inc" target="_blank" rel="noopener noreferrer" className="marta-label marta-link hover:text-foreground">LinkedIn</a>
             </nav>
             <div className="flex items-center gap-3">
