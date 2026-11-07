@@ -9,6 +9,7 @@
  * credentials and no referrer, so the token never leaves the origin.
  */
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
+import { unpackMeshes, type PackedMeshes } from '@/components/cad-to-catalog/engine/fastpack';
 
 export interface OpenedModel {
   dispose(): void;
@@ -26,12 +27,24 @@ export async function fetchModelBytes(url: string, signal?: AbortSignal): Promis
   return data;
 }
 
-/** Opens the bytes in a new viewer inside `host`. The caller disposes it on unmount. */
-export async function openModel(host: HTMLElement, data: ArrayBuffer, fileName: string): Promise<OpenedModel> {
+const isGzip = (b: ArrayBuffer) => { const u = new Uint8Array(b, 0, Math.min(2, b.byteLength)); return u[0] === 0x1f && u[1] === 0x8b; };
+
+/** A fastload run's "Meshes" file (meshes.bin.gz): fetched, unzipped and unpacked. */
+export async function fetchPackedMeshes(url: string, signal?: AbortSignal): Promise<PackedMeshes> {
+  let data = await fetchModelBytes(url, signal);
+  if (isGzip(data)) data = await new Response(new Response(data).body!.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+  return unpackMeshes(data);
+}
+
+/**
+ * Opens the bytes in a new viewer inside `host`. The caller disposes it on unmount.
+ * `packedMeshes`: a fastload skeleton's real meshes, swapped into its one-triangle placeholders.
+ */
+export async function openModel(host: HTMLElement, data: ArrayBuffer, fileName: string, packedMeshes?: PackedMeshes): Promise<OpenedModel> {
   const { CatalogEngine } = await import('@/components/cad-to-catalog/engine/engine');
   const engine = new CatalogEngine(host);
   try {
-    await engine.open(new File([data], fileName), new Map());
+    await engine.open(new File([data], fileName), new Map(), packedMeshes ? { packedMeshes } : {});
   } catch (error) {
     engine.dispose();
     throw error;
