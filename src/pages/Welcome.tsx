@@ -26,6 +26,13 @@ import heroGemstoneRings from '@/assets/jewelry/hero-gemstone-rings.webp';
 import heroAquamarineRings from '@/assets/jewelry/hero-aquamarine-rings.webp';
 import heroDiamondBracelets from '@/assets/jewelry/hero-diamond-bracelets.webp';
 
+// Partnerships shown in the footer. Each links to its press release on the
+// public (Astro) site, the same way the footer's About link does.
+const PARTNERS = [
+  { name: "Women's Jewelry Association", detail: 'New York · May 2026', href: 'https://formanova.ai/press/wja-partnership/' },
+  { name: 'Dubai Jewellery Group', detail: 'Dubai · July 2026', href: 'https://formanova.ai/press/djg-partnership/' },
+];
+
 export default function Welcome() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -182,46 +189,25 @@ export default function Welcome() {
       <footer className="border-t border-border/20 content-deferred">
         <div className="marta-section border-b border-border/20">
           <div className="marta-container text-center">
-            <span className="marta-label">Featured In</span>
-            <div className="flex flex-wrap items-center justify-center gap-8 md:gap-16 mt-12 mb-16">
-              {[
-                { name: 'CNN', url: 'https://cnn.com' },
-                { name: 'TECHCRUNCH', url: 'https://techcrunch.com' },
-                { name: 'THE TELEGRAPH', url: 'https://telegraph.co.uk' },
-                { name: 'HUFFPOST', url: 'https://huffpost.com' },
-              ].map((brand) => (
-                <a 
-                  key={brand.name} 
-                  href={brand.url} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="font-display text-2xl md:text-3xl text-foreground/50 hover:text-foreground/70 transition-colors duration-300 cursor-pointer"
+            <span className="marta-label">Partnerships</span>
+            {/* Each partner links to our dated press release about it. */}
+            <div className="flex flex-wrap items-start justify-center gap-8 md:gap-16 mt-12 mb-16">
+              {PARTNERS.map((partner) => (
+                <a
+                  key={partner.name}
+                  href={partner.href}
+                  className="group flex flex-col items-center gap-3 text-center"
                 >
-                  {brand.name}
+                  <span className="font-display text-2xl md:text-3xl text-foreground/50 group-hover:text-foreground/70 transition-colors duration-300">
+                    {partner.name}
+                  </span>
+                  <span className="marta-label">{partner.detail}</span>
                 </a>
               ))}
             </div>
-            <p className="font-display text-3xl md:text-4xl mb-12">
-              Trusted by <span className="hero-accent-text">70+</span> Brands
+            <p className="font-display text-3xl md:text-4xl">
+              Trusted by <span className="hero-accent-text">4,000+</span> Jewelers
             </p>
-            <div className="flex flex-wrap items-center justify-center gap-8 md:gap-16">
-              {[
-                { name: 'HUGO BOSS', url: 'https://hugoboss.com' },
-                { name: 'ATOIR', url: 'https://atoirthelabel.com' },
-                { name: 'TULLEEN', url: 'https://tulleen.com' },
-                { name: 'MANGO', url: 'https://mango.com' },
-              ].map((brand) => (
-                <a 
-                  key={brand.name} 
-                  href={brand.url} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="font-display text-2xl md:text-3xl text-foreground/50 hover:text-foreground/70 transition-colors duration-300 cursor-pointer"
-                >
-                  {brand.name}
-                </a>
-              ))}
-            </div>
           </div>
         </div>
         
