@@ -1,6 +1,6 @@
 import React, { lazy, Suspense } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Link, useNavigate, Navigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { ArrowRight, Play } from 'lucide-react';
 import { ScrollRevealSection, StaggerContainer } from '@/components/ScrollRevealSection';
 import { KineticText } from '@/components/KineticText';
@@ -214,10 +214,12 @@ export default function Welcome() {
         <div className="marta-container py-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <ThemeLogo className="h-8" />
-            <nav className="flex items-center gap-8">
-              <Link to="/studio" className="marta-label marta-link hover:text-foreground">Studio</Link>
+            {/* Photoshoots, CAD and About are pages on the public (Astro) site, so
+                they are plain links, not router links. */}
+            <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-4 lg:flex-nowrap lg:gap-x-8">
+              <a href="https://formanova.ai/ai-jewelry-photoshoot/" className="marta-label marta-link hover:text-foreground">Photoshoots</a>
+              <a href="https://formanova.ai/ai-jewelry-cad/" className="marta-label marta-link hover:text-foreground">CAD</a>
               <a href="https://formanova.ai/about/" className="marta-label marta-link hover:text-foreground">About</a>
-              <Link to="/tutorial" className="marta-label marta-link hover:text-foreground">Tutorial</Link>
               <a href="https://linkedin.com/company/rare-sense-inc" target="_blank" rel="noopener noreferrer" className="marta-label marta-link hover:text-foreground">LinkedIn</a>
             </nav>
             <div className="flex items-center gap-3">
