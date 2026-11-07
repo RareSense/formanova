@@ -7,6 +7,7 @@ import {
   STILL_WORKING_CUE,
   WebRTCCall,
   deadAirCheckIn,
+  summariseWaits,
   type CallDeps,
   type CallEndResult,
   type CallErrorCode,
@@ -113,6 +114,53 @@ async function startLive(s: ReturnType<typeof setup>, extra: Record<string, unkn
 describe('WebRTCCall', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
+
+  describe('turn waits (how long the caller waits for Ruby; numbers only)', () => {
+    it('times each wait from the caller last words to Ruby first words, and marks waits with a lookup', async () => {
+      const s = setup();
+      const runTool = vi.fn(async () => ({}));
+      await startLive(s, { runTool });
+      s.pc.dc.message({ type: 'session.output_transcript.delta', delta: 'Hi, I am Ruby.' });
+      // a plain answer: 1.5 s
+      s.pc.dc.message({ type: 'session.input_transcript.delta', delta: 'What do you ' });
+      await vi.advanceTimersByTimeAsync(500);
+      s.pc.dc.message({ type: 'session.input_transcript.delta', delta: 'do?' });
+      await vi.advanceTimersByTimeAsync(1500);
+      s.pc.dc.message({ type: 'session.output_transcript.delta', delta: 'We make ' });
+      await vi.advanceTimersByTimeAsync(300);
+      s.pc.dc.message({ type: 'session.output_transcript.delta', delta: 'jewelry images.' });
+      // a price question that runs a lookup: 9 s
+      s.pc.dc.message({ type: 'session.input_transcript.delta', delta: 'How much for 100?' });
+      await vi.advanceTimersByTimeAsync(1000);
+      s.pc.dc.message({
+        type: 'response.event', delegation_id: 'd1',
+        event: { type: 'response.output_item.done', item: { type: 'function_call', call_id: 'c1', name: 'quote_shoot' } },
+      });
+      await vi.advanceTimersByTimeAsync(8000);
+      s.pc.dc.message({ type: 'response.event', delegation_id: 'd1', event: { type: 'response.completed' } });
+      s.pc.dc.message({ type: 'session.output_transcript.delta', delta: 'That would be...' });
+      await s.call.end();
+      const result = s.cbs.onEnded.mock.calls[0][0] as CallEndResult;
+      expect(result.waits).toEqual([{ wait_ms: 1500, lookup: false }, { wait_ms: 9000, lookup: true }]);
+    });
+
+    it('does not count words Ruby says while the caller is still being transcribed late', async () => {
+      const s = setup();
+      await startLive(s, { rubyLevel: () => 0.5 }); // Ruby is audibly speaking
+      s.pc.dc.message({ type: 'session.input_transcript.delta', delta: 'mm-hmm' });
+      await vi.advanceTimersByTimeAsync(200);
+      s.pc.dc.message({ type: 'session.output_transcript.delta', delta: 'and so on' });
+      await s.call.end();
+      expect((s.cbs.onEnded.mock.calls[0][0] as CallEndResult).waits).toEqual([]);
+    });
+  });
+
+  it('summarises turn waits for analytics', () => {
+    expect(summariseWaits([])).toEqual({ turn_waits: 0, turn_wait_p50_ms: null, turn_wait_max_ms: null, turn_waits_over_6s: 0, lookup_wait_max_ms: null });
+    expect(summariseWaits([
+      { wait_ms: 1200, lookup: false }, { wait_ms: 900, lookup: false }, { wait_ms: 7000, lookup: true }, { wait_ms: 15000, lookup: true },
+    ])).toEqual({ turn_waits: 4, turn_wait_p50_ms: 1200, turn_wait_max_ms: 15000, turn_waits_over_6s: 2, lookup_wait_max_ms: 15000 });
+  });
 
   it('requests the mic with echo/noise/gain processing and exchanges SDP', async () => {
     const s = setup();

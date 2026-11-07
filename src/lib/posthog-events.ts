@@ -730,6 +730,12 @@ export interface RubyCallEndedProps {
   paid: boolean;
   files_uploaded: number;
   error_code: string | null;
+  /** How long the caller waited for Ruby's answers (caller's last words to her first words). */
+  turn_waits?: number;
+  turn_wait_p50_ms?: number | null;
+  turn_wait_max_ms?: number | null;
+  turn_waits_over_6s?: number;
+  lookup_wait_max_ms?: number | null;
 }
 
 export function trackRubyCallEnded(props: RubyCallEndedProps) {
