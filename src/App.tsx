@@ -223,6 +223,8 @@ const MainApp = () => (
                   <Route path="/ai-jewelry-cad" element={<AIJewelryCAD />} />
                   <Route path="/ai-jewelry-photography-comparison" element={<Navigate to="/blog/ai-jewelry-photography-comparison" replace />} />
                   <Route path="/link" element={<LinkAccount />} />
+                  {/* Public: logged-out visitors see the packs and sign in to buy. */}
+                  <Route path="/pricing" element={<Pricing />} />
                   {/* <Route path="/tutorial" element={<Tutorial />} /> */}{/* hidden for now */}
                   
                   {/* Role picker — one-time "what best describes you?" screen, gated by feature flag */}
@@ -236,7 +238,6 @@ const MainApp = () => (
                   <Route path="/credits" element={<ProtectedRoute><Credits /></ProtectedRoute>} />
                   <Route path="/my-shopify-store" element={<ProtectedRoute><MyShopifyStore /></ProtectedRoute>} />
                   <Route path="/brand-details" element={<ProtectedRoute><BrandDetails /></ProtectedRoute>} />
-                  <Route path="/pricing" element={<ProtectedRoute><Pricing /></ProtectedRoute>} />
                   <Route path="/payment-success" element={<ProtectedRoute><PaymentSuccess /></ProtectedRoute>} />
                   <Route path="/success" element={<ProtectedRoute><PaymentSuccess /></ProtectedRoute>} />
                   <Route path="/cancel" element={<ProtectedRoute><PaymentCancel /></ProtectedRoute>} />

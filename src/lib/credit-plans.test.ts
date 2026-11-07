@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CREDIT_PLANS, PLUS_TIER_ID, STARTER_OFFER, isCadWorkflow, resolveGridTiers } from './credit-plans';
+import { CREDIT_PLANS, PLUS_TIER_ID, PUBLIC_TIERS, STARTER_OFFER, isCadWorkflow, resolveGridTiers } from './credit-plans';
 import { isStarterTier, selectStarterTier, type BillingTier } from './starter-pack';
 
 const t = (tier_id: string, credits: number): BillingTier => ({ tier_id, name: 'n', type: 'one_time', credits });
@@ -97,5 +97,17 @@ describe('isCadWorkflow', () => {
     expect(isCadWorkflow('design_image_v1')).toBe(true);
     expect(isCadWorkflow('photoshoot')).toBe(false);
     expect(isCadWorkflow(undefined)).toBe(false);
+  });
+});
+
+describe('PUBLIC_TIERS (logged-out /pricing)', () => {
+  it('is the $2 offer plus every plan, in display order', () => {
+    const shown = resolveGridTiers(PUBLIC_TIERS);
+    expect(isStarterTier(shown[0])).toBe(true);
+    expect(credits(shown)).toEqual([50, 100, 160, 500, 1500]);
+  });
+
+  it('does not change the signed-in fallback, which has no $2 offer', () => {
+    expect(credits(resolveGridTiers([]))).toEqual([100, 160, 500, 1500]);
   });
 });

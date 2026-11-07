@@ -84,6 +84,20 @@ describe('Header nav links', () => {
     expect(screen.getAllByRole('link', { name: 'Home' })).toHaveLength(2);
   });
 
+  it('offers Pricing to a logged-out visitor, in both menus', () => {
+    mockAuth.user = null;
+    renderHeader();
+    const pricing = screen.getAllByRole('link', { name: 'Pricing' });
+    expect(pricing).toHaveLength(2);
+    pricing.forEach((link) => expect(link.getAttribute('href')).toBe('/pricing'));
+  });
+
+  it('does not add a Pricing nav link for a signed-in user (they buy from the credits pill)', () => {
+    mockAuth.user = { id: 'u1', email: 'user@example.com' };
+    renderHeader();
+    expect(screen.queryAllByRole('link', { name: 'Pricing' })).toHaveLength(0);
+  });
+
   it('keeps Dashboard for a signed-in user, in both menus', () => {
     mockAuth.user = { id: 'u1', email: 'user@example.com' };
     renderHeader();

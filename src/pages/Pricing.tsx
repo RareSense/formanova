@@ -1,16 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { ArrowLeft, Loader2 } from 'lucide-react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCredits } from '@/contexts/CreditsContext';
-import { toast } from '@/hooks/use-toast';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { useBillingLocale } from '@/hooks/use-billing-locale';
 import { isStarterTier, type BillingTier } from '@/lib/starter-pack';
 import { CreditPlanGrid } from '@/components/pricing/CreditPlanGrid';
-import { resolveGridTiers } from '@/lib/credit-plans';
+import { PUBLIC_TIERS, resolveGridTiers } from '@/lib/credit-plans';
 import { DoneForYouCard } from '@/components/pricing/DoneForYouCard';
 import { useDoneForYouVisible } from '@/hooks/use-done-for-you-visible';
 import { RubyCallDialog } from '@/components/sales/RubyCallDialog';
@@ -19,8 +18,9 @@ import creditCoinIcon from '@/assets/icons/credit-coin.png';
 const CHECKOUT_URL = '/billing/checkout';
 
 export default function Pricing() {
-  const { user } = useAuth();
+  const { user, initializing } = useAuth();
   const { credits } = useCredits();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
   const [errorTier, setErrorTier] = useState<string | null>(null);
@@ -36,8 +36,9 @@ export default function Pricing() {
   // (the studio / history page), not a generic Dashboard, so in-progress work is
   // never a dead-end. Falls back to Dashboard for direct visits with no redirect.
   const redirectParam = searchParams.get('redirect');
-  const backTo = redirectParam && redirectParam.startsWith('/') ? redirectParam : '/dashboard';
-  const backLabel = redirectParam ? 'Back' : 'Dashboard';
+  // Logged-out visitors (public page) go back Home: the Dashboard needs an account.
+  const backTo = !user ? '/' : redirectParam && redirectParam.startsWith('/') ? redirectParam : '/dashboard';
+  const backLabel = !user ? 'Home' : redirectParam ? 'Back' : 'Dashboard';
 
   const fetchTiers = useCallback(async () => {
     setTiersLoading(true);
@@ -70,7 +71,8 @@ export default function Pricing() {
 
   const handleCheckout = async (tierId: string) => {
     if (!user?.id) {
-      toast({ title: 'Please sign in first', variant: 'destructive' });
+      // The page is public: sign in, come back here, and pick the pack again.
+      navigate(`/login?redirect=${encodeURIComponent('/pricing')}`);
       return;
     }
     if (loadingTier) return;
@@ -113,7 +115,13 @@ export default function Pricing() {
   // bought it), otherwise the 3 standard plans. Counted after the grid's own
   // filtering, since the backend list also carries packages that are not shown.
   // Done For You, when shown, is its own path beside the plans (layout B), so the page uses the wide width.
-  const cardCount = resolveGridTiers(tiers).length + (showDoneForYou ? 1 : 0);
+  // Logged-out visitors (public page) see every pack, the $2 offer included, in USD.
+  // Signed-in users see their own list from the backend, as before.
+  const shownTiers = user ? tiers : PUBLIC_TIERS;
+  // Wait for the session check, as the route guard did, so a signed-in user never
+  // sees the public list first.
+  const plansLoading = initializing || (user ? tiersLoading : false);
+  const cardCount = resolveGridTiers(shownTiers).length + (showDoneForYou ? 1 : 0);
   const maxWidthClass = cardCount >= 4 ? 'max-w-7xl' : 'max-w-5xl';
 
   return (
@@ -151,13 +159,13 @@ export default function Pricing() {
         </div>
 
         {/* Plans */}
-        {tiersLoading ? (
+        {plansLoading ? (
           <div className="flex justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : (
           <CreditPlanGrid
-            tiers={tiers}
+            tiers={shownTiers}
             isINR={isINR}
             symbol={symbol}
             currency={currency}
