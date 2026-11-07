@@ -32,6 +32,7 @@ import {
 } from '@/lib/posthog-events';
 import {
   WebRTCCall,
+  summariseWaits,
   type CallCallbacks,
   type CallEndReason,
   type CallErrorCode,
@@ -425,6 +426,7 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
               paid: stats.paid,
               files_uploaded: stats.files,
               error_code: errorRef.current,
+              ...summariseWaits(result.waits ?? []),
             });
           }
           if (isCurrent()) {

@@ -31,9 +31,31 @@ export interface SessionAnswer {
   greeting?: string | null;
 }
 
+/** One wait: from the caller's last words to Ruby's first words back; lookup = her head or a tool was working. */
+export interface TurnWait {
+  wait_ms: number;
+  lookup: boolean;
+}
+
 export interface CallEndResult {
   turns: CallTurn[];
   reason: CallEndReason;
+  waits?: TurnWait[];
+}
+
+export const LONG_WAIT_MS = 6000;
+
+/** Numbers for analytics: how long callers waited for Ruby on this call. */
+export function summariseWaits(waits: TurnWait[]) {
+  const ms = waits.map((w) => w.wait_ms).sort((a, b) => a - b);
+  const lookups = waits.filter((w) => w.lookup).map((w) => w.wait_ms);
+  return {
+    turn_waits: ms.length,
+    turn_wait_p50_ms: ms.length ? ms[Math.floor((ms.length - 1) / 2)] : null,
+    turn_wait_max_ms: ms.length ? ms[ms.length - 1] : null,
+    turn_waits_over_6s: ms.filter((m) => m > LONG_WAIT_MS).length,
+    lookup_wait_max_ms: lookups.length ? Math.max(...lookups) : null,
+  };
 }
 
 export interface CallDeps {
@@ -154,6 +176,10 @@ export class WebRTCCall {
   private clientName: string | null = null;
   private lastHeard = 0;
   private lastRubyOut = 0;
+  /** Set by the caller's words (while Ruby is quiet), cleared by Ruby's first words back. */
+  private waitingSince: number | null = null;
+  private waitLookup = false;
+  private waits: TurnWait[] = [];
   private deadAirStep = 0;
   private deadAirCount = 0;
   /** Lookup phase: one spoken "still on it" per lookup, so a slow tool never leaves the line silent. */
@@ -363,18 +389,29 @@ export class WebRTCCall {
         this.startWatch();
         break;
       case 'session.input_transcript.delta':
+        // A late transcript of words said while Ruby is talking is not a wait.
+        if (ev.delta && this.rubyLevel() <= SPEAKING_LEVEL) {
+          if (this.waitingSince === null) this.waitLookup = false;
+          this.waitingSince = this.deps.now();
+        }
         this.addTurn('client', ev.delta, ev.start_ms, ev.end_ms);
         break;
       case 'session.output_transcript.delta':
+        if (ev.delta && this.waitingSince !== null) {
+          this.waits.push({ wait_ms: this.deps.now() - this.waitingSince, lookup: this.waitLookup || this.runner.isBusy() });
+          this.waitingSince = null;
+        }
         this.lastRubyOut = this.deps.now();
         this.addTurn('ruby', ev.delta, ev.start_ms, ev.end_ms);
         this.openMic();
         break;
       case 'session.delegation.created':
         this.runner.delegationCreated(ev.delegation?.id);
+        if (this.waitingSince !== null && this.runner.isBusy()) this.waitLookup = true;
         break;
       case 'response.event':
         this.runner.handle(ev.delegation_id, (ev.event || {}) as Parameters<DelegationRunner['handle']>[1]);
+        if (this.waitingSince !== null && this.runner.isBusy()) this.waitLookup = true;
         break;
       case 'session.closed':
         void this.finish('ruby_closed');
@@ -529,6 +566,6 @@ export class WebRTCCall {
     }
     this.mic?.getTracks().forEach((t) => t.stop());
     this.setState('ended');
-    this.cb.onEnded?.({ turns: this.getTurns(), reason });
+    this.cb.onEnded?.({ turns: this.getTurns(), reason, waits: [...this.waits] });
   }
 }
