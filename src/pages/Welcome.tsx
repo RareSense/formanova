@@ -212,7 +212,7 @@ export default function Welcome() {
         </div>
         
         <div className="marta-container py-8">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
             <ThemeLogo className="h-8" />
             {/* Photoshoots, CAD and About are pages on the public (Astro) site, so
                 they are plain links, not router links. */}
