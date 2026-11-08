@@ -34,7 +34,7 @@ describe('DoneForYouOfferModal', () => {
   it('says it in a few plain words (owner, 2026-11-08): our team makes your photos; talk to our AI', () => {
     renderModal();
     expect(screen.getByRole('heading', { name: 'Let FormaNova creatives make your photos' })).toBeInTheDocument();
-    expect(screen.getByText('You made them one by one. We can make them all at once.')).toBeInTheDocument();
+    expect(screen.getByText('You made them one by one. We can make them in bulk.')).toBeInTheDocument();
     const call = screen.getByRole('button', { name: 'Talk to our AI' });
     expect(call.querySelector('svg')).not.toBeNull(); // the call icon (owner, 2026-11-08)
     expect(screen.getByRole('button', { name: 'No thanks' })).toBeInTheDocument();

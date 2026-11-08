@@ -47,7 +47,10 @@ export function DoneForYouOfferModal({ userId, moment, open, onClose }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && close()}>
-      <DialogContent className="max-w-[420px] border-2 border-[hsl(var(--formanova-hero-accent))] p-8 text-center">
+      <DialogContent
+        // No focus ring on the button when it opens (owner, 2026-11-08); Tab still shows it.
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        className="max-w-[420px] border-2 border-[hsl(var(--formanova-hero-accent))] p-8 text-center">
         {declined ? (
           <>
             <DialogTitle className="sr-only">Done For You</DialogTitle>
@@ -64,7 +67,7 @@ export function DoneForYouOfferModal({ userId, moment, open, onClose }: Props) {
               <h2 className="font-display text-3xl leading-tight tracking-wide sm:text-4xl">Let FormaNova creatives make your photos</h2>
             </DialogTitle>
             <DialogDescription className="mt-3 text-base text-muted-foreground">
-              You made them one by one. We can make them all at once.
+              You made them one by one. We can make them in bulk.
             </DialogDescription>
             {/* The site's own primary button (theme aware), with the call icon the Done For You card uses. */}
             <Button onClick={talk} size="lg" className="mt-8 w-full">
