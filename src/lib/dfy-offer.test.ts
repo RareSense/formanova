@@ -15,10 +15,10 @@ describe('Done For You offer for paying users (owner, 2026-11-08)', () => {
     expect(hasPaid([])).toBe(false); // nothing loaded: never guess
   });
 
-  it('two chances at most: once on the dashboard, once after they made an image', () => {
+  it('the dashboard keeps offering until they choose; after an image is one chance', () => {
     expect(ask('u1', 'dashboard')).toBe(true);
     markOfferSeen('u1', 'dashboard');
-    expect(ask('u1', 'dashboard')).toBe(false);
+    expect(ask('u1', 'dashboard')).toBe(true);
     expect(ask('u1', 'after_image')).toBe(true);
     markOfferSeen('u1', 'after_image');
     expect(ask('u1', 'after_image')).toBe(false);
@@ -44,5 +44,16 @@ describe('Done For You offer for paying users (owner, 2026-11-08)', () => {
     expect(offerState('u2')).toEqual({ seen: {} });
     localStorage.setItem('formanova_dfy_offer_v2_u4', 'not json');
     expect(offerState('u4')).toEqual({ seen: {} });
+  });
+});
+
+describe('dashboard ignores an old close (owner, 2026-11-08)', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('a dashboard close saved by the earlier version does not stop it; only a choice does', () => {
+    markOfferSeen('u1', 'dashboard'); // what the earlier version saved on the X
+    expect(shouldOffer({ userId: 'u1', paid: true, otherModalOpen: false, moment: 'dashboard' })).toBe(true);
+    saveOfferChoice('u1', 'no');
+    expect(shouldOffer({ userId: 'u1', paid: true, otherModalOpen: false, moment: 'dashboard' })).toBe(false);
   });
 });
