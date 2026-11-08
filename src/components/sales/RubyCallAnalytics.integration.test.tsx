@@ -20,8 +20,6 @@ import posthog from 'posthog-js';
 
 let mockUser: { id: string; email: string; full_name: string } | null = null;
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: mockUser }) }));
-vi.mock('@/lib/feature-flags', async (orig) => ({ ...(await orig<typeof import('@/lib/feature-flags')>()), isRubyCallEnabled: () => true }));
-vi.mock('@/hooks/use-done-for-you-visible', () => ({ useDoneForYouVisible: () => true }));
 
 const QUOTE = {
   approved: true,

@@ -11,7 +11,6 @@ import { isStarterTier, type BillingTier } from '@/lib/starter-pack';
 import { CreditPlanGrid } from '@/components/pricing/CreditPlanGrid';
 import { PUBLIC_TIERS, resolveGridTiers } from '@/lib/credit-plans';
 import { DoneForYouCard } from '@/components/pricing/DoneForYouCard';
-import { useDoneForYouVisible } from '@/hooks/use-done-for-you-visible';
 import { RubyCallDialog } from '@/components/sales/RubyCallDialog';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
 
@@ -67,7 +66,7 @@ export default function Pricing() {
   }, [user, fetchTiers]);
 
   const openCall = useCallback(() => setCallOpen(true), []);
-  const showDoneForYou = useDoneForYouVisible();
+  const showDoneForYou = true; // Done For You and Ruby are for everyone (owner, 2026-11-08)
 
   const handleCheckout = async (tierId: string) => {
     if (!user?.id) {

@@ -28,22 +28,20 @@ function renderCard(onOpenCall = vi.fn(), url = '/pricing') {
 
 describe('DoneForYouCard', () => {
   beforeEach(() => {
-    vi.stubEnv('VITE_RUBY_CALL_ALLOWLIST_EMAILS', 'ruby@example.com');
+    vi.stubEnv('VITE_RUBY_CALL_ALLOWLIST_EMAILS', ''); // owner, 2026-11-08: there is no allowlist; it must not matter
     mockUser = null;
   });
   afterEach(() => vi.unstubAllEnvs());
 
-  it('is hidden for a signed-in user who is not allowlisted', () => {
-    mockUser = { email: 'other@example.com' };
+  it('is shown to every signed-in user and every visitor, with no allowlist (owner, 2026-11-08)', () => {
+    mockUser = { email: 'anyone@shop.co' };
     renderCard();
-    expect(screen.queryByText('Done for you')).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Done for you' })).toBeInTheDocument();
   });
 
-  it('is hidden when no allowlist is configured', () => {
-    vi.stubEnv('VITE_RUBY_CALL_ALLOWLIST_EMAILS', '');
-    mockUser = { email: 'ruby@example.com' };
+  it('is shown to signed-out visitors too', () => {
     renderCard();
-    expect(screen.queryByText('Done for you')).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Done for you' })).toBeInTheDocument();
   });
 
   it('is the only tinted card: a flat gold tint, no fade (owner, 2026-11-07)', () => {

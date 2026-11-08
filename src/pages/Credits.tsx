@@ -16,7 +16,6 @@ import { getPostPurchaseReturn, clearPostPurchaseReturn } from '@/lib/post-purch
 import { CreditPlanGrid } from '@/components/pricing/CreditPlanGrid';
 import { isCadWorkflow, resolveGridTiers } from '@/lib/credit-plans';
 import { DoneForYouCard } from '@/components/pricing/DoneForYouCard';
-import { useDoneForYouVisible } from '@/hooks/use-done-for-you-visible';
 import { RubyCallDialog } from '@/components/sales/RubyCallDialog';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
 
@@ -58,7 +57,6 @@ export default function Credits() {
   const [unavailableTier, setUnavailableTier] = useState<string | null>(null);
   const [callOpen, setCallOpen] = useState(false);
   const openCall = useCallback(() => setCallOpen(true), []);
-  const doneForYouAllowed = useDoneForYouVisible();
 
   const fetchTiers = useCallback(async () => {
     setTiersLoading(true);
@@ -188,7 +186,7 @@ export default function Credits() {
   // A direct visit with nothing blocked shows every package.
   const photoShortfall = isShort && cadRequiredCredits === undefined;
   // Done For You only on a normal visit, never on the CAD or photo shortfall views.
-  const showDoneForYou = doneForYouAllowed && !isShort;
+  const showDoneForYou = !isShort; // for everyone (owner, 2026-11-08); not on a shortfall view
 
   // 4 cards when the backend still returns the one-time Starter tier (user never
   // bought it), otherwise the 3 standard plans. Counted after the grid's own
