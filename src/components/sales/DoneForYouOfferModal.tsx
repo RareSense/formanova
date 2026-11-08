@@ -26,7 +26,7 @@ export function DoneForYouOfferModal({ userId, moment, open, onClose }: Props) {
   }, [open, moment]);
 
   const close = () => {
-    if (!chose.current) trackDfyOffer('closed', moment); // that moment is used; the other one may still come
+    if (!chose.current) trackDfyOffer('closed', moment); // on the dashboard it comes back next visit; after an image it was the one chance
     onClose();
   };
 
