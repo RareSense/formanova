@@ -2,21 +2,17 @@
  * The 3D view of Catalog from CAD: hosts CatalogEngine's canvas, the drop area
  * before any file is open, an "Opening…" overlay, and the view tools
  * (zoom, undo / redo, fit: the vertical strip the other CAD pages use), and the
- * Light and Reflections settings of the local CAD to Pictures tool (kept in this
- * browser). The engine lives as long as this component.
+ * Simple / Refract gem toggle the other CAD pages have. The engine lives as long
+ * as this component.
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Diamond, Loader2 } from 'lucide-react';
 import { ViewportSideTools } from '@/components/text-to-cad/ViewportOverlays';
 import { CatalogEngine } from './engine/engine';
-import { STUDIOS, type StudioId } from './engine/look';
+import GemToggle from '@/components/text-to-cad/QualityToggle';
+import type { GemMode } from '@/components/text-to-cad/GemInstanceRenderer';
 import { useEngineState } from './useEngineState';
 import { entriesFromDrop, entriesFromInput, type FileEntry } from './engine/package';
-
-const LIGHT_KEY = 'c2c.light';
-const STUDIO_KEY = 'c2c.studio';
-const stored = (key: string) => { try { return localStorage.getItem(key); } catch { return null; } };
-const store = (key: string, v: string) => { try { localStorage.setItem(key, v); } catch { /* private mode: this visit only */ } };
 
 interface Props {
   onEngine: (engine: CatalogEngine | null) => void;
@@ -36,9 +32,8 @@ export default function CatalogViewer({ onEngine, onFiles, busy, locked, compact
   const [engine, setEngine] = useState<CatalogEngine | null>(null);
   const [hot, setHot] = useState(false);
   const state = useEngineState(engine);
-  // Light: brightness of the view and the pictures, 40-200 %. Reflections: the studio the metal reflects.
-  const [light, setLight] = useState(() => { const v = Number(stored(LIGHT_KEY)); return v >= 40 && v <= 200 ? v : 100; });
-  const [studio, setStudio] = useState<StudioId>(() => STUDIOS.find((s) => s.id === stored(STUDIO_KEY))?.id ?? 'photo');
+  // Stones in the view and the pictures: the refraction shader (Refract) or physical glass (Simple).
+  const [gemMode, setGemMode] = useState<GemMode>('refraction');
   const onEngineRef = useRef(onEngine);
   onEngineRef.current = onEngine;
 
@@ -57,14 +52,8 @@ export default function CatalogViewer({ onEngine, onFiles, busy, locked, compact
   }, [engine, locked]);
 
   useEffect(() => {
-    engine?.setLight(light / 100);
-    store(LIGHT_KEY, String(light));
-  }, [engine, light]);
-
-  useEffect(() => {
-    engine?.setStudio(studio).catch((e) => console.warn(e));
-    store(STUDIO_KEY, studio);
-  }, [engine, studio]);
+    engine?.setGemMode(gemMode);
+  }, [engine, gemMode]);
 
   const hasModel = state.parts.length > 0;
   return (
@@ -107,23 +96,10 @@ export default function CatalogViewer({ onEngine, onFiles, busy, locked, compact
         </div>
       )}
 
+      {/* Hidden while shooting, as the view tools: the pictures keep the mode they started with. */}
       {hasModel && !locked && (
-        <div className="absolute top-20 left-2 z-10 flex flex-col gap-2 bg-card/90 border border-border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em]">
-          <label className="flex items-center gap-2" title="Brighter or darker, in the view and the pictures">
-            Light
-            <input type="range" min={40} max={200} step={5} value={light} onChange={(e) => setLight(Number(e.target.value))} className="w-24 accent-formanova-hero-accent" aria-label="Light" />
-          </label>
-          <div className="flex items-center gap-2" title="The studio the metal reflects">
-            Reflections
-            <div className="flex" role="group" aria-label="Reflections">
-              {STUDIOS.map((s) => (
-                <button key={s.id} type="button" aria-pressed={studio === s.id} onClick={() => setStudio(s.id)}
-                  className={`px-2 py-1 border border-border -ml-px first:ml-0 ${studio === s.id ? 'bg-foreground text-background' : 'bg-card hover:bg-muted'}`}>
-                  {s.name}
-                </button>
-              ))}
-            </div>
-          </div>
+        <div className="absolute top-20 left-2 z-10">
+          <GemToggle visible mode={gemMode} onModeChange={setGemMode} />
         </div>
       )}
 
