@@ -7,7 +7,7 @@ const events = vi.hoisted(() => ({ trackDfyOffer: vi.fn() }));
 vi.mock('@/lib/posthog-events', () => events);
 
 import { DoneForYouOfferModal } from './DoneForYouOfferModal';
-import { offerChoice } from '@/lib/dfy-offer';
+import { offerState } from '@/lib/dfy-offer';
 
 function Where() {
   const loc = useLocation();
@@ -18,7 +18,7 @@ function renderModal() {
   render(
     <MemoryRouter initialEntries={['/dashboard']}>
       <Routes>
-        <Route path="/dashboard" element={<DoneForYouOfferModal userId="u1" open onClose={vi.fn()} />} />
+        <Route path="/dashboard" element={<DoneForYouOfferModal userId="u1" moment="dashboard" open onClose={vi.fn()} />} />
         <Route path="/pricing" element={<Where />} />
       </Routes>
     </MemoryRouter>,
@@ -31,29 +31,29 @@ describe('DoneForYouOfferModal', () => {
     events.trackDfyOffer.mockReset();
   });
 
-  it('says it plainly: our team makes your whole collection, get your price from Ruby', () => {
+  it('says it in a few plain words (owner, 2026-11-08): our team makes your photos; talk to our AI', () => {
     renderModal();
-    expect(screen.getByRole('heading', { name: 'Want us to make your photos for you?' })).toBeInTheDocument();
-    expect(screen.getByText(/Until now you have made your photoshoots yourself/)).toBeInTheDocument();
-    expect(screen.getByText(/Our creative team can make your whole collection for you/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Get my price' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Let our team make your photos' })).toBeInTheDocument();
+    expect(screen.getByText('You made them yourself so far. We can make all of them for you.')).toBeInTheDocument();
+    const call = screen.getByRole('button', { name: 'Talk to our AI' });
+    expect(call.className).toContain('marta-button-filled'); // the site's primary button, theme aware
     expect(screen.getByRole('button', { name: 'No thanks' })).toBeInTheDocument();
-    expect(events.trackDfyOffer).toHaveBeenCalledWith('shown');
+    expect(events.trackDfyOffer).toHaveBeenCalledWith('shown', 'dashboard');
   });
 
-  it('"Get my price" opens the Ruby call on the pricing page and remembers the choice', () => {
+  it('"Talk to our AI" opens the Ruby call on the pricing page and remembers the choice', () => {
     renderModal();
-    fireEvent.click(screen.getByRole('button', { name: 'Get my price' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Talk to our AI' }));
     expect(screen.getByTestId('where')).toHaveTextContent('/pricing?talk=ruby');
-    expect(offerChoice('u1')?.choice).toBe('talk');
-    expect(events.trackDfyOffer).toHaveBeenCalledWith('talk_clicked');
+    expect(offerState('u1').choice).toBe('talk');
+    expect(events.trackDfyOffer).toHaveBeenCalledWith('talk_clicked', 'dashboard');
   });
 
   it('"No thanks" says where to find it later, and remembers', () => {
     renderModal();
     fireEvent.click(screen.getByRole('button', { name: 'No thanks' }));
-    expect(screen.getByText('No problem. You can find this any time on the Pricing page.')).toBeInTheDocument();
-    expect(offerChoice('u1')?.choice).toBe('no');
-    expect(events.trackDfyOffer).toHaveBeenCalledWith('declined');
+    expect(screen.getByText("Okay! It's always on the Pricing page.")).toBeInTheDocument();
+    expect(offerState('u1').choice).toBe('no');
+    expect(events.trackDfyOffer).toHaveBeenCalledWith('declined', 'dashboard');
   });
 });
