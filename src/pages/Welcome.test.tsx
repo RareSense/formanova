@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import Welcome from './Welcome';
@@ -54,5 +54,24 @@ describe('Welcome hero', () => {
     expect(pricing).toHaveAttribute('href', '/pricing');
     const start = screen.getByRole('button', { name: /start creating/i });
     expect(pricing.parentElement).toBe(start.parentElement);
+  });
+});
+
+describe('Welcome CAD section (owner, 2026-11-07: the homepage must speak to CAD)', () => {
+  it('answers the "is it real NURBS?" doubt with a file the visitor can open in Rhino', () => {
+    renderPage();
+    const section = screen.getByRole('region', { name: /real nurbs/i });
+    const scoped = within(section);
+    // Proof, not just a claim: the same .3dm the CAD page serves, plus what's in it (checked with rhino3dm).
+    const download = scoped.getByRole('link', { name: /download the \.3dm/i });
+    expect(download).toHaveAttribute('href', 'https://formanova.ai/images/cad/models/formanova-chandelier-earrings.3dm');
+    expect(scoped.getByText(/the earrings above, 2\.1 MB/i)).toBeInTheDocument();
+    expect(scoped.getByText(/58 separate solids, zero meshes/i)).toBeInTheDocument();
+    expect(scoped.getByRole('img', { name: /rhino 8/i })).toHaveAttribute('loading', 'lazy');
+    // The comparison rows are the CAD page's own wording.
+    for (const row of ['NURBS surfaces and solids', 'Triangle mesh', 'One fused shell', 'STEP and STL per part', 'One STL']) {
+      expect(scoped.getByText(row)).toBeInTheDocument();
+    }
+    expect(scoped.getByRole('link', { name: /see how cad works/i })).toHaveAttribute('href', 'https://formanova.ai/ai-jewelry-cad/');
   });
 });
