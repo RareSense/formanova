@@ -15,13 +15,14 @@ function brandPromptDone(userId: string): boolean {
 }
 
 /**
- * The Done For You offer at one moment (dashboard, or after an image is made): paying users only, each moment
- * once, never over another pop-up. `ready` lets the page wait (e.g. until the new image has been on screen).
- * Once shown it stays open until closed, even though that moment now counts as used.
+ * The Done For You offer at one moment: on the dashboard every visit until they choose No thanks or Talk to our
+ * AI; after an image, once. Paying users only, never over another pop-up. `ready` lets the page wait (e.g. until the new image has been on screen).
+ * Once shown it stays open until closed, and once closed it stays closed for the rest of this visit.
  */
 export function useDfyOffer(userId: string | null | undefined, otherModalOpen: boolean, moment: OfferMoment, ready = true) {
   const [paid, setPaid] = useState(false);
   const [open, setOpen] = useState(false);
+  const [closedThisVisit, setClosedThisVisit] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -36,12 +37,18 @@ export function useDfyOffer(userId: string | null | undefined, otherModalOpen: b
   }, [userId]);
 
   useEffect(() => {
-    if (open || !ready || !userId) return;
+    if (open || closedThisVisit || !ready || !userId) return;
     if (shouldOffer({ userId, paid, moment, otherModalOpen: otherModalOpen || !brandPromptDone(userId) })) {
-      markOfferSeen(userId, moment);
+      // Owner, 2026-11-08: on the dashboard only No thanks / Talk to our AI end it; closing it (the ✕) shows it
+      // again on the next visit. After an image it is a single chance.
+      if (moment === 'after_image') markOfferSeen(userId, moment);
       setOpen(true);
     }
-  }, [open, ready, userId, paid, moment, otherModalOpen]);
+  }, [open, closedThisVisit, ready, userId, paid, moment, otherModalOpen]);
 
-  return { open, close: () => setOpen(false) };
+  const close = () => {
+    setOpen(false);
+    setClosedThisVisit(true); // not again during this visit; the next dashboard visit may show it again
+  };
+  return { open, close };
 }

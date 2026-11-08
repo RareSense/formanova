@@ -19,16 +19,33 @@ describe('useDfyOffer', () => {
     localStorage.setItem('formanova_brand_prompt_v2_u1', 'true');
   });
 
-  it('opens once for a paying user, stays open while shown, and marks that moment used', async () => {
+  it('dashboard: closing it (the ✕) shows it again on the next dashboard visit (owner, 2026-11-08)', async () => {
     tiers([BASIC]);
     const { result } = renderHook(() => useDfyOffer('u1', false, 'dashboard'));
     await waitFor(() => expect(result.current.open).toBe(true));
-    expect(offerState('u1').seen.dashboard).toBeTypeOf('number');
+    act(() => result.current.close());
+    expect(result.current.open).toBe(false);
+    const nextVisit = renderHook(() => useDfyOffer('u1', false, 'dashboard'));
+    await waitFor(() => expect(nextVisit.result.current.open).toBe(true));
+  });
+
+  it('dashboard: No thanks (or Talk to our AI) and it never shows again', async () => {
+    tiers([BASIC]);
+    saveOfferChoice('u1', 'no');
+    const nextVisit = renderHook(() => useDfyOffer('u1', false, 'dashboard'));
+    await settle();
+    expect(nextVisit.result.current.open).toBe(false);
+  });
+
+  it('after an image: shown once, stays open while shown, then that chance is used', async () => {
+    tiers([BASIC]);
+    const { result } = renderHook(() => useDfyOffer('u1', false, 'after_image'));
+    await waitFor(() => expect(result.current.open).toBe(true));
+    expect(offerState('u1').seen.after_image).toBeTypeOf('number');
     await settle();
     expect(result.current.open).toBe(true); // used, but still on screen
     act(() => result.current.close());
-    expect(result.current.open).toBe(false);
-    const again = renderHook(() => useDfyOffer('u1', false, 'dashboard'));
+    const again = renderHook(() => useDfyOffer('u1', false, 'after_image'));
     await settle();
     expect(again.result.current.open).toBe(false);
   });
@@ -73,5 +90,22 @@ describe('useDfyOffer', () => {
     await settle();
     expect(overEffort.result.current.open).toBe(false);
     expect(beforeBrand.result.current.open).toBe(false);
+  });
+});
+
+describe('useDfyOffer, same visit', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    fetchMock.authenticatedFetch.mockReset();
+    localStorage.setItem('formanova_brand_prompt_v2_u1', 'true');
+  });
+
+  it('once closed, it does not pop back up during the same dashboard visit', async () => {
+    tiers([BASIC]);
+    const { result } = renderHook(() => useDfyOffer('u1', false, 'dashboard'));
+    await waitFor(() => expect(result.current.open).toBe(true));
+    act(() => result.current.close());
+    await settle();
+    expect(result.current.open).toBe(false);
   });
 });
