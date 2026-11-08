@@ -188,6 +188,36 @@ describe('WebRTCCall', () => {
     expect(s.pc.dc.sent).toContainEqual({ type: 'session.input_audio.unmute' });
   });
 
+  // Owner, 2026-11-08: Ruby restarted her greeting ("So let me quickly introduce myself. Hey... So let me quickly
+  // introduce myself") because the nudge fired while she was already speaking but her transcript had not arrived.
+  const NUDGE = 'Start speaking now: greet the caller out loud straight away, then continue as instructed.';
+  const nudged = (s: ReturnType<typeof setup>) =>
+    s.pc.dc.sent.some((m: { type?: string; content?: string }) => m.type === 'session.instructions.append' && m.content === NUDGE);
+
+  it('no greeting nudge while Ruby is audibly speaking, even before her transcript arrives', async () => {
+    const s = setup();
+    await startLive(s, { rubyLevel: () => 0.5 });
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(nudged(s)).toBe(false);
+  });
+
+  it('no greeting nudge once Ruby was heard, even if she pauses at that moment', async () => {
+    const s = setup();
+    let level = 0.5;
+    await startLive(s, { rubyLevel: () => level });
+    await vi.advanceTimersByTimeAsync(1100);
+    level = 0;
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(nudged(s)).toBe(false);
+  });
+
+  it('a silent start still gets the greeting nudge', async () => {
+    const s = setup();
+    await startLive(s, { rubyLevel: () => 0 });
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(nudged(s)).toBe(true);
+  });
+
   it('parses transcript deltas into merged turns per speaker', async () => {
     const s = setup();
     await startLive(s);
