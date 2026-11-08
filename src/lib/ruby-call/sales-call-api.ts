@@ -46,6 +46,14 @@ export interface PastCall {
   transcript: string;
   uploads: number;
   links: number;
+  /** The payment link that call made; Ruby's backend checks it with billing before she picks up (owner, 2026-11-08). */
+  payment?: PastPayment;
+}
+
+export interface PastPayment {
+  link_id: string;
+  status: string;
+  total: string | null;
 }
 
 export interface CallUpload {

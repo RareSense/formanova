@@ -6,7 +6,7 @@ import { reachLead, reachMessage, type ReachChannel } from '@/lib/ruby-call/reac
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { CallRecorder } from '@/lib/ruby-call/call-recorder';
-import { callerContext, fetchPastCalls } from '@/lib/ruby-call/call-memory';
+import { callerContext, fetchPastCalls, openPastLink } from '@/lib/ruby-call/call-memory';
 import { createCallTools, type LastQuote, type ToolHost } from '@/lib/ruby-call/call-tools';
 import { claimsOnScreen, falseScreenClaim, SCREEN_CLAIM_GRACE_MS, SCREEN_CLAIM_NOTE } from '@/lib/ruby-call/screen-claims';
 import { linkMessage, linkRecord, uploadClientFile, uploadProblem, uploadedMessage } from '@/lib/ruby-call/client-uploads';
@@ -280,6 +280,9 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
       recorder.prepare();
       recorderRef.current = recorder;
       const pastCalls = fetchPastCalls();
+      // Owner, 2026-11-08: a link from the last call that is not paid yet is watched once this call is live,
+      // so Ruby hears the moment the caller pays it (her backend already checked it before she picked up).
+      let pastLink: string | null = null;
       notesRef.current?.stop();
       // eslint-disable-next-line prefer-const
       let call: WebRTCCall;
@@ -386,6 +389,7 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
             if (stats.liveAt === null) {
               stats.liveAt = Date.now();
               trackRubyCallConnected({ language, connect_ms: stats.liveAt - stats.startedAt });
+              if (pastLink && !paymentRef.current) host.watchPayment?.(pastLink, () => {});
             }
           }
         },
@@ -463,6 +467,7 @@ export function useRubyCall({ createCall, createRecorder }: UseRubyCallOptions =
             caller: callerContext(),
             pastCalls: await pastCalls,
           });
+          pastLink = openPastLink(await pastCalls);
           sessionRef.current = { callSessionId: session.callSessionId, workflowId: session.workflowId, startedAt: new Date().toISOString() };
           recorder.setUploader(callAudioUploader(session.workflowId, session.callSessionId));
           return session;

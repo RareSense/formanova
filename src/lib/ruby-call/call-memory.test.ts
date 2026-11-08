@@ -5,7 +5,7 @@ vi.mock('@/lib/authenticated-fetch', () => authFetch);
 const history = vi.hoisted(() => ({ getWorkflowDetails: vi.fn() }));
 vi.mock('@/lib/generation-history-api', () => history);
 
-import { callerContext, fetchPastCalls, pastCallFromRecord, transcriptFromTurns } from './call-memory';
+import { callerContext, fetchPastCalls, openPastLink, pastCallFromRecord, transcriptFromTurns } from './call-memory';
 
 const json = (body: unknown, ok = true) => Promise.resolve({ ok, status: ok ? 200 : 500, json: async () => body } as Response);
 
@@ -52,6 +52,25 @@ describe('call memory', () => {
       }),
     ).toEqual({ date: '2026-11-03T10:39Z', lead: { brand: 'B' }, transcript: 'Client: hi', uploads: 2, links: 1 });
     expect(pastCallFromRecord('d', { turns: [] })).toBeNull();
+  });
+
+  it('keeps the payment link a past call made, so Ruby can check it on the next call (owner, 2026-11-08)', () => {
+    const rec = (payment: unknown) => pastCallFromRecord('d', { turns: [{ role: 'client', text: 'bye' }], payment });
+    expect(rec({ url: 'u', total: '$285.00', simulated: false, email: 'e', linkId: 'plink_9', status: 'open' })?.payment).toEqual({
+      link_id: 'plink_9',
+      status: 'open',
+      total: '$285.00',
+    });
+    expect(rec({ url: 'u', total: '$285.00', simulated: false, email: 'e', linkId: 'plink_9', status: 'paid' })?.payment?.status).toBe('paid');
+    expect(rec({ url: 'u', total: null, simulated: true, email: 'e', linkId: null })?.payment).toBeUndefined();
+    expect(rec(null)?.payment).toBeUndefined();
+  });
+
+  it('finds the newest past link that is not paid yet', () => {
+    const call = (payment?: { link_id: string; status: string; total: string | null }) => ({ date: 'd', lead: {}, transcript: '', uploads: 0, links: 0, payment });
+    expect(openPastLink([call({ link_id: 'old', status: 'open', total: null }), call({ link_id: 'new', status: 'open', total: null })])).toBe('new');
+    expect(openPastLink([call({ link_id: 'old', status: 'open', total: null }), call({ link_id: 'new', status: 'paid', total: null })])).toBeNull();
+    expect(openPastLink([call(), call()])).toBeNull();
   });
 
   it('takes the newest three ruby_post_call runs, newest last, reading details when the list has no input', async () => {

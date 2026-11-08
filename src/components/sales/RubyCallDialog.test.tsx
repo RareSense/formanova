@@ -29,6 +29,7 @@ vi.mock('@/lib/ruby-call/post-call-save', () => save);
 const memory = vi.hoisted(() => ({
   fetchPastCalls: vi.fn(async () => [{ date: 'd', lead: {}, transcript: 'Ruby: hi', uploads: 0, links: 0 }]),
   callerContext: () => ({ timezone: 'Asia/Karachi', local_time: 'Tue 3 Nov, 15:40', browser_language: 'en-US' }),
+  openPastLink: () => null,
 }));
 vi.mock('@/lib/ruby-call/call-memory', () => memory);
 
