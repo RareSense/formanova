@@ -10,6 +10,7 @@ import { loadCad, UNIT_SCALE, type LoadInfo, type LoadOptions } from './formats'
 import { classify, collectParts, buildSets, splitByConnectivity, type Part, type PartSet, type PartGroup } from './parts';
 import { MaterialCache, PRESETS, gemFromName, type Choice } from './materials';
 import { Look, type Backdrop } from './look';
+import { gemEntryStep } from './gems';
 import type { GemMode } from '@/components/text-to-cad/GemInstanceRenderer';
 import { applyAngle, currentAngle, fitDistance, frameRect, type Angle } from './camera';
 
@@ -155,6 +156,8 @@ export class CatalogEngine {
     this.holder.position.set(-c.x, -b.min.y, -c.z);
     this.model = root;
     this.byId = new Map(parts.map((p) => [p.id, p]));
+    // Stones step into themselves as far, relative to the piece, as in text-to-CAD (see gemEntryStep).
+    this.materials.gemStep = gemEntryStep(Math.max(...b.getSize(new THREE.Vector3()).toArray()));
     for (const p of parts) this.apply(p);
     this.look.placeFor(this.sphere().radius);
     this.state = { ...this.state, fileName: file.name, parts, sets: buildSets(kinds), selected: new Set(), info };

@@ -51,6 +51,7 @@ uniform float fresnel;
 uniform float aberrationStrength;
 uniform vec3 colorFactor;
 uniform float envIntensity;
+uniform float entryStep;
 
 vec3 sampleEnv(vec3 dir){
   vec2 uv=vec2(atan(dir.z,dir.x)*0.1591549431+0.5,asin(clamp(dir.y,-1.0,1.0))*0.3183098862+0.5);
@@ -58,7 +59,7 @@ vec3 sampleEnv(vec3 dir){
 }
 vec3 totalInternalReflection(vec3 incoming,float ior_){
   vec3 rayDirection=refract(incoming,vNormal,1.0/ior_);
-  vec3 rayOrigin=vWorldPosition+rayDirection*0.001;
+  vec3 rayOrigin=vWorldPosition+rayDirection*entryStep;
   rayOrigin=(modelMatrixInverse*vec4(rayOrigin,1.0)).xyz;
   rayDirection=normalize((modelMatrixInverse*vec4(rayDirection,0.0)).xyz);
   for(float i=0.0;i<8.0;i++){
@@ -102,8 +103,14 @@ void main(){
   #include <colorspace_fragment>
 }`;
 
-/** One material per stone shape (the BVH is the shape). envMap: the raw (not PMREM) studio HDRI. */
-export function referenceGemMaterial(geometry: THREE.BufferGeometry, envMap: THREE.Texture, spec: GemSpec, name: string) {
+/**
+ * One material per stone shape (the BVH is the shape). envMap: the raw (not PMREM) studio HDRI.
+ * entryStep: how far (world units) a ray steps into the stone before tracing. Text-to-CAD scales every
+ * piece to ~2.2 units and steps 0.001; this page keeps real units (mm), where 0.001 is so short the ray
+ * hits the facet it entered through and leaves at once, so the stone shows the grey wall behind it.
+ * Pass the same step relative to the piece: 0.001 * pieceSize / 2.2 (gemEntryStep).
+ */
+export function referenceGemMaterial(geometry: THREE.BufferGeometry, envMap: THREE.Texture, spec: GemSpec, name: string, entryStep = 0.001) {
   const filter = new THREE.Color(spec.color).lerp(new THREE.Color(spec.atten ?? spec.color), spec.atten === 0xffffff ? 0 : 0.55);
   const m = new THREE.ShaderMaterial({
     name,
@@ -121,11 +128,15 @@ export function referenceGemMaterial(geometry: THREE.BufferGeometry, envMap: THR
       fresnel: { value: 0.25 },
       colorFactor: { value: filter },
       envIntensity: { value: 1.2 },
+      entryStep: { value: entryStep },
     },
   });
   m.userData.reference = true;
   return m;
 }
+
+/** Text-to-CAD's entry step (0.001 in a piece scaled to 2.2 units), for a piece of this size in world units. */
+export const gemEntryStep = (pieceSize: number) => 0.001 * Math.max(pieceSize, 1e-6) / 2.2;
 
 // FormaNova's tone curve for that viewer, installed as three's CustomToneMapping
 // exactly as CADCanvas.tsx installs it (same guard, so either can run first).
