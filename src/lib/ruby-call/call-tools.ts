@@ -64,6 +64,12 @@ export const SAY_WITH_LINK =
   'Then we need their photos and a short brief (which pieces, the look, sizes, background). They can do that right now on this call, ' +
   "or, if they pay later, just come back to this page and give her a call again: she'll remember their order and they'll do the photos and brief together.";
 
+/** Owner, 2026-11-08: said the first time they send photos, so curation is never a surprise. */
+export const SAY_ON_DATA =
+  'Tell Ruby to say this now, in her own words, short: "Are your photos already sorted, with one folder per product, named by product, and only your best sharp, well-lit photos? ' +
+  "If they need curation, just let us know: that is a separate cost, because people on our team look through your files, pick the best images and sort them before they go to the AI. " +
+  'Or you can sort them yourself for free, whichever you prefer. Either way, if our team needs anything, they will contact you."';
+
 /** Said before the goodbye while the link is unpaid. */
 export const SAY_BEFORE_GOODBYE =
   'Not ended yet: their payment link is not paid. First tell Ruby to say, in two short sentences: whenever they are ready, pay with the link on their screen; ' +
@@ -186,6 +192,13 @@ export function createCallTools(host: ToolHost, api: ToolApi = DEFAULT_API): Too
   // The real link still open on this call, so a changed order cancels it before a new one is made.
   let openLink: { linkId: string; deal: string } | null = null;
   let unpaidLink = false;
+  let curationSaid = false;
+  // The first time they send their photos, Ruby makes curation clear (owner, 2026-11-08).
+  const curationOnce = () => {
+    if (curationSaid) return { shown: true };
+    curationSaid = true;
+    return { shown: true, say_next: SAY_ON_DATA };
+  };
   let nextStepsSaid = false;
   let quotesShown = 0;
   const tools: Record<string, (args: Record<string, unknown>) => Promise<ToolOutput> | ToolOutput> = {
@@ -244,11 +257,11 @@ export function createCallTools(host: ToolHost, api: ToolApi = DEFAULT_API): Too
     request_upload: (args) => {
       const purpose = PURPOSES.includes(args.purpose as UploadPurpose) ? (args.purpose as UploadPurpose) : 'other';
       host.showPanel({ kind: 'upload', title: title(args.title, PURPOSE_TITLES[purpose]), purpose, note: note(args.note) });
-      return { shown: true };
+      return purpose === 'jewelry_photos' ? curationOnce() : { shown: true };
     },
     request_link: (args) => {
       host.showPanel({ kind: 'link', title: title(args.title, 'Share a link'), note: note(args.note) });
-      return { shown: true };
+      return curationOnce();
     },
     request_brief: async (args) =>
       (await host.showPanel({ kind: 'brief', title: title(args.title, 'Your brief'), note: note(args.note) }))

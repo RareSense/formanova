@@ -22,8 +22,6 @@ vi.mock('@/lib/authenticated-fetch', () => ({
     json: async () => [{ tier_id: 'tier_5e6c6184', name: 'Basic', type: 'subscription', credits: 100 }],
   })),
 }));
-const visible = vi.hoisted(() => ({ value: true }));
-vi.mock('@/hooks/use-done-for-you-visible', () => ({ useDoneForYouVisible: () => visible.value }));
 vi.mock('@/components/pricing/DoneForYouCard', () => ({
   DoneForYouCard: () => <div>Done For You card</div>,
 }));
@@ -41,7 +39,7 @@ function renderPage(page: JSX.Element, state?: unknown) {
 
 describe('Done For You card on the plan pages', () => {
   beforeEach(() => {
-    visible.value = true;
+    vi.stubEnv('VITE_RUBY_CALL_ALLOWLIST_EMAILS', ''); // no allowlist: shown to everyone (owner, 2026-11-08)
     credits.value = 10;
   });
 
@@ -70,10 +68,8 @@ describe('Done For You card on the plan pages', () => {
     expect(screen.queryByText('Done For You card')).not.toBeInTheDocument();
   });
 
-  it('is not shown for users outside the allowlist', async () => {
-    visible.value = false;
+  it('there is no allowlist: an empty one still shows it', async () => {
     renderPage(<Credits />);
-    await screen.findAllByText(/basic/i);
-    expect(screen.queryByText('Done For You card')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('Done For You card')).toBeInTheDocument());
   });
 });

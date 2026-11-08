@@ -31,24 +31,14 @@ describe('CAD rollout allowlists', () => {
   });
 });
 
-describe('Ruby call (Done For You) rollout', () => {
+describe('allowlist gates', () => {
   afterEach(() => vi.unstubAllEnvs());
 
-  it('"*" opens Ruby to every signed-in user, and keeps the card configured for visitors', async () => {
-    vi.stubEnv('VITE_RUBY_CALL_ALLOWLIST_EMAILS', '*');
-    const { isRubyCallEnabled, isRubyCallConfigured } = await import('./feature-flags');
-    expect(isRubyCallEnabled('anyone@brand.com')).toBe(true);
-    expect(isRubyCallEnabled('Never.Paid@Shop.co')).toBe(true);
-    expect(isRubyCallEnabled(null)).toBe(false);
-    expect(isRubyCallConfigured()).toBe(true);
-  });
-
-  it('without "*" only listed emails get Ruby, and "*" never leaks into other gates', async () => {
-    vi.stubEnv('VITE_RUBY_CALL_ALLOWLIST_EMAILS', 'uswa@raresense.so');
+  // Owner, 2026-11-08: Done For You and Ruby have no allowlist; "*" means nothing to the gates that remain.
+  it('"*" never opens a gate', async () => {
     vi.stubEnv('VITE_CAD_UPLOAD_ALLOWLIST_EMAILS', '*');
-    const { isRubyCallEnabled, isCadUploadEnabled } = await import('./feature-flags');
-    expect(isRubyCallEnabled('uswa@raresense.so')).toBe(true);
-    expect(isRubyCallEnabled('other@brand.com')).toBe(false);
-    expect(isCadUploadEnabled('other@brand.com')).toBe(false);
+    const flags = await import('./feature-flags');
+    expect(flags.isCadUploadEnabled('other@brand.com')).toBe(false);
+    expect('isRubyCallEnabled' in flags).toBe(false);
   });
 });
