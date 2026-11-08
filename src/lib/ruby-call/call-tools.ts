@@ -58,6 +58,18 @@ export interface ToolHost {
   accountEmail?(): string | null;
 }
 
+/** Owner, 2026-11-08: the whole plan, said when the link is on screen, before they pay. */
+export const SAY_WITH_LINK =
+  "Tell Ruby to say this now, in her own words, all of it: the link is on their screen and they can pay now or later; paying starts their project. " +
+  'Then we need their photos and a short brief (which pieces, the look, sizes, background). They can do that right now on this call, ' +
+  "or, if they pay later, just come back to this page and give her a call again: she'll remember their order and they'll do the photos and brief together.";
+
+/** Said before the goodbye while the link is unpaid. */
+export const SAY_BEFORE_GOODBYE =
+  'Not ended yet: their payment link is not paid. First tell Ruby to say, in two short sentences: whenever they are ready, pay with the link on their screen; ' +
+  "then just come back to this page and give her a call again, and they'll do the photos and brief together (anything already uploaded stays with their order). " +
+  'Then her goodbye, then call end_call again.';
+
 export interface ToolApi {
   runQuote(req: QuoteRequest): Promise<Record<string, unknown>>;
   runNegotiate(args: Record<string, unknown>): Promise<Record<string, unknown>>;
@@ -173,6 +185,8 @@ function modelView(result: Record<string, unknown>): ToolOutput {
 export function createCallTools(host: ToolHost, api: ToolApi = DEFAULT_API): ToolRunner {
   // The real link still open on this call, so a changed order cancels it before a new one is made.
   let openLink: { linkId: string; deal: string } | null = null;
+  let unpaidLink = false;
+  let nextStepsSaid = false;
   let quotesShown = 0;
   const tools: Record<string, (args: Record<string, unknown>) => Promise<ToolOutput> | ToolOutput> = {
     show_on_screen: async (args) => {
@@ -278,6 +292,11 @@ export function createCallTools(host: ToolHost, api: ToolApi = DEFAULT_API): Too
       return { shown: true };
     },
     end_call: () => {
+      // Owner, 2026-11-08: a caller left with an unpaid link and no idea what came next. Held once, so Ruby says it.
+      if (unpaidLink && !nextStepsSaid) {
+        nextStepsSaid = true;
+        return { ending: false, say_first: SAY_BEFORE_GOODBYE };
+      }
       host.endAfterGoodbye();
       return { ending: true };
     },
@@ -334,6 +353,7 @@ export function createCallTools(host: ToolHost, api: ToolApi = DEFAULT_API): Too
         const payment = { url, total, totalCents, simulated, email, installments, linkId: first.linkId ?? null };
         host.showPanel(panel);
         host.setPayment(payment);
+        unpaidLink = true;
         trackRubyPaymentLinkCreated({
           total_cents: totalCents,
           first_payment_cents: plan[0].amountCents,
@@ -345,12 +365,13 @@ export function createCallTools(host: ToolHost, api: ToolApi = DEFAULT_API): Too
           openLink = { linkId, deal: dealKey };
           host.watchPayment?.(linkId, (paidAt) => {
             if (openLink?.linkId === linkId) openLink = null;
+            unpaidLink = false;
             void host.showPanel({ ...panel, paid: true });
             host.setPayment({ ...payment, status: 'paid', paidAt });
           });
         }
         host.updateLead({ email, payment_link: url, payment_total: total });
-        return { url, total, totalCents, simulated, installments };
+        return { url, total, totalCents, simulated, installments, say_next: SAY_WITH_LINK };
       } catch (e) {
         return { error: errorText(e, 'The payment link could not be made right now.') };
       }

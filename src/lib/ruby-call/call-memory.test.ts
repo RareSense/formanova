@@ -66,6 +66,14 @@ describe('call memory', () => {
     expect(rec(null)?.payment).toBeUndefined();
   });
 
+  it('asks history for Ruby calls only, so a busy account never times out the memory (owner, 2026-11-08)', async () => {
+    authFetch.authenticatedFetch.mockImplementation(() => json([]));
+    await fetchPastCalls();
+    const url = String(authFetch.authenticatedFetch.mock.calls[0][0]);
+    expect(url).toContain('workflow_name=ruby_post_call');
+    expect(Number(new URL(url, 'http://x').searchParams.get('limit'))).toBeLessThanOrEqual(10);
+  });
+
   it('finds the newest past link that is not paid yet', () => {
     const call = (payment?: { link_id: string; status: string; total: string | null }) => ({ date: 'd', lead: {}, transcript: '', uploads: 0, links: 0, payment });
     expect(openPastLink([call({ link_id: 'old', status: 'open', total: null }), call({ link_id: 'new', status: 'open', total: null })])).toBe('new');
