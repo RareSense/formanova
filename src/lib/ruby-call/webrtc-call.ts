@@ -176,6 +176,8 @@ export class WebRTCCall {
   private clientName: string | null = null;
   private lastHeard = 0;
   private lastRubyOut = 0;
+  /** Ruby's voice was heard (audio level), which can come seconds before her first transcript. */
+  private rubyHeard = false;
   /** Set by the caller's words (while Ruby is quiet), cleared by Ruby's first words back. */
   private waitingSince: number | null = null;
   private waitLookup = false;
@@ -378,7 +380,8 @@ export class WebRTCCall {
         }
         this.later(() => this.openMic(), MIC_OPEN_FALLBACK_MS);
         this.later(() => {
-          if (!this.turns.length) {
+          // Owner, 2026-11-08: only when she is really silent; a late transcript made her restart her greeting.
+          if (!this.turns.length && !this.rubyHeard && this.rubyLevel() <= SPEAKING_LEVEL) {
             this.send({
               type: 'session.instructions.append',
               delegation_id: null,
@@ -437,6 +440,7 @@ export class WebRTCCall {
   }
 
   private watch() {
+    if (this.rubyLevel() > SPEAKING_LEVEL) this.rubyHeard = true;
     this.runner.tick();
     if (this.state !== 'live' || this.finishing || this.ending || this.muted) {
       this.heard();
