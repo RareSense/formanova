@@ -2,7 +2,9 @@
 // "Talk to our AI" opens the Ruby call on /pricing (?talk=ruby), so the dashboard needs no call window of its own.
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Phone } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { trackDfyOffer } from '@/lib/posthog-events';
 import { saveOfferChoice, type OfferMoment } from '@/lib/dfy-offer';
 
@@ -52,21 +54,23 @@ export function DoneForYouOfferModal({ userId, moment, open, onClose }: Props) {
             <DialogDescription className="text-base text-foreground">
               Okay! It's always on the Pricing page.
             </DialogDescription>
-            <button type="button" onClick={onClose} className="marta-button-filled mt-6 w-full">
+            <Button onClick={onClose} className="mt-6 w-full">
               Close
-            </button>
+            </Button>
           </>
         ) : (
           <>
             <DialogTitle asChild>
-              <h2 className="font-display text-3xl leading-tight">Let our team make your photos</h2>
+              <h2 className="font-display text-3xl leading-tight tracking-wide sm:text-4xl">Let FormaNova creatives make your photos</h2>
             </DialogTitle>
-            <DialogDescription className="mt-4 text-lg leading-relaxed text-muted-foreground">
-              You made them yourself so far. We can make all of them for you.
+            <DialogDescription className="mt-3 text-base text-muted-foreground">
+              You made them one by one. We can make them all at once.
             </DialogDescription>
-            <button type="button" onClick={talk} className="marta-button-filled mt-8 w-full py-4 text-lg">
+            {/* The site's own primary button (theme aware), with the call icon the Done For You card uses. */}
+            <Button onClick={talk} size="lg" className="mt-8 w-full">
+              <Phone className="mr-2 h-4 w-4" aria-hidden="true" />
               Talk to our AI
-            </button>
+            </Button>
             <button type="button" onClick={noThanks} className="mt-4 text-sm text-muted-foreground underline">
               No thanks
             </button>
