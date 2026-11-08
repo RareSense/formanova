@@ -1,9 +1,10 @@
+import { useCadGenerateWorkflow } from "@/hooks/useCadGenerateWorkflow";
 import { useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { useEstimatedCost } from "@/hooks/use-estimated-cost";
-import { RING_CAD_NURBS_WORKFLOW, cadJewelryNoun, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
+import { cadJewelryNoun, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
 import CadJewelryTypeCards from "@/components/text-to-cad/CadJewelryTypeCards";
 import { useJewelryTypeGate } from "@/components/text-to-cad/useJewelryTypeGate";
 import { CAD_EXAMPLE_PROMPTS } from "./cad-examples";
@@ -29,8 +30,9 @@ export default function InitialPromptScreen({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const noun = jewelryType ? cadJewelryNoun(jewelryType) : "jewelry";
   const { cardsRef, guardedGenerate, typeError } = useJewelryTypeGate(jewelryType, onGenerate);
+  const cadWorkflowName = useCadGenerateWorkflow();
   const { cost: estimatedCost, loading: costLoading } = useEstimatedCost({
-    workflowName: RING_CAD_NURBS_WORKFLOW,
+    workflowName: cadWorkflowName,
     model,
     pricingContext: { llm_tier: tier },
   });

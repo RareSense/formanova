@@ -130,6 +130,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** The auth state, or undefined outside an AuthProvider (for hooks that must not throw in isolation). */
+export function useOptionalAuth() {
+  return useContext(AuthContext);
+}
+
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {

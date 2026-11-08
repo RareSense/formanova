@@ -1,3 +1,4 @@
+import { useCadGenerateWorkflow } from "@/hooks/useCadGenerateWorkflow";
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { Helmet } from "react-helmet-async";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -41,7 +42,7 @@ import {
 import GemToggle from "@/components/text-to-cad/QualityToggle";
 import { runMicroBenchmark } from "@/lib/gpu-detect";
 import type { GemMode } from "@/components/text-to-cad/CADCanvas";
-import { RING_CAD_DEFAULT_TIER, RING_CAD_NURBS_WORKFLOW, RING_CAD_TIERS, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
+import { RING_CAD_DEFAULT_TIER, RING_CAD_TIERS, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
 import { recordStudioVisit } from '@/lib/studio-preference';
 import { useCadRestoreFromUrl } from "@/hooks/useCadRestoreFromUrl";
 import { useCadMetal } from "@/hooks/useCadMetal";
@@ -128,8 +129,9 @@ export default function TextToCAD({ variant = "idea" }: { variant?: DesignStartV
   const { referenceImages, replaceReferenceImages } = useReferenceImages();
   /** How the design was started (describe, draw, inspiration): names step 1 of the step bar. */
   const [startMode, setStartMode] = useState<StartMode>(variant === "inspiration" ? "mix" : "describe");
+  const cadWorkflowName = useCadGenerateWorkflow();
   const { cost: cadCost, loading: cadCostLoading } = useEstimatedCost({
-    workflowName: RING_CAD_NURBS_WORKFLOW,
+    workflowName: cadWorkflowName,
     model,
     pricingContext: { llm_tier: activeTier },
   });

@@ -2,9 +2,9 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useGenerations } from "@/contexts/GenerationsContext";
 import { toast } from "sonner";
 import { useCreditPreflight } from "@/hooks/use-credit-preflight";
+import { useCadGenerateWorkflow } from "@/hooks/useCadGenerateWorkflow";
 import { AuthExpiredError, authenticatedFetch } from "@/lib/authenticated-fetch";
 import {
-  RING_CAD_NURBS_WORKFLOW,
   RING_CAD_DEFAULT_TIER,
   DEFAULT_CAD_JEWELRY_TYPE,
   RING_CAD_POLL_TIMEOUT_MS,
@@ -95,6 +95,8 @@ export function useImageToCADWorkflow({
   onWorkspaceActivate,
 }: WorkflowParams) {
   const { generations, trackCadGeneration } = useGenerations();
+  // jewelry_cad_agent for allowlisted users, jewelry_cad_generate for everyone else.
+  const cadWorkflowName = useCadGenerateWorkflow();
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [hasModel, setHasModel] = useState(false);
@@ -627,7 +629,7 @@ export function useImageToCADWorkflow({
     // start call below is the authority and rejects with 402.
     let approved: boolean;
     try {
-      approved = (import.meta.env.VITE_DEMO_NO_AUTH === 'true' && import.meta.env.VITE_DEMO_GLB_URL) ? true : await checkCredits(RING_CAD_NURBS_WORKFLOW, 1, {
+      approved = (import.meta.env.VITE_DEMO_NO_AUTH === 'true' && import.meta.env.VITE_DEMO_GLB_URL) ? true : await checkCredits(cadWorkflowName, 1, {
         pricingContext: { llm_tier: tier },
       });
     } catch (err) {
@@ -709,7 +711,7 @@ export function useImageToCADWorkflow({
 
       // JWT only - the tenant API key and on-behalf-of header are applied by the
       // backend proxy and must never be sent from the browser (AI_RULES section 1).
-      const startRes = await authenticatedFetch(`/api/run/state/${RING_CAD_NURBS_WORKFLOW}`, {
+      const startRes = await authenticatedFetch(`/api/run/state/${cadWorkflowName}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody),
@@ -784,7 +786,7 @@ export function useImageToCADWorkflow({
       setGenerationFailed(true);
     }
     return true;
-  }, [prompt, referenceImages, tier, jewelryType, material, weightTarget, cadRoute, cadSource, isGenerating, onWorkspaceActivate, trackCadGeneration, checkCredits]);
+  }, [prompt, referenceImages, tier, jewelryType, material, weightTarget, cadRoute, cadSource, isGenerating, onWorkspaceActivate, trackCadGeneration, checkCredits, cadWorkflowName]);
 
   /**
    * One press, one run. isGenerating only turns true after the credit check

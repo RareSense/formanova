@@ -21,6 +21,8 @@ vi.mock('@/lib/posthog-events', () => ({
   trackCadImproveRequested: vi.fn(),
   trackCadResultRestored: vi.fn(),
 }));
+const cadWorkflow = vi.hoisted(() => ({ name: 'jewelry_cad_generate' }));
+vi.mock('@/hooks/useCadGenerateWorkflow', () => ({ useCadGenerateWorkflow: () => cadWorkflow.name }));
 const toastError = vi.hoisted(() => vi.fn());
 vi.mock('sonner', () => ({ toast: { error: toastError, success: vi.fn(), info: vi.fn() } }));
 
@@ -427,5 +429,25 @@ describe('useImageToCADWorkflow metal weight', () => {
       await result.current.restoreCompletedWorkflow('state-old', '/v1.glb', { ring, selectedVersionId: 'v1' });
     });
     expect(result.current.metalWeight.source.available).toBe(false);
+  });
+});
+
+describe('useImageToCADWorkflow workflow choice', () => {
+  beforeEach(() => {
+    checkCredits.mockReset().mockResolvedValue(true);
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({ workflow_id: 'state-1' }) } as Response);
+  });
+
+  it('checks credits for and starts the workflow chosen for this user (the CAD agent when allowlisted)', async () => {
+    cadWorkflow.name = 'jewelry_cad_agent';
+    try {
+      const { result } = renderWorkflow();
+      await act(async () => { await result.current.simulateGeneration(); });
+      expect(checkCredits.mock.calls[0][0]).toBe('jewelry_cad_agent');
+      expect(startCalls().map(([url]) => url)).toEqual(['/api/run/state/jewelry_cad_agent']);
+    } finally {
+      cadWorkflow.name = 'jewelry_cad_generate';
+    }
   });
 });

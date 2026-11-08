@@ -497,6 +497,7 @@ describe('jewelry CAD workflows in history', () => {
     const { isRingCadWorkflow } = await import('./generation-history-api');
     expect(isRingCadWorkflow('jewelry_cad_generate')).toBe(true);
     expect(isRingCadWorkflow('jewelry_cad_improve')).toBe(true);
+    expect(isRingCadWorkflow('jewelry_cad_agent')).toBe(true);
     expect(isRingCadWorkflow('jewelry_photoshoot')).toBe(false);
   });
 });

@@ -1,9 +1,10 @@
+import { useCadGenerateWorkflow } from "@/hooks/useCadGenerateWorkflow";
 import { useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { RotateCcw, X, Maximize2 } from "lucide-react";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { useEstimatedCost } from "@/hooks/use-estimated-cost";
-import { RING_CAD_NURBS_WORKFLOW, MAX_RING_CAD_REFERENCE_IMAGES } from "@/lib/ring-cad-nurbs-api";
+import { MAX_RING_CAD_REFERENCE_IMAGES } from "@/lib/ring-cad-nurbs-api";
 import VersionsPanel, { type VersionCard } from '@/components/text-to-cad/VersionsPanel';
 import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
 
@@ -85,7 +86,8 @@ export default function LeftPanel({
   onSelectVersion,
   versionSpec,
 }: LeftPanelProps) {
-  const { cost: generationCost, loading: generationCostLoading } = useEstimatedCost({ workflowName: RING_CAD_NURBS_WORKFLOW, model });
+  const cadWorkflowName = useCadGenerateWorkflow();
+  const { cost: generationCost, loading: generationCostLoading } = useEstimatedCost({ workflowName: cadWorkflowName, model });
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   const primaryPreviewUrl = referenceImagePreviewUrls[0] ?? null;

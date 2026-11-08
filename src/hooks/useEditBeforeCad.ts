@@ -10,9 +10,9 @@
  *   approved pictures are in place, so credits, progress and the result are
  *   exactly the existing flow.
  */
+import { useCadGenerateWorkflow } from '@/hooks/useCadGenerateWorkflow';
 import { useCallback, useEffect, useState } from 'react';
 import { useEstimatedCost } from '@/hooks/use-estimated-cost';
-import { RING_CAD_NURBS_WORKFLOW } from '@/lib/ring-cad-nurbs-api';
 import type { DesignUse } from '@/components/text-to-cad/DesignUseChoice';
 
 interface UseEditBeforeCadOptions {
@@ -31,8 +31,9 @@ export function useEditBeforeCad({ model, tier, referenceImages, replaceReferenc
   const [editApproved, setEditApproved] = useState(false);
   const [pendingCad, setPendingCad] = useState(false);
 
+  const cadWorkflowName = useCadGenerateWorkflow();
   const { cost: cadCost, loading: cadCostLoading } = useEstimatedCost({
-    workflowName: RING_CAD_NURBS_WORKFLOW,
+    workflowName: cadWorkflowName,
     model,
     pricingContext: { llm_tier: tier },
   });

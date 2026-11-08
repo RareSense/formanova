@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   buildRingCadStartBody,
   CAD_JEWELRY_TYPES,
@@ -530,5 +530,18 @@ describe('jewelry_cad_generate', () => {
     expect(
       buildRingCadStartBody({ referenceImages: [], userDescription: 'pendant', jewelryType: 'necklace' }).payload.jewelry_type,
     ).toBe('necklace');
+  });
+});
+
+describe('jewelry_cad_agent rollout', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('allowlisted users start the CAD agent, everyone else the generate workflow', async () => {
+    vi.stubEnv('VITE_CAD_AGENT_ALLOWLIST_EMAILS', 'owner@example.com');
+    const { cadGenerateWorkflowFor, CAD_AGENT_WORKFLOW, RING_CAD_WORKFLOW } = await import('./ring-cad-nurbs-api');
+    expect(CAD_AGENT_WORKFLOW).toBe('jewelry_cad_agent');
+    expect(cadGenerateWorkflowFor('Owner@example.com')).toBe(CAD_AGENT_WORKFLOW);
+    expect(cadGenerateWorkflowFor('someone@example.com')).toBe(RING_CAD_WORKFLOW);
+    expect(cadGenerateWorkflowFor(null)).toBe(RING_CAD_WORKFLOW);
   });
 });

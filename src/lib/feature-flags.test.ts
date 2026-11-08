@@ -42,3 +42,20 @@ describe('allowlist gates', () => {
     expect('isRubyCallEnabled' in flags).toBe(false);
   });
 });
+
+describe('CAD agent allowlist', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('opens only for listed emails, case-insensitive', async () => {
+    vi.stubEnv('VITE_CAD_AGENT_ALLOWLIST_EMAILS', 'owner@example.com');
+    const { isCadAgentEnabled } = await import('./feature-flags');
+    expect(isCadAgentEnabled(' OWNER@example.com ')).toBe(true);
+    expect(isCadAgentEnabled('other@example.com')).toBe(false);
+    expect(isCadAgentEnabled(null)).toBe(false);
+  });
+
+  it('is closed when the variable is unset', async () => {
+    const { isCadAgentEnabled } = await import('./feature-flags');
+    expect(isCadAgentEnabled('owner@example.com')).toBe(false);
+  });
+});

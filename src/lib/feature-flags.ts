@@ -32,6 +32,14 @@ export function isWeightStlEnabled(email: string | undefined | null): boolean {
 }
 
 /**
+ * Users whose CAD runs start jewelry_cad_agent (the automatic CAD agent) instead of jewelry_cad_generate.
+ * Staging only for now: leave VITE_CAD_AGENT_ALLOWLIST_EMAILS empty in production.
+ */
+export function isCadAgentEnabled(email: string | undefined | null): boolean {
+  return isAllowlistedEmail(email, 'VITE_CAD_AGENT_ALLOWLIST_EMAILS');
+}
+
+/**
  * Alternate two-column upload layout — enabled for all users.
  */
 /**

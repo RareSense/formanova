@@ -1,3 +1,4 @@
+import { isCadAgentEnabled } from '@/lib/feature-flags';
 import { azureUriToUrl } from '@/lib/azure-utils';
 import type { CadReferenceItem } from '@/lib/microservices-api';
 import { METAL_ALLOYS, materialPayload, type MetalAlloy } from '@/lib/metal-weight/alloys';
@@ -110,6 +111,17 @@ export const RING_CAD_WORKFLOW = 'jewelry_cad_generate';
  * it; the type is saved on the model and decides which Improve runs later.
  */
 export type JewelryType = 'ring' | 'necklace' | 'bracelet' | 'earring' | 'other';
+
+/**
+ * The automatic CAD agent: plans, builds, checks and repairs by itself, and delivers with no admin step.
+ * Same start payload and the same result keys as jewelry_cad_generate. Only allowlisted users start it.
+ */
+export const CAD_AGENT_WORKFLOW = 'jewelry_cad_agent';
+
+/** The generate workflow this user's new CAD runs start: the agent when allowlisted, otherwise RING_CAD_WORKFLOW. */
+export function cadGenerateWorkflowFor(email: string | undefined | null): string {
+  return isCadAgentEnabled(email) ? CAD_AGENT_WORKFLOW : RING_CAD_WORKFLOW;
+}
 
 /** @deprecated Use RING_CAD_WORKFLOW; kept so existing imports keep working. */
 export const RING_CAD_NURBS_WORKFLOW = RING_CAD_WORKFLOW;

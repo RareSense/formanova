@@ -337,6 +337,12 @@ export const FIXTURES: Record<string, () => AdminGenerationDetail> = {
     const { cad_improve: _lineage, ...payload } = run.input_payload as Record<string, unknown>;
     return { ...run, input_payload: payload };
   },
+  // jewelry_cad_agent takes the same start payload and returns the same result keys as jewelry_cad_generate.
+  jewelry_cad_agent: () => {
+    const run = renamed(cadImproveRun(), 'jewelry_cad_agent');
+    const { cad_improve: _lineage, ...payload } = run.input_payload as Record<string, unknown>;
+    return { ...run, input_payload: payload };
+  },
   jewelry_cad_improve: cadImproveRun,
   ring_cad_improve: () => renamed(cadImproveRun(), 'ring_cad_improve'),
   ring_cad_nurbs_v1: () => renamed(cadImproveRun(), 'ring_cad_nurbs_v1'),

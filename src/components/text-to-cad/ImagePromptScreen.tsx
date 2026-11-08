@@ -1,9 +1,10 @@
+import { useCadGenerateWorkflow } from "@/hooks/useCadGenerateWorkflow";
 import { useEffect, useRef, useCallback, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import creditCoinIcon from "@/assets/icons/credit-coin.png";
 import { useEstimatedCost } from "@/hooks/use-estimated-cost";
-import { RING_CAD_NURBS_WORKFLOW, cadJewelryNoun, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
+import { cadJewelryNoun, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
 import CadJewelryTypeCards from "@/components/text-to-cad/CadJewelryTypeCards";
 import { useJewelryTypeGate } from "@/components/text-to-cad/useJewelryTypeGate";
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
@@ -108,8 +109,9 @@ export default function ImagePromptScreen({
 
   // ring_cad_nurbs_v1 handles every input mode (text-only, one image, 2-5
   // images) — the workflow name never changes, only the payload shape does.
+  const cadWorkflowName = useCadGenerateWorkflow();
   const { cost: estimatedCost, loading: costLoading } = useEstimatedCost({
-    workflowName: RING_CAD_NURBS_WORKFLOW,
+    workflowName: cadWorkflowName,
     model,
     pricingContext: { llm_tier: tier },
   });

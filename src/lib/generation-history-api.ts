@@ -384,7 +384,8 @@ export function isRingCadWorkflow(name: string): boolean {
     lower.includes('ring_cad_generate') ||
     lower.includes('ring_cad_improve') ||
     lower.includes('jewelry_cad_generate') ||
-    lower.includes('jewelry_cad_improve')
+    lower.includes('jewelry_cad_improve') ||
+    lower.includes('jewelry_cad_agent')
   );
 }
 
