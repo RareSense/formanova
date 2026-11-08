@@ -241,6 +241,19 @@ describe('call tools', () => {
     expect(shown[4].title).toBe('Share a link');
   });
 
+  it('the first photo upload or folder link of a call carries the curation lines, once (owner, 2026-11-08)', async () => {
+    const run = createCallTools(makeHost(), makeApi());
+    const first = (await run('request_upload', { purpose: 'jewelry_photos' })) as { say_next?: string };
+    for (const must of ['already sorted', 'one folder per product', 'separate cost', 'pick the best', 'yourself', 'free', 'contact you'])
+      expect(first.say_next).toContain(must);
+    expect(await run('request_link', {})).toEqual({ shown: true });
+    expect(await run('request_upload', { purpose: 'jewelry_photos' })).toEqual({ shown: true });
+    const linkFirst = createCallTools(makeHost(), makeApi());
+    expect(((await linkFirst('request_link', {})) as { say_next?: string }).say_next).toContain('separate cost');
+    const refsOnly = createCallTools(makeHost(), makeApi());
+    expect(await refsOnly('request_upload', { purpose: 'references' })).toEqual({ shown: true });
+  });
+
   it('request_upload, request_link and contact_team show their cards', async () => {
     const host = makeHost();
     const run = createCallTools(host, makeApi());

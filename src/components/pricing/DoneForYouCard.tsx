@@ -5,8 +5,6 @@ import { Button } from '@/components/ui/button';
 import { CardKicker } from '@/components/pricing/CardKicker';
 import { trackRubyCtaClicked } from '@/lib/posthog-events';
 import { useAuth } from '@/contexts/AuthContext';
-import { isRubyCallEnabled } from '@/lib/feature-flags';
-import { useDoneForYouVisible } from '@/hooks/use-done-for-you-visible';
 
 const TALK_RETURN_PATH = '/pricing?talk=ruby';
 
@@ -30,22 +28,18 @@ export function DoneForYouCard({ onOpenCall }: DoneForYouCardProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const visible = useDoneForYouVisible();
-  const enabled = isRubyCallEnabled(user?.email);
   const autoOpened = useRef(false);
 
   // Returning from login with ?talk=ruby: open the call window once.
   useEffect(() => {
-    if (!enabled || !user || autoOpened.current) return;
+    if (!user || autoOpened.current) return;
     if (searchParams.get('talk') !== 'ruby') return;
     autoOpened.current = true;
     onOpenCall();
     const next = new URLSearchParams(searchParams);
     next.delete('talk');
     setSearchParams(next, { replace: true });
-  }, [enabled, user, searchParams, setSearchParams, onOpenCall]);
-
-  if (!visible) return null;
+  }, [user, searchParams, setSearchParams, onOpenCall]);
 
   const handleClick = () => {
     trackRubyCtaClicked({ signed_in: !!user });
