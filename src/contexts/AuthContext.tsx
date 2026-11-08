@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { analytics } from '@heycatch/sdk';
 
 import {
   trackLogin,
@@ -40,6 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(u);
       if (u) {
         identifyUser(u.id, { email: u.email, name: u.full_name });
+        analytics.setIdentity(u.id, { email: u.email, name: u.full_name });
         trackLogin('google', u.email);
       }
     };
@@ -69,6 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser(currentUser);
             // Identify returning users so PostHog links them to their email
             identifyUser(currentUser.id, { email: currentUser.email, name: currentUser.full_name });
+            analytics.setIdentity(currentUser.id, { email: currentUser.email, name: currentUser.full_name });
           } else {
             // Keep existing local session; token-only auth is handled by guards + API 401s.
             const cachedUser = getStoredUser();
@@ -104,6 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     trackLogout();
+    analytics.resetIdentity();
     await authApi.logout();
     setUser(null);
   };

@@ -6,6 +6,15 @@ import PostHogErrorBoundary from "./components/PostHogErrorBoundary";
 import { getStoredUser } from "./lib/auth-api";
 import { getHostRedirectDecision } from "./lib/host-redirect-policy";
 import posthog from 'posthog-js';
+import { analytics } from '@heycatch/sdk';
+
+// HeyCatch analytics. Called at module scope in the entry file, so every page and the
+// short links (/a-/z, /0-/9) are covered. The key is publishable. Identity is set in
+// AuthContext. Setup guide: https://heycatch.ai/agents.md
+analytics.init({
+  projectKey: 'hck_pk_Q-WHio9VKg259Dyk3y7MTusq00DEXmQw',
+  install: { framework: 'vite-react', agent: 'claude-code' },
+});
 
 // requestIdleCallback / cancelIdleCallback polyfill for Safari
 if (typeof window !== 'undefined' && !('requestIdleCallback' in window)) {
