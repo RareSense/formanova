@@ -25,12 +25,26 @@ import heroEmeraldEarrings from '@/assets/jewelry/hero-emerald-earrings.webp';
 import heroGemstoneRings from '@/assets/jewelry/hero-gemstone-rings.webp';
 import heroAquamarineRings from '@/assets/jewelry/hero-aquamarine-rings.webp';
 import heroDiamondBracelets from '@/assets/jewelry/hero-diamond-bracelets.webp';
+import rhinoEarrings from '@/assets/home/rhino-chandelier-earrings.webp';
 
 // Partnerships shown in the footer. Each links to its press release on the
 // public (Astro) site, the same way the footer's About link does.
 const PARTNERS = [
   { name: "Women's Jewelry Association", detail: 'New York · May 2026', href: 'https://formanova.ai/press/wja-partnership/' },
   { name: 'Dubai Jewellery Group', detail: 'Dubai · July 2026', href: 'https://formanova.ai/press/djg-partnership/' },
+];
+
+// CAD section. Jewelers doubt that "AI CAD" is real NURBS (many tools sell an STL),
+// so the section offers the file itself. Rows and headings are the CAD page's own
+// comparison wording. The .3dm is the one the CAD page serves; its contents (58
+// closed solids, no meshes, millimeters, METAL and GEMS layers) were checked with
+// rhino3dm on 2026-11-07. Update the caption if that file is ever replaced.
+const CAD_SAMPLE_URL = 'https://formanova.ai/images/cad/models/formanova-chandelier-earrings.3dm';
+const CAD_COMPARE = [
+  { label: 'Geometry', ours: 'NURBS surfaces and solids', mesh: 'Triangle mesh' },
+  { label: 'Editing in Rhino', ours: 'Edit surfaces and control points', mesh: 'Remodel from scratch' },
+  { label: 'Parts', ours: 'Separate, named objects on layers', mesh: 'One fused shell' },
+  { label: 'For the caster', ours: 'STEP and STL per part', mesh: 'One STL' },
 ];
 
 export default function Welcome() {
@@ -171,6 +185,79 @@ export default function Welcome() {
         </div>
       </section>
 
+      {/* CAD Section */}
+      <section aria-labelledby="home-cad-title" className="marta-section content-deferred">
+        <div className="marta-container">
+          <ScrollRevealSection animation="fade-up" className="mb-12 md:mb-16">
+            <span className="marta-label mb-6 block">From design to photoshoot</span>
+            {/* KineticText splits the words into letters, so screen readers get the plain line instead. */}
+            <h2 id="home-cad-title" className="marta-headline-sm">
+              <span className="sr-only">AI CAD You Can Actually Edit</span>
+              <span aria-hidden="true">
+                <KineticText animation="wave">AI CAD You Can Actually Edit</KineticText>
+              </span>
+            </h2>
+            <p className="marta-body text-muted-foreground max-w-xl mt-6">
+              Not designed yet? Describe a piece or upload a photo. In 30 to 40 minutes you get a native
+              Rhino .3dm: real NURBS, not an STL in disguise. Every part its own named object, in millimeters.
+            </p>
+          </ScrollRevealSection>
+
+          {/* Side by side only from xl: at lg the table column is too narrow and cells run to 5 lines. */}
+          <div className="grid gap-12 xl:grid-cols-5 xl:items-start xl:gap-16">
+            <figure className="xl:col-span-3">
+              <img
+                src={rhinoEarrings}
+                alt="Rhino 8, NURBS wireframe: chandelier earrings .3dm in four viewports with METAL and GEMS layers"
+                width={1904}
+                height={929}
+                loading="lazy"
+                decoding="async"
+                className="w-full h-auto border border-border/20"
+              />
+              <figcaption className="marta-label mt-4 leading-relaxed">
+                This pair: 58 separate solids, zero meshes. Rhino 8, in millimeters.
+              </figcaption>
+            </figure>
+
+            <div className="xl:col-span-2">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-border/20">
+                    <th scope="col"><span className="sr-only">Property</span></th>
+                    <th scope="col" className="marta-label pb-3 pr-4 font-medium">FormaNova .3dm</th>
+                    <th scope="col" className="marta-label pb-3 font-medium">A mesh from a 3D generator</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {CAD_COMPARE.map((row) => (
+                    <tr key={row.label} className="border-b border-border/20 align-top">
+                      <th scope="row" className="marta-label py-4 pr-4 font-medium">{row.label}</th>
+                      <td className="marta-body py-4 pr-4 text-foreground">{row.ours}</td>
+                      <td className="marta-body py-4 text-muted-foreground">{row.mesh}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {/* The file is the proof: a mesh can't pass this check in Rhino. */}
+              <div className="mt-10">
+                <a href={CAD_SAMPLE_URL} download className="marta-button-filled text-center">
+                  Download the .3dm
+                </a>
+                <p className="marta-body text-muted-foreground mt-4">
+                  The earrings above, 2.1 MB. Open it in Rhino and check it yourself.
+                </p>
+                {/* Public (Astro) page, so a plain link, not a router link. */}
+                <a href="https://formanova.ai/ai-jewelry-cad/" className="marta-label marta-link hover:text-foreground mt-6 inline-flex items-center gap-2">
+                  See how CAD works <ArrowRight className="h-3 w-3" aria-hidden="true" />
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* CTA Section. A shorter bottom so the Partnerships band follows closely (owner, 2026-11-07). */}
       <section className="marta-section pb-16 md:pb-20 lg:pb-24 content-deferred">
         <ScrollRevealSection animation="zoom" className="marta-container text-center">
@@ -180,10 +267,10 @@ export default function Welcome() {
               <KineticText animation="split">Ready To Create?</KineticText>
             </h2>
             <p className="marta-body text-muted-foreground max-w-lg mx-auto mb-12">
-              Professional photoshoots with mathematically verified accuracy. Your jewelry, perfectly preserved.
+              Design it in CAD, show it in photoshoots, with your jewelry perfectly preserved.
             </p>
             <button onClick={handleStart} className="marta-button-filled magnetic-button">
-              <span>Start Your Photoshoot</span>
+              <span>Start Creating</span>
               <ArrowRight className="h-4 w-4" />
             </button>
           </div>
