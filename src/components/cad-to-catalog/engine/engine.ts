@@ -9,7 +9,8 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { loadCad, UNIT_SCALE, type LoadInfo, type LoadOptions } from './formats';
 import { classify, collectParts, buildSets, splitByConnectivity, type Part, type PartSet, type PartGroup } from './parts';
 import { MaterialCache, PRESETS, gemFromName, type Choice } from './materials';
-import { Look, type Backdrop, type StudioId } from './look';
+import { Look, type Backdrop } from './look';
+import type { GemMode } from '@/components/text-to-cad/GemInstanceRenderer';
 import { applyAngle, currentAngle, fitDistance, frameRect, type Angle } from './camera';
 
 export interface EngineState {
@@ -34,6 +35,7 @@ export class CatalogEngine {
   private axis = new THREE.Group(); // file units -> mm, Z-up -> Y-up
   private look: Look;
   private materials = new MaterialCache();
+  private gemMode: GemMode = 'refraction';
   private model: THREE.Object3D | null = null;
   private byId = new Map<string, Part>();
   private history: Snapshot[] = [];
@@ -181,7 +183,8 @@ export class CatalogEngine {
   /* ---------- materials ---------- */
 
   private apply(p: Part) {
-    p.mesh.material = p.choice ? this.materials.material(p.choice, p.mesh.geometry, p.maxDim || 1, this.look.gemEnv) : p.mesh.userData.c2p.sourceMaterial;
+    const gemEnv = this.gemMode === 'refraction' ? this.look.gemEnv : null; // Simple: physical glass
+    p.mesh.material = p.choice ? this.materials.material(p.choice, p.mesh.geometry, p.maxDim || 1, gemEnv) : p.mesh.userData.c2p.sourceMaterial;
     this.needsRender = true;
   }
 
@@ -331,7 +334,12 @@ export class CatalogEngine {
   modelSphere() { return this.sphere(); }
 
   setLight(v: number) { this.renderer.toneMappingExposure = v; this.needsRender = true; }
-  setStudio(id: StudioId) { return this.look.setStudio(id); }
+  /** Stones as the refraction shader (Refract) or physical glass (Simple), as the other CAD pages' gem toggle. */
+  setGemMode(mode: GemMode) {
+    if (mode === this.gemMode) return;
+    this.gemMode = mode;
+    this.refreshGems();
+  }
   get studioId() { return this.look.studioId; }
 
   /* ---------- pictures ---------- */
