@@ -11,7 +11,8 @@ import { POST_CALL_WORKFLOW, isRubyDevMode, type CallerContext, type PastCall, t
 export const PAST_CALLS_MAX = 3;
 export const PAST_TRANSCRIPT_MAX = 2500;
 export const MEMORY_TIMEOUT_MS = 2500;
-const HISTORY_SCAN = 100;
+/** Ruby calls only (a quick save and the final one can both be listed), so a busy account never times out the memory. */
+const HISTORY_SCAN = 10;
 
 export function callerContext(now = new Date(), language?: string): CallerContext {
   let timezone: string | null = null;
@@ -133,7 +134,7 @@ async function recordFor(run: RawRun): Promise<{ record: Record<string, unknown>
 }
 
 async function loadPastCalls(): Promise<PastCall[]> {
-  const res = await authenticatedFetch(`/history/workflows/me?limit=${HISTORY_SCAN}&offset=0`);
+  const res = await authenticatedFetch(`/history/workflows/me?workflow_name=${POST_CALL_WORKFLOW}&limit=${HISTORY_SCAN}&offset=0`);
   if (!res.ok) return [];
   const data = await res.json();
   const runs: RawRun[] = Array.isArray(data) ? data : (data?.workflows ?? []);

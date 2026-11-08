@@ -318,6 +318,36 @@ describe('call tools', () => {
     expect(host.endAfterGoodbye).toHaveBeenCalled();
   });
 
+  describe('next steps are never skipped (owner, 2026-11-08)', () => {
+    const order = { lines: [{ productId: 'p2k', quantity: 120 }], installmentCount: 2, email: 'a@b.co' };
+
+    it('the payment link result carries the whole plan for Ruby to say before they pay', async () => {
+      const out = (await createCallTools(makeHost(), makeApi())('send_payment_link', order)) as { say_next: string };
+      for (const must of ['now or later', 'photos', 'brief', 'give her a call again', 'remember']) expect(out.say_next).toContain(must);
+    });
+
+    it('with the link unpaid, the first end_call is held once so Ruby says the next steps; the second ends', async () => {
+      const host = makeHost();
+      const tools = createCallTools(host, makeApi());
+      await tools('send_payment_link', order);
+      const first = (await tools('end_call', {})) as { ending: boolean; say_first: string };
+      expect(first.ending).toBe(false);
+      expect(first.say_first).toContain('give her a call again');
+      expect(host.endAfterGoodbye).not.toHaveBeenCalled();
+      expect(await tools('end_call', {})).toEqual({ ending: true });
+      expect(host.endAfterGoodbye).toHaveBeenCalledTimes(1);
+    });
+
+    it('once the link is paid, end_call ends right away', async () => {
+      const host = { ...makeHost(), watchPayment: vi.fn() };
+      const api = makeApi({ createPaymentLink: vi.fn(async () => ({ url: 'https://buy.stripe.com/x', simulated: false, linkId: 'plink_1' })) });
+      const tools = createCallTools(host, api);
+      await tools('send_payment_link', order);
+      await host.watchPayment.mock.calls[0][1]('2026-11-08T10:00:00Z');
+      expect(await tools('end_call', {})).toEqual({ ending: true });
+    });
+  });
+
   describe('send_payment_link', () => {
     const args = {
       lines: [{ productId: 'p2k', quantity: 120 }],
@@ -370,6 +400,7 @@ describe('call tools', () => {
         totalCents: 135000,
         simulated: true,
         installments: INSTALLMENTS,
+        say_next: expect.stringContaining('give her a call again'),
       });
       expect(host.showPanel.mock.calls[0][0]).toMatchObject({ kind: 'deal', total: '$1,350', simulated: true, installments: INSTALLMENTS });
       expect(host.setPayment).toHaveBeenCalledWith({
