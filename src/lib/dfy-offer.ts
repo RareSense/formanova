@@ -50,5 +50,8 @@ export function saveOfferChoice(userId: string, choice: OfferChoice) {
 export function shouldOffer(o: { userId: string; paid: boolean; otherModalOpen: boolean; moment: OfferMoment }): boolean {
   if (!o.paid || o.otherModalOpen) return false;
   const state = offerState(o.userId);
-  return !state.choice && !state.seen[o.moment];
+  if (state.choice) return false; // No thanks or Talk to our AI: never again
+  // Owner, 2026-11-08: on the dashboard only a choice ends it (a close saved by the earlier version is ignored);
+  // after an image it is a single chance.
+  return o.moment === 'dashboard' || !state.seen[o.moment];
 }
