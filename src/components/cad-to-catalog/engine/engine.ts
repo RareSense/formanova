@@ -333,6 +333,7 @@ export class CatalogEngine {
   fitDistanceFor(radius: number, focal: number) { return fitDistance(this, radius, focal); }
   modelSphere() { return this.sphere(); }
 
+  setLight(v: number) { this.renderer.toneMappingExposure = v; this.needsRender = true; }
   /** Stones as the refraction shader (Refract) or physical glass (Simple), as the other CAD pages' gem toggle. */
   setGemMode(mode: GemMode) {
     if (mode === this.gemMode) return;

@@ -1,9 +1,9 @@
 /**
  * The 3D view of Catalog from CAD: hosts CatalogEngine's canvas, the drop area
  * before any file is open, an "Opening…" overlay, and the view tools
- * (zoom, undo / redo, fit: the vertical strip the other CAD pages use), and the
- * Simple / Refract gem toggle the other CAD pages have. The engine lives as long
- * as this component.
+ * (zoom, undo / redo, fit: the vertical strip the other CAD pages use), the Light
+ * setting (kept in this browser) and the Simple / Refract gem toggle the other CAD
+ * pages have. The engine lives as long as this component.
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Diamond, Loader2 } from 'lucide-react';
@@ -13,6 +13,10 @@ import GemToggle from '@/components/text-to-cad/QualityToggle';
 import type { GemMode } from '@/components/text-to-cad/GemInstanceRenderer';
 import { useEngineState } from './useEngineState';
 import { entriesFromDrop, entriesFromInput, type FileEntry } from './engine/package';
+
+const LIGHT_KEY = 'c2c.light';
+const stored = (key: string) => { try { return localStorage.getItem(key); } catch { return null; } };
+const store = (key: string, v: string) => { try { localStorage.setItem(key, v); } catch { /* private mode: this visit only */ } };
 
 interface Props {
   onEngine: (engine: CatalogEngine | null) => void;
@@ -32,6 +36,8 @@ export default function CatalogViewer({ onEngine, onFiles, busy, locked, compact
   const [engine, setEngine] = useState<CatalogEngine | null>(null);
   const [hot, setHot] = useState(false);
   const state = useEngineState(engine);
+  // Light: brightness of the view and the pictures, 40-200 %.
+  const [light, setLight] = useState(() => { const v = Number(stored(LIGHT_KEY)); return v >= 40 && v <= 200 ? v : 100; });
   // Stones in the view and the pictures: the refraction shader (Refract) or physical glass (Simple).
   const [gemMode, setGemMode] = useState<GemMode>('refraction');
   const onEngineRef = useRef(onEngine);
@@ -50,6 +56,11 @@ export default function CatalogViewer({ onEngine, onFiles, busy, locked, compact
   useEffect(() => {
     if (engine) engine.controls.enabled = !locked;
   }, [engine, locked]);
+
+  useEffect(() => {
+    engine?.setLight(light / 100);
+    store(LIGHT_KEY, String(light));
+  }, [engine, light]);
 
   useEffect(() => {
     engine?.setGemMode(gemMode);
@@ -96,9 +107,13 @@ export default function CatalogViewer({ onEngine, onFiles, busy, locked, compact
         </div>
       )}
 
-      {/* Hidden while shooting, as the view tools: the pictures keep the mode they started with. */}
+      {/* Hidden while shooting, as the view tools: the pictures keep the light and mode they started with. */}
       {hasModel && !locked && (
-        <div className="absolute top-20 left-2 z-10">
+        <div className="absolute top-20 left-2 z-10 flex flex-col items-start gap-2">
+          <label className="flex items-center gap-2 bg-card/90 border border-border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em]" title="Brighter or darker, in the view and the pictures">
+            Light
+            <input type="range" min={40} max={200} step={5} value={light} onChange={(e) => setLight(Number(e.target.value))} className="w-24 accent-formanova-hero-accent" aria-label="Light" />
+          </label>
           <GemToggle visible mode={gemMode} onModeChange={setGemMode} />
         </div>
       )}
