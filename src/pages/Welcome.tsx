@@ -189,17 +189,17 @@ export default function Welcome() {
       <section aria-labelledby="home-cad-title" className="marta-section content-deferred">
         <div className="marta-container">
           <ScrollRevealSection animation="fade-up" className="mb-12 md:mb-16">
-            <span className="marta-label mb-6 block">CAD for Rhino</span>
+            <span className="marta-label mb-6 block">From design to photoshoot</span>
             {/* KineticText splits the words into letters, so screen readers get the plain line instead. */}
             <h2 id="home-cad-title" className="marta-headline-sm">
-              <span className="sr-only">Real NURBS. Not an STL in disguise.</span>
+              <span className="sr-only">AI CAD You Can Actually Edit</span>
               <span aria-hidden="true">
-                <KineticText animation="wave">Real NURBS. Not an STL in disguise.</KineticText>
+                <KineticText animation="wave">AI CAD You Can Actually Edit</KineticText>
               </span>
             </h2>
             <p className="marta-body text-muted-foreground max-w-xl mt-6">
-              Describe a piece or upload a photo. In 30 to 40 minutes you get a native Rhino .3dm:
-              NURBS solids you can edit, every part its own named object, in millimeters.
+              Not designed yet? Describe a piece or upload a photo. In 30 to 40 minutes you get a native
+              Rhino .3dm: real NURBS, not an STL in disguise. Every part its own named object, in millimeters.
             </p>
           </ScrollRevealSection>
 
@@ -267,10 +267,10 @@ export default function Welcome() {
               <KineticText animation="split">Ready To Create?</KineticText>
             </h2>
             <p className="marta-body text-muted-foreground max-w-lg mx-auto mb-12">
-              Professional photoshoots with mathematically verified accuracy. Your jewelry, perfectly preserved.
+              Design it in CAD, show it in photoshoots, with your jewelry perfectly preserved.
             </p>
             <button onClick={handleStart} className="marta-button-filled magnetic-button">
-              <span>Start Your Photoshoot</span>
+              <span>Start Creating</span>
               <ArrowRight className="h-4 w-4" />
             </button>
           </div>
