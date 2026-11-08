@@ -6,7 +6,7 @@
  */
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import { getWorkflowDetails } from '@/lib/generation-history-api';
-import { POST_CALL_WORKFLOW, isRubyDevMode, type CallerContext, type PastCall } from './sales-call-api';
+import { POST_CALL_WORKFLOW, isRubyDevMode, type CallerContext, type PastCall, type PastPayment } from './sales-call-api';
 
 export const PAST_CALLS_MAX = 3;
 export const PAST_TRANSCRIPT_MAX = 2500;
@@ -54,6 +54,20 @@ export function transcriptFromTurns(turns: unknown, max = PAST_TRANSCRIPT_MAX): 
   return nl > 0 && nl < 200 ? tail.slice(nl + 1) : tail;
 }
 
+/** The real payment link a saved call made (none for a simulated link). */
+function pastPayment(raw: unknown): PastPayment | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const p = raw as Record<string, unknown>;
+  if (p.simulated || typeof p.linkId !== 'string' || !p.linkId) return undefined;
+  return { link_id: p.linkId, status: p.status === 'paid' ? 'paid' : 'open', total: typeof p.total === 'string' ? p.total : null };
+}
+
+/** The newest past call's link when it is not paid yet: the page watches it during this call. */
+export function openPastLink(calls: PastCall[]): string | null {
+  const last = [...calls].reverse().find((c) => c.payment);
+  return last?.payment && last.payment.status !== 'paid' ? last.payment.link_id : null;
+}
+
 export function pastCallFromRecord(
   date: string,
   input: Record<string, unknown> | null | undefined,
@@ -65,12 +79,14 @@ export function pastCallFromRecord(
   const saved = input.lead && typeof input.lead === 'object' ? (input.lead as Record<string, unknown>) : {};
   const lead = { ...extractedLead, ...saved };
   if (!transcript && !Object.keys(lead).length) return null;
+  const payment = pastPayment(input.payment);
   return {
     date,
     lead,
     transcript,
     uploads: Array.isArray(input.uploads) ? input.uploads.length : 0,
     links: Array.isArray(input.links) ? input.links.length : 0,
+    ...(payment ? { payment } : {}),
   };
 }
 

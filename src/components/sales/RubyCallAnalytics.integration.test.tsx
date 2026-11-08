@@ -58,8 +58,10 @@ vi.mock('@/lib/ruby-call/post-call-save', () => ({
   saveOnPageHide: vi.fn(),
   retryUnsavedCalls: vi.fn(async () => 0),
 }));
-vi.mock('@/lib/ruby-call/call-memory', () => ({
-  fetchPastCalls: vi.fn(async () => []),
+const memory = vi.hoisted(() => ({ fetchPastCalls: vi.fn(async (): Promise<unknown[]> => []) }));
+vi.mock('@/lib/ruby-call/call-memory', async (orig) => ({
+  openPastLink: (await orig<typeof import('@/lib/ruby-call/call-memory')>()).openPastLink,
+  fetchPastCalls: memory.fetchPastCalls,
   callerContext: () => ({ timezone: 'Asia/Karachi', local_time: 't', browser_language: 'en-US' }),
 }));
 
@@ -137,6 +139,39 @@ describe('Ruby call analytics (integration)', () => {
       ['ruby_cta_clicked', { signed_in: true }],
       ['ruby_cta_clicked', { signed_in: false }],
     ]);
+  });
+
+  it('a returning caller with an unpaid link from the last call: the page watches it, and Ruby hears when it is paid', async () => {
+    memory.fetchPastCalls.mockResolvedValueOnce([
+      { date: 'd', lead: {}, transcript: 'Client: bye', uploads: 0, links: 0, payment: { link_id: 'pl_old', status: 'open', total: '$285.00' } },
+    ]);
+    pay.paymentLinkStatus.mockResolvedValue({ status: 'paid', paidAt: null });
+    const f = fakes();
+    renderCall(f);
+    fireEvent.click(screen.getByRole('button', { name: 'Start call' }));
+    await waitFor(() => expect(f.engine.start).toHaveBeenCalled());
+    await act(async () => {
+      await f.opts().createSession({ sdp: 'offer', language: 'en' });
+    });
+    expect(pay.watchPayment).not.toHaveBeenCalled(); // not before the call is live
+    act(() => f.cbs().onState?.('live'));
+    await waitFor(() => expect(pay.watchPayment).toHaveBeenCalledTimes(1));
+    const check = pay.watchPayment.mock.calls[0][0] as () => Promise<unknown>;
+    await check();
+    expect(pay.paymentLinkStatus).toHaveBeenCalledWith('pl_old');
+    await waitFor(() => expect(f.engine.appendInstruction).toHaveBeenCalledWith(expect.stringContaining('payment was received')));
+  });
+
+  it('a caller with no unpaid past link starts no watch', async () => {
+    const f = fakes();
+    renderCall(f);
+    fireEvent.click(screen.getByRole('button', { name: 'Start call' }));
+    await waitFor(() => expect(f.engine.start).toHaveBeenCalled());
+    await act(async () => {
+      await f.opts().createSession({ sdp: 'offer', language: 'en' });
+    });
+    act(() => f.cbs().onState?.('live'));
+    expect(pay.watchPayment).not.toHaveBeenCalled();
   });
 
   it('a full call records the funnel in order: started, connected, quotes, link, paid, uploads, team, ended', async () => {
