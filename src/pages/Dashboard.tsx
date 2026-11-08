@@ -272,7 +272,7 @@ export default function Dashboard() {
   // selection. pendingRoute holds where to go once the user picks; null = closed.
   const [pendingRoute, setPendingRoute] = useState<string | null>(null);
   // Owner, 2026-11-08: the Done For You offer for paying users, never over the effort chooser.
-  const offer = useDfyOffer(user?.id, pendingRoute !== null);
+  const offer = useDfyOffer(user?.id, pendingRoute !== null, 'dashboard');
   const defaultEffort: EffortLevel =
     localStorage.getItem('formanova_studio_effort') === 'high' ? 'high' : 'low';
 
@@ -371,7 +371,7 @@ export default function Dashboard() {
           </motion.div>
       </div>
 
-      {user?.id && <DoneForYouOfferModal userId={user.id} open={offer.open} onClose={offer.close} />}
+      {user?.id && <DoneForYouOfferModal userId={user.id} moment="dashboard" open={offer.open} onClose={offer.close} />}
 
       <EffortIntroModal
         open={pendingRoute !== null}

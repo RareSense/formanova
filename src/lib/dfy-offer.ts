@@ -1,49 +1,54 @@
-// Owner, 2026-11-08: paying users have been making their photoshoots themselves; offer once, plainly, that our
-// team can make the whole collection for them (Done For You, priced by Ruby). Designed with Fable 5.1.
+// Owner, 2026-11-08: paying users have been making their photoshoots themselves; offer plainly that our team can
+// make them all. Two chances at most: once on the dashboard, once after they made an image. "No thanks" (or
+// talking to our AI) ends it for good. Designed with Fable 5.1.
 import { selectStarterTier, type BillingTier } from './starter-pack';
 
-export type OfferChoice = 'talk' | 'no' | 'closed';
-export interface SavedChoice {
-  choice: OfferChoice;
-  at: number;
-  /** True once a "closed" offer has been shown again. */
-  reminded?: boolean;
+export type OfferMoment = 'dashboard' | 'after_image';
+export type OfferChoice = 'talk' | 'no';
+export interface OfferState {
+  choice?: OfferChoice;
+  seen: Partial<Record<OfferMoment, number>>;
 }
 
-/** A closed offer (no button chosen) comes back once, after this long. */
-export const REMIND_AFTER_MS = 14 * 24 * 60 * 60 * 1000;
-const KEY = 'formanova_dfy_offer_';
+const KEY = 'formanova_dfy_offer_v2_';
 
 /** The backend drops the Starter tier from /billing/tiers once the user has bought anything. */
 export function hasPaid(tiers: BillingTier[]): boolean {
   return tiers.length > 0 && selectStarterTier(tiers) === null;
 }
 
-export function offerChoice(userId: string): SavedChoice | null {
+export function offerState(userId: string): OfferState {
   try {
-    const raw = localStorage.getItem(KEY + userId);
-    if (!raw) return null;
-    const saved = JSON.parse(raw) as SavedChoice;
-    return saved && typeof saved.at === 'number' && ['talk', 'no', 'closed'].includes(saved.choice) ? saved : null;
+    const saved = JSON.parse(localStorage.getItem(KEY + userId) ?? 'null') as OfferState | null;
+    if (saved && typeof saved === 'object' && saved.seen && typeof saved.seen === 'object') {
+      return { ...(saved.choice === 'talk' || saved.choice === 'no' ? { choice: saved.choice } : {}), seen: saved.seen };
+    }
   } catch {
-    return null;
+    /* unreadable: start fresh */
   }
+  return { seen: {} };
 }
 
-export function saveOfferChoice(userId: string, choice: OfferChoice, now = Date.now()) {
-  const before = offerChoice(userId);
-  const saved: SavedChoice = { choice, at: now, ...(before?.choice === 'closed' ? { reminded: true } : {}) };
+function save(userId: string, state: OfferState) {
   try {
-    localStorage.setItem(KEY + userId, JSON.stringify(saved));
+    localStorage.setItem(KEY + userId, JSON.stringify(state));
   } catch {
     /* storage blocked: the offer may show again, which is harmless */
   }
 }
 
-export function shouldOffer(o: { userId: string; paid: boolean; otherModalOpen: boolean; now?: number }): boolean {
+/** Marked when it is shown, so a reload never shows the same chance twice. */
+export function markOfferSeen(userId: string, moment: OfferMoment, now = Date.now()) {
+  const state = offerState(userId);
+  save(userId, { ...state, seen: { ...state.seen, [moment]: now } });
+}
+
+export function saveOfferChoice(userId: string, choice: OfferChoice) {
+  save(userId, { ...offerState(userId), choice });
+}
+
+export function shouldOffer(o: { userId: string; paid: boolean; otherModalOpen: boolean; moment: OfferMoment }): boolean {
   if (!o.paid || o.otherModalOpen) return false;
-  const saved = offerChoice(o.userId);
-  if (!saved) return true;
-  if (saved.choice !== 'closed' || saved.reminded) return false;
-  return (o.now ?? Date.now()) - saved.at >= REMIND_AFTER_MS;
+  const state = offerState(o.userId);
+  return !state.choice && !state.seen[o.moment];
 }

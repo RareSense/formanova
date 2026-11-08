@@ -10,6 +10,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { azureUriToUrl } from '@/lib/azure-utils';
 import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
 import { ModelGuideModal } from '@/components/studio/ModelGuideModal';
+import { DoneForYouOfferModal } from '@/components/sales/DoneForYouOfferModal';
+import { useDfyOffer } from '@/hooks/use-dfy-offer';
 import { UploadGuideModal } from '@/components/studio/UploadGuideModal';
 import { ProductShotGuideModal } from '@/components/studio/ProductShotGuideModal';
 import { TO_SINGULAR } from '@/lib/jewelry-utils';
@@ -85,6 +87,9 @@ function getStepFromQuery(stepParam: string | null): StudioStep {
   return stepParam === 'model' ? 'model' : 'upload';
 }
 
+
+/** How long their new image is on screen before the Done For You offer may appear. */
+const DFY_OFFER_AFTER_IMAGE_MS = 4000;
 
 export default function UnifiedStudio() {
   // Counts towards which studio this user lands in after sign-in. The
@@ -278,6 +283,15 @@ export default function UnifiedStudio() {
     hasCheckedUploadGuide,
     hasCheckedProductShotGuide,
   } = useStudioOnboarding({ currentStep, isProductShot, user, initializing });
+
+  // Owner, 2026-11-08: the Done For You offer's second chance, once their new image has been on screen a moment.
+  const [resultSettled, setResultSettled] = useState(false);
+  useEffect(() => {
+    if (currentStep !== 'results') return setResultSettled(false);
+    const t = setTimeout(() => setResultSettled(true), DFY_OFFER_AFTER_IMAGE_MS);
+    return () => clearTimeout(t);
+  }, [currentStep]);
+  const dfyOffer = useDfyOffer(user?.id, false, 'after_image', resultSettled);
 
   const activeModelUrl = customModelImage || selectedModel?.url || null;
   const resolvedJewelryImage = useAuthenticatedImage(jewelryImage);
@@ -772,6 +786,8 @@ export default function UnifiedStudio() {
         open={productShotGuideOpen}
         onClose={handleProductShotGuideClose}
       />
+
+      {user?.id && <DoneForYouOfferModal userId={user.id} moment="after_image" open={dfyOffer.open} onClose={dfyOffer.close} />}
 
       <ModelGuideModal
         open={modelGuideOpen}

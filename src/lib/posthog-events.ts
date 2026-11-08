@@ -659,8 +659,8 @@ export function trackUpscalePaywallHit(props: UpscalePaywallHitProps) {
 // Numbers and labels only: never an email, name, link, transcript or call id.
 
 /** The Done For You offer pop-up for paying users (owner, 2026-11-08): shown, talk_clicked, declined, closed. */
-export function trackDfyOffer(step: 'shown' | 'talk_clicked' | 'declined' | 'closed') {
-  capture(`dfy_offer_${step}`);
+export function trackDfyOffer(step: 'shown' | 'talk_clicked' | 'declined' | 'closed', moment: 'dashboard' | 'after_image') {
+  capture(`dfy_offer_${step}`, { moment });
 }
 
 export function trackRubyCtaClicked(props: { signed_in: boolean }) {
