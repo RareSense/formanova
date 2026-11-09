@@ -90,6 +90,8 @@ export function swatchColor(choice: Choice | null, fileColor: string) {
  */
 export class MaterialCache {
   private made = new Map<string, THREE.Material>();
+  /** World-unit step a ray takes into a stone (gemEntryStep of the open piece). */
+  gemStep = 0.001;
 
   /** refEnv: the raw studio HDRI the gem shader samples; until it loads stones get physical glass. */
   material(choice: Choice, geometry: THREE.BufferGeometry, partSize: number, refEnv: THREE.Texture | null): THREE.Material {
@@ -108,10 +110,10 @@ export class MaterialCache {
       return this.made.get(key)!;
     }
     if (refEnv) {
-      const key = `ref|${m.id}|${shade}|${geometry.uuid}`;
+      const key = `ref|${m.id}|${shade}|${geometry.uuid}|${this.gemStep}`;
       if (!this.made.has(key)) {
         const spec = { ...REF_GEM[m.id], color: shaded(hex(REF_GEM[m.id].color), shade).getHex() };
-        this.made.set(key, referenceGemMaterial(geometry, refEnv, spec, m.name));
+        this.made.set(key, referenceGemMaterial(geometry, refEnv, spec, m.name, this.gemStep));
       }
       return this.made.get(key)!;
     }
