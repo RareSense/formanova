@@ -114,7 +114,6 @@ export default function CatalogViewer({ onEngine, onFiles, busy, locked, compact
             Light
             <input type="range" min={40} max={200} step={5} value={light} onChange={(e) => setLight(Number(e.target.value))} className="w-24 accent-formanova-hero-accent" aria-label="Light" />
           </label>
-          <GemToggle visible mode={gemMode} onModeChange={setGemMode} />
         </div>
       )}
 
@@ -126,7 +125,15 @@ export default function CatalogViewer({ onEngine, onFiles, busy, locked, compact
           </div>
         </div>
       )}
-      {children}
+      {/* Bottom: the gem toggle bottom-left as on the other CAD pages, sitting above the pictures strip when there is one. */}
+      <div className="absolute left-0 right-0 bottom-0 z-10 flex flex-col pointer-events-none">
+        {hasModel && !locked && (
+          <div className="self-start p-4 pointer-events-auto">
+            <GemToggle visible mode={gemMode} onModeChange={setGemMode} />
+          </div>
+        )}
+        <div className="pointer-events-auto">{children}</div>
+      </div>
     </div>
   );
 }
