@@ -20,6 +20,11 @@ describe('referenceKeyForMaterial defaults', () => {
   it('keeps name-based classification for unassigned parts', () => {
     expect(referenceKeyForMaterial(undefined, 'Pave_Gem_00')).toBe('diamond');
   });
+
+  it('gives glass windows the clear-glass look, not diamond', () => {
+    expect(referenceKeyForMaterial(undefined, 'crystal_glass_window')).toBe('clearGlass');
+    expect(referenceKeyForMaterial(undefined, 'glass.stl')).toBe('clearGlass');
+  });
 });
 
 describe('isStoneLook', () => {

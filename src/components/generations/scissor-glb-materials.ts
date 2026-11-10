@@ -51,7 +51,24 @@ export function markEmbeddedGltfMaterials(gltf: ParsedGltfMaterialMetadata): voi
   });
 }
 
+// Glass windows (lockets, amulet frames) must stay see-through so whatever sits
+// behind them shows; the gem fallback below is a mostly opaque blue.
+const GLASS_RE = /glass|window/i;
+
 export function createHistoryFallbackMaterial(meshName: string): THREE.Material {
+  if (GLASS_RE.test(meshName)) {
+    return new THREE.MeshPhysicalMaterial({
+      color: 0xffffff,
+      metalness: 0,
+      roughness: 0,
+      transmission: 1,
+      thickness: 0.2,
+      ior: 1.5,
+      envMapIntensity: 1,
+      side: THREE.DoubleSide,
+    });
+  }
+
   const isGem = GEM_RE.test(meshName) && !METAL_RE.test(meshName);
 
   if (isGem) {
