@@ -61,9 +61,9 @@ export function createHistoryFallbackMaterial(meshName: string): THREE.Material 
       color: 0xffffff,
       metalness: 0,
       roughness: 0,
-      transmission: 1,
-      thickness: 0.2,
-      ior: 1.5,
+      transparent: true,
+      opacity: 0.12,
+      depthWrite: false,
       envMapIntensity: 1,
       side: THREE.DoubleSide,
     });
