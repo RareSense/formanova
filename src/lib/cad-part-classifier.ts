@@ -14,7 +14,7 @@ export type CadPartKind = "gem" | "metal";
 
 /** Stone words, including cut names and gem species. */
 const GEM_WORDS = [
-  "gem", "diamond", "stone", "accent", "pave", "melee", "brilliant", "brill", "crystal", "jewel",
+  "gem", "diamond", "stone", "accent", "pave", "melee", "brilliant", "brill", "crystal", "glass", "jewel",
   "solitaire", "cz", "cubic", "moissanite", "briolette", "cabochon", "facet", "round_cut",
   "cushion", "oval", "marquise", "princess", "baguette", "asscher", "trillion", "pear",
   "ruby", "sapphire", "emerald", "amethyst", "citrine", "aquamarine", "topaz", "garnet",

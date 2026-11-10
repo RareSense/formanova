@@ -28,6 +28,13 @@ describe("classifyCadPartName", () => {
     }
   });
 
+  it("glass panes (locket windows) are gems, so they render clear, not gold", () => {
+    for (const name of ["glass.stl", "glass_front", "Glass1", "locket_glass_back"]) {
+      expect(isCadGemName(name)).toBe(true);
+    }
+    expect(classifyCadPartName("glass_seat_ledge")).toBe("metal");
+  });
+
   it("does not read 'engagement' as a gem", () => {
     expect(classifyCadPartName("EngagementBand")).toBe("metal");
     expect(classifyCadPartName("shank_engagement")).toBe("metal");
