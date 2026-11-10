@@ -110,8 +110,9 @@ describe('applyHistoryPreviewMaterials', () => {
 
       const material = mesh.material as THREE.MeshPhysicalMaterial;
       expect(material.metalness).toBe(0);
-      expect(material.transmission).toBe(1);
-      expect(material.ior).toBeCloseTo(1.5);
+      expect(material.transparent).toBe(true);
+      expect(material.opacity).toBeLessThan(0.3);
+      expect(material.transmission).toBe(0);
       expect(material.color.getHex()).toBe(0xffffff);
     }
   });

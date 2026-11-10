@@ -42,7 +42,7 @@ const Q = getQualitySettings();
 // Mesh-name metal/gem classification lives in @/lib/cad-part-classifier so every
 // path below (reference, magic, flat preview, duplicates) agrees on what a gem is.
 
-type ReferenceMaterialKind = "metal" | "gem" | "pearl";
+type ReferenceMaterialKind = "metal" | "gem" | "pearl" | "glass";
 
 interface ReferenceMaterialSpec {
   label: string;
@@ -86,7 +86,7 @@ const REFERENCE_MATERIALS: Record<string, ReferenceMaterialSpec> = {
   morganite:    { label: "Morganite", kind: "gem", color: 0xf4c6c6, atten: 0xc06a78, ior: 1.58 },
   blackDiamond: { label: "Black Diamond", kind: "gem", color: 0x17171c, atten: 0x000000, ior: 2.42, rough: 0.04, dark: true },
   // Locket and amulet windows: clear, glass-like refraction, no fire, so what sits behind shows.
-  clearGlass:   { label: "Clear Glass", kind: "gem", color: 0xffffff, atten: 0xffffff, ior: 1.5, disp: 0 },
+  clearGlass:   { label: "Clear Glass", kind: "glass", color: 0xffffff },
 
   pearlWhite:   { label: "White Pearl", kind: "pearl", color: 0xfdfaf3, sheen: 0xf6dfda },
   pearlGolden:  { label: "Golden Pearl", kind: "pearl", color: 0xf0d9a2, sheen: 0xf6c86a },
@@ -166,6 +166,18 @@ function makeReferencePhysicalMaterial(spec: ReferenceMaterialSpec): THREE.MeshP
       metalness: 1,
       roughness: spec.rough ?? 0.08,
       envMapIntensity: REFERENCE_BASE_ENV.metal,
+      side: THREE.DoubleSide,
+    });
+  } else if (spec.kind === "glass") {
+    // Plain see-through pane: no refraction shader or transmission pass, so the part behind always shows.
+    material = new THREE.MeshPhysicalMaterial({
+      color: spec.color,
+      metalness: 0,
+      roughness: 0,
+      transparent: true,
+      opacity: 0.12,
+      depthWrite: false,
+      envMapIntensity: 1,
       side: THREE.DoubleSide,
     });
   } else if (spec.kind === "pearl") {
