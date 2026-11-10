@@ -99,4 +99,20 @@ describe('applyHistoryPreviewMaterials', () => {
     expect(material.color.getHex()).toBe(0xffd88a);
     expect(material.metalness).toBe(1);
   });
+
+  it('renders glass windows clear, not as a blue gem or gold', () => {
+    for (const name of ['crystal_glass_window', 'glass.stl', 'locket_window']) {
+      const model = new THREE.Group();
+      const mesh = meshNamed(name);
+      model.add(mesh);
+
+      applyHistoryPreviewMaterials(model, true);
+
+      const material = mesh.material as THREE.MeshPhysicalMaterial;
+      expect(material.metalness).toBe(0);
+      expect(material.transmission).toBe(1);
+      expect(material.ior).toBeCloseTo(1.5);
+      expect(material.color.getHex()).toBe(0xffffff);
+    }
+  });
 });

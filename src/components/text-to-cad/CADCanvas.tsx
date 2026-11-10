@@ -85,6 +85,8 @@ const REFERENCE_MATERIALS: Record<string, ReferenceMaterialSpec> = {
   tanzanite:    { label: "Tanzanite", kind: "gem", color: 0x7480e2, atten: 0x28329e, ior: 1.69 },
   morganite:    { label: "Morganite", kind: "gem", color: 0xf4c6c6, atten: 0xc06a78, ior: 1.58 },
   blackDiamond: { label: "Black Diamond", kind: "gem", color: 0x17171c, atten: 0x000000, ior: 2.42, rough: 0.04, dark: true },
+  // Locket and amulet windows: clear, glass-like refraction, no fire, so what sits behind shows.
+  clearGlass:   { label: "Clear Glass", kind: "gem", color: 0xffffff, atten: 0xffffff, ior: 1.5, disp: 0 },
 
   pearlWhite:   { label: "White Pearl", kind: "pearl", color: 0xfdfaf3, sheen: 0xf6dfda },
   pearlGolden:  { label: "Golden Pearl", kind: "pearl", color: 0xf0d9a2, sheen: 0xf6c86a },
@@ -111,6 +113,7 @@ const REFERENCE_ENVIRONMENTS = {
 type ReferenceEnvironmentKey = keyof typeof REFERENCE_ENVIRONMENTS;
 
 const REFERENCE_TYPE_RULES: [RegExp, string][] = [
+  [/glass/i, "clearGlass"],
   [/pearl/i, "pearlWhite"], [/opal/i, "opal"],
   [/ruby/i, "ruby"], [/sapphire/i, "sapphire"], [/emerald/i, "emerald"],
   [/amethyst/i, "amethyst"], [/citrine/i, "citrine"], [/aqua/i, "aquamarine"],
