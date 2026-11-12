@@ -100,6 +100,89 @@ describe('applyHistoryPreviewMaterials', () => {
     expect(material.metalness).toBe(1);
   });
 
+  it('keeps real materials on a forced-palette card when the file is marked as authored', () => {
+    const blackRhodium = new THREE.MeshStandardMaterial({ color: 0x2a2a2e, metalness: 1, roughness: 0.3 });
+    const pinkSapphire = new THREE.MeshPhysicalMaterial({ color: 0xe86aa6, metalness: 0, roughness: 0.05 });
+    const model = new THREE.Group();
+    const hoop = meshNamed('gold_black_rhodium_pave_hoop_left', blackRhodium);
+    const stone = meshNamed('stone_pink_sapphire_left', pinkSapphire);
+    model.add(hoop, stone);
+    markEmbeddedGltfMaterials({
+      scene: model,
+      parser: {
+        associations: new Map([[hoop, { meshes: 0, primitives: 0 }], [stone, { meshes: 1, primitives: 0 }]]),
+        json: {
+          asset: { extras: { formanovaMaterials: 'authored' } },
+          meshes: [{ primitives: [{ material: 0 }] }, { primitives: [{ material: 1 }] }],
+        },
+      },
+    });
+
+    applyHistoryPreviewMaterials(model, true);
+
+    const hoopMaterial = hoop.material as THREE.MeshStandardMaterial;
+    expect(hoopMaterial).not.toBe(blackRhodium);
+    expect(hoopMaterial.color.getHex()).toBe(0x2a2a2e);
+    expect(hoopMaterial.roughness).toBe(0.3);
+    expect((stone.material as THREE.MeshPhysicalMaterial).color.getHex()).toBe(0xe86aa6);
+  });
+
+  it('still gives the palette to a part without a material in a file marked as authored', () => {
+    const model = new THREE.Group();
+    const mesh = meshNamed('Shank');
+    model.add(mesh);
+    markEmbeddedGltfMaterials({
+      scene: model,
+      parser: {
+        associations: new Map([[mesh, { meshes: 0, primitives: 0 }]]),
+        json: { asset: { extras: { formanovaMaterials: 'authored' } }, meshes: [{ primitives: [{}] }] },
+      },
+    });
+
+    applyHistoryPreviewMaterials(model, true);
+
+    expect((mesh.material as THREE.MeshStandardMaterial).color.getHex()).toBe(0xffd88a);
+  });
+
+  it('ignores any other marker value and keeps forcing the palette', () => {
+    for (const extras of [undefined, {}, { formanovaMaterials: 'clay' }, { formanovaMaterials: true }]) {
+      const clay = new THREE.MeshStandardMaterial({ color: 0x777777, metalness: 0, roughness: 0.8 });
+      const model = new THREE.Group();
+      const mesh = meshNamed('Shank', clay);
+      model.add(mesh);
+      markEmbeddedGltfMaterials({
+        scene: model,
+        parser: {
+          associations: new Map([[mesh, { meshes: 0, primitives: 0 }]]),
+          json: { asset: { extras }, meshes: [{ primitives: [{ material: 0 }] }] },
+        },
+      });
+
+      applyHistoryPreviewMaterials(model, true);
+
+      expect((mesh.material as THREE.MeshStandardMaterial).color.getHex()).toBe(0xffd88a);
+    }
+  });
+
+  it('carries the authored mark through a scene clone, as the preview cache does', () => {
+    const authored = new THREE.MeshStandardMaterial({ color: 0x2a2a2e, metalness: 1, roughness: 0.3 });
+    const model = new THREE.Group();
+    const mesh = meshNamed('clasp_arm', authored);
+    model.add(mesh);
+    markEmbeddedGltfMaterials({
+      scene: model,
+      parser: {
+        associations: new Map([[mesh, { meshes: 0, primitives: 0 }]]),
+        json: { asset: { extras: { formanovaMaterials: 'authored' } }, meshes: [{ primitives: [{ material: 0 }] }] },
+      },
+    });
+
+    const copy = model.clone(true);
+    applyHistoryPreviewMaterials(copy, true);
+
+    expect(((copy.children[0] as THREE.Mesh).material as THREE.MeshStandardMaterial).color.getHex()).toBe(0x2a2a2e);
+  });
+
   it('renders glass windows clear, not as a blue gem or gold', () => {
     for (const name of ['crystal_glass_window', 'glass.stl', 'locket_window']) {
       const model = new THREE.Group();
