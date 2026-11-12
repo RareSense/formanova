@@ -1,6 +1,16 @@
 import * as THREE from 'three';
 
 export const HAS_EMBEDDED_GLTF_MATERIAL = '__historyHasEmbeddedGltfMaterial';
+/** Set on a mesh whose file declares that its materials are the real, finished
+ * look of the piece (see AUTHORED_MATERIALS_MARK). */
+export const HAS_AUTHORED_GLTF_MATERIAL = '__historyHasAuthoredGltfMaterial';
+
+/** A GLB opts in with `asset.extras.formanovaMaterials: "authored"`. Hand-built
+ * CAD deliveries carry real per-part materials (white gold next to black
+ * rhodium, pink sapphires, pearls) and set this. Pipeline GLBs embed grey clay
+ * and do not, so they keep getting the jewelry palette. */
+const AUTHORED_MATERIALS_KEY = 'formanovaMaterials';
+const AUTHORED_MATERIALS_MARK = 'authored';
 
 interface GltfPrimitiveAssociation {
   meshes?: number;
@@ -15,6 +25,7 @@ interface ParsedGltfMaterialMetadata {
     // both accurate and safe.
     associations: Map<object, GltfPrimitiveAssociation>;
     json: {
+      asset?: { extras?: unknown };
       meshes?: Array<{ primitives?: Array<{ material?: number }> }>;
     };
   };
@@ -39,15 +50,25 @@ function fallbackGemColor(name: string): number {
   return GEM_COLORS.find(([pattern]) => pattern.test(name))?.[1] ?? 0x4f7ce0;
 }
 
-/** Record whether each mesh primitive had an explicit material in the GLTF document. */
+function declaresAuthoredMaterials(extras: unknown): boolean {
+  return typeof extras === 'object' && extras !== null
+    && (extras as Record<string, unknown>)[AUTHORED_MATERIALS_KEY] === AUTHORED_MATERIALS_MARK;
+}
+
+/** Record whether each mesh primitive had an explicit material in the GLTF
+ * document, and whether the file declares those materials as authored. Both
+ * are stored per mesh so they survive the scene clones the preview cache makes. */
 export function markEmbeddedGltfMaterials(gltf: ParsedGltfMaterialMetadata): void {
+  const authored = declaresAuthoredMaterials(gltf.parser.json.asset?.extras);
   gltf.scene.traverse((child) => {
     if (!(child as THREE.Mesh).isMesh) return;
     const association = gltf.parser.associations.get(child);
     const primitive = association?.meshes === undefined || association.primitives === undefined
       ? undefined
       : gltf.parser.json.meshes?.[association.meshes]?.primitives?.[association.primitives];
-    child.userData[HAS_EMBEDDED_GLTF_MATERIAL] = primitive?.material !== undefined;
+    const embedded = primitive?.material !== undefined;
+    child.userData[HAS_EMBEDDED_GLTF_MATERIAL] = embedded;
+    child.userData[HAS_AUTHORED_GLTF_MATERIAL] = authored && embedded;
   });
 }
 
@@ -101,13 +122,18 @@ export function createHistoryFallbackMaterial(meshName: string): THREE.Material 
   });
 }
 
-/** Preserve authored materials; add display-only fallbacks to materialless GLTF primitives. */
+/** Preserve authored materials; add display-only fallbacks to materialless GLTF primitives.
+ * `forceJewelryPalette` overrides embedded materials (pipeline GLBs embed grey
+ * clay), except on a file that marks its materials as authored. */
 export function applyHistoryPreviewMaterials(model: THREE.Object3D, forceJewelryPalette = false): void {
   model.traverse((child) => {
     if (!(child as THREE.Mesh).isMesh) return;
 
     const mesh = child as THREE.Mesh;
-    if (!forceJewelryPalette && mesh.userData[HAS_EMBEDDED_GLTF_MATERIAL] === true) {
+    const keepEmbedded = forceJewelryPalette
+      ? mesh.userData[HAS_AUTHORED_GLTF_MATERIAL] === true
+      : mesh.userData[HAS_EMBEDDED_GLTF_MATERIAL] === true;
+    if (keepEmbedded) {
       mesh.material = Array.isArray(mesh.material)
         ? mesh.material.map((material) => material.clone())
         : mesh.material.clone();
