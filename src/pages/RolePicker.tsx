@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Check, Loader2, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -10,8 +10,13 @@ import {
   markOnboardingComplete,
   saveUserType,
   setCachedUserType,
+  signTosAgreement,
+  getAccountStatus,
+  type AccountStatus,
 } from '@/lib/onboarding-api';
-import { trackUserTypeSelected } from '@/lib/posthog-events';
+import { trackUserTypeSelected, trackSignup } from '@/lib/posthog-events';
+import { trackHeyCatchSignupCompleted } from '@/lib/heycatch-events';
+import { onboardingReturnPath } from '@/lib/onboarding-return';
 import { toast } from '@/hooks/use-toast';
 import { JewelryBrandModal, type BrandDetails } from '@/components/JewelryBrandModal';
 
@@ -126,9 +131,23 @@ function RoleCard({ label, Icon, selected, onSelect }: RoleCardProps) {
 // Page
 // ---------------------------------------------------------------------------
 
+/** How long to wait for the server's account check before going on without it. */
+const ROLE_CHECK_TIMEOUT_MS = 3000;
+
+/** The check's answer, or null (unknown) if it takes too long. Never hangs Continue. */
+function answerWithin(check: Promise<AccountStatus | null>): Promise<AccountStatus | null> {
+  return Promise.race([
+    check,
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), ROLE_CHECK_TIMEOUT_MS)),
+  ]);
+}
+
 export default function RolePicker() {
   const { user, initializing } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  // The page the onboarding redirect caught them on, or the studio as before.
+  const returnTo = onboardingReturnPath((location.state as { from?: unknown } | null)?.from);
   const [selected, setSelected] = useState<UserType | null>(null);
   const [tosChecked, setTosChecked] = useState(false);
   const [shakeRole, setShakeRole] = useState(false);
@@ -141,6 +160,39 @@ export default function RolePicker() {
   const [brandDetails, setBrandDetails] = useState<BrandDetails | null>(null);
   const shakeRoleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shakeTosTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Who this account is, asked when the page opens (see getAccountStatus).
+  // Keyed by user id, so a different account never reuses another's answer.
+  const savedRoleCheck = useRef<{ userId: string; result: Promise<AccountStatus | null> } | null>(null);
+  const userId = user?.id;
+  // The question stays hidden (a spinner shows) until the server answers. A user
+  // whose role is already saved ("known") is never asked again.
+  const [showQuestion, setShowQuestion] = useState(false);
+
+  useEffect(() => {
+    if (initializing) return;
+    if (!userId) { setShowQuestion(true); return; }
+    if (isOnboardingComplete(userId)) return; // the effect below sends them on
+    if (savedRoleCheck.current?.userId !== userId) {
+      savedRoleCheck.current = { userId, result: getAccountStatus() };
+    }
+    // `active` turns false on unmount, or once the question has shown: a late
+    // answer never pulls someone away mid-choice (Continue still uses it).
+    let active = true;
+    // A slow server never blocks a new user: after this, the question shows anyway.
+    const fallback = setTimeout(() => { active = false; setShowQuestion(true); }, ROLE_CHECK_TIMEOUT_MS);
+    savedRoleCheck.current.result.then((status) => {
+      if (!active) return;
+      clearTimeout(fallback);
+      if (status === 'known') {
+        // Known on the server: remember it on this device and skip the question.
+        markOnboardingComplete(userId);
+        navigate(returnTo, { replace: true });
+      } else {
+        setShowQuestion(true);
+      }
+    });
+    return () => { active = false; clearTimeout(fallback); };
+  }, [initializing, userId, navigate, returnTo]);
 
   const triggerShake = (type: 'role' | 'tos') => {
     if (type === 'role') {
@@ -157,9 +209,9 @@ export default function RolePicker() {
   useEffect(() => {
     if (initializing) return;
     if (user && isOnboardingComplete(user.id)) {
-      navigate('/studio', { replace: true });
+      navigate(returnTo, { replace: true });
     }
-  }, [user, initializing, navigate]);
+  }, [user, initializing, navigate, returnTo]);
 
   const handleContinue = async () => {
     if (!selected) { triggerShake('role'); setRoleError('Please select one to continue.'); return; }
@@ -168,9 +220,22 @@ export default function RolePicker() {
     setSubmitting(true);
     setError(null);
     try {
+      // Ask before saving: once the role is saved, a new account looks returning.
+      // Started on mount, so this is normally already answered.
+      const check = savedRoleCheck.current;
+      const status = await answerWithin(check?.userId === user.id ? check.result : getAccountStatus());
+      // Record the Terms they just ticked. The only server record of consent;
+      // safe to repeat (backend: unique per user, type and version).
+      await signTosAgreement();
       await saveUserType(selected, selected === 'jewelry_brand' ? brandDetails : null);
       setCachedUserType(user.id, selected);
       trackUserTypeSelected({ user_type: selected });
+      // A signup only for a genuinely new account: no role and no run ever.
+      // Known users, older accounts without a role, and unknowns are not counted.
+      if (status === 'new') {
+        trackSignup('google', user.email);
+        trackHeyCatchSignupCompleted({ user_type: selected });
+      }
       if (selected === 'jewelry_brand' && brandDetails) {
         toast({
           title: 'Saved',
@@ -178,12 +243,20 @@ export default function RolePicker() {
         });
       }
       markOnboardingComplete(user.id);
-      navigate('/studio', { replace: true });
+      navigate(returnTo, { replace: true });
     } catch {
       setSubmitting(false);
       setError('Something went wrong. Please try again.');
     }
   };
+
+  if (!showQuestion) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" aria-label="Loading" />
+      </div>
+    );
+  }
 
   return (
     <>

@@ -46,6 +46,7 @@ import {
   trackUploadGuideViewed,
   trackUploadGuideAcknowledged,
   trackUserTypeSelected,
+  trackSignup,
   trackFeedbackModalOpened,
   trackFeedbackSubmitted,
   trackBrandFormOpened,
@@ -969,5 +970,12 @@ describe('Ruby funnel events', () => {
       ['ruby_team_contact_shown', undefined],
       ['ruby_call_ended', { duration_s: 140, reason: 'ruby_closed', quotes_shown: 2, link_created: true, paid: true, files_uploaded: 3, error_code: null }],
     ])
+  })
+})
+
+describe('trackSignup', () => {
+  it('captures user_signed_up with the method and email', () => {
+    trackSignup('google', 'new@example.com')
+    expect(posthog.capture).toHaveBeenCalledWith('user_signed_up', { method: 'google', email: 'new@example.com' })
   })
 })
