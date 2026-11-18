@@ -10,7 +10,9 @@ import {
   markOnboardingComplete,
   saveUserType,
   setCachedUserType,
-  hasSavedUserType,
+  signTosAgreement,
+  getAccountStatus,
+  type AccountStatus,
 } from '@/lib/onboarding-api';
 import { trackUserTypeSelected, trackSignup } from '@/lib/posthog-events';
 import { trackHeyCatchSignupCompleted } from '@/lib/heycatch-events';
@@ -129,11 +131,11 @@ function RoleCard({ label, Icon, selected, onSelect }: RoleCardProps) {
 // Page
 // ---------------------------------------------------------------------------
 
-/** How long to wait for the server's "already has a role?" answer before going on without it. */
+/** How long to wait for the server's account check before going on without it. */
 const ROLE_CHECK_TIMEOUT_MS = 3000;
 
 /** The check's answer, or null (unknown) if it takes too long. Never hangs Continue. */
-function answerWithin(check: Promise<boolean | null>): Promise<boolean | null> {
+function answerWithin(check: Promise<AccountStatus | null>): Promise<AccountStatus | null> {
   return Promise.race([
     check,
     new Promise<null>((resolve) => setTimeout(() => resolve(null), ROLE_CHECK_TIMEOUT_MS)),
@@ -158,12 +160,12 @@ export default function RolePicker() {
   const [brandDetails, setBrandDetails] = useState<BrandDetails | null>(null);
   const shakeRoleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shakeTosTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Whether the server already held a role when this page opened (see hasSavedUserType).
+  // Who this account is, asked when the page opens (see getAccountStatus).
   // Keyed by user id, so a different account never reuses another's answer.
-  const savedRoleCheck = useRef<{ userId: string; result: Promise<boolean | null> } | null>(null);
+  const savedRoleCheck = useRef<{ userId: string; result: Promise<AccountStatus | null> } | null>(null);
   const userId = user?.id;
-  // The question stays hidden (a spinner shows) until the server says this is a
-  // new account. A returning user on a new device is never asked again.
+  // The question stays hidden (a spinner shows) until the server answers. A user
+  // whose role is already saved ("known") is never asked again.
   const [showQuestion, setShowQuestion] = useState(false);
 
   useEffect(() => {
@@ -171,17 +173,17 @@ export default function RolePicker() {
     if (!userId) { setShowQuestion(true); return; }
     if (isOnboardingComplete(userId)) return; // the effect below sends them on
     if (savedRoleCheck.current?.userId !== userId) {
-      savedRoleCheck.current = { userId, result: hasSavedUserType() };
+      savedRoleCheck.current = { userId, result: getAccountStatus() };
     }
     // `active` turns false on unmount, or once the question has shown: a late
     // answer never pulls someone away mid-choice (Continue still uses it).
     let active = true;
     // A slow server never blocks a new user: after this, the question shows anyway.
     const fallback = setTimeout(() => { active = false; setShowQuestion(true); }, ROLE_CHECK_TIMEOUT_MS);
-    savedRoleCheck.current.result.then((isReturning) => {
+    savedRoleCheck.current.result.then((status) => {
       if (!active) return;
       clearTimeout(fallback);
-      if (isReturning === true) {
+      if (status === 'known') {
         // Known on the server: remember it on this device and skip the question.
         markOnboardingComplete(userId);
         navigate(returnTo, { replace: true });
@@ -221,13 +223,16 @@ export default function RolePicker() {
       // Ask before saving: once the role is saved, a new account looks returning.
       // Started on mount, so this is normally already answered.
       const check = savedRoleCheck.current;
-      const isReturning = await answerWithin(check?.userId === user.id ? check.result : hasSavedUserType());
+      const status = await answerWithin(check?.userId === user.id ? check.result : getAccountStatus());
+      // Record the Terms they just ticked. The only server record of consent;
+      // safe to repeat (backend: unique per user, type and version).
+      await signTosAgreement();
       await saveUserType(selected, selected === 'jewelry_brand' ? brandDetails : null);
       setCachedUserType(user.id, selected);
       trackUserTypeSelected({ user_type: selected });
-      // A signup only when the server had no role (false). Returning users on a
-      // new device (true) and unknowns (null) are not counted, so nothing double-counts.
-      if (isReturning === false) {
+      // A signup only for a genuinely new account: no role and no run ever.
+      // Known users, older accounts without a role, and unknowns are not counted.
+      if (status === 'new') {
         trackSignup('google', user.email);
         trackHeyCatchSignupCompleted({ user_type: selected });
       }

@@ -5,7 +5,7 @@ vi.mock('@/lib/authenticated-fetch', () => ({
 }));
 
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
-import { saveUserType, getCachedUserType, setCachedUserType, hasSavedUserType } from '@/lib/onboarding-api';
+import { saveUserType, getCachedUserType, setCachedUserType, getAccountStatus, signTosAgreement } from '@/lib/onboarding-api';
 
 const mockFetch = vi.mocked(authenticatedFetch);
 
@@ -96,21 +96,75 @@ describe('saveUserType', () => {
   });
 });
 
-describe('hasSavedUserType', () => {
-  it('is false for a new account: the server has no role yet', async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify({ id: 'u1', user_type: null }), { status: 200 }));
-    expect(await hasSavedUserType()).toBe(false);
+/** Answers GET /api/user/profile and GET /history/workflows/me by URL. */
+function serve(profile: Response | Error, history: Response | Error) {
+  mockFetch.mockImplementation(async (url: string) => {
+    const r = String(url).startsWith('/api/user/profile') ? profile : history;
+    if (r instanceof Error) throw r;
+    return r.clone();
+  });
+}
+const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+
+describe('getAccountStatus', () => {
+  it('is "known" when the server already holds a role', async () => {
+    serve(json({ id: 'u1', user_type: 'freelancer' }), json([{ id: 'w1' }]));
+    expect(await getAccountStatus()).toBe('known');
   });
 
-  it('is true for a returning account onboarding again on a new device', async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify({ id: 'u1', user_type: 'freelancer' }), { status: 200 }));
-    expect(await hasSavedUserType()).toBe(true);
+  it('is "new" only when there is no role AND no run has ever been made', async () => {
+    serve(json({ id: 'u1', user_type: null }), json([]));
+    expect(await getAccountStatus()).toBe('new');
+    serve(json({ id: 'u1', user_type: null }), json({ workflows: [] }));
+    expect(await getAccountStatus()).toBe('new');
   });
 
-  it('is null when the server cannot say (error status or network failure)', async () => {
-    mockFetch.mockResolvedValue(new Response('nope', { status: 500 }));
-    expect(await hasSavedUserType()).toBeNull();
-    mockFetch.mockRejectedValue(new Error('network'));
-    expect(await hasSavedUserType()).toBeNull();
+  it('is "existing_without_role" for an account that has run something but never picked a role', async () => {
+    serve(json({ id: 'u1', user_type: null }), json([{ id: 'w1' }]));
+    expect(await getAccountStatus()).toBe('existing_without_role');
+    serve(json({ id: 'u1', user_type: null }), json({ workflows: [{ id: 'w1' }] }));
+    expect(await getAccountStatus()).toBe('existing_without_role');
+  });
+
+  it('asks history for one run only', async () => {
+    serve(json({ id: 'u1', user_type: null }), json([]));
+    await getAccountStatus();
+    expect(mockFetch).toHaveBeenCalledWith('/history/workflows/me?limit=1&offset=0');
+  });
+
+  it('is null (unknown) when either call fails or answers oddly, and never throws', async () => {
+    serve(new Response('nope', { status: 500 }), json([]));
+    expect(await getAccountStatus()).toBeNull();
+    serve(json({ id: 'u1', user_type: null }), new Response('nope', { status: 500 }));
+    expect(await getAccountStatus()).toBeNull();
+    serve(json({ id: 'u1', user_type: null }), new Error('network'));
+    expect(await getAccountStatus()).toBeNull();
+    serve(json({ id: 'u1', user_type: null }), json({ unexpected: true }));
+    expect(await getAccountStatus()).toBeNull();
+  });
+
+  it('a role answers "known" even if history fails', async () => {
+    serve(json({ id: 'u1', user_type: 'other' }), new Error('network'));
+    expect(await getAccountStatus()).toBe('known');
+  });
+});
+
+describe('signTosAgreement', () => {
+  it('records Terms v1.0 with exactly the type and version the server expects', async () => {
+    mockFetch.mockResolvedValue(new Response('{}', { status: 201 }));
+    await signTosAgreement();
+    expect(mockFetch).toHaveBeenCalledWith('/api/user/acknowledgements', expect.objectContaining({ method: 'POST' }));
+    const body = JSON.parse((mockFetch.mock.calls[0][1] as RequestInit).body as string);
+    expect(body).toEqual({ acknowledgement_type: 'tos', version: '1.0' });
+  });
+
+  it('treats a repeat (200, already signed) as success', async () => {
+    mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
+    await expect(signTosAgreement()).resolves.toBeUndefined();
+  });
+
+  it('throws on failure so the caller can stop', async () => {
+    mockFetch.mockResolvedValue(new Response('no', { status: 500 }));
+    await expect(signTosAgreement()).rejects.toThrow();
   });
 });

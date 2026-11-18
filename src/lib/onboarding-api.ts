@@ -44,19 +44,34 @@ export async function getUserProfile(): Promise<UserProfile> {
 }
 
 /**
- * Whether the server already holds a role for this account. The onboarding
- * "done" flag lives in localStorage, so a returning user on a new device or a
- * cleared browser sees onboarding again; the server's user_type (null until
- * the first onboarding saves it) tells a new account from a returning one.
- * true = returning, false = new, null = couldn't tell (never throws).
+ * Who is on the onboarding page, from the server's point of view.
+ * - known: a role is saved. A returning user on a new device or a cleared
+ *   browser (the onboarding "done" flag lives only in localStorage).
+ * - new: no role AND no run ever made. A genuinely new account.
+ * - existing_without_role: no role, but has run something. Mostly accounts
+ *   from before onboarding existed (backend, 2026-11-17: 2,231 such
+ *   accounts), so "no role" alone does not mean new.
  */
-export async function hasSavedUserType(): Promise<boolean | null> {
-  try {
-    const profile = await getUserProfile();
-    return profile.user_type != null;
-  } catch {
-    return null;
-  }
+export type AccountStatus = 'known' | 'new' | 'existing_without_role';
+
+/** GET /history/workflows/me with limit=1: has this account ever run anything? */
+async function hasAnyRun(): Promise<boolean> {
+  const res = await authenticatedFetch('/history/workflows/me?limit=1&offset=0');
+  if (!res.ok) throw new Error(`Failed to read history: ${res.status}`);
+  const data = await res.json();
+  const runs = Array.isArray(data) ? data : data?.workflows;
+  if (!Array.isArray(runs)) throw new Error('Unexpected history response');
+  return runs.length > 0;
+}
+
+/** The account's status, or null if the server can't say. Never throws. */
+export async function getAccountStatus(): Promise<AccountStatus | null> {
+  // Both asked at once; history only matters when there is no role.
+  const [profile, anyRun] = await Promise.allSettled([getUserProfile(), hasAnyRun()]);
+  if (profile.status !== 'fulfilled') return null;
+  if (profile.value.user_type != null) return 'known';
+  if (anyRun.status !== 'fulfilled') return null;
+  return anyRun.value ? 'existing_without_role' : 'new';
 }
 
 const USER_TYPE_CACHE_PREFIX = 'formanova_user_type_';
