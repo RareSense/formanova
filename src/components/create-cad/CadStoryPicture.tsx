@@ -16,7 +16,7 @@ export interface CadStory {
 export default function CadStoryPicture({ story }: { story: CadStory }) {
   const { input } = story;
   return (
-    <div className="absolute inset-0 grid grid-cols-2" role="img" aria-label={`${story.inputLabel} to NURBS CAD`}>
+    <div className="absolute inset-0 grid grid-cols-[1fr_auto_1fr] bg-white" role="img" aria-label={`${story.inputLabel} to NURBS CAD`}>
       <div className="relative overflow-hidden bg-white">
         {input.kind === "photo" ? (
           <img src={input.src} alt="" draggable={false}
@@ -27,11 +27,13 @@ export default function CadStoryPicture({ story }: { story: CadStory }) {
           </p>
         )}
       </div>
+      {/* The arrow has its own narrow column between the two pictures, so it never sits on either. */}
+      <div aria-hidden="true" className="flex items-center justify-center px-1.5 sm:px-2">
+        <span className="relative block h-px w-3 bg-[hsl(var(--formanova-hero-accent))] after:absolute after:-right-px after:-top-[3px] after:border-y-[3.5px] after:border-l-[6px] after:border-y-transparent after:border-l-[hsl(var(--formanova-hero-accent))] sm:w-4" />
+      </div>
       <div className="relative overflow-hidden bg-muted/40">
         <ThemedCadPicture {...story.cad} className="h-full w-full p-2 sm:p-3" />
       </div>
-      {/* The arrow sits on the seam between the two halves. */}
-      <span aria-hidden="true" className="absolute left-1/2 top-1/2 h-px w-4 -translate-x-1/2 -translate-y-1/2 bg-[hsl(var(--formanova-hero-accent))] after:absolute after:-right-px after:-top-[3px] after:border-y-[3.5px] after:border-l-[6px] after:border-y-transparent after:border-l-[hsl(var(--formanova-hero-accent))] sm:w-5" />
     </div>
   );
 }

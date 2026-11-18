@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
-import { ArrowRight, PenLine, Phone } from 'lucide-react';
+import { ArrowRight, Phone } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { usePrefetchGenerations } from '@/hooks/use-prefetch-generations';
@@ -13,11 +13,10 @@ import { PeopleIcon } from '@/components/icons/PeopleIcon';
 import { RingIcon } from '@/components/icons/RingIcon';
 import { RhinoIcon } from '@/components/icons/RhinoIcon';
 import { TextToCadIcon } from '@/components/icons/TextToCadIcon';
+import { DoodleToCadIcon } from '@/components/icons/DoodleToCadIcon';
 import { ImageToCadIcon } from '@/components/icons/ImageToCadIcon';
 import { EffortIntroModal } from '@/components/studio/EffortIntroModal';
-import { DoneForYouOfferModal } from '@/components/sales/DoneForYouOfferModal';
 import { RubyCallDialog } from '@/components/sales/RubyCallDialog';
-import { useDfyOffer } from '@/hooks/use-dfy-offer';
 import type { EffortLevel } from '@/components/studio/EffortToggle';
 
 import modelShotImg from '@/assets/jewelry/model-shot-card.webp';
@@ -119,7 +118,8 @@ const cadWorkflows: Workflow[] = [
     title: 'CAD from Doodle',
     description: 'Sketch your piece by hand.',
     route: '/text-to-cad?entry=doodle',
-    icon: PenLine,
+    icon: DoodleToCadIcon,
+    wideIcon: true,
     story: { inputLabel: 'Your sketch', input: { kind: 'photo', src: doodleSketch }, cad: { shade: doodleShade, metal: doodleMetal, gems: doodleGems } },
   },
   {
@@ -308,8 +308,7 @@ export default function Dashboard() {
   // First-run effort chooser, shown on the photography cards before category
   // selection. pendingRoute holds where to go once the user picks; null = closed.
   const [pendingRoute, setPendingRoute] = useState<string | null>(null);
-  // Owner, 2026-11-08: the Done For You offer for paying users, never over the effort chooser.
-  const offer = useDfyOffer(user?.id, pendingRoute !== null, 'dashboard');
+  // The Done For You popup is gone: the Custom Projects card is always on the page (owner, 2026-11-19).
   const defaultEffort: EffortLevel =
     localStorage.getItem('formanova_studio_effort') === 'high' ? 'high' : 'low';
 
@@ -413,7 +412,6 @@ export default function Dashboard() {
 
       <RubyCallDialog open={callOpen} onOpenChange={setCallOpen} />
 
-      {user?.id && <DoneForYouOfferModal userId={user.id} moment="dashboard" open={offer.open} onClose={offer.close} />}
 
       <EffortIntroModal
         open={pendingRoute !== null}

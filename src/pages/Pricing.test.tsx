@@ -74,10 +74,9 @@ describe('Pricing, logged out', () => {
     expect(screen.queryByRole('link', { name: /dashboard/i })).not.toBeInTheDocument();
   });
 
-  it('shows the Done For You card, which goes through sign-in before the call', () => {
+  it('has no Done For You card (it moved to the dashboard, owner 2026-11-19)', () => {
     renderPricing();
-    fireEvent.click(screen.getByRole('button', { name: /get my price/i }));
-    expect(screen.getByTestId('where')).toHaveTextContent(`/login?redirect=${encodeURIComponent('/pricing?talk=ruby')}`);
+    expect(screen.queryByRole('button', { name: /get my price/i })).not.toBeInTheDocument();
   });
 
   it('waits for the session check before choosing what to show', () => {

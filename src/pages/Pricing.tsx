@@ -10,8 +10,6 @@ import { useBillingLocale } from '@/hooks/use-billing-locale';
 import { isStarterTier, type BillingTier } from '@/lib/starter-pack';
 import { CreditPlanGrid } from '@/components/pricing/CreditPlanGrid';
 import { PUBLIC_TIERS, resolveGridTiers } from '@/lib/credit-plans';
-import { DoneForYouCard } from '@/components/pricing/DoneForYouCard';
-import { RubyCallDialog } from '@/components/sales/RubyCallDialog';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
 
 const CHECKOUT_URL = '/billing/checkout';
@@ -26,7 +24,6 @@ export default function Pricing() {
   const [tiers, setTiers] = useState<BillingTier[]>([]);
   const [tiersLoading, setTiersLoading] = useState(true);
   const [unavailableTier, setUnavailableTier] = useState<string | null>(null);
-  const [callOpen, setCallOpen] = useState(false);
   const { currency, symbol, country } = useBillingLocale();
   const isINR = currency === 'INR';
 
@@ -65,8 +62,6 @@ export default function Pricing() {
     if (user) fetchTiers();
   }, [user, fetchTiers]);
 
-  const openCall = useCallback(() => setCallOpen(true), []);
-  const showDoneForYou = true; // Done For You and Ruby are for everyone (owner, 2026-11-08)
 
   const handleCheckout = async (tierId: string) => {
     if (!user?.id) {
@@ -120,7 +115,7 @@ export default function Pricing() {
   // Wait for the session check, as the route guard did, so a signed-in user never
   // sees the public list first.
   const plansLoading = initializing || (user ? tiersLoading : false);
-  const cardCount = resolveGridTiers(shownTiers).length + (showDoneForYou ? 1 : 0);
+  const cardCount = resolveGridTiers(shownTiers).length;
   const maxWidthClass = cardCount >= 4 ? 'max-w-7xl' : 'max-w-5xl';
 
   return (
@@ -172,11 +167,9 @@ export default function Pricing() {
             unavailableTier={unavailableTier}
             errorTier={errorTier}
             onCheckout={handleCheckout}
-            doneForYou={showDoneForYou ? <DoneForYouCard onOpenCall={openCall} /> : undefined}
           />
         )}
 
-        <RubyCallDialog open={callOpen} onOpenChange={setCallOpen} />
 
       </div>
     </div>
