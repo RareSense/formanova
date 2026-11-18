@@ -129,6 +129,17 @@ function RoleCard({ label, Icon, selected, onSelect }: RoleCardProps) {
 // Page
 // ---------------------------------------------------------------------------
 
+/** How long to wait for the server's "already has a role?" answer before going on without it. */
+const ROLE_CHECK_TIMEOUT_MS = 3000;
+
+/** The check's answer, or null (unknown) if it takes too long. Never hangs Continue. */
+function answerWithin(check: Promise<boolean | null>): Promise<boolean | null> {
+  return Promise.race([
+    check,
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), ROLE_CHECK_TIMEOUT_MS)),
+  ]);
+}
+
 export default function RolePicker() {
   const { user, initializing } = useAuth();
   const navigate = useNavigate();
@@ -151,13 +162,35 @@ export default function RolePicker() {
   // Keyed by user id, so a different account never reuses another's answer.
   const savedRoleCheck = useRef<{ userId: string; result: Promise<boolean | null> } | null>(null);
   const userId = user?.id;
+  // The question stays hidden (a spinner shows) until the server says this is a
+  // new account. A returning user on a new device is never asked again.
+  const [showQuestion, setShowQuestion] = useState(false);
 
   useEffect(() => {
-    if (initializing || !userId || isOnboardingComplete(userId)) return;
+    if (initializing) return;
+    if (!userId) { setShowQuestion(true); return; }
+    if (isOnboardingComplete(userId)) return; // the effect below sends them on
     if (savedRoleCheck.current?.userId !== userId) {
       savedRoleCheck.current = { userId, result: hasSavedUserType() };
     }
-  }, [initializing, userId]);
+    // `active` turns false on unmount, or once the question has shown: a late
+    // answer never pulls someone away mid-choice (Continue still uses it).
+    let active = true;
+    // A slow server never blocks a new user: after this, the question shows anyway.
+    const fallback = setTimeout(() => { active = false; setShowQuestion(true); }, ROLE_CHECK_TIMEOUT_MS);
+    savedRoleCheck.current.result.then((isReturning) => {
+      if (!active) return;
+      clearTimeout(fallback);
+      if (isReturning === true) {
+        // Known on the server: remember it on this device and skip the question.
+        markOnboardingComplete(userId);
+        navigate(returnTo, { replace: true });
+      } else {
+        setShowQuestion(true);
+      }
+    });
+    return () => { active = false; clearTimeout(fallback); };
+  }, [initializing, userId, navigate, returnTo]);
 
   const triggerShake = (type: 'role' | 'tos') => {
     if (type === 'role') {
@@ -188,7 +221,7 @@ export default function RolePicker() {
       // Ask before saving: once the role is saved, a new account looks returning.
       // Started on mount, so this is normally already answered.
       const check = savedRoleCheck.current;
-      const isReturning = await (check?.userId === user.id ? check.result : hasSavedUserType());
+      const isReturning = await answerWithin(check?.userId === user.id ? check.result : hasSavedUserType());
       await saveUserType(selected, selected === 'jewelry_brand' ? brandDetails : null);
       setCachedUserType(user.id, selected);
       trackUserTypeSelected({ user_type: selected });
@@ -211,6 +244,14 @@ export default function RolePicker() {
       setError('Something went wrong. Please try again.');
     }
   };
+
+  if (!showQuestion) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" aria-label="Loading" />
+      </div>
+    );
+  }
 
   return (
     <>
