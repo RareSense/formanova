@@ -37,39 +37,39 @@ function renderPage(page: JSX.Element, state?: unknown) {
   );
 }
 
-describe('Done For You card on the plan pages', () => {
+// Owner, 2026-11-19: Done For You lives on the dashboard's Custom Projects card,
+// so the plan pages no longer carry it on any view.
+describe('Done For You is not on the plan pages', () => {
   beforeEach(() => {
-    vi.stubEnv('VITE_RUBY_CALL_ALLOWLIST_EMAILS', ''); // no allowlist: shown to everyone (owner, 2026-11-08)
     credits.value = 10;
   });
 
-  it('shows on /pricing', async () => {
+  it('is not on /pricing', async () => {
     renderPage(<Pricing />);
-    await waitFor(() => expect(screen.getByText('Done For You card')).toBeInTheDocument());
+    await screen.findAllByText(/basic/i); // the plans have loaded
+    expect(screen.queryByText('Done For You card')).not.toBeInTheDocument();
+    expect(screen.queryByText('Ruby call dialog')).not.toBeInTheDocument();
   });
 
-  it('shows on a normal /credits visit, with the call window', async () => {
+  it('is not on a normal /credits visit, and the plans keep their heading', async () => {
     renderPage(<Credits />);
-    await waitFor(() => expect(screen.getByText('Done For You card')).toBeInTheDocument());
-    expect(screen.getByText('Ruby call dialog')).toBeInTheDocument();
+    await screen.findByText(/get more credits/i);
+    await screen.findAllByText(/basic/i);
+    expect(screen.queryByText('Done For You card')).not.toBeInTheDocument();
+    expect(screen.queryByText('Ruby call dialog')).not.toBeInTheDocument();
   });
 
   it('is not shown on the photo shortfall view', async () => {
     renderPage(<Credits />, { requiredCredits: 50, workflowName: 'jewelry_photoshoots_generator' });
     await screen.findByText(/get more credits/i);
-    await screen.findAllByText(/basic/i); // the plans have loaded
+    await screen.findAllByText(/basic/i);
     expect(screen.queryByText('Done For You card')).not.toBeInTheDocument();
   });
 
   it('is not shown on the CAD shortfall view', async () => {
     renderPage(<Credits />, { requiredCredits: 500, workflowName: 'ring_cad_nurbs_v1' });
     await screen.findByText(/get more credits/i);
-    await screen.findAllByText(/basic/i); // the plans have loaded
+    await screen.findAllByText(/basic/i);
     expect(screen.queryByText('Done For You card')).not.toBeInTheDocument();
-  });
-
-  it('there is no allowlist: an empty one still shows it', async () => {
-    renderPage(<Credits />);
-    await waitFor(() => expect(screen.getByText('Done For You card')).toBeInTheDocument());
   });
 });

@@ -67,6 +67,8 @@ export default function TextToCAD({ variant = "idea" }: { variant?: DesignStartV
 
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const requested = searchParams.get("entry");
+  const entry = variant === "idea" && (requested === "text" || requested === "doodle") ? requested : undefined;
   const { user } = useAuth();
   const notificationEmail = useNotificationEmail(user?.email);
   const showCadUpload = isCadUploadEnabled(user?.email);
@@ -316,6 +318,7 @@ export default function TextToCAD({ variant = "idea" }: { variant?: DesignStartV
     return (
       <div className="min-h-[calc(100vh-5rem)] flex bg-background" tabIndex={0}>
         <DesignToCadFlow
+          entry={entry}
           variant={variant}
           jewelryType={jewelryType}
           setJewelryType={setJewelryType}
