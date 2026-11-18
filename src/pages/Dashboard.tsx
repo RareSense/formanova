@@ -103,7 +103,7 @@ const cadWorkflows: Workflow[] = [
     route: '/image-to-cad',
     icon: ImageToCadIcon,
     wideIcon: true,
-    story: { inputLabel: 'Your photo', input: { kind: 'photo', src: fireflyPhoto, cover: true }, cad: { shade: earringShade, metal: earringMetal, gems: earringGems } },
+    story: { inputLabel: 'Your photo', input: { kind: 'photo', src: fireflyPhoto }, cad: { shade: earringShade, metal: earringMetal, gems: earringGems } },
   },
   // Text and Doodle open straight on the writing box or the drawing pad of the
   // CAD from Idea page, so nobody picks "Idea" and then has to choose again.
