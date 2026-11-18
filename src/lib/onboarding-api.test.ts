@@ -5,7 +5,7 @@ vi.mock('@/lib/authenticated-fetch', () => ({
 }));
 
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
-import { saveUserType, getCachedUserType, setCachedUserType } from '@/lib/onboarding-api';
+import { saveUserType, getCachedUserType, setCachedUserType, hasSavedUserType } from '@/lib/onboarding-api';
 
 const mockFetch = vi.mocked(authenticatedFetch);
 
@@ -93,5 +93,24 @@ describe('saveUserType', () => {
   it('throws on a failed response', async () => {
     mockFetch.mockResolvedValue(new Response('{}', { status: 500 }));
     await expect(saveUserType('other')).rejects.toThrow();
+  });
+});
+
+describe('hasSavedUserType', () => {
+  it('is false for a new account: the server has no role yet', async () => {
+    mockFetch.mockResolvedValue(new Response(JSON.stringify({ id: 'u1', user_type: null }), { status: 200 }));
+    expect(await hasSavedUserType()).toBe(false);
+  });
+
+  it('is true for a returning account onboarding again on a new device', async () => {
+    mockFetch.mockResolvedValue(new Response(JSON.stringify({ id: 'u1', user_type: 'freelancer' }), { status: 200 }));
+    expect(await hasSavedUserType()).toBe(true);
+  });
+
+  it('is null when the server cannot say (error status or network failure)', async () => {
+    mockFetch.mockResolvedValue(new Response('nope', { status: 500 }));
+    expect(await hasSavedUserType()).toBeNull();
+    mockFetch.mockRejectedValue(new Error('network'));
+    expect(await hasSavedUserType()).toBeNull();
   });
 });

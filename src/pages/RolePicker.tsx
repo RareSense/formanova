@@ -10,8 +10,9 @@ import {
   markOnboardingComplete,
   saveUserType,
   setCachedUserType,
+  hasSavedUserType,
 } from '@/lib/onboarding-api';
-import { trackUserTypeSelected } from '@/lib/posthog-events';
+import { trackUserTypeSelected, trackSignup } from '@/lib/posthog-events';
 import { trackHeyCatchSignupCompleted } from '@/lib/heycatch-events';
 import { toast } from '@/hooks/use-toast';
 import { JewelryBrandModal, type BrandDetails } from '@/components/JewelryBrandModal';
@@ -142,6 +143,17 @@ export default function RolePicker() {
   const [brandDetails, setBrandDetails] = useState<BrandDetails | null>(null);
   const shakeRoleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shakeTosTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Whether the server already held a role when this page opened (see hasSavedUserType).
+  // Keyed by user id, so a different account never reuses another's answer.
+  const savedRoleCheck = useRef<{ userId: string; result: Promise<boolean | null> } | null>(null);
+  const userId = user?.id;
+
+  useEffect(() => {
+    if (initializing || !userId || isOnboardingComplete(userId)) return;
+    if (savedRoleCheck.current?.userId !== userId) {
+      savedRoleCheck.current = { userId, result: hasSavedUserType() };
+    }
+  }, [initializing, userId]);
 
   const triggerShake = (type: 'role' | 'tos') => {
     if (type === 'role') {
@@ -169,10 +181,19 @@ export default function RolePicker() {
     setSubmitting(true);
     setError(null);
     try {
+      // Ask before saving: once the role is saved, a new account looks returning.
+      // Started on mount, so this is normally already answered.
+      const check = savedRoleCheck.current;
+      const isReturning = await (check?.userId === user.id ? check.result : hasSavedUserType());
       await saveUserType(selected, selected === 'jewelry_brand' ? brandDetails : null);
       setCachedUserType(user.id, selected);
       trackUserTypeSelected({ user_type: selected });
-      trackHeyCatchSignupCompleted({ user_type: selected });
+      // A signup only when the server had no role (false). Returning users on a
+      // new device (true) and unknowns (null) are not counted, so nothing double-counts.
+      if (isReturning === false) {
+        trackSignup('google', user.email);
+        trackHeyCatchSignupCompleted({ user_type: selected });
+      }
       if (selected === 'jewelry_brand' && brandDetails) {
         toast({
           title: 'Saved',

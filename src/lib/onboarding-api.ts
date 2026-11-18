@@ -43,6 +43,22 @@ export async function getUserProfile(): Promise<UserProfile> {
   return res.json();
 }
 
+/**
+ * Whether the server already holds a role for this account. The onboarding
+ * "done" flag lives in localStorage, so a returning user on a new device or a
+ * cleared browser sees onboarding again; the server's user_type (null until
+ * the first onboarding saves it) tells a new account from a returning one.
+ * true = returning, false = new, null = couldn't tell (never throws).
+ */
+export async function hasSavedUserType(): Promise<boolean | null> {
+  try {
+    const profile = await getUserProfile();
+    return profile.user_type != null;
+  } catch {
+    return null;
+  }
+}
+
 const USER_TYPE_CACHE_PREFIX = 'formanova_user_type_';
 
 /** Seed the per-user cache (called wherever the profile is already known). */
