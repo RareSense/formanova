@@ -36,6 +36,8 @@ interface DesignToCadFlowProps {
   onCreateCad: (files: File[]) => Promise<boolean | void> | void;
   /** Idea (describe or draw) or Inspiration (pictures). */
   variant?: DesignStartVariant;
+  /** Dashboard shortcut: open straight on the writing box or the drawing pad. */
+  entry?: "text" | "doodle";
   /** How the current design was started, for the step bar shown after this flow hands over. */
   onStartMode?: (mode: DesignBrief["mode"]) => void;
 }
@@ -75,7 +77,7 @@ export function lowCreditsAfterDesign(balance: number | null, designCost: number
  * pick from, then the same editor as Image to CAD (edit, angles, Ready for
  * CAD). Generate CAD hands the approved pictures to the page's normal CAD run.
  */
-export default function DesignToCadFlow({ jewelryType, setJewelryType, onGlbUpload, dimensions, onDimensions, cadCost, cadCostLoading, creatingCad, onCreateCad, modelPicker, metalStep, variant, onStartMode }: DesignToCadFlowProps) {
+export default function DesignToCadFlow({ jewelryType, setJewelryType, onGlbUpload, dimensions, onDimensions, cadCost, cadCostLoading, creatingCad, onCreateCad, modelPicker, metalStep, variant, entry, onStartMode }: DesignToCadFlowProps) {
   const { generate } = useDesignImageRun();
   const { credits } = useCredits();
   const navigate = useNavigate();
@@ -150,7 +152,7 @@ export default function DesignToCadFlow({ jewelryType, setJewelryType, onGlbUplo
     <>
       {/* Kept mounted while hidden, so Back finds the brief as it was left. */}
       <div className={stage === "start" ? "contents" : "hidden"}>
-        <DesignStartScreen jewelryType={jewelryType} setJewelryType={setJewelryType} busy={false} onMake={requestMake} onGlbUpload={onGlbUpload} variant={variant} />
+        <DesignStartScreen jewelryType={jewelryType} setJewelryType={setJewelryType} busy={false} onMake={requestMake} onGlbUpload={onGlbUpload} variant={variant} entry={entry} />
       </div>
       {stage === "pick" && (
         <div className="flex w-full flex-col">

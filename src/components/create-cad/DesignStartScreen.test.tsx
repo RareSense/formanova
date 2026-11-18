@@ -110,3 +110,29 @@ describe('DesignStartScreen inspiration examples', () => {
     expect(canvasPictures()).toHaveLength(0);
   });
 });
+
+describe('DesignStartScreen direct entries from the dashboard', () => {
+  const renderEntry = (entry: 'text' | 'doodle') =>
+    render(<DesignStartScreen variant="idea" entry={entry} jewelryType="ring" setJewelryType={vi.fn()} busy={false} onMake={vi.fn()} />);
+
+  it('CAD from Text opens the writing box with no second choice', () => {
+    renderEntry('text');
+    expect(screen.queryByRole('tablist', { name: /how do you want to start/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: /describe your ring/i })).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: /about your drawing/i })).not.toBeInTheDocument();
+    expect(screen.getAllByText('CAD from Text').length).toBeGreaterThan(0);
+  });
+
+  it('CAD from Doodle opens the drawing pad with no second choice', () => {
+    renderEntry('doodle');
+    expect(screen.queryByRole('tablist', { name: /how do you want to start/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: /about your drawing/i })).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: /describe your ring/i })).not.toBeInTheDocument();
+    expect(screen.getByText('Draw your piece')).toBeInTheDocument();
+  });
+
+  it('without an entry, CAD from Idea still offers the choice (original path unchanged)', () => {
+    render(<DesignStartScreen variant="idea" jewelryType="ring" setJewelryType={vi.fn()} busy={false} onMake={vi.fn()} />);
+    expect(screen.getByRole('tablist', { name: /how do you want to start/i })).toBeInTheDocument();
+  });
+});

@@ -4,8 +4,8 @@ export interface CadStory {
   /** What the customer brings: a picture, or the words they typed. */
   input: { kind: "photo"; src: string; cover?: boolean } | { kind: "prompt"; text: string };
   inputLabel: string;
-  /** The Rhino capture, as theme-coloured layers. */
-  cad: { shade: string; metal: string; gems: string };
+  /** The Rhino capture, as theme-coloured layers, or a single picture where no layered capture exists yet. */
+  cad: { shade: string; metal: string; gems: string } | { image: string };
 }
 
 const label = "absolute left-1.5 top-1.5 z-10 bg-background/85 px-1 font-mono text-[7px] uppercase tracking-[0.14em] text-muted-foreground sm:text-[8px]";
@@ -28,7 +28,9 @@ export default function CadStoryPicture({ story }: { story: CadStory }) {
       <span aria-hidden="true" className="relative h-px w-3 flex-shrink-0 bg-[hsl(var(--formanova-hero-accent))] after:absolute after:-right-px after:-top-[3px] after:border-y-[3.5px] after:border-l-[6px] after:border-y-transparent after:border-l-[hsl(var(--formanova-hero-accent))] sm:w-5" />
       <div className="relative h-full flex-1 overflow-hidden border border-border/70">
         <span className={label}>NURBS CAD</span>
-        <ThemedCadPicture {...story.cad} className="h-full w-full p-1.5 pt-4" />
+        {"image" in story.cad
+          ? <img src={story.cad.image} alt="" draggable={false} className="h-full w-full bg-white object-contain p-1.5 pt-4" />
+          : <ThemedCadPicture {...story.cad} className="h-full w-full p-1.5 pt-4" />}
       </div>
     </div>
   );

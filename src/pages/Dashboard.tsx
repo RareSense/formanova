@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, PenLine, Phone } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { usePrefetchGenerations } from '@/hooks/use-prefetch-generations';
@@ -16,6 +16,7 @@ import { TextToCadIcon } from '@/components/icons/TextToCadIcon';
 import { ImageToCadIcon } from '@/components/icons/ImageToCadIcon';
 import { EffortIntroModal } from '@/components/studio/EffortIntroModal';
 import { DoneForYouOfferModal } from '@/components/sales/DoneForYouOfferModal';
+import { RubyCallDialog } from '@/components/sales/RubyCallDialog';
 import { useDfyOffer } from '@/hooks/use-dfy-offer';
 import type { EffortLevel } from '@/components/studio/EffortToggle';
 
@@ -35,12 +36,20 @@ import solitaireGems from '@/assets/cad-cards/story/solitaire-gems.webp';
 import ladybugShade from '@/assets/cad-cards/story/ladybug-shade.webp';
 import ladybugMetal from '@/assets/cad-cards/story/ladybug-metal.webp';
 import ladybugGems from '@/assets/cad-cards/story/ladybug-gems.webp';
+import doodleSketch from '@/assets/dashboard/doodle-sketch.webp';
+// Placeholder until a Rhino capture of a real doodle job replaces it (owner, 2026-11-19).
+import doodleCad from '@/assets/dashboard/doodle-cad.webp';
+import doneForYouBench from '@/assets/dashboard/done-for-you-bench.webp';
 
 type Workflow = {
   title: string;
   description: string;
   /** Existing destination, unchanged from the Photo Studio / CAD Studio pages. */
-  route: string;
+  route?: string;
+  /** Done For You opens the call window on this page instead of going somewhere. */
+  action?: 'call';
+  /** Button text; Continue unless set. */
+  cta?: string;
   icon: React.ComponentType<{ className?: string }>;
   image?: string;
   /** CAD cards: what goes in and the CAD it becomes, drawn in theme colours. */
@@ -93,13 +102,22 @@ const cadWorkflows: Workflow[] = [
     wideIcon: true,
     story: { inputLabel: 'Your photo', input: { kind: 'photo', src: fireflyPhoto }, cad: { shade: earringShade, metal: earringMetal, gems: earringGems } },
   },
+  // Text and Doodle open straight on the writing box or the drawing pad of the
+  // CAD from Idea page, so nobody picks "Idea" and then has to choose again.
   {
-    title: 'CAD from Idea',
-    description: 'Turn your idea into a CAD model.',
-    route: '/text-to-cad',
+    title: 'CAD from Text',
+    description: 'Describe your piece in words.',
+    route: '/text-to-cad?entry=text',
     icon: TextToCadIcon,
     wideIcon: true,
-    story: { inputLabel: 'Your idea', input: { kind: 'prompt', text: 'Solitaire ring, round diamond, pavé band…' }, cad: { shade: solitaireShade, metal: solitaireMetal, gems: solitaireGems } },
+    story: { inputLabel: 'Your words', input: { kind: 'prompt', text: 'Solitaire ring, round diamond, pavé band…' }, cad: { shade: solitaireShade, metal: solitaireMetal, gems: solitaireGems } },
+  },
+  {
+    title: 'CAD from Doodle',
+    description: 'Sketch your piece by hand.',
+    route: '/text-to-cad?entry=doodle',
+    icon: PenLine,
+    story: { inputLabel: 'Your sketch', input: { kind: 'photo', src: doodleSketch }, cad: { image: doodleCad } },
   },
   {
     title: 'CAD from Inspiration',
@@ -110,6 +128,16 @@ const cadWorkflows: Workflow[] = [
     story: { inputLabel: 'Inspiration', input: { kind: 'photo', src: ladybugPhoto, cover: true }, cad: { shade: ladybugShade, metal: ladybugMetal, gems: ladybugGems } },
   },
 ];
+
+// Owner, 2026-11-19: the project service sits beside Photography, for free and paid users alike.
+const doneForYou: Workflow = {
+  title: 'Done For You',
+  description: 'Discuss your project with our AI and get a custom quote.',
+  action: 'call',
+  cta: 'Call our AI',
+  icon: Phone,
+  image: doneForYouBench,
+};
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -186,6 +214,9 @@ function CategoryDivider({
 const CARD_FRAME =
   'group relative marta-frame overflow-hidden h-full transition-all duration-300 hover:border-formanova-hero-accent hover:shadow-[0_0_30px_-5px_hsl(var(--formanova-hero-accent)/0.4)] cursor-pointer';
 
+/** Phone and tablet: a card alone on its row sits centred at the width of the others. */
+const HALF_CENTRED = 'col-span-2 w-[calc(50%-4px)] justify-self-center sm:w-[calc(50%-8px)] md:w-[calc(50%-10px)] lg:col-span-1 lg:w-auto lg:justify-self-stretch';
+
 const CONTINUE_BUTTON =
   'px-4 py-2.5 sm:px-6 sm:py-2 bg-formanova-hero-accent text-primary-foreground font-mono text-[10px] md:text-xs tracking-[0.2em] uppercase inline-flex items-center justify-center gap-2 whitespace-nowrap transition-all duration-300 hover:opacity-90';
 
@@ -248,10 +279,10 @@ function WorkflowCard({
         <div className="mt-auto pt-2 sm:pt-3 md:pt-4">
           <button
             type="button"
-            aria-label={`Continue to ${workflow.title}`}
+            aria-label={workflow.cta ? `${workflow.cta}: ${workflow.title}` : `Continue to ${workflow.title}`}
             className={CONTINUE_BUTTON}
           >
-            Continue
+            {workflow.cta ?? 'Continue'}
             <ArrowRight className="w-3 h-3 shrink-0" />
           </button>
         </div>
@@ -266,7 +297,7 @@ export default function Dashboard() {
   const { refetch: refetchShopifyStatus } = useShopifyStatus();
   const userName = user?.email ? user.email.split('@')[0] : '';
   const photography = [...photographyWorkflows, catalogWorkflow];
-  const threeEach = photography.length === 3;
+  const [callOpen, setCallOpen] = useState(false);
 
   // First-run effort chooser, shown on the photography cards before category
   // selection. pendingRoute holds where to go once the user picks; null = closed.
@@ -289,6 +320,8 @@ export default function Dashboard() {
   }, [refetchShopifyStatus]);
 
   const handleSelect = (workflow: Workflow) => {
+    // The call does not start here: the window opens and the user starts it when ready.
+    if (workflow.action === 'call') { setCallOpen(true); return; }
     if (workflow.studioType) trackStudioTypeSelected(workflow.studioType);
     // First time through photography: pop the effort chooser and defer
     // navigation until they choose. Afterwards (seen flag set) go straight
@@ -329,47 +362,50 @@ export default function Dashboard() {
         </motion.div>
 
         {/* Every card is the same size on every screen, so no workflow looks
-            more important. Laptop: one line (2 + 3, or 3 + 3 with Catalog from
-            CAD). Tablet: one section per row, three columns, Photography's two
-            centred when it has two. Phone: two columns, a third card centred
-            under the other two. */}
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-            className={`w-full max-w-[1400px] grid ${threeEach ? 'lg:grid-cols-2' : 'lg:grid-cols-[2fr_3fr]'} gap-x-4 lg:gap-x-6 xl:gap-x-8 gap-y-2 sm:gap-y-6 pb-0 sm:pb-4`}
-          >
-            <section aria-labelledby="dashboard-photography" className="flex flex-col">
-              <CategoryDivider id="dashboard-photography" label="Photography" />
-              <div className={`grid grid-cols-2 gap-2 sm:gap-4 md:gap-5 flex-1 ${threeEach ? 'sm:grid-cols-3' : 'sm:grid-cols-6 lg:grid-cols-2'}`}>
-                {photography.map((workflow, i) => (
-                  <WorkflowCard
-                    key={workflow.title}
-                    workflow={workflow}
-                    onSelect={handleSelect}
-                    className={threeEach
-                      ? (i === 2 ? 'col-span-2 w-[calc(50%-4px)] justify-self-center sm:col-span-1 sm:w-auto sm:justify-self-stretch' : '')
-                      : `sm:col-span-2 lg:col-span-1 ${i === 0 ? 'sm:col-start-2 lg:col-start-auto' : ''}`}
-                  />
-                ))}
-              </div>
-            </section>
+            more important. Laptop: four columns. Row one is Photography's three
+            cards under one rule, then Done For You under its own Custom Projects
+            rule; row two is the four CAD cards. Phone and tablet: two columns,
+            each section under its own rule, a lone card centred. */}
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="w-full max-w-[1400px] grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 md:gap-5 lg:gap-x-6 pb-0 sm:pb-4"
+        >
+          {/* display: contents keeps each section a landmark while its cards stay in the one grid. */}
+          <section aria-labelledby="dashboard-photography" className="contents">
+          <div className="col-span-2 lg:col-span-3 lg:row-start-1 lg:col-start-1">
+            <CategoryDivider id="dashboard-photography" label="Photography" />
+          </div>
+          {photography.map((workflow, i) => (
+            <WorkflowCard
+              key={workflow.title}
+              workflow={workflow}
+              onSelect={handleSelect}
+              className={`lg:row-start-2 ${['lg:col-start-1', 'lg:col-start-2', 'lg:col-start-3'][i]} ${i === 2 ? HALF_CENTRED : ''}`}
+            />
+          ))}
+          </section>
 
-            <section aria-labelledby="dashboard-cad" className="flex flex-col">
-              <CategoryDivider id="dashboard-cad" label="CAD" tag={<RhinoTag />} />
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4 md:gap-5 flex-1">
-                {cadWorkflows.map((workflow, i) => (
-                  <WorkflowCard
-                    key={workflow.title}
-                    workflow={workflow}
-                    onSelect={handleSelect}
-                    className={i === cadWorkflows.length - 1 ? 'col-span-2 w-[calc(50%-4px)] justify-self-center sm:col-span-1 sm:w-auto sm:justify-self-stretch' : ''}
-                  />
-                ))}
-              </div>
-            </section>
-          </motion.div>
+          <section aria-labelledby="dashboard-custom-projects" className="contents">
+          <div className="col-span-2 mt-2 sm:mt-3 lg:col-span-1 lg:mt-0 lg:row-start-1 lg:col-start-4">
+            <CategoryDivider id="dashboard-custom-projects" label="Custom Projects" />
+          </div>
+          <WorkflowCard workflow={doneForYou} onSelect={handleSelect} className={`lg:row-start-2 lg:col-start-4 ${HALF_CENTRED}`} />
+          </section>
+
+          <section aria-labelledby="dashboard-cad" className="contents">
+          <div className="col-span-2 mt-2 sm:mt-3 lg:col-span-4 lg:row-start-3">
+            <CategoryDivider id="dashboard-cad" label="CAD" tag={<RhinoTag />} />
+          </div>
+          {cadWorkflows.map((workflow) => (
+            <WorkflowCard key={workflow.title} workflow={workflow} onSelect={handleSelect} className="lg:row-start-4" />
+          ))}
+          </section>
+        </motion.div>
       </div>
+
+      <RubyCallDialog open={callOpen} onOpenChange={setCallOpen} />
 
       {user?.id && <DoneForYouOfferModal userId={user.id} moment="dashboard" open={offer.open} onClose={offer.close} />}
 
