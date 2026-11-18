@@ -45,6 +45,8 @@ import { PresetModelThumb } from '@/components/studio/PresetModelThumb';
 import { type PresetModel } from '@/lib/models-api';
 import { AspectRatioPill, ResolutionPill, type Resolution } from '@/components/studio/OutputSettingsPills';
 import creditCoinIcon from '@/assets/icons/credit-coin.png';
+import { GenerateBlockedHint } from '@/components/studio/GenerateBlockedHint';
+import { generateBlockedReason } from '@/lib/generate-blocked-reason';
 
 interface PresetCategory {
   id: string;
@@ -132,6 +134,7 @@ export function StudioModelStep({
   handleRenameUserModel,
   handleSelectLibraryModel,
 }: StudioModelStepProps) {
+  const hint = { isProductShot, jewelryImage, activeModelUrl, preflightChecking, isModelUploading };
   return (
     <motion.div
       ref={step2Ref}
@@ -269,6 +272,7 @@ export function StudioModelStep({
                 size="lg"
                 onClick={handleGenerate}
                 disabled={!jewelryImage || !activeModelUrl || preflightChecking || isModelUploading}
+                aria-describedby="generate-hint-desktop"
                 className="gap-2.5 font-display text-lg uppercase tracking-wide bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] text-background hover:opacity-90 transition-opacity border-0 disabled:opacity-40 disabled:from-muted disabled:to-muted disabled:text-muted-foreground"
               >
                 {isModelUploading ? 'Uploading…' : 'Generate Photoshoot'}
@@ -283,8 +287,10 @@ export function StudioModelStep({
             </div>
           </div>
 
-          {/* Spacer so content clears the mobile sticky bar */}
-          <div className="md:hidden h-44" />
+          <GenerateBlockedHint id="generate-hint-desktop" className="hidden md:flex justify-end -mt-3" {...hint} />
+
+          {/* Spacer so content clears the mobile sticky bar (taller while the hint line shows) */}
+          <div className={generateBlockedReason(hint) ? 'md:hidden h-52' : 'md:hidden h-44'} />
         </div>
 
         {/* Right 1/3 -- Model Selection Sidebar */}
@@ -466,6 +472,7 @@ export function StudioModelStep({
           size="lg"
           onClick={handleGenerate}
           disabled={!jewelryImage || !activeModelUrl || preflightChecking || isModelUploading}
+          aria-describedby="generate-hint-mobile"
           className="w-full gap-2.5 font-display text-lg uppercase tracking-wide bg-gradient-to-r from-[hsl(var(--formanova-hero-accent))] to-[hsl(var(--formanova-glow))] text-background hover:opacity-90 transition-opacity border-0 disabled:opacity-40 disabled:from-muted disabled:to-muted disabled:text-muted-foreground"
         >
           {isModelUploading ? 'Uploading…' : 'Generate Photoshoot'}
@@ -477,6 +484,7 @@ export function StudioModelStep({
             </span>
           )}
         </Button>
+        <GenerateBlockedHint id="generate-hint-mobile" className="justify-center text-center" {...hint} />
         <Button
           variant="ghost"
           size="sm"
