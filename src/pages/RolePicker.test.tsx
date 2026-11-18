@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 const navigate = vi.hoisted(() => vi.fn());
-vi.mock('react-router-dom', () => ({ useNavigate: () => navigate }));
+const routerLocation = vi.hoisted(() => ({ current: { state: null as unknown } }));
+vi.mock('react-router-dom', () => ({ useNavigate: () => navigate, useLocation: () => routerLocation.current }));
 
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ user: { id: 'u1', email: 'new@example.com' }, initializing: false }),
@@ -39,6 +40,7 @@ describe('RolePicker signup events', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     api.isOnboardingComplete.mockReturnValue(false);
+    routerLocation.current = { state: null };
   });
 
   it('counts a signup once for a brand-new account (no role on the server yet)', async () => {
@@ -88,5 +90,39 @@ describe('RolePicker signup events', () => {
     expect(ph.trackSignup).not.toHaveBeenCalled();
     expect(hc.trackHeyCatchSignupCompleted).not.toHaveBeenCalled();
     expect(navigate).not.toHaveBeenCalled();
+  });
+});
+
+describe('RolePicker destination after onboarding', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.isOnboardingComplete.mockReturnValue(false);
+    api.hasSavedUserType.mockResolvedValue(false);
+    api.saveUserType.mockResolvedValue(undefined);
+  });
+
+  it('goes on to the page the user was heading to', async () => {
+    routerLocation.current = { state: { from: '/image-to-cad?ref=hero' } };
+    finishOnboarding();
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/image-to-cad?ref=hero', { replace: true }));
+  });
+
+  it('goes to the studio, as before, when there is no destination', async () => {
+    routerLocation.current = { state: null };
+    finishOnboarding();
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/studio', { replace: true }));
+  });
+
+  it('never goes to an unsafe destination', async () => {
+    routerLocation.current = { state: { from: '//evil.example' } };
+    finishOnboarding();
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/studio', { replace: true }));
+  });
+
+  it('sends an already-onboarded user straight on to their destination', async () => {
+    api.isOnboardingComplete.mockReturnValue(true);
+    routerLocation.current = { state: { from: '/credits' } };
+    render(<RolePicker />);
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/credits', { replace: true }));
   });
 });

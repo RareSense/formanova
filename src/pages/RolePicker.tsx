@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Check, Loader2, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import {
 } from '@/lib/onboarding-api';
 import { trackUserTypeSelected, trackSignup } from '@/lib/posthog-events';
 import { trackHeyCatchSignupCompleted } from '@/lib/heycatch-events';
+import { onboardingReturnPath } from '@/lib/onboarding-return';
 import { toast } from '@/hooks/use-toast';
 import { JewelryBrandModal, type BrandDetails } from '@/components/JewelryBrandModal';
 
@@ -131,6 +132,9 @@ function RoleCard({ label, Icon, selected, onSelect }: RoleCardProps) {
 export default function RolePicker() {
   const { user, initializing } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  // The page the onboarding redirect caught them on, or the studio as before.
+  const returnTo = onboardingReturnPath((location.state as { from?: unknown } | null)?.from);
   const [selected, setSelected] = useState<UserType | null>(null);
   const [tosChecked, setTosChecked] = useState(false);
   const [shakeRole, setShakeRole] = useState(false);
@@ -170,9 +174,9 @@ export default function RolePicker() {
   useEffect(() => {
     if (initializing) return;
     if (user && isOnboardingComplete(user.id)) {
-      navigate('/studio', { replace: true });
+      navigate(returnTo, { replace: true });
     }
-  }, [user, initializing, navigate]);
+  }, [user, initializing, navigate, returnTo]);
 
   const handleContinue = async () => {
     if (!selected) { triggerShake('role'); setRoleError('Please select one to continue.'); return; }
@@ -201,7 +205,7 @@ export default function RolePicker() {
         });
       }
       markOnboardingComplete(user.id);
-      navigate('/studio', { replace: true });
+      navigate(returnTo, { replace: true });
     } catch {
       setSubmitting(false);
       setError('Something went wrong. Please try again.');

@@ -2,7 +2,7 @@ import React, { Suspense, useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { HelmetProvider } from "react-helmet-async";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation, useParams } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams } from "react-router-dom";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CreditsProvider } from "@/contexts/CreditsContext";
@@ -11,8 +11,7 @@ import { Header } from "@/components/layout/Header";
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { CADGate } from '@/components/CADGate';
 import { AdminRouteGuard } from '@/components/AdminRouteGuard';
-import { useAuth } from '@/contexts/AuthContext';
-import { isOnboardingComplete } from '@/lib/onboarding-api';
+import { OnboardingRedirectHandler } from '@/components/OnboardingRedirectHandler';
 import { PostHogPageView } from '@/components/PostHogPageView';
 import { BrandPromptHandler } from '@/components/BrandPromptHandler';
 import { ChunkErrorBoundary } from '@/components/ChunkErrorBoundary';
@@ -134,31 +133,6 @@ function PostReloadHandler() {
       }
     }
   }, [navigate]);
-  return null;
-}
-
-const ONBOARDING_PUBLIC_PATHS = [
-  '/', '/login', '/oauth-callback', '/feedback', '/link',
-  '/ai-jewelry-photoshoot', '/ai-jewelry-cad', '/ai-jewelry-photography-comparison',
-];
-
-/** Redirects gated users to /onboarding before their first protected-page visit. */
-function OnboardingRedirectHandler() {
-  const { user, initializing } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  useEffect(() => {
-    if (initializing) return;
-    if (!user) return;
-    if (location.pathname === '/onboarding' || location.pathname === '/onboarding-welcome') return;
-    if (isOnboardingComplete(user.id)) return;
-    const isPublic = ONBOARDING_PUBLIC_PATHS.includes(location.pathname)
-      || location.pathname.startsWith('/blog/');
-    if (isPublic) return;
-    navigate('/onboarding', { replace: true });
-  }, [initializing, user?.id, location.pathname, navigate]);
-
   return null;
 }
 
