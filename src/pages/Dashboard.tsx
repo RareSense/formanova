@@ -195,7 +195,7 @@ function CategoryDivider({
   tag?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-2 sm:gap-3 md:gap-4 mb-1.5 sm:mb-2.5 md:mb-3 [@media(max-height:820px)]:mb-2">
+    <div className="flex items-center gap-2 sm:gap-3 md:gap-4 mb-1.5 sm:mb-2.5 md:mb-3 [@media(max-height:820px)]:mb-2 lg:mb-0">
       <span aria-hidden="true" className="h-px flex-1 bg-border" />
       <div className="flex items-center gap-2.5 md:gap-3 shrink-0">
         <h2
@@ -218,7 +218,8 @@ const CARD_FRAME =
 const HALF_CENTRED = 'col-span-2 w-[calc(50%-4px)] justify-self-center sm:w-[calc(50%-8px)] md:w-[calc(50%-10px)] lg:col-span-1 lg:w-auto lg:justify-self-stretch';
 
 const CONTINUE_BUTTON =
-  'px-4 py-2.5 sm:px-6 sm:py-2 bg-formanova-hero-accent text-primary-foreground font-mono text-[10px] md:text-xs tracking-[0.2em] uppercase inline-flex items-center justify-center gap-2 whitespace-nowrap transition-all duration-300 hover:opacity-90';
+  // One fixed width for every card, so Call our AI and Continue are the same size.
+  'w-[9.5rem] sm:w-[12rem] lg:w-[11rem] xl:w-[12rem] px-4 py-2.5 sm:px-6 sm:py-2 lg:py-1.5 bg-formanova-hero-accent text-primary-foreground font-mono text-[10px] md:text-xs tracking-[0.2em] uppercase inline-flex items-center justify-center gap-2 whitespace-nowrap transition-all duration-300 hover:opacity-90';
 
 function WorkflowCard({
   workflow,
@@ -241,7 +242,9 @@ function WorkflowCard({
       className={`${CARD_FRAME} flex flex-col ${className}`}
     >
       {/* Image */}
-      <div className="relative aspect-[4/3] overflow-hidden">
+      {/* Laptop and up: the picture height follows the screen height, so both rows
+          and their headings fit without scrolling. Phone: the usual 4:3. */}
+      <div className="relative aspect-[4/3] overflow-hidden lg:aspect-auto lg:h-[clamp(52px,calc((100svh-5rem-var(--dash-fixed))/2),240px)]">
         {workflow.story ? (
           <CadStoryPicture story={workflow.story} />
         ) : (
@@ -256,8 +259,8 @@ function WorkflowCard({
       </div>
 
       {/* Content */}
-      <div className="relative z-10 flex flex-col items-center flex-1 px-2.5 py-2 sm:px-4 sm:py-4 md:py-5 bg-card">
-        <div className="w-9 h-9 sm:w-12 sm:h-12 flex items-center justify-center border border-border bg-background -mt-[26px] sm:-mt-11 mb-1 sm:mb-2 relative z-10">
+      <div className="relative z-10 flex flex-col items-center flex-1 px-2.5 py-2 sm:px-4 sm:py-4 md:py-5 lg:px-3 lg:pt-0 lg:pb-2.5 bg-card">
+        <div className="w-9 h-9 sm:w-12 sm:h-12 flex items-center justify-center border border-border bg-background -mt-[26px] sm:-mt-11 lg:w-10 lg:h-10 lg:-mt-5 mb-1 sm:mb-2 lg:mb-1 relative z-10">
           <Icon
             className={`text-formanova-hero-accent ${
               workflow.wideIcon
@@ -268,15 +271,15 @@ function WorkflowCard({
         </div>
         {/* Room for two lines on every card, so a long title (Product Shot from CAD)
             does not push its description and button below the cards beside it. */}
-        <h3 className="min-h-[2em] flex items-center justify-center text-center font-display text-lg sm:text-xl md:text-2xl uppercase tracking-wide text-foreground leading-none mb-1 sm:mb-1.5">
+        <h3 className="min-h-[2em] lg:min-h-0 flex items-center justify-center text-center font-display text-lg sm:text-xl md:text-2xl lg:text-[22px] uppercase tracking-wide text-foreground leading-none mb-1 sm:mb-1.5 lg:mb-1">
           {workflow.title}
         </h3>
-        <p className="font-mono text-[9px] sm:text-[11px] md:text-xs tracking-[0.1em] sm:tracking-[0.15em] text-foreground/80 uppercase text-center max-w-[240px]">
+        <p className="font-mono text-[9px] sm:text-[11px] md:text-xs tracking-[0.1em] sm:tracking-[0.15em] text-foreground/80 uppercase text-center max-w-[240px] lg:max-w-[300px] lg:tracking-[0.06em] lg:text-[10px] xl:text-[11px] lg:leading-snug">
           {workflow.description}
         </p>
         {/* mt-auto on the wrapper, not the button, so the Continue buttons line
             up across a row without inflating the button's own padding. */}
-        <div className="mt-auto pt-2 sm:pt-3 md:pt-4">
+        <div className="mt-auto pt-2 sm:pt-3 md:pt-4 lg:pt-2">
           <button
             type="button"
             aria-label={workflow.cta ? `${workflow.cta}: ${workflow.title}` : `Continue to ${workflow.title}`}
@@ -342,21 +345,21 @@ export default function Dashboard() {
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
 
-      <div className="min-h-[calc(100svh-5rem)] bg-background flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 lg:px-10 overflow-x-hidden py-2 sm:py-3 md:py-4 [@media(max-height:820px)]:py-2">
+      <div className="[--dash-fixed:466px] min-h-[calc(100svh-5rem)] bg-background flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 lg:px-10 overflow-x-hidden py-2 sm:py-3 md:py-4 [@media(max-height:820px)]:py-2">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="text-center mb-1.5 sm:mb-3 md:mb-4 [@media(max-height:820px)]:mb-2 max-w-[720px]"
+          className="text-center mb-1.5 sm:mb-3 md:mb-4 [@media(max-height:820px)]:mb-2 lg:mb-1 max-w-[720px]"
         >
-          <p className="font-mono text-[10px] md:text-xs tracking-[0.3em] uppercase text-formanova-hero-accent mb-1.5 font-medium hidden sm:block [@media(max-height:780px)]:hidden">
+          <p className="font-mono text-[10px] md:text-xs tracking-[0.3em] uppercase text-formanova-hero-accent mb-1.5 font-medium hidden sm:block lg:hidden [@media(max-height:780px)]:hidden">
             {userName ? `Welcome, ${userName}` : 'Welcome'}
           </p>
-          <h1 className="font-display text-xl sm:text-4xl md:text-5xl [@media(max-height:820px)]:md:text-4xl uppercase tracking-wide text-foreground leading-none mb-1 sm:mb-1.5">
+          <h1 className="font-display text-xl sm:text-4xl md:text-5xl [@media(max-height:820px)]:md:text-4xl uppercase tracking-wide text-foreground leading-none mb-1 sm:mb-1.5 lg:text-4xl lg:mb-0">
             What do you want to create?
           </h1>
-          <p className="font-mono text-[11px] md:text-xs tracking-[0.12em] text-foreground/70 uppercase font-medium hidden sm:block [@media(max-height:780px)]:hidden">
+          <p className="font-mono text-[11px] md:text-xs tracking-[0.12em] text-foreground/70 uppercase font-medium hidden sm:block lg:hidden [@media(max-height:780px)]:hidden">
             Pick a workflow to begin
           </p>
         </motion.div>
@@ -370,7 +373,7 @@ export default function Dashboard() {
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="w-full max-w-[1400px] grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 md:gap-5 lg:gap-x-6 pb-0 sm:pb-4"
+          className="w-full max-w-[1400px] grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 md:gap-5 lg:gap-x-6 lg:gap-y-2 pb-0 sm:pb-4 lg:pb-0"
         >
           {/* display: contents keeps each section a landmark while its cards stay in the one grid. */}
           <section aria-labelledby="dashboard-photography" className="contents">
