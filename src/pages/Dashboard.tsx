@@ -37,8 +37,11 @@ import ladybugShade from '@/assets/cad-cards/story/ladybug-shade.webp';
 import ladybugMetal from '@/assets/cad-cards/story/ladybug-metal.webp';
 import ladybugGems from '@/assets/cad-cards/story/ladybug-gems.webp';
 import doodleSketch from '@/assets/dashboard/doodle-sketch.webp';
-// Placeholder until a Rhino capture of a real doodle job replaces it (owner, 2026-11-19).
-import doodleCad from '@/assets/dashboard/doodle-cad.webp';
+// Doodle CAD layers made from a render, in the Rhino-capture style of the cards above;
+// replace with a Rhino capture of a real doodle job when there is one.
+import doodleShade from '@/assets/dashboard/doodle-shade.webp';
+import doodleMetal from '@/assets/dashboard/doodle-metal.webp';
+import doodleGems from '@/assets/dashboard/doodle-gems.webp';
 import doneForYouBench from '@/assets/dashboard/done-for-you-bench.webp';
 
 type Workflow = {
@@ -100,7 +103,7 @@ const cadWorkflows: Workflow[] = [
     route: '/image-to-cad',
     icon: ImageToCadIcon,
     wideIcon: true,
-    story: { inputLabel: 'Your photo', input: { kind: 'photo', src: fireflyPhoto }, cad: { shade: earringShade, metal: earringMetal, gems: earringGems } },
+    story: { inputLabel: 'Your photo', input: { kind: 'photo', src: fireflyPhoto, cover: true }, cad: { shade: earringShade, metal: earringMetal, gems: earringGems } },
   },
   // Text and Doodle open straight on the writing box or the drawing pad of the
   // CAD from Idea page, so nobody picks "Idea" and then has to choose again.
@@ -110,14 +113,14 @@ const cadWorkflows: Workflow[] = [
     route: '/text-to-cad?entry=text',
     icon: TextToCadIcon,
     wideIcon: true,
-    story: { inputLabel: 'Your words', input: { kind: 'prompt', text: 'Solitaire ring, round diamond, pavé band…' }, cad: { shade: solitaireShade, metal: solitaireMetal, gems: solitaireGems } },
+    story: { inputLabel: 'Your words', input: { kind: 'prompt', text: 'Solitaire ring' }, cad: { shade: solitaireShade, metal: solitaireMetal, gems: solitaireGems } },
   },
   {
     title: 'CAD from Doodle',
     description: 'Sketch your piece by hand.',
     route: '/text-to-cad?entry=doodle',
     icon: PenLine,
-    story: { inputLabel: 'Your sketch', input: { kind: 'photo', src: doodleSketch }, cad: { image: doodleCad } },
+    story: { inputLabel: 'Your sketch', input: { kind: 'photo', src: doodleSketch }, cad: { shade: doodleShade, metal: doodleMetal, gems: doodleGems } },
   },
   {
     title: 'CAD from Inspiration',
@@ -219,7 +222,7 @@ const HALF_CENTRED = 'col-span-2 w-[calc(50%-4px)] justify-self-center sm:w-[cal
 
 const CONTINUE_BUTTON =
   // One fixed width for every card, so Call our AI and Continue are the same size.
-  'w-[9.5rem] sm:w-[12rem] lg:w-[11rem] xl:w-[12rem] px-4 py-2.5 sm:px-6 sm:py-2 lg:py-1.5 bg-formanova-hero-accent text-primary-foreground font-mono text-[10px] md:text-xs tracking-[0.2em] uppercase inline-flex items-center justify-center gap-2 whitespace-nowrap transition-all duration-300 hover:opacity-90';
+  'w-[9.5rem] sm:w-[12rem] lg:w-[11rem] xl:w-[12rem] px-4 py-2.5 sm:px-6 sm:py-2 lg:py-2.5 bg-formanova-hero-accent text-primary-foreground font-mono text-[10px] md:text-xs tracking-[0.2em] uppercase inline-flex items-center justify-center gap-2 whitespace-nowrap transition-all duration-300 hover:opacity-90';
 
 function WorkflowCard({
   workflow,
@@ -345,7 +348,7 @@ export default function Dashboard() {
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
 
-      <div className="[--dash-fixed:466px] min-h-[calc(100svh-5rem)] bg-background flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 lg:px-10 overflow-x-hidden py-2 sm:py-3 md:py-4 [@media(max-height:820px)]:py-2">
+      <div className="[--dash-fixed:486px] min-h-[calc(100svh-5rem)] bg-background flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 lg:px-10 overflow-x-hidden py-2 sm:py-3 md:py-4 [@media(max-height:820px)]:py-2">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}

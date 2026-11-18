@@ -3,35 +3,35 @@ import ThemedCadPicture from "./ThemedCadPicture";
 export interface CadStory {
   /** What the customer brings: a picture, or the words they typed. */
   input: { kind: "photo"; src: string; cover?: boolean } | { kind: "prompt"; text: string };
+  /** Spoken name of the input, for screen readers. */
   inputLabel: string;
-  /** The Rhino capture, as theme-coloured layers, or a single picture where no layered capture exists yet. */
-  cad: { shade: string; metal: string; gems: string } | { image: string };
+  /** The Rhino capture, as theme-coloured layers. */
+  cad: { shade: string; metal: string; gems: string };
 }
 
-const label = "absolute left-1.5 top-1.5 z-10 bg-background/85 px-1 font-mono text-[7px] uppercase tracking-[0.14em] text-muted-foreground sm:text-[8px]";
-
-/** Dashboard card picture: what goes in, an arrow, the real CAD it becomes. */
+/**
+ * Dashboard card picture, edge to edge: what goes in fills the left half, a
+ * small gold arrow, the real CAD it becomes on a soft light ground on the right.
+ */
 export default function CadStoryPicture({ story }: { story: CadStory }) {
   const { input } = story;
   return (
-    <div className="absolute inset-0 flex items-center justify-center gap-2 bg-muted/20 p-3 sm:gap-3 sm:p-4">
-      <div className="relative h-full flex-1 overflow-hidden border border-border/70 bg-white">
-        <span className={label}>{story.inputLabel}</span>
+    <div className="absolute inset-0 grid grid-cols-2" role="img" aria-label={`${story.inputLabel} to NURBS CAD`}>
+      <div className="relative overflow-hidden bg-white">
         {input.kind === "photo" ? (
-          <img src={input.src} alt="" draggable={false} className={`h-full w-full ${input.cover ? "object-cover" : "object-contain p-2 pt-5"}`} />
+          <img src={input.src} alt="" draggable={false}
+            className={`h-full w-full ${input.cover ? "object-cover transition-transform duration-500 group-hover:scale-105" : "object-contain p-2"}`} />
         ) : (
-          <p className="line-clamp-4 px-2 pt-6 font-mono text-[9px] leading-snug text-zinc-800 sm:text-[11px]">
-            {input.text}<span className="ml-0.5 inline-block h-[1em] w-px translate-y-[2px] bg-[hsl(var(--formanova-hero-accent))]" />
+          <p className="flex h-full items-center justify-center px-3 text-center font-serif text-sm italic leading-snug text-zinc-800 sm:text-base lg:text-[15px] xl:text-lg">
+            “{input.text}”
           </p>
         )}
       </div>
-      <span aria-hidden="true" className="relative h-px w-3 flex-shrink-0 bg-[hsl(var(--formanova-hero-accent))] after:absolute after:-right-px after:-top-[3px] after:border-y-[3.5px] after:border-l-[6px] after:border-y-transparent after:border-l-[hsl(var(--formanova-hero-accent))] sm:w-5" />
-      <div className="relative h-full flex-1 overflow-hidden border border-border/70">
-        <span className={label}>NURBS CAD</span>
-        {"image" in story.cad
-          ? <img src={story.cad.image} alt="" draggable={false} className="h-full w-full bg-white object-contain p-1.5 pt-4" />
-          : <ThemedCadPicture {...story.cad} className="h-full w-full p-1.5 pt-4" />}
+      <div className="relative overflow-hidden bg-muted/40">
+        <ThemedCadPicture {...story.cad} className="h-full w-full p-2 sm:p-3" />
       </div>
+      {/* The arrow sits on the seam between the two halves. */}
+      <span aria-hidden="true" className="absolute left-1/2 top-1/2 h-px w-4 -translate-x-1/2 -translate-y-1/2 bg-[hsl(var(--formanova-hero-accent))] after:absolute after:-right-px after:-top-[3px] after:border-y-[3.5px] after:border-l-[6px] after:border-y-transparent after:border-l-[hsl(var(--formanova-hero-accent))] sm:w-5" />
     </div>
   );
 }
