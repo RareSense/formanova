@@ -11,7 +11,6 @@ import { trackStudioTypeSelected } from '@/lib/posthog-events';
 
 import { PeopleIcon } from '@/components/icons/PeopleIcon';
 import { RingIcon } from '@/components/icons/RingIcon';
-import { RhinoIcon } from '@/components/icons/RhinoIcon';
 import { TextToCadIcon } from '@/components/icons/TextToCadIcon';
 import { DoodleToCadIcon } from '@/components/icons/DoodleToCadIcon';
 import { ImageToCadIcon } from '@/components/icons/ImageToCadIcon';
@@ -41,7 +40,7 @@ import doodleSketch from '@/assets/dashboard/doodle-sketch.webp';
 import doodleShade from '@/assets/dashboard/doodle-shade.webp';
 import doodleMetal from '@/assets/dashboard/doodle-metal.webp';
 import doodleGems from '@/assets/dashboard/doodle-gems.webp';
-import doneForYouBench from '@/assets/dashboard/done-for-you-bench.webp';
+import doneForYouCall from '@/assets/dashboard/done-for-you-call.webp';
 
 type Workflow = {
   title: string;
@@ -135,11 +134,11 @@ const cadWorkflows: Workflow[] = [
 // Owner, 2026-11-19: the project service sits beside Photography, for free and paid users alike.
 const doneForYou: Workflow = {
   title: 'Done For You',
-  description: 'Discuss your project with our AI and get a custom quote.',
+  description: 'Discuss your project with our AI.',
   action: 'call',
   cta: 'Call our AI',
   icon: Phone,
-  image: doneForYouBench,
+  image: doneForYouCall,
 };
 
 const containerVariants = {
@@ -151,36 +150,6 @@ const itemVariants = {
   hidden: { opacity: 0, y: 16 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
 };
-
-/**
- * Compatibility note for the CAD category.
- *
- * Sits on the divider rather than on each card because it describes both CAD
- * workflows, not either one of them.
- *
- * No box. An outlined pill in an accent colour is the shape of a chip or a
- * filter, so people try to press it. Mono type inside square brackets is the
- * conventional way to write a machine-readable fact, and nothing about it
- * invites a click: no border, no fill, no hover, default cursor.
- *
- * Mark and words sit inside the brackets together and share one colour. Split
- * across the bracket, or coloured differently from each other, they read as
- * two separate things rather than one label. Foreground rather than accent
- * keeps it out of competition with the CAD label beside it.
- *
- * The brackets are aria-hidden so this is announced as "Rhino compatible"
- * rather than with the punctuation read out.
- */
-function RhinoTag() {
-  return (
-    <span className="inline-flex items-center gap-1 cursor-default font-mono text-[9px] md:text-[10px] tracking-[0.15em] uppercase text-foreground font-bold whitespace-nowrap">
-      <span aria-hidden="true">[</span>
-      <RhinoIcon className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0" />
-      <span>Rhino compatible</span>
-      <span aria-hidden="true">]</span>
-    </span>
-  );
-}
 
 /**
  * Category divider: a centred cluster with a rule running out to each edge.
@@ -199,17 +168,17 @@ function CategoryDivider({
 }) {
   return (
     <div className="flex items-center gap-2 sm:gap-3 md:gap-4 mb-1.5 sm:mb-2.5 md:mb-3 [@media(max-height:820px)]:mb-2 lg:mb-0">
-      <span aria-hidden="true" className="h-px flex-1 bg-border" />
+      <span aria-hidden="true" className="h-0.5 flex-1 bg-foreground/45" />
       <div className="flex items-center gap-2.5 md:gap-3 shrink-0">
         <h2
           id={id}
-          className="font-display text-xl sm:text-2xl md:text-3xl [@media(max-height:860px)]:text-xl uppercase tracking-wide text-formanova-hero-accent leading-none whitespace-nowrap"
+          className="font-display text-xl sm:text-2xl md:text-3xl [@media(max-height:860px)]:text-xl lg:!text-2xl uppercase tracking-wide text-formanova-hero-accent leading-none whitespace-nowrap"
         >
           {label}
         </h2>
         {tag}
       </div>
-      <span aria-hidden="true" className="h-px flex-1 bg-border" />
+      <span aria-hidden="true" className="h-0.5 flex-1 bg-foreground/45" />
     </div>
   );
 }
@@ -222,7 +191,7 @@ const HALF_CENTRED = 'col-span-2 w-[calc(50%-4px)] justify-self-center sm:w-[cal
 
 const CONTINUE_BUTTON =
   // One fixed width for every card, so Call our AI and Continue are the same size.
-  'w-[9.5rem] sm:w-[12rem] lg:w-[11rem] xl:w-[12rem] px-4 py-2.5 sm:px-6 sm:py-2 lg:py-2.5 bg-formanova-hero-accent text-primary-foreground font-mono text-[10px] md:text-xs tracking-[0.2em] uppercase inline-flex items-center justify-center gap-2 whitespace-nowrap transition-all duration-300 hover:opacity-90';
+  'w-[9.5rem] sm:w-[12rem] lg:w-[10rem] xl:w-[11rem] px-4 py-2.5 sm:px-6 sm:py-2 lg:py-2 bg-formanova-hero-accent text-primary-foreground font-mono text-[10px] md:text-xs tracking-[0.2em] uppercase inline-flex items-center justify-center gap-2 whitespace-nowrap transition-all duration-300 hover:opacity-90';
 
 function WorkflowCard({
   workflow,
@@ -247,7 +216,7 @@ function WorkflowCard({
       {/* Image */}
       {/* Laptop and up: the picture height follows the screen height, so both rows
           and their headings fit without scrolling. Phone: the usual 4:3. */}
-      <div className="relative aspect-[4/3] overflow-hidden lg:aspect-auto lg:h-[clamp(52px,calc((100svh-5rem-var(--dash-fixed))/2),240px)]">
+      <div className="relative aspect-[4/3] overflow-hidden lg:aspect-auto lg:h-[clamp(44px,calc((100svh-5rem-var(--dash-fixed))/2),240px)]">
         {workflow.story ? (
           <CadStoryPicture story={workflow.story} />
         ) : (
@@ -274,10 +243,10 @@ function WorkflowCard({
         </div>
         {/* Room for two lines on every card, so a long title (Product Shot from CAD)
             does not push its description and button below the cards beside it. */}
-        <h3 className="min-h-[2em] lg:min-h-0 flex items-center justify-center text-center font-display text-lg sm:text-xl md:text-2xl lg:text-[22px] uppercase tracking-wide text-foreground leading-none mb-1 sm:mb-1.5 lg:mb-1">
+        <h3 className="min-h-[2em] lg:min-h-0 flex items-center justify-center text-center font-display text-lg sm:text-xl md:text-2xl lg:!text-xl uppercase tracking-wide text-foreground leading-none mb-1 sm:mb-1.5 lg:mb-1">
           {workflow.title}
         </h3>
-        <p className="font-mono text-[9px] sm:text-[11px] md:text-xs tracking-[0.1em] sm:tracking-[0.15em] text-foreground/80 uppercase text-center max-w-[240px] lg:max-w-[300px] lg:tracking-[0.06em] lg:text-[10px] xl:text-[11px] lg:leading-snug">
+        <p className="font-mono text-[9px] sm:text-[11px] md:text-xs tracking-[0.1em] sm:tracking-[0.15em] text-foreground/80 uppercase text-center max-w-[240px] lg:max-w-[300px] lg:tracking-[0.06em] lg:!text-[11px] lg:leading-snug">
           {workflow.description}
         </p>
         {/* mt-auto on the wrapper, not the button, so the Continue buttons line
@@ -308,7 +277,7 @@ export default function Dashboard() {
   // First-run effort chooser, shown on the photography cards before category
   // selection. pendingRoute holds where to go once the user picks; null = closed.
   const [pendingRoute, setPendingRoute] = useState<string | null>(null);
-  // The Done For You popup is gone: the Custom Projects card is always on the page (owner, 2026-11-19).
+  // The Done For You popup is gone: the Large Projects card is always on the page (owner, 2026-11-19).
   const defaultEffort: EffortLevel =
     localStorage.getItem('formanova_studio_effort') === 'high' ? 'high' : 'low';
 
@@ -347,7 +316,7 @@ export default function Dashboard() {
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
 
-      <div className="[--dash-fixed:486px] min-h-[calc(100svh-5rem)] bg-background flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 lg:px-10 overflow-x-hidden py-2 sm:py-3 md:py-4 [@media(max-height:820px)]:py-2">
+      <div className="[--dash-fixed:520px] min-h-[calc(100svh-5rem)] bg-background flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 lg:px-10 overflow-x-hidden py-2 sm:py-3 md:py-4 [@media(max-height:820px)]:py-2">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -358,7 +327,7 @@ export default function Dashboard() {
           <p className="font-mono text-[10px] md:text-xs tracking-[0.3em] uppercase text-formanova-hero-accent mb-1.5 font-medium hidden sm:block lg:hidden [@media(max-height:780px)]:hidden">
             {userName ? `Welcome, ${userName}` : 'Welcome'}
           </p>
-          <h1 className="font-display text-xl sm:text-4xl md:text-5xl [@media(max-height:820px)]:md:text-4xl uppercase tracking-wide text-foreground leading-none mb-1 sm:mb-1.5 lg:text-4xl lg:mb-0">
+          <h1 className="font-display text-xl sm:text-4xl md:text-5xl [@media(max-height:820px)]:md:text-4xl lg:!text-[42px] uppercase tracking-wide text-foreground leading-none mb-1 sm:mb-1.5 lg:mb-4">
             What do you want to create?
           </h1>
           <p className="font-mono text-[11px] md:text-xs tracking-[0.12em] text-foreground/70 uppercase font-medium hidden sm:block lg:hidden [@media(max-height:780px)]:hidden">
@@ -368,14 +337,14 @@ export default function Dashboard() {
 
         {/* Every card is the same size on every screen, so no workflow looks
             more important. Laptop: four columns. Row one is Photography's three
-            cards under one rule, then Done For You under its own Custom Projects
+            cards under one rule, then Done For You under its own Large Projects
             rule; row two is the four CAD cards. Phone and tablet: two columns,
             each section under its own rule, a lone card centred. */}
         <motion.div
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="w-full max-w-[1400px] grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 md:gap-5 lg:gap-x-6 lg:gap-y-2 pb-0 sm:pb-4 lg:pb-0"
+          className="w-full max-w-[1400px] lg:max-w-[1180px] grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 md:gap-5 lg:gap-x-5 lg:gap-y-3 pb-0 sm:pb-4 lg:pb-0"
         >
           {/* display: contents keeps each section a landmark while its cards stay in the one grid. */}
           <section aria-labelledby="dashboard-photography" className="contents">
@@ -392,16 +361,16 @@ export default function Dashboard() {
           ))}
           </section>
 
-          <section aria-labelledby="dashboard-custom-projects" className="contents">
+          <section aria-labelledby="dashboard-large-projects" className="contents">
           <div className="col-span-2 mt-2 sm:mt-3 lg:col-span-1 lg:mt-0 lg:row-start-1 lg:col-start-4">
-            <CategoryDivider id="dashboard-custom-projects" label="Custom Projects" />
+            <CategoryDivider id="dashboard-large-projects" label="Large Projects" />
           </div>
           <WorkflowCard workflow={doneForYou} onSelect={handleSelect} className={`lg:row-start-2 lg:col-start-4 ${HALF_CENTRED}`} />
           </section>
 
           <section aria-labelledby="dashboard-cad" className="contents">
-          <div className="col-span-2 mt-2 sm:mt-3 lg:col-span-4 lg:row-start-3">
-            <CategoryDivider id="dashboard-cad" label="CAD" tag={<RhinoTag />} />
+          <div className="col-span-2 mt-2 sm:mt-3 lg:col-span-4 lg:row-start-3 lg:mt-4">
+            <CategoryDivider id="dashboard-cad" label="CAD" />
           </div>
           {cadWorkflows.map((workflow) => (
             <WorkflowCard key={workflow.title} workflow={workflow} onSelect={handleSelect} className="lg:row-start-4" />

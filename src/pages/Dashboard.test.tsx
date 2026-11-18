@@ -80,12 +80,12 @@ afterEach(() => {
 });
 
 describe('Dashboard as the merged studio hub', () => {
-  it('asks what to create and shows the eight cards under Photography, Custom Projects and CAD', () => {
+  it('asks what to create and shows the eight cards under Photography, Large Projects and CAD', () => {
     const el = renderDashboard();
 
     expect(el.querySelector('h1')?.textContent).toBe('What do you want to create?');
     const headings = Array.from(el.querySelectorAll('h2')).map((h) => h.textContent);
-    expect(headings).toEqual(['Photography', 'Custom Projects', 'CAD']);
+    expect(headings).toEqual(['Photography', 'Large Projects', 'CAD']);
 
     const titles = Array.from(el.querySelectorAll('h3')).map((h) => h.textContent);
     expect(titles).toEqual([
@@ -101,12 +101,12 @@ describe('Dashboard as the merged studio hub', () => {
 
     expect(el.textContent).toContain('Turn your jewelry photo into a CAD model.');
     expect(el.textContent).toContain('Turn your inspiration into a CAD model.');
-    expect(el.textContent).toContain('Discuss your project with our AI and get a custom quote.');
+    expect(el.textContent).toContain('Discuss your project with our AI.');
   });
 
-  it('puts Done For You alone under Custom Projects, with Call our AI opening the call window', () => {
+  it('puts Done For You alone under Large Projects, with Call our AI opening the call window', () => {
     const el = renderDashboard();
-    const custom = el.querySelector('section[aria-labelledby="dashboard-custom-projects"]');
+    const custom = el.querySelector('section[aria-labelledby="dashboard-large-projects"]');
     expect(custom?.querySelectorAll('h3')).toHaveLength(1);
     expect(custom?.querySelector('h3')?.textContent).toBe('Done For You');
 
@@ -117,27 +117,12 @@ describe('Dashboard as the merged studio hub', () => {
     expect(el.querySelector('[data-testid="call-dialog"]')).not.toBeNull();
   });
 
-  // The note describes both CAD workflows, so it belongs to the category
-  // divider. On the cards it was repeated twice and said nothing card-specific.
-  it('carries the format note once, on the CAD divider, as plain metadata', () => {
+  // Owner, 2026-11-19: the CAD heading is just "CAD", with no Rhino compatible note.
+  it('labels the CAD section plainly, with no Rhino note', () => {
     const el = renderDashboard();
-
-    // The outermost span only: the note nests spans to keep the brackets out
-    // of the accessible name, and every level reads the same textContent.
-    const metaNodes = Array.from(el.querySelectorAll('span')).filter(
-      (node) => node.textContent?.trim() === '[Rhino compatible]' && node.querySelector('svg'),
-    );
-    expect(metaNodes).toHaveLength(1);
-
-    const [note] = metaNodes;
-    // Never a button, link, or anything else that invites a click.
-    expect(note.closest('a')).toBeNull();
-    expect(note.closest('button')).toBeNull();
-    expect(note.querySelector('button')).toBeNull();
-
-    // It sits with the CAD heading rather than inside a workflow card.
-    const divider = note.closest('div');
-    expect(divider?.querySelector('h2')?.textContent).toBe('CAD');
+    const cad = el.querySelector('section[aria-labelledby="dashboard-cad"]');
+    expect(cad?.querySelector('h2')?.textContent).toBe('CAD');
+    expect(el.textContent).not.toContain('Rhino compatible');
   });
 
   it('gives every workflow card a Continue action and Done For You its own', () => {
