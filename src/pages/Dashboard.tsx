@@ -168,7 +168,7 @@ function CategoryDivider({
 }) {
   return (
     <div className="flex items-center gap-2 sm:gap-3 md:gap-4 mb-1.5 sm:mb-2.5 md:mb-3 [@media(max-height:820px)]:mb-2 lg:mb-0">
-      <span aria-hidden="true" className="h-0.5 flex-1 bg-foreground/45" />
+      <span aria-hidden="true" className="h-px flex-1 bg-foreground/55" />
       <div className="flex items-center gap-2.5 md:gap-3 shrink-0">
         <h2
           id={id}
@@ -178,7 +178,7 @@ function CategoryDivider({
         </h2>
         {tag}
       </div>
-      <span aria-hidden="true" className="h-0.5 flex-1 bg-foreground/45" />
+      <span aria-hidden="true" className="h-px flex-1 bg-foreground/55" />
     </div>
   );
 }
@@ -316,7 +316,7 @@ export default function Dashboard() {
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
 
-      <div className="[--dash-fixed:520px] min-h-[calc(100svh-5rem)] bg-background flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 lg:px-10 overflow-x-hidden py-2 sm:py-3 md:py-4 [@media(max-height:820px)]:py-2">
+      <div className="[--dash-fixed:560px] min-h-[calc(100svh-5rem)] bg-background flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 lg:px-10 overflow-x-hidden py-2 sm:py-3 md:py-4 [@media(max-height:820px)]:py-2">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -327,7 +327,7 @@ export default function Dashboard() {
           <p className="font-mono text-[10px] md:text-xs tracking-[0.3em] uppercase text-formanova-hero-accent mb-1.5 font-medium hidden sm:block lg:hidden [@media(max-height:780px)]:hidden">
             {userName ? `Welcome, ${userName}` : 'Welcome'}
           </p>
-          <h1 className="font-display text-xl sm:text-4xl md:text-5xl [@media(max-height:820px)]:md:text-4xl lg:!text-[42px] uppercase tracking-wide text-foreground leading-none mb-1 sm:mb-1.5 lg:mb-4">
+          <h1 className="font-display text-xl sm:text-4xl md:text-5xl [@media(max-height:820px)]:md:text-4xl lg:!text-[42px] uppercase tracking-wide text-foreground leading-none mb-1 sm:mb-1.5 lg:mb-8 lg:[@media(max-height:700px)]:mb-4">
             What do you want to create?
           </h1>
           <p className="font-mono text-[11px] md:text-xs tracking-[0.12em] text-foreground/70 uppercase font-medium hidden sm:block lg:hidden [@media(max-height:780px)]:hidden">
@@ -369,7 +369,7 @@ export default function Dashboard() {
           </section>
 
           <section aria-labelledby="dashboard-cad" className="contents">
-          <div className="col-span-2 mt-2 sm:mt-3 lg:col-span-4 lg:row-start-3 lg:mt-4">
+          <div className="col-span-2 mt-2 sm:mt-3 lg:col-span-4 lg:row-start-3 lg:mt-10 lg:[@media(max-height:700px)]:mt-5">
             <CategoryDivider id="dashboard-cad" label="CAD" />
           </div>
           {cadWorkflows.map((workflow) => (
