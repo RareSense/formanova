@@ -40,6 +40,7 @@ interface DesignStartScreenProps {
   onGlbUpload?: (file: File) => void;
   /** Idea: describe or draw. Inspiration: one or more pictures. */
   variant?: DesignStartVariant;
+  entry?: "text" | "doodle" | "design";
 }
 
 export type DesignStartVariant = "idea" | "inspiration";
@@ -51,11 +52,11 @@ const MODES: [StartMode, string, typeof Type][] = [["describe", "Describe it", T
  * draw or mix pictures), then 4 designs to choose from or just 1. The CAD is
  * only made after the design picture is approved.
  */
-export default function DesignStartScreen({ jewelryType, setJewelryType, busy, onMake, onGlbUpload, variant = "idea" }: DesignStartScreenProps) {
+export default function DesignStartScreen({ jewelryType, setJewelryType, busy, onMake, onGlbUpload, variant = "idea", entry }: DesignStartScreenProps) {
   const noun = jewelryType ? cadJewelryNoun(jewelryType) : "jewelry";
   const inspiration = variant === "inspiration";
-  const flowName = inspiration ? "CAD from Inspiration" : "CAD from Idea";
-  const [mode, setMode] = useState<StartMode>(inspiration ? "mix" : "describe");
+  const flowName = entry === "design" ? "Design Jewellery" : entry === "text" ? "CAD from Text" : entry === "doodle" ? "CAD from Doodle" : inspiration ? "CAD from Inspiration" : "CAD from Idea";
+  const [mode, setMode] = useState<StartMode>(inspiration ? "mix" : entry === "doodle" ? "draw" : "describe");
   const [text, setText] = useState("");
   const [hasInk, setHasInk] = useState(false);
   const [mixFiles, setMixFiles] = useState<File[]>([]);
@@ -134,7 +135,7 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
   return (
     <div className="flex w-full items-start justify-center bg-background">
       <div className={inspiration ? "w-full px-3 pb-6 pt-20 sm:px-6 lg:px-3" : "w-full max-w-[760px] px-4 pb-10 pt-16 sm:px-6"}>
-        <CadFlowSteps labels={cadFlowStepLabels(mode)} current={0} className="mb-8" />
+        {entry !== "design" && <CadFlowSteps labels={cadFlowStepLabels(mode)} current={0} className="mb-8" />}
         <div className={inspiration ? "mb-8 max-w-[680px]" : ""}>
         <span className="marta-label mb-1 block">{flowName}</span>
         <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">What are you making?</h3>
@@ -147,10 +148,10 @@ export default function DesignStartScreen({ jewelryType, setJewelryType, busy, o
         <div className={inspiration ? "grid gap-8 lg:grid-cols-3 lg:gap-10" : ""}>
         <div className={inspiration ? "lg:col-span-2" : ""}>
         <span className={`marta-label mb-1 block ${inspiration ? "" : "mt-10"}`}>{flowName}</span>
-        <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">{inspiration ? "Add your inspiration" : "How do you want to start?"}</h3>
-        <p className="mt-1.5 text-sm text-muted-foreground">You'll see the design first. The CAD is only made once you're happy with it.</p>
+        <h3 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground md:text-4xl">{inspiration ? "Add your inspiration" : entry === "doodle" ? "Draw your piece" : entry === "text" ? "Describe your piece" : "How do you want to start?"}</h3>
+        <p className="mt-1.5 text-sm text-muted-foreground">{entry === "design" ? "Make a design image, then refine or download it." : "You'll see the design first. The CAD is only made once you're happy with it."}</p>
 
-        {!inspiration && <div role="tablist" aria-label="How do you want to start?" className="mt-4 grid grid-cols-2 border border-border">
+        {!inspiration && entry !== "text" && entry !== "doodle" && <div role="tablist" aria-label="How do you want to start?" className="mt-4 grid grid-cols-2 border border-border">
           {MODES.map(([id, title, Icon], i) => (
             <button key={id} type="button" role="tab" aria-selected={mode === id} onClick={() => setMode(id)} disabled={busy}
               className={`flex min-h-[48px] flex-col items-center justify-center gap-1 py-2.5 text-sm transition-colors sm:flex-row sm:gap-2 ${i > 0 ? "border-l border-border" : ""} ${mode === id ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"}`}>

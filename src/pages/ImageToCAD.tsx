@@ -22,6 +22,7 @@ import { trackCadStudioOpen, trackCadReferenceUploaded } from "@/lib/posthog-eve
 import { useCADKeyboardShortcuts } from "@/hooks/use-cad-keyboard-shortcuts";
 
 import ImagePromptScreen from "@/components/text-to-cad/ImagePromptScreen";
+import RedesignStart from "@/components/create-cad/RedesignStart";
 import DesignEditor from "@/components/create-cad/DesignEditor";
 import { useEditBeforeCad } from "@/hooks/useEditBeforeCad";
 import LeftPanel from "@/components/text-to-cad/LeftPanel";
@@ -49,6 +50,11 @@ import { EMPTY_METAL_REQUEST, metalRequestPayload, type MetalRequest } from "@/l
 const PHONE_TRANSFORM_MODES = ["orbit"] as const;
 
 export default function ImageToCAD() {
+  const [params] = useSearchParams();
+  return params.get("entry") === "redesign" && !params.has("workflow_id") ? <RedesignStart /> : <ImageCadWorkspace />;
+}
+
+function ImageCadWorkspace() {
   // Counts towards which studio this user lands in after sign-in. The
   // workspaces are counted rather than the hub pages so both sides are
   // measured the same way: where the work happens, not where you browse.

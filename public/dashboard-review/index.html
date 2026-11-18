@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FormaNova · Dashboard review</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#fcfbf8;color:#23231e;font:15px/1.4 Arial,sans-serif}button,select{font:inherit;color:inherit}button{cursor:pointer}button:focus-visible,select:focus-visible{outline:3px solid #976217;outline-offset:3px}
+header{background:white;border-bottom:1px solid #dedbd2;display:flex;align-items:center;justify-content:space-between;padding:15px 5vw}header img{width:150px;max-height:46px;object-fit:contain}header span{font-size:13px}main{max-width:1500px;margin:auto;padding:32px 4vw 95px}.top{display:flex;align-items:center;justify-content:space-between;gap:25px}h1{font:normal clamp(30px,3.4vw,55px)/1.04 Georgia,serif;letter-spacing:-.05em;margin:0;max-width:15em}h2,h3,p{margin:0}h2{font:normal 29px Georgia,serif}.service{background:#f1eadc;border:1px solid #d4c39f;padding:16px 20px;display:grid;align-items:center;gap:4px 18px;grid-template-columns:1fr auto}.service h2{font:600 18px Arial}.service p{font-size:13px;max-width:32ch}.service button{grid-column:2;grid-row:1/3;background:#25251e;color:white;border:0;padding:10px 15px}
+nav{display:flex;flex-wrap:wrap;gap:6px;margin:25px 0;border-bottom:1px solid #d8d4c8}nav button{background:transparent;border:0;border-bottom:2px solid transparent;padding:10px 14px}nav button[aria-pressed=true]{border-color:#946614;font-weight:700}
+.groups{display:grid;gap:24px}section{min-width:0}.heading{display:flex;align-items:baseline;gap:10px;margin-bottom:12px}.heading small{font-size:11px;color:#675e50}.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,215px),1fr));gap:12px}.tool{min-width:0;display:flex;flex-direction:column;text-align:left;border:1px solid #ddd9ce;background:#fff;padding:0;overflow:hidden}.tool:hover{border-color:#967643;background:#fffdf6}.tool img{width:100%;height:133px;object-fit:cover}.tool.cad img{object-fit:contain;background:white}.copy{display:grid;grid-template-columns:1fr auto;align-items:center;padding:12px;gap:3px 7px;width:100%}.copy b{font-size:16px;line-height:1.2}.copy small{grid-row:2;color:#625d53;font-size:12px}.arrow{grid-area:1/2/3/3;color:#906414}.switcher{position:fixed;z-index:5;bottom:12px;left:12px;display:flex;align-items:center;gap:8px;padding:8px 12px;background:#242520;color:white;border-radius:6px;box-shadow:0 4px 16px #0002;font-size:12px}.switcher select{max-width:65vw;padding:6px;background:#fff;color:#222}.layout{display:grid;gap:18px}
+body[data-v="1"] .groups,body[data-v="5"] .groups{grid-template-columns:repeat(3,minmax(0,1fr));align-items:start}body[data-v="1"] .tiles,body[data-v="5"] .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+body[data-v="2"] section{display:grid;grid-template-columns:180px 1fr;border-top:1px solid #c8bfad;padding-top:16px}
+body[data-v="3"] .layout{grid-template-columns:minmax(0,1fr) 260px}body[data-v="3"] .layout>.service{align-self:start;grid-template-columns:1fr}body[data-v="3"] .service button{grid-area:auto;justify-self:start}
+body[data-v="4"] .tiles,body[data-v="7"] .tiles{grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr))}body[data-v="4"] .tool,body[data-v="7"] .tool{flex-direction:row;align-items:center}body[data-v="4"] .tool img,body[data-v="7"] .tool img{width:40%;height:105px}
+body[data-v="5"] section{padding:15px;background:white;border:1px solid #cec8ba}body[data-v="5"] .tool{border:0}body[data-v="5"] .tool img{height:105px}
+body[data-v="6"] .tool{position:relative;border:0}body[data-v="6"] .tool img{height:170px}body[data-v="6"] .copy{background:#272821;color:#fff}body[data-v="6"] .copy small,body[data-v="6"] .arrow{color:#e7d3aa}
+body[data-v="7"] .groups{grid-template-columns:repeat(2,minmax(0,1fr))}body[data-v="7"] section:first-child{grid-column:1/-1}
+body[data-v="8"] .layout{grid-template-columns:180px 1fr}body[data-v="8"] nav{align-self:start;flex-direction:column;margin:0;position:sticky;top:10px}body[data-v="8"] nav button{text-align:left}
+body[data-v="9"] .groups{grid-template-columns:repeat(2,minmax(0,1fr))}body[data-v="9"] section:first-child{grid-row:span 2}body[data-v="9"] .photo img{height:205px}body[data-v="9"] .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+body[data-v="10"] section{background:#f2efe7;padding:18px;border-left:3px solid #ac8a4a}body[data-v="10"] .tiles{grid-template-columns:repeat(auto-fill,minmax(min(100%,175px),1fr))}body[data-v="10"] .tool img{height:95px}
+body[data-filtered=true] .groups{grid-template-columns:1fr}dialog{max-width:min(410px,90vw);border:1px solid #bbaf98;padding:26px}dialog p{margin:12px 0 20px}dialog button{padding:8px 16px}dialog::backdrop{background:#25231f66}
+@media(max-width:850px){body .layout,body[data-v] .groups,body[data-v] .layout,body[data-v] section{display:block}section{margin-bottom:24px}.top{align-items:flex-start;flex-direction:column;gap:16px}.service{width:100%}body[data-v="8"] nav{position:static;flex-direction:row;margin-bottom:18px}.layout>.service{margin:0 0 18px}body[data-v="3"] .layout{display:flex;flex-direction:column-reverse}body[data-v] .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.tool img{height:115px}body[data-v] .tool .copy{padding:9px}.copy b{font-size:14px}main{padding:22px 4vw 90px}}
+@media(max-width:530px){body[data-v="4"] .tiles,body[data-v="7"] .tiles{grid-template-columns:1fr}.service{padding:12px}.service button{padding:9px}.heading{margin-top:15px}nav{gap:0}nav button{font-size:13px;padding:9px 10px}}
+</style>
+<header><img src="logo.webp" alt="FormaNova"><span>Dashboard</span></header>
+<main><div class="top"><h1>What do you want to create?</h1><aside class="service"><h2>Done For You</h2><p>Discuss your project with our AI and get a custom quote.</p><button id="call">Call our AI</button></aside></div>
+<nav aria-label="Filter workflows"></nav><div class="layout"><div class="groups"></div></div></main>
+<label class="switcher">Version <select id="version"></select></label>
+<dialog><h2></h2><p></p><form method="dialog"><button>Back to dashboard</button></form></dialog>
+<script>
+const catalogue = [
+ ['Photography','Model Shot','Show jewellery worn by a model.','model'],
+ ['Photography','Product Shot','Create a product photograph.','product'],
+ ['Photography','Product Shot from CAD','Turn your CAD file into a photograph.','catalog'],
+ ['CAD','CAD from Image','Start with a jewellery photo.','image'],
+ ['CAD','CAD from Text','Describe the piece in words.','text'],
+ ['CAD','CAD from Doodle','Draw the piece you have in mind.','doodle'],
+ ['CAD','CAD from Inspiration','Start with a visual reference.','inspiration'],
+ ['Design','Design Jewellery','Create and refine a design image.','design'],
+ ['Design','Redesign Jewellery','Upload a piece and describe your changes.','redesign']
+];
+const directions=['Studio columns','Section index','Project desk','Visual directory','Studio panels','Photo contact sheet','Workbench','Category rail','Design spread','Compact shelves'];
+const version=document.querySelector('#version'),nav=document.querySelector('nav'),groups=document.querySelector('.groups'),layout=document.querySelector('.layout'),service=document.querySelector('.service'),topRow=document.querySelector('.top');
+const embedded=window.parent!==window && new URLSearchParams(location.search).has('embedded');
+if(embedded)document.querySelector('header').remove();
+const images=/* ASSET_MAP */ {};
+let filter='All';
+function activate(id,title,description){
+ if(embedded){parent.postMessage({type:'formanova-review-launch',id},location.origin);return}
+ const dialog=document.querySelector('dialog');
+ dialog.querySelector('h2').textContent=title;
+ dialog.querySelector('p').textContent=description+' This download previews the entry. Live actions run in the frontend branch.';
+ dialog.showModal();
+}
+function draw(){
+ const v=Number(version.value);
+ document.body.dataset.v=v;
+ topRow.after(nav);topRow.append(service);
+ if(v===3)layout.append(service);
+ if(v===8)layout.prepend(nav);
+ document.body.dataset.filtered=filter!=='All';
+ nav.replaceChildren();groups.replaceChildren();
+ const categories=[...new Set(catalogue.map(row=>row[0]))];
+ for(const name of ['All',...categories]){
+  const button=document.createElement('button');button.textContent=name==='All'?'All workflows':name;
+  button.setAttribute('aria-pressed',filter===name);
+  button.onclick=()=>{filter=name;draw();nav.querySelector('[aria-pressed=true]').focus()};nav.append(button);
+ }
+ for(const category of categories.filter(name=>filter==='All'||filter===name)){
+  const section=document.createElement('section');
+  section.innerHTML='<div class="heading"><h2>'+category+'</h2>'+(category==='CAD'?'<small>Rhino compatible</small>':'')+'</div><div class="tiles"></div>';
+  for(const [,title,desc,id] of catalogue.filter(row=>row[0]===category)){
+   const button=document.createElement('button');button.className='tool '+(category==='Photography'?'photo':category.toLowerCase());
+   button.innerHTML='<img alt=""><span class="copy"><b>'+title+'</b><small>'+desc+'</small><span class="arrow" aria-hidden="true">↗</span></span>';
+   button.querySelector('img').src=images[id]||id+'.webp';button.onclick=()=>activate(id,title,desc);
+   section.querySelector('.tiles').append(button);
+  }
+  groups.append(section);
+ }
+}
+directions.forEach((name,index)=>version.add(new Option((index+1)+' · '+name,index+1)));
+const initial=Number(location.hash.slice(1));
+version.value=initial>=1&&initial<=10?initial:1;
+version.onchange=()=>{history.replaceState(null,'','#'+version.value);draw();window.scrollTo(0,0)};
+document.querySelector('#call').onclick=()=>activate('quote','Discuss your project','Get a custom quote with our AI.');
+draw();
+</script></html>

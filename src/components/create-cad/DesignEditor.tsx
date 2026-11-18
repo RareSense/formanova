@@ -44,6 +44,7 @@ type Stage = "edit" | "ready";
 const TITLES: Record<Stage, string> = { edit: "Edit design", ready: "Ready for CAD" };
 
 interface DesignEditorProps {
+  designOnly?: boolean;
   open: boolean;
   /** The uploaded picture to start from. */
   source: File | null;
@@ -115,7 +116,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
  *  ready  - the approved design, optional extra views (other uploads
  *           come in marked as the old design), optional dimensions, Create CAD.
  */
-export default function DesignEditor({ open, source, extras = [], jewelryType, onCancel, onKeep, onCreateCad, dimensions, onDimensions, cadCost, cadCostLoading, creatingCad, modelPicker, metalStep, approveWithoutEdit = false, steps }: DesignEditorProps) {
+export default function DesignEditor({ designOnly = false, open, source, extras = [], jewelryType, onCancel, onKeep, onCreateCad, dimensions, onDimensions, cadCost, cadCostLoading, creatingCad, modelPicker, metalStep, approveWithoutEdit = false, steps }: DesignEditorProps) {
   const { generate } = useDesignImageRun();
   const [picture, setPicture] = useState<Picture | null>(null);
   const [edited, setEdited] = useState(false);
@@ -324,6 +325,13 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
   /** "Looks right": every photo as it is now (edited or not) goes to the CAD. */
   const looksRight = useCallback(() => {
     if (!canApprove || !picture) return;
+    if (designOnly) {
+      const link = document.createElement("a");
+      link.href = picture.display;
+      link.download = "jewellery-design";
+      link.click();
+      return;
+    }
     saveSlot();
     const all = slots.current.map((sl, i) => ({ display: sl.picture.display, input: sl.picture.input, label: i === 0 ? "Main" : `Photo ${i + 1}` }));
     setApproved(all[0]);
@@ -336,7 +344,7 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
     setApprovalKey((k) => k + 1);
     setSelected(null);
     setStage("ready");
-  }, [canApprove, picture, edited, results, resultIndex, instruction, lastSent, history, cur]); // eslint-disable-line react-hooks/exhaustive-deps -- saveSlot reads these
+  }, [designOnly, canApprove, picture, edited, results, resultIndex, instruction, lastSent, history, cur]); // eslint-disable-line react-hooks/exhaustive-deps -- saveSlot reads these
 
   const showResult = (i: number) => {
     const r = results[i];
@@ -465,7 +473,7 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
             {/* Where you are, like a checkout stepper: the picture is step 1, the CAD comes next. */}
             <div className="flex min-w-0 flex-col items-center">
               <DialogPrimitive.Title className="sr-only">{TITLES[stage]}</DialogPrimitive.Title>
-              {steps ? steps(stage) : <ol aria-label="Steps" className="flex items-center gap-2 text-sm">
+              {designOnly ? <strong>Your design</strong> : steps ? steps(stage) : <ol aria-label="Steps" className="flex items-center gap-2 text-sm">
                 {(["Design", "CAD"] as const).map((name, i) => {
                   const current = (stage === "edit" ? 0 : 1) === i;
                   const done = stage !== "edit" && i === 0;
@@ -564,7 +572,7 @@ export default function DesignEditor({ open, source, extras = [], jewelryType, o
                       title={hasChange ? "Send your change first" : "Use this design (Ctrl Enter)"}
                       className="flex h-9 items-center gap-2 bg-foreground px-5 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-40"
                     >
-                      <Check className="h-4 w-4" strokeWidth={1.5} /> Looks right
+                      <Check className="h-4 w-4" strokeWidth={1.5} /> {designOnly ? "Download design" : "Looks right"}
                     </button>
                   </div>
                 </div>

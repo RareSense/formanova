@@ -1,5 +1,7 @@
+import DashboardReviewFrame from "@/components/DashboardReviewFrame";
+import { RubyCallDialog } from "@/components/sales/RubyCallDialog";
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
@@ -262,6 +264,9 @@ function WorkflowCard({
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const review = params.get('review') === 'layouts';
+  const [callOpen, setCallOpen] = useState(false);
   const { user } = useAuth();
   const { refetch: refetchShopifyStatus } = useShopifyStatus();
   const userName = user?.email ? user.email.split('@')[0] : '';
@@ -272,7 +277,7 @@ export default function Dashboard() {
   // selection. pendingRoute holds where to go once the user picks; null = closed.
   const [pendingRoute, setPendingRoute] = useState<string | null>(null);
   // Owner, 2026-11-08: the Done For You offer for paying users, never over the effort chooser.
-  const offer = useDfyOffer(user?.id, pendingRoute !== null, 'dashboard');
+  const offer = useDfyOffer(user?.id, pendingRoute !== null, 'dashboard', !review);
   const defaultEffort: EffortLevel =
     localStorage.getItem('formanova_studio_effort') === 'high' ? 'high' : 'low';
 
@@ -309,7 +314,18 @@ export default function Dashboard() {
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
 
-      <div className="min-h-[calc(100svh-5rem)] bg-background flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 lg:px-10 overflow-x-hidden py-2 sm:py-3 md:py-4 [@media(max-height:820px)]:py-2">
+      {review ? <DashboardReviewFrame onLaunch={(id) => {
+        const existing = { model: photographyWorkflows[0], product: photographyWorkflows[1],
+          catalog: catalogWorkflow, image: cadWorkflows[0], inspiration: cadWorkflows[2] };
+        if (Object.prototype.hasOwnProperty.call(existing, id)) {
+          handleSelect(existing[id as keyof typeof existing]);
+          return;
+        }
+        const starts = { text: '/text-to-cad?entry=text', doodle: '/text-to-cad?entry=doodle',
+          design: '/text-to-cad?entry=design', redesign: '/image-to-cad?entry=redesign' };
+        if (Object.prototype.hasOwnProperty.call(starts, id)) navigate(starts[id as keyof typeof starts]);
+        if (id === 'quote') setCallOpen(true);
+      }} /> : <div className="min-h-[calc(100svh-5rem)] bg-background flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 lg:px-10 overflow-x-hidden py-2 sm:py-3 md:py-4 [@media(max-height:820px)]:py-2">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -369,9 +385,10 @@ export default function Dashboard() {
               </div>
             </section>
           </motion.div>
-      </div>
+      </div>}
 
-      {user?.id && <DoneForYouOfferModal userId={user.id} moment="dashboard" open={offer.open} onClose={offer.close} />}
+      {review && <RubyCallDialog open={callOpen} onOpenChange={setCallOpen} />}
+      {!review && user?.id && <DoneForYouOfferModal userId={user.id} moment="dashboard" open={offer.open} onClose={offer.close} />}
 
       <EffortIntroModal
         open={pendingRoute !== null}

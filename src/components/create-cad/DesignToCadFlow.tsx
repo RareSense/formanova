@@ -36,6 +36,7 @@ interface DesignToCadFlowProps {
   onCreateCad: (files: File[]) => Promise<boolean | void> | void;
   /** Idea (describe or draw) or Inspiration (pictures). */
   variant?: DesignStartVariant;
+  entry?: "text" | "doodle" | "design";
   /** How the current design was started, for the step bar shown after this flow hands over. */
   onStartMode?: (mode: DesignBrief["mode"]) => void;
 }
@@ -75,7 +76,7 @@ export function lowCreditsAfterDesign(balance: number | null, designCost: number
  * pick from, then the same editor as Image to CAD (edit, angles, Ready for
  * CAD). Generate CAD hands the approved pictures to the page's normal CAD run.
  */
-export default function DesignToCadFlow({ jewelryType, setJewelryType, onGlbUpload, dimensions, onDimensions, cadCost, cadCostLoading, creatingCad, onCreateCad, modelPicker, metalStep, variant, onStartMode }: DesignToCadFlowProps) {
+export default function DesignToCadFlow({ jewelryType, setJewelryType, onGlbUpload, dimensions, onDimensions, cadCost, cadCostLoading, creatingCad, onCreateCad, modelPicker, metalStep, variant, entry, onStartMode }: DesignToCadFlowProps) {
   const { generate } = useDesignImageRun();
   const { credits } = useCredits();
   const navigate = useNavigate();
@@ -119,7 +120,7 @@ export default function DesignToCadFlow({ jewelryType, setJewelryType, onGlbUplo
   /** Every new design goes through here: warn first when it would leave too little for the CAD. */
   const requestMake = (next: DesignBrief) => {
     const left = lowCreditsAfterDesign(credits, DESIGN_IMAGE_CREDITS * next.count, cadCost);
-    if (left !== null) { setLowCredit({ brief: next, left }); return; }
+    if (entry !== "design" && left !== null) { setLowCredit({ brief: next, left }); return; }
     void make(next);
   };
   const buyCredits = () => {
@@ -150,11 +151,11 @@ export default function DesignToCadFlow({ jewelryType, setJewelryType, onGlbUplo
     <>
       {/* Kept mounted while hidden, so Back finds the brief as it was left. */}
       <div className={stage === "start" ? "contents" : "hidden"}>
-        <DesignStartScreen jewelryType={jewelryType} setJewelryType={setJewelryType} busy={false} onMake={requestMake} onGlbUpload={onGlbUpload} variant={variant} />
+        <DesignStartScreen jewelryType={jewelryType} setJewelryType={setJewelryType} busy={false} onMake={requestMake} onGlbUpload={entry === "design" ? undefined : onGlbUpload} variant={variant} entry={entry} />
       </div>
       {stage === "pick" && (
         <div className="flex w-full flex-col">
-          <CadFlowSteps labels={stepLabels} current={1} className="px-4 pt-10" />
+          {entry !== "design" && <CadFlowSteps labels={stepLabels} current={1} className="px-4 pt-10" />}
           {waiting && (
             <DesignGenerating
               firstMessage={brief?.mode === "draw" ? "Reading your drawing..." : brief?.mode === "mix" ? "Studying your inspiration..." : "Reading your description..."}
@@ -172,6 +173,7 @@ export default function DesignToCadFlow({ jewelryType, setJewelryType, onGlbUplo
         </div>
       )}
       <DesignEditor
+        designOnly={entry === "design"}
         open={!!editorSource}
         source={editorSource}
         jewelryType={jewelryType}
