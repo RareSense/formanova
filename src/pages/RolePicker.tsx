@@ -12,6 +12,7 @@ import {
   setCachedUserType,
 } from '@/lib/onboarding-api';
 import { trackUserTypeSelected } from '@/lib/posthog-events';
+import { trackHeyCatchSignupCompleted } from '@/lib/heycatch-events';
 import { toast } from '@/hooks/use-toast';
 import { JewelryBrandModal, type BrandDetails } from '@/components/JewelryBrandModal';
 
@@ -171,6 +172,7 @@ export default function RolePicker() {
       await saveUserType(selected, selected === 'jewelry_brand' ? brandDetails : null);
       setCachedUserType(user.id, selected);
       trackUserTypeSelected({ user_type: selected });
+      trackHeyCatchSignupCompleted({ user_type: selected });
       if (selected === 'jewelry_brand' && brandDetails) {
         toast({
           title: 'Saved',
