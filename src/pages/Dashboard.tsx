@@ -316,7 +316,7 @@ export default function Dashboard() {
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
 
-      <div className="[--dash-fixed:570px] min-h-[calc(100svh-5rem)] bg-background flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 lg:px-10 overflow-x-hidden py-2 sm:py-3 md:py-4 [@media(max-height:820px)]:py-2">
+      <div className="[--dash-fixed:574px] min-h-[calc(100svh-5rem)] bg-background flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 lg:px-10 overflow-x-hidden py-2 sm:py-3 md:py-4 [@media(max-height:820px)]:py-2">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -327,7 +327,7 @@ export default function Dashboard() {
           <p className="font-mono text-[10px] md:text-xs tracking-[0.3em] uppercase text-formanova-hero-accent mb-1.5 font-medium hidden sm:block lg:hidden [@media(max-height:780px)]:hidden">
             {userName ? `Welcome, ${userName}` : 'Welcome'}
           </p>
-          <h1 className="font-display text-2xl sm:text-4xl md:text-5xl [@media(max-height:820px)]:md:text-4xl lg:!text-5xl uppercase tracking-wide text-foreground leading-none mb-3 sm:mb-3 lg:mb-9 lg:[@media(max-height:700px)]:mb-4">
+          <h1 className="font-display text-2xl sm:text-4xl md:text-5xl [@media(max-height:820px)]:md:text-4xl lg:!text-5xl uppercase tracking-wide text-foreground leading-none mb-3 sm:mb-3 lg:mb-10 lg:[@media(max-height:700px)]:mb-4">
             What do you want to create?
           </h1>
           <p className="font-mono text-[11px] md:text-xs tracking-[0.12em] text-foreground/70 uppercase font-medium hidden sm:block lg:hidden [@media(max-height:780px)]:hidden">
