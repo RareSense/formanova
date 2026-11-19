@@ -132,8 +132,8 @@ const cadWorkflows: Workflow[] = [
 ];
 
 // Owner, 2026-11-19: the project service sits beside Photography, for free and paid users alike.
-// Lucide's default 2 px stroke is heavier than FormaNova's line icons on the other cards; match their weight.
-const ThinPhoneIcon = ({ className }: { className?: string }) => <Phone className={className} strokeWidth={1.3} />;
+// Same line weight and size as RingIcon: its 3.5 / 128 stroke is about 0.7 on Lucide's 24 grid, and Lucide's built-in padding is scaled away.
+const ThinPhoneIcon = ({ className }: { className?: string }) => <Phone className={`${className ?? ""} scale-[1.18]`} strokeWidth={0.7} />;
 
 const doneForYou: Workflow = {
   title: 'Done For You',
