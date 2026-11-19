@@ -132,12 +132,15 @@ const cadWorkflows: Workflow[] = [
 ];
 
 // Owner, 2026-11-19: the project service sits beside Photography, for free and paid users alike.
+// Lucide's default 2 px stroke is heavier than FormaNova's line icons on the other cards; match their weight.
+const ThinPhoneIcon = ({ className }: { className?: string }) => <Phone className={className} strokeWidth={1.3} />;
+
 const doneForYou: Workflow = {
   title: 'Done For You',
   description: 'Discuss your project with our AI.',
   action: 'call',
   cta: 'Call our AI',
-  icon: Phone,
+  icon: ThinPhoneIcon,
   image: doneForYouCall,
 };
 
