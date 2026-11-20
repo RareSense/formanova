@@ -66,8 +66,11 @@ export const FOOTER_H = 32;
 export const COLS = 4;
 export const GAP = 14;
 export const TEXT_GAP = 8;
-export const LINE_H = 11;
-export const TEXT_LINES = 5;
+export const LINE_H = 10;
+/** Name (up to 2 lines), SKU, details, then wholesale and retail pinned to the last two lines. */
+export const TEXT_LINES = 6;
+/** Font for every line sheet: Inter, the FormaNova site font, embedded so any currency or accent prints. */
+export const SHEET_FONT = 'Inter';
 
 export interface GridGeometry {
   pageW: number;
@@ -144,6 +147,37 @@ export function productLines(p: Product, currency: string): { name: string; sku:
     wholesale: wholesale && `Wholesale ${wholesale}`,
     retail: retail && `Retail ${retail}`,
   };
+}
+
+/**
+ * Breaks text into at most `maxLines` lines that fit `maxW`, by words; the
+ * last line ends in an ellipsis when text is left over. `measure` gives a
+ * string's width in points, from the PDF or from a browser canvas.
+ */
+export function wrapLines(text: string, maxW: number, measure: (s: string) => number, maxLines: number): string[] {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let current = '';
+  for (let i = 0; i < words.length; i++) {
+    const next = current ? `${current} ${words[i]}` : words[i];
+    if (measure(next) <= maxW || !current) {
+      current = next;
+      continue;
+    }
+    lines.push(current);
+    current = words[i];
+    if (lines.length === maxLines - 1) {
+      current = words.slice(i).join(' ');
+      break;
+    }
+  }
+  if (current) lines.push(current);
+  return lines.slice(0, maxLines).map((line) => {
+    if (measure(line) <= maxW) return line;
+    let t = line;
+    while (t.length > 1 && measure(`${t}…`) > maxW) t = t.slice(0, -1);
+    return `${t.trimEnd()}…`;
+  });
 }
 
 /** What is still missing, in plain words, so the editor can point at it. */

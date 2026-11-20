@@ -28,8 +28,10 @@ export function imageKind(file: File): ImageKind {
 }
 
 /** A photo that could not be used, with a message the jeweler can act on. */
+export type ImageErrorKind = 'unsupported' | 'too_large' | 'unreadable';
+
 export class ImageError extends Error {
-  constructor(public readonly fileName: string, message: string) {
+  constructor(public readonly fileName: string, message: string, public readonly kind: ImageErrorKind = 'unreadable') {
     super(message);
     this.name = 'ImageError';
   }
@@ -80,10 +82,10 @@ async function decode(file: File, kind: ImageKind): Promise<Drawable> {
 export async function loadImage(file: File, maxSide = MAX_SIDE): Promise<SheetImage> {
   const kind = imageKind(file);
   if (kind === 'unsupported') {
-    throw new ImageError(file.name, 'This file type cannot be opened in a browser. Please export it as JPG or PNG.');
+    throw new ImageError(file.name, 'This file type cannot be opened in a browser. Please export it as JPG or PNG.', 'unsupported');
   }
   if (file.size > MAX_FILE_BYTES) {
-    throw new ImageError(file.name, 'This photo is larger than 50 MB. Please export a smaller JPG.');
+    throw new ImageError(file.name, 'This photo is larger than 50 MB. Please export a smaller JPG.', 'too_large');
   }
 
   let drawable: Drawable;

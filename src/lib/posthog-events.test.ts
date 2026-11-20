@@ -61,6 +61,7 @@ import {
   trackLineSheetStarted,
   trackLineSheetDownloaded,
   trackLineSheetCtaClicked,
+  trackLineSheetFailed,
   trackRubyCtaClicked,
   trackRubyCallStarted,
   trackRubyCallConnected,
@@ -162,6 +163,11 @@ describe('line sheet tool events', () => {
     expect(posthog.capture).toHaveBeenCalledWith('line_sheet_downloaded', {
       products: 14, pages: 3, has_terms: true, has_logo: false, paper: 'letter', currency: 'USD',
     })
+  })
+
+  it('captures line_sheet_failed with the reason and counts, never file names', () => {
+    trackLineSheetFailed({ reason: 'photo_skipped', count: 2, kinds: ['unsupported', 'too_large'] })
+    expect(posthog.capture).toHaveBeenCalledWith('line_sheet_failed', { reason: 'photo_skipped', count: 2, kinds: ['unsupported', 'too_large'] })
   })
 
   it('captures line_sheet_cta_clicked with the offer that was clicked', () => {

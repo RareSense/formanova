@@ -33,12 +33,14 @@ describe('imageKind', () => {
 describe('loadImage', () => {
   it('explains, without decoding, when the type cannot be opened', async () => {
     await expect(loadImage(file('scan.tif', 'image/tiff'))).rejects.toThrow(/export it as JPG/);
+    await expect(loadImage(file('scan.tif', 'image/tiff'))).rejects.toMatchObject({ kind: 'unsupported' });
   });
 
   it('explains when a photo is over 50 MB', async () => {
     const err = await loadImage(file('big.jpg', 'image/jpeg', MAX_FILE_BYTES + 1)).catch((e) => e);
     expect(err).toBeInstanceOf(ImageError);
     expect(err.message).toMatch(/larger than 50 MB/);
+    expect(err.kind).toBe('too_large');
   });
 });
 

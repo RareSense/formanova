@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  containImage, emptyProduct, fileName, formatPrice, gridGeometry, missingFields, paginate, productLines,
+  containImage, emptyProduct, fileName, wrapLines, formatPrice, gridGeometry, missingFields, paginate, productLines,
   type LineSheet,
 } from './layout';
 
@@ -83,5 +83,25 @@ describe('containImage', () => {
 describe('fileName', () => {
   it('builds a safe file name from brand and collection', () => {
     expect(fileName({ name: 'Lumen & Co', collection: 'Spring 2027', email: '', phone: '', website: '' })).toBe('lumen-co-spring-2027-line-sheet.pdf');
+  });
+});
+
+describe('wrapLines', () => {
+  const measure = (s: string) => s.length; // one unit per character
+
+  it('keeps short text on one line', () => {
+    expect(wrapLines('Halo Ring', 20, measure, 2)).toEqual(['Halo Ring']);
+  });
+
+  it('breaks by words onto a second line', () => {
+    expect(wrapLines('Etoile Diamond Choker', 15, measure, 2)).toEqual(['Etoile Diamond', 'Choker']);
+  });
+
+  it('ends the last allowed line with an ellipsis when text is left over', () => {
+    expect(wrapLines('Etoile Diamond Choker Limited Edition Gold', 15, measure, 2)).toEqual(['Etoile Diamond', 'Choker Limited…']);
+  });
+
+  it('shortens a single word that is too long', () => {
+    expect(wrapLines('Supercalifragilistic', 10, measure, 2)).toEqual(['Supercali…']);
   });
 });

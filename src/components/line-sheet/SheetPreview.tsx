@@ -1,10 +1,19 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import {
-  CONTACT_LINES, FOOTER_H, LINE_H, MARGIN, TERM_ROWS, TEXT_GAP,
-  cellPosition, containImage, gridGeometry, logoBox, paginate, productLines,
+  CONTACT_LINES, FOOTER_H, LINE_H, MARGIN, SHEET_FONT, TERM_ROWS, TEXT_GAP,
+  cellPosition, containImage, gridGeometry, logoBox, paginate, productLines, wrapLines,
   type LineSheet,
 } from '@/lib/line-sheet/layout';
 import { INK, MUTED, RULE } from '@/lib/line-sheet/pdf-colors';
+
+/** Width of bold 8pt Inter text, as the PDF measures it, from a reused canvas. */
+let measureCtx: CanvasRenderingContext2D | null = null;
+function measureName(text: string): number {
+  if (!measureCtx) measureCtx = document.createElement('canvas').getContext('2d');
+  if (!measureCtx) return text.length * 4.4;
+  measureCtx.font = `600 8px ${SHEET_FONT}, Helvetica, Arial, sans-serif`;
+  return measureCtx.measureText(text).width;
+}
 
 /**
  * The line sheet pages exactly as the PDF draws them: the same layout numbers,
@@ -36,7 +45,7 @@ export function SheetPreview({ sheet }: { sheet: LineSheet }) {
           style={{ width: g.pageW * scale, height: g.pageH * scale }}
         >
           <div
-            style={{ width: g.pageW, height: g.pageH, transform: `scale(${scale})`, transformOrigin: 'top left', position: 'relative', fontFamily: 'Helvetica, Arial, sans-serif', color: INK }}
+            style={{ width: g.pageW, height: g.pageH, transform: `scale(${scale})`, transformOrigin: 'top left', position: 'relative', fontFamily: `${SHEET_FONT}, Helvetica, Arial, sans-serif`, color: INK }}
           >
             <Header sheet={sheet} pageW={g.pageW} />
 
@@ -49,6 +58,8 @@ export function SheetPreview({ sheet }: { sheet: LineSheet }) {
               const lines = productLines(p, sheet.currency);
               const box = p.image ? containImage(p.image, g.imageH) : null;
               const ty = y + g.imageH + TEXT_GAP + 8;
+              const nameLines = wrapLines(lines.name, g.cellW, measureName, 2);
+              const afterName = ty + Math.max(1, nameLines.length) * LINE_H;
               return (
                 <div key={p.id}>
                   {p.image && box ? (
@@ -58,22 +69,22 @@ export function SheetPreview({ sheet }: { sheet: LineSheet }) {
                       No photo
                     </div>
                   )}
-                  <Line value={lines.name} x={x} y={ty} w={g.cellW} bold />
-                  <Line value={lines.sku} x={x} y={ty + LINE_H} w={g.cellW} color={MUTED} />
-                  <Line value={lines.details} x={x} y={ty + 2 * LINE_H} w={g.cellW} />
-                  <Line value={lines.wholesale} x={x} y={ty + 3 * LINE_H} w={g.cellW} bold />
-                  <Line value={lines.retail} x={x} y={ty + 4 * LINE_H} w={g.cellW} />
+                  {nameLines.map((line, n) => <Line key={n} value={line} x={x} y={ty + n * LINE_H} w={g.cellW} bold />)}
+                  <Line value={lines.sku} x={x} y={afterName} w={g.cellW} color={MUTED} />
+                  <Line value={lines.details} x={x} y={afterName + LINE_H} w={g.cellW} />
+                  <Line value={lines.wholesale} x={x} y={ty + 4 * LINE_H} w={g.cellW} bold />
+                  <Line value={lines.retail} x={x} y={ty + 5 * LINE_H} w={g.cellW} />
                 </div>
               );
             })}
 
             {page.kind === 'terms' && (
               <>
-                <p style={{ ...text(MARGIN, g.gridTop + 8, 13, INK), fontWeight: 700 }}>Order terms</p>
+                <p style={{ ...text(MARGIN, g.gridTop + 8, 13, INK), fontWeight: 600 }}>Order terms</p>
                 <dl style={{ position: 'absolute', left: MARGIN, top: g.gridTop + 25, width: g.pageW - 2 * MARGIN, margin: 0, display: 'grid', gridTemplateColumns: '110px 1fr', rowGap: 10, fontSize: 9, lineHeight: '13px' }}>
                   {TERM_ROWS(sheet.terms).map((r) => (
                     <div key={r.label} style={{ display: 'contents' }}>
-                      <dt style={{ fontWeight: 700, color: MUTED }}>{r.label}</dt>
+                      <dt style={{ fontWeight: 600, color: MUTED }}>{r.label}</dt>
                       <dd style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{r.value.trim()}</dd>
                     </div>
                   ))}
@@ -98,7 +109,7 @@ function text(x: number, y: number, size: number, color: string): CSSProperties 
 
 function Line({ value, x, y, w, bold, color = INK }: { value: string; x: number; y: number; w: number; bold?: boolean; color?: string }) {
   if (!value) return null;
-  return <p style={{ ...text(x, y, 8, color), width: w, overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: bold ? 700 : 400 }}>{value}</p>;
+  return <p style={{ ...text(x, y, 8, color), width: w, overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: bold ? 600 : 400 }}>{value}</p>;
 }
 
 function Header({ sheet, pageW }: { sheet: LineSheet; pageW: number }) {
@@ -109,7 +120,7 @@ function Header({ sheet, pageW }: { sheet: LineSheet; pageW: number }) {
   return (
     <>
       {brand.logo && logo && <img src={brand.logo.src} alt="" style={{ position: 'absolute', left: MARGIN, top: MARGIN, width: logo.w, height: logo.h }} />}
-      <p style={{ ...text(textX, MARGIN + 14, 16, INK), width: leftW, overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 700 }}>{brand.name.trim() || 'Your brand'}</p>
+      <p style={{ ...text(textX, MARGIN + 14, 16, INK), width: leftW, overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 600 }}>{brand.name.trim() || 'Your brand'}</p>
       {brand.collection.trim() && (
         <p style={{ ...text(textX, MARGIN + 30, 10, MUTED), width: leftW, overflow: 'hidden', textOverflow: 'ellipsis' }}>{brand.collection.trim()}</p>
       )}

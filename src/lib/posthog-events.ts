@@ -680,13 +680,26 @@ export interface LineSheetDownloadedProps {
 }
 
 /** First piece added to a line sheet: the visitor really started using the tool. */
-export function trackLineSheetStarted(props: { method: 'photos' | 'blank' }) {
+export function trackLineSheetStarted(props: { method: 'photos' | 'typed' | 'paste' }) {
   capture('line_sheet_started', { ...props });
 }
 
 /** PDF downloaded. Counts only: photos and product text never go to analytics. */
 export function trackLineSheetDownloaded(props: LineSheetDownloadedProps) {
   capture('line_sheet_downloaded', { ...props });
+}
+
+export interface LineSheetFailedProps {
+  reason: 'photo_skipped' | 'pdf_error';
+  /** How many photos were skipped (1 for a PDF error). */
+  count: number;
+  /** Why each photo was skipped; never file names or contents. */
+  kinds?: ('unsupported' | 'too_large' | 'unreadable')[];
+}
+
+/** Something in the tool failed for the visitor: photos it could not open, or the PDF build. */
+export function trackLineSheetFailed(props: LineSheetFailedProps) {
+  capture('line_sheet_failed', { ...props });
 }
 
 /** The FormaNova offer under the tool was clicked. */
