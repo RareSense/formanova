@@ -57,6 +57,7 @@ import {
   trackUpscaleStarted,
   trackUpscaleCompleted,
   trackUpscalePaywallHit,
+  trackLargeProjectsClicked,
   trackRubyCtaClicked,
   trackRubyCallStarted,
   trackRubyCallConnected,
@@ -144,6 +145,13 @@ describe('trackBrandFormSubmitted', () => {
       social_count: 2,
       has_brand_book: false,
     })
+  })
+})
+
+describe('trackLargeProjectsClicked', () => {
+  it('captures large_projects_clicked from the dashboard', () => {
+    trackLargeProjectsClicked()
+    expect(posthog.capture).toHaveBeenCalledWith('large_projects_clicked', { source: 'dashboard' })
   })
 })
 

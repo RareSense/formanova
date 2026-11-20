@@ -663,6 +663,11 @@ export function trackDfyOffer(step: 'shown' | 'talk_clicked' | 'declined' | 'clo
   capture(`dfy_offer_${step}`, { moment });
 }
 
+/** Dashboard Large Projects card clicked (owner, 2026-11-20): measures demand. Compare with ruby_call_started to see who opens the call window and leaves. */
+export function trackLargeProjectsClicked() {
+  capture('large_projects_clicked', { source: 'dashboard' });
+}
+
 export function trackRubyCtaClicked(props: { signed_in: boolean }) {
   capture('ruby_cta_clicked', { ...props });
 }

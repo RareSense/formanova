@@ -6,6 +6,7 @@ import { HelmetProvider } from 'react-helmet-async';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import Dashboard from './Dashboard';
+import { trackLargeProjectsClicked } from '@/lib/posthog-events';
 
 vi.mock('framer-motion', () => ({
   motion: new Proxy({}, {
@@ -31,6 +32,7 @@ vi.mock('@/hooks/use-prefetch-generations', () => ({
 
 vi.mock('@/lib/posthog-events', () => ({
   trackStudioTypeSelected: vi.fn(),
+  trackLargeProjectsClicked: vi.fn(),
 }));
 
 vi.mock('@/components/studio/EffortIntroModal', () => ({
@@ -113,8 +115,10 @@ describe('Dashboard as the merged studio hub', () => {
     expect(el.querySelector('[data-testid="call-dialog"]')).toBeNull();
     const call = Array.from(custom?.querySelectorAll('button') ?? []).find((b) => b.textContent?.includes('Call our AI'));
     expect(call).toBeTruthy();
+    expect(trackLargeProjectsClicked).not.toHaveBeenCalled();
     act(() => call?.click());
     expect(el.querySelector('[data-testid="call-dialog"]')).not.toBeNull();
+    expect(trackLargeProjectsClicked).toHaveBeenCalledTimes(1);
   });
 
   // Owner, 2026-11-19: the CAD heading is just "CAD", with no Rhino compatible note.
