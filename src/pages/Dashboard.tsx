@@ -7,7 +7,7 @@ import { ArrowRight, Phone } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePrefetchGenerations } from '@/hooks/use-prefetch-generations';
 import { useShopifyStatus } from '@/hooks/useShopify';
-import { trackStudioTypeSelected } from '@/lib/posthog-events';
+import { trackStudioTypeSelected, trackLargeProjectsClicked } from '@/lib/posthog-events';
 
 import { PeopleIcon } from '@/components/icons/PeopleIcon';
 import { RingIcon } from '@/components/icons/RingIcon';
@@ -298,7 +298,7 @@ export default function Dashboard() {
 
   const handleSelect = (workflow: Workflow) => {
     // The call does not start here: the window opens and the user starts it when ready.
-    if (workflow.action === 'call') { setCallOpen(true); return; }
+    if (workflow.action === 'call') { trackLargeProjectsClicked(); setCallOpen(true); return; }
     if (workflow.studioType) trackStudioTypeSelected(workflow.studioType);
     // First time through photography: pop the effort chooser and defer
     // navigation until they choose. Afterwards (seen flag set) go straight
