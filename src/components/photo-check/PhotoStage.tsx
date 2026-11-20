@@ -37,10 +37,6 @@ export function PhotoStage({ src, width, height, box, minFill }: {
           />
         )}
       </div>
-      <figcaption className="mt-2 font-body text-xs text-muted-foreground">
-        {box ? 'Solid line: your jewelry.' : 'Could not find the jewelry on this background.'}
-        {minFill !== undefined && ` Dashed square: the size it should reach (${Math.round(minFill * 100)}% of the frame).`}
-      </figcaption>
     </figure>
   );
 }

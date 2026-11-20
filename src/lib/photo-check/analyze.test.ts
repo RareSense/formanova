@@ -64,7 +64,7 @@ describe('runChecks', () => {
     const checks = runChecks(meta(900, 600), far, 'amazon');
     expect(checks.find((c) => c.id === 'size')?.status).toBe('warn');
     expect(checks.find((c) => c.id === 'shape')?.status).toBe('warn');
-    expect(checks.find((c) => c.id === 'fill')?.text).toMatch(/fills 30%.*Aim for 85%/);
+    expect(checks.find((c) => c.id === 'fill')?.text).toMatch(/fills 30%.*Amazon wants 85%/);
     expect(verdictOf(checks)).toBe('attention');
   });
 

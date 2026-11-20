@@ -152,19 +152,19 @@ export function runChecks(meta: PhotoMeta, a: Analysis, market: Marketplace): Ch
   const checks: Check[] = [];
 
   // Size
-  const sizeText = `${w} × ${h} px`;
+  const px = `${w} × ${h} px`;
   if (long < r.minLongSide) {
-    checks.push({ id: 'size', status: 'fail', text: `${sizeText}. Too small for ${r.label}: the longest side needs at least ${r.minLongSide} px.` });
+    checks.push({ id: 'size', status: 'fail', text: `${px}. Too small: ${r.label} needs ${r.minLongSide} px or more.` });
   } else if (r.maxSide && (w > r.maxSide || h > r.maxSide)) {
-    checks.push({ id: 'size', status: 'warn', text: `${sizeText}. Larger than ${r.label} accepts (${r.maxSide} px). Fix it will make it smaller.` });
+    checks.push({ id: 'size', status: 'warn', text: `${px}. Over ${r.maxSide} px. Fix it shrinks it.` });
   } else if (r.maxMegapixels && (w * h) / 1e6 > r.maxMegapixels) {
-    checks.push({ id: 'size', status: 'warn', text: `${sizeText}. Over ${r.maxMegapixels} megapixels. Fix it will make it smaller.` });
+    checks.push({ id: 'size', status: 'warn', text: `${px}. Over ${r.maxMegapixels} megapixels. Fix it shrinks it.` });
   } else {
     const ok = r.goodSideApplies === 'both' ? Math.min(w, h) >= r.goodSide : long >= r.goodSide;
-    const want = r.goodSideApplies === 'both' ? `at least ${r.goodSide} px on each side` : `at least ${r.goodSide} px on the longest side`;
-    checks.push(ok
-      ? { id: 'size', status: 'pass', text: `${sizeText}. Large enough.` }
-      : { id: 'size', status: 'warn', text: `${sizeText}. ${r.label} recommends ${want}${market === 'amazon' ? ' so shoppers can zoom' : ''}.` });
+    const want = market === 'amazon'
+      ? `Under ${r.goodSide} px, so shoppers can't zoom.`
+      : r.goodSideApplies === 'both' ? `${r.label} wants ${r.goodSide} px on each side.` : `${r.label} recommends ${r.goodSide} px.`;
+    checks.push(ok ? { id: 'size', status: 'pass', text: `${px}.` } : { id: 'size', status: 'warn', text: `${px}. ${want}` });
   }
 
   // Shape
@@ -172,44 +172,43 @@ export function runChecks(meta: PhotoMeta, a: Analysis, market: Marketplace): Ch
   if (r.shape === 'square') {
     checks.push(Math.abs(ratio - 1) < 0.01
       ? { id: 'shape', status: 'pass', text: 'Square.' }
-      : { id: 'shape', status: 'warn', text: `Not square. ${r.label} shows product photos best as squares. Fix it will add white space around it.` });
+      : { id: 'shape', status: 'warn', text: 'Not square. Fix it adds white space.' });
   } else if (r.shape === 'landscape-or-square') {
     checks.push(ratio >= 0.99
       ? { id: 'shape', status: 'pass', text: ratio > 1.01 ? 'Landscape.' : 'Square.' }
-      : { id: 'shape', status: 'warn', text: `Portrait. ${r.label} recommends landscape or square for the first photo.` });
+      : { id: 'shape', status: 'warn', text: `Portrait. ${r.label} prefers landscape or square.` });
   }
 
   // Background
   const bg = a.background;
   if (r.needsWhiteBackground) {
     if (bg.kind === 'white') checks.push({ id: 'background', status: 'pass', text: 'Pure white background.' });
-    else if (bg.kind === 'near-white') checks.push({ id: 'background', status: 'warn', text: 'Background is off-white. Fix it can make it pure white without touching the jewelry.' });
-    else if (bg.kind === 'plain') checks.push({ id: 'background', status: 'fail', text: `Background is not white. ${r.label} needs pure white for the main photo. This needs a new background.` });
-    else checks.push({ id: 'background', status: 'fail', text: `Busy background. ${r.label} needs pure white for the main photo. This needs a new background.` });
+    else if (bg.kind === 'near-white') checks.push({ id: 'background', status: 'warn', text: 'Off-white background. Fix it makes it pure white.' });
+    else checks.push({ id: 'background', status: 'fail', text: `${bg.kind === 'busy' ? 'Busy' : 'Coloured'} background. ${r.label} needs pure white.` });
   } else if (bg.kind === 'busy') {
-    checks.push({ id: 'background', status: 'warn', text: 'Busy background. A plain background usually sells jewelry better.' });
+    checks.push({ id: 'background', status: 'warn', text: 'Busy background.' });
   } else {
-    checks.push({ id: 'background', status: 'pass', text: bg.kind === 'plain' ? 'Plain background.' : 'Clean, light background.' });
+    checks.push({ id: 'background', status: 'pass', text: bg.kind === 'plain' ? 'Plain background.' : 'Light background.' });
   }
 
   // Fill
   if (a.fill === null) {
-    checks.push({ id: 'fill', status: 'unknown', text: "Can't tell where the jewelry is on this background." });
+    checks.push({ id: 'fill', status: 'unknown', text: "Can't find the jewelry." });
   } else if (r.minFill !== undefined) {
     checks.push(a.fill >= r.minFill
-      ? { id: 'fill', status: 'pass', text: `The jewelry fills ${pct(a.fill)} of the frame.` }
-      : { id: 'fill', status: 'warn', text: `The jewelry fills ${pct(a.fill)} of the frame. Aim for ${pct(r.minFill)} or more. Fix it will frame it closer.` });
-  } else if (a.fill < 0.5) {
-    checks.push({ id: 'fill', status: 'warn', text: `The jewelry fills only ${pct(a.fill)} of the frame. Shoppers see more detail when it fills more.` });
+      ? { id: 'fill', status: 'pass', text: `Jewelry fills ${pct(a.fill)}.` }
+      : { id: 'fill', status: 'warn', text: `Jewelry fills ${pct(a.fill)}. ${r.label} wants ${pct(r.minFill)}.` });
   } else {
-    checks.push({ id: 'fill', status: 'pass', text: `The jewelry fills ${pct(a.fill)} of the frame.` });
+    checks.push(a.fill < 0.5
+      ? { id: 'fill', status: 'warn', text: `Jewelry fills only ${pct(a.fill)}.` }
+      : { id: 'fill', status: 'pass', text: `Jewelry fills ${pct(a.fill)}.` });
   }
 
   // File
   if (r.maxFileBytes && meta.bytes > r.maxFileBytes) {
-    checks.push({ id: 'file', status: 'fail', text: `${mb(meta.bytes)}. Over the ${mb(r.maxFileBytes)} limit. Fix it will make it smaller.` });
+    checks.push({ id: 'file', status: 'fail', text: `${mb(meta.bytes)}. Over the ${mb(r.maxFileBytes)} limit.` });
   } else if (r.softMaxFileBytes && meta.bytes > r.softMaxFileBytes) {
-    checks.push({ id: 'file', status: 'warn', text: `${mb(meta.bytes)}. Files over ${mb(r.softMaxFileBytes)} may not finish uploading. Fix it will make it smaller.` });
+    checks.push({ id: 'file', status: 'warn', text: `${mb(meta.bytes)}. Over ${mb(r.softMaxFileBytes)} may not upload.` });
   } else {
     checks.push({ id: 'file', status: 'pass', text: `${mb(meta.bytes)}.` });
   }

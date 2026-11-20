@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { CheckList } from '@/components/photo-check/CheckList';
 import { PhotoStage } from '@/components/photo-check/PhotoStage';
 import { BeforeAfter } from '@/components/photo-check/BeforeAfter';
+import { MarketLogo } from '@/components/photo-check/MarketLogo';
 import { getPublicSiteUrl } from '@/lib/public-url';
 import { PHOTO_CHECK_FAQS, PHOTO_CHECK_PAGE, PHOTO_CHECK_STEPS } from '@/lib/seo/static-pages';
 import { ACCEPTED_IMAGES, ImageError, decodeFullImage } from '@/lib/line-sheet/image';
@@ -201,8 +202,9 @@ export default function JewelryPhotoChecker() {
                 type="button"
                 aria-pressed={market === m}
                 onClick={() => setMarket(m)}
-                className={`px-5 py-2 font-body text-sm transition-colors ${market === m ? 'bg-foreground text-background' : 'text-foreground hover:bg-muted'}`}
+                className={`inline-flex items-center gap-2 px-5 py-2 font-body text-sm transition-colors ${market === m ? 'bg-foreground text-background' : 'text-foreground hover:bg-muted'}`}
               >
+                <MarketLogo market={m} />
                 {MARKET_RULES[m].label}
               </button>
             ))}
@@ -229,8 +231,8 @@ export default function JewelryPhotoChecker() {
               className="flex w-full cursor-pointer flex-col items-center justify-center gap-3 border-2 border-dashed border-border px-6 py-16 text-center transition-colors hover:bg-muted/40"
             >
               {busy ? <Loader2 className="h-9 w-9 animate-spin text-primary" /> : <Diamond className="h-9 w-9 text-primary" />}
-              <span className="font-body text-base font-medium">Drop a photo of your jewelry, or click to choose one</span>
-              <span className="font-body text-sm text-muted-foreground">JPG, PNG, WebP, AVIF and iPhone HEIC. One photo at a time.</span>
+              <span className="font-body text-base font-medium">Drop a jewelry photo, or click to choose</span>
+              <span className="font-body text-sm text-muted-foreground">JPG, PNG, WebP or iPhone photos</span>
             </button>
           ) : (
             <div className="grid gap-10 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] md:items-start">
@@ -256,8 +258,8 @@ export default function JewelryPhotoChecker() {
 
                 {fixed && (
                   <p className="font-body text-sm text-muted-foreground">
-                    {fixed.width} × {fixed.height} px JPEG. Your jewelry is unchanged; only the framing and background were adjusted.
-                    {fixed.width < rules.target.width && ' The jewelry is small in your original photo, so the fixed photo is smaller too: we never enlarge photos, because that blurs the detail. For a larger photo, shoot closer or at a higher resolution.'}
+                    Your jewelry is unchanged. Only the framing and background were adjusted.
+                    {fixed.width < rules.target.width && ' Small original, so it stays small: shoot closer for zoom.'}
                   </p>
                 )}
 
@@ -283,9 +285,9 @@ export default function JewelryPhotoChecker() {
         </div>
 
         <p className="mt-4 font-body text-xs text-muted-foreground">
-          {rules.label} rules from{' '}
-          <a href={SOURCES[market]} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">{rules.source}</a>
-          , checked {rules.checkedOn}. These are pre-checks, not {rules.label}&rsquo;s approval.
+          {rules.label} rules checked {rules.checkedOn} (
+          <a href={SOURCES[market]} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">source</a>
+          ). A pre-check, not {rules.label}&rsquo;s approval.
         </p>
 
         <section className="mt-20 max-w-2xl space-y-12 font-body">

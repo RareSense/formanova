@@ -8,19 +8,19 @@ const ICON: Record<CheckStatus, { Icon: typeof CheckIcon; label: string; classNa
   unknown: { Icon: CircleHelp, label: "Can't tell", className: 'text-muted-foreground' },
 };
 
-const VERDICT: Record<Verdict, string> = {
-  good: 'Looks good.',
-  attention: 'Needs attention.',
-  unknown: "Can't tell reliably.",
-};
+/** What to do, in one line: "2 things to fix for Amazon." */
+function headline(verdict: Verdict, checks: Check[], market: string): string {
+  if (verdict === 'good') return `Ready for ${market}.`;
+  const n = checks.filter((c) => c.status === 'warn' || c.status === 'fail').length;
+  if (n === 0) return "Can't check this photo reliably.";
+  return `${n} ${n === 1 ? 'thing' : 'things'} to fix for ${market}.`;
+}
 
 /** The verdict in one line, then one plain line per check. Colour only marks a real problem. */
 export function CheckList({ verdict, checks, market }: { verdict: Verdict; checks: Check[]; market: string }) {
   return (
     <div className="space-y-4">
-      <p className="font-body text-xl font-semibold">
-        {VERDICT[verdict]} <span className="font-normal text-muted-foreground">For {market}.</span>
-      </p>
+      <p className="font-body text-xl font-semibold">{headline(verdict, checks, market)}</p>
       <ul className="space-y-3" aria-label="Photo checks">
         {checks.map((c) => {
           const { Icon, label, className } = ICON[c.status];
