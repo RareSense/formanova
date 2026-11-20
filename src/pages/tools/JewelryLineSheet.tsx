@@ -9,6 +9,7 @@ import { SheetPreview } from '@/components/line-sheet/SheetPreview';
 import { SheetGrid } from '@/components/line-sheet/SheetGrid';
 import { DocInput, DocTextarea, LogoBox } from '@/components/line-sheet/DocFields';
 import { getPublicSiteUrl } from '@/lib/public-url';
+import { LINE_SHEET_FAQS, LINE_SHEET_PAGE, LINE_SHEET_STEPS } from '@/lib/seo/static-pages';
 import {
   emptyProduct, fileName, hasTerms, missingFields, paginate,
   type Brand, type LineSheet, type Paper, type Product, type SheetLayout, type Terms,
@@ -19,24 +20,7 @@ import { trackLineSheetCtaClicked, trackLineSheetDownloaded, trackLineSheetFaile
 const PAGE_URL = `${getPublicSiteUrl()}/tools/jewelry-line-sheet-generator`;
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'AED', 'INR'];
 
-const FAQS = [
-  {
-    q: 'What is a jewelry line sheet?',
-    a: 'A line sheet is the document a jewelry brand sends to boutiques and wholesale buyers. It shows each piece with a photo, style number (SKU), materials and prices, plus the brand’s contact details and order terms, so a buyer can choose and order.',
-  },
-  {
-    q: 'What should a jewelry line sheet include?',
-    a: 'A clear photo of each piece, its name and SKU, the metal, stones and size, the wholesale price and the suggested retail price. Add your brand name, collection, contact details and order terms such as minimum order, payment and delivery time.',
-  },
-  {
-    q: 'Is this line sheet generator really free?',
-    a: 'Yes. There is no signup, no watermark and no page limit. You can download the full PDF for as many pieces as you add.',
-  },
-  {
-    q: 'Is my line sheet saved?',
-    a: 'No. The PDF is made in your browser and is not saved anywhere. Closing this page clears it, so download your PDF before you leave. Like most websites, we record how people use this page so we can improve it.',
-  },
-];
+const FAQS = LINE_SHEET_FAQS;
 
 const EMPTY_BRAND: Brand = { name: '', collection: '', email: '', phone: '', website: '' };
 const EMPTY_TERMS: Terms = { minimumOrder: '', payment: '', delivery: '', notes: '' };
@@ -179,8 +163,8 @@ export default function JewelryLineSheet() {
   return (
     <div className="min-h-screen bg-muted/30 text-foreground">
       <Helmet>
-        <title>Free Jewelry Line Sheet Generator (PDF) | FormaNova</title>
-        <meta name="description" content="Make a professional jewelry line sheet for wholesale buyers in minutes. Add photos, SKUs and prices, then download a clean PDF. Free, no signup, no watermark." />
+        <title>{LINE_SHEET_PAGE.title}</title>
+        <meta name="description" content={LINE_SHEET_PAGE.description} />
         <link rel="canonical" href={PAGE_URL} />
       </Helmet>
       <script
@@ -211,7 +195,7 @@ export default function JewelryLineSheet() {
           <Link to="/tools" className="font-body text-sm text-muted-foreground hover:text-foreground">Free tools</Link>
           <h1 className="mt-2 font-display text-4xl uppercase tracking-wide md:text-5xl">Jewelry Line Sheet Generator</h1>
           <p className="mt-3 font-body text-base text-muted-foreground">
-            Make a professional line sheet for wholesale buyers. Free, no signup, no watermark.
+            {LINE_SHEET_PAGE.intro}
           </p>
         </header>
 
@@ -347,10 +331,7 @@ export default function JewelryLineSheet() {
           <div className="space-y-4">
             <h2 className="font-body text-xl font-semibold normal-case tracking-normal">How to make a jewelry line sheet</h2>
             <ol className="list-decimal space-y-2 pl-5 text-base text-muted-foreground">
-              <li>Add your logo, brand name, collection and contact details.</li>
-              <li>Add a photo of each piece, then its name, SKU, metal, stone, size and prices.</li>
-              <li>Add your order terms: minimum order, payment and delivery.</li>
-              <li>Check the preview and download the PDF.</li>
+              {LINE_SHEET_STEPS.map((step) => <li key={step}>{step}</li>)}
             </ol>
           </div>
           <div className="space-y-6">

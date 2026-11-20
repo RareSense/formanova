@@ -2,6 +2,7 @@ import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { getPublicSiteUrl } from '@/lib/public-url';
+import { TOOLS_PAGE } from '@/lib/seo/static-pages';
 
 /**
  * Home of FormaNova's free tools (proposal section 5: "One home"). Each tool is
@@ -21,15 +22,15 @@ export default function ToolsIndex() {
   return (
     <div className="min-h-screen bg-muted/30 text-foreground">
       <Helmet>
-        <title>Free Jewelry Business Tools | FormaNova</title>
-        <meta name="description" content="Free tools for jewelry brands and designers. No signup, no watermark. Start with the jewelry line sheet generator." />
+        <title>{TOOLS_PAGE.title}</title>
+        <meta name="description" content={TOOLS_PAGE.description} />
         <link rel="canonical" href={PAGE_URL} />
       </Helmet>
 
       <div className="mx-auto max-w-3xl px-6 py-12 md:py-16">
         <header className="mb-10">
-          <h1 className="font-display text-4xl uppercase tracking-wide md:text-5xl">Free tools for jewelers</h1>
-          <p className="mt-3 font-body text-base text-muted-foreground">Free to use. No signup. No watermark.</p>
+          <h1 className="font-display text-4xl uppercase tracking-wide md:text-5xl">{TOOLS_PAGE.h1}</h1>
+          <p className="mt-3 font-body text-base text-muted-foreground">{TOOLS_PAGE.intro}</p>
         </header>
 
         <ul className="space-y-4">

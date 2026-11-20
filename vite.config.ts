@@ -4,6 +4,37 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { ViteImageOptimizer } from "vite-plugin-image-optimizer";
 import fs from "fs";
+import { STATIC_PAGES, renderStaticHtml } from "./src/lib/seo/static-pages";
+
+/**
+ * After the build, writes a plain-HTML copy of index.html for each public tool
+ * page (dist/tools/.../index.html) with that page's title, description and
+ * readable text. nginx serves these files for those exact addresses (see the
+ * PR #193 nginx note; `serve -s` itself always answers with dist/index.html),
+ * so crawlers and link previews that do not run JavaScript read real content.
+ * React replaces it on load. Content lives in src/lib/seo/static-pages.ts.
+ */
+function staticPagesPlugin(): Plugin {
+  let outDir = "dist";
+  return {
+    name: "static-pages",
+    apply: "build",
+    configResolved(config) {
+      outDir = path.resolve(config.root, config.build.outDir);
+    },
+    closeBundle() {
+      const indexPath = path.join(outDir, "index.html");
+      if (!fs.existsSync(indexPath)) return;
+      const indexHtml = fs.readFileSync(indexPath, "utf8");
+      const siteUrl = process.env.VITE_PUBLIC_SITE_URL?.trim() || "https://formanova.ai";
+      for (const page of STATIC_PAGES) {
+        const dir = path.join(outDir, page.path);
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(path.join(dir, "index.html"), renderStaticHtml(indexHtml, page, siteUrl));
+      }
+    },
+  };
+}
 
 /**
  * Converts render-blocking <link rel="stylesheet"> tags to non-render-blocking
@@ -61,6 +92,7 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
       react(),
+      staticPagesPlugin(),
       mode === "development" && componentTagger(),
       ViteImageOptimizer({
         png: { quality: 70 },
