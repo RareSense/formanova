@@ -58,6 +58,9 @@ import {
   trackUpscaleCompleted,
   trackUpscalePaywallHit,
   trackLargeProjectsClicked,
+  trackLineSheetStarted,
+  trackLineSheetDownloaded,
+  trackLineSheetCtaClicked,
   trackRubyCtaClicked,
   trackRubyCallStarted,
   trackRubyCallConnected,
@@ -145,6 +148,25 @@ describe('trackBrandFormSubmitted', () => {
       social_count: 2,
       has_brand_book: false,
     })
+  })
+})
+
+describe('line sheet tool events', () => {
+  it('captures line_sheet_started with how the first piece was added', () => {
+    trackLineSheetStarted({ method: 'photos' })
+    expect(posthog.capture).toHaveBeenCalledWith('line_sheet_started', { method: 'photos' })
+  })
+
+  it('captures line_sheet_downloaded with counts only, never file contents', () => {
+    trackLineSheetDownloaded({ products: 14, pages: 3, has_terms: true, has_logo: false, paper: 'letter', currency: 'USD' })
+    expect(posthog.capture).toHaveBeenCalledWith('line_sheet_downloaded', {
+      products: 14, pages: 3, has_terms: true, has_logo: false, paper: 'letter', currency: 'USD',
+    })
+  })
+
+  it('captures line_sheet_cta_clicked with the offer that was clicked', () => {
+    trackLineSheetCtaClicked({ cta: 'collection_photos' })
+    expect(posthog.capture).toHaveBeenCalledWith('line_sheet_cta_clicked', { cta: 'collection_photos' })
   })
 })
 
