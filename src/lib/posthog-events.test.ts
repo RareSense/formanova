@@ -58,6 +58,10 @@ import {
   trackUpscaleCompleted,
   trackUpscalePaywallHit,
   trackLargeProjectsClicked,
+  trackLineSheetStarted,
+  trackLineSheetDownloaded,
+  trackLineSheetCtaClicked,
+  trackLineSheetFailed,
   trackRubyCtaClicked,
   trackRubyCallStarted,
   trackRubyCallConnected,
@@ -145,6 +149,30 @@ describe('trackBrandFormSubmitted', () => {
       social_count: 2,
       has_brand_book: false,
     })
+  })
+})
+
+describe('line sheet tool events', () => {
+  it('captures line_sheet_started with how the first piece was added', () => {
+    trackLineSheetStarted({ method: 'photos' })
+    expect(posthog.capture).toHaveBeenCalledWith('line_sheet_started', { method: 'photos' })
+  })
+
+  it('captures line_sheet_downloaded with counts only, never file contents', () => {
+    trackLineSheetDownloaded({ products: 14, pages: 3, has_terms: true, has_logo: false, paper: 'letter', currency: 'USD', layout: 'grid' })
+    expect(posthog.capture).toHaveBeenCalledWith('line_sheet_downloaded', {
+      products: 14, pages: 3, has_terms: true, has_logo: false, paper: 'letter', currency: 'USD', layout: 'grid',
+    })
+  })
+
+  it('captures line_sheet_failed with the reason and counts, never file names', () => {
+    trackLineSheetFailed({ reason: 'photo_skipped', count: 2, kinds: ['unsupported', 'too_large'] })
+    expect(posthog.capture).toHaveBeenCalledWith('line_sheet_failed', { reason: 'photo_skipped', count: 2, kinds: ['unsupported', 'too_large'] })
+  })
+
+  it('captures line_sheet_cta_clicked with the offer that was clicked', () => {
+    trackLineSheetCtaClicked({ cta: 'collection_photos' })
+    expect(posthog.capture).toHaveBeenCalledWith('line_sheet_cta_clicked', { cta: 'collection_photos' })
   })
 })
 

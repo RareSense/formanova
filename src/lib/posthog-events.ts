@@ -668,6 +668,46 @@ export function trackLargeProjectsClicked() {
   capture('large_projects_clicked', { source: 'dashboard' });
 }
 
+// ═══════ Free tools: jewelry line sheet (owner, 2026-11-21) ══════════
+
+export interface LineSheetDownloadedProps {
+  products: number;
+  pages: number;
+  has_terms: boolean;
+  has_logo: boolean;
+  paper: 'letter' | 'a4';
+  currency: string;
+  layout: 'grid' | 'detailed';
+}
+
+/** First piece added to a line sheet: the visitor really started using the tool. */
+export function trackLineSheetStarted(props: { method: 'photos' | 'typed' | 'paste' }) {
+  capture('line_sheet_started', { ...props });
+}
+
+/** PDF downloaded. Counts only: photos and product text never go to analytics. */
+export function trackLineSheetDownloaded(props: LineSheetDownloadedProps) {
+  capture('line_sheet_downloaded', { ...props });
+}
+
+export interface LineSheetFailedProps {
+  reason: 'photo_skipped' | 'pdf_error';
+  /** How many photos were skipped (1 for a PDF error). */
+  count: number;
+  /** Why each photo was skipped; never file names or contents. */
+  kinds?: ('unsupported' | 'too_large' | 'unreadable')[];
+}
+
+/** Something in the tool failed for the visitor: photos it could not open, or the PDF build. */
+export function trackLineSheetFailed(props: LineSheetFailedProps) {
+  capture('line_sheet_failed', { ...props });
+}
+
+/** The FormaNova offer under the tool was clicked. */
+export function trackLineSheetCtaClicked(props: { cta: 'collection_photos' }) {
+  capture('line_sheet_cta_clicked', { ...props });
+}
+
 export function trackRubyCtaClicked(props: { signed_in: boolean }) {
   capture('ruby_cta_clicked', { ...props });
 }
