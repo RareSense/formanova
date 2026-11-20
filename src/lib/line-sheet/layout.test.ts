@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  containImage, emptyProduct, fileName, wrapLines, formatPrice, gridGeometry, missingFields, paginate, productLines,
+  containImage, detailRows, emptyProduct, fileName, wrapLines, formatPrice, gridGeometry, missingFields, paginate, productLines,
   type LineSheet,
 } from './layout';
 
@@ -103,5 +103,25 @@ describe('wrapLines', () => {
 
   it('shortens a single word that is too long', () => {
     expect(wrapLines('Supercalifragilistic', 10, measure, 2)).toEqual(['Supercali…']);
+  });
+});
+
+describe('Detailed layout', () => {
+  it('fits 6 pieces (3 x 2) on a US Letter page with bigger photos than the grid', () => {
+    const d = gridGeometry('letter', 'detailed');
+    const g = gridGeometry('letter', 'grid');
+    expect(d.perPage).toBe(6);
+    expect(d.imageH).toBeGreaterThan(g.imageH);
+    expect(d.gridTop + d.rows * d.cellH + (d.rows - 1) * 14).toBeLessThanOrEqual(d.pageH - 40 - 32);
+  });
+
+  it('splits 14 pieces into pages of 6, 6 and 2', () => {
+    const pages = paginate({ ...sheet(14), layout: 'detailed' });
+    expect(pages.map((p) => (p.kind === 'products' ? p.products.length : -1))).toEqual([6, 6, 2]);
+  });
+
+  it('labels each filled detail and leaves blanks out', () => {
+    const p = { ...emptyProduct('a'), sku: 'LJ-1', metal: '14k gold', size: ' ' };
+    expect(detailRows(p)).toEqual([{ label: 'SKU', value: 'LJ-1' }, { label: 'Metal', value: '14k gold' }]);
   });
 });

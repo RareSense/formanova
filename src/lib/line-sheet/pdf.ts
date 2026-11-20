@@ -1,7 +1,7 @@
 import type { jsPDF as JsPDF } from 'jspdf';
 import {
-  CONTACT_LINES, FOOTER_H, LINE_H, MARGIN, SHEET_FONT, TERM_ROWS, TEXT_GAP,
-  cellPosition, containImage, gridGeometry, logoBox, paginate, productLines, wrapLines,
+  CONTACT_LINES, FOOTER_H, LABEL_W, LINE_H, MARGIN, SHEET_FONT, TERM_ROWS, TEXT_GAP,
+  cellPosition, containImage, detailRows, gridGeometry, logoBox, paginate, productLines, wrapLines,
   type LineSheet,
 } from './layout';
 import { INK, MUTED, RULE } from './pdf-colors';
@@ -82,7 +82,7 @@ function drawFooter(doc: JsPDF, sheet: LineSheet, pageW: number, pageH: number, 
 /** Builds the line sheet PDF in the browser. jsPDF is loaded only when this runs. */
 export async function buildLineSheetPdf(sheet: LineSheet): Promise<JsPDF> {
   const { jsPDF } = await import('jspdf');
-  const g = gridGeometry(sheet.paper);
+  const g = gridGeometry(sheet.paper, sheet.layout);
   const doc = new jsPDF({ unit: 'pt', format: [g.pageW, g.pageH], compress: true });
   await embedFonts(doc);
   const pages = paginate(sheet);
@@ -113,11 +113,24 @@ export async function buildLineSheetPdf(sheet: LineSheet): Promise<JsPDF> {
         const nameLines = wrapLines(lines.name, g.cellW, (t) => doc.getTextWidth(t), 2);
         nameLines.forEach((line, i) => put(line, true, INK, top + i * LINE_H));
         const after = top + Math.max(1, nameLines.length) * LINE_H;
-        put(lines.sku, false, MUTED, after);
-        put(lines.details, false, INK, after + LINE_H);
+        if (sheet.layout === 'detailed') {
+          // One labelled line per detail: "Metal  14k gold".
+          detailRows(p).forEach((r, i) => {
+            const ty = after + i * LINE_H;
+            doc.setFont(SHEET_FONT, 'normal');
+            doc.setFontSize(8);
+            doc.setTextColor(MUTED);
+            doc.text(r.label, x, ty);
+            doc.setTextColor(INK);
+            doc.text(fit(doc, r.value, g.cellW - LABEL_W), x + LABEL_W, ty);
+          });
+        } else {
+          put(lines.sku, false, MUTED, after);
+          put(lines.details, false, INK, after + LINE_H);
+        }
         // Prices always on the last two lines, so they line up across a row.
-        put(lines.wholesale, true, INK, top + 4 * LINE_H);
-        put(lines.retail, false, INK, top + 5 * LINE_H);
+        put(lines.wholesale, true, INK, top + (g.textLines - 2) * LINE_H);
+        put(lines.retail, false, INK, top + (g.textLines - 1) * LINE_H);
       });
     } else {
       doc.setFont(SHEET_FONT, 'bold');

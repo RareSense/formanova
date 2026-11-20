@@ -11,7 +11,7 @@ import { DocInput, DocTextarea, LogoBox } from '@/components/line-sheet/DocField
 import { getPublicSiteUrl } from '@/lib/public-url';
 import {
   emptyProduct, fileName, hasTerms, missingFields, paginate,
-  type Brand, type LineSheet, type Paper, type Product, type Terms,
+  type Brand, type LineSheet, type Paper, type Product, type SheetLayout, type Terms,
 } from '@/lib/line-sheet/layout';
 import { ACCEPTED_IMAGES, ImageError, describeFailures, loadImage } from '@/lib/line-sheet/image';
 import { trackLineSheetCtaClicked, trackLineSheetDownloaded, trackLineSheetFailed, trackLineSheetStarted } from '@/lib/posthog-events';
@@ -68,12 +68,13 @@ export default function JewelryLineSheet() {
   const [terms, setTerms] = useState<Terms>(EMPTY_TERMS);
   const [paper, setPaper] = useState<Paper>('letter');
   const [currency, setCurrency] = useState('USD');
+  const [layout, setLayout] = useState<SheetLayout>('grid');
   const [busy, setBusy] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
   const started = useRef(false);
   const addPhotosInput = useRef<HTMLInputElement>(null);
 
-  const sheet: LineSheet = useMemo(() => ({ brand, products, terms, paper, currency }), [brand, products, terms, paper, currency]);
+  const sheet: LineSheet = useMemo(() => ({ brand, products, terms, paper, currency, layout }), [brand, products, terms, paper, currency, layout]);
   const pageCount = paginate(sheet).length;
   const incomplete = products.filter((p) => missingFields(p).length > 0).length;
 
@@ -171,7 +172,7 @@ export default function JewelryLineSheet() {
     }
     // Tracked after the download, outside the try, so analytics can never turn a good download into an error.
     track(() => (saved
-      ? trackLineSheetDownloaded({ products: products.length, pages: pageCount, has_terms: hasTerms(terms), has_logo: !!brand.logo, paper, currency })
+      ? trackLineSheetDownloaded({ products: products.length, pages: pageCount, has_terms: hasTerms(terms), has_logo: !!brand.logo, paper, currency, layout })
       : trackLineSheetFailed({ reason: 'pdf_error', count: 1 })));
   };
 
@@ -207,7 +208,8 @@ export default function JewelryLineSheet() {
       <div className="mx-auto max-w-7xl px-6 py-12 md:px-12 md:py-16">
         {/* Title */}
         <header className="mb-10 max-w-2xl">
-          <h1 className="font-display text-4xl uppercase tracking-wide md:text-5xl">Jewelry Line Sheet Generator</h1>
+          <Link to="/tools" className="font-body text-sm text-muted-foreground hover:text-foreground">Free tools</Link>
+          <h1 className="mt-2 font-display text-4xl uppercase tracking-wide md:text-5xl">Jewelry Line Sheet Generator</h1>
           <p className="mt-3 font-body text-base text-muted-foreground">
             Make a professional line sheet for wholesale buyers. Free, no signup, no watermark.
           </p>
@@ -284,7 +286,14 @@ export default function JewelryLineSheet() {
               {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
               Download PDF
             </Button>
-            <div className="grid grid-cols-2 gap-2 lg:grid-cols-1">
+            <div className="grid grid-cols-3 gap-2 lg:grid-cols-1">
+              <Select value={layout} onValueChange={(v) => setLayout(v as SheetLayout)}>
+                <SelectTrigger aria-label="Layout"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="grid">Grid · 12 per page</SelectItem>
+                  <SelectItem value="detailed">Detailed · 6 per page</SelectItem>
+                </SelectContent>
+              </Select>
               <Select value={paper} onValueChange={(v) => setPaper(v as Paper)}>
                 <SelectTrigger aria-label="Paper size"><SelectValue /></SelectTrigger>
                 <SelectContent>

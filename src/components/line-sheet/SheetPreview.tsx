@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import {
-  CONTACT_LINES, FOOTER_H, LINE_H, MARGIN, SHEET_FONT, TERM_ROWS, TEXT_GAP,
-  cellPosition, containImage, gridGeometry, logoBox, paginate, productLines, wrapLines,
+  CONTACT_LINES, FOOTER_H, LABEL_W, LINE_H, MARGIN, SHEET_FONT, TERM_ROWS, TEXT_GAP,
+  cellPosition, containImage, detailRows, gridGeometry, logoBox, paginate, productLines, wrapLines,
   type LineSheet,
 } from '@/lib/line-sheet/layout';
 import { INK, MUTED, RULE } from '@/lib/line-sheet/pdf-colors';
@@ -21,7 +21,7 @@ function measureName(text: string): number {
  * Text is placed by its baseline, like the PDF.
  */
 export function SheetPreview({ sheet }: { sheet: LineSheet }) {
-  const g = gridGeometry(sheet.paper);
+  const g = gridGeometry(sheet.paper, sheet.layout);
   const pages = paginate(sheet);
   const boxRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.8);
@@ -70,10 +70,21 @@ export function SheetPreview({ sheet }: { sheet: LineSheet }) {
                     </div>
                   )}
                   {nameLines.map((line, n) => <Line key={n} value={line} x={x} y={ty + n * LINE_H} w={g.cellW} bold />)}
-                  <Line value={lines.sku} x={x} y={afterName} w={g.cellW} color={MUTED} />
-                  <Line value={lines.details} x={x} y={afterName + LINE_H} w={g.cellW} />
-                  <Line value={lines.wholesale} x={x} y={ty + 4 * LINE_H} w={g.cellW} bold />
-                  <Line value={lines.retail} x={x} y={ty + 5 * LINE_H} w={g.cellW} />
+                  {sheet.layout === 'detailed' ? (
+                    detailRows(p).map((r, n) => (
+                      <div key={r.label}>
+                        <Line value={r.label} x={x} y={afterName + n * LINE_H} w={LABEL_W} color={MUTED} />
+                        <Line value={r.value} x={x + LABEL_W} y={afterName + n * LINE_H} w={g.cellW - LABEL_W} />
+                      </div>
+                    ))
+                  ) : (
+                    <>
+                      <Line value={lines.sku} x={x} y={afterName} w={g.cellW} color={MUTED} />
+                      <Line value={lines.details} x={x} y={afterName + LINE_H} w={g.cellW} />
+                    </>
+                  )}
+                  <Line value={lines.wholesale} x={x} y={ty + (g.textLines - 2) * LINE_H} w={g.cellW} bold />
+                  <Line value={lines.retail} x={x} y={ty + (g.textLines - 1) * LINE_H} w={g.cellW} />
                 </div>
               );
             })}

@@ -47,12 +47,21 @@ export interface Terms {
 
 export type Paper = 'letter' | 'a4';
 
+/**
+ * Grid: 4 per row, photo first, details in one line (like the Eva Marcus
+ * jewelry sheet). Detailed: 3 per row, bigger photos, each detail on its own
+ * labelled line (like a fashion line sheet). Owner, 2026-11-21.
+ */
+export type SheetLayout = 'grid' | 'detailed';
+
 export interface LineSheet {
   brand: Brand;
   products: Product[];
   terms: Terms;
   paper: Paper;
   currency: string;
+  /** Defaults to 'grid'. */
+  layout?: SheetLayout;
 }
 
 export const PAPER_SIZE: Record<Paper, { w: number; h: number }> = {
@@ -63,12 +72,20 @@ export const PAPER_SIZE: Record<Paper, { w: number; h: number }> = {
 export const MARGIN = 40;
 export const HEADER_H = 64;
 export const FOOTER_H = 32;
-export const COLS = 4;
 export const GAP = 14;
 export const TEXT_GAP = 8;
 export const LINE_H = 10;
-/** Name (up to 2 lines), SKU, details, then wholesale and retail pinned to the last two lines. */
-export const TEXT_LINES = 6;
+/**
+ * Columns and text lines per layout. Grid: name (up to 2 lines), SKU, details,
+ * then wholesale and retail pinned to the last two lines. Detailed: name (up to
+ * 2), SKU, metal, stone, size, then the two prices.
+ */
+export const LAYOUT_SPEC: Record<SheetLayout, { cols: number; textLines: number }> = {
+  grid: { cols: 4, textLines: 6 },
+  detailed: { cols: 3, textLines: 8 },
+};
+/** Width of the label column ("Metal", "Stone") in the Detailed layout. */
+export const LABEL_W = 34;
 /** Font for every line sheet: Inter, the FormaNova site font, embedded so any currency or accent prints. */
 export const SHEET_FONT = 'Inter';
 
@@ -79,25 +96,28 @@ export interface GridGeometry {
   imageH: number;
   cellH: number;
   rows: number;
+  cols: number;
+  textLines: number;
   perPage: number;
   /** Top of the product grid. */
   gridTop: number;
 }
 
-export function gridGeometry(paper: Paper): GridGeometry {
+export function gridGeometry(paper: Paper, layout: SheetLayout = 'grid'): GridGeometry {
   const { w, h } = PAPER_SIZE[paper];
-  const cellW = (w - 2 * MARGIN - (COLS - 1) * GAP) / COLS;
+  const { cols, textLines } = LAYOUT_SPEC[layout];
+  const cellW = (w - 2 * MARGIN - (cols - 1) * GAP) / cols;
   const imageH = cellW;
-  const cellH = imageH + TEXT_GAP + TEXT_LINES * LINE_H;
+  const cellH = imageH + TEXT_GAP + textLines * LINE_H;
   const available = h - 2 * MARGIN - HEADER_H - FOOTER_H;
   const rows = Math.max(1, Math.floor((available + GAP) / (cellH + GAP)));
-  return { pageW: w, pageH: h, cellW, imageH, cellH, rows, perPage: rows * COLS, gridTop: MARGIN + HEADER_H };
+  return { pageW: w, pageH: h, cellW, imageH, cellH, rows, cols, textLines, perPage: rows * cols, gridTop: MARGIN + HEADER_H };
 }
 
 /** Top-left corner of the product at `slot` (0-based, within its page). */
 export function cellPosition(slot: number, g: GridGeometry): { x: number; y: number } {
-  const col = slot % COLS;
-  const row = Math.floor(slot / COLS);
+  const col = slot % g.cols;
+  const row = Math.floor(slot / g.cols);
   return { x: MARGIN + col * (g.cellW + GAP), y: g.gridTop + row * (g.cellH + GAP) };
 }
 
@@ -111,7 +131,7 @@ export type SheetPage =
 
 /** Products split into pages, then a terms page when any term is filled in. */
 export function paginate(sheet: LineSheet): SheetPage[] {
-  const { perPage } = gridGeometry(sheet.paper);
+  const { perPage } = gridGeometry(sheet.paper, sheet.layout);
   const pages: SheetPage[] = [];
   for (let i = 0; i < sheet.products.length; i += perPage) {
     pages.push({ kind: 'products', products: sheet.products.slice(i, i + perPage) });
@@ -147,6 +167,16 @@ export function productLines(p: Product, currency: string): { name: string; sku:
     wholesale: wholesale && `Wholesale ${wholesale}`,
     retail: retail && `Retail ${retail}`,
   };
+}
+
+/** Labelled detail lines for the Detailed layout, empty ones left out. */
+export function detailRows(p: Product): { label: string; value: string }[] {
+  return [
+    { label: 'SKU', value: p.sku },
+    { label: 'Metal', value: p.metal },
+    { label: 'Stone', value: p.stone },
+    { label: 'Size', value: p.size },
+  ].map((r) => ({ ...r, value: r.value.trim() })).filter((r) => r.value !== '');
 }
 
 /**

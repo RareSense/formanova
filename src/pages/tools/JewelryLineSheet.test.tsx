@@ -87,7 +87,7 @@ describe('JewelryLineSheet analytics', () => {
     await clickDownload(el);
     expect(save).toHaveBeenCalledWith('line-sheet.pdf');
     expect(trackLineSheetDownloaded).toHaveBeenCalledWith({
-      products: 1, pages: 1, has_terms: false, has_logo: false, paper: 'letter', currency: 'USD',
+      products: 1, pages: 1, has_terms: false, has_logo: false, paper: 'letter', currency: 'USD', layout: 'grid',
     });
     expect(toast).not.toHaveBeenCalled();
   });

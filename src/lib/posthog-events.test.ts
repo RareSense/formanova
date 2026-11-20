@@ -159,9 +159,9 @@ describe('line sheet tool events', () => {
   })
 
   it('captures line_sheet_downloaded with counts only, never file contents', () => {
-    trackLineSheetDownloaded({ products: 14, pages: 3, has_terms: true, has_logo: false, paper: 'letter', currency: 'USD' })
+    trackLineSheetDownloaded({ products: 14, pages: 3, has_terms: true, has_logo: false, paper: 'letter', currency: 'USD', layout: 'grid' })
     expect(posthog.capture).toHaveBeenCalledWith('line_sheet_downloaded', {
-      products: 14, pages: 3, has_terms: true, has_logo: false, paper: 'letter', currency: 'USD',
+      products: 14, pages: 3, has_terms: true, has_logo: false, paper: 'letter', currency: 'USD', layout: 'grid',
     })
   })
 

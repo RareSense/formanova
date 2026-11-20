@@ -677,6 +677,7 @@ export interface LineSheetDownloadedProps {
   has_logo: boolean;
   paper: 'letter' | 'a4';
   currency: string;
+  layout: 'grid' | 'detailed';
 }
 
 /** First piece added to a line sheet: the visitor really started using the tool. */
