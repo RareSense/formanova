@@ -703,6 +703,46 @@ export function trackLineSheetFailed(props: LineSheetFailedProps) {
   capture('line_sheet_failed', { ...props });
 }
 
+// ═══════ Free tools: jewelry photo checker (owner, 2026-11-21) ══════
+
+type PhotoMarketplace = 'amazon' | 'etsy' | 'shopify';
+
+export interface PhotoCheckResultProps {
+  marketplace: PhotoMarketplace;
+  verdict: 'good' | 'attention' | 'unknown';
+  /** Ids of checks that did not pass: size, shape, background, fill, file. */
+  issues: string[];
+  background: 'white' | 'near-white' | 'plain' | 'busy';
+  long_side: number;
+}
+
+/** A photo was added to the checker. */
+export function trackPhotoCheckStarted(props: { marketplace: PhotoMarketplace }) {
+  capture('photo_check_started', { ...props });
+}
+
+/** The checklist was shown. Codes and sizes only, never the photo. */
+export function trackPhotoCheckResult(props: PhotoCheckResultProps) {
+  capture('photo_check_result', { ...props });
+}
+
+export function trackPhotoCheckFixed(props: { marketplace: PhotoMarketplace }) {
+  capture('photo_check_fixed', { ...props });
+}
+
+export function trackPhotoCheckDownloaded(props: { marketplace: PhotoMarketplace; fixed: boolean }) {
+  capture('photo_check_downloaded', { ...props });
+}
+
+/** The FormaNova offer under the checker was clicked. */
+export function trackPhotoCheckCtaClicked(props: { cta: 'on_model' | 'studio_photos'; verdict: 'good' | 'attention' | 'unknown' }) {
+  capture('photo_check_cta_clicked', { ...props });
+}
+
+export function trackPhotoCheckFailed(props: { reason: 'unsupported' | 'too_large' | 'unreadable' | 'fix_error' }) {
+  capture('photo_check_failed', { ...props });
+}
+
 /** The FormaNova offer under the tool was clicked. */
 export function trackLineSheetCtaClicked(props: { cta: 'collection_photos' }) {
   capture('line_sheet_cta_clicked', { ...props });

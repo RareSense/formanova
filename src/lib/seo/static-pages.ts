@@ -66,17 +66,57 @@ export const LINE_SHEET_PAGE: StaticPage = {
   links: [{ href: '/tools', label: 'Free tools for jewelers' }],
 };
 
+export const PHOTO_CHECK_FAQS: Faq[] = [
+  {
+    q: 'What are the Amazon image requirements for jewelry?',
+    a: 'For the main image, Amazon asks for a pure white background (RGB 255, 255, 255), the piece filling about 85% of the frame, and at least 1000 pixels on the longest side so shoppers can zoom. Check the current rules in Seller Central, as Amazon updates them.',
+  },
+  {
+    q: 'What size should jewelry photos be for Etsy and Shopify?',
+    a: 'Etsy recommends at least 2000 pixels on each side, with a landscape or square first photo, and files under 1 MB upload most reliably. Shopify accepts up to 5000 x 5000 pixels and 20 MB, and recommends 2048 x 2048 squares.',
+  },
+  {
+    q: 'Does the fix change my jewelry?',
+    a: 'No. It only reframes the photo, adds white space and turns an off-white backdrop pure white, working inward from the edges. It stops at the outline of the piece, so the metal, stones and highlights stay exactly as photographed.',
+  },
+  {
+    q: 'Does a passing check mean Amazon will approve my photo?',
+    a: 'No. The checker measures size, shape, background and framing. Marketplaces also review things it cannot measure, such as props, text or watermarks, so treat it as a careful pre-check.',
+  },
+];
+
+export const PHOTO_CHECK_STEPS = [
+  'Choose where you sell: Amazon, Etsy or Shopify.',
+  'Add a photo of your jewelry.',
+  'Read the checklist: size, shape, background and how much of the frame the piece fills.',
+  'Click Fix it to reframe and clean the background, compare before and after, and download.',
+];
+
+export const PHOTO_CHECK_PAGE: StaticPage = {
+  path: '/tools/amazon-image-checker',
+  title: 'Free Amazon Image Checker for Jewelry Photos | FormaNova',
+  description: 'Check a jewelry photo against Amazon, Etsy and Shopify image rules, then fix size, square framing and white background in one click. Free, no signup.',
+  h1: 'Jewelry Photo Checker',
+  intro: 'Check a jewelry photo against Amazon, Etsy or Shopify rules, then fix it in one click. Free, no signup.',
+  howTo: { heading: 'How to check a jewelry photo', steps: PHOTO_CHECK_STEPS },
+  faqs: PHOTO_CHECK_FAQS,
+  links: [{ href: '/tools', label: 'Free tools for jewelers' }],
+};
+
 export const TOOLS_PAGE: StaticPage = {
   path: '/tools',
   title: 'Free Jewelry Business Tools | FormaNova',
   description: 'Free tools for jewelry brands and designers. No signup, no watermark. Start with the jewelry line sheet generator.',
   h1: 'Free tools for jewelers',
   intro: 'Free to use. No signup. No watermark.',
-  links: [{ href: '/tools/jewelry-line-sheet-generator', label: 'Jewelry Line Sheet Generator: turn your pieces, prices and terms into a PDF line sheet for wholesale buyers.' }],
+  links: [
+    { href: '/tools/jewelry-line-sheet-generator', label: 'Jewelry Line Sheet Generator: turn your pieces, prices and terms into a PDF line sheet for wholesale buyers.' },
+    { href: '/tools/amazon-image-checker', label: 'Jewelry Photo Checker: check a photo against Amazon, Etsy or Shopify rules and fix it in one click.' },
+  ],
 };
 
 /** Pages that get a plain-HTML copy at build time. */
-export const STATIC_PAGES: StaticPage[] = [TOOLS_PAGE, LINE_SHEET_PAGE];
+export const STATIC_PAGES: StaticPage[] = [TOOLS_PAGE, LINE_SHEET_PAGE, PHOTO_CHECK_PAGE];
 
 const escapeHtml = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

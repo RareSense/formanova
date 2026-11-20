@@ -38,7 +38,7 @@ describe('renderStaticHtml', () => {
     expect(() => renderStaticHtml(indexHtml.replace(/<title>[^<]*<\/title>/, ''), TOOLS_PAGE, 'https://formanova.ai')).toThrow(/missing/);
   });
 
-  it('covers the tools home and the line sheet page', () => {
-    expect(STATIC_PAGES.map((p) => p.path)).toEqual(['/tools', '/tools/jewelry-line-sheet-generator']);
+  it('covers the tools home and each tool page', () => {
+    expect(STATIC_PAGES.map((p) => p.path)).toEqual(['/tools', '/tools/jewelry-line-sheet-generator', '/tools/amazon-image-checker']);
   });
 });

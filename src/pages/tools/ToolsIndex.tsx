@@ -14,6 +14,11 @@ const FREE_TOOLS = [
     name: 'Jewelry Line Sheet Generator',
     description: 'Turn your pieces, prices and terms into a PDF line sheet for wholesale buyers.',
   },
+  {
+    href: '/tools/amazon-image-checker',
+    name: 'Jewelry Photo Checker',
+    description: 'Check a jewelry photo against Amazon, Etsy or Shopify rules, then fix it in one click.',
+  },
 ] as const;
 
 const PAGE_URL = `${getPublicSiteUrl()}/tools`;

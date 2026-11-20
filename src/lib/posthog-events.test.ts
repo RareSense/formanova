@@ -62,6 +62,12 @@ import {
   trackLineSheetDownloaded,
   trackLineSheetCtaClicked,
   trackLineSheetFailed,
+  trackPhotoCheckStarted,
+  trackPhotoCheckResult,
+  trackPhotoCheckFixed,
+  trackPhotoCheckDownloaded,
+  trackPhotoCheckCtaClicked,
+  trackPhotoCheckFailed,
   trackRubyCtaClicked,
   trackRubyCallStarted,
   trackRubyCallConnected,
@@ -149,6 +155,26 @@ describe('trackBrandFormSubmitted', () => {
       social_count: 2,
       has_brand_book: false,
     })
+  })
+})
+
+describe('photo checker tool events', () => {
+  it('captures the start, result and fix with codes only, never the photo', () => {
+    trackPhotoCheckStarted({ marketplace: 'amazon' })
+    expect(posthog.capture).toHaveBeenCalledWith('photo_check_started', { marketplace: 'amazon' })
+    trackPhotoCheckResult({ marketplace: 'amazon', verdict: 'attention', issues: ['shape', 'fill'], background: 'near-white', long_side: 2400 })
+    expect(posthog.capture).toHaveBeenCalledWith('photo_check_result', { marketplace: 'amazon', verdict: 'attention', issues: ['shape', 'fill'], background: 'near-white', long_side: 2400 })
+    trackPhotoCheckFixed({ marketplace: 'etsy' })
+    expect(posthog.capture).toHaveBeenCalledWith('photo_check_fixed', { marketplace: 'etsy' })
+  })
+
+  it('captures download, offer click and failure', () => {
+    trackPhotoCheckDownloaded({ marketplace: 'shopify', fixed: true })
+    expect(posthog.capture).toHaveBeenCalledWith('photo_check_downloaded', { marketplace: 'shopify', fixed: true })
+    trackPhotoCheckCtaClicked({ cta: 'on_model', verdict: 'good' })
+    expect(posthog.capture).toHaveBeenCalledWith('photo_check_cta_clicked', { cta: 'on_model', verdict: 'good' })
+    trackPhotoCheckFailed({ reason: 'unsupported' })
+    expect(posthog.capture).toHaveBeenCalledWith('photo_check_failed', { reason: 'unsupported' })
   })
 })
 
