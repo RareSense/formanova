@@ -267,7 +267,7 @@ export default function JewelryLineSheet() {
 
           {/* The one action */}
           <aside className="space-y-4 lg:sticky lg:top-24">
-            <Button type="button" size="lg" onClick={download} disabled={busy || products.length === 0} className="w-full">
+            <Button type="button" size="lg" onClick={download} disabled={busy || products.length === 0} className="w-full bg-foreground text-background hover:bg-foreground/90">
               {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
               Download PDF
             </Button>
