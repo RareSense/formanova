@@ -73,9 +73,9 @@ interface ReferenceMaterialSpec {
 
 // Exact material constants from the approved standalone reference.
 const REFERENCE_MATERIALS: Record<string, ReferenceMaterialSpec> = {
-  gold18k:      { label: "Yellow Gold", kind: "metal", color: 0xffd88a, rough: 0.05 },
-  roseGold:     { label: "Rose Gold", kind: "metal", color: 0xf6c1a6, rough: 0.08 },
-  whiteGold:    { label: "White Gold", kind: "metal", color: 0xf7f4ec, rough: 0.07 },
+  gold18k:      { label: "Yellow Gold", kind: "metal", color: 0xe5b377, rough: 0 },
+  roseGold:     { label: "Rose Gold", kind: "metal", color: 0xf2af83, rough: 0 },
+  whiteGold:    { label: "White Gold", kind: "metal", color: 0xc2c2c3, rough: 0 },
   platinum:     { label: "Platinum", kind: "metal", color: 0xe9e9e7, rough: 0.11 },
   silver:       { label: "Silver", kind: "metal", color: 0xfbfaf6, rough: 0.05 },
   blackRhodium: { label: "Black Rhodium", kind: "metal", color: 0x3b3b40, rough: 0.28 },
@@ -116,7 +116,7 @@ export function isStoneLook(key: string | null): boolean {
   return REFERENCE_MATERIALS[key]?.kind !== "metal";
 }
 
-const REFERENCE_BASE_ENV = { metal: 1.5, gem: 2.3, pearl: 1.1 } as const;
+const REFERENCE_BASE_ENV = { metal: 1.0, gem: 2.3, pearl: 1.1 } as const;
 const REFERENCE_ENVIRONMENTS = {
   room: null,
   photostudio: "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/brown_photostudio_02_1k.hdr",
@@ -570,7 +570,7 @@ function ReferenceStudioEnvironment({ children }: { children: React.ReactNode })
 let gemStudioPromise: Promise<THREE.Texture> | null = null;
 function loadGemStudio(): Promise<THREE.Texture> {
   if (!gemStudioPromise) {
-    gemStudioPromise = new RGBELoader().loadAsync("/hdri/gem-studio-1k.hdr").then((t) => {
+    gemStudioPromise = new RGBELoader().loadAsync("/hdri/gem-sparkle-1k.hdr").then((t) => {
       t.mapping = THREE.EquirectangularReflectionMapping;
       return t;
     });
@@ -2624,7 +2624,7 @@ function ReferenceGemMesh({
         aberrationStrength: { value: materialSpec.disp ?? 0.008 },
         fresnel: { value: 0.25 },
         colorFactor: { value: filter },
-        envIntensity: { value: colourless ? 0.75 : 0.6 },
+        envIntensity: { value: colourless ? 1.5 : 1.0 },
         selected: { value: 0 },
       },
       vertexShader: REFERENCE_GEM_VERTEX_SHADER,
