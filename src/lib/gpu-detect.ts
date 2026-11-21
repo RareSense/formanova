@@ -389,3 +389,56 @@ function cleanup(canvas: HTMLCanvasElement) {
 export function getBenchmarkResult(): boolean | null {
   return benchmarkResult;
 }
+
+// ── Refractive gems: can this computer and browser handle them? ──
+
+const SOFTWARE_GPU = /swiftshader|llvmpipe|softpipe|basic render|microsoft basic|software/i;
+const GEM_CRASH_KEY = "fn_refraction_crashed";
+
+export interface RefractionSupport {
+  /** True when refractive gems should be on by default. */
+  safe: boolean;
+  /** Plain-English reason when not safe, shown to the user. */
+  reason: string | null;
+}
+
+/** Remember that refractive gems crashed the 3D view in this browser. */
+export function recordRefractionCrash(): void {
+  try { localStorage.setItem(GEM_CRASH_KEY, "1"); } catch { /* storage blocked */ }
+}
+
+/** Forget an earlier crash, after the user turns refraction back on themselves. */
+export function clearRefractionCrash(): void {
+  try { localStorage.removeItem(GEM_CRASH_KEY); } catch { /* storage blocked */ }
+}
+
+let cachedSupport: RefractionSupport | null = null;
+
+export function getRefractionSupport(): RefractionSupport {
+  if (cachedSupport) return cachedSupport;
+  const no = (reason: string): RefractionSupport => (cachedSupport = { safe: false, reason });
+
+  let crashed = false;
+  try { crashed = localStorage.getItem(GEM_CRASH_KEY) === "1"; } catch { /* storage blocked */ }
+  if (crashed) return no("Simple gems: real gems stopped your browser before.");
+
+  let webgl2 = false;
+  try { webgl2 = !!document.createElement("canvas").getContext("webgl2"); } catch { /* none */ }
+  if (!webgl2) return no("Simple gems: your browser's 3D is older.");
+
+  const renderer = getGPURendererString();
+  if (SOFTWARE_GPU.test(renderer)) return no("Simple gems: 3D is running without graphics acceleration.");
+
+  // Chrome's Vulkan path (some Linux and Android devices) draws the gem shader
+  // as flat colour; found on an NVIDIA H100 with ANGLE Vulkan.
+  if (/vulkan/i.test(renderer)) return no("Simple gems: your browser may draw real gems wrong.");
+
+  const tier = getQualitySettings().tier;
+  if (tier === "low") return no("Simple gems: your computer's graphics are light.");
+
+  const mem = (navigator as { deviceMemory?: number }).deviceMemory;
+  const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  if (mobile && (mem === undefined || mem <= 4)) return no("Simple gems: your phone may run short on graphics memory.");
+
+  return (cachedSupport = { safe: true, reason: null });
+}
