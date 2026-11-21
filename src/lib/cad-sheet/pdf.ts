@@ -2,7 +2,7 @@ import type { jsPDF as JsPDF } from 'jspdf';
 import { embedFonts } from '@/lib/line-sheet/pdf';
 import { SHEET_FONT } from '@/lib/line-sheet/layout';
 import { INK, MUTED, RULE } from '@/lib/line-sheet/pdf-colors';
-import { ENTERED_LABELS, SOURCE_LABEL, readRows, type CadReading, type EnteredFields, type UnitKey } from './model';
+import { ENTERED_LABELS, SOURCE_LABEL, readRows, type Source, type CadReading, type EnteredFields, type UnitKey } from './model';
 import { VIEW_LABEL, type ViewName } from './views';
 
 export type Paper = 'letter' | 'a4';
@@ -23,6 +23,14 @@ export interface SheetInput {
   views: Record<ViewName, string> | null;
   paper: Paper;
   date: string;
+  /** Ring size, band, stones and weight as shown on the page, with their sources. */
+  measured: SheetRow[];
+}
+
+export interface SheetRow {
+  label: string;
+  value: string;
+  source: Source | 'none';
 }
 
 /**
@@ -84,7 +92,7 @@ export async function buildTechSheetPdf(input: SheetInput): Promise<JsPDF> {
   const colW = (W - 2 * M - 24) / 2;
   const rows = (title: string, x: number, items: { label: string; value: string; source: string }[]) => {
     let ry = y;
-    text(title, x, ry, 11, true);
+    if (title) text(title, x, ry, 11, true);
     ry += 18;
     for (const r of items) {
       text(r.label, x, ry, 8.5, true, MUTED);
@@ -97,12 +105,23 @@ export async function buildTechSheetPdf(input: SheetInput): Promise<JsPDF> {
     }
     return ry;
   };
+  const tag = (src: Source | 'none') => (src === 'none' ? 'Not given' : SOURCE_LABEL[src]);
   const fromCad = readRows(reading, input.units).map((r) => ({ ...r, source: SOURCE_LABEL[r.source] }));
-  const fromYou = ENTERED_LABELS.filter((f) => f.key !== 'notes')
-    .map((f) => ({ label: f.label, value: entered[f.key].trim(), source: entered[f.key].trim() ? SOURCE_LABEL.you : 'Not given' }));
+  const fromModel = input.measured.map((r) => ({ ...r, source: tag(r.source) }));
   const endA = rows('From the CAD file', M, fromCad);
-  const endB = rows('Entered by you', M + colW + 24, fromYou);
+  const endB = rows('Measured from the model', M + colW + 24, fromModel);
   y = Math.max(endA, endB) + 6;
+  doc.setDrawColor(RULE);
+  doc.line(M, y, W - M, y);
+  y += 20;
+  const you = [{ key: 'metal' as const, label: 'Metal' }, ...ENTERED_LABELS.filter((f) => f.key !== 'notes')]
+    .map((f) => ({ label: f.label, value: entered[f.key].trim(), source: entered[f.key].trim() ? SOURCE_LABEL.you : 'Not given' }));
+  const half = Math.ceil(you.length / 2);
+  text('Entered by you', M, y, 11, true);
+  y += 4;
+  const endC = rows('', M, you.slice(0, half));
+  const endD = rows('', M + colW + 24, you.slice(half));
+  y = Math.max(endC, endD) + 6;
 
   // Notes
   if (entered.notes.trim()) {
@@ -118,6 +137,6 @@ export async function buildTechSheetPdf(input: SheetInput): Promise<JsPDF> {
   // Footer: what the tags mean
   doc.setDrawColor(RULE);
   doc.line(M, H - M - 20, W - M, H - M - 20);
-  text('From CAD: read from the file.  Estimated: assumed, please confirm.  Entered by you: typed in by the maker.', M, H - M, 7.5, false, MUTED);
+  text('From CAD: read from the file.  Estimated: measured or assumed, please confirm.  Entered by you: typed in by the maker.', M, H - M, 7.5, false, MUTED);
   return doc;
 }

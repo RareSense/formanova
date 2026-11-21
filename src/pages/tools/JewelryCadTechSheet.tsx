@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Diamond, Download, Loader2 } from 'lucide-react';
@@ -9,12 +9,16 @@ import { DocInput, DocTextarea } from '@/components/line-sheet/DocFields';
 import { getPublicSiteUrl } from '@/lib/public-url';
 import { CAD_SHEET_FAQS, CAD_SHEET_PAGE, CAD_SHEET_STEPS } from '@/lib/seo/static-pages';
 import {
-  EMPTY_ENTERED, ENTERED_LABELS, SOURCE_LABEL, UNIT_CHOICES, readRows, sheetFileName,
+  EMPTY_ENTERED, ENTERED_LABELS, MEASURED_FIELDS, SOURCE_LABEL, UNIT_CHOICES, readRows, sheetFileName,
   type CadReading, type EnteredFields, type Source, type UnitKey,
 } from '@/lib/cad-sheet/model';
 import { VIEW_LABEL, type ViewName } from '@/lib/cad-sheet/views';
 import { CAD_ACCEPT, CadFileError } from '@/lib/cad-sheet/files';
-import type { Paper } from '@/lib/cad-sheet/pdf';
+import type { Paper, SheetRow } from '@/lib/cad-sheet/pdf';
+import { formatAuto, type RawMeasure } from '@/lib/cad-sheet/auto';
+import type { PartBox } from '@/lib/cad-sheet/stones';
+import { METALS } from '@/lib/cad-sheet/metals';
+import { SIZE_SYSTEMS, defaultSizeSystem, type LengthUnit, type SizeSystem } from '@/lib/cad-sheet/sizes';
 import { trackCadSheetCtaClicked, trackCadSheetDownloaded, trackCadSheetFailed, trackCadSheetStarted } from '@/lib/posthog-events';
 
 const PAGE_URL = `${getPublicSiteUrl()}${CAD_SHEET_PAGE.path}`;
@@ -28,6 +32,8 @@ function track(send: () => void) {
     // A lost event is better than a broken sheet.
   }
 }
+
+type MeasuredKey = (typeof MEASURED_FIELDS)[number]['key'];
 
 const today = () => new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -55,6 +61,14 @@ export default function JewelryCadTechSheet() {
   const [units, setUnits] = useState<UnitKey | null>(null);
   const [paper, setPaper] = useState<Paper>('letter');
   const [busy, setBusy] = useState(false);
+  const [raw, setRaw] = useState<RawMeasure | null>(null);
+  const [partBoxes, setPartBoxes] = useState<PartBox[]>([]);
+  const [system, setSystem] = useState<SizeSystem>(() => defaultSizeSystem(typeof navigator === 'undefined' ? 'en-US' : navigator.language));
+  const [length, setLength] = useState<LengthUnit>('mm');
+  const [metalKey, setMetalKey] = useState('');
+  const [density, setDensity] = useState('');
+  /** Measured values the jeweler typed over; a missing key means "use the measurement". */
+  const [overrides, setOverrides] = useState<Partial<Record<MeasuredKey, string>>>({});
   const [downloaded, setDownloaded] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const date = today();
@@ -67,8 +81,11 @@ export default function JewelryCadTechSheet() {
     try {
       // The CAD reader and three.js load only when a file is chosen.
       const [{ readCad }, { renderViews }] = await Promise.all([import('@/lib/cad-sheet/read'), import('@/lib/cad-sheet/views')]);
-      const { reading: r, root } = await readCad(file);
+      const [{ reading: r, root, metal, partBoxes: boxes }, { measureRaw }] = await Promise.all([readCad(file), import('@/lib/cad-sheet/auto')]);
       setReading(r);
+      setRaw(measureRaw(r, metal));
+      setPartBoxes(boxes);
+      setOverrides({});
       setViews(renderViews(root, r.upAxis));
       setUnits(null);
       setDownloaded(false);
@@ -88,7 +105,11 @@ export default function JewelryCadTechSheet() {
     let ok = false;
     try {
       const { buildTechSheetPdf } = await import('@/lib/cad-sheet/pdf');
-      const doc = await buildTechSheetPdf({ reading, units, entered, views, paper, date });
+      const metalLine = [entered.metal.trim(), densityNum > 0 ? `${densityNum} g/cm³` : ''].filter(Boolean).join(' · ');
+      const doc = await buildTechSheetPdf({
+        reading, units, entered: { ...entered, metal: metalLine }, views, paper, date,
+        measured: measured.map(({ label, value, source }) => ({ label, value, source })),
+      });
       doc.save(sheetFileName(entered, reading.fileName));
       ok = true;
       setDownloaded(true);
@@ -102,12 +123,35 @@ export default function JewelryCadTechSheet() {
         format: reading.format,
         has_views: !!views,
         units_confirmed: !!reading.fileUnits || !!units,
-        fields_filled: ENTERED_LABELS.filter((f) => entered[f.key].trim()).length,
+        fields_filled: ENTERED_LABELS.filter((f) => entered[f.key].trim()).length + (entered.metal.trim() ? 1 : 0),
+        measured: measured.filter((m) => m.auto).length,
+        typed_over: measured.filter((m) => m.source === 'you').length,
       })
       : trackCadSheetFailed({ reason: 'pdf_error' })));
   };
 
   const rows = reading ? readRows(reading, units) : [];
+  const densityNum = Number.parseFloat(density);
+  const auto = useMemo(
+    () => (reading && raw ? formatAuto(reading, raw, partBoxes, { units, density: densityNum > 0 ? densityNum : 1, system, length }) : null),
+    [reading, raw, partBoxes, units, densityNum, system, length],
+  );
+  /** Each measured line as shown and printed: the jeweler's text wins, then the measurement. */
+  const measured: (SheetRow & { key: MeasuredKey; why: string; auto: string | null })[] = MEASURED_FIELDS.map((f) => {
+    let a: { value: string | null; why?: string } = auto?.[f.key] ?? { value: null, why: '' };
+    if (f.key === 'weight' && a.value && !(densityNum > 0)) a = { value: null, why: 'Choose the metal above to get a weight.' };
+    const typed = overrides[f.key];
+    const value = typed ?? a.value ?? '';
+    return {
+      key: f.key, label: f.label, value, auto: a.value, why: a.value ? '' : (a.why ?? ''),
+      source: typed !== undefined && typed !== a.value && typed.trim() ? 'you' : value.trim() ? 'estimated' : 'none',
+    };
+  });
+  const pickMetal = (key: string) => {
+    setMetalKey(key);
+    const m = METALS.find((x) => x.key === key);
+    if (m) { setDensity(String(m.density)); setEntered((f) => ({ ...f, metal: m.label })); }
+  };
 
   return (
     <div className="min-h-screen bg-muted/30 text-foreground">
@@ -213,7 +257,7 @@ export default function JewelryCadTechSheet() {
 
                 <hr className="my-8 border-border" />
 
-                {/* From the file | entered by you */}
+                {/* From the file | measured from the model */}
                 <div className="grid gap-10 md:grid-cols-2">
                   <section>
                     <h2 className="font-body text-base font-semibold normal-case tracking-normal">From the CAD file</h2>
@@ -240,20 +284,87 @@ export default function JewelryCadTechSheet() {
                   </section>
 
                   <section>
-                    <h2 className="font-body text-base font-semibold normal-case tracking-normal">Entered by you</h2>
-                    <div className="mt-4 space-y-4">
-                      {ENTERED_LABELS.filter((f) => !f.wide).map((f) => (
-                        <div key={f.key}>
+                    <h2 className="font-body text-base font-semibold normal-case tracking-normal">Measured from the model</h2>
+                    <p className="mt-1 font-body text-sm text-muted-foreground">Please check these. Type over any value to change it.</p>
+                    <div className="mt-4 grid grid-cols-2 gap-3">
+                      <div>
+                        <label htmlFor="cad-system" className="font-body text-sm text-muted-foreground">Ring sizes</label>
+                        <Select value={system} onValueChange={(v) => setSystem(v as SizeSystem)}>
+                          <SelectTrigger id="cad-system" className="mt-1"><SelectValue /></SelectTrigger>
+                          <SelectContent>{SIZE_SYSTEMS.map((x) => <SelectItem key={x.key} value={x.key}>{x.label}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label htmlFor="cad-length" className="font-body text-sm text-muted-foreground">Lengths in</label>
+                        <Select value={length} onValueChange={(v) => setLength(v as LengthUnit)}>
+                          <SelectTrigger id="cad-length" className="mt-1"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="mm">Millimeters</SelectItem>
+                            <SelectItem value="in">Inches</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label htmlFor="cad-metal" className="font-body text-sm text-muted-foreground">Metal</label>
+                        <Select value={metalKey} onValueChange={pickMetal}>
+                          <SelectTrigger id="cad-metal" className="mt-1"><SelectValue placeholder="Choose…" /></SelectTrigger>
+                          <SelectContent>{METALS.map((m) => <SelectItem key={m.key} value={m.key}>{m.label}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label htmlFor="cad-density" className="font-body text-sm text-muted-foreground">Density, g/cm³</label>
+                        <DocInput id="cad-density" aria-label="Density in grams per cubic centimeter" inputMode="decimal" placeholder="e.g. 13.07" value={density} onChange={(e) => setDensity(e.target.value)} className="mt-1 font-body text-base" />
+                      </div>
+                    </div>
+                    <div className="mt-5 space-y-4">
+                      {measured.map((m) => (
+                        <div key={m.key}>
                           <div className="flex items-baseline justify-between gap-4">
-                            <label htmlFor={`cad-${f.key}`} className="font-body text-sm text-muted-foreground">{f.label}</label>
-                            <Tag source={entered[f.key].trim() ? 'you' : 'none'} />
+                            <label htmlFor={`cad-${m.key}`} className="font-body text-sm text-muted-foreground">{m.label}</label>
+                            <span className="flex items-baseline gap-3">
+                              {m.source === 'you' && m.auto && (
+                                <button
+                                  type="button"
+                                  onClick={() => setOverrides((o) => { const next = { ...o }; delete next[m.key]; return next; })}
+                                  className="font-body text-xs underline underline-offset-4"
+                                >
+                                  Use measured
+                                </button>
+                              )}
+                              <Tag source={m.source} />
+                            </span>
                           </div>
-                          <DocInput id={`cad-${f.key}`} aria-label={f.label} placeholder={f.placeholder} value={entered[f.key]} onChange={set(f.key)} className="font-body text-base" />
+                          <DocInput
+                            id={`cad-${m.key}`}
+                            aria-label={m.label}
+                            placeholder={MEASURED_FIELDS.find((f) => f.key === m.key)?.placeholder}
+                            value={m.value}
+                            onChange={(e) => setOverrides((o) => ({ ...o, [m.key]: e.target.value }))}
+                            className="font-body text-base"
+                          />
+                          {m.why && !m.value && <p className="mt-1 font-body text-sm text-muted-foreground">{m.why}</p>}
                         </div>
                       ))}
                     </div>
                   </section>
                 </div>
+
+                <hr className="my-8 border-border" />
+
+                <section>
+                  <h2 className="font-body text-base font-semibold normal-case tracking-normal">Entered by you</h2>
+                  <div className="mt-4 grid gap-x-10 gap-y-4 md:grid-cols-2">
+                    {ENTERED_LABELS.filter((f) => !f.wide).map((f) => (
+                      <div key={f.key}>
+                        <div className="flex items-baseline justify-between gap-4">
+                          <label htmlFor={`cad-${f.key}`} className="font-body text-sm text-muted-foreground">{f.label}</label>
+                          <Tag source={entered[f.key].trim() ? 'you' : 'none'} />
+                        </div>
+                        <DocInput id={`cad-${f.key}`} aria-label={f.label} placeholder={f.placeholder} value={entered[f.key]} onChange={set(f.key)} className="font-body text-base" />
+                      </div>
+                    ))}
+                  </div>
+                </section>
 
                 <hr className="my-8 border-border" />
 

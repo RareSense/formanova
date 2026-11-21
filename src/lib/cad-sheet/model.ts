@@ -72,23 +72,41 @@ export interface EnteredFields {
   reference: string;
   revision: string;
   metal: string;
+  /** Measured values the jeweler may type over; empty means "use the measurement". */
   ringSize: string;
+  band: string;
   stones: string;
+  weight: string;
   finish: string;
   tolerances: string;
+  hallmark: string;
+  engraving: string;
+  designer: string;
+  customer: string;
   notes: string;
 }
 
 export const EMPTY_ENTERED: EnteredFields = {
-  pieceName: '', reference: '', revision: 'A', metal: '', ringSize: '', stones: '', finish: '', tolerances: '', notes: '',
+  pieceName: '', reference: '', revision: 'A', metal: '', ringSize: '', band: '', stones: '', weight: '',
+  finish: '', tolerances: '', hallmark: '', engraving: '', designer: '', customer: '', notes: '',
 };
 
+/** Values the tool measures from the model, which the jeweler can type over. */
+export const MEASURED_FIELDS: { key: 'ringSize' | 'band' | 'stones' | 'weight'; label: string; placeholder: string }[] = [
+  { key: 'ringSize', label: 'Ring size', placeholder: 'e.g. US 7 · 17.3 mm inside' },
+  { key: 'band', label: 'Band at the back', placeholder: 'e.g. 2.0 mm wide × 1.4 mm thick' },
+  { key: 'stones', label: 'Stones', placeholder: 'e.g. 1 × round 6.50 mm; 24 × round 1.30 mm' },
+  { key: 'weight', label: 'Metal weight', placeholder: 'e.g. 3.2 g' },
+];
+
+/** Fields only the jeweler can give. Metal is chosen from a list on the page. */
 export const ENTERED_LABELS: { key: keyof EnteredFields; label: string; placeholder: string; wide?: boolean }[] = [
-  { key: 'metal', label: 'Metal', placeholder: 'e.g. 18k yellow gold' },
-  { key: 'ringSize', label: 'Ring size', placeholder: 'e.g. US 7' },
-  { key: 'stones', label: 'Stones', placeholder: 'e.g. 1.0 ct round lab diamond, 24 melee' },
   { key: 'finish', label: 'Finish', placeholder: 'e.g. high polish, matte band' },
   { key: 'tolerances', label: 'Tolerances', placeholder: 'e.g. ±0.05 mm on seats' },
+  { key: 'hallmark', label: 'Hallmark / stamp', placeholder: 'e.g. 750, maker’s mark inside the shank' },
+  { key: 'engraving', label: 'Engraving', placeholder: 'e.g. “Always” inside, 1.2 mm script' },
+  { key: 'designer', label: 'Designer', placeholder: 'Your name or studio' },
+  { key: 'customer', label: 'Customer / order no.', placeholder: 'e.g. Order 2041' },
   { key: 'notes', label: 'Production notes', placeholder: 'e.g. cast in one piece, set after polish', wide: true },
 ];
 
