@@ -14,6 +14,11 @@ const FREE_TOOLS = [
     name: 'Jewelry Line Sheet Generator',
     description: 'Turn your pieces, prices and terms into a PDF line sheet for wholesale buyers.',
   },
+  {
+    href: '/tools/amazon-image-checker',
+    name: 'Jewelry Photo Checker',
+    description: 'Make a jewelry photo ready for Amazon, Etsy or Shopify, on clean white.',
+  },
 ] as const;
 
 const PAGE_URL = `${getPublicSiteUrl()}/tools`;
@@ -27,7 +32,8 @@ export default function ToolsIndex() {
         <link rel="canonical" href={PAGE_URL} />
       </Helmet>
 
-      <div className="mx-auto max-w-3xl px-6 py-12 md:py-16">
+      <div className="mx-auto max-w-7xl px-6 py-12 md:px-12 md:py-16">
+        <div className="max-w-3xl">
         <header className="mb-10">
           <h1 className="font-display text-4xl uppercase tracking-wide md:text-5xl">{TOOLS_PAGE.h1}</h1>
           <p className="mt-3 font-body text-base text-muted-foreground">{TOOLS_PAGE.intro}</p>
@@ -49,6 +55,7 @@ export default function ToolsIndex() {
             </li>
           ))}
         </ul>
+        </div>
       </div>
     </div>
   );

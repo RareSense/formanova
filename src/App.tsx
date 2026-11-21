@@ -92,6 +92,7 @@ const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 const AIJewelryPhotoshoot = lazyWithRetry(() => import("./pages/AIJewelryPhotoshoot"));
 const JewelryLineSheet = lazyWithRetry(() => import("./pages/tools/JewelryLineSheet"));
 const ToolsIndex = lazyWithRetry(() => import("./pages/tools/ToolsIndex"));
+const JewelryPhotoChecker = lazyWithRetry(() => import("./pages/tools/JewelryPhotoChecker"));
 const AIJewelryCAD = lazyWithRetry(() => import("./pages/AIJewelryCAD"));
 const LinkAccount = lazyWithRetry(() => import("./pages/LinkAccount"));
 const RolePicker = lazyWithRetry(() => import("./pages/RolePicker"));
@@ -200,6 +201,7 @@ const MainApp = () => (
                   {/* Free tools: public, no signup (owner, 2026-11-21). */}
                   <Route path="/tools" element={<ToolsIndex />} />
                   <Route path="/tools/jewelry-line-sheet-generator" element={<JewelryLineSheet />} />
+                  <Route path="/tools/amazon-image-checker" element={<JewelryPhotoChecker />} />
                   <Route path="/ai-jewelry-photography-comparison" element={<Navigate to="/blog/ai-jewelry-photography-comparison" replace />} />
                   <Route path="/link" element={<LinkAccount />} />
                   {/* Public: logged-out visitors see the packs and sign in to buy. */}

@@ -48,7 +48,7 @@ function loadWithElement(file: File): Promise<HTMLImageElement> {
   });
 }
 
-type Drawable = { source: CanvasImageSource; width: number; height: number; close?: () => void };
+export type Drawable = { source: CanvasImageSource; width: number; height: number; close?: () => void };
 
 async function decode(file: File, kind: ImageKind): Promise<Drawable> {
   if (kind === 'heic') {
@@ -113,6 +113,28 @@ export async function loadImage(file: File, maxSide = MAX_SIDE): Promise<SheetIm
     throw new ImageError(file.name, 'This photo could not be opened. Please save it again as JPG and add it once more.');
   } finally {
     drawable.close?.();
+  }
+}
+
+/**
+ * Opens a photo at full size, with the same format support, size limit and
+ * plain error messages as loadImage, for tools that need the original pixels
+ * (the photo checker). The caller must call close() when done.
+ */
+export async function decodeFullImage(file: File): Promise<Drawable> {
+  const kind = imageKind(file);
+  if (kind === 'unsupported') {
+    throw new ImageError(file.name, 'This file type cannot be opened in a browser. Please export it as JPG or PNG.', 'unsupported');
+  }
+  if (file.size > MAX_FILE_BYTES) {
+    throw new ImageError(file.name, 'This photo is larger than 50 MB. Please export a smaller JPG.', 'too_large');
+  }
+  try {
+    const d = await decode(file, kind);
+    if (!d.width || !d.height) throw new Error('empty image');
+    return d;
+  } catch {
+    throw new ImageError(file.name, 'This photo could not be opened. Please save it again as JPG and add it once more.');
   }
 }
 
