@@ -201,7 +201,9 @@ const MainApp = () => (
                   {/* Free tools: public, no signup (owner, 2026-11-21). */}
                   <Route path="/tools" element={<ToolsIndex />} />
                   <Route path="/tools/jewelry-line-sheet-generator" element={<JewelryLineSheet />} />
-                  <Route path="/tools/amazon-image-checker" element={<JewelryPhotoChecker />} />
+                  <Route path="/tools/amazon-image-checker" element={<JewelryPhotoChecker key="amazon" initialMarket="amazon" />} />
+                  <Route path="/tools/etsy-image-resizer" element={<JewelryPhotoChecker key="etsy" initialMarket="etsy" />} />
+                  <Route path="/tools/shopify-image-resizer" element={<JewelryPhotoChecker key="shopify" initialMarket="shopify" />} />
                   <Route path="/ai-jewelry-photography-comparison" element={<Navigate to="/blog/ai-jewelry-photography-comparison" replace />} />
                   <Route path="/link" element={<LinkAccount />} />
                   {/* Public: logged-out visitors see the packs and sign in to buy. */}

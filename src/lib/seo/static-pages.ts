@@ -66,42 +66,106 @@ export const LINE_SHEET_PAGE: StaticPage = {
   links: [{ href: '/tools', label: 'Free tools for jewelers' }],
 };
 
-export const PHOTO_CHECK_FAQS: Faq[] = [
-  {
-    q: 'What are the Amazon image requirements for jewelry?',
-    a: 'For the main image, Amazon asks for a pure white background (RGB 255, 255, 255), the piece filling about 85% of the frame, and at least 1000 pixels on the longest side so shoppers can zoom. Check the current rules in Seller Central, as Amazon updates them.',
-  },
-  {
-    q: 'What size should jewelry photos be for Etsy and Shopify?',
-    a: 'Etsy recommends at least 2000 pixels on each side, with a landscape or square first photo, and files under 1 MB upload most reliably. Shopify accepts up to 5000 x 5000 pixels and 20 MB, and recommends 2048 x 2048 squares.',
-  },
-  {
-    q: 'Does the fix change my jewelry?',
-    a: 'No. It only reframes the photo, adds white space and turns an off-white backdrop pure white, working inward from the edges. It stops at the outline of the piece, so the metal, stones and highlights stay exactly as photographed.',
-  },
-  {
-    q: 'Does a passing check mean Amazon will approve my photo?',
-    a: 'No. The checker measures size, shape, background and framing. Marketplaces also review things it cannot measure, such as props, text or watermarks, so treat it as a careful pre-check.',
-  },
-];
+/** The photo tool's three pages: one tool, the marketplace pre-selected, each page written for its own search. */
+export type PhotoMarket = 'amazon' | 'etsy' | 'shopify';
 
-export const PHOTO_CHECK_STEPS = [
-  'Choose where you sell: Amazon, Etsy or Shopify.',
-  'Drop a photo of your jewelry.',
-  'The ready version appears beside it: framed, sized and on a clean white background.',
-  'Download it.',
-];
-
-export const PHOTO_CHECK_PAGE: StaticPage = {
-  path: '/tools/amazon-image-checker',
-  title: 'Free Amazon Image Checker for Jewelry Photos | FormaNova',
-  description: 'Check a jewelry photo against Amazon, Etsy and Shopify image rules, then fix size, square framing and white background in one click. Free, no signup.',
-  h1: 'Jewelry Photo Checker',
-  intro: 'Framed, sized and on clean white for Amazon, Etsy or Shopify. Free, no signup.',
-  howTo: { heading: 'How to check a jewelry photo', steps: PHOTO_CHECK_STEPS },
-  faqs: PHOTO_CHECK_FAQS,
-  links: [{ href: '/tools', label: 'Free tools for jewelers' }],
+const SAME_JEWELRY: Faq = {
+  q: 'Does it change my jewelry?',
+  a: 'No. It only reframes the photo, adds white space and turns an off-white backdrop pure white, working inward from the edges. It stops at the outline of the piece, so the metal, stones and highlights stay exactly as photographed.',
 };
+
+const photoSteps = (market: string) => [
+  `Drop a photo of your jewelry. ${market} is already selected.`,
+  `The ${market}-ready version appears beside it: framed, sized and on a clean white background.`,
+  'Download it, as JPG or WebP, at the size you need.',
+];
+
+/** Links between the three pages, shown at the bottom of each. */
+export const PHOTO_PAGE_LINKS = [
+  { href: '/tools/amazon-image-checker', label: 'Amazon image checker' },
+  { href: '/tools/etsy-image-resizer', label: 'Etsy image resizer' },
+  { href: '/tools/shopify-image-resizer', label: 'Shopify image resizer' },
+];
+
+export const PHOTO_PAGES: Record<PhotoMarket, StaticPage & { faqs: Faq[]; howTo: { heading: string; steps: string[] } }> = {
+  amazon: {
+    path: '/tools/amazon-image-checker',
+    title: 'Free Amazon Image Checker for Jewelry Photos | FormaNova',
+    description: 'Check a jewelry photo against Amazon image rules, then fix the size, square framing and white background in one step. Free, no signup.',
+    h1: 'Amazon Image Checker for Jewelry',
+    intro: 'Square, pure white and framed at 85% for Amazon. Free, no signup.',
+    howTo: { heading: 'How to make a jewelry photo ready for Amazon', steps: photoSteps('Amazon') },
+    faqs: [
+      {
+        q: 'What are the Amazon image requirements for jewelry?',
+        a: 'For the main image, Amazon asks for a pure white background (RGB 255, 255, 255), the piece filling about 85% of the frame, and at least 1000 pixels on the longest side so shoppers can zoom. Check the current rules in Seller Central, as Amazon updates them.',
+      },
+      {
+        q: 'Why does Amazon reject my jewelry main image?',
+        a: 'The usual reasons are an off-white or grey background, the piece too small in the frame, or a photo under 1000 pixels. This tool fixes the first two when the background is plain. A busy background has to be replaced instead.',
+      },
+      SAME_JEWELRY,
+      {
+        q: 'Does a passing check mean Amazon will approve my photo?',
+        a: 'No. The checker measures size, shape, background and framing. Amazon also reviews things it cannot measure, such as props, text or watermarks, so treat it as a careful pre-check.',
+      },
+    ],
+    links: [{ href: '/tools', label: 'Free tools for jewelers' }],
+  },
+  etsy: {
+    path: '/tools/etsy-image-resizer',
+    title: 'Free Etsy Image Resizer for Jewelry Photos | FormaNova',
+    description: 'Resize jewelry photos for Etsy listings: landscape, at least 2000 px, under 1 MB and on clean white. Free, no signup.',
+    h1: 'Etsy Image Resizer for Jewelry',
+    intro: 'Landscape, 2000 px and under 1 MB for Etsy listings. Free, no signup.',
+    howTo: { heading: 'How to resize a jewelry photo for Etsy', steps: photoSteps('Etsy') },
+    faqs: [
+      {
+        q: 'What size should Etsy listing photos be?',
+        a: 'Etsy recommends at least 2000 pixels on both the width and the height, with a landscape or square first photo. Photos under 635 pixels may show lower in search.',
+      },
+      {
+        q: 'Why will my Etsy photo not upload?',
+        a: 'Etsy says files over 1 MB may not finish uploading on a slower connection, and it does not support transparent PNG or animated GIF files. This tool saves a JPG under 1 MB.',
+      },
+      SAME_JEWELRY,
+      {
+        q: 'Does a good result mean Etsy will accept my photo?',
+        a: 'It means the size, shape, file size and background are right. Etsy also has its own content rules, so treat this as a careful pre-check.',
+      },
+    ],
+    links: [{ href: '/tools', label: 'Free tools for jewelers' }],
+  },
+  shopify: {
+    path: '/tools/shopify-image-resizer',
+    title: 'Free Shopify Image Resizer for Jewelry Photos | FormaNova',
+    description: 'Resize jewelry photos for Shopify: 2048 x 2048 squares on clean white, as JPG or WebP. Free, no signup.',
+    h1: 'Shopify Image Resizer for Jewelry',
+    intro: '2048 × 2048 squares on clean white, as JPG or WebP. Free, no signup.',
+    howTo: { heading: 'How to resize a jewelry photo for Shopify', steps: photoSteps('Shopify') },
+    faqs: [
+      {
+        q: 'What size should Shopify product images be?',
+        a: 'Shopify recommends 2048 x 2048 pixel squares. It accepts images up to 5000 x 5000 pixels (25 megapixels) and under 20 MB.',
+      },
+      {
+        q: 'Can I use WebP images on Shopify?',
+        a: 'Yes. Shopify accepts WebP, which makes smaller files than JPG at the same quality. Choose WebP under Download before you save.',
+      },
+      {
+        q: 'Why do my product photos look different sizes in my store?',
+        a: 'When photos have different shapes or the piece fills a different share of each one, the product grid looks uneven. Saving every photo as a square with the piece at the same size makes the grid line up.',
+      },
+      SAME_JEWELRY,
+    ],
+    links: [{ href: '/tools', label: 'Free tools for jewelers' }],
+  },
+};
+
+/** Kept for existing imports: the Amazon page. */
+export const PHOTO_CHECK_PAGE = PHOTO_PAGES.amazon;
+export const PHOTO_CHECK_FAQS = PHOTO_PAGES.amazon.faqs;
+export const PHOTO_CHECK_STEPS = PHOTO_PAGES.amazon.howTo.steps;
 
 export const TOOLS_PAGE: StaticPage = {
   path: '/tools',
@@ -111,12 +175,14 @@ export const TOOLS_PAGE: StaticPage = {
   intro: 'Free to use. No signup. No watermark.',
   links: [
     { href: '/tools/jewelry-line-sheet-generator', label: 'Jewelry Line Sheet Generator: turn your pieces, prices and terms into a PDF line sheet for wholesale buyers.' },
-    { href: '/tools/amazon-image-checker', label: 'Jewelry Photo Checker: make a jewelry photo ready for Amazon, Etsy or Shopify.' },
+    { href: '/tools/amazon-image-checker', label: 'Amazon image checker for jewelry photos.' },
+    { href: '/tools/etsy-image-resizer', label: 'Etsy image resizer for jewelry photos.' },
+    { href: '/tools/shopify-image-resizer', label: 'Shopify image resizer for jewelry photos.' },
   ],
 };
 
 /** Pages that get a plain-HTML copy at build time. */
-export const STATIC_PAGES: StaticPage[] = [TOOLS_PAGE, LINE_SHEET_PAGE, PHOTO_CHECK_PAGE];
+export const STATIC_PAGES: StaticPage[] = [TOOLS_PAGE, LINE_SHEET_PAGE, PHOTO_PAGES.amazon, PHOTO_PAGES.etsy, PHOTO_PAGES.shopify];
 
 const escapeHtml = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
