@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeLayout, whitenBackdrop } from './fix';
+import { computeLayout, describeFix, whitenBackdrop } from './fix';
 import type { Pixels } from './analyze';
 
 describe('computeLayout', () => {
@@ -103,5 +103,17 @@ describe('whitenBackdrop inside the jewelry', () => {
     const p = loop();
     whitenBackdrop(p);
     expect(at(p, 20, 20)).toEqual(BACK);
+  });
+});
+
+describe('describeFix', () => {
+  const offWhite = { background: { kind: 'near-white' as const, color: [238, 235, 230] as [number, number, number], whiteShare: 0 }, box: { x: 0.2, y: 0.3, w: 0.3, h: 0.4 }, fill: 0.4 };
+  it('says in plain words what changed', () => {
+    expect(describeFix({ width: 4000, height: 2500, bytes: 1, type: 'image/jpeg' }, offWhite, 'amazon', { width: 2000, height: 2000 }))
+      .toEqual(['Made square', 'White background', 'Jewelry fills 87%', '2000 × 2000 px']);
+  });
+  it('is honest when the original was too small', () => {
+    expect(describeFix({ width: 800, height: 600, bytes: 1, type: 'image/jpeg' }, offWhite, 'amazon', { width: 700, height: 700 }))
+      .toContain('Kept at 700 × 700: shoot closer for a larger photo');
   });
 });

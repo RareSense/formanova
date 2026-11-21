@@ -1,4 +1,4 @@
-import type { Analysis, Box, Pixels } from './analyze';
+import type { Analysis, Box, PhotoMeta, Pixels } from './analyze';
 import { MARKET_RULES, type Marketplace } from './rules';
 
 /** Where the original photo is drawn inside the fixed photo, in pixels. */
@@ -141,4 +141,21 @@ export async function buildFixedPhoto(source: CanvasImageSource, srcW: number, s
     blob = await toBlob(canvas, quality);
   }
   return { blob, url: URL.createObjectURL(blob), width: layout.outW, height: layout.outH };
+}
+
+/**
+ * What the fix did, in a few plain words each, for the line under the photos:
+ * "Made square · White background · Jewelry fills 87%".
+ */
+export function describeFix(meta: PhotoMeta, a: Analysis, market: Marketplace, out: { width: number; height: number }): string[] {
+  const r = MARKET_RULES[market];
+  const changes: string[] = [];
+  const srcRatio = meta.width / meta.height;
+  const outRatio = out.width / out.height;
+  if (Math.abs(srcRatio - outRatio) > 0.01) changes.push(outRatio === 1 ? 'Made square' : 'Made landscape');
+  if (a.background.kind === 'near-white') changes.push('White background');
+  if (a.box) changes.push(`Jewelry fills ${Math.round(r.fixFill * 100)}%`);
+  if (out.width < r.target.width) changes.push(`Kept at ${out.width} × ${out.height}: shoot closer for a larger photo`);
+  else if (Math.max(meta.width, meta.height) !== Math.max(out.width, out.height)) changes.push(`${out.width} × ${out.height} px`);
+  return changes;
 }

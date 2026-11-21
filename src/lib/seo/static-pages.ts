@@ -87,9 +87,9 @@ export const PHOTO_CHECK_FAQS: Faq[] = [
 
 export const PHOTO_CHECK_STEPS = [
   'Choose where you sell: Amazon, Etsy or Shopify.',
-  'Add a photo of your jewelry.',
-  'Read the checklist: size, shape, background and how much of the frame the piece fills.',
-  'Click Fix it to reframe and clean the background, compare before and after, and download.',
+  'Drop a photo of your jewelry.',
+  'The ready version appears beside it: framed, sized and on a clean white background.',
+  'Download it.',
 ];
 
 export const PHOTO_CHECK_PAGE: StaticPage = {
@@ -97,7 +97,7 @@ export const PHOTO_CHECK_PAGE: StaticPage = {
   title: 'Free Amazon Image Checker for Jewelry Photos | FormaNova',
   description: 'Check a jewelry photo against Amazon, Etsy and Shopify image rules, then fix size, square framing and white background in one click. Free, no signup.',
   h1: 'Jewelry Photo Checker',
-  intro: 'Check a jewelry photo against Amazon, Etsy or Shopify rules, then fix it in one click. Free, no signup.',
+  intro: 'Framed, sized and on a clean white background for Amazon, Etsy or Shopify. Free, no signup.',
   howTo: { heading: 'How to check a jewelry photo', steps: PHOTO_CHECK_STEPS },
   faqs: PHOTO_CHECK_FAQS,
   links: [{ href: '/tools', label: 'Free tools for jewelers' }],
