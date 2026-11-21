@@ -1,18 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Diamond, Download, Loader2 } from 'lucide-react';
+import { ArrowRight, Diamond, Download, Loader2, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { CheckList } from '@/components/photo-check/CheckList';
-import { PhotoStage } from '@/components/photo-check/PhotoStage';
-import { BeforeAfter } from '@/components/photo-check/BeforeAfter';
+import { ListingFrame } from '@/components/photo-check/ListingFrame';
+import { StatusRow } from '@/components/photo-check/StatusRow';
 import { MarketLogo } from '@/components/photo-check/MarketLogo';
 import { getPublicSiteUrl } from '@/lib/public-url';
 import { PHOTO_CHECK_FAQS, PHOTO_CHECK_PAGE, PHOTO_CHECK_STEPS } from '@/lib/seo/static-pages';
 import { ACCEPTED_IMAGES, ImageError, decodeFullImage } from '@/lib/line-sheet/image';
 import { analyze, canFix, runChecks, verdictOf, type Analysis, type Check, type PhotoMeta } from '@/lib/photo-check/analyze';
-import { buildFixedPhoto, computeLayout, type FixLayout, type FixedPhoto } from '@/lib/photo-check/fix';
+import { buildFixedPhoto, type FixedPhoto } from '@/lib/photo-check/fix';
 import { samplePixels } from '@/lib/photo-check/sample';
 import { MARKET_RULES, SOURCES, type Marketplace } from '@/lib/photo-check/rules';
 import {
@@ -43,7 +42,6 @@ interface Loaded {
 }
 
 interface Fixed extends FixedPhoto {
-  layout: FixLayout;
   checks: Check[];
 }
 
@@ -59,6 +57,7 @@ export default function JewelryPhotoChecker() {
   const [photo, setPhoto] = useState<Loaded | null>(null);
   const [fixed, setFixed] = useState<Fixed | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showAfter, setShowAfter] = useState(true);
   const input = useRef<HTMLInputElement>(null);
   const rules = MARKET_RULES[market];
 
@@ -125,9 +124,9 @@ export default function JewelryPhotoChecker() {
       img.close();
       setFixed({
         ...out,
-        layout: computeLayout(photo.meta.width, photo.meta.height, photo.analysis.box, market),
         checks: runChecks({ width: out.width, height: out.height, bytes: out.blob.size, type: 'image/jpeg' }, after, market),
       });
+      setShowAfter(true);
       track(() => trackPhotoCheckFixed({ marketplace: market }));
     } catch {
       track(() => trackPhotoCheckFailed({ reason: 'fix_error' }));
@@ -155,6 +154,14 @@ export default function JewelryPhotoChecker() {
   const shownChecks = fixed ? fixed.checks : checks;
   const shownVerdict = fixed ? verdictOf(fixed.checks) : verdict;
   const needsNewBackground = photo && !fixable;
+  const firstIssue = shownChecks.find((c) => c.status === 'fail' || c.status === 'warn' || c.status === 'unknown');
+  const nextStep = !photo
+    ? { text: '', tone: '' }
+    : shownVerdict === 'good'
+      ? { text: fixed ? `Ready for ${rules.label}. Your jewelry is unchanged.` : `Ready for ${rules.label}.`, tone: 'font-medium' }
+      : fixed && fixed.width < rules.target.width
+        ? { text: 'Small original, so the fixed photo is small too. Shoot closer for zoom.', tone: 'text-muted-foreground' }
+        : { text: firstIssue?.text ?? '', tone: firstIssue?.status === 'fail' ? 'text-destructive' : 'text-foreground' };
 
   return (
     <div className="min-h-screen bg-muted/30 text-foreground">
@@ -192,25 +199,6 @@ export default function JewelryPhotoChecker() {
           <p className="mt-3 font-body text-base text-muted-foreground">{PHOTO_CHECK_PAGE.intro}</p>
         </header>
 
-        {/* Where you sell */}
-        <div className="mb-6 flex flex-wrap items-center gap-3">
-          <span className="font-body text-sm text-muted-foreground" id="market-label">Where do you sell?</span>
-          <div role="group" aria-labelledby="market-label" className="inline-flex border border-border bg-background">
-            {MARKETS.map((m) => (
-              <button
-                key={m}
-                type="button"
-                aria-pressed={market === m}
-                onClick={() => setMarket(m)}
-                className={`inline-flex items-center gap-2 px-5 py-2 font-body text-sm transition-colors ${market === m ? 'bg-foreground text-background' : 'text-foreground hover:bg-muted'}`}
-              >
-                <MarketLogo market={m} />
-                {MARKET_RULES[m].label}
-              </button>
-            ))}
-          </div>
-        </div>
-
         <input
           ref={input}
           type="file"
@@ -221,65 +209,104 @@ export default function JewelryPhotoChecker() {
           onChange={(e) => { addPhoto(e.target.files?.[0]); e.target.value = ''; }}
         />
 
-        <div className="border border-border bg-background p-6 shadow-sm md:p-10">
-          {!photo ? (
-            <button
-              type="button"
-              onClick={() => input.current?.click()}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => { e.preventDefault(); addPhoto(e.dataTransfer.files?.[0]); }}
-              className="flex w-full cursor-pointer flex-col items-center justify-center gap-3 border-2 border-dashed border-border px-6 py-16 text-center transition-colors hover:bg-muted/40"
-            >
-              {busy ? <Loader2 className="h-9 w-9 animate-spin text-primary" /> : <Diamond className="h-9 w-9 text-primary" />}
-              <span className="font-body text-base font-medium">Drop a jewelry photo, or click to choose</span>
-              <span className="font-body text-sm text-muted-foreground">JPG, PNG, WebP or iPhone photos</span>
-            </button>
-          ) : (
-            <div className="grid gap-10 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] md:items-start">
-              {fixed
-                ? <BeforeAfter beforeSrc={photo.url} afterSrc={fixed.url} layout={fixed.layout} />
-                : <PhotoStage src={photo.url} width={photo.meta.width} height={photo.meta.height} box={photo.analysis.box} minFill={photo.analysis.box ? rules.minFill : undefined} />}
+        {/* One editor: top bar, the photo in the marketplace's frame, the status strip. */}
+        <div className="border border-border bg-background shadow-sm">
+          {/* Top bar: presets on the left, the one next step on the right */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3">
+            <div role="group" aria-label="Where do you sell?" className="inline-flex border border-border">
+              {MARKETS.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  aria-pressed={market === m}
+                  onClick={() => setMarket(m)}
+                  className={`inline-flex h-10 items-center gap-2 px-4 font-body text-sm transition-colors ${market === m ? 'bg-foreground text-background' : 'text-foreground hover:bg-muted'}`}
+                >
+                  <MarketLogo market={m} />
+                  {MARKET_RULES[m].label}
+                </button>
+              ))}
+            </div>
+            <div className="ml-auto flex items-center gap-2">
+              {photo && (
+                <Button type="button" variant="ghost" onClick={reset} className="h-10 px-4">New photo</Button>
+              )}
+              {!photo ? (
+                <Button type="button" onClick={() => input.current?.click()} disabled={busy} className="h-10 w-48 px-4">
+                  {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Choose a photo
+                </Button>
+              ) : fixed ? (
+                <Button type="button" onClick={download} className="h-10 w-48 px-4">
+                  <Download className="mr-2 h-4 w-4" /> Download
+                </Button>
+              ) : fixable && verdict !== 'good' ? (
+                <Button type="button" onClick={fix} disabled={busy} className="h-10 w-48 px-4">
+                  {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />} Fix for {rules.label}
+                </Button>
+              ) : null}
+            </div>
+          </div>
 
-              <div className="space-y-6">
-                <CheckList verdict={shownVerdict} checks={shownChecks} market={rules.label} />
-
-                <div className="flex flex-wrap gap-3">
-                  {fixed ? (
-                    <Button type="button" size="lg" onClick={download} className="px-6">
-                      <Download className="mr-2 h-4 w-4" /> Download fixed photo
-                    </Button>
-                  ) : fixable && verdict !== 'good' ? (
-                    <Button type="button" size="lg" onClick={fix} disabled={busy} className="px-6">
-                      {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Fix it for {rules.label}
-                    </Button>
-                  ) : null}
-                  <Button type="button" size="lg" variant="outline" onClick={reset} className="px-6">Check another photo</Button>
-                </div>
-
-                {fixed && (
-                  <p className="font-body text-sm text-muted-foreground">
-                    Your jewelry is unchanged. Only the framing and background were adjusted.
-                    {fixed.width < rules.target.width && ' Small original, so it stays small: shoot closer for zoom.'}
-                  </p>
-                )}
-
-                {/* One contextual offer, as in the proposal */}
-                {(shownVerdict === 'good' || needsNewBackground) && (
-                  <div className="space-y-2 border-t border-border pt-5">
-                    <p className="font-body text-sm text-muted-foreground">
-                      {needsNewBackground ? 'Get consistent studio product photos of this piece.' : 'Ready for your listing. Now show this jewelry on a model.'}
-                    </p>
-                    <Link
-                      to={OFFER_URL}
-                      reloadDocument
-                      onClick={() => track(() => trackPhotoCheckCtaClicked({ cta: needsNewBackground ? 'studio_photos' : 'on_model', verdict: shownVerdict }))}
-                      className="inline-flex items-center font-body text-sm font-medium underline underline-offset-4"
+          {/* Canvas: always the marketplace's frame, so nothing moves */}
+          <div
+            className="bg-muted/50 px-5 py-8"
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => { e.preventDefault(); addPhoto(e.dataTransfer.files?.[0]); }}
+          >
+            {!photo ? (
+              <ListingFrame ratio={rules.target.width / rules.target.height}>
+                <button
+                  type="button"
+                  onClick={() => input.current?.click()}
+                  className="absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-3 p-6 text-center"
+                >
+                  <Diamond className="h-9 w-9 text-primary" />
+                  <span className="font-body text-base font-medium">Drop a jewelry photo</span>
+                  <span className="font-body text-sm text-muted-foreground">See it as {rules.label} will show it</span>
+                </button>
+              </ListingFrame>
+            ) : (
+              <ListingFrame
+                ratio={rules.target.width / rules.target.height}
+                src={fixed && showAfter ? fixed.url : photo.url}
+                alt={fixed && showAfter ? 'Your photo, fixed' : 'Your photo'}
+              />
+            )}
+            {fixed && (
+              <div className="mt-5 flex justify-center">
+                <div role="group" aria-label="Compare" className="inline-flex border border-border bg-background">
+                  {[false, true].map((after) => (
+                    <button
+                      key={String(after)}
+                      type="button"
+                      aria-pressed={showAfter === after}
+                      onClick={() => setShowAfter(after)}
+                      className={`h-9 w-24 font-body text-sm transition-colors ${showAfter === after ? 'bg-foreground text-background' : 'hover:bg-muted'}`}
                     >
-                      {needsNewBackground ? 'See FormaNova product photos' : 'See FormaNova on-model photos'} <ArrowRight className="ml-1 h-4 w-4" />
-                    </Link>
-                  </div>
-                )}
+                      {after ? 'After' : 'Before'}
+                    </button>
+                  ))}
+                </div>
               </div>
+            )}
+          </div>
+
+          {photo && <StatusRow checks={shownChecks} />}
+
+          {/* One line that says what to do next */}
+          {photo && (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-4 font-body text-sm">
+              <p className={nextStep.tone}>{nextStep.text}</p>
+              {(shownVerdict === 'good' || needsNewBackground) && (
+                <Link
+                  to={OFFER_URL}
+                  reloadDocument
+                  onClick={() => track(() => trackPhotoCheckCtaClicked({ cta: needsNewBackground ? 'studio_photos' : 'on_model', verdict: shownVerdict }))}
+                  className="inline-flex items-center font-medium underline underline-offset-4"
+                >
+                  {needsNewBackground ? 'Get studio photos of this piece' : 'Now show it on a model'} <ArrowRight className="ml-1 h-4 w-4" />
+                </Link>
+              )}
             </div>
           )}
         </div>

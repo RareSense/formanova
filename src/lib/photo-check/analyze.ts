@@ -137,6 +137,8 @@ export interface Check {
   status: CheckStatus;
   /** One plain sentence. */
   text: string;
+  /** The measured value in a few characters, for the status row ("Off-white", "34%"). */
+  value: string;
 }
 
 const pct = (n: number) => `${Math.round(n * 100)}%`;
@@ -146,10 +148,14 @@ const mb = fileSize;
 
 /** The checklist for one marketplace, in the order a seller thinks about it. */
 export function runChecks(meta: PhotoMeta, a: Analysis, market: Marketplace): Check[] {
+  return addValues(rawChecks(meta, a, market), meta, a);
+}
+
+function rawChecks(meta: PhotoMeta, a: Analysis, market: Marketplace): Omit<Check, 'value'>[] {
   const r = MARKET_RULES[market];
   const { width: w, height: h } = meta;
   const long = Math.max(w, h);
-  const checks: Check[] = [];
+  const checks: Omit<Check, 'value'>[] = [];
 
   // Size
   const px = `${w} × ${h} px`;
@@ -213,6 +219,20 @@ export function runChecks(meta: PhotoMeta, a: Analysis, market: Marketplace): Ch
     checks.push({ id: 'file', status: 'pass', text: `${mb(meta.bytes)}.` });
   }
   return checks;
+}
+
+const BACKGROUND_VALUE: Record<BackgroundKind, string> = { white: 'Pure white', 'near-white': 'Off-white', plain: 'Coloured', busy: 'Busy' };
+
+function addValues(checks: Omit<Check, 'value'>[], meta: PhotoMeta, a: Analysis): Check[] {
+  const ratio = meta.width / meta.height;
+  const values: Record<Check['id'], string> = {
+    size: `${meta.width} × ${meta.height}`,
+    shape: Math.abs(ratio - 1) < 0.01 ? 'Square' : ratio > 1 ? 'Landscape' : 'Portrait',
+    background: BACKGROUND_VALUE[a.background.kind],
+    fill: a.fill === null ? 'Not found' : pct(a.fill),
+    file: fileSize(meta.bytes),
+  };
+  return checks.map((c) => ({ ...c, value: values[c.id] }));
 }
 
 export type Verdict = 'good' | 'attention' | 'unknown';

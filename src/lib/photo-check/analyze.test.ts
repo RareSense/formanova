@@ -57,6 +57,7 @@ describe('runChecks', () => {
     const checks = runChecks(meta(2000, 2000), centred, 'amazon');
     expect(checks.map((c) => c.status)).toEqual(['pass', 'pass', 'pass', 'pass', 'pass']);
     expect(verdictOf(checks)).toBe('good');
+    expect(checks.map((c) => c.value)).toEqual(['2000 × 2000', 'Square', 'Pure white', '90%', '391 KB']);
   });
 
   it('flags a small, wide Amazon photo with the piece too far away', () => {
