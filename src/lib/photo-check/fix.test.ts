@@ -114,6 +114,69 @@ describe('describeFix', () => {
   });
   it('is honest when the original was too small', () => {
     expect(describeFix({ width: 800, height: 600, bytes: 1, type: 'image/jpeg' }, offWhite, 'amazon', { width: 700, height: 700 }))
-      .toContain('Kept at 700 × 700: shoot closer for a larger photo');
+      .toContain('700 × 700 px: shoot closer for a larger photo');
+  });
+});
+
+describe('whitenBackdrop on white gold (proposal test: bright highlights)', () => {
+  const BACK: [number, number, number] = [236, 235, 233];
+  /** Off-white 40 x 40, a white-gold band (light grey 212-230, cool tint) touching the backdrop, with a 250 highlight on its rim. */
+  function whiteGold(): Pixels {
+    const w = 40, h = 40;
+    const data = new Uint8ClampedArray(w * h * 4);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const inBand = x >= 8 && x < 32 && y >= 16 && y < 24;
+      const shade = 212 + Math.round(((x - 8) / 24) * 18); // 212 .. 230, a soft metal gradient
+      const rimHighlight = inBand && y === 16 && x >= 14 && x < 18;
+      const c = rimHighlight ? [250, 250, 251] : inBand ? [shade - 4, shade, shade + 4] : BACK;
+      data.set([...c, 255], (y * w + x) * 4);
+    }
+    return { width: w, height: h, data };
+  }
+  const at = (p: Pixels, x: number, y: number) => Array.from(p.data.slice((y * 40 + x) * 4, (y * 40 + x) * 4 + 3));
+
+  it('cleans the backdrop', () => {
+    const p = whiteGold();
+    whitenBackdrop(p, BACK);
+    expect(at(p, 2, 2)).toEqual([255, 255, 255]);
+  });
+
+  it('keeps every light-grey metal pixel exactly as it was', () => {
+    const p = whiteGold();
+    const before = whiteGold();
+    whitenBackdrop(p, BACK);
+    for (let y = 16; y < 24; y++) for (let x = 8; x < 32; x++) {
+      if (y === 16 && x >= 14 && x < 18) continue; // the near-white highlight is checked below
+      expect(at(p, x, y)).toEqual(at(before, x, y));
+    }
+  });
+
+  it('keeps a bright highlight that sits on the rim', () => {
+    const p = whiteGold();
+    whitenBackdrop(p, BACK);
+    expect(at(p, 15, 16)).toEqual([250, 250, 251]);
+  });
+});
+
+describe('proposal test: tall necklace', () => {
+  it('frames a long necklace by its height inside Amazon\'s square', () => {
+    // Portrait 2000 x 5000 photo; a thin chain runs from 10% to 90% of the height.
+    const l = computeLayout(2000, 5000, { x: 0.45, y: 0.1, w: 0.1, h: 0.8 }, 'amazon');
+    expect([l.outW, l.outH]).toEqual([2000, 2000]);
+    expect((0.8 * l.drawH) / 2000).toBeCloseTo(0.87, 2); // the necklace's height fills 87%
+    expect(l.drawY + 0.1 * l.drawH).toBeCloseTo(130, -1); // starts 6.5% from the top
+  });
+});
+
+describe('whitenBackdrop and camera noise', () => {
+  it('cleans an isolated noisy speck in the backdrop', () => {
+    const BACK: [number, number, number] = [236, 235, 233];
+    const w = 20, h = 20;
+    const data = new Uint8ClampedArray(w * h * 4);
+    for (let i = 0; i < w * h; i++) data.set([...BACK, 255], i * 4);
+    data.set([222, 221, 219, 255], (10 * w + 10) * 4); // one speck, 14 levels darker
+    const p = { width: w, height: h, data };
+    whitenBackdrop(p, BACK);
+    expect(Array.from(p.data.slice((10 * w + 10) * 4, (10 * w + 10) * 4 + 3))).toEqual([255, 255, 255]);
   });
 });

@@ -41,7 +41,8 @@ export function computeLayout(srcW: number, srcH: number, box: Box | null, marke
 
 /**
  * Turns the off-white backdrop pure white. First it spreads in from the edges
- * through light, nearly grey pixels, stopping at the jewelry's outline. Then
+ * through pixels matching the measured backdrop colour, stopping at the
+ * jewelry's outline, light-grey metal and highlights included. Then
  * it also cleans enclosed gaps (inside a bracelet loop or a ring) that match
  * the backdrop colour, but only gaps large enough to be backdrop: a white-gold
  * highlight is small and a different shade, so the piece is never changed.
@@ -56,10 +57,12 @@ export function whitenBackdrop(px: Pixels, backdrop?: [number, number, number], 
     const hi = Math.max(data[i], data[i + 1], data[i + 2]);
     return lo >= minLevel && hi - lo <= maxTint;
   };
+  // Within a small, strict distance of the measured backdrop colour. Light-grey
+  // metal (white gold, silver) and bright highlights differ by more, so they stop the fill.
   const near = (p: number) => {
     if (!backdrop) return false;
     const i = p * 4;
-    return Math.abs(data[i] - backdrop[0]) + Math.abs(data[i + 1] - backdrop[1]) + Math.abs(data[i + 2] - backdrop[2]) <= 18;
+    return Math.abs(data[i] - backdrop[0]) + Math.abs(data[i + 1] - backdrop[1]) + Math.abs(data[i + 2] - backdrop[2]) <= 12;
   };
   /** Collects the connected region from `starts` whose pixels pass `accept`. */
   const region = (starts: number[], accept: (p: number) => boolean): number[] => {
@@ -87,9 +90,31 @@ export function whitenBackdrop(px: Pixels, backdrop?: [number, number, number], 
   const border: number[] = [];
   for (let x = 0; x < w; x++) border.push(x, (h - 1) * w + x);
   for (let y = 0; y < h; y++) border.push(y * w, y * w + w - 1);
-  paint(region(border, isLight));
+  // With the backdrop colour known, spread only through that colour; without it, through any light grey.
+  paint(region(border, backdrop ? near : isLight));
 
   if (backdrop) {
+    // Camera noise: a light speck whose four neighbours are all cleaned backdrop is
+    // backdrop too. Metal always has metal beside it, so it never qualifies. Twice,
+    // for 2-pixel specks.
+    const lightish = (p: number) => {
+      const i = p * 4;
+      const lo = Math.min(data[i], data[i + 1], data[i + 2]);
+      return lo >= Math.min(backdrop[0], backdrop[1], backdrop[2]) - 16 && Math.max(data[i], data[i + 1], data[i + 2]) - lo <= 18;
+    };
+    for (let pass = 0; pass < 2; pass++) {
+      const specks: number[] = [];
+      for (let y = 1; y < h - 1; y++) {
+        for (let x = 1; x < w - 1; x++) {
+          const p = y * w + x;
+          if (seen[p] || !lightish(p)) continue;
+          if (seen[p - 1] && seen[p + 1] && seen[p - w] && seen[p + w]) specks.push(p);
+        }
+      }
+      for (const p of specks) seen[p] = 1;
+      paint(specks);
+    }
+
     const minArea = Math.max(16, Math.round(w * h * 0.002));
     for (let p = 0; p < w * h; p++) {
       if (seen[p] || !near(p)) continue;
@@ -155,7 +180,7 @@ export function describeFix(meta: PhotoMeta, a: Analysis, market: Marketplace, o
   if (Math.abs(srcRatio - outRatio) > 0.01) changes.push(outRatio === 1 ? 'Made square' : 'Made landscape');
   if (a.background.kind === 'near-white') changes.push('White background');
   if (a.box) changes.push(`Jewelry fills ${Math.round(r.fixFill * 100)}%`);
-  if (out.width < r.target.width) changes.push(`Kept at ${out.width} × ${out.height}: shoot closer for a larger photo`);
+  if (out.width < r.target.width) changes.push(`${out.width} × ${out.height} px: shoot closer for a larger photo`);
   else if (Math.max(meta.width, meta.height) !== Math.max(out.width, out.height)) changes.push(`${out.width} × ${out.height} px`);
   return changes;
 }

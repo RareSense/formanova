@@ -730,7 +730,7 @@ export function trackPhotoCheckFixed(props: { marketplace: PhotoMarketplace }) {
   capture('photo_check_fixed', { ...props });
 }
 
-export function trackPhotoCheckDownloaded(props: { marketplace: PhotoMarketplace; fixed: boolean }) {
+export function trackPhotoCheckDownloaded(props: { marketplace: PhotoMarketplace; fixed: boolean; format: 'jpg' | 'webp'; resized: boolean }) {
   capture('photo_check_downloaded', { ...props });
 }
 

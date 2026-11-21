@@ -169,8 +169,8 @@ describe('photo checker tool events', () => {
   })
 
   it('captures download, offer click and failure', () => {
-    trackPhotoCheckDownloaded({ marketplace: 'shopify', fixed: true })
-    expect(posthog.capture).toHaveBeenCalledWith('photo_check_downloaded', { marketplace: 'shopify', fixed: true })
+    trackPhotoCheckDownloaded({ marketplace: 'shopify', fixed: true, format: 'webp', resized: true })
+    expect(posthog.capture).toHaveBeenCalledWith('photo_check_downloaded', { marketplace: 'shopify', fixed: true, format: 'webp', resized: true })
     trackPhotoCheckCtaClicked({ cta: 'on_model', verdict: 'good' })
     expect(posthog.capture).toHaveBeenCalledWith('photo_check_cta_clicked', { cta: 'on_model', verdict: 'good' })
     trackPhotoCheckFailed({ reason: 'unsupported' })

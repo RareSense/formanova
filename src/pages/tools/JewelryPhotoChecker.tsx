@@ -6,12 +6,14 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { ListingFrame } from '@/components/photo-check/ListingFrame';
 import { MarketLogo } from '@/components/photo-check/MarketLogo';
+import { DownloadOptions } from '@/components/photo-check/DownloadOptions';
 import { getPublicSiteUrl } from '@/lib/public-url';
 import { PHOTO_CHECK_FAQS, PHOTO_CHECK_PAGE, PHOTO_CHECK_STEPS } from '@/lib/seo/static-pages';
 import { ACCEPTED_IMAGES, ImageError, decodeFullImage } from '@/lib/line-sheet/image';
 import { analyze, canFix, runChecks, verdictOf, type Analysis, type PhotoMeta, type Verdict } from '@/lib/photo-check/analyze';
 import { buildFixedPhoto, describeFix, type FixedPhoto } from '@/lib/photo-check/fix';
 import { samplePixels } from '@/lib/photo-check/sample';
+import { exportPhoto, exportSize, type ExportFormat } from '@/lib/photo-check/export';
 import { MARKET_RULES, SOURCES, type Marketplace } from '@/lib/photo-check/rules';
 import {
   trackPhotoCheckCtaClicked, trackPhotoCheckDownloaded, trackPhotoCheckFailed,
@@ -61,6 +63,9 @@ export default function JewelryPhotoChecker() {
   const [photo, setPhoto] = useState<Loaded | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [busy, setBusy] = useState(false);
+  const [format, setFormat] = useState<ExportFormat>('jpeg');
+  /** Chosen width, or null for the fixed photo's own width. */
+  const [exportWidth, setExportWidth] = useState<number | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const rules = MARKET_RULES[market];
   const ratio = rules.target.width / rules.target.height;
@@ -73,6 +78,7 @@ export default function JewelryPhotoChecker() {
   // Make the marketplace-ready version whenever the photo or marketplace changes.
   useEffect(() => {
     setResult(null);
+    setExportWidth(null);
     if (!photo) { setBusy(false); return; }
     let cancelled = false;
     const checks = runChecks(photo.meta, photo.analysis, market);
@@ -126,13 +132,27 @@ export default function JewelryPhotoChecker() {
     }
   };
 
-  const download = () => {
+  const download = async () => {
     if (result?.kind !== 'fixed' || !photo) return;
-    const a = document.createElement('a');
-    a.href = result.photo.url;
-    a.download = `${photo.name.replace(/\.[^.]+$/, '')}-${market}.jpg`;
-    a.click();
-    track(() => trackPhotoCheckDownloaded({ marketplace: market, fixed: true }));
+    const fixedPhoto = result.photo;
+    const size = exportSize(fixedPhoto.width, fixedPhoto.height, exportWidth ?? undefined);
+    const resized = size.width !== fixedPhoto.width;
+    try {
+      // The fixed photo is already a JPG at full size: reuse it unless a different type or size was chosen.
+      const blob = format === 'jpeg' && !resized
+        ? fixedPhoto.blob
+        : await exportPhoto(fixedPhoto.blob, size.width, size.height, format, rules.softMaxFileBytes);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${photo.name.replace(/\.[^.]+$/, '')}-${market}.${format === 'webp' ? 'webp' : 'jpg'}`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      track(() => trackPhotoCheckDownloaded({ marketplace: market, fixed: true, format: format === 'webp' ? 'webp' : 'jpg', resized }));
+    } catch {
+      track(() => trackPhotoCheckFailed({ reason: 'fix_error' }));
+      toast({ title: 'The photo could not be saved.', description: 'Please try again, or choose JPG.' });
+    }
   };
 
   const offer = (cta: 'on_model' | 'studio_photos', label: string) => (
@@ -275,6 +295,13 @@ export default function JewelryPhotoChecker() {
                 <Button type="button" size="lg" onClick={download} className="w-56 bg-foreground text-background hover:bg-foreground/90">
                   <Download className="mr-2 h-4 w-4" /> Download
                 </Button>
+                <DownloadOptions
+                  fixedW={result.photo.width}
+                  fixedH={result.photo.height}
+                  format={format}
+                  width={exportWidth ?? result.photo.width}
+                  onChange={(f, w) => { setFormat(f); setExportWidth(w); }}
+                />
                 <button type="button" onClick={() => input.current?.click()} className="font-body text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground">
                   Use another photo
                 </button>

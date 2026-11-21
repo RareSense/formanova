@@ -103,3 +103,18 @@ describe('fileSize', () => {
     expect(fileSize(3 * 1024 * 1024)).toBe('3.0 MB');
   });
 });
+
+describe('proposal test: tall necklace and undersized photo', () => {
+  it('finds a thin chain running down a portrait photo', () => {
+    const p = photo(60, 150, [255, 255, 255], { x: 29, y: 15, w: 2, h: 120, fg: GOLD });
+    const a = analyze(p);
+    expect(a.box?.h).toBeCloseTo(0.8, 1);
+    expect(a.fill).toBeCloseTo(0.8, 1);
+  });
+
+  it('fails an undersized photo for Amazon with the minimum in plain words', () => {
+    const checks = runChecks(meta(400, 300), analyze(photo(40, 30, [255, 255, 255], { x: 5, y: 5, w: 30, h: 20, fg: GOLD })), 'amazon');
+    expect(checks.find((c) => c.id === 'size')).toMatchObject({ status: 'fail' });
+    expect(checks.find((c) => c.id === 'size')?.text).toMatch(/needs 500 px or more/);
+  });
+});
