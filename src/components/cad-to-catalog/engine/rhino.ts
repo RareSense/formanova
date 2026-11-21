@@ -29,7 +29,8 @@ export interface RhinoReport {
 }
 
 let rhinoPromise: Promise<any> | null = null;
-function loadRhino3dm(): Promise<any> {
+/** Rhino's reader (rhino3dm), loaded once; also used by the free CAD tech sheet to measure files saved without display meshes. */
+export function loadRhino3dm(): Promise<any> {
   rhinoPromise ||= new Promise((resolve, reject) => {
     const w = window as any;
     const start = () => w.rhino3dm({ locateFile: (f: string) => THREE_CDN + 'libs/rhino3dm/' + f }).then(resolve, reject);

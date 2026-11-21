@@ -93,6 +93,7 @@ const AIJewelryPhotoshoot = lazyWithRetry(() => import("./pages/AIJewelryPhotosh
 const JewelryLineSheet = lazyWithRetry(() => import("./pages/tools/JewelryLineSheet"));
 const ToolsIndex = lazyWithRetry(() => import("./pages/tools/ToolsIndex"));
 const JewelryPhotoChecker = lazyWithRetry(() => import("./pages/tools/JewelryPhotoChecker"));
+const JewelryCadTechSheet = lazyWithRetry(() => import("./pages/tools/JewelryCadTechSheet"));
 const AIJewelryCAD = lazyWithRetry(() => import("./pages/AIJewelryCAD"));
 const LinkAccount = lazyWithRetry(() => import("./pages/LinkAccount"));
 const RolePicker = lazyWithRetry(() => import("./pages/RolePicker"));
@@ -204,6 +205,7 @@ const MainApp = () => (
                   <Route path="/tools/amazon-image-checker" element={<JewelryPhotoChecker key="amazon" initialMarket="amazon" />} />
                   <Route path="/tools/etsy-image-resizer" element={<JewelryPhotoChecker key="etsy" initialMarket="etsy" />} />
                   <Route path="/tools/shopify-image-resizer" element={<JewelryPhotoChecker key="shopify" initialMarket="shopify" />} />
+                  <Route path="/tools/jewelry-cad-tech-sheet" element={<JewelryCadTechSheet />} />
                   <Route path="/ai-jewelry-photography-comparison" element={<Navigate to="/blog/ai-jewelry-photography-comparison" replace />} />
                   <Route path="/link" element={<LinkAccount />} />
                   {/* Public: logged-out visitors see the packs and sign in to buy. */}

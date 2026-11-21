@@ -167,6 +167,47 @@ export const PHOTO_CHECK_PAGE = PHOTO_PAGES.amazon;
 export const PHOTO_CHECK_FAQS = PHOTO_PAGES.amazon.faqs;
 export const PHOTO_CHECK_STEPS = PHOTO_PAGES.amazon.howTo.steps;
 
+export const CAD_SHEET_FAQS: Faq[] = [
+  {
+    q: 'What is a jewelry CAD tech sheet?',
+    a: 'It is the page a manufacturer works from: the piece, its reference and revision, front, side and top views, the overall size read from the CAD file, and the metal, ring size, stones, finish and tolerances you specify.',
+  },
+  {
+    q: 'Which files can I use?',
+    a: 'Rhino .3dm, STL, OBJ, PLY, STEP and GLB files. They open right in your browser; the CAD file itself is not uploaded.',
+  },
+  {
+    q: 'Why does my STL say the size is estimated?',
+    a: 'STL, OBJ and PLY files do not record their units, so the same numbers could be millimeters or inches. Choose the units your file was made in and the sheet marks the size as entered by you.',
+  },
+  {
+    q: 'Why are there no views for my Rhino file?',
+    a: 'Rhino files saved with Save small keep only the exact surfaces, without the display meshes a browser needs to draw them. The sizes are still read from the surfaces. To add views, open the file in Rhino, choose Save As and turn Save small off.',
+  },
+  {
+    q: 'Does it calculate metal weight?',
+    a: 'Not yet. A reliable weight needs a closed solid, correct units and metal kept apart from stones, so this version leaves weight out rather than guess.',
+  },
+];
+
+export const CAD_SHEET_STEPS = [
+  'Drop your CAD file: .3dm, .stl, .obj, .step, .glb or .ply.',
+  'Check the size and units read from the file.',
+  'Add the metal, ring size, stones, finish, tolerances and notes.',
+  'Download the tech sheet PDF for your manufacturer.',
+];
+
+export const CAD_SHEET_PAGE: StaticPage = {
+  path: '/tools/jewelry-cad-tech-sheet',
+  title: 'Free Jewelry CAD Tech Sheet Generator (PDF) | FormaNova',
+  description: 'Turn a Rhino, STL or STEP jewelry file into a manufacturing tech sheet: views, overall size, metal, stones and notes. Free, no signup, in your browser.',
+  h1: 'Jewelry CAD Tech Sheet',
+  intro: 'A manufacturing sheet from your CAD file: views, size, metal and stones. Free, no signup.',
+  howTo: { heading: 'How to make a jewelry tech sheet', steps: CAD_SHEET_STEPS },
+  faqs: CAD_SHEET_FAQS,
+  links: [{ href: '/tools', label: 'Free tools for jewelers' }],
+};
+
 export const TOOLS_PAGE: StaticPage = {
   path: '/tools',
   title: 'Free Jewelry Business Tools | FormaNova',
@@ -178,11 +219,12 @@ export const TOOLS_PAGE: StaticPage = {
     { href: '/tools/amazon-image-checker', label: 'Amazon image checker for jewelry photos.' },
     { href: '/tools/etsy-image-resizer', label: 'Etsy image resizer for jewelry photos.' },
     { href: '/tools/shopify-image-resizer', label: 'Shopify image resizer for jewelry photos.' },
+    { href: '/tools/jewelry-cad-tech-sheet', label: 'Jewelry CAD tech sheet: a manufacturing sheet from your CAD file.' },
   ],
 };
 
 /** Pages that get a plain-HTML copy at build time. */
-export const STATIC_PAGES: StaticPage[] = [TOOLS_PAGE, LINE_SHEET_PAGE, PHOTO_PAGES.amazon, PHOTO_PAGES.etsy, PHOTO_PAGES.shopify];
+export const STATIC_PAGES: StaticPage[] = [TOOLS_PAGE, LINE_SHEET_PAGE, PHOTO_PAGES.amazon, PHOTO_PAGES.etsy, PHOTO_PAGES.shopify, CAD_SHEET_PAGE];
 
 const escapeHtml = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

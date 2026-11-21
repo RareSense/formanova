@@ -3,8 +3,13 @@ import { resolve } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Runs the reload snippet from the real index.html in jsdom.
-const html = readFileSync(resolve(__dirname, '../../index.html'), 'utf8');
-const snippet = html.slice(html.indexOf('(function() {\n        window.addEventListener(\'error\''), html.indexOf('}, true);\n      })();') + '}, true);\n      })();'.length);
+// Line endings normalised: a Windows checkout has CRLF, which would hide the snippet.
+const html = readFileSync(resolve(__dirname, '../../index.html'), 'utf8').replace(/\r\n/g, '\n');
+const START = "(function() {\n        window.addEventListener('error'";
+const END = '}, true);\n      })();';
+const start = html.indexOf(START);
+if (start < 0) throw new Error('reload snippet not found in index.html');
+const snippet = html.slice(start, html.indexOf(END, start) + END.length);
 
 let reload: ReturnType<typeof vi.fn>;
 let listener: ((e: Event) => void) | undefined;

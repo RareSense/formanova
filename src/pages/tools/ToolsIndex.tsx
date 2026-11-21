@@ -19,6 +19,11 @@ const FREE_TOOLS = [
     name: 'Jewelry Photo Checker',
     description: 'Framed, sized and on clean white for Amazon, Etsy or Shopify.',
   },
+  {
+    href: '/tools/jewelry-cad-tech-sheet',
+    name: 'Jewelry CAD Tech Sheet',
+    description: 'A manufacturing sheet from your CAD file: views, size, metal and stones.',
+  },
 ] as const;
 
 const PAGE_URL = `${getPublicSiteUrl()}/tools`;

@@ -21,7 +21,7 @@ async function fontBase64(url: string): Promise<string> {
  * currency sign) so text like "₹1,200" or "Étoile" prints exactly. The
  * built-in PDF fonts cannot draw ₹ and many other characters.
  */
-async function embedFonts(doc: JsPDF) {
+export async function embedFonts(doc: JsPDF) {
   const [regular, semibold] = await Promise.all([fontBase64(interRegularUrl), fontBase64(interSemiBoldUrl)]);
   doc.addFileToVFS('Inter-Regular.ttf', regular);
   doc.addFont('Inter-Regular.ttf', SHEET_FONT, 'normal');
