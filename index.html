@@ -14,13 +14,21 @@
         mq.addEventListener('change', setFav);
       })();
       // If a hashed CSS/JS asset returns 404 (stale cached index.html after a new deploy),
-      // hard-reload to pick up the fresh index.html and correct assets.
+      // reload to pick up the fresh index.html and correct assets. A <script> keeps its
+      // URL in src, a <link> in href. At most one reload a minute, so an asset that is
+      // really missing can never cause a reload loop.
       (function() {
         window.addEventListener('error', function(e) {
           var t = e.target;
-          if (t && (t.tagName === 'LINK' || t.tagName === 'SCRIPT') && typeof t.href === 'string' && t.href.indexOf('/assets/') !== -1) {
-            window.location.reload(true);
-          }
+          if (!t || (t.tagName !== 'LINK' && t.tagName !== 'SCRIPT')) return;
+          var u = t.src || t.href;
+          if (typeof u !== 'string' || u.indexOf('/assets/') === -1) return;
+          try {
+            var last = Number(sessionStorage.getItem('fn_asset_reload')) || 0;
+            if (Date.now() - last < 60000) return;
+            sessionStorage.setItem('fn_asset_reload', String(Date.now()));
+          } catch (err) { /* storage blocked: still reload once */ }
+          window.location.reload();
         }, true);
       })();
     </script>
