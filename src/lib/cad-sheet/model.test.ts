@@ -60,3 +60,10 @@ describe('formatSize and sheetFileName', () => {
     expect(sheetFileName(EMPTY_ENTERED, 'Elephant ring.3dm')).toBe('elephant-ring-tech-sheet.pdf');
   });
 });
+
+import { layerText } from './model';
+describe('layerText', () => {
+  it('drops number-only layer names and keeps real ones', () => {
+    expect(layerText(['3', '5 :: 17', 'Gem', '图层 01'])).toBe('Gem, 图层 01, 2 unnamed');
+  });
+});

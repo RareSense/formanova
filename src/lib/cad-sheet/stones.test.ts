@@ -20,7 +20,7 @@ describe('stoneSchedule', () => {
       ...Array.from({ length: 12 }, () => part('GEMS', 'melee', [1.3, 1.3, 0.8])),
       part('METAL', 'shank', [20, 22, 2]),
     ];
-    expect(formatSchedule(stoneSchedule(parts))).toBe('1 × oval or fancy 8.00 × 6.00 mm; 2 × oval or fancy 6.00 × 4.00 mm; 12 × round 1.30 mm');
+    expect(formatSchedule(stoneSchedule(parts))).toBe('Centre: 1 oval or fancy, 8.00 × 6.00 mm; Side stones: 2 oval or fancy, 6.00 × 4.00 mm; Melee: 12 stones, 1.30 mm (12 × 1.30)');
   });
 
   it('reads a round stone from its two largest sides whatever its orientation', () => {

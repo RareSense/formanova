@@ -89,23 +89,74 @@ export function measureRing(tris: Triangles, upAxis: Axis): RingMeasure | null {
   // (opposite the head), within ±12° of the downward direction.
   const [a, b] = other(best.axis);
   const down = upAxis === a ? [-1, 0] : upAxis === b ? [0, -1] : [0, -1];
-  let rMin = Infinity, rMax = -Infinity, wMin = Infinity, wMax = -Infinity;
+  // The shank's own surfaces, found by casting rays through the triangles: the
+  // first surface outside the hole is the shank's outside, so a stand, sprue or
+  // second ring further out is never counted.
+  const near: number[] = [];
   for (const p of pts) {
     const dx = p[a] - best.cx, dy = p[b] - best.cy;
     const dist = Math.hypot(dx, dy);
-    if (dist < best.r * 0.98) continue;
-    const cos = (dx * down[0] + dy * down[1]) / (dist || 1);
-    if (cos < Math.cos((12 * Math.PI) / 180)) continue;
-    rMin = Math.min(rMin, dist); rMax = Math.max(rMax, dist);
-    wMin = Math.min(wMin, p[best.axis]); wMax = Math.max(wMax, p[best.axis]);
+    if (dist < best.r * 0.98 || dist > best.r * 1.1) continue;
+    if ((dx * down[0] + dy * down[1]) / (dist || 1) < Math.cos((12 * Math.PI) / 180)) continue;
+    near.push(p[best.axis]);
   }
-  if (rMax === -Infinity) return null;
+  if (!near.length) return null;
+  const wMid = (Math.min(...near) + Math.max(...near)) / 2;
+  // Several rays around the back of the shank, and the middle answer: a sprue,
+  // stand or crossing band hits only some of them.
+  const thick: number[] = [], wide: number[] = [];
+  for (const deg of [-45, -30, -15, 0, 15, 30, 45]) {
+    const c = Math.cos((deg * Math.PI) / 180), sn = Math.sin((deg * Math.PI) / 180);
+    const dir2 = [down[0] * c - down[1] * sn, down[0] * sn + down[1] * c];
+    const at = (rad: number, w: number) => {
+      const o = [0, 0, 0];
+      o[a] = best.cx + dir2[0] * rad; o[b] = best.cy + dir2[1] * rad; o[best.axis] = w;
+      return o;
+    };
+    const radial = [0, 0, 0]; radial[a] = dir2[0]; radial[b] = dir2[1];
+    const hits = rayHits(tris, at(best.r * 0.5, wMid), radial, best.r * 0.015).map((t) => t + best.r * 0.5).filter((t) => t > best.r * 0.9);
+    if (hits.length < 2) continue;
+    thick.push(hits[1] - hits[0]);
+    const along = [0, 0, 0]; along[best.axis] = 1;
+    const wHits = rayHits(tris, at((hits[0] + hits[1]) / 2, wMid - 1000), along, best.r * 0.015).map((t) => t + wMid - 1000);
+    const before = wHits.filter((t) => t <= wMid), after = wHits.filter((t) => t > wMid);
+    if (before.length && after.length) wide.push(Math.min(...after) - Math.max(...before));
+  }
+  if (thick.length < 3 || wide.length < 3) return null;
+  const median = (v: number[]) => [...v].sort((x, y) => x - y)[Math.floor(v.length / 2)];
   return {
     axis: best.axis,
     innerDiameterMm: 2 * best.r,
-    bandWidthMm: wMax - wMin,
-    bandThicknessMm: rMax - best.r,
+    bandWidthMm: median(wide),
+    bandThicknessMm: median(thick),
   };
+}
+
+/** Distances along a ray (unit direction) to every triangle it crosses, nearest first. */
+function rayHits(tris: Triangles, o: number[], d: number[], merge: number): number[] {
+  const out: number[] = [];
+  const n = tris.length / 9;
+  for (let t = 0; t < n; t++) {
+    const i = t * 9;
+    const e1 = [tris[i + 3] - tris[i], tris[i + 4] - tris[i + 1], tris[i + 5] - tris[i + 2]];
+    const e2 = [tris[i + 6] - tris[i], tris[i + 7] - tris[i + 1], tris[i + 8] - tris[i + 2]];
+    const p = [d[1] * e2[2] - d[2] * e2[1], d[2] * e2[0] - d[0] * e2[2], d[0] * e2[1] - d[1] * e2[0]];
+    const det = e1[0] * p[0] + e1[1] * p[1] + e1[2] * p[2];
+    if (Math.abs(det) < 1e-12) continue;
+    const inv = 1 / det;
+    const s = [o[0] - tris[i], o[1] - tris[i + 1], o[2] - tris[i + 2]];
+    const u = (s[0] * p[0] + s[1] * p[1] + s[2] * p[2]) * inv;
+    if (u < 0 || u > 1) continue;
+    const q = [s[1] * e1[2] - s[2] * e1[1], s[2] * e1[0] - s[0] * e1[2], s[0] * e1[1] - s[1] * e1[0]];
+    const v = (d[0] * q[0] + d[1] * q[1] + d[2] * q[2]) * inv;
+    if (v < 0 || u + v > 1) continue;
+    const dist = (e2[0] * q[0] + e2[1] * q[1] + e2[2] * q[2]) * inv;
+    if (dist > 0) out.push(dist);
+  }
+  out.sort((x, y) => x - y);
+  // A crossing counted twice on a shared edge, or a surface modelled twice, is one surface
+  // (`merge` is about 0.13 mm on a normal ring, in the file's own units).
+  return out.filter((v, k) => k === 0 || v - out[k - 1] > merge);
 }
 
 /** US ring size from the inside diameter (US: diameter = 11.63 + 0.8128 × size mm), to the nearest quarter. */
