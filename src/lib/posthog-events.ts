@@ -711,7 +711,7 @@ export function trackCadSheetStarted(props: { format: string; no_mesh: boolean }
 }
 
 /** Tech sheet PDF downloaded. Counts only; never the file or what was typed. */
-export function trackCadSheetDownloaded(props: { format: string; has_views: boolean; units_confirmed: boolean; fields_filled: number }) {
+export function trackCadSheetDownloaded(props: { format: string; has_views: boolean; units_confirmed: boolean; fields_filled: number; measured: number; typed_over: number }) {
   capture('cad_sheet_downloaded', { ...props });
 }
 
