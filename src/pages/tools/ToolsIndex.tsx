@@ -17,7 +17,7 @@ const FREE_TOOLS = [
   {
     href: '/tools/amazon-image-checker',
     name: 'Jewelry Photo Checker',
-    description: 'Make a jewelry photo ready for Amazon, Etsy or Shopify, on clean white.',
+    description: 'Framed, sized and on clean white for Amazon, Etsy or Shopify.',
   },
 ] as const;
 

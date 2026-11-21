@@ -8,7 +8,7 @@ import { ListingFrame } from '@/components/photo-check/ListingFrame';
 import { MarketLogo } from '@/components/photo-check/MarketLogo';
 import { DownloadOptions } from '@/components/photo-check/DownloadOptions';
 import { getPublicSiteUrl } from '@/lib/public-url';
-import { PHOTO_CHECK_FAQS, PHOTO_CHECK_PAGE, PHOTO_CHECK_STEPS } from '@/lib/seo/static-pages';
+import { PHOTO_PAGES, PHOTO_PAGE_LINKS } from '@/lib/seo/static-pages';
 import { ACCEPTED_IMAGES, ImageError, decodeFullImage } from '@/lib/line-sheet/image';
 import { analyze, canFix, runChecks, verdictOf, type Analysis, type PhotoMeta, type Verdict } from '@/lib/photo-check/analyze';
 import { buildFixedPhoto, describeFix, type FixedPhoto } from '@/lib/photo-check/fix';
@@ -20,7 +20,6 @@ import {
   trackPhotoCheckFixed, trackPhotoCheckResult, trackPhotoCheckStarted,
 } from '@/lib/posthog-events';
 
-const PAGE_URL = `${getPublicSiteUrl()}${PHOTO_CHECK_PAGE.path}`;
 const MARKETS: Marketplace[] = ['amazon', 'etsy', 'shopify'];
 const OFFER_URL = '/ai-jewelry-photoshoot/?utm_source=tools&utm_medium=amazon-image-checker';
 /** The proposal's plain-language result. */
@@ -57,9 +56,13 @@ type Result =
  * beside it, with one line saying what changed and one Download button.
  * Everything runs in the browser.
  */
-export default function JewelryPhotoChecker() {
+export default function JewelryPhotoChecker({ initialMarket = 'amazon' }: { initialMarket?: Marketplace }) {
+  // Each marketplace has its own page (/tools/amazon-image-checker, /tools/etsy-image-resizer,
+  // /tools/shopify-image-resizer): same tool, that marketplace pre-selected, its own words.
+  const content = PHOTO_PAGES[initialMarket];
+  const PAGE_URL = `${getPublicSiteUrl()}${content.path}`;
   const { toast } = useToast();
-  const [market, setMarket] = useState<Marketplace>('amazon');
+  const [market, setMarket] = useState<Marketplace>(initialMarket);
   const [photo, setPhoto] = useState<Loaded | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [busy, setBusy] = useState(false);
@@ -169,8 +172,8 @@ export default function JewelryPhotoChecker() {
   return (
     <div className="min-h-screen bg-muted/30 text-foreground">
       <Helmet>
-        <title>{PHOTO_CHECK_PAGE.title}</title>
-        <meta name="description" content={PHOTO_CHECK_PAGE.description} />
+        <title>{content.title}</title>
+        <meta name="description" content={content.description} />
         <link rel="canonical" href={PAGE_URL} />
       </Helmet>
       <script
@@ -189,7 +192,7 @@ export default function JewelryPhotoChecker() {
             {
               '@context': 'https://schema.org',
               '@type': 'FAQPage',
-              mainEntity: PHOTO_CHECK_FAQS.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })),
+              mainEntity: content.faqs.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })),
             },
           ]),
         }}
@@ -198,8 +201,8 @@ export default function JewelryPhotoChecker() {
       <div className="mx-auto max-w-7xl px-6 py-12 md:px-12 md:py-16">
         <header className="mb-10 max-w-2xl">
           <Link to="/tools" className="font-body text-sm text-muted-foreground hover:text-foreground">Free tools</Link>
-          <h1 className="mt-2 font-display text-4xl uppercase tracking-wide md:text-5xl">{PHOTO_CHECK_PAGE.h1}</h1>
-          <p className="mt-3 font-body text-base text-muted-foreground">{PHOTO_CHECK_PAGE.intro}</p>
+          <h1 className="mt-2 font-display text-4xl uppercase tracking-wide md:text-5xl">{content.h1}</h1>
+          <p className="mt-3 font-body text-base text-muted-foreground">{content.intro}</p>
         </header>
 
         <input
@@ -332,20 +335,25 @@ export default function JewelryPhotoChecker() {
 
         <section className="mt-20 max-w-2xl space-y-12 font-body">
           <div className="space-y-4">
-            <h2 className="font-body text-xl font-semibold normal-case tracking-normal">{PHOTO_CHECK_PAGE.howTo?.heading}</h2>
+            <h2 className="font-body text-xl font-semibold normal-case tracking-normal">{content.howTo.heading}</h2>
             <ol className="list-decimal space-y-2 pl-5 text-base text-muted-foreground">
-              {PHOTO_CHECK_STEPS.map((step) => <li key={step}>{step}</li>)}
+              {content.howTo.steps.map((step) => <li key={step}>{step}</li>)}
             </ol>
           </div>
           <div className="space-y-6">
             <h2 className="font-body text-xl font-semibold normal-case tracking-normal">Questions</h2>
-            {PHOTO_CHECK_FAQS.map((f) => (
+            {content.faqs.map((f) => (
               <div key={f.q} className="space-y-2">
                 <h3 className="font-body text-base font-medium normal-case tracking-normal">{f.q}</h3>
                 <p className="text-base leading-relaxed text-muted-foreground">{f.a}</p>
               </div>
             ))}
           </div>
+          <nav aria-label="Same tool for other marketplaces" className="flex flex-wrap gap-x-6 gap-y-2 border-t border-border pt-6 text-sm">
+            {PHOTO_PAGE_LINKS.filter((l) => l.href !== content.path).map((l) => (
+              <Link key={l.href} to={l.href} className="underline underline-offset-4 hover:text-foreground">{l.label}</Link>
+            ))}
+          </nav>
         </section>
       </div>
     </div>
