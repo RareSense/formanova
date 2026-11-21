@@ -21,6 +21,9 @@ import {
 const PAGE_URL = `${getPublicSiteUrl()}${PHOTO_CHECK_PAGE.path}`;
 const MARKETS: Marketplace[] = ['amazon', 'etsy', 'shopify'];
 const OFFER_URL = '/ai-jewelry-photoshoot/?utm_source=tools&utm_medium=amazon-image-checker';
+/** The proposal's plain-language result. */
+const VERDICT_WORDS: Record<Verdict, string> = { good: 'Looks good', attention: 'Needs attention', unknown: "Can't tell reliably" };
+const typeName = (t: string) => (t.split('/')[1] || 'image').replace('jpeg', 'jpg').toUpperCase();
 
 /** Analytics must never break the tool. */
 function track(send: () => void) {
@@ -61,6 +64,7 @@ export default function JewelryPhotoChecker() {
   const input = useRef<HTMLInputElement>(null);
   const rules = MARKET_RULES[market];
   const ratio = rules.target.width / rules.target.height;
+  const verdict = photo ? verdictOf(runChecks(photo.meta, photo.analysis, market)) : null;
 
   // Free the decoded photo and object URLs when they are replaced or the page closes.
   useEffect(() => () => { if (photo) { photo.close?.(); URL.revokeObjectURL(photo.url); } }, [photo]);
@@ -223,14 +227,17 @@ export default function JewelryPhotoChecker() {
                   <button
                     type="button"
                     onClick={() => input.current?.click()}
-                    className="absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-3 border-2 border-dashed border-border p-6 text-center transition-colors hover:bg-muted/40"
+                    className="absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-3 border-2 border-dashed border-neutral-300 p-6 text-center text-neutral-900 transition-colors hover:bg-neutral-50"
                   >
-                    {busy ? <Loader2 className="h-9 w-9 animate-spin text-primary" /> : <Diamond className="h-9 w-9 text-primary" />}
+                    {busy ? <Loader2 className="h-9 w-9 animate-spin text-neutral-900" /> : <Diamond className="h-9 w-9 text-neutral-900" />}
                     <span className="font-body text-base font-medium">Drop a jewelry photo</span>
-                    <span className="font-body text-sm text-muted-foreground">or click to choose one</span>
+                    <span className="font-body text-sm text-neutral-600">or click to choose one</span>
                   </button>
                 </ListingFrame>
               )}
+              <p className="h-5 text-center font-body text-xs text-muted-foreground">
+                {photo && verdict && `${VERDICT_WORDS[verdict]} · ${photo.meta.width} × ${photo.meta.height} · ${typeName(photo.meta.type)}`}
+              </p>
             </figure>
 
             <div className="flex justify-center text-muted-foreground" aria-hidden="true">
@@ -246,13 +253,17 @@ export default function JewelryPhotoChecker() {
                 <ListingFrame ratio={ratio} src={photo.url} alt="Your photo" />
               ) : (
                 <ListingFrame ratio={ratio}>
-                  <div className="absolute inset-0 flex items-center justify-center p-8 text-center font-body text-sm text-muted-foreground">
+                  <div className="absolute inset-0 flex items-center justify-center p-8 text-center font-body text-sm text-neutral-600">
                     {busy && photo ? <Loader2 className="h-6 w-6 animate-spin" /> : result?.kind === 'cannot-fix'
-                      ? `This background can't be made white automatically. ${rules.label} needs pure white for the main photo.`
+                      ? `${rules.label} needs a pure white background. This one has to be replaced, and that can't be done here without risking the jewelry.`
                       : `Your ${rules.label}-ready photo appears here`}
                   </div>
                 </ListingFrame>
               )}
+              <p className="h-5 text-center font-body text-xs text-muted-foreground">
+                {result?.kind === 'fixed' && `${result.photo.width} × ${result.photo.height} · JPG`}
+                {result?.kind === 'already-good' && photo && `${photo.meta.width} × ${photo.meta.height} · ${typeName(photo.meta.type)}`}
+              </p>
             </figure>
           </div>
 
@@ -261,7 +272,7 @@ export default function JewelryPhotoChecker() {
             {result?.kind === 'fixed' && (
               <>
                 <p className="font-body text-sm text-muted-foreground">{result.changes.join(' · ')}. Your jewelry is unchanged.</p>
-                <Button type="button" size="lg" onClick={download} className="w-56">
+                <Button type="button" size="lg" onClick={download} className="w-56 bg-foreground text-background hover:bg-foreground/90">
                   <Download className="mr-2 h-4 w-4" /> Download
                 </Button>
                 <button type="button" onClick={() => input.current?.click()} className="font-body text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground">
@@ -271,13 +282,13 @@ export default function JewelryPhotoChecker() {
             )}
             {result?.kind === 'already-good' && (
               <>
-                <p className="font-body text-sm">Already right for {rules.label}. Nothing to change.</p>
-                {offer('on_model', 'Now show it on a model')}
+                <p className="font-body text-sm">Ready for your listing. Nothing to change.</p>
+                {offer('on_model', 'Now show this jewelry on a model')}
               </>
             )}
             {result?.kind === 'cannot-fix' && (
               <>
-                {offer('studio_photos', 'Get studio photos of this piece')}
+                {offer('studio_photos', 'Get consistent studio product photos of this piece')}
                 <button type="button" onClick={() => input.current?.click()} className="font-body text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground">
                   Use another photo
                 </button>
