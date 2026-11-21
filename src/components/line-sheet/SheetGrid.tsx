@@ -47,14 +47,14 @@ export function SheetGrid({ products, onChange, onFillRows, onPhotos, onMove, on
   };
 
   const cell = 'border border-border/70 p-0';
-  const input = 'h-10 w-full min-w-0 truncate bg-transparent px-3 font-body text-sm text-foreground outline-none placeholder:text-muted-foreground/50 focus:relative focus:z-10 focus:ring-2 focus:ring-inset focus:ring-primary';
+  const input = 'h-10 w-full min-w-0 truncate bg-transparent px-3 font-body text-sm text-foreground outline-none placeholder:text-muted-foreground focus:relative focus:z-10 focus:ring-2 focus:ring-inset focus:ring-primary';
 
   const row = (p: Product | null, i: number) => {
     const id = p?.id ?? 'blank';
     const photoId = `grid-photo-${id}`;
     return (
       <tr key={id}>
-        <th scope="row" className={`${cell} w-10 bg-muted/60 text-center font-body text-xs font-normal text-muted-foreground`}>
+        <th scope="row" className={`${cell} w-10 bg-muted/60 text-center font-body text-xs font-normal text-foreground`}>
           {p ? (
             <DropdownMenu>
               <DropdownMenuTrigger className="h-10 w-full hover:bg-muted" aria-label={`Row ${i + 1} options`}>{i + 1}</DropdownMenuTrigger>
@@ -108,9 +108,9 @@ export function SheetGrid({ products, onChange, onFillRows, onPhotos, onMove, on
         <thead>
           <tr className="bg-muted/60">
             <th scope="col" className={`${cell} w-10`}><span className="sr-only">Row</span></th>
-            <th scope="col" className={`${cell} w-14 px-2 py-2 text-left font-body text-xs font-medium text-muted-foreground`}>Photo</th>
+            <th scope="col" className={`${cell} w-14 px-2 py-2 text-left font-body text-xs font-medium text-foreground`}>Photo</th>
             {TABLE_FIELDS.map((f) => (
-              <th key={f} scope="col" className={`${cell} ${WIDTH[f]} px-3 py-2 font-body text-xs font-medium text-muted-foreground ${NUMERIC.includes(f) ? 'text-right' : 'text-left'}`}>
+              <th key={f} scope="col" className={`${cell} ${WIDTH[f]} px-3 py-2 font-body text-xs font-medium text-foreground ${NUMERIC.includes(f) ? 'text-right' : 'text-left'}`}>
                 {HEADINGS[f]}
               </th>
             ))}

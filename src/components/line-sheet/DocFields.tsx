@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
  * until hovered, a clear outline while typing. The placeholder says what goes
  * there; the aria-label names it for screen readers.
  */
-const QUIET = 'w-full bg-transparent border border-transparent px-2 -mx-2 outline-none transition-colors hover:border-border focus:border-primary placeholder:text-muted-foreground/60';
+const QUIET = 'w-full bg-transparent border border-transparent px-2 -mx-2 outline-none transition-colors hover:border-border focus:border-primary placeholder:text-muted-foreground';
 
 export function DocInput({ className = '', ...props }: InputHTMLAttributes<HTMLInputElement> & { 'aria-label': string }) {
   return <input {...props} className={cn(QUIET, 'h-9', className)} />;
