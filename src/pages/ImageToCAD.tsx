@@ -34,6 +34,7 @@ import KeyboardShortcutsPanel from "@/components/text-to-cad/KeyboardShortcutsPa
 import GenerationProgress from "@/components/text-to-cad/GenerationProgress";
 import { ViewportToolbar, ViewportSideTools } from "@/components/text-to-cad/ViewportOverlays";
 import GemToggle from "@/components/text-to-cad/QualityToggle";
+import { getRefractionSupport, recordRefractionCrash, clearRefractionCrash } from "@/lib/gpu-detect";
 import type { GemMode } from "@/components/text-to-cad/CADCanvas";
 import { RING_CAD_DEFAULT_TIER, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
 import { recordStudioVisit } from '@/lib/studio-preference';
@@ -91,9 +92,10 @@ export default function ImageToCAD() {
   const [panelsOpen, setPanelsOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [displayMenuOpen, setDisplayMenuOpen] = useState(false);
-  const [magicTexturing, setMagicTexturing] = useState(false);
+  const [magicTexturing, setMagicTexturing] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [gemMode, setGemMode] = useState<GemMode>("simple");
+  const refractionSupport = useMemo(() => getRefractionSupport(), []);
+  const [gemMode, setGemMode] = useState<GemMode>(() => (refractionSupport.safe ? "refraction" : "simple"));
   const [workspaceActive, setWorkspaceActive] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [jewelryType, setJewelryType] = useState<CadJewelryType | null>(null);
@@ -417,7 +419,7 @@ export default function ImageToCAD() {
                 magicTexturing={magicTexturing}
                 qualityMode="balanced"
                 gemMode={gemMode}
-                onGemModeForced={(mode) => setGemMode(mode)}
+                onGemModeForced={(mode) => { recordRefractionCrash(); setGemMode(mode); }}
                 exploded={showCadUpload && exploded}
               />
             </CADRuntimeErrorBoundary>
@@ -456,7 +458,7 @@ export default function ImageToCAD() {
             )}
             {workflow.hasModel && !workflow.isGenerating && !workflow.isModelLoading && (
               <div className="absolute bottom-4 left-4 z-50">
-                <GemToggle visible mode={gemMode} onModeChange={setGemMode} />
+                <GemToggle riskReason={refractionSupport.reason} visible mode={gemMode} onModeChange={(m) => { if (m === "refraction") clearRefractionCrash(); setGemMode(m); }} />
               </div>
             )}
             {workflow.hasModel && !workflow.isGenerating && !workflow.isModelLoading && (

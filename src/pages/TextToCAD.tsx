@@ -39,6 +39,7 @@ import {
   ViewportSideTools,
 } from "@/components/text-to-cad/ViewportOverlays";
 import GemToggle from "@/components/text-to-cad/QualityToggle";
+import { getRefractionSupport, recordRefractionCrash, clearRefractionCrash } from "@/lib/gpu-detect";
 import { runMicroBenchmark } from "@/lib/gpu-detect";
 import type { GemMode } from "@/components/text-to-cad/CADCanvas";
 import { RING_CAD_DEFAULT_TIER, RING_CAD_NURBS_WORKFLOW, RING_CAD_TIERS, type CadJewelryType } from "@/lib/ring-cad-nurbs-api";
@@ -94,9 +95,10 @@ export default function TextToCAD({ variant = "idea" }: { variant?: DesignStartV
   const [panelsOpen, setPanelsOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [displayMenuOpen, setDisplayMenuOpen] = useState(false);
-  const [magicTexturing, setMagicTexturing] = useState(false);
+  const [magicTexturing, setMagicTexturing] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [gemMode, setGemMode] = useState<GemMode>("simple");
+  const refractionSupport = useMemo(() => getRefractionSupport(), []);
+  const [gemMode, setGemMode] = useState<GemMode>(() => (refractionSupport.safe ? "refraction" : "simple"));
   const [weightResult, setWeightResult] = useState<{
     weight_14k_gold_g: number;
     weight_platinum_g: number;
@@ -423,7 +425,7 @@ export default function TextToCAD({ variant = "idea" }: { variant?: DesignStartV
                 magicTexturing={magicTexturing}
                 qualityMode="balanced"
                 gemMode={gemMode}
-                onGemModeForced={(mode) => setGemMode(mode)}
+                onGemModeForced={(mode) => { recordRefractionCrash(); setGemMode(mode); }}
                 exploded={showCadUpload && exploded}
               />
             </CADRuntimeErrorBoundary>
@@ -465,9 +467,10 @@ export default function TextToCAD({ variant = "idea" }: { variant?: DesignStartV
             {workflow.hasModel && !workflow.isGenerating && !workflow.isModelLoading && (
               <div className="absolute bottom-4 left-4 z-50">
                 <GemToggle
+                  riskReason={refractionSupport.reason}
                   visible
                   mode={gemMode}
-                  onModeChange={setGemMode}
+                  onModeChange={(m) => { if (m === "refraction") clearRefractionCrash(); setGemMode(m); }}
                 />
               </div>
             )}
