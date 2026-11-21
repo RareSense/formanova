@@ -27,7 +27,7 @@ describe('measureAll', () => {
     const a = measureAll(reading, band(8.66, 1.5, 2.5), [{ layer: 'GEMS', name: '', sizeMm: [5, 5, 3] }], null, 13.07);
     expect(a.ringSize.value).toBe('US 7 · 17.3 mm inside');
     expect(a.band.value).toMatch(/^2\.\d\d mm wide × 1\.\d\d mm thick$/);
-    expect(a.stones.value).toBe('1 × round 5.00 mm');
+    expect(a.stones.value).toBe('Stones: 1 round, 5.00 mm');
     expect(a.weight.value).toMatch(/^2\.9\d g \(/); // π(10.16² − 8.66²)·2.5 = 221.7 mm³ → 2.90 g
   });
 

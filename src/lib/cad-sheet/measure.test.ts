@@ -80,3 +80,27 @@ describe('meshVolume', () => {
     expect(meshVolume(open).closed).toBeLessThan(1);
   });
 });
+
+describe('shank on a ring standing on a block', () => {
+  it('measures only the shank, not the block under it', async () => {
+    const { measureRing } = await import('./measure');
+    const out: number[] = [];
+    const quad = (p: number[][]) => out.push(...p[0], ...p[1], ...p[2], ...p[0], ...p[2], ...p[3]);
+    const segs = 180, r = 8.5, t = 1.5, w = 2.5;
+    for (let i = 0; i < segs; i++) {
+      const a0 = (i / segs) * 2 * Math.PI, a1 = ((i + 1) / segs) * 2 * Math.PI;
+      const pt = (rad: number, a: number, y: number) => [rad * Math.cos(a), y, rad * Math.sin(a)];
+      quad([pt(r + t, a0, -w / 2), pt(r + t, a1, -w / 2), pt(r + t, a1, w / 2), pt(r + t, a0, w / 2)]);
+      quad([pt(r, a0, w / 2), pt(r, a1, w / 2), pt(r, a1, -w / 2), pt(r, a0, -w / 2)]);
+      quad([pt(r, a0, -w / 2), pt(r, a1, -w / 2), pt(r + t, a1, -w / 2), pt(r + t, a0, -w / 2)]);
+      quad([pt(r + t, a0, w / 2), pt(r + t, a1, w / 2), pt(r, a1, w / 2), pt(r, a0, w / 2)]);
+    }
+    // A 4 mm block just under the ring, 0.5 mm away.
+    const z0 = -(r + t + 0.5), z1 = z0 - 4, x = 3, y = 3;
+    quad([[-x, -y, z0], [x, -y, z0], [x, y, z0], [-x, y, z0]]);
+    quad([[-x, -y, z1], [-x, y, z1], [x, y, z1], [x, -y, z1]]);
+    const m = measureRing(new Float32Array(out), 2)!;
+    expect(m.bandThicknessMm).toBeCloseTo(1.5, 1);
+    expect(m.bandWidthMm).toBeCloseTo(2.5, 1);
+  });
+});

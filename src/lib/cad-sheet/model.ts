@@ -128,7 +128,7 @@ export function readRows(r: CadReading, chosen: UnitKey | null): ReadRow[] {
     { label: 'Overall size (W × D × H)', value: formatSize(size.mm), source: size.source },
     { label: 'Parts', value: String(r.parts), source: 'cad' },
   ];
-  if (r.layers.length) rows.push({ label: 'Layers', value: r.layers.join(', '), source: 'cad' });
+  if (r.layers.length) rows.push({ label: 'Layers', value: layerText(r.layers), source: 'cad' });
   return rows;
 }
 
@@ -137,4 +137,16 @@ export function sheetFileName(entered: EnteredFields, cadFileName: string): stri
   const base = [entered.pieceName.trim() || cadFileName.replace(/\.[^.]+$/, ''), entered.reference.trim(), 'tech sheet']
     .filter(Boolean).join(' ');
   return `${base.replace(/[^\w\- ]+/g, '').replace(/\s+/g, '-').toLowerCase() || 'tech-sheet'}.pdf`;
+}
+
+/**
+ * Layer names worth printing: the last part of each path, without names that
+ * are only numbers and punctuation ("3, 5 :: 17"), which mean nothing on a sheet.
+ */
+export function layerText(layers: string[]): string {
+  const named = [...new Set(layers.map((l) => l.split('::').pop()!.trim()).filter((l) => /\p{L}/u.test(l)))];
+  const unnamed = layers.length - layers.filter((l) => /\p{L}/u.test(l.split('::').pop()!)).length;
+  const parts = [...named];
+  if (unnamed) parts.push(`${unnamed} unnamed`);
+  return parts.join(', ');
 }

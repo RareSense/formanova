@@ -39,7 +39,8 @@ async function rhinoParts(file: File): Promise<PartBox[]> {
       if (!a.visible) continue;
       const g = o.geometry();
       const t = g.objectType;
-      if (t !== rhino.ObjectType.Brep && t !== rhino.ObjectType.Extrusion && t !== rhino.ObjectType.Mesh && t !== rhino.ObjectType.SubD) continue;
+      // Block instances count too: stones are often placed as blocks of one modelled gem.
+      if (t !== rhino.ObjectType.Brep && t !== rhino.ObjectType.Extrusion && t !== rhino.ObjectType.Mesh && t !== rhino.ObjectType.SubD && t !== rhino.ObjectType.InstanceReference) continue;
       const bb = g.getBoundingBox();
       if (!bb?.isValid) continue;
       const layer = layers.findIndex(a.layerIndex);

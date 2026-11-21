@@ -1,5 +1,5 @@
 import { CLOSED_ENOUGH, measureRing, meshVolume, type Axis } from './measure';
-import { formatSchedule, stoneSchedule, type PartBox } from './stones';
+import { formatSchedule, stoneSchedule, stonesOnLayers, type PartBox, type StoneGroup } from './stones';
 import { formatWeight } from './metals';
 import { formatLength, formatRingSizeIn, type LengthUnit, type SizeSystem } from './sizes';
 import type { CadReading, UnitKey } from './model';
@@ -15,6 +15,8 @@ export interface AutoValues {
   band: Measured;
   stones: Measured;
   weight: Measured;
+  /** The stone groups behind `stones`, for the sheet's stone schedule rows. */
+  groups?: StoneGroup[];
 }
 
 /** The slow part, done once per file: numbers in file units, or why each is missing. */
@@ -26,7 +28,7 @@ export interface RawMeasure {
 }
 
 const NO_MESH = 'Not measured: this file has no display meshes. Type it in.';
-const NO_RING = 'Not a ring, or no finger hole found. Type it in if needed.';
+export const NO_RING = 'Not a ring, or no finger hole found. Type it in if needed.';
 const OPEN = 'Not measured: the metal is not one closed solid, so its volume would be a guess. Type it in.';
 
 export function measureRaw(r: CadReading, metal: Float32Array): RawMeasure {
@@ -46,6 +48,8 @@ export interface FormatChoice {
   density: number;
   system: SizeSystem;
   length: LengthUnit;
+  /** Layers the jeweler says hold the stones; null means "layers named as stones". */
+  stoneLayers?: string[] | null;
 }
 
 /**
@@ -62,15 +66,17 @@ export function formatAuto(r: CadReading, raw: RawMeasure, partBoxes: PartBox[],
     ringWhy = `The finger hole measures ${(ring.innerDiameter * k).toFixed(1)} mm across, which is not a ring size. Check the file's units, or type it in.`;
     ring = null;
   }
-  const groups = stoneSchedule(partBoxes.map((p) => ({ ...p, sizeMm: p.sizeMm.map((v) => v * k) as [number, number, number] })));
+  const picked = c.stoneLayers?.length ? stonesOnLayers(partBoxes, c.stoneLayers) : partBoxes;
+  const groups = stoneSchedule(picked.map((p) => ({ ...p, sizeMm: p.sizeMm.map((v) => v * k) as [number, number, number] })));
   return {
+    groups,
     ringSize: ring ? { value: formatRingSizeIn(c.system, ring.innerDiameter * k, c.length) } : { value: null, why: ringWhy },
     band: ring
       ? { value: `${formatLength(ring.bandWidth * k, c.length)} wide × ${formatLength(ring.bandThickness * k, c.length)} thick` }
       : { value: null, why: ringWhy },
     stones: groups.length
       ? { value: formatSchedule(groups) }
-      : { value: null, why: r.format === '3dm' ? 'No parts on a stone layer were found. Type them in.' : 'This file type does not keep stones apart. Type them in.' },
+      : { value: null, why: r.format === '3dm' ? 'No layer is named for stones. Pick the stone layer above, or type them in.' : 'This file type does not keep stones apart. Type them in.' },
     weight: raw.volume !== null ? { value: formatWeight(raw.volume * k * k * k, c.density) } : { value: null, why: raw.volumeWhy },
   };
 }

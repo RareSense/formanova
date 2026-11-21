@@ -12,10 +12,11 @@ import {
   EMPTY_ENTERED, ENTERED_LABELS, MEASURED_FIELDS, SOURCE_LABEL, UNIT_CHOICES, readRows, sheetFileName,
   type CadReading, type EnteredFields, type Source, type UnitKey,
 } from '@/lib/cad-sheet/model';
-import { VIEW_LABEL, type ViewName } from '@/lib/cad-sheet/views';
+import { VIEW_LABEL, VIEW_NAMES, type ViewName } from '@/lib/cad-sheet/views';
 import { CAD_ACCEPT, CadFileError } from '@/lib/cad-sheet/files';
 import type { Paper, SheetRow } from '@/lib/cad-sheet/pdf';
-import { formatAuto, type RawMeasure } from '@/lib/cad-sheet/auto';
+import { NO_RING, formatAuto, type RawMeasure } from '@/lib/cad-sheet/auto';
+import { scheduleRows } from '@/lib/cad-sheet/stones';
 import type { PartBox } from '@/lib/cad-sheet/stones';
 import { METALS } from '@/lib/cad-sheet/metals';
 import { SIZE_SYSTEMS, defaultSizeSystem, type LengthUnit, type SizeSystem } from '@/lib/cad-sheet/sizes';
@@ -56,7 +57,11 @@ function Tag({ source }: { source: Source | 'none' }) {
 export default function JewelryCadTechSheet() {
   const { toast } = useToast();
   const [reading, setReading] = useState<CadReading | null>(null);
-  const [views, setViews] = useState<Record<ViewName, string> | null>(null);
+  const [views, setViews] = useState<Partial<Record<ViewName, string>> | null>(null);
+  /** Layer the jeweler says holds the stones; '' means layers named as stones. */
+  const [stoneLayer, setStoneLayer] = useState('');
+  const pictures = useRef<HTMLInputElement>(null);
+  const [ownPictures, setOwnPictures] = useState(false);
   const [entered, setEntered] = useState<EnteredFields>(EMPTY_ENTERED);
   const [units, setUnits] = useState<UnitKey | null>(null);
   const [paper, setPaper] = useState<Paper>('letter');
@@ -86,6 +91,8 @@ export default function JewelryCadTechSheet() {
       setRaw(measureRaw(r, metal));
       setPartBoxes(boxes);
       setOverrides({});
+      setStoneLayer('');
+      setOwnPictures(false);
       setViews(renderViews(root, r.upAxis));
       setUnits(null);
       setDownloaded(false);
@@ -108,6 +115,10 @@ export default function JewelryCadTechSheet() {
       const metalLine = [entered.metal.trim(), densityNum > 0 ? `${densityNum} g/cm³` : ''].filter(Boolean).join(' · ');
       const doc = await buildTechSheetPdf({
         reading, units, entered: { ...entered, metal: metalLine }, views, paper, date,
+        stoneRows: auto?.groups?.length ? scheduleRows(auto.groups) : null,
+        density: densityNum > 0 ? densityNum : null,
+        ownPictures,
+        notRing: !!raw && !raw.ring && raw.ringWhy === NO_RING,
         measured: measured.map(({ label, value, source }) => ({ label, value, source })),
       });
       doc.save(sheetFileName(entered, reading.fileName));
@@ -133,8 +144,8 @@ export default function JewelryCadTechSheet() {
   const rows = reading ? readRows(reading, units) : [];
   const densityNum = Number.parseFloat(density);
   const auto = useMemo(
-    () => (reading && raw ? formatAuto(reading, raw, partBoxes, { units, density: densityNum > 0 ? densityNum : 1, system, length }) : null),
-    [reading, raw, partBoxes, units, densityNum, system, length],
+    () => (reading && raw ? formatAuto(reading, raw, partBoxes, { units, density: densityNum > 0 ? densityNum : 1, system, length, stoneLayers: stoneLayer ? [stoneLayer] : null }) : null),
+    [reading, raw, partBoxes, units, densityNum, system, length, stoneLayer],
   );
   /** Each measured line as shown and printed: the jeweler's text wins, then the measurement. */
   const measured: (SheetRow & { key: MeasuredKey; why: string; auto: string | null })[] = MEASURED_FIELDS.map((f) => {
@@ -147,6 +158,35 @@ export default function JewelryCadTechSheet() {
       source: typed !== undefined && typed !== a.value && typed.trim() ? 'you' : value.trim() ? 'estimated' : 'none',
     };
   });
+  const stoneLayerChoices = [...new Set(partBoxes.map((p) => p.layer).filter(Boolean))];
+
+  /** The jeweler's own pictures when the file has no display meshes: up to four. */
+  const addPictures = async (files: FileList | null) => {
+    if (!files?.length) return;
+    const toPng = (f: File) => new Promise<string>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const k = Math.min(1, 1200 / Math.max(img.width, img.height));
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        const g = c.getContext('2d')!;
+        g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+        g.drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(img.src);
+        resolve(c.toDataURL('image/png'));
+      };
+      img.onerror = () => reject(new Error('unreadable'));
+      img.src = URL.createObjectURL(f);
+    });
+    try {
+      const urls = await Promise.all([...files].filter((f) => f.type.startsWith('image/')).slice(0, 4).map(toPng));
+      setViews(Object.fromEntries(urls.map((u, i) => [VIEW_NAMES[i], u])));
+      setOwnPictures(true);
+    } catch {
+      toast({ title: 'That picture could not be opened', description: 'Please use a JPG, PNG or WebP image.' });
+    }
+  };
+
   const pickMetal = (key: string) => {
     setMetalKey(key);
     const m = METALS.find((x) => x.key === key);
@@ -238,8 +278,8 @@ export default function JewelryCadTechSheet() {
 
                 {/* Views */}
                 {views ? (
-                  <div className="grid grid-cols-3 gap-4">
-                    {(['front', 'side', 'top'] as ViewName[]).map((v) => (
+                  <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                    {VIEW_NAMES.filter((v) => views[v]).map((v) => (
                       <figure key={v} className="m-0 space-y-2">
                         <img src={views[v]} alt={`${VIEW_LABEL[v]} view of the piece`} className="aspect-square w-full border border-border bg-white object-contain" />
                         <figcaption className="font-body text-sm text-muted-foreground">{VIEW_LABEL[v]}</figcaption>
@@ -250,8 +290,10 @@ export default function JewelryCadTechSheet() {
                   <div className="border border-border p-5 font-body text-sm">
                     <p className="font-medium">No views for this file.</p>
                     <p className="mt-1 text-muted-foreground">
-                      It was saved in Rhino with Save small, which keeps the exact surfaces but not the display meshes a browser draws. The size below is still read from the surfaces. To add views, open it in Rhino, choose Save As and turn Save small off.
+                      It was saved in Rhino with Save small, which keeps the exact surfaces but not the display meshes a browser draws. The size below is still read from the surfaces. To add views, open it in Rhino, choose Save As and turn Save small off, or add your own pictures.
                     </p>
+                    <input ref={pictures} type="file" accept="image/*" multiple className="sr-only" tabIndex={-1} aria-hidden="true" onChange={(e) => { addPictures(e.target.files); e.target.value = ''; }} />
+                    <Button type="button" variant="outline" className="mt-4 px-6" onClick={() => pictures.current?.click()}>Add pictures (up to 4)</Button>
                   </div>
                 )}
 
@@ -315,6 +357,18 @@ export default function JewelryCadTechSheet() {
                         <label htmlFor="cad-density" className="font-body text-sm text-muted-foreground">Density, g/cm³</label>
                         <DocInput id="cad-density" aria-label="Density in grams per cubic centimeter" inputMode="decimal" placeholder="e.g. 13.07" value={density} onChange={(e) => setDensity(e.target.value)} className="mt-1 font-body text-base" />
                       </div>
+                      {stoneLayerChoices.length > 1 && (
+                        <div className="col-span-2">
+                          <label htmlFor="cad-stone-layer" className="font-body text-sm text-muted-foreground">Stones are on</label>
+                          <Select value={stoneLayer || 'auto'} onValueChange={(v) => setStoneLayer(v === 'auto' ? '' : v)}>
+                            <SelectTrigger id="cad-stone-layer" className="mt-1"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="auto">Layers named as stones</SelectItem>
+                              {stoneLayerChoices.map((l) => <SelectItem key={l} value={l}>Layer “{l}”</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
                     </div>
                     <div className="mt-5 space-y-4">
                       {measured.map((m) => (
