@@ -703,6 +703,26 @@ export function trackLineSheetFailed(props: LineSheetFailedProps) {
   capture('line_sheet_failed', { ...props });
 }
 
+// ═══════ Free tools: jewelry CAD tech sheet (owner, 2026-11-21) ═════
+
+/** A CAD file was opened in the tech sheet tool. no_mesh: Rhino parts saved without display meshes. */
+export function trackCadSheetStarted(props: { format: string; no_mesh: boolean }) {
+  capture('cad_sheet_started', { ...props });
+}
+
+/** Tech sheet PDF downloaded. Counts only; never the file or what was typed. */
+export function trackCadSheetDownloaded(props: { format: string; has_views: boolean; units_confirmed: boolean; fields_filled: number }) {
+  capture('cad_sheet_downloaded', { ...props });
+}
+
+export function trackCadSheetCtaClicked(props: { cta: 'cad_photos' | 'sketch_to_cad' }) {
+  capture('cad_sheet_cta_clicked', { ...props });
+}
+
+export function trackCadSheetFailed(props: { reason: 'unsupported' | 'too_large' | 'unreadable' | 'pdf_error' }) {
+  capture('cad_sheet_failed', { ...props });
+}
+
 // ═══════ Free tools: jewelry photo checker (owner, 2026-11-21) ══════
 
 type PhotoMarketplace = 'amazon' | 'etsy' | 'shopify';

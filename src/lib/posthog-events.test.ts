@@ -68,6 +68,10 @@ import {
   trackPhotoCheckDownloaded,
   trackPhotoCheckCtaClicked,
   trackPhotoCheckFailed,
+  trackCadSheetStarted,
+  trackCadSheetDownloaded,
+  trackCadSheetCtaClicked,
+  trackCadSheetFailed,
   trackRubyCtaClicked,
   trackRubyCallStarted,
   trackRubyCallConnected,
@@ -155,6 +159,19 @@ describe('trackBrandFormSubmitted', () => {
       social_count: 2,
       has_brand_book: false,
     })
+  })
+})
+
+describe('CAD tech sheet tool events', () => {
+  it('captures start, download, offer click and failure with codes and counts only', () => {
+    trackCadSheetStarted({ format: '3dm', no_mesh: false })
+    expect(posthog.capture).toHaveBeenCalledWith('cad_sheet_started', { format: '3dm', no_mesh: false })
+    trackCadSheetDownloaded({ format: 'stl', has_views: true, units_confirmed: true, fields_filled: 4 })
+    expect(posthog.capture).toHaveBeenCalledWith('cad_sheet_downloaded', { format: 'stl', has_views: true, units_confirmed: true, fields_filled: 4 })
+    trackCadSheetCtaClicked({ cta: 'cad_photos' })
+    expect(posthog.capture).toHaveBeenCalledWith('cad_sheet_cta_clicked', { cta: 'cad_photos' })
+    trackCadSheetFailed({ reason: 'unreadable' })
+    expect(posthog.capture).toHaveBeenCalledWith('cad_sheet_failed', { reason: 'unreadable' })
   })
 })
 

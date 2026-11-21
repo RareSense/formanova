@@ -39,7 +39,7 @@ describe('renderStaticHtml', () => {
   });
 
   it('covers the tools home and each tool page', () => {
-    expect(STATIC_PAGES.map((p) => p.path)).toEqual(['/tools', '/tools/jewelry-line-sheet-generator', '/tools/amazon-image-checker', '/tools/etsy-image-resizer', '/tools/shopify-image-resizer']);
+    expect(STATIC_PAGES.map((p) => p.path)).toEqual(['/tools', '/tools/jewelry-line-sheet-generator', '/tools/amazon-image-checker', '/tools/etsy-image-resizer', '/tools/shopify-image-resizer', '/tools/jewelry-cad-tech-sheet']);
   });
 });
 
