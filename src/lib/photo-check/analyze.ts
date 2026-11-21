@@ -190,7 +190,7 @@ function rawChecks(meta: PhotoMeta, a: Analysis, market: Marketplace): Omit<Chec
   if (r.needsWhiteBackground) {
     if (bg.kind === 'white') checks.push({ id: 'background', status: 'pass', text: 'Pure white background.' });
     else if (bg.kind === 'near-white') checks.push({ id: 'background', status: 'warn', text: 'Off-white background. Fix it makes it pure white.' });
-    else checks.push({ id: 'background', status: 'fail', text: `${bg.kind === 'busy' ? 'Busy' : 'Coloured'} background. ${r.label} needs pure white.` });
+    else checks.push({ id: 'background', status: 'fail', text: `${bg.kind === 'busy' ? 'Busy' : 'Colored'} background. ${r.label} needs pure white.` });
   } else if (bg.kind === 'busy') {
     checks.push({ id: 'background', status: 'warn', text: 'Busy background.' });
   } else {
@@ -221,7 +221,7 @@ function rawChecks(meta: PhotoMeta, a: Analysis, market: Marketplace): Omit<Chec
   return checks;
 }
 
-const BACKGROUND_VALUE: Record<BackgroundKind, string> = { white: 'Pure white', 'near-white': 'Off-white', plain: 'Coloured', busy: 'Busy' };
+const BACKGROUND_VALUE: Record<BackgroundKind, string> = { white: 'Pure white', 'near-white': 'Off-white', plain: 'Colored', busy: 'Busy' };
 
 function addValues(checks: Omit<Check, 'value'>[], meta: PhotoMeta, a: Analysis): Check[] {
   const ratio = meta.width / meta.height;

@@ -195,8 +195,8 @@ export default function JewelryPhotoChecker() {
         }}
       />
 
-      <div className="mx-auto max-w-5xl px-6 py-12 md:py-16">
-        <header className="mb-8 max-w-2xl">
+      <div className="mx-auto max-w-7xl px-6 py-12 md:px-12 md:py-16">
+        <header className="mb-10 max-w-2xl">
           <Link to="/tools" className="font-body text-sm text-muted-foreground hover:text-foreground">Free tools</Link>
           <h1 className="mt-2 font-display text-4xl uppercase tracking-wide md:text-5xl">{PHOTO_CHECK_PAGE.h1}</h1>
           <p className="mt-3 font-body text-base text-muted-foreground">{PHOTO_CHECK_PAGE.intro}</p>
@@ -255,7 +255,7 @@ export default function JewelryPhotoChecker() {
                   </button>
                 </ListingFrame>
               )}
-              <p className="h-5 text-center font-body text-xs text-muted-foreground">
+              <p className="h-5 text-center font-body text-sm text-muted-foreground">
                 {photo && verdict && `${VERDICT_WORDS[verdict]} · ${photo.meta.width} × ${photo.meta.height} · ${typeName(photo.meta.type)}`}
               </p>
             </figure>
@@ -280,7 +280,7 @@ export default function JewelryPhotoChecker() {
                   </div>
                 </ListingFrame>
               )}
-              <p className="h-5 text-center font-body text-xs text-muted-foreground">
+              <p className="h-5 text-center font-body text-sm text-muted-foreground">
                 {result?.kind === 'fixed' && `${result.photo.width} × ${result.photo.height} · JPG`}
                 {result?.kind === 'already-good' && photo && `${photo.meta.width} × ${photo.meta.height} · ${typeName(photo.meta.type)}`}
               </p>
@@ -291,7 +291,7 @@ export default function JewelryPhotoChecker() {
           <div className="mt-8 flex min-h-[88px] flex-col items-center justify-start gap-4 text-center">
             {result?.kind === 'fixed' && (
               <>
-                <p className="font-body text-sm text-muted-foreground">{result.changes.join(' · ')}. Your jewelry is unchanged.</p>
+                <p className="font-body text-sm text-foreground">{result.changes.join(' · ')}. Your jewelry is unchanged.</p>
                 <Button type="button" size="lg" onClick={download} className="w-56 bg-foreground text-background hover:bg-foreground/90">
                   <Download className="mr-2 h-4 w-4" /> Download
                 </Button>
@@ -302,9 +302,9 @@ export default function JewelryPhotoChecker() {
                   width={exportWidth ?? result.photo.width}
                   onChange={(f, w) => { setFormat(f); setExportWidth(w); }}
                 />
-                <button type="button" onClick={() => input.current?.click()} className="font-body text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground">
+                <Button type="button" variant="outline" size="lg" onClick={() => input.current?.click()} className="w-56">
                   Use another photo
-                </button>
+                </Button>
               </>
             )}
             {result?.kind === 'already-good' && (
@@ -316,9 +316,9 @@ export default function JewelryPhotoChecker() {
             {result?.kind === 'cannot-fix' && (
               <>
                 {offer('studio_photos', 'Get consistent studio product photos of this piece')}
-                <button type="button" onClick={() => input.current?.click()} className="font-body text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground">
+                <Button type="button" variant="outline" size="lg" onClick={() => input.current?.click()} className="w-56">
                   Use another photo
-                </button>
+                </Button>
               </>
             )}
           </div>

@@ -97,7 +97,7 @@ export const PHOTO_CHECK_PAGE: StaticPage = {
   title: 'Free Amazon Image Checker for Jewelry Photos | FormaNova',
   description: 'Check a jewelry photo against Amazon, Etsy and Shopify image rules, then fix size, square framing and white background in one click. Free, no signup.',
   h1: 'Jewelry Photo Checker',
-  intro: 'Framed, sized and on a clean white background for Amazon, Etsy or Shopify. Free, no signup.',
+  intro: 'Framed, sized and on clean white for Amazon, Etsy or Shopify. Free, no signup.',
   howTo: { heading: 'How to check a jewelry photo', steps: PHOTO_CHECK_STEPS },
   faqs: PHOTO_CHECK_FAQS,
   links: [{ href: '/tools', label: 'Free tools for jewelers' }],
@@ -111,7 +111,7 @@ export const TOOLS_PAGE: StaticPage = {
   intro: 'Free to use. No signup. No watermark.',
   links: [
     { href: '/tools/jewelry-line-sheet-generator', label: 'Jewelry Line Sheet Generator: turn your pieces, prices and terms into a PDF line sheet for wholesale buyers.' },
-    { href: '/tools/amazon-image-checker', label: 'Jewelry Photo Checker: check a photo against Amazon, Etsy or Shopify rules and fix it in one click.' },
+    { href: '/tools/amazon-image-checker', label: 'Jewelry Photo Checker: make a jewelry photo ready for Amazon, Etsy or Shopify.' },
   ],
 };
 
