@@ -212,10 +212,11 @@ export default function JewelryLineSheet() {
                   <DocInput aria-label="Collection" placeholder="Collection, e.g. Spring 2027" value={brand.collection} onChange={setBrandField('collection')} className="font-body text-base text-muted-foreground" />
                 </div>
               </div>
-              <div className="w-full font-body text-sm md:w-64 md:text-right">
-                <DocInput aria-label="Email" type="email" placeholder="Email" value={brand.email} onChange={setBrandField('email')} className="h-7 md:text-right" />
-                <DocInput aria-label="Phone" type="tel" placeholder="Phone" value={brand.phone} onChange={setBrandField('phone')} className="h-7 md:text-right" />
-                <DocInput aria-label="Website" placeholder="Website" value={brand.website} onChange={setBrandField('website')} className="h-7 md:text-right" />
+              {/* Contact: one left-aligned column, exactly as tall as the brand block (80px) so top and bottom edges line up. */}
+              <div className="flex w-full flex-col justify-between font-body text-sm md:h-20 md:w-64">
+                <DocInput aria-label="Email" type="email" placeholder="Email" value={brand.email} onChange={setBrandField('email')} className="h-[26px]" />
+                <DocInput aria-label="Phone" type="tel" placeholder="Phone" value={brand.phone} onChange={setBrandField('phone')} className="h-[26px]" />
+                <DocInput aria-label="Website" placeholder="Website" value={brand.website} onChange={setBrandField('website')} className="h-[26px]" />
               </div>
             </div>
 
