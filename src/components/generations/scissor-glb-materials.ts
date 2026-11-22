@@ -113,11 +113,11 @@ export function createHistoryFallbackMaterial(meshName: string): THREE.Material 
   // 0, colour 0xecc895: measured against the leading jewelry viewer) so a ring looks the same in history as it does once opened in the
   // Studio. The previous darker, rougher gold read as a different metal.
   return new THREE.MeshStandardMaterial({
-    color: 0xe5b377,
+    color: 0xecc895,
     metalness: 1,
-    roughness: 0,
+    roughness: 0.05,
     // CADCanvas REFERENCE_BASE_ENV.metal.
-    envMapIntensity: 1.0,
+    envMapIntensity: 1.5,
     side: THREE.DoubleSide,
   });
 }

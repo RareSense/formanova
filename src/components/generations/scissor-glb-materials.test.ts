@@ -23,7 +23,7 @@ describe('applyHistoryPreviewMaterials', () => {
     expect(material.metalness).toBe(1);
     expect(material.roughness).toBeLessThan(0.4);
     // Same gold as CADCanvas gold18k, so history matches the Studio.
-    expect(material.color.getHex()).toBe(0xe5b377);
+    expect(material.color.getHex()).toBe(0xecc895);
   });
 
   it('uses the explicit pink semantic for Top_CenterStone_Pink', () => {
@@ -96,7 +96,7 @@ describe('applyHistoryPreviewMaterials', () => {
     applyHistoryPreviewMaterials(model, true);
 
     const material = mesh.material as THREE.MeshStandardMaterial;
-    expect(material.color.getHex()).toBe(0xe5b377);
+    expect(material.color.getHex()).toBe(0xecc895);
     expect(material.metalness).toBe(1);
   });
 
@@ -141,7 +141,7 @@ describe('applyHistoryPreviewMaterials', () => {
 
     applyHistoryPreviewMaterials(model, true);
 
-    expect((mesh.material as THREE.MeshStandardMaterial).color.getHex()).toBe(0xe5b377);
+    expect((mesh.material as THREE.MeshStandardMaterial).color.getHex()).toBe(0xecc895);
   });
 
   it('ignores any other marker value and keeps forcing the palette', () => {
@@ -160,7 +160,7 @@ describe('applyHistoryPreviewMaterials', () => {
 
       applyHistoryPreviewMaterials(model, true);
 
-      expect((mesh.material as THREE.MeshStandardMaterial).color.getHex()).toBe(0xe5b377);
+      expect((mesh.material as THREE.MeshStandardMaterial).color.getHex()).toBe(0xecc895);
     }
   });
 
