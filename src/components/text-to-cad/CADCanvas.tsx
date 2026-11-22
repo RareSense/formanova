@@ -65,6 +65,14 @@ interface ReferenceMaterialSpec {
   atten?: number;
   ior?: number;
   disp?: number;
+  /** Per-channel multiplier on light leaving the stone (default 1). */
+  boost?: [number, number, number];
+  /** Mid-tone lift inside the stone (default 1). */
+  gamma?: number;
+  /** Surface reflection strength, 0.5 = physical Fresnel (default 0.5). */
+  refl?: number;
+  /** Light brightness inside the stone (overrides the default). */
+  env?: number;
   sheen?: number;
   irid?: number;
   opal?: boolean;
@@ -286,6 +294,9 @@ uniform float aberrationStrength;
 uniform vec3 colorFactor;
 uniform float envIntensity;
 uniform float selected;
+uniform vec3 boost;
+uniform float gammaFactor;
+uniform float reflectivity;
 
 vec3 sampleEnv(vec3 dir){
   vec2 uv=vec2(atan(dir.z,dir.x)*0.1591549431+0.5,asin(clamp(dir.y,-1.0,1.0))*0.3183098862+0.5);
@@ -323,12 +334,15 @@ void main(){
   }else{
     col=sampleEnv(dG);
   }
+  // Light leaving through the crown: gamma lifts the mid-tones, boost scales it
+  // per channel (the controls jewelry viewers expose as gammaFactor/boostFactors).
+  col=pow(max(col,0.0),vec3(1.0/max(gammaFactor,0.01)))*boost;
   col*=envIntensity*colorFactor;
   vec3 reflDir=reflect(viewDirection,vNormal);
   vec3 reflCol=sampleEnv(reflDir)*envIntensity;
   float cosT=clamp(-dot(viewDirection,vNormal),0.0,1.0);
   float F0=pow((ior-1.0)/(ior+1.0),2.0);
-  float F=F0+(1.0-F0)*pow(1.0-cosT,5.0);
+  float F=clamp((F0+(1.0-F0)*pow(1.0-cosT,5.0))*reflectivity*2.0,0.0,1.0);
   col=mix(col,reflCol,F);
   float f=pow(max(0.0,1.0+dot(viewDirection,vNormal)),10.0)*fresnel;
   col=mix(col,vec3(1.0),f);
@@ -2624,7 +2638,10 @@ function ReferenceGemMesh({
         aberrationStrength: { value: materialSpec.disp ?? 0.008 },
         fresnel: { value: 0.25 },
         colorFactor: { value: filter },
-        envIntensity: { value: colourless ? 0.75 : 0.6 },
+        envIntensity: { value: materialSpec.env ?? (colourless ? 0.75 : 0.6) },
+        boost: { value: new THREE.Vector3(...(materialSpec.boost ?? [1, 1, 1])) },
+        gammaFactor: { value: materialSpec.gamma ?? 1 },
+        reflectivity: { value: materialSpec.refl ?? 0.5 },
         selected: { value: 0 },
       },
       vertexShader: REFERENCE_GEM_VERTEX_SHADER,
