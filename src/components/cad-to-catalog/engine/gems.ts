@@ -129,7 +129,7 @@ export function referenceGemMaterial(geometry: THREE.BufferGeometry, envMap: THR
       aberrationStrength: { value: spec.disp ?? 0.008 },
       fresnel: { value: 0.25 },
       colorFactor: { value: filter },
-      envIntensity: { value: colourless ? 0.75 : 0.6 },
+      envIntensity: { value: colourless ? 1.2 : 1.0 },
       entryStep: { value: entryStep },
     },
   });
