@@ -110,14 +110,14 @@ export function createHistoryFallbackMaterial(meshName: string): THREE.Material 
   }
 
   // Matches CADCanvas's gold18k reference material (0xffd88a at roughness
-  // 0.08) so a ring looks the same in history as it does once opened in the
+  // 0, colour 0xecc895: measured against the leading jewelry viewer) so a ring looks the same in history as it does once opened in the
   // Studio. The previous darker, rougher gold read as a different metal.
   return new THREE.MeshStandardMaterial({
-    color: 0xffd88a,
+    color: 0xecc895,
     metalness: 1,
-    roughness: 0.08,
+    roughness: 0,
     // CADCanvas REFERENCE_BASE_ENV.metal.
-    envMapIntensity: 1.15,
+    envMapIntensity: 1.5,
     side: THREE.DoubleSide,
   });
 }

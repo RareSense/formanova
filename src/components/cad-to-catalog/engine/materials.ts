@@ -27,21 +27,21 @@ export interface Choice {
 }
 
 export const METALS: Preset[] = [
-  { id: 'gold-yellow', name: 'Yellow Gold', color: '#ffd88a', roughness: 0.08 },
-  { id: 'gold-rose', name: 'Rose Gold', color: '#f6c1a6', roughness: 0.08 },
-  { id: 'gold-white', name: 'White Gold', color: '#f7f4ec', roughness: 0.07 },
+  { id: 'gold-yellow', name: 'Yellow Gold', color: '#ecc895', roughness: 0 },
+  { id: 'gold-rose', name: 'Rose Gold', color: '#f9d8be', roughness: 0 },
+  { id: 'gold-white', name: 'White Gold', color: '#e2e2e3', roughness: 0 },
   { id: 'platinum', name: 'Platinum', color: '#e9e9e7', roughness: 0.11 },
   { id: 'silver', name: 'Sterling Silver', color: '#fbfaf6', roughness: 0.05 },
   { id: 'gold-brushed', name: 'Brushed Gold', color: '#ffd88a', roughness: 0.3 },
   { id: 'silver-brushed', name: 'Brushed Silver', color: '#fbfaf6', roughness: 0.25 },
   { id: 'rhodium-black', name: 'Black Rhodium', color: '#3b3b40', roughness: 0.28 },
-].map((m) => ({ ...m, kind: 'metal' as const, env: 1.15 }));
+].map((m) => ({ ...m, kind: 'metal' as const, env: 1.5 }));
 
 const REF_GEM: Record<string, GemSpec> = {
-  diamond: { color: 0xffffff, atten: 0xffffff, ior: 2.42, disp: 0.02 },
-  ruby: { color: 0xf26a8c, atten: 0x9e0f34, ior: 1.76 },
-  sapphire: { color: 0x4f7ce0, atten: 0x0c2f9e, ior: 1.76 },
-  emerald: { color: 0x46c684, atten: 0x02702f, ior: 1.57 },
+  diamond: { color: 0xffffff, atten: 0xffffff, ior: 2.6, disp: 0.012 },
+  ruby: { color: 0xe14276, atten: 0x9e0f34, ior: 1.76 },
+  sapphire: { color: 0x649dc4, atten: 0x0c2f9e, ior: 1.76 },
+  emerald: { color: 0x19d597, atten: 0x02702f, ior: 1.57 },
   'black-diamond': { color: 0x17171c, atten: 0x000000, ior: 2.42 },
   amethyst: { color: 0xb488e2, atten: 0x5c1e96, ior: 1.54 },
   topaz: { color: 0x4b9dbd, atten: 0x0e4a66, ior: 1.61 },

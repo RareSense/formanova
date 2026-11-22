@@ -111,7 +111,9 @@ void main(){
  * Pass the same step relative to the piece: 0.001 * pieceSize / 2.2 (gemEntryStep).
  */
 export function referenceGemMaterial(geometry: THREE.BufferGeometry, envMap: THREE.Texture, spec: GemSpec, name: string, entryStep = 0.001) {
-  const filter = new THREE.Color(spec.color).lerp(new THREE.Color(spec.atten ?? spec.color), spec.atten === 0xffffff ? 0 : 0.55);
+  const filter = new THREE.Color(spec.color).lerp(new THREE.Color(spec.atten ?? spec.color), spec.atten === 0xffffff ? 0 : 0.75);
+  // Same as the Studio viewer: coloured stones take less light so they stay deep.
+  const colourless = (spec.atten ?? 0xffffff) === 0xffffff;
   const m = new THREE.ShaderMaterial({
     name,
     vertexShader,
@@ -122,12 +124,12 @@ export function referenceGemMaterial(geometry: THREE.BufferGeometry, envMap: THR
       envMap: { value: envMap },
       bvh: { value: bvhFor(geometry) },
       modelMatrixInverse: { value: new THREE.Matrix4() },
-      bounces: { value: 3 },
+      bounces: { value: 6 },
       ior: { value: spec.ior ?? 1.5 },
       aberrationStrength: { value: spec.disp ?? 0.008 },
       fresnel: { value: 0.25 },
       colorFactor: { value: filter },
-      envIntensity: { value: 1.2 },
+      envIntensity: { value: colourless ? 1.2 : 1.0 },
       entryStep: { value: entryStep },
     },
   });
@@ -144,6 +146,13 @@ const ORIGINAL_TONE_MAPPING_CHUNK = THREE.ShaderChunk.tonemapping_pars_fragment;
 export function installReferenceToneMapping() {
   if (THREE.ShaderChunk.tonemapping_pars_fragment.includes('StartCompression = 0.8 - 0.04')) return;
   THREE.ShaderChunk.tonemapping_pars_fragment = ORIGINAL_TONE_MAPPING_CHUNK.replace('vec3 CustomToneMapping( vec3 color ) { return color; }', /* glsl */ `
+vec3 jewelGrade( vec3 c ) {
+  vec3 d = pow( max( c, 0.0 ), vec3( 1.0 / 2.2 ) );
+  d = clamp( ( d - 0.5 ) * 1.18 + 0.5, 0.0, 1.0 );
+  vec3 l = pow( d, vec3( 2.2 ) );
+  float y = dot( l, vec3( 0.2126, 0.7152, 0.0722 ) );
+  return max( mix( vec3( y ), l, 1.04 ), 0.0 );
+}
 vec3 CustomToneMapping( vec3 color ) {
   const float StartCompression = 0.8 - 0.04;
   const float Desaturation = 0.15;
@@ -157,6 +166,6 @@ vec3 CustomToneMapping( vec3 color ) {
   float newPeak = 1.0 - d * d / ( peak + d - StartCompression );
   color *= newPeak / peak;
   float g = 1.0 - 1.0 / ( Desaturation * ( peak - newPeak ) + 1.0 );
-  return mix( color, vec3( newPeak ), g );
+  return jewelGrade( mix( color, vec3( newPeak ), g ) );
 }`);
 }
