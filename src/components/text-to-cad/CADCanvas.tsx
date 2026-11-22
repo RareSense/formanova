@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect, Suspense, useMemo, forwardRef, useImperativeHandle, useCallback } from "react";
+import { modelHasTextureMaps } from "@/lib/gltf-texture-maps";
 import { Canvas, useThree, useFrame, ThreeEvent, invalidate } from "@react-three/fiber";
 import {
   OrbitControls,
@@ -1202,8 +1203,12 @@ const LoadedModel = forwardRef<
     // ── Magic Texturing: auto-assign materials based on mesh name + material heuristics ──
     // Only run if magicTexturing is enabled
     const autoMaterials: Record<string, MaterialDef> = {};
+    // Baked textures (antiqued finish, AO, normals) are shown as authored.
+    const authoredTextures = modelHasTextureMaps(list.map((md) => md.originalMaterial));
 
-    if (magicTexturing) {
+    if (authoredTextures) {
+      console.log("[CADCanvas] GLB has texture maps; keeping its embedded materials");
+    } else if (magicTexturing) {
     // PRIORITY 0: If the GLB's embedded material name matches a library material
     //             (i.e. previously exported from Formanova), honour that assignment
     //             and skip heuristics entirely.
@@ -1744,7 +1749,12 @@ const LoadedModel = forwardRef<
     applyMagicTextures: () => {
       const list = meshDataListRef.current;
       if (!list.length) return;
-      
+      if (modelHasTextureMaps(list.map((md) => md.originalMaterial))) {
+        setAssignedMaterials({});
+        inv();
+        return;
+      }
+
       const newMaterials: Record<string, MaterialDef> = {};
       let recognisedCount = 0;
 

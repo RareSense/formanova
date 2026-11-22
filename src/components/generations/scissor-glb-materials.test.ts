@@ -200,3 +200,26 @@ describe('applyHistoryPreviewMaterials', () => {
     }
   });
 });
+
+describe('applyHistoryPreviewMaterials with baked textures', () => {
+  it('keeps a textured GLB (and its untextured accents) as authored under the jewelry palette', () => {
+    const model = new THREE.Group();
+    const tex = new THREE.Texture();
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const silver = new THREE.MeshStandardMaterial({ map: tex, aoMap: new THREE.Texture(), normalMap: new THREE.Texture() });
+    const body = meshNamed('bulldog_body', silver);
+    const nose = meshNamed('nose', new THREE.MeshStandardMaterial({ color: 0x050505 }));
+    body.userData.__historyHasEmbeddedGltfMaterial = true;
+    nose.userData.__historyHasEmbeddedGltfMaterial = true;
+    model.add(body, nose);
+
+    applyHistoryPreviewMaterials(model, true);
+
+    const kept = body.material as THREE.MeshStandardMaterial;
+    expect(kept.map).toBe(tex);
+    expect(kept.map?.colorSpace).toBe(THREE.SRGBColorSpace);
+    expect(kept.aoMap).not.toBeNull();
+    expect(kept.normalMap).not.toBeNull();
+    expect((nose.material as THREE.MeshStandardMaterial).color.getHex()).toBe(0x050505);
+  });
+});
