@@ -77,7 +77,7 @@ export function applyNeutralToneMapping(renderer: THREE.WebGLRenderer): void {
  * different HDRI, so matching the tone mapping and the light rig still left it
  * looking like a different piece once opened in the Studio.
  */
-export const STUDIO_ENVIRONMENT_HDR = '/hdri/metal-studio-1k.hdr';
+export const STUDIO_ENVIRONMENT_HDR = '/hdri/gem-studio-1k.hdr';
 
 /**
  * The Studio viewport's backdrop: a vertical white to light grey gradient,
