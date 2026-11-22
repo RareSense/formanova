@@ -73,9 +73,9 @@ interface ReferenceMaterialSpec {
 
 // Exact material constants from the approved standalone reference.
 const REFERENCE_MATERIALS: Record<string, ReferenceMaterialSpec> = {
-  gold18k:      { label: "Yellow Gold", kind: "metal", color: 0xe5b377, rough: 0 },
-  roseGold:     { label: "Rose Gold", kind: "metal", color: 0xf2af83, rough: 0 },
-  whiteGold:    { label: "White Gold", kind: "metal", color: 0xc2c2c3, rough: 0 },
+  gold18k:      { label: "Yellow Gold", kind: "metal", color: 0xecc895, rough: 0 },
+  roseGold:     { label: "Rose Gold", kind: "metal", color: 0xf9d8be, rough: 0 },
+  whiteGold:    { label: "White Gold", kind: "metal", color: 0xe2e2e3, rough: 0 },
   platinum:     { label: "Platinum", kind: "metal", color: 0xe9e9e7, rough: 0.11 },
   silver:       { label: "Silver", kind: "metal", color: 0xfbfaf6, rough: 0.05 },
   blackRhodium: { label: "Black Rhodium", kind: "metal", color: 0x3b3b40, rough: 0.28 },
@@ -84,8 +84,8 @@ const REFERENCE_MATERIALS: Record<string, ReferenceMaterialSpec> = {
   wax:          { label: "Casting Wax", kind: "pearl", color: 0x1f6e44 },
   stoneBlue:    { label: "Stone Blue", kind: "metal", color: 0x3f6fc4, rough: 0.22 },
 
-  diamond:      { label: "Diamond", kind: "gem", color: 0xffffff, atten: 0xffffff, ior: 2.42, disp: 0.006 },
-  champagne:    { label: "Champagne", kind: "gem", color: 0xf6e3bd, atten: 0xc89a4e, ior: 2.42, disp: 0.006 },
+  diamond:      { label: "Diamond", kind: "gem", color: 0xffffff, atten: 0xffffff, ior: 2.42, disp: 0.016 },
+  champagne:    { label: "Champagne", kind: "gem", color: 0xf6e3bd, atten: 0xc89a4e, ior: 2.42, disp: 0.016 },
   ruby:         { label: "Ruby", kind: "gem", color: 0xf26a8c, atten: 0x9e0f34, ior: 1.76 },
   sapphire:     { label: "Sapphire", kind: "gem", color: 0x4f7ce0, atten: 0x0c2f9e, ior: 1.76 },
   emerald:      { label: "Emerald", kind: "gem", color: 0x46c684, atten: 0x02702f, ior: 1.57, rough: 0.03 },
@@ -116,7 +116,7 @@ export function isStoneLook(key: string | null): boolean {
   return REFERENCE_MATERIALS[key]?.kind !== "metal";
 }
 
-const REFERENCE_BASE_ENV = { metal: 1.0, gem: 2.3, pearl: 1.1 } as const;
+const REFERENCE_BASE_ENV = { metal: 1.5, gem: 2.3, pearl: 1.1 } as const;
 const REFERENCE_ENVIRONMENTS = {
   room: null,
   photostudio: "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/brown_photostudio_02_1k.hdr",
@@ -2624,7 +2624,7 @@ function ReferenceGemMesh({
         aberrationStrength: { value: materialSpec.disp ?? 0.008 },
         fresnel: { value: 0.25 },
         colorFactor: { value: filter },
-        envIntensity: { value: colourless ? 1.5 : 1.0 },
+        envIntensity: { value: colourless ? 1.2 : 1.0 },
         selected: { value: 0 },
       },
       vertexShader: REFERENCE_GEM_VERTEX_SHADER,
