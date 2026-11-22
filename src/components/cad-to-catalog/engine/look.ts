@@ -14,7 +14,7 @@ import { installReferenceToneMapping } from './gems';
 export const STUDIOS = [
   { id: 'photo', name: 'Studio', url: 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/brown_photostudio_02_2k.hdr' },
   { id: 'softbox', name: 'Softboxes', url: '/hdri/jewelry-studio-v2.hdr' },
-  { id: 'diamond', name: 'Diamond', url: '/hdri/gem-studio-1k.hdr' },
+  { id: 'diamond', name: 'Diamond', url: '/hdri/metal-studio-1k.hdr' },
 ] as const;
 export type StudioId = (typeof STUDIOS)[number]['id'];
 const GEM_ENV_URL = '/hdri/gem-studio-1k.hdr';

@@ -131,6 +131,9 @@ const REFERENCE_ENVIRONMENTS = {
   bright: "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/studio_small_08_1k.hdr",
   softbox: "/hdri/jewelry-studio-v2.hdr",
   diamond: "/hdri/gem-studio-1k.hdr",
+  // Our own softbox studio for metal: bright everywhere (no dark bars to mirror
+  // as black stripes on polished bands), three soft boxes for the shine lines.
+  metal: "/hdri/metal-studio-1k.hdr",
   sunset: "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r180/examples/textures/equirectangular/venice_sunset_1k.hdr",
 } as const;
 type ReferenceEnvironmentKey = keyof typeof REFERENCE_ENVIRONMENTS;
@@ -492,11 +495,11 @@ function makeReferenceBackground(): THREE.CanvasTexture {
 }
 
 function getRequestedReferenceEnvironment(): ReferenceEnvironmentKey {
-  if (typeof window === "undefined") return "diamond";
+  if (typeof window === "undefined") return "metal";
   const requested = new URLSearchParams(window.location.search).get("cadEnvironment");
   return requested && requested in REFERENCE_ENVIRONMENTS
     ? requested as ReferenceEnvironmentKey
-    : "diamond";
+    : "metal";
 }
 
 function ReferenceStudioEnvironment({ children }: { children: React.ReactNode }) {
