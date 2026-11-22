@@ -429,6 +429,11 @@ export function getRefractionSupport(): RefractionSupport {
   const renderer = getGPURendererString();
   if (SOFTWARE_GPU.test(renderer)) return no("Simple gems: 3D is running without graphics acceleration.");
 
+  // Desktop Linux: the refraction shader receives scrambled uniforms there (reads
+  // as selected, refracts to black), reproduced on NVIDIA GL and SwiftShader.
+  const ua = navigator.userAgent;
+  if (/Linux/i.test(ua) && !/Android/i.test(ua)) return no("Simple gems: real gems don't draw correctly on Linux yet.");
+
   // Chrome's Vulkan path (some Linux and Android devices) draws the gem shader
   // as flat colour; found on an NVIDIA H100 with ANGLE Vulkan.
   if (/vulkan/i.test(renderer)) return no("Simple gems: your browser may draw real gems wrong.");
