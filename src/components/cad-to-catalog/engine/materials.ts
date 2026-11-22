@@ -27,9 +27,9 @@ export interface Choice {
 }
 
 export const METALS: Preset[] = [
-  { id: 'gold-yellow', name: 'Yellow Gold', color: '#ecc895', roughness: 0 },
-  { id: 'gold-rose', name: 'Rose Gold', color: '#f9d8be', roughness: 0 },
-  { id: 'gold-white', name: 'White Gold', color: '#e2e2e3', roughness: 0 },
+  { id: 'gold-yellow', name: 'Yellow Gold', color: '#ecc895', roughness: 0.05 },
+  { id: 'gold-rose', name: 'Rose Gold', color: '#f9d8be', roughness: 0.05 },
+  { id: 'gold-white', name: 'White Gold', color: '#e2e2e3', roughness: 0.05 },
   { id: 'platinum', name: 'Platinum', color: '#e9e9e7', roughness: 0.11 },
   { id: 'silver', name: 'Sterling Silver', color: '#fbfaf6', roughness: 0.05 },
   { id: 'gold-brushed', name: 'Brushed Gold', color: '#ffd88a', roughness: 0.3 },

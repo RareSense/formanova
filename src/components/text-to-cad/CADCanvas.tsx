@@ -73,9 +73,9 @@ interface ReferenceMaterialSpec {
 
 // Exact material constants from the approved standalone reference.
 const REFERENCE_MATERIALS: Record<string, ReferenceMaterialSpec> = {
-  gold18k:      { label: "Yellow Gold", kind: "metal", color: 0xecc895, rough: 0 },
-  roseGold:     { label: "Rose Gold", kind: "metal", color: 0xf9d8be, rough: 0 },
-  whiteGold:    { label: "White Gold", kind: "metal", color: 0xe2e2e3, rough: 0 },
+  gold18k:      { label: "Yellow Gold", kind: "metal", color: 0xecc895, rough: 0.05 },
+  roseGold:     { label: "Rose Gold", kind: "metal", color: 0xf9d8be, rough: 0.05 },
+  whiteGold:    { label: "White Gold", kind: "metal", color: 0xe2e2e3, rough: 0.05 },
   platinum:     { label: "Platinum", kind: "metal", color: 0xe9e9e7, rough: 0.11 },
   silver:       { label: "Silver", kind: "metal", color: 0xfbfaf6, rough: 0.05 },
   blackRhodium: { label: "Black Rhodium", kind: "metal", color: 0x3b3b40, rough: 0.28 },

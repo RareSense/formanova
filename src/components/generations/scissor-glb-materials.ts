@@ -115,7 +115,7 @@ export function createHistoryFallbackMaterial(meshName: string): THREE.Material 
   return new THREE.MeshStandardMaterial({
     color: 0xecc895,
     metalness: 1,
-    roughness: 0,
+    roughness: 0.05,
     // CADCanvas REFERENCE_BASE_ENV.metal.
     envMapIntensity: 1.5,
     side: THREE.DoubleSide,
