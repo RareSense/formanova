@@ -17,7 +17,7 @@ export const STUDIOS = [
   { id: 'diamond', name: 'Diamond', url: '/hdri/gem-studio-1k.hdr' },
 ] as const;
 export type StudioId = (typeof STUDIOS)[number]['id'];
-const GEM_ENV_URL = '/hdri/gem-sparkle-1k.hdr';
+const GEM_ENV_URL = '/hdri/gem-studio-1k.hdr';
 
 export type Backdrop = 'view' | 'white' | 'clear';
 // RenderPass / ShaderPass draw into the read buffer they are given; the write buffer is unused.
