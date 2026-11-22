@@ -19,13 +19,6 @@ import * as THREE from 'three';
  * this same curve.
  */
 const NEUTRAL_TONE_MAPPING_CHUNK = /* glsl */`
-vec3 jewelGrade( vec3 c ) {
-  vec3 d = pow( max( c, 0.0 ), vec3( 1.0 / 2.2 ) );
-  d = clamp( ( d - 0.5 ) * 1.18 + 0.5, 0.0, 1.0 );
-  vec3 l = pow( d, vec3( 2.2 ) );
-  float y = dot( l, vec3( 0.2126, 0.7152, 0.0722 ) );
-  return max( mix( vec3( y ), l, 1.04 ), 0.0 );
-}
 vec3 CustomToneMapping( vec3 color ) {
   const float StartCompression = 0.8 - 0.04;
   const float Desaturation = 0.15;
@@ -39,21 +32,18 @@ vec3 CustomToneMapping( vec3 color ) {
   float newPeak = 1.0 - d * d / ( peak + d - StartCompression );
   color *= newPeak / peak;
   float g = 1.0 - 1.0 / ( Desaturation * ( peak - newPeak ) + 1.0 );
-  return jewelGrade( mix( color, vec3( newPeak ), g ) );
+  return mix( color, vec3( newPeak ), g );
 }
 `;
 
-/** Matches CADCanvas's default (0.97 * intensity, intensity defaulting to 1).
- * The grade above (contrast 1.18, saturation 1.04) is CADCanvas's jewelGrade. */
-export const NEUTRAL_TONE_MAPPING_EXPOSURE = 0.97;
+/** Matches CADCanvas's default (1.0 * intensity, intensity defaulting to 1). */
+export const NEUTRAL_TONE_MAPPING_EXPOSURE = 1.0;
 
 let installed = false;
 
 /** Installs the neutral curve once per page, then configures the renderer to
  * use it at the same exposure as the Studio viewport. */
 export function applyNeutralToneMapping(renderer: THREE.WebGLRenderer): void {
-  // CADCanvas may have installed the identical chunk first.
-  if (THREE.ShaderChunk.tonemapping_pars_fragment.includes("StartCompression = 0.8 - 0.04")) installed = true;
   if (!installed) {
     // Same literal replace CADCanvas performs, so both paths produce an
     // identical shader rather than merely a similar one.
@@ -69,15 +59,15 @@ export function applyNeutralToneMapping(renderer: THREE.WebGLRenderer): void {
 }
 
 /**
- * The environment CADCanvas lights with by default (its `diamond` key, a
- * bright softbox studio shared by metal and stones).
+ * The environment CADCanvas lights with by default (its `photostudio` key).
  *
  * On polished metal the environment IS the appearance: every highlight and
  * reflection is the room, not the lights. The history preview used to load a
  * different HDRI, so matching the tone mapping and the light rig still left it
  * looking like a different piece once opened in the Studio.
  */
-export const STUDIO_ENVIRONMENT_HDR = '/hdri/gem-studio-1k.hdr';
+export const STUDIO_ENVIRONMENT_HDR =
+  'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/brown_photostudio_02_1k.hdr';
 
 /**
  * The Studio viewport's backdrop: a vertical white to light grey gradient,
@@ -99,7 +89,7 @@ export function makeStudioBackdrop(): THREE.CanvasTexture {
   if (!context) return new THREE.CanvasTexture(canvas);
   const gradient = context.createLinearGradient(0, 0, 0, 512);
   gradient.addColorStop(0, '#ffffff');
-  gradient.addColorStop(1, '#f4f5f7');
+  gradient.addColorStop(1, '#c9cdd4');
   context.fillStyle = gradient;
   context.fillRect(0, 0, 2, 512);
   const texture = new THREE.CanvasTexture(canvas);

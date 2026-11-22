@@ -73,9 +73,9 @@ interface ReferenceMaterialSpec {
 
 // Exact material constants from the approved standalone reference.
 const REFERENCE_MATERIALS: Record<string, ReferenceMaterialSpec> = {
-  gold18k:      { label: "Yellow Gold", kind: "metal", color: 0xecc895, rough: 0 },
-  roseGold:     { label: "Rose Gold", kind: "metal", color: 0xf9d8be, rough: 0 },
-  whiteGold:    { label: "White Gold", kind: "metal", color: 0xe2e2e3, rough: 0 },
+  gold18k:      { label: "Yellow Gold", kind: "metal", color: 0xffd88a, rough: 0.05 },
+  roseGold:     { label: "Rose Gold", kind: "metal", color: 0xf6c1a6, rough: 0.08 },
+  whiteGold:    { label: "White Gold", kind: "metal", color: 0xf7f4ec, rough: 0.07 },
   platinum:     { label: "Platinum", kind: "metal", color: 0xe9e9e7, rough: 0.11 },
   silver:       { label: "Silver", kind: "metal", color: 0xfbfaf6, rough: 0.05 },
   blackRhodium: { label: "Black Rhodium", kind: "metal", color: 0x3b3b40, rough: 0.28 },
@@ -84,18 +84,18 @@ const REFERENCE_MATERIALS: Record<string, ReferenceMaterialSpec> = {
   wax:          { label: "Casting Wax", kind: "pearl", color: 0x1f6e44 },
   stoneBlue:    { label: "Stone Blue", kind: "metal", color: 0x3f6fc4, rough: 0.22 },
 
-  diamond:      { label: "Diamond", kind: "gem", color: 0xffffff, atten: 0xffffff, ior: 2.6, disp: 0.012 },
-  champagne:    { label: "Champagne", kind: "gem", color: 0xf6e3bd, atten: 0xc89a4e, ior: 2.42, disp: 0.016 },
-  ruby:         { label: "Ruby", kind: "gem", color: 0xe14276, atten: 0x9e0f34, ior: 1.76 },
-  sapphire:     { label: "Sapphire", kind: "gem", color: 0x649dc4, atten: 0x0c2f9e, ior: 1.76 },
-  emerald:      { label: "Emerald", kind: "gem", color: 0x19d597, atten: 0x02702f, ior: 1.57, rough: 0.03 },
+  diamond:      { label: "Diamond", kind: "gem", color: 0xffffff, atten: 0xffffff, ior: 2.42, disp: 0.006 },
+  champagne:    { label: "Champagne", kind: "gem", color: 0xf6e3bd, atten: 0xc89a4e, ior: 2.42, disp: 0.006 },
+  ruby:         { label: "Ruby", kind: "gem", color: 0xf26a8c, atten: 0x9e0f34, ior: 1.76 },
+  sapphire:     { label: "Sapphire", kind: "gem", color: 0x4f7ce0, atten: 0x0c2f9e, ior: 1.76 },
+  emerald:      { label: "Emerald", kind: "gem", color: 0x46c684, atten: 0x02702f, ior: 1.57, rough: 0.03 },
   amethyst:     { label: "Amethyst", kind: "gem", color: 0xb488e2, atten: 0x5c1e96, ior: 1.54 },
-  citrine:      { label: "Citrine", kind: "gem", color: 0xffe9bc, atten: 0xa96400, ior: 1.54 },
+  citrine:      { label: "Citrine", kind: "gem", color: 0xf2bb4d, atten: 0xa96400, ior: 1.54 },
   aquamarine:   { label: "Aquamarine", kind: "gem", color: 0xaee2de, atten: 0x2f9e96, ior: 1.57 },
   topaz:        { label: "London Topaz", kind: "gem", color: 0x4b9dbd, atten: 0x0e4a66, ior: 1.61 },
   garnet:       { label: "Garnet", kind: "gem", color: 0xcd5050, atten: 0x570a10, ior: 1.73 },
   peridot:      { label: "Peridot", kind: "gem", color: 0xbcd45c, atten: 0x647f04, ior: 1.65 },
-  tanzanite:    { label: "Tanzanite", kind: "gem", color: 0x052999, atten: 0x28329e, ior: 1.91 },
+  tanzanite:    { label: "Tanzanite", kind: "gem", color: 0x7480e2, atten: 0x28329e, ior: 1.69 },
   morganite:    { label: "Morganite", kind: "gem", color: 0xf4c6c6, atten: 0xc06a78, ior: 1.58 },
   blackDiamond: { label: "Black Diamond", kind: "gem", color: 0x17171c, atten: 0x000000, ior: 2.42, rough: 0.04, dark: true },
   // Locket and amulet windows: clear, glass-like refraction, no fire, so what sits behind shows.
@@ -570,7 +570,7 @@ function ReferenceStudioEnvironment({ children }: { children: React.ReactNode })
 let gemStudioPromise: Promise<THREE.Texture> | null = null;
 function loadGemStudio(): Promise<THREE.Texture> {
   if (!gemStudioPromise) {
-    gemStudioPromise = new RGBELoader().loadAsync("/hdri/gem-sparkle-1k.hdr").then((t) => {
+    gemStudioPromise = new RGBELoader().loadAsync("/hdri/gem-studio-1k.hdr").then((t) => {
       t.mapping = THREE.EquirectangularReflectionMapping;
       return t;
     });
@@ -2624,7 +2624,7 @@ function ReferenceGemMesh({
         aberrationStrength: { value: materialSpec.disp ?? 0.008 },
         fresnel: { value: 0.25 },
         colorFactor: { value: filter },
-        envIntensity: { value: colourless ? 1.2 : 1.0 },
+        envIntensity: { value: colourless ? 0.75 : 0.6 },
         selected: { value: 0 },
       },
       vertexShader: REFERENCE_GEM_VERTEX_SHADER,
