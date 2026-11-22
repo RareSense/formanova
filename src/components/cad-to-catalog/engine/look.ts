@@ -3,7 +3,7 @@
 // shading (GTAO), FormaNova's tone curve, and a backdrop that stays pure white.
 
 import * as THREE from 'three';
-import { loadEnvironment } from '@/lib/load-environment';
+import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
@@ -14,10 +14,10 @@ import { installReferenceToneMapping } from './gems';
 export const STUDIOS = [
   { id: 'photo', name: 'Studio', url: 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/brown_photostudio_02_2k.hdr' },
   { id: 'softbox', name: 'Softboxes', url: '/hdri/jewelry-studio-v2.hdr' },
-  { id: 'diamond', name: 'Diamond', url: '/hdri/ijewel-metal-068.exr' },
+  { id: 'diamond', name: 'Diamond', url: '/hdri/diamond-studio.hdr' },
 ] as const;
 export type StudioId = (typeof STUDIOS)[number]['id'];
-const GEM_ENV_URL = '/hdri/ijewel-gem-004.exr';
+const GEM_ENV_URL = 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/brown_photostudio_02_1k.hdr';
 
 export type Backdrop = 'view' | 'white' | 'clear';
 // RenderPass / ShaderPass draw into the read buffer they are given; the write buffer is unused.
@@ -32,7 +32,7 @@ export class Look {
   readonly sun: THREE.DirectionalLight;
   /** The raw studio HDRI the gem shader samples (null until loaded). */
   gemEnv: THREE.Texture | null = null;
-  studioId: StudioId = 'diamond';
+  studioId: StudioId = 'photo';
   studioReady = false;
   private envMap: THREE.Texture | null = null;
   private pmrem: THREE.PMREMGenerator;
@@ -49,7 +49,7 @@ export class Look {
   constructor(private renderer: THREE.WebGLRenderer, private scene: THREE.Scene, private camera: THREE.PerspectiveCamera, private onChange: () => void) {
     installReferenceToneMapping();
     renderer.toneMapping = THREE.CustomToneMapping;
-    renderer.toneMappingExposure = 0.97;
+    renderer.toneMappingExposure = 1;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.VSMShadowMap; // blurred: a soft drop shadow
     this.pmrem = new THREE.PMREMGenerator(renderer);
@@ -72,7 +72,8 @@ export class Look {
     scene.add(this.floor);
     scene.background = this.viewBackdrop();
 
-    loadEnvironment(GEM_ENV_URL).then((t) => {
+    new RGBELoader().loadAsync(GEM_ENV_URL).then((t) => {
+      t.mapping = THREE.EquirectangularReflectionMapping;
       this.gemEnv = t;
       this.onChange();
     }).catch((e) => console.warn('studio light for stones not loaded', e));
@@ -85,7 +86,8 @@ export class Look {
     const st = STUDIOS.find((x) => x.id === id) || STUDIOS[0];
     this.studioId = st.id;
     if (!this.studioMaps.has(st.id)) {
-      this.studioMaps.set(st.id, loadEnvironment(st.url).then((t) => {
+      this.studioMaps.set(st.id, new RGBELoader().loadAsync(st.url).then((t) => {
+        t.mapping = THREE.EquirectangularReflectionMapping;
         return this.pmrem.fromEquirectangular(t).texture;
       }));
     }

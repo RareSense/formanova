@@ -24,9 +24,7 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { applyNeutralToneMapping, makeStudioBackdrop, STUDIO_ENVIRONMENT_HDR } from '@/lib/neutral-tone-mapping';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
-import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
-import { loadEnvironment } from '@/lib/load-environment';
+import { RGBELoader } from 'three-stdlib';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Box } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
@@ -106,8 +104,7 @@ export function ScissorGLBGrid({ children, continuous = true }: ScissorGLBGridPr
   /** One backdrop shared by every card, built lazily so it is not created
    * during SSR or before a scene needs it. */
   const backdropRef = useRef<THREE.Texture | null>(null);
-  // Compressed GLBs (Draco, meshopt); decoder served from /draco, same as the Studio.
-  const gltfLoaderRef = useRef(new GLTFLoader().setDRACOLoader(new DRACOLoader().setDecoderPath('/draco/')).setMeshoptDecoder(MeshoptDecoder));
+  const gltfLoaderRef = useRef(new GLTFLoader());
   const pendingRegistrationsRef = useRef(new PendingCardRegistrationQueue<HTMLDivElement>());
   const requestRenderRef = useRef<() => void>(() => undefined);
   const [rendererReady, setRendererReady] = useState(false);
@@ -152,7 +149,9 @@ export function ScissorGLBGrid({ children, continuous = true }: ScissorGLBGridPr
     pmrem.dispose();
 
     // Preload HDRI environment
-    loadEnvironment(STUDIO_ENVIRONMENT_HDR).then((texture) => {
+    const rgbeLoader = new RGBELoader();
+    rgbeLoader.load(STUDIO_ENVIRONMENT_HDR, (texture) => {
+      texture.mapping = THREE.EquirectangularReflectionMapping;
       envMapRef.current = texture;
       for (const card of cardsRef.current.values()) {
         card.scene.environment = texture;

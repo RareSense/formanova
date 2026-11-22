@@ -55,7 +55,7 @@ async function loadForcedPaletteCard(glb: ArrayBuffer): Promise<THREE.MeshStanda
 describe('forced-palette cards, through the real GLTF loader', () => {
   it('shows gold on a GLB that does not mark its materials (unchanged behaviour)', async () => {
     const material = await loadForcedPaletteCard(buildGlb());
-    expect(material.color.getHex()).toBe(0xe5b377);
+    expect(material.color.getHex()).toBe(0xffd88a);
   });
 
   it('keeps the file materials on a GLB marked formanovaMaterials: "authored"', async () => {
@@ -63,6 +63,6 @@ describe('forced-palette cards, through the real GLTF loader', () => {
     expect(material.name).toBe('Gold_black_rhodium');
     expect(material.metalness).toBe(1);
     expect(material.roughness).toBeCloseTo(0.3);
-    expect(material.color.getHex()).not.toBe(0xe5b377);
+    expect(material.color.getHex()).not.toBe(0xffd88a);
   });
 });

@@ -6,11 +6,10 @@ import {
   GizmoHelper,
   GizmoViewport,
 } from "@react-three/drei";
-import { OrbitControls as OrbitControlsImpl } from "three-stdlib";
+import { OrbitControls as OrbitControlsImpl, RGBELoader } from "three-stdlib";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { loadEnvironment, IJEWEL_GEM_LIGHT, IJEWEL_METAL_LIGHT } from "@/lib/load-environment";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 
@@ -66,14 +65,6 @@ interface ReferenceMaterialSpec {
   atten?: number;
   ior?: number;
   disp?: number;
-  /** Per-channel multiplier on light leaving the stone (default 1). */
-  boost?: [number, number, number];
-  /** Mid-tone lift inside the stone (default 1). */
-  gamma?: number;
-  /** Surface reflection strength, 0.5 = physical Fresnel (default 0.5). */
-  refl?: number;
-  /** Light brightness inside the stone (overrides the default). */
-  env?: number;
   sheen?: number;
   irid?: number;
   opal?: boolean;
@@ -82,9 +73,9 @@ interface ReferenceMaterialSpec {
 
 // Exact material constants from the approved standalone reference.
 const REFERENCE_MATERIALS: Record<string, ReferenceMaterialSpec> = {
-  gold18k:      { label: "Yellow Gold", kind: "metal", color: 0xe5b377, rough: 0 },
-  roseGold:     { label: "Rose Gold", kind: "metal", color: 0xf2af83, rough: 0 },
-  whiteGold:    { label: "White Gold", kind: "metal", color: 0xc2c2c3, rough: 0 },
+  gold18k:      { label: "Yellow Gold", kind: "metal", color: 0xffd88a, rough: 0.08 },
+  roseGold:     { label: "Rose Gold", kind: "metal", color: 0xf6c1a6, rough: 0.08 },
+  whiteGold:    { label: "White Gold", kind: "metal", color: 0xf7f4ec, rough: 0.07 },
   platinum:     { label: "Platinum", kind: "metal", color: 0xe9e9e7, rough: 0.11 },
   silver:       { label: "Silver", kind: "metal", color: 0xfbfaf6, rough: 0.05 },
   blackRhodium: { label: "Black Rhodium", kind: "metal", color: 0x3b3b40, rough: 0.28 },
@@ -93,18 +84,18 @@ const REFERENCE_MATERIALS: Record<string, ReferenceMaterialSpec> = {
   wax:          { label: "Casting Wax", kind: "pearl", color: 0x1f6e44 },
   stoneBlue:    { label: "Stone Blue", kind: "metal", color: 0x3f6fc4, rough: 0.22 },
 
-  diamond:      { label: "Diamond", kind: "gem", color: 0xffffff, atten: 0xffffff, ior: 2.4, disp: 0.004, env: 0.6, boost: [2, 2, 2], gamma: 1.09, refl: 0.46 },
-  champagne:    { label: "Champagne", kind: "gem", color: 0xf6e3bd, atten: 0xc89a4e, ior: 2.42, disp: 0.016 },
-  ruby:         { label: "Ruby", kind: "gem", color: 0xe14276, atten: 0x9e0f34, ior: 1.76 },
-  sapphire:     { label: "Sapphire", kind: "gem", color: 0x649dc4, atten: 0x0c2f9e, ior: 1.76 },
-  emerald:      { label: "Emerald", kind: "gem", color: 0x19d597, atten: 0x02702f, ior: 1.57, rough: 0.03 },
+  diamond:      { label: "Diamond", kind: "gem", color: 0xffffff, atten: 0xffffff, ior: 2.42, disp: 0.02 },
+  champagne:    { label: "Champagne", kind: "gem", color: 0xf6e3bd, atten: 0xc89a4e, ior: 2.42, disp: 0.02 },
+  ruby:         { label: "Ruby", kind: "gem", color: 0xf26a8c, atten: 0x9e0f34, ior: 1.76 },
+  sapphire:     { label: "Sapphire", kind: "gem", color: 0x4f7ce0, atten: 0x0c2f9e, ior: 1.76 },
+  emerald:      { label: "Emerald", kind: "gem", color: 0x46c684, atten: 0x02702f, ior: 1.57, rough: 0.03 },
   amethyst:     { label: "Amethyst", kind: "gem", color: 0xb488e2, atten: 0x5c1e96, ior: 1.54 },
-  citrine:      { label: "Citrine", kind: "gem", color: 0xffe9bc, atten: 0xa96400, ior: 1.54 },
+  citrine:      { label: "Citrine", kind: "gem", color: 0xf2bb4d, atten: 0xa96400, ior: 1.54 },
   aquamarine:   { label: "Aquamarine", kind: "gem", color: 0xaee2de, atten: 0x2f9e96, ior: 1.57 },
   topaz:        { label: "London Topaz", kind: "gem", color: 0x4b9dbd, atten: 0x0e4a66, ior: 1.61 },
   garnet:       { label: "Garnet", kind: "gem", color: 0xcd5050, atten: 0x570a10, ior: 1.73 },
   peridot:      { label: "Peridot", kind: "gem", color: 0xbcd45c, atten: 0x647f04, ior: 1.65 },
-  tanzanite:    { label: "Tanzanite", kind: "gem", color: 0x052999, atten: 0x28329e, ior: 1.91 },
+  tanzanite:    { label: "Tanzanite", kind: "gem", color: 0x7480e2, atten: 0x28329e, ior: 1.69 },
   morganite:    { label: "Morganite", kind: "gem", color: 0xf4c6c6, atten: 0xc06a78, ior: 1.58 },
   blackDiamond: { label: "Black Diamond", kind: "gem", color: 0x17171c, atten: 0x000000, ior: 2.42, rough: 0.04, dark: true },
   // Locket and amulet windows: clear, glass-like refraction, no fire, so what sits behind shows.
@@ -130,11 +121,6 @@ const REFERENCE_ENVIRONMENTS = {
   room: null,
   photostudio: "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/brown_photostudio_02_1k.hdr",
   bright: "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/studio_small_08_1k.hdr",
-  softbox: "/hdri/jewelry-studio-v2.hdr",
-  diamond: "/hdri/gem-studio-1k.hdr",
-  // Our own softbox studio for metal: bright everywhere (no dark bars to mirror
-  // as black stripes on polished bands), three soft boxes for the shine lines.
-  metal: IJEWEL_METAL_LIGHT,
   sunset: "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r180/examples/textures/equirectangular/venice_sunset_1k.hdr",
 } as const;
 type ReferenceEnvironmentKey = keyof typeof REFERENCE_ENVIRONMENTS;
@@ -225,10 +211,10 @@ function makeReferencePhysicalMaterial(spec: ReferenceMaterialSpec): THREE.MeshP
     });
   } else {
     // Exact FAST GEMS fallback from the reference implementation.
-    // Simple gems: a mirror-like solid so facets read as light and dark planes,
-    // instead of a see-through glow that washed diamonds out to a white blob.
     material = new THREE.MeshPhysicalMaterial({
       color: spec.color,
+      // Simple gems: a mirror-like solid so facets read as light and dark planes,
+      // instead of a see-through glow that washed diamonds out to a white blob.
       metalness: 0.55,
       roughness: spec.rough ?? 0.02,
       envMapIntensity: 1.6,
@@ -298,9 +284,6 @@ uniform float aberrationStrength;
 uniform vec3 colorFactor;
 uniform float envIntensity;
 uniform float selected;
-uniform vec3 boost;
-uniform float gammaFactor;
-uniform float reflectivity;
 
 vec3 sampleEnv(vec3 dir){
   vec2 uv=vec2(atan(dir.z,dir.x)*0.1591549431+0.5,asin(clamp(dir.y,-1.0,1.0))*0.3183098862+0.5);
@@ -338,15 +321,12 @@ void main(){
   }else{
     col=sampleEnv(dG);
   }
-  // Light leaving through the crown: gamma lifts the mid-tones, boost scales it
-  // per channel (the controls jewelry viewers expose as gammaFactor/boostFactors).
-  col=pow(max(col,0.0),vec3(1.0/max(gammaFactor,0.01)))*boost;
   col*=envIntensity*colorFactor;
   vec3 reflDir=reflect(viewDirection,vNormal);
   vec3 reflCol=sampleEnv(reflDir)*envIntensity;
   float cosT=clamp(-dot(viewDirection,vNormal),0.0,1.0);
   float F0=pow((ior-1.0)/(ior+1.0),2.0);
-  float F=clamp((F0+(1.0-F0)*pow(1.0-cosT,5.0))*reflectivity*2.0,0.0,1.0);
+  float F=F0+(1.0-F0)*pow(1.0-cosT,5.0);
   col=mix(col,reflCol,F);
   float f=pow(max(0.0,1.0+dot(viewDirection,vNormal)),10.0)*fresnel;
   col=mix(col,vec3(1.0),f);
@@ -406,9 +386,6 @@ const MotionQualityContext = React.createContext<MotionQualityApi>({
 const ORIGINAL_TONE_MAPPING_CHUNK = THREE.ShaderChunk.tonemapping_pars_fragment;
 const REFERENCE_NEUTRAL_TONE_MAPPING = /* glsl */`
 vec3 CustomToneMapping( vec3 color ) {
-  // ACES Filmic (three's curve, as the reference jewelry viewer uses), then the
-  // jewelry grade. The neutral curve below is kept only as the install marker.
-  return jewelGrade( ACESFilmicToneMapping( color ) );
   const float StartCompression = 0.8 - 0.04;
   const float Desaturation = 0.15;
   color *= toneMappingExposure;
@@ -421,27 +398,14 @@ vec3 CustomToneMapping( vec3 color ) {
   float newPeak = 1.0 - d * d / ( peak + d - StartCompression );
   color *= newPeak / peak;
   float g = 1.0 - 1.0 / ( Desaturation * ( peak - newPeak ) + 1.0 );
-  return jewelGrade( mix( color, vec3( newPeak ), g ) );
+  return mix( color, vec3( newPeak ), g );
 }`;
-
-// Jewelry grade after the tone curve: a little more contrast (1.18) and colour
-// (1.04), the values the leading web jewelry viewers ship with. Contrast pivots
-// on mid-grey in display space so whites stay white and shadows stay open.
-const JEWEL_GRADE = /* glsl */`
-vec3 jewelGrade( vec3 c ) {
-  vec3 d = pow( max( c, 0.0 ), vec3( 1.0 / 2.2 ) );
-  d = clamp( ( d - 0.5 ) * 1.18 + 0.5, 0.0, 1.0 );
-  vec3 l = pow( d, vec3( 2.2 ) );
-  float y = dot( l, vec3( 0.2126, 0.7152, 0.0722 ) );
-  return max( mix( vec3( y ), l, 1.04 ), 0.0 );
-}
-`;
 
 function installReferenceNeutralToneMapping() {
   if (THREE.ShaderChunk.tonemapping_pars_fragment.includes("StartCompression = 0.8 - 0.04")) return;
   THREE.ShaderChunk.tonemapping_pars_fragment = ORIGINAL_TONE_MAPPING_CHUNK.replace(
     "vec3 CustomToneMapping( vec3 color ) { return color; }",
-    JEWEL_GRADE + REFERENCE_NEUTRAL_TONE_MAPPING,
+    REFERENCE_NEUTRAL_TONE_MAPPING,
   );
 }
 
@@ -476,7 +440,7 @@ const NO_RAYCAST = () => null;
 function LightController({ intensity }: { intensity: number }) {
   const { gl, invalidate: inv } = useThree();
   useEffect(() => {
-    gl.toneMappingExposure = 0.97 * intensity;
+    gl.toneMappingExposure = 1.0 * intensity;
     inv();
   }, [intensity, gl, inv]);
   return null;
@@ -490,7 +454,7 @@ function makeReferenceBackground(): THREE.CanvasTexture {
   if (!context) return new THREE.CanvasTexture(canvas);
   const gradient = context.createLinearGradient(0, 0, 0, 512);
   gradient.addColorStop(0, "#ffffff");
-  gradient.addColorStop(1, "#f4f5f7");
+  gradient.addColorStop(1, "#c9cdd4");
   context.fillStyle = gradient;
   context.fillRect(0, 0, 2, 512);
   const texture = new THREE.CanvasTexture(canvas);
@@ -499,11 +463,11 @@ function makeReferenceBackground(): THREE.CanvasTexture {
 }
 
 function getRequestedReferenceEnvironment(): ReferenceEnvironmentKey {
-  if (typeof window === "undefined") return "metal";
+  if (typeof window === "undefined") return "photostudio";
   const requested = new URLSearchParams(window.location.search).get("cadEnvironment");
   return requested && requested in REFERENCE_ENVIRONMENTS
     ? requested as ReferenceEnvironmentKey
-    : "metal";
+    : "photostudio";
 }
 
 function ReferenceStudioEnvironment({ children }: { children: React.ReactNode }) {
@@ -539,7 +503,9 @@ function ReferenceStudioEnvironment({ children }: { children: React.ReactNode })
 
     const sourceUrl = REFERENCE_ENVIRONMENTS[environmentKey];
     if (sourceUrl) {
-      loadEnvironment(sourceUrl).then(
+      const loader = new RGBELoader();
+      loader.load(
+        sourceUrl,
         (texture) => {
           if (disposed) {
             texture.dispose();
@@ -554,6 +520,7 @@ function ReferenceStudioEnvironment({ children }: { children: React.ReactNode })
           setRawEnvironment(texture);
           inv();
         },
+        undefined,
         (error) => {
           console.error(`[CADCanvas] Failed to load ${environmentKey} environment; using Soft Studio`, error);
           if (!disposed) {
@@ -585,29 +552,6 @@ function ReferenceStudioEnvironment({ children }: { children: React.ReactNode })
   return <ReferenceEnvironmentContext.Provider value={value}>{children}</ReferenceEnvironmentContext.Provider>;
 }
 
-let gemStudioPromise: Promise<THREE.Texture> | null = null;
-function loadGemStudio(): Promise<THREE.Texture> {
-  if (!gemStudioPromise) {
-    gemStudioPromise = loadEnvironment(IJEWEL_GEM_LIGHT).then((t) => {
-      t.mapping = THREE.EquirectangularReflectionMapping;
-      return t;
-    });
-    gemStudioPromise.catch(() => { gemStudioPromise = null; });
-  }
-  return gemStudioPromise;
-}
-function useGemStudio(): THREE.Texture | null {
-  const [texture, setTexture] = useState<THREE.Texture | null>(null);
-  const { invalidate: inv } = useThree();
-  useEffect(() => {
-    let live = true;
-    loadGemStudio().then((t) => { if (live) { setTexture(t); inv(); } })
-      .catch((e) => console.warn("[CADCanvas] stone studio light not loaded", e));
-    return () => { live = false; };
-  }, [inv]);
-  return texture;
-}
-
 function ReferenceStudioLighting() {
   const lightRef = useRef<THREE.DirectionalLight>(null);
   useEffect(() => {
@@ -628,9 +572,9 @@ function ReferenceStudioLighting() {
   return (
     <>
       <directionalLight ref={lightRef} color={0xffffff} intensity={0.55} position={[1.5, 8, 2]} castShadow />
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.12, 0]} receiveShadow>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.35, 0]} receiveShadow>
         <planeGeometry args={[12, 12]} />
-        <shadowMaterial transparent opacity={0.2} />
+        <shadowMaterial transparent opacity={0.13} />
       </mesh>
     </>
   );
@@ -663,8 +607,7 @@ function MotionAdaptiveProvider({
   }, [gl, size.height, size.width]);
 
   // At rest the ring is drawn at 1.5x resolution (capped at 2x) so edges and
-  // tiny stones come out smooth, the way leading jewelry viewers refine a still
-  // frame. Heavy scenes stay at the base resolution to protect the GPU.
+  // tiny stones come out smooth. Heavy scenes stay at the base resolution.
   const restDpr = heavyScene ? baseDpr : Math.min(2, baseDpr * 1.5);
   const exitMotion = useCallback(() => {
     if (!inMotionRef.current && Math.abs(appliedDprRef.current - restDpr) < 0.001) return;
@@ -2620,32 +2563,23 @@ function ReferenceGemMesh({
   onMeshDoubleClick?: (name: string, multi: boolean) => void;
   onMeshHover?: (name: string | null) => void;
 }) {
-  const { rawEnvironment: metalEnvironment } = React.useContext(ReferenceEnvironmentContext);
-  // Stones get their own bright studio, never the metal's: this is what keeps
-  // diamonds white and lively instead of grey.
-  const gemStudio = useGemStudio();
-  const rawEnvironment = gemStudio ?? metalEnvironment;
+  const { rawEnvironment } = React.useContext(ReferenceEnvironmentContext);
   const gemMaterial = useMemo(() => {
     const filter = new THREE.Color(materialSpec.color).lerp(
       new THREE.Color(materialSpec.atten ?? materialSpec.color),
-      materialSpec.atten === 0xffffff ? 0 : 0.75,
+      materialSpec.atten === 0xffffff ? 0 : 0.55,
     );
-    // Coloured stones need less light than diamonds or they wash out pastel.
-    const colourless = (materialSpec.atten ?? 0xffffff) === 0xffffff;
     const material = new THREE.ShaderMaterial({
       uniforms: {
         envMap: { value: rawEnvironment ?? referenceWhiteEnvironment },
         bvh: { value: referenceBvhFor(geometry) },
         modelMatrixInverse: { value: new THREE.Matrix4() },
-        bounces: { value: Math.min(6, Q.gemBounces) },
+        bounces: { value: 3 },
         ior: { value: materialSpec.ior ?? 1.5 },
         aberrationStrength: { value: materialSpec.disp ?? 0.008 },
         fresnel: { value: 0.25 },
         colorFactor: { value: filter },
-        envIntensity: { value: materialSpec.env ?? (colourless ? 1.2 : 0.6) },
-        boost: { value: new THREE.Vector3(...(materialSpec.boost ?? [1, 1, 1])) },
-        gammaFactor: { value: materialSpec.gamma ?? 1 },
-        reflectivity: { value: materialSpec.refl ?? 0.5 },
+        envIntensity: { value: 1.2 },
         selected: { value: 0 },
       },
       vertexShader: REFERENCE_GEM_VERTEX_SHADER,
@@ -2952,7 +2886,7 @@ const CADCanvas = forwardRef<CADCanvasHandle, CADCanvasProps>(
             alpha: false,
             preserveDrawingBuffer: true,
             toneMapping: THREE.CustomToneMapping,
-            toneMappingExposure: 0.97 * lightIntensity,
+            toneMappingExposure: 1.0 * lightIntensity,
             powerPreference: effectiveQ.tier === "low" ? "low-power" : "high-performance",
           }}
           dpr={baseDpr}
@@ -2962,7 +2896,7 @@ const CADCanvas = forwardRef<CADCanvasHandle, CADCanvasProps>(
           onCreated={({ gl }) => {
             installReferenceNeutralToneMapping();
             gl.toneMapping = THREE.CustomToneMapping;
-            gl.toneMappingExposure = 0.97 * lightIntensity;
+            gl.toneMappingExposure = 1.0 * lightIntensity;
             gl.outputColorSpace = THREE.SRGBColorSpace;
             gl.shadowMap.enabled = true;
             gl.shadowMap.type = THREE.PCFSoftShadowMap;

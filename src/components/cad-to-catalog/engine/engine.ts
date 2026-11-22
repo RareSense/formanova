@@ -69,7 +69,7 @@ export class CatalogEngine {
     this.holder.add(this.axis);
     this.scene.add(this.holder);
     this.look = new Look(this.renderer, this.scene, this.camera, () => this.refreshGems());
-    this.look.setStudio('diamond').catch((e) => console.warn(e));
+    this.look.setStudio('photo').catch((e) => console.warn(e));
     this.renderer.setAnimationLoop(() => {
       if (this.busy) return;
       if (this.controls.update()) this.needsRender = true;
