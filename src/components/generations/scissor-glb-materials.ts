@@ -1,3 +1,4 @@
+import { modelHasTextureMaps } from '@/lib/gltf-texture-maps';
 import * as THREE from 'three';
 
 export const HAS_EMBEDDED_GLTF_MATERIAL = '__historyHasEmbeddedGltfMaterial';
@@ -126,12 +127,22 @@ export function createHistoryFallbackMaterial(meshName: string): THREE.Material 
  * `forceJewelryPalette` overrides embedded materials (pipeline GLBs embed grey
  * clay), except on a file that marks its materials as authored. */
 export function applyHistoryPreviewMaterials(model: THREE.Object3D, forceJewelryPalette = false): void {
+  // Baked textures mean the file is authored even without the extras mark.
+  const textured: THREE.Material[] = [];
+  model.traverse((child) => {
+    const mesh = child as THREE.Mesh;
+    if (mesh.isMesh && mesh.userData[HAS_EMBEDDED_GLTF_MATERIAL] === true) {
+      textured.push(...(Array.isArray(mesh.material) ? mesh.material : [mesh.material]));
+    }
+  });
+  const authoredTextures = modelHasTextureMaps(textured);
   model.traverse((child) => {
     if (!(child as THREE.Mesh).isMesh) return;
 
     const mesh = child as THREE.Mesh;
     const keepEmbedded = forceJewelryPalette
       ? mesh.userData[HAS_AUTHORED_GLTF_MATERIAL] === true
+        || (authoredTextures && mesh.userData[HAS_EMBEDDED_GLTF_MATERIAL] === true)
       : mesh.userData[HAS_EMBEDDED_GLTF_MATERIAL] === true;
     if (keepEmbedded) {
       mesh.material = Array.isArray(mesh.material)
