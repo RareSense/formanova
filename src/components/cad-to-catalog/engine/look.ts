@@ -3,7 +3,7 @@
 // shading (GTAO), FormaNova's tone curve, and a backdrop that stays pure white.
 
 import * as THREE from 'three';
-import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
+import { loadEnvironment } from '@/lib/load-environment';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
@@ -14,10 +14,10 @@ import { installReferenceToneMapping } from './gems';
 export const STUDIOS = [
   { id: 'photo', name: 'Studio', url: 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/brown_photostudio_02_2k.hdr' },
   { id: 'softbox', name: 'Softboxes', url: '/hdri/jewelry-studio-v2.hdr' },
-  { id: 'diamond', name: 'Diamond', url: '/hdri/metal-studio-1k.hdr' },
+  { id: 'diamond', name: 'Diamond', url: '/hdri/ijewel-metal-068.exr' },
 ] as const;
 export type StudioId = (typeof STUDIOS)[number]['id'];
-const GEM_ENV_URL = '/hdri/gem-studio-1k.hdr';
+const GEM_ENV_URL = '/hdri/ijewel-gem-004.exr';
 
 export type Backdrop = 'view' | 'white' | 'clear';
 // RenderPass / ShaderPass draw into the read buffer they are given; the write buffer is unused.
@@ -72,8 +72,7 @@ export class Look {
     scene.add(this.floor);
     scene.background = this.viewBackdrop();
 
-    new RGBELoader().loadAsync(GEM_ENV_URL).then((t) => {
-      t.mapping = THREE.EquirectangularReflectionMapping;
+    loadEnvironment(GEM_ENV_URL).then((t) => {
       this.gemEnv = t;
       this.onChange();
     }).catch((e) => console.warn('studio light for stones not loaded', e));
@@ -86,8 +85,7 @@ export class Look {
     const st = STUDIOS.find((x) => x.id === id) || STUDIOS[0];
     this.studioId = st.id;
     if (!this.studioMaps.has(st.id)) {
-      this.studioMaps.set(st.id, new RGBELoader().loadAsync(st.url).then((t) => {
-        t.mapping = THREE.EquirectangularReflectionMapping;
+      this.studioMaps.set(st.id, loadEnvironment(st.url).then((t) => {
         return this.pmrem.fromEquirectangular(t).texture;
       }));
     }
