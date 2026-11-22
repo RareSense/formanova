@@ -84,7 +84,7 @@ const REFERENCE_MATERIALS: Record<string, ReferenceMaterialSpec> = {
   wax:          { label: "Casting Wax", kind: "pearl", color: 0x1f6e44 },
   stoneBlue:    { label: "Stone Blue", kind: "metal", color: 0x3f6fc4, rough: 0.22 },
 
-  diamond:      { label: "Diamond", kind: "gem", color: 0xffffff, atten: 0xffffff, ior: 2.6, disp: 0.012 },
+  diamond:      { label: "Diamond", kind: "gem", color: 0xffffff, atten: 0xffffff, ior: 2.42, disp: 0.012 },
   champagne:    { label: "Champagne", kind: "gem", color: 0xf6e3bd, atten: 0xc89a4e, ior: 2.42, disp: 0.016 },
   ruby:         { label: "Ruby", kind: "gem", color: 0xe14276, atten: 0x9e0f34, ior: 1.76 },
   sapphire:     { label: "Sapphire", kind: "gem", color: 0x649dc4, atten: 0x0c2f9e, ior: 1.76 },
@@ -570,7 +570,7 @@ function ReferenceStudioEnvironment({ children }: { children: React.ReactNode })
 let gemStudioPromise: Promise<THREE.Texture> | null = null;
 function loadGemStudio(): Promise<THREE.Texture> {
   if (!gemStudioPromise) {
-    gemStudioPromise = new RGBELoader().loadAsync("/hdri/gem-sparkle-1k.hdr").then((t) => {
+    gemStudioPromise = new RGBELoader().loadAsync("/hdri/gem-studio-1k.hdr").then((t) => {
       t.mapping = THREE.EquirectangularReflectionMapping;
       return t;
     });
@@ -2624,7 +2624,7 @@ function ReferenceGemMesh({
         aberrationStrength: { value: materialSpec.disp ?? 0.008 },
         fresnel: { value: 0.25 },
         colorFactor: { value: filter },
-        envIntensity: { value: colourless ? 1.2 : 1.0 },
+        envIntensity: { value: colourless ? 0.75 : 0.6 },
         selected: { value: 0 },
       },
       vertexShader: REFERENCE_GEM_VERTEX_SHADER,
