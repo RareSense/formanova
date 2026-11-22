@@ -65,14 +65,6 @@ interface ReferenceMaterialSpec {
   atten?: number;
   ior?: number;
   disp?: number;
-  /** Per-channel multiplier on light leaving the stone (default 1). */
-  boost?: [number, number, number];
-  /** Mid-tone lift inside the stone (default 1). */
-  gamma?: number;
-  /** Surface reflection strength, 0.5 = physical Fresnel (default 0.5). */
-  refl?: number;
-  /** Light brightness inside the stone (overrides the default). */
-  env?: number;
   sheen?: number;
   irid?: number;
   opal?: boolean;
@@ -92,7 +84,7 @@ const REFERENCE_MATERIALS: Record<string, ReferenceMaterialSpec> = {
   wax:          { label: "Casting Wax", kind: "pearl", color: 0x1f6e44 },
   stoneBlue:    { label: "Stone Blue", kind: "metal", color: 0x3f6fc4, rough: 0.22 },
 
-  diamond:      { label: "Diamond", kind: "gem", color: 0xffffff, atten: 0xffffff, ior: 2.4, disp: 0.012, env: 1.5, boost: [2, 2, 2], gamma: 1.09, refl: 0.46 },
+  diamond:      { label: "Diamond", kind: "gem", color: 0xffffff, atten: 0xffffff, ior: 2.42, disp: 0.012 },
   champagne:    { label: "Champagne", kind: "gem", color: 0xf6e3bd, atten: 0xc89a4e, ior: 2.42, disp: 0.016 },
   ruby:         { label: "Ruby", kind: "gem", color: 0xe14276, atten: 0x9e0f34, ior: 1.76 },
   sapphire:     { label: "Sapphire", kind: "gem", color: 0x649dc4, atten: 0x0c2f9e, ior: 1.76 },
@@ -294,9 +286,6 @@ uniform float aberrationStrength;
 uniform vec3 colorFactor;
 uniform float envIntensity;
 uniform float selected;
-uniform vec3 boost;
-uniform float gammaFactor;
-uniform float reflectivity;
 
 vec3 sampleEnv(vec3 dir){
   vec2 uv=vec2(atan(dir.z,dir.x)*0.1591549431+0.5,asin(clamp(dir.y,-1.0,1.0))*0.3183098862+0.5);
@@ -334,15 +323,12 @@ void main(){
   }else{
     col=sampleEnv(dG);
   }
-  // Light leaving through the crown: gamma lifts the mid-tones, boost scales it
-  // per channel (the controls jewelry viewers expose as gammaFactor/boostFactors).
-  col=pow(max(col,0.0),vec3(1.0/max(gammaFactor,0.01)))*boost;
   col*=envIntensity*colorFactor;
   vec3 reflDir=reflect(viewDirection,vNormal);
   vec3 reflCol=sampleEnv(reflDir)*envIntensity;
   float cosT=clamp(-dot(viewDirection,vNormal),0.0,1.0);
   float F0=pow((ior-1.0)/(ior+1.0),2.0);
-  float F=clamp((F0+(1.0-F0)*pow(1.0-cosT,5.0))*reflectivity*2.0,0.0,1.0);
+  float F=F0+(1.0-F0)*pow(1.0-cosT,5.0);
   col=mix(col,reflCol,F);
   float f=pow(max(0.0,1.0+dot(viewDirection,vNormal)),10.0)*fresnel;
   col=mix(col,vec3(1.0),f);
@@ -584,7 +570,7 @@ function ReferenceStudioEnvironment({ children }: { children: React.ReactNode })
 let gemStudioPromise: Promise<THREE.Texture> | null = null;
 function loadGemStudio(): Promise<THREE.Texture> {
   if (!gemStudioPromise) {
-    gemStudioPromise = new RGBELoader().loadAsync("/hdri/gem-sparkle-1k.hdr").then((t) => {
+    gemStudioPromise = new RGBELoader().loadAsync("/hdri/gem-studio-1k.hdr").then((t) => {
       t.mapping = THREE.EquirectangularReflectionMapping;
       return t;
     });
@@ -2638,10 +2624,7 @@ function ReferenceGemMesh({
         aberrationStrength: { value: materialSpec.disp ?? 0.008 },
         fresnel: { value: 0.25 },
         colorFactor: { value: filter },
-        envIntensity: { value: materialSpec.env ?? (colourless ? 0.75 : 0.6) },
-        boost: { value: new THREE.Vector3(...(materialSpec.boost ?? [1, 1, 1])) },
-        gammaFactor: { value: materialSpec.gamma ?? 1 },
-        reflectivity: { value: materialSpec.refl ?? 0.5 },
+        envIntensity: { value: colourless ? 0.75 : 0.6 },
         selected: { value: 0 },
       },
       vertexShader: REFERENCE_GEM_VERTEX_SHADER,
