@@ -27,9 +27,6 @@ vec3 jewelGrade( vec3 c ) {
   return max( mix( vec3( y ), l, 1.04 ), 0.0 );
 }
 vec3 CustomToneMapping( vec3 color ) {
-  // ACES Filmic (three's curve, as the reference jewelry viewer uses), then the
-  // jewelry grade. The neutral curve below is kept only as the install marker.
-  return jewelGrade( ACESFilmicToneMapping( color ) );
   const float StartCompression = 0.8 - 0.04;
   const float Desaturation = 0.15;
   color *= toneMappingExposure;
