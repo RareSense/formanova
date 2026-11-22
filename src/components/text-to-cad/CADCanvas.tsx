@@ -93,7 +93,7 @@ const REFERENCE_MATERIALS: Record<string, ReferenceMaterialSpec> = {
   wax:          { label: "Casting Wax", kind: "pearl", color: 0x1f6e44 },
   stoneBlue:    { label: "Stone Blue", kind: "metal", color: 0x3f6fc4, rough: 0.22 },
 
-  diamond:      { label: "Diamond", kind: "gem", color: 0xffffff, atten: 0xffffff, ior: 2.4, disp: 0.004, env: 0.6, boost: [2, 2, 2], gamma: 1.09, refl: 0.46 },
+  diamond:      { label: "Diamond", kind: "gem", color: 0xffffff, atten: 0xffffff, ior: 2.4, disp: 0.004, env: 1.5, boost: [2, 2, 2], gamma: 1.09, refl: 0.46 },
   champagne:    { label: "Champagne", kind: "gem", color: 0xf6e3bd, atten: 0xc89a4e, ior: 2.42, disp: 0.016 },
   ruby:         { label: "Ruby", kind: "gem", color: 0xe14276, atten: 0x9e0f34, ior: 1.76 },
   sapphire:     { label: "Sapphire", kind: "gem", color: 0x649dc4, atten: 0x0c2f9e, ior: 1.76 },
@@ -2639,7 +2639,7 @@ function ReferenceGemMesh({
         aberrationStrength: { value: materialSpec.disp ?? 0.008 },
         fresnel: { value: 0.25 },
         colorFactor: { value: filter },
-        envIntensity: { value: materialSpec.env ?? (colourless ? 1.2 : 0.6) },
+        envIntensity: { value: materialSpec.env ?? (colourless ? 1.5 : 1.0) },
         boost: { value: new THREE.Vector3(...(materialSpec.boost ?? [1, 1, 1])) },
         gammaFactor: { value: materialSpec.gamma ?? 1 },
         reflectivity: { value: materialSpec.refl ?? 0.5 },
