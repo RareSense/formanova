@@ -117,7 +117,7 @@ export function createHistoryFallbackMaterial(meshName: string): THREE.Material 
     metalness: 1,
     roughness: 0,
     // CADCanvas REFERENCE_BASE_ENV.metal.
-    envMapIntensity: 1.15,
+    envMapIntensity: 1.0,
     side: THREE.DoubleSide,
   });
 }

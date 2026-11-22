@@ -125,7 +125,7 @@ export function isStoneLook(key: string | null): boolean {
   return REFERENCE_MATERIALS[key]?.kind !== "metal";
 }
 
-const REFERENCE_BASE_ENV = { metal: 1.15, gem: 2.3, pearl: 1.1 } as const;
+const REFERENCE_BASE_ENV = { metal: 1.0, gem: 2.3, pearl: 1.1 } as const;
 const REFERENCE_ENVIRONMENTS = {
   room: null,
   photostudio: "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/brown_photostudio_02_1k.hdr",
