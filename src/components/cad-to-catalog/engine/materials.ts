@@ -35,7 +35,7 @@ export const METALS: Preset[] = [
   { id: 'gold-brushed', name: 'Brushed Gold', color: '#ffd88a', roughness: 0.3 },
   { id: 'silver-brushed', name: 'Brushed Silver', color: '#fbfaf6', roughness: 0.25 },
   { id: 'rhodium-black', name: 'Black Rhodium', color: '#3b3b40', roughness: 0.28 },
-].map((m) => ({ ...m, kind: 'metal' as const, env: 1.0 }));
+].map((m) => ({ ...m, kind: 'metal' as const, env: 0.55 }));
 
 const REF_GEM: Record<string, GemSpec> = {
   diamond: { color: 0xffffff, atten: 0xffffff, ior: 2.4, disp: 0.004 },
