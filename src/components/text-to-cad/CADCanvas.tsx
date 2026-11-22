@@ -2227,6 +2227,8 @@ const LoadedModel = forwardRef<
     const standard: (MeshData & { material: THREE.Material; isSelected: boolean })[] = [];
     const gems: { meshData: MeshData; materialSpec: ReferenceMaterialSpec; materialKey: string; isSelected: boolean }[] = [];
     let refractionGemCount = 0;
+    // A textured GLB is shown as authored: unassigned meshes keep their own material.
+    const keepAuthored = modelHasTextureMaps(meshDataList.map((m) => m.originalMaterial));
 
     meshDataList.forEach((md) => {
       // Skip hidden meshes entirely
@@ -2234,7 +2236,7 @@ const LoadedModel = forwardRef<
 
       const isSelected = selectedMeshNames.has(md.name);
       const assigned = assignedMaterials[md.name];
-      const referenceKey = referenceKeyForMaterial(assigned, md.name);
+      const referenceKey = !assigned && keepAuthored ? null : referenceKeyForMaterial(assigned, md.name);
       const referenceSpec = referenceKey ? REFERENCE_MATERIALS[referenceKey] : undefined;
 
       // Selection highlight — show blue overlay when selected, UNLESS the user
