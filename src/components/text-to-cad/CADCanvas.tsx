@@ -6,10 +6,11 @@ import {
   GizmoHelper,
   GizmoViewport,
 } from "@react-three/drei";
-import { OrbitControls as OrbitControlsImpl, RGBELoader } from "three-stdlib";
+import { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { loadEnvironment, IJEWEL_GEM_LIGHT, IJEWEL_METAL_LIGHT } from "@/lib/load-environment";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 
@@ -81,9 +82,9 @@ interface ReferenceMaterialSpec {
 
 // Exact material constants from the approved standalone reference.
 const REFERENCE_MATERIALS: Record<string, ReferenceMaterialSpec> = {
-  gold18k:      { label: "Yellow Gold", kind: "metal", color: 0xecc895, rough: 0.05 },
-  roseGold:     { label: "Rose Gold", kind: "metal", color: 0xf9d8be, rough: 0.05 },
-  whiteGold:    { label: "White Gold", kind: "metal", color: 0xe2e2e3, rough: 0.05 },
+  gold18k:      { label: "Yellow Gold", kind: "metal", color: 0xe5b377, rough: 0 },
+  roseGold:     { label: "Rose Gold", kind: "metal", color: 0xf2af83, rough: 0 },
+  whiteGold:    { label: "White Gold", kind: "metal", color: 0xc2c2c3, rough: 0 },
   platinum:     { label: "Platinum", kind: "metal", color: 0xe9e9e7, rough: 0.11 },
   silver:       { label: "Silver", kind: "metal", color: 0xfbfaf6, rough: 0.05 },
   blackRhodium: { label: "Black Rhodium", kind: "metal", color: 0x3b3b40, rough: 0.28 },
@@ -92,7 +93,7 @@ const REFERENCE_MATERIALS: Record<string, ReferenceMaterialSpec> = {
   wax:          { label: "Casting Wax", kind: "pearl", color: 0x1f6e44 },
   stoneBlue:    { label: "Stone Blue", kind: "metal", color: 0x3f6fc4, rough: 0.22 },
 
-  diamond:      { label: "Diamond", kind: "gem", color: 0xffffff, atten: 0xffffff, ior: 2.4, disp: 0.004, env: 0.3, boost: [2, 2, 2], gamma: 1.09, refl: 0.46 },
+  diamond:      { label: "Diamond", kind: "gem", color: 0xffffff, atten: 0xffffff, ior: 2.4, disp: 0.004, env: 1.5, boost: [2, 2, 2], gamma: 1.09, refl: 0.46 },
   champagne:    { label: "Champagne", kind: "gem", color: 0xf6e3bd, atten: 0xc89a4e, ior: 2.42, disp: 0.016 },
   ruby:         { label: "Ruby", kind: "gem", color: 0xe14276, atten: 0x9e0f34, ior: 1.76 },
   sapphire:     { label: "Sapphire", kind: "gem", color: 0x649dc4, atten: 0x0c2f9e, ior: 1.76 },
@@ -124,7 +125,7 @@ export function isStoneLook(key: string | null): boolean {
   return REFERENCE_MATERIALS[key]?.kind !== "metal";
 }
 
-const REFERENCE_BASE_ENV = { metal: 1.5, gem: 2.3, pearl: 1.1 } as const;
+const REFERENCE_BASE_ENV = { metal: 1.0, gem: 2.3, pearl: 1.1 } as const;
 const REFERENCE_ENVIRONMENTS = {
   room: null,
   photostudio: "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/brown_photostudio_02_1k.hdr",
@@ -133,7 +134,7 @@ const REFERENCE_ENVIRONMENTS = {
   diamond: "/hdri/gem-studio-1k.hdr",
   // Our own softbox studio for metal: bright everywhere (no dark bars to mirror
   // as black stripes on polished bands), three soft boxes for the shine lines.
-  metal: "/hdri/metal-studio-1k.hdr",
+  metal: IJEWEL_METAL_LIGHT,
   sunset: "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r180/examples/textures/equirectangular/venice_sunset_1k.hdr",
 } as const;
 type ReferenceEnvironmentKey = keyof typeof REFERENCE_ENVIRONMENTS;
@@ -535,9 +536,7 @@ function ReferenceStudioEnvironment({ children }: { children: React.ReactNode })
 
     const sourceUrl = REFERENCE_ENVIRONMENTS[environmentKey];
     if (sourceUrl) {
-      const loader = new RGBELoader();
-      loader.load(
-        sourceUrl,
+      loadEnvironment(sourceUrl).then(
         (texture) => {
           if (disposed) {
             texture.dispose();
@@ -552,7 +551,6 @@ function ReferenceStudioEnvironment({ children }: { children: React.ReactNode })
           setRawEnvironment(texture);
           inv();
         },
-        undefined,
         (error) => {
           console.error(`[CADCanvas] Failed to load ${environmentKey} environment; using Soft Studio`, error);
           if (!disposed) {
@@ -587,7 +585,7 @@ function ReferenceStudioEnvironment({ children }: { children: React.ReactNode })
 let gemStudioPromise: Promise<THREE.Texture> | null = null;
 function loadGemStudio(): Promise<THREE.Texture> {
   if (!gemStudioPromise) {
-    gemStudioPromise = new RGBELoader().loadAsync("/hdri/gem-panels-1k.hdr").then((t) => {
+    gemStudioPromise = loadEnvironment(IJEWEL_GEM_LIGHT).then((t) => {
       t.mapping = THREE.EquirectangularReflectionMapping;
       return t;
     });
@@ -2641,7 +2639,7 @@ function ReferenceGemMesh({
         aberrationStrength: { value: materialSpec.disp ?? 0.008 },
         fresnel: { value: 0.25 },
         colorFactor: { value: filter },
-        envIntensity: { value: materialSpec.env ?? (colourless ? 0.75 : 0.6) },
+        envIntensity: { value: materialSpec.env ?? (colourless ? 1.5 : 1.0) },
         boost: { value: new THREE.Vector3(...(materialSpec.boost ?? [1, 1, 1])) },
         gammaFactor: { value: materialSpec.gamma ?? 1 },
         reflectivity: { value: materialSpec.refl ?? 0.5 },

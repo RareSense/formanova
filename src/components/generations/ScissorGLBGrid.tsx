@@ -26,7 +26,7 @@ import { applyNeutralToneMapping, makeStudioBackdrop, STUDIO_ENVIRONMENT_HDR } f
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
-import { RGBELoader } from 'three-stdlib';
+import { loadEnvironment } from '@/lib/load-environment';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Box } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
@@ -152,9 +152,7 @@ export function ScissorGLBGrid({ children, continuous = true }: ScissorGLBGridPr
     pmrem.dispose();
 
     // Preload HDRI environment
-    const rgbeLoader = new RGBELoader();
-    rgbeLoader.load(STUDIO_ENVIRONMENT_HDR, (texture) => {
-      texture.mapping = THREE.EquirectangularReflectionMapping;
+    loadEnvironment(STUDIO_ENVIRONMENT_HDR).then((texture) => {
       envMapRef.current = texture;
       for (const card of cardsRef.current.values()) {
         card.scene.environment = texture;
