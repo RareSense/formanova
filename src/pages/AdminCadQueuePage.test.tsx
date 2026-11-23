@@ -59,7 +59,7 @@ describe('AdminCadQueuePage', () => {
     expect(tableCalls()[0].phases).toEqual(['queued', 'errored', 'awaiting_review', 'rejected', 'running', 'finalizing']);
     expect(await screen.findByText('Nothing waiting. The queue is clear.')).toBeTruthy();
     const tabs = screen.getAllByRole('tab');
-    expect(tabs.map((tab) => tab.textContent?.replace(/\d+$/, ''))).toEqual(['All open', 'To start', 'To review', 'Running', 'Done']);
+    expect(tabs.map((tab) => tab.textContent?.replace(/\d+$/, ''))).toEqual(['All open', 'To start', 'To review', 'Running', 'Done', 'All']);
     expect(screen.getByRole('tab', { name: /All open/ }).getAttribute('aria-selected')).toBe('true');
   });
 
@@ -79,6 +79,15 @@ describe('AdminCadQueuePage', () => {
     first.unmount();
     renderPage('/admin/cad-queue?tab=start');
     await waitFor(() => expect(tableCalls().at(-1)!.phases).toEqual(['queued', 'errored']));
+  });
+
+  it('All (tab=all, from the Rhino Users page) asks for every phase, delivered and failed too', async () => {
+    api.listSupervisedRuns.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
+    renderPage('/admin/cad-queue?tab=all&search=user1%40b.co');
+    await waitFor(() => expect(tableCalls().length).toBeGreaterThan(0));
+    expect(tableCalls().at(-1)!.phases).toEqual(
+      ['queued', 'errored', 'awaiting_review', 'rejected', 'running', 'finalizing', 'delivered', 'failed']);
+    expect(screen.getByRole('tab', { name: /^All( \d+)?$/ }).getAttribute('aria-selected')).toBe('true');
   });
 
   it('shows a live count on every tab, not just the open one', async () => {
