@@ -18,7 +18,7 @@ function refUrl(ref: unknown): string | null {
   return typeof uri === 'string' && uri.startsWith('azure://') ? azureUriToUrl(uri) || null : null;
 }
 
-function downloadUrl(urls: Record<string, string> | undefined, role: string): string | null {
+export function downloadUrl(urls: Record<string, string> | undefined, role: string): string | null {
   const url = urls?.[role];
   return url ? azureUriToUrl(url) || url : null;
 }
