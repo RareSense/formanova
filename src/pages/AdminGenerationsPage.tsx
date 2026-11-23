@@ -130,6 +130,9 @@ export default function AdminGenerationsPage() {
   const userType = searchParams.get('user_type') ?? '';
   const isPaying = searchParams.get('is_paying') ?? '';
   const client = CLIENT_OPTIONS.find((o) => o.value === searchParams.get('client'))?.value ?? '';
+  // Default list hides supervised runs (they live in the supervision queue).
+  // `supervised=any` (used by the Rhino Users page) includes them: Rhino CAD runs are supervised.
+  const includeSupervised = searchParams.get('supervised') === 'any';
   const offset = Number(searchParams.get('offset') ?? '0') || 0;
   const trimmedSearch = search.trim();
   const hasSearch = trimmedSearch.length > 0;
@@ -150,11 +153,11 @@ export default function AdminGenerationsPage() {
   }, [searchInput]);
 
   const query = useQuery({
-    queryKey: ['admin-generations', { status, search, searchField, hasFeedback, userType, isPaying, client, offset }],
+    queryKey: ['admin-generations', { status, search, searchField, hasFeedback, userType, isPaying, client, includeSupervised, offset }],
     queryFn: () => listAdminGenerations({
       limit: PAGE_SIZE,
       offset,
-      supervised: false,
+      supervised: includeSupervised ? undefined : false,
       status: status || undefined,
       user_email: hasSearch && searchField === 'email' ? trimmedSearch : undefined,
       workflow_name: hasSearch && searchField === 'workflow' ? trimmedSearch : undefined,
@@ -200,8 +203,8 @@ export default function AdminGenerationsPage() {
   }
 
   const hasFilters = useMemo(
-    () => Boolean(status || search || hasFeedback || userType || isPaying || client),
-    [status, search, hasFeedback, userType, isPaying, client],
+    () => Boolean(status || search || hasFeedback || userType || isPaying || client || includeSupervised),
+    [status, search, hasFeedback, userType, isPaying, client, includeSupervised],
   );
 
   function openDetail(item: AdminGenerationListItem) {

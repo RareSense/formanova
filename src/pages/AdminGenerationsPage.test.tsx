@@ -25,6 +25,21 @@ describe('AdminGenerationsPage', () => {
     await waitFor(() => expect(listAdminGenerations).toHaveBeenCalled());
     expect(listAdminGenerations).toHaveBeenCalledWith(expect.objectContaining({ supervised: false }));
   });
+
+  it('includes supervised runs with supervised=any (Rhino Users "View Runs")', async () => {
+    listAdminGenerations.mockClear();
+    listAdminGenerations.mockResolvedValue({ items: [], total: 0, limit: 20, offset: 0 });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={['/admin/generations?client=rhino&search=a%40b.co&supervised=any']}>
+          <AdminGenerationsPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(listAdminGenerations).toHaveBeenCalled());
+    expect(listAdminGenerations).toHaveBeenCalledWith(expect.objectContaining({ supervised: undefined, client: 'rhino' }));
+  });
 });
 
 describe('AdminGenerationsPage cost columns', () => {
