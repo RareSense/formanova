@@ -51,8 +51,8 @@ describe('CadDownloadMenu', () => {
     openMenu();
     await screen.findByText('(full editable model, for your CAD technician to fix anything that\'s off)');
     expect(menuRows()).toEqual([
-      'GLB(3D preview for your phone, browser or AR)',
       '3DM(full editable model, for your CAD technician to fix anything that\'s off)',
+      'GLB(3D preview for your phone, browser or AR)',
       '3DM(simple copy to look at in any 3D program, not for editing)',
       'STEP(opens in any CAD program, for your CAD technician or manufacturer)',
       'STL(metal and stones together, to preview or 3D print a sample)',
@@ -90,7 +90,7 @@ describe('CadDownloadMenu', () => {
 
     openMenu();
     await screen.findByText('(full editable model, for your CAD technician to fix anything that\'s off)');
-    expect(menuRows()).toEqual(['GLB(3D preview for your phone, browser or AR)', '3DM(full editable model, for your CAD technician to fix anything that\'s off)']);
+    expect(menuRows()).toEqual(['3DM(full editable model, for your CAD technician to fix anything that\'s off)', 'GLB(3D preview for your phone, browser or AR)']);
   });
 
   it('offers the edited export only once there is an edit', async () => {
@@ -187,7 +187,7 @@ describe('CadDownloadMenu: files from the version', () => {
     expect(screen.queryByText(LABELS.stl)).toBeNull();
     expect(screen.queryByText(LABELS.step)).toBeNull();
     const rows = menuRows();
-    expect(rows.slice(0, 2)).toEqual(['GLB(3D preview for your phone, browser or AR)', '3DM(full editable model, for your CAD technician to fix anything that\'s off)']);
+    expect(rows.slice(0, 2)).toEqual(['3DM(full editable model, for your CAD technician to fix anything that\'s off)', 'GLB(3D preview for your phone, browser or AR)']);
     expect(rows).toHaveLength(4);
   });
 
