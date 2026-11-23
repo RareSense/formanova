@@ -1,6 +1,6 @@
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 
-export type CadArtifactKind = 'glb' | '3dm' | 'stl' | 'step';
+export type CadArtifactKind = 'glb' | '3dm' | 'stl' | 'step' | 'file';
 
 interface CadArtifactUrls {
   glb_url?: string | null;
@@ -18,6 +18,8 @@ export function selectCadArtifactUrl(
 
 export async function isExpectedCadArtifact(blob: Blob, kind: CadArtifactKind): Promise<boolean> {
   if (blob.size === 0) return false;
+  // Stone lists, PDFs, scripts: no format check beyond not being empty.
+  if (kind === 'file') return true;
 
   const prefix = blob.slice(0, Math.min(blob.size, 84));
   const buffer = await new Promise<ArrayBuffer>((resolve, reject) => {

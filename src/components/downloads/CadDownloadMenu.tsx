@@ -24,6 +24,7 @@ import {
 import { cn } from '@/lib/utils';
 import type { CadSource } from '@/lib/cad-analytics';
 import type { CadDownloadKind, CadVersionDownload } from '@/lib/cad-versions-api';
+import { DOWNLOAD_NOTES } from '@/components/downloads/download-notes';
 import { saveVersionFile } from '@/lib/cad-version-file';
 
 /**
@@ -141,14 +142,14 @@ interface FormatRow {
   note?: string;
 }
 
-/** What each version file is called in the list. The 3DM keeps the Rhino hint used above. */
+/** What each version file is called in the list. */
 const VERSION_FILE_LABELS: Record<CadDownloadKind, string> = {
-  threedm: 'Rhino, editable',
-  stl: 'Full model STL – with stones, for viewing and CAD',
-  step: 'Full model STEP – with stones, for viewing and CAD',
-  casting_stl: 'Casting STL – send to your caster',
-  stones: 'Stone list',
-  spec_sheet: 'Spec sheet – for jeweller review',
+  threedm: DOWNLOAD_NOTES.threedm,
+  stl: DOWNLOAD_NOTES.stl,
+  step: DOWNLOAD_NOTES.step,
+  casting_stl: DOWNLOAD_NOTES.casting_stl,
+  stones: DOWNLOAD_NOTES.stones,
+  spec_sheet: DOWNLOAD_NOTES.spec_sheet,
 };
 
 /**
@@ -226,11 +227,11 @@ export function CadDownloadMenu({
   // Fixed order: the editable file first, then preview, viewer copy, and the
   // exchange formats. Only formats this run actually has are listed.
   const formats: FormatRow[] = [];
-  if (onDownloadThreedm) formats.push({ format: '3DM', hint: 'Rhino, editable', onSelect: onDownloadThreedm });
-  if (onDownloadGlb) formats.push({ format: 'GLB', hint: '3D preview', onSelect: onDownloadGlb });
-  if (onDownloadViewerThreedm) formats.push({ format: '3DM', hint: 'Viewer only (mesh)', onSelect: onDownloadViewerThreedm });
-  if (onDownloadStep && !versionKinds.has('step')) formats.push({ format: 'STEP', hint: 'Other CAD software', onSelect: onDownloadStep });
-  if (onDownloadStl && !versionKinds.has('stl')) formats.push({ format: 'STL', hint: '3D printing', onSelect: onDownloadStl });
+  if (onDownloadThreedm) formats.push({ format: '3DM', hint: DOWNLOAD_NOTES.threedm, onSelect: onDownloadThreedm });
+  if (onDownloadGlb) formats.push({ format: 'GLB', hint: DOWNLOAD_NOTES.glb, onSelect: onDownloadGlb });
+  if (onDownloadViewerThreedm) formats.push({ format: '3DM', hint: DOWNLOAD_NOTES.viewer_threedm, onSelect: onDownloadViewerThreedm });
+  if (onDownloadStep && !versionKinds.has('step')) formats.push({ format: 'STEP', hint: DOWNLOAD_NOTES.step, onSelect: onDownloadStep });
+  if (onDownloadStl && !versionKinds.has('stl')) formats.push({ format: 'STL', hint: DOWNLOAD_NOTES.stl, onSelect: onDownloadStl });
   // The version's own files follow, one item per kind. Today's Rhino item
   // stays the 3DM whenever it exists.
   for (const kind of versionFiles) {
