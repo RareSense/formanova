@@ -94,7 +94,7 @@ describe('AdminRhinoUsersPage', () => {
     });
     renderAt();
     fireEvent.click(await screen.findByText('user1@b.co'));
-    expect(screen.getByTestId('where').textContent).toBe('/admin/generations?client=rhino&search=user1%40b.co');
+    expect(screen.getByTestId('where').textContent).toBe('/admin/generations?client=rhino&search=user1%40b.co&supervised=any');
   });
 
   it('shows the empty state', async () => {

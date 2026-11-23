@@ -105,8 +105,9 @@ export default function AdminRhinoUsersPage() {
   }
 
   // Generations has no user-id filter; its email search is the closest match.
+  // Rhino CAD runs are supervised, so the default supervised=false list would be empty.
   function openRuns(item: AdminRhinoUser) {
-    const qs = new URLSearchParams({ client: 'rhino', search: item.user_email });
+    const qs = new URLSearchParams({ client: 'rhino', search: item.user_email, supervised: 'any' });
     navigate(`/admin/generations?${qs.toString()}`);
   }
 
