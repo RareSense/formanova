@@ -11,9 +11,15 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ImageOff, Loader2 } from 'lucide-react';
+import { ChevronDown, Download, ImageOff, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { GLBPreviewSlot, ScissorGLBGrid } from '@/components/generations/ScissorGLBGrid';
 import { downloadCadArtifact } from '@/lib/cad-artifact-download';
@@ -25,17 +31,14 @@ import type { SupervisedRunDetail } from '@/lib/supervised-runs-api';
 
 /** Every file role the admin can fetch, in list order: label, file extension, how the download is checked. */
 const FILE_ROLES: { role: keyof typeof DOWNLOAD_NOTES; label: string; ext: string; kind: CadArtifactKind }[] = [
+  { role: 'glb', label: 'GLB', ext: 'glb', kind: 'glb' },
   { role: 'threedm', label: '3DM', ext: '3dm', kind: '3dm' },
   { role: 'viewer_threedm', label: 'Viewer 3DM', ext: 'viewer.3dm', kind: '3dm' },
-  { role: 'glb', label: 'GLB', ext: 'glb', kind: 'glb' },
   { role: 'step', label: 'STEP', ext: 'step', kind: 'step' },
   { role: 'casting_stl', label: 'Casting STL', ext: 'casting.stl', kind: 'stl' },
   { role: 'stl', label: 'Full STL', ext: 'stl', kind: 'stl' },
   { role: 'stones', label: 'Stones list', ext: 'stones.csv', kind: 'file' },
   { role: 'spec_sheet', label: 'Spec sheet PDF', ext: 'pdf', kind: 'file' },
-  { role: 'code', label: 'Code', ext: 'py', kind: 'file' },
-  { role: 'design_contract', label: 'Design contract', ext: 'json', kind: 'file' },
-  { role: 'thumbnail', label: 'Thumbnail', ext: 'png', kind: 'file' },
 ];
 
 const SOURCE_TEXT: Record<string, string> = {
@@ -117,14 +120,23 @@ export default function SupervisedDeliveredCard({ workflowId, detail, title = 'W
         )}
         {files.length > 0 && (
           <div className="space-y-2">
-            {files.map((file) => (
-              <div key={file.role} className="flex flex-wrap items-center gap-3">
-                <Button variant="outline" className="w-44 px-4" disabled={downloading} onClick={() => void download(file)}>
-                  Download {file.label}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild disabled={downloading}>
+                <Button variant="outline" className="gap-2 px-4" disabled={downloading} data-testid="delivered-download-menu">
+                  <Download aria-hidden="true" className="h-3.5 w-3.5" />
+                  Download
+                  <ChevronDown aria-hidden="true" className="h-3.5 w-3.5 opacity-70" />
                 </Button>
-                <span className="text-sm text-muted-foreground">{DOWNLOAD_NOTES[file.role]}</span>
-              </div>
-            ))}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="min-w-[15rem]">
+                {files.map((file) => (
+                  <DropdownMenuItem key={file.role} onSelect={() => void download(file)} className="gap-3 py-2">
+                    <span className="w-24 shrink-0 font-mono text-[11px] font-semibold uppercase tracking-wider">{file.label}</span>
+                    <span className="text-[12px] text-muted-foreground">{DOWNLOAD_NOTES[file.role]}</span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             {error && <p className="break-words text-sm text-destructive" role="alert">Couldn't download that file.</p>}
           </div>
         )}

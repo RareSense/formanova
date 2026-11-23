@@ -89,7 +89,7 @@ describe('metal weight on the result screen', () => {
     expect(screen.queryByText(/Weight not available/)).toBeNull();
     expect(screen.getByTestId('tag')).toBeEmptyDOMElement();
     openDownloads();
-    await screen.findByText('3D preview');
+    await screen.findByText('(3D preview for your phone, browser or AR)');
     expect(screen.queryByText(/ g \(.* dwt\)$/)).toBeNull();
   });
 });

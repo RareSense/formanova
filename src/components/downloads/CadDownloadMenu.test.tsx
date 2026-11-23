@@ -33,7 +33,7 @@ describe('CadDownloadMenu', () => {
     render(<CadDownloadMenu onDownloadThreedm={onDownloadThreedm} onDownloadGlb={noop} />);
 
     openMenu();
-    await screen.findByText('(full editable model - ask your CAD designer to change sizes or stones)');
+    await screen.findByText('(full editable model, for your CAD technician to fix anything that\'s off)');
     expect(onDownloadThreedm).not.toHaveBeenCalled();
   });
 
@@ -49,24 +49,24 @@ describe('CadDownloadMenu', () => {
     );
 
     openMenu();
-    await screen.findByText('(full editable model - ask your CAD designer to change sizes or stones)');
+    await screen.findByText('(full editable model, for your CAD technician to fix anything that\'s off)');
     expect(menuRows()).toEqual([
-      '3DM(full editable model - ask your CAD designer to change sizes or stones)',
       'GLB(3D preview for your phone, browser or AR)',
-      '3DM(simple copy to look at in any 3D program - not for editing)',
-      'STEP(opens in any CAD program - for your CAD designer or manufacturer)',
-      'STL(metal and stones together - to preview or 3D print a sample)',
+      '3DM(full editable model, for your CAD technician to fix anything that\'s off)',
+      '3DM(simple copy to look at in any 3D program, not for editing)',
+      'STEP(opens in any CAD program, for your CAD technician or manufacturer)',
+      'STL(metal and stones together, to preview or 3D print a sample)',
     ]);
   });
 
   // One case per format: opening the menu five times in a single test ran past
   // the 5 s test limit on a loaded machine.
   it.each([
-    ['(full editable model - ask your CAD designer to change sizes or stones)', 'onDownloadThreedm'],
+    ['(full editable model, for your CAD technician to fix anything that\'s off)', 'onDownloadThreedm'],
     ['(3D preview for your phone, browser or AR)', 'onDownloadGlb'],
-    ['(simple copy to look at in any 3D program - not for editing)', 'onDownloadViewerThreedm'],
-    ['(opens in any CAD program - for your CAD designer or manufacturer)', 'onDownloadStep'],
-    ['(metal and stones together - to preview or 3D print a sample)', 'onDownloadStl'],
+    ['(simple copy to look at in any 3D program, not for editing)', 'onDownloadViewerThreedm'],
+    ['(opens in any CAD program, for your CAD technician or manufacturer)', 'onDownloadStep'],
+    ['(metal and stones together, to preview or 3D print a sample)', 'onDownloadStl'],
   ] as const)('downloads the format that was chosen: %s', async (hint, handler) => {
     const handlers = {
       onDownloadThreedm: vi.fn(),
@@ -89,15 +89,15 @@ describe('CadDownloadMenu', () => {
     render(<CadDownloadMenu onDownloadThreedm={noop} onDownloadGlb={noop} />);
 
     openMenu();
-    await screen.findByText('(full editable model - ask your CAD designer to change sizes or stones)');
-    expect(menuRows()).toEqual(['3DM(full editable model - ask your CAD designer to change sizes or stones)', 'GLB(3D preview for your phone, browser or AR)']);
+    await screen.findByText('(full editable model, for your CAD technician to fix anything that\'s off)');
+    expect(menuRows()).toEqual(['GLB(3D preview for your phone, browser or AR)', '3DM(full editable model, for your CAD technician to fix anything that\'s off)']);
   });
 
   it('offers the edited export only once there is an edit', async () => {
     const onExportEdited = vi.fn();
     const { unmount } = render(<CadDownloadMenu onDownloadThreedm={noop} onDownloadGlb={noop} />);
     openMenu();
-    await screen.findByText('(full editable model - ask your CAD designer to change sizes or stones)');
+    await screen.findByText('(full editable model, for your CAD technician to fix anything that\'s off)');
     expect(screen.queryByText('With my edits')).toBeNull();
     unmount();
 
@@ -119,7 +119,7 @@ describe('CadDownloadMenu', () => {
     render(<CadDownloadMenu onDownloadThreedm={noop} metalWeightLine={null} />);
 
     openMenu();
-    await screen.findByText('(full editable model - ask your CAD designer to change sizes or stones)');
+    await screen.findByText('(full editable model, for your CAD technician to fix anything that\'s off)');
     expect(screen.queryByText(/^Metal:/)).toBeNull();
   });
 
@@ -161,10 +161,10 @@ describe('CadDownloadMenu: files from the version', () => {
     { kind: 'stones', filename: 'ring-stones.csv', bytes: 10 },
   ];
   const LABELS = {
-    stl: '(metal and stones together - to preview or 3D print a sample)',
-    step: '(opens in any CAD program - for your CAD designer or manufacturer)',
+    stl: '(metal and stones together, to preview or 3D print a sample)',
+    step: '(opens in any CAD program, for your CAD technician or manufacturer)',
     casting_stl: '(give this to your caster)',
-    stones: '(stone sizes and counts - give it to your stone setter)',
+    stones: '(stone sizes and counts, give it to your stone setter)',
   };
 
   beforeEach(() => {
@@ -187,7 +187,7 @@ describe('CadDownloadMenu: files from the version', () => {
     expect(screen.queryByText(LABELS.stl)).toBeNull();
     expect(screen.queryByText(LABELS.step)).toBeNull();
     const rows = menuRows();
-    expect(rows.slice(0, 2)).toEqual(['3DM(full editable model - ask your CAD designer to change sizes or stones)', 'GLB(3D preview for your phone, browser or AR)']);
+    expect(rows.slice(0, 2)).toEqual(['GLB(3D preview for your phone, browser or AR)', '3DM(full editable model, for your CAD technician to fix anything that\'s off)']);
     expect(rows).toHaveLength(4);
   });
 
@@ -224,9 +224,9 @@ describe('CadDownloadMenu: files from the version', () => {
 
     openMenu();
     await screen.findByText(LABELS.stl);
-    expect(screen.getAllByText('(metal and stones together - to preview or 3D print a sample)')).toHaveLength(1);
-    expect(screen.getAllByText('(opens in any CAD program - for your CAD designer or manufacturer)')).toHaveLength(1);
-    expect(screen.getAllByText('(full editable model - ask your CAD designer to change sizes or stones)')).toHaveLength(1);
+    expect(screen.getAllByText('(metal and stones together, to preview or 3D print a sample)')).toHaveLength(1);
+    expect(screen.getAllByText('(opens in any CAD program, for your CAD technician or manufacturer)')).toHaveLength(1);
+    expect(screen.getAllByText('(full editable model, for your CAD technician to fix anything that\'s off)')).toHaveLength(1);
     for (const label of Object.values(LABELS)) expect(screen.getAllByText(label).length).toBeGreaterThan(0);
   });
 
@@ -243,8 +243,8 @@ describe('CadDownloadMenu: files from the version', () => {
 
     openMenu();
     await screen.findByText(LABELS.stones);
-    expect(screen.getByText('(metal and stones together - to preview or 3D print a sample)')).toBeInTheDocument();
-    expect(screen.getByText('(opens in any CAD program - for your CAD designer or manufacturer)')).toBeInTheDocument();
+    expect(screen.getByText('(metal and stones together, to preview or 3D print a sample)')).toBeInTheDocument();
+    expect(screen.getByText('(opens in any CAD program, for your CAD technician or manufacturer)')).toBeInTheDocument();
   });
 
   it('fetches a fresh link on every press and follows it', async () => {
@@ -310,9 +310,9 @@ describe('CadDownloadMenu: the spec sheet and Download all', () => {
     await screen.findByText('(give this to your caster)');
     expect(menuRows()).toEqual([
       'GLB(3D preview for your phone, browser or AR)',
-      'STL(metal and stones together - to preview or 3D print a sample)',
+      'STL(metal and stones together, to preview or 3D print a sample)',
       'STL(give this to your caster)',
-      'JSON(stone sizes and counts - give it to your stone setter)',
+      'JSON(stone sizes and counts, give it to your stone setter)',
     ]);
     expect(screen.queryByText(/spec sheet/i)).toBeNull();
     expect(screen.queryByText('Download all')).toBeNull();

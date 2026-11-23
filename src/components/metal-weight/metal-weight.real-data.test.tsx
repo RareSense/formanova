@@ -250,7 +250,7 @@ describe('legacy and edge paths', () => {
     expect(screen.queryByRole('region', { name: 'Metal weight' })).toBeNull();
     expect(screen.queryByText(/Weight not available/)).toBeNull();
     openDownloads();
-    await screen.findByText('3D preview');
+    await screen.findByText('(3D preview for your phone, browser or AR)');
     expect(screen.queryByText(/ g \(.* dwt\)$/)).toBeNull();
   });
 

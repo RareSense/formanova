@@ -224,11 +224,11 @@ export function CadDownloadMenu({
   // Fixed light download beside fixed dark Improve, in every theme.
   const tone = variant === 'result' ? 'quiet' : 'filled';
 
-  // Fixed order: the editable file first, then preview, viewer copy, and the
+  // Fixed order: the 3D preview (GLB) first, then the editable file, viewer copy, and the
   // exchange formats. Only formats this run actually has are listed.
   const formats: FormatRow[] = [];
-  if (onDownloadThreedm) formats.push({ format: '3DM', hint: DOWNLOAD_NOTES.threedm, onSelect: onDownloadThreedm });
   if (onDownloadGlb) formats.push({ format: 'GLB', hint: DOWNLOAD_NOTES.glb, onSelect: onDownloadGlb });
+  if (onDownloadThreedm) formats.push({ format: '3DM', hint: DOWNLOAD_NOTES.threedm, onSelect: onDownloadThreedm });
   if (onDownloadViewerThreedm) formats.push({ format: '3DM', hint: DOWNLOAD_NOTES.viewer_threedm, onSelect: onDownloadViewerThreedm });
   if (onDownloadStep && !versionKinds.has('step')) formats.push({ format: 'STEP', hint: DOWNLOAD_NOTES.step, onSelect: onDownloadStep });
   if (onDownloadStl && !versionKinds.has('stl')) formats.push({ format: 'STL', hint: DOWNLOAD_NOTES.stl, onSelect: onDownloadStl });
