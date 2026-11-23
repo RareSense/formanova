@@ -24,12 +24,14 @@ const REFRESH_MS = 15000;
 const EACH_RUNS_OWN = '__each__';
 const EACH_OPTION = [{ value: EACH_RUNS_OWN, label: "Each run's own" }];
 
-type TabKey = 'open' | 'start' | 'running' | 'review' | 'done';
+type TabKey = 'open' | 'start' | 'running' | 'review' | 'done' | 'all';
 const OPEN_PHASES: SupervisedPhase[] = ['queued', 'errored', 'awaiting_review', 'rejected', 'running', 'finalizing'];
 // All open first: a short queue is all on one screen, grouped by what each run needs next.
 const TABS: Array<{ key: TabKey; label: string; phases: SupervisedPhase[] }> = [
   { key: 'open', label: 'All open', phases: OPEN_PHASES },
   ...QUEUE_GROUPS.map((group) => ({ key: group.key as TabKey, label: group.label, phases: group.phases })),
+  // Every phase, delivered and failed too: where the Rhino Users page sends a user's runs.
+  { key: 'all', label: 'All', phases: QUEUE_GROUPS.flatMap((group) => group.phases) },
 ];
 
 function NotAuthorizedState() {

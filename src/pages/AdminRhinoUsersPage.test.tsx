@@ -9,6 +9,12 @@ vi.mock('@/lib/admin-rhino-users-api', async (orig) => ({
   listAdminRhinoUsers,
 }));
 
+const listAdminGenerations = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/admin-generations-api', async (orig) => ({
+  ...(await orig<object>()),
+  listAdminGenerations,
+}));
+
 import AdminRhinoUsersPage from './AdminRhinoUsersPage';
 import { AdminGenerationsApiError } from '@/lib/admin-generations-api';
 
@@ -33,14 +39,15 @@ function renderAt(url = '/admin/rhino-users') {
       <MemoryRouter initialEntries={[url]}>
         <Routes>
           <Route path="/admin/rhino-users" element={<><AdminRhinoUsersPage /><Where /></>} />
-          <Route path="/admin/generations" element={<Where />} />
+          <Route path="/admin/cad-queue" element={<Where />} />
+          <Route path="/admin/cad-queue/:id" element={<Where />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
   );
 }
 
-beforeEach(() => { listAdminRhinoUsers.mockReset(); });
+beforeEach(() => { listAdminRhinoUsers.mockReset(); listAdminGenerations.mockReset(); });
 
 describe('AdminRhinoUsersPage', () => {
   it('shows the totals and one row per user, all time by default', async () => {
@@ -88,13 +95,38 @@ describe('AdminRhinoUsersPage', () => {
     expect(screen.getByTestId('where').textContent).toBe('/admin/rhino-users?offset=40');
   });
 
-  it("opens the user's Rhino runs in Generations", async () => {
+  it("opens a user's only Rhino run in the CAD queue run view", async () => {
     listAdminRhinoUsers.mockResolvedValue({
       totals: { users: 1, runs: 1, credits: 140 }, items: [user(1)], total: 1, limit: 20, offset: 0,
     });
+    listAdminGenerations.mockResolvedValue({ items: [{ workflow_id: 'state-abc' }], total: 1, limit: 2, offset: 0 });
     renderAt();
     fireEvent.click(await screen.findByText('user1@b.co'));
-    expect(screen.getByTestId('where').textContent).toBe('/admin/generations?client=rhino&search=user1%40b.co&supervised=any');
+    await waitFor(() =>
+      expect(screen.getByTestId('where').textContent).toBe('/admin/cad-queue/state-abc?tab=all&search=user1%40b.co'));
+    expect(listAdminGenerations).toHaveBeenCalledWith({ client: 'rhino', user_email: 'user1@b.co', limit: 2 });
+  });
+
+  it('opens the CAD queue, every phase, searched by email when a user has several runs', async () => {
+    listAdminRhinoUsers.mockResolvedValue({
+      totals: { users: 1, runs: 2, credits: 280 }, items: [user(2)], total: 1, limit: 20, offset: 0,
+    });
+    listAdminGenerations.mockResolvedValue({ items: [{ workflow_id: 'a' }, { workflow_id: 'b' }], total: 2, limit: 2, offset: 0 });
+    renderAt();
+    fireEvent.click(await screen.findByText('user2@b.co'));
+    await waitFor(() =>
+      expect(screen.getByTestId('where').textContent).toBe('/admin/cad-queue?tab=all&search=user2%40b.co'));
+  });
+
+  it('falls back to the searched CAD queue when the run lookup fails', async () => {
+    listAdminRhinoUsers.mockResolvedValue({
+      totals: { users: 1, runs: 1, credits: 140 }, items: [user(1)], total: 1, limit: 20, offset: 0,
+    });
+    listAdminGenerations.mockRejectedValue(new Error('down'));
+    renderAt();
+    fireEvent.click(await screen.findByText('user1@b.co'));
+    await waitFor(() =>
+      expect(screen.getByTestId('where').textContent).toBe('/admin/cad-queue?tab=all&search=user1%40b.co'));
   });
 
   it('shows the empty state', async () => {

@@ -14,7 +14,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { PaginationBar } from '@/components/generations/PaginationBar';
-import { AdminGenerationsApiError } from '@/lib/admin-generations-api';
+import { AdminGenerationsApiError, listAdminGenerations } from '@/lib/admin-generations-api';
 import { listAdminRhinoUsers, rhinoDateRange, type AdminRhinoUser } from '@/lib/admin-rhino-users-api';
 import { formatCredits } from '@/lib/admin-cost-display';
 import { parseServerTime } from '@/lib/server-time';
@@ -104,11 +104,20 @@ export default function AdminRhinoUsersPage() {
     setSearchParams(next);
   }
 
-  // Generations has no user-id filter; its email search is the closest match.
-  // Rhino CAD runs are supervised, so the default supervised=false list would be empty.
-  function openRuns(item: AdminRhinoUser) {
-    const qs = new URLSearchParams({ client: 'rhino', search: item.user_email, supervised: 'any' });
-    navigate(`/admin/generations?${qs.toString()}`);
+  // Open the runs the way supervised runs show: one Rhino run opens straight in the CAD queue
+  // run view; several (or a failed lookup) open the CAD queue, every phase, searched by email.
+  async function openRuns(item: AdminRhinoUser) {
+    const listQs = new URLSearchParams({ tab: 'all', search: item.user_email });
+    let target = `/admin/cad-queue?${listQs.toString()}`;
+    try {
+      const runs = await listAdminGenerations({ client: 'rhino', user_email: item.user_email, limit: 2 });
+      if (runs.total === 1 && runs.items[0]) {
+        target = `/admin/cad-queue/${encodeURIComponent(runs.items[0].workflow_id)}?${listQs.toString()}`;
+      }
+    } catch {
+      // Fall back to the searched list.
+    }
+    navigate(target);
   }
 
   return (
@@ -188,7 +197,7 @@ export default function AdminRhinoUsersPage() {
                   </TableHeader>
                   <TableBody>
                     {items.map((item) => (
-                      <TableRow key={item.user_id} className="cursor-pointer" onClick={() => openRuns(item)}>
+                      <TableRow key={item.user_id} className="cursor-pointer" onClick={() => void openRuns(item)}>
                         <TableCell className="max-w-[260px] truncate text-sm">{item.user_email || '-'}</TableCell>
                         <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">
                           {formatDateTime(item.first_run_at)}
@@ -204,7 +213,7 @@ export default function AdminRhinoUsersPage() {
                             className="gap-1.5"
                             onClick={(event) => {
                               event.stopPropagation();
-                              openRuns(item);
+                              void openRuns(item);
                             }}
                           >
                             View Runs
