@@ -197,14 +197,14 @@ describe('CAD generation history card', () => {
       fireEvent.keyDown(screen.getByRole('button', { name: 'Download' }), { key: 'Enter' });
 
     openMenu();
-    fireEvent.click(await screen.findByText('(simple copy to look at in any 3D program - not for editing)'));
+    fireEvent.click(await screen.findByText('(simple copy to look at in any 3D program, not for editing)'));
     await waitFor(() => expect(downloadCadArtifact).toHaveBeenCalledTimes(1));
     expect(vi.mocked(downloadCadArtifact).mock.calls[0][0]).toBe('/v2.viewer.3dm');
     expect(vi.mocked(downloadCadArtifact).mock.calls[0][1]).toMatch(/-viewing-copy\.3dm$/);
 
     fireEvent.click(screen.getByRole('button', { name: 'Preview version 1' }));
     openMenu();
-    fireEvent.click(await screen.findByText('(simple copy to look at in any 3D program - not for editing)'));
+    fireEvent.click(await screen.findByText('(simple copy to look at in any 3D program, not for editing)'));
     await waitFor(() => expect(downloadCadArtifact).toHaveBeenCalledTimes(2));
     expect(vi.mocked(downloadCadArtifact).mock.calls[1][0]).toBe('/v1.viewer.3dm');
   });
@@ -237,7 +237,7 @@ describe('CAD generation history card', () => {
 
     await chooseDownload('(give this to your caster)');
     await waitFor(() => expect(fetchVersionDownloadLink).toHaveBeenCalledWith('asset-1', 'casting_stl'));
-    expect(screen.queryByText('(stone sizes and counts - give it to your stone setter)')).toBeNull();
+    expect(screen.queryByText('(stone sizes and counts, give it to your stone setter)')).toBeNull();
     clickSpy.mockRestore();
   });
 
@@ -262,7 +262,7 @@ describe('CAD generation history card', () => {
       </MemoryRouter>,
     );
 
-    await chooseDownload('(stone sizes and counts - give it to your stone setter)');
+    await chooseDownload('(stone sizes and counts, give it to your stone setter)');
     await waitFor(() => expect(fetchVersionDownloadLink).toHaveBeenCalledWith('asset-del', 'stones'));
   });
 
@@ -284,8 +284,8 @@ describe('CAD generation history card', () => {
     );
 
     fireEvent.keyDown(screen.getByRole('button', { name: 'Download' }), { key: 'Enter' });
-    await screen.findByText('(full editable model - ask your CAD designer to change sizes or stones)');
-    expect(screen.queryByText('(simple copy to look at in any 3D program - not for editing)')).toBeNull();
+    await screen.findByText('(full editable model, for your CAD technician to fix anything that\'s off)');
+    expect(screen.queryByText('(simple copy to look at in any 3D program, not for editing)')).toBeNull();
   });
 
   it('does not expose internal mode or provider values', () => {
@@ -348,7 +348,7 @@ describe('CAD generation history card', () => {
     expect((screen.getByRole('textbox') as HTMLInputElement).value).toBe('ring');
     expect(screen.queryByText('.glb')).toBeNull();
 
-    await chooseDownload('(full editable model - ask your CAD designer to change sizes or stones)');
+    await chooseDownload('(full editable model, for your CAD technician to fix anything that\'s off)');
     await waitFor(() => expect(downloadCadArtifact).toHaveBeenCalledWith(
       expect.any(String),
       'ring.3dm',
@@ -366,7 +366,7 @@ describe('CAD generation history card', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Rename design' }));
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Customer Ring' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save design name' }));
-    await chooseDownload('(full editable model - ask your CAD designer to change sizes or stones)');
+    await chooseDownload('(full editable model, for your CAD technician to fix anything that\'s off)');
 
     await waitFor(() => expect(downloadCadArtifact).toHaveBeenCalledWith(
       '/fresh/manufacturing-3dm',
@@ -384,7 +384,7 @@ describe('CAD generation history card', () => {
     );
 
     fireEvent.keyDown(screen.getByRole('button', { name: 'Download' }), { key: 'Enter' });
-    const row = await screen.findByText('(full editable model - ask your CAD designer to change sizes or stones)');
+    const row = await screen.findByText('(full editable model, for your CAD technician to fix anything that\'s off)');
     vi.useFakeTimers();
     try {
       fireEvent.click(row);
@@ -407,7 +407,7 @@ describe('CAD generation history card', () => {
       </MemoryRouter>,
     );
 
-    await chooseDownload('(full editable model - ask your CAD designer to change sizes or stones)');
+    await chooseDownload('(full editable model, for your CAD technician to fix anything that\'s off)');
 
     await waitFor(() => expect(downloadCadArtifact).toHaveBeenCalledWith('/api/artifacts/3dm', 'ring.3dm', '3dm'));
     expect(downloadCadArtifact).toHaveBeenNthCalledWith(1, '/fresh/manufacturing-3dm', 'ring.3dm', '3dm');
