@@ -9,6 +9,14 @@ import type * as THREE from 'three';
 import { JEWELRY_PRESETS, presetForLibraryId, type JewelryPreset } from './presets';
 import { isStoneLayer, pickGem, pickMetal, gemFamily, type PartHints } from './picker';
 
+/** A stone baked as a plain opaque colour (no transmission): shown flat if kept,
+ * so the viewer uses the refractive gem preset its name picks instead. */
+export function isFlatGemMaterial(material: THREE.Material | null | undefined): boolean {
+  if (!material) return false;
+  const m = material as THREE.Material & { transmission?: number };
+  return !!gemFamily(m.name) && !(m.transmission && m.transmission > 0);
+}
+
 /** Names exporters give to "no material". */
 const PLACEHOLDER_NAME = /^(material|default|defaultmaterial|default[_ ]material|mat|lambert\d*|blinn\d*|phong\d*|initialshadinggroup|none|untitled|no[_ ]?material|dummy)([._ -]?\d+)?$/i;
 const PLACEHOLDER_WORD = /wax|clay|placeholder|flat[_ ]?(gem|metal)|\(flat\)/i;
@@ -26,6 +34,7 @@ export function isUsableFileMaterial(material: THREE.Material | null | undefined
   const name = (m.name ?? '').trim();
   // An unnamed material still counts when its values are real (judged below).
   if (name && (PLACEHOLDER_NAME.test(name) || PLACEHOLDER_WORD.test(name))) return false;
+  if (isFlatGemMaterial(material)) return false;
   // Grey clay: colourless, matte, not metal, not see-through.
   const c = m.color;
   if (c && (m.metalness ?? 0) < 0.1 && !(m.transmission && m.transmission > 0) && (m.roughness ?? 1) >= 0.5
