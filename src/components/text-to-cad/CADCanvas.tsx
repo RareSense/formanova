@@ -37,7 +37,7 @@ import type { MaterialDef } from "@/components/cad-studio/materials";
 import { classifyCadPartName, isCadGemName } from "@/lib/cad-part-classifier";
 import {
   JEWELRY_PRESETS, LIBRARY_ID_TO_PRESET, STUDIO_ENV_INTENSITY, STUDIO_EXPOSURE,
-  blenderMetalRoughness, createStudioLight, gemFamily, isStoneLayer, layerOf, pickGem, pickMetal, studioBackdropColor,
+  GEM_SHADER_ENV_INTENSITY, blenderMetalRoughness, isUsableFileMaterial, createStudioLight, gemShaderColor, gemFamily, isStoneLayer, layerOf, pickGem, pickMetal, studioBackdropColor,
   type PartHints,
 } from "@/lib/jewelry-look";
 import { computeExplodeOffsets, easeExplode, EXPLODE_DURATION_S } from "@/lib/cad-explode";
@@ -410,7 +410,7 @@ function ReferenceStudioEnvironment({ children }: { children: React.ReactNode })
     scene.background = studioBackdropColor();
     scene.backgroundBlurriness = 0;
     scene.environment = studio.env;
-    setRawEnvironment(studio.raw);
+    setRawEnvironment(studio.gemRaw);
     inv();
     return () => {
       scene.environment = previousEnvironment;
@@ -1084,119 +1084,17 @@ const LoadedModel = forwardRef<
     // Baked textures (antiqued finish, AO, normals) are shown as authored.
     const authoredTextures = modelHasTextureMaps(list.map((md) => md.originalMaterial));
 
-    if (authoredTextures) {
-      console.log("[CADCanvas] GLB has texture maps; keeping its embedded materials");
-    } else if (magicTexturing) {
-    // PRIORITY 0: If the GLB's embedded material name matches a library material
-    //             (i.e. previously exported from Formanova), honour that assignment
-    //             and skip heuristics entirely.
-    let recognisedCount = 0;
-
-    list.forEach((md) => {
-      const matName = md.originalMaterial?.name;
-      if (matName) {
-        const libMatch = findMaterialByName(matName);
-        if (libMatch) {
-          autoMaterials[md.name] = libMatch;
-          recognisedCount++;
-          console.log(`[MagicTex] "${md.name}" → ${libMatch.name} (recognised from GLB material name "${matName}")`);
-        }
-      }
-    });
-
-    // If the majority of meshes had recognised materials, skip heuristic texturing
-    const useRecognised = recognisedCount > 0 && recognisedCount >= list.length * 0.5;
-
-    if (useRecognised) {
-      // Fill any unrecognised meshes with a sensible fallback based on the recognised set
-      const fallbackGold = findMaterial("yellow-gold")!;
-      const fallbackDiamond = findMaterial("diamond")!;
+    // No default look: parts show the material baked into the file. Only a file
+    // material named after a library material (exported earlier from FormaNova)
+    // becomes that library assignment. Parts with no usable material fall back to
+    // the shared preset picker at render time (jewelry-look resolvePartLook).
+    void magicTexturing;
+    if (!authoredTextures) {
       list.forEach((md) => {
-        if (!autoMaterials[md.name]) {
-          autoMaterials[md.name] = isCadGemName(md.name) ? fallbackDiamond : fallbackGold;
-        }
-      });
-      console.log(`[MagicTex] Recognised ${recognisedCount}/${list.length} materials from GLB — skipping heuristics`);
-    } else {
-      // ── Standard heuristic texturing for fresh/pipeline GLBs ──
-      const diamondMatDef = findMaterial("diamond")!;
-      const goldMatDef = findMaterial("yellow-gold")!;
-
-      // Compute median vertex count to identify small meshes (likely gems)
-      const vertCounts = list.map((md) => md.geometry?.attributes?.position?.count || 0).sort((a, b) => a - b);
-      const medianVerts = vertCounts[Math.floor(vertCounts.length / 2)] || 0;
-
-      // Helper: detect if original material looks like a gem (transparent, refractive, non-metallic)
-      const looksLikeGem = (mat: THREE.Material): boolean => {
-        if (!(mat instanceof THREE.MeshPhysicalMaterial || mat instanceof THREE.MeshStandardMaterial)) return false;
-        const phys = mat as THREE.MeshPhysicalMaterial;
-        if (phys.transmission !== undefined && phys.transmission > 0.1) return true;
-        if (phys.transparent && phys.opacity < 0.8) return true;
-        if (phys.metalness < 0.3 && phys.roughness < 0.15) return true;
-        if (phys.metalness < 0.3) {
-          const c = phys.color;
-          if (c && c.r > 0.7 && c.g > 0.7 && c.b > 0.7 && phys.roughness < 0.4) return true;
-        }
-        return false;
-      };
-
-      const looksLikeMetal = (mat: THREE.Material): boolean => {
-        if (!(mat instanceof THREE.MeshPhysicalMaterial || mat instanceof THREE.MeshStandardMaterial)) return false;
-        return mat.metalness > 0.7;
-      };
-
-      list.forEach((md) => {
-        if (autoMaterials[md.name]) return; // already recognised above
-        const lower = md.name.toLowerCase();
-        const verts = md.geometry?.attributes?.position?.count || 0;
-
-        const kind = classifyCadPartName(md.name);
-        if (kind === "gem") {
-          autoMaterials[md.name] = diamondMatDef;
-        } else if (kind === "metal") {
-          autoMaterials[md.name] = goldMatDef;
-        } else if (looksLikeGem(md.originalMaterial)) {
-          autoMaterials[md.name] = diamondMatDef;
-          console.log(`[MagicTex] "${md.name}" → diamond (material heuristic)`);
-        } else if (verts > 0 && verts < medianVerts * 0.3 && !looksLikeMetal(md.originalMaterial)) {
-          autoMaterials[md.name] = diamondMatDef;
-          console.log(`[MagicTex] "${md.name}" → diamond (size heuristic: ${verts} verts)`);
-        } else {
-          autoMaterials[md.name] = goldMatDef;
-        }
+        const libMatch = md.originalMaterial?.name ? findMaterialByName(md.originalMaterial.name) : undefined;
+        if (libMatch) autoMaterials[md.name] = libMatch;
       });
     }
-    } else {
-      // ── Flat mesh classification (default when magic texturing is off) ──
-      // gem → blue (#4a90d9), metal → green (#77dd77), flat shading, no maps
-      // Built from the shared list so the flat preview and the real materials
-      // agree on what a gem is: `wing_accent_right` is a stone here too, and
-      // only `accent_stone` used to match.
-
-      list.forEach((md) => {
-        const lower = md.name.toLowerCase();
-        const phys = md.originalMaterial as THREE.MeshPhysicalMaterial;
-        const kind = classifyCadPartName(lower);
-        let isGem = kind === "gem";
-        if (kind === null) {
-          if (phys.transmission > 0.5 || phys.ior > 2.0) isGem = true;
-        }
-        const color = isGem ? 0x4a90d9 : 0x77dd77;
-        autoMaterials[md.name] = {
-          preview: `#${color.toString(16).padStart(6, '0')}`,
-          id: `flat-${isGem ? 'gem' : 'metal'}-${md.name}`,
-          name: isGem ? 'Gem (flat)' : 'Metal (flat)',
-          category: isGem ? 'gemstone' : 'metal',
-          create: () => new THREE.MeshPhysicalMaterial({
-            color,
-            metalness: 0,
-            roughness: isGem ? 0.6 : 0.8,
-            flatShading: true,
-            side: THREE.DoubleSide,
-          }),
-        };
-      });
-    } // end if (magicTexturing) / else
 
     // ── Scene complexity guardrail ──
     const totalVerts = list.reduce((sum, md) => sum + (md.geometry?.attributes?.position?.count || 0), 0);
@@ -2115,7 +2013,9 @@ const LoadedModel = forwardRef<
 
       const isSelected = selectedMeshNames.has(md.name);
       const assigned = assignedMaterials[md.name];
-      const referenceKey = !assigned && keepAuthored ? null : referenceKeyForMaterial(assigned, md.name, { materialName: md.originalMaterial?.name, layer: md.layer });
+      // Shared rule: library pick > baked file material > picker fallback.
+      const fileLook = !assigned && (keepAuthored || isUsableFileMaterial(md.originalMaterial));
+      const referenceKey = fileLook ? null : referenceKeyForMaterial(assigned, md.name, { materialName: md.originalMaterial?.name, layer: md.layer });
       const referenceSpec = referenceKey ? REFERENCE_MATERIALS[referenceKey] : undefined;
 
       // Selection highlight — show blue overlay when selected, UNLESS the user
@@ -2207,7 +2107,7 @@ const LoadedModel = forwardRef<
       const positionCount = mesh.geometry.attributes.position?.count ?? 0;
       triangleCount += (mesh.geometry.index?.count ?? positionCount) / 3;
       const assigned = assignedMaterials[mesh.name];
-      const referenceKey = referenceKeyForMaterial(assigned, mesh.name, { materialName: mesh.originalMaterial?.name, layer: mesh.layer });
+      const referenceKey = !assigned && isUsableFileMaterial(mesh.originalMaterial) ? null : referenceKeyForMaterial(assigned, mesh.name, { materialName: mesh.originalMaterial?.name, layer: mesh.layer });
       if (referenceKey) { if (isStoneLook(referenceKey)) gemCount++; }
       else if (!referenceKey && assigned?.category === "gemstone") gemCount++;
     }
@@ -2460,10 +2360,7 @@ function ReferenceGemMesh({
 }) {
   const { rawEnvironment } = React.useContext(ReferenceEnvironmentContext);
   const gemMaterial = useMemo(() => {
-    const filter = new THREE.Color(materialSpec.color).lerp(
-      new THREE.Color(materialSpec.atten ?? materialSpec.color),
-      materialSpec.atten === 0xffffff ? 0 : 0.55,
-    );
+    const filter = gemShaderColor(materialSpec);
     const material = new THREE.ShaderMaterial({
       uniforms: {
         envMap: { value: rawEnvironment ?? referenceWhiteEnvironment },
@@ -2474,7 +2371,7 @@ function ReferenceGemMesh({
         aberrationStrength: { value: materialSpec.disp ?? 0.008 },
         fresnel: { value: 0.25 },
         colorFactor: { value: filter },
-        envIntensity: { value: 1 },
+        envIntensity: { value: GEM_SHADER_ENV_INTENSITY },
         selected: { value: 0 },
       },
       vertexShader: REFERENCE_GEM_VERTEX_SHADER,

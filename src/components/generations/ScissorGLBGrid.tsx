@@ -97,6 +97,8 @@ export function ScissorGLBGrid({ children, continuous = true }: ScissorGLBGridPr
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const cardsRef = useRef<Map<string, CardEntry>>(new Map());
+  // Dev only: lets the local viewer-look check put every viewer on the same camera.
+  if (__DEV__ && typeof window !== 'undefined') (window as unknown as { __scissorCards?: unknown }).__scissorCards = cardsRef.current;
   const listenersRef = useRef<Map<string, Set<CardStateListener>>>(new Map());
   const rafRef = useRef<number>(0);
   const envMapRef = useRef<THREE.Texture | null>(null);

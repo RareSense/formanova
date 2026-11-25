@@ -61,8 +61,9 @@ export interface JewelryPreset {
 export const BLENDER_GEM_DENSITY = 260;
 /** Light path through a stone, in metres, used to turn Blender's absorption
  * (per metre, x density) into one three.js attenuation colour. Light bounces
- * around a faceted stone several times, so this is a few stone diameters. */
-export const GEM_REFERENCE_PATH_M = 0.006;
+ * around a faceted stone many times (Cycles: 24 transmission bounces), so this is
+ * several stone diameters; 15 mm matches the saturation of the Blender close-ups. */
+export const GEM_REFERENCE_PATH_M = 0.015;
 /** Blender clamps polished metal roughness to at least this. */
 export const BLENDER_MIN_METAL_ROUGHNESS = 0.1;
 

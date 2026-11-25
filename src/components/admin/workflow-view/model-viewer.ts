@@ -43,8 +43,6 @@ export async function fetchPackedMeshes(url: string, signal?: AbortSignal): Prom
 export async function openModel(host: HTMLElement, data: ArrayBuffer, fileName: string, packedMeshes?: PackedMeshes): Promise<OpenedModel> {
   const { CatalogEngine } = await import('@/components/cad-to-catalog/engine/engine');
   const engine = new CatalogEngine(host);
-  // Same look as the Studio and history: shared jewelry-look presets and Blender studio light.
-  engine.restyleMetal = true;
   try {
     await engine.open(new File([data], fileName), new Map(), packedMeshes ? { packedMeshes } : {});
   } catch (error) {

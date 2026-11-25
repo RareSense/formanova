@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
+  GEM_REFERENCE_PATH_M,
   JEWELRY_PRESETS, LIBRARY_ID_TO_PRESET, STUDIO_EXPOSURE, STUDIO_SOFTBOXES, STUDIO_WORLD,
-  absorptionTransmittance, isStoneLayer, layerOf, linearRgbToHex, pickGem, pickMetal, studioEnvironmentPixels,
+  absorptionTransmittance, isStoneLayer, isUsableFileMaterial, layerOf, resolvePartLook, linearRgbToHex, pickGem, pickMetal, studioEnvironmentPixels,
 } from '.';
 
 describe('pickGem', () => {
@@ -51,7 +52,7 @@ describe('presets derive from the Blender values', () => {
   it('gem IOR and absorption come from Blender', () => {
     expect(JEWELRY_PRESETS.ruby.ior).toBe(1.77);
     expect(JEWELRY_PRESETS.diamond.ior).toBe(2.42);
-    const t = absorptionTransmittance([0.85, 0.06, 0.12], 0.006);
+    const t = absorptionTransmittance([0.85, 0.06, 0.12], GEM_REFERENCE_PATH_M);
     expect(JEWELRY_PRESETS.ruby.atten).toBe(linearRgbToHex(t));
   });
   it('every library id maps to a preset', () => {
@@ -82,5 +83,27 @@ describe('every viewer reads the same presets', () => {
   });
   it('admin workflow viewer opens models in the shared-look engine', () => {
     expect(read('src/components/admin/workflow-view/model-viewer.ts')).toContain("@/components/cad-to-catalog/engine/engine");
+  });
+});
+
+describe('resolvePartLook: one rule for every viewer', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const THREE = require('three') as typeof import('three');
+  const baked = new THREE.MeshPhysicalMaterial({ name: 'band_18k_yellow', color: 0xc8aa5a, metalness: 1, roughness: 0.2 });
+  it('keeps a real baked material', () => {
+    expect(resolvePartLook({ fileMaterial: baked, objectName: 'band' })).toEqual({ source: 'file' });
+    const gem = new THREE.MeshPhysicalMaterial({ name: 'gem_col_orange', color: 0xee6e14, transmission: 1 });
+    expect(resolvePartLook({ fileMaterial: gem, objectName: 'stone_1' }).source).toBe('file');
+  });
+  it('falls back by name/layer when the material is missing or a placeholder', () => {
+    expect(resolvePartLook({ fileMaterial: null, objectName: 'diamond_round_01', layer: 'stones_ruby' })).toMatchObject({ source: 'picker', preset: { key: 'ruby' } });
+    const clay = new THREE.MeshStandardMaterial({ name: 'clay', color: 0x888888, metalness: 0, roughness: 0.8 });
+    expect(resolvePartLook({ fileMaterial: clay, objectName: 'shank_rose' })).toMatchObject({ source: 'picker', preset: { key: 'roseGold' } });
+    expect(resolvePartLook({ fileMaterial: new THREE.MeshStandardMaterial({ name: 'Material.001' }), objectName: 'lab_orange_sapphire', layer: 'stones_sapphire' }))
+      .toMatchObject({ source: 'picker', preset: { key: 'orangeSapphire' } });
+    expect(isUsableFileMaterial(new THREE.MeshStandardMaterial())).toBe(false);
+  });
+  it('library apply overrides the baked material', () => {
+    expect(resolvePartLook({ libraryId: 'ruby', fileMaterial: baked, objectName: 'band' })).toMatchObject({ source: 'library', preset: { key: 'ruby' } });
   });
 });

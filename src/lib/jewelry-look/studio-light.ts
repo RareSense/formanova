@@ -57,7 +57,7 @@ const toThree = (b: V3): V3 => [b[0], b[2], -b[1]];
 export const softboxRadiance = (s: Softbox) => s.strength * STUDIO_LIGHT_SCALE;
 
 /** Linear RGBA float pixels of the studio light, equirectangular (three's mapping). */
-export function studioEnvironmentPixels(width = 1024, height = 512): Float32Array {
+export function studioEnvironmentPixels(width = 1024, height = 512, world = STUDIO_WORLD): Float32Array {
   const boxes = STUDIO_SOFTBOXES.map((s) => {
     const c = toThree(s.offset);
     const n = unit([-c[0], -c[1], -c[2]]); // faces the piece
@@ -75,7 +75,7 @@ export function studioEnvironmentPixels(width = 1024, height = 512): Float32Arra
       const lon = ((i + 0.5) / width - 0.5) * 2 * Math.PI;
       // inverse of u = atan(z, x) / 2pi + 0.5
       const d: V3 = [Math.cos(lat) * Math.cos(lon), Math.sin(lat), Math.cos(lat) * Math.sin(lon)];
-      let L = STUDIO_WORLD;
+      let L = world;
       for (const b of boxes) {
         const den = -dot(d, b.n);
         if (den <= 1e-4) continue;
@@ -93,18 +93,26 @@ export function studioEnvironmentPixels(width = 1024, height = 512): Float32Arra
   return px;
 }
 
-let cachedHalf: Uint16Array | null = null;
+/** World level the refraction gem shaders see. Cycles stones gather light from
+ * the bright gold seat and many bounces; a one-bounce browser shader looking
+ * into the 0.05 world reads near-black, so the stones see a lifted world.
+ * Tuned against the Blender stone close-ups. */
+export const GEM_ENV_WORLD = 1.0;
+
+const cachedHalf = new Map<number, Uint16Array>();
 
 /** Raw equirectangular studio texture (for the refraction shader and PMREM).
  * Half float: filterable on every WebGL2 GPU, unlike full float. */
-export function createStudioEquirect(): THREE.DataTexture {
+export function createStudioEquirect(world = STUDIO_WORLD): THREE.DataTexture {
   const w = 1024, h = 512;
-  if (!cachedHalf) {
-    const f = studioEnvironmentPixels(w, h);
-    cachedHalf = new Uint16Array(f.length);
-    for (let i = 0; i < f.length; i++) cachedHalf[i] = THREE.DataUtils.toHalfFloat(Math.min(f[i], 65000));
+  let half = cachedHalf.get(world);
+  if (!half) {
+    const f = studioEnvironmentPixels(w, h, world);
+    half = new Uint16Array(f.length);
+    for (let i = 0; i < f.length; i++) half[i] = THREE.DataUtils.toHalfFloat(Math.min(f[i], 65000));
+    cachedHalf.set(world, half);
   }
-  const tex = new THREE.DataTexture(cachedHalf, w, h, THREE.RGBAFormat, THREE.HalfFloatType);
+  const tex = new THREE.DataTexture(half, w, h, THREE.RGBAFormat, THREE.HalfFloatType);
   tex.mapping = THREE.EquirectangularReflectionMapping;
   tex.colorSpace = THREE.LinearSRGBColorSpace;
   tex.magFilter = THREE.LinearFilter;
@@ -115,8 +123,10 @@ export function createStudioEquirect(): THREE.DataTexture {
 }
 
 export interface StudioLight {
-  /** Raw equirect texture: what the refraction gem shader samples. */
+  /** Raw equirect studio texture. */
   raw: THREE.DataTexture;
+  /** Raw equirect the refraction gem shaders sample (world lifted to GEM_ENV_WORLD). */
+  gemRaw: THREE.DataTexture;
   /** PMREM texture for scene.environment. */
   env: THREE.Texture;
   dispose(): void;
@@ -124,10 +134,11 @@ export interface StudioLight {
 
 export function createStudioLight(renderer: THREE.WebGLRenderer): StudioLight {
   const raw = createStudioEquirect();
+  const gemRaw = createStudioEquirect(GEM_ENV_WORLD);
   const pmrem = new THREE.PMREMGenerator(renderer);
   const target = pmrem.fromEquirectangular(raw);
   pmrem.dispose();
-  return { raw, env: target.texture, dispose: () => { target.dispose(); raw.dispose(); } };
+  return { raw, gemRaw, env: target.texture, dispose: () => { target.dispose(); raw.dispose(); gemRaw.dispose(); } };
 }
 
 /** Camera backdrop: Blender's flat light grey. three does not tone-map a Color background. */

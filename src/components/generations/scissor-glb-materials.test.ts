@@ -56,7 +56,6 @@ describe('applyHistoryPreviewMaterials', () => {
       color: 0x123456,
       metalness: 0.35,
       roughness: 0.67,
-      transmission: 0.42,
     });
     const model = new THREE.Group();
     const mesh = meshNamed('Shank', authored);
@@ -76,7 +75,6 @@ describe('applyHistoryPreviewMaterials', () => {
     expect(material.color.getHex()).toBe(0x123456);
     expect(material.metalness).toBe(0.35);
     expect(material.roughness).toBe(0.67);
-    expect(material.transmission).toBe(0.42);
   });
 
   it('uses the colored jewelry palette for version cards even when the GLB embeds grey clay', () => {

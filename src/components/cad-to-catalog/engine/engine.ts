@@ -9,7 +9,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { loadCad, UNIT_SCALE, type LoadInfo, type LoadOptions } from './formats';
 import { classify, collectParts, buildSets, splitByConnectivity, type Part, type PartSet, type PartGroup } from './parts';
 import { MaterialCache, PRESETS, gemFor, metalFor, type Choice } from './materials';
-import { STUDIO_EXPOSURE, blenderMetalRoughness } from '@/lib/jewelry-look';
+import { STUDIO_EXPOSURE, blenderMetalRoughness, resolvePartLook } from '@/lib/jewelry-look';
 import { Look, type Backdrop } from './look';
 import { gemEntryStep } from './gems';
 import type { GemMode } from '@/components/text-to-cad/GemInstanceRenderer';
@@ -56,9 +56,6 @@ export class CatalogEngine {
   private down: [number, number] | null = null;
   private fitDist = 1;
   state: EngineState = { fileName: '', parts: [], sets: [], selected: new Set(), info: null, canUndo: false, canRedo: false, ready: false };
-
-  /** Replace file metal with the shared preset (admin viewer); off for CAD to Catalog. */
-  restyleMetal = false;
 
   constructor(private container: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
@@ -144,16 +141,15 @@ export class CatalogEngine {
           (mat as THREE.ShaderMaterial).uniformsNeedUpdate = true;
         }
       };
-      // Stones start as refractive gems (a flat file colour cannot refract); metal
-      // keeps what the file says; parts with no material at all start as yellow gold.
-      p.choice = p.group === 'stone' ? { kind: 'preset', id: gemFor({ materialName: p.source.name, layer: p.layer, objectName: p.name }) }
-        : p.source.isDefault ? { kind: 'preset', id: 'gold-yellow' } : null;
-      // Viewers that must match the other FormaNova viewers (admin) restyle metal like the
-      // Blender studio renderer: shared preset colour, file roughness clamped to 0.10..0.45.
-      if (this.restyleMetal && p.group === 'metal' && !p.choice) {
-        const id = metalFor({ materialName: p.source.name, layer: p.layer, objectName: p.name });
-        const fileRough = (p.mesh.userData.c2p?.sourceMaterial as THREE.MeshStandardMaterial | undefined)?.roughness;
-        if (id) p.choice = { kind: 'preset', id, rough: blenderMetalRoughness(fileRough, PRESETS.get(id)?.roughness) };
+      // Shared rule (jewelry-look resolvePartLook): the file's own material when it is a
+      // real one; otherwise a shared preset picked from material name, layer, object name.
+      const fileMat = p.mesh.userData.c2p?.sourceMaterial as THREE.Material | undefined;
+      const look = resolvePartLook({ fileMaterial: p.source.isDefault ? null : fileMat, materialName: p.source.name, layer: p.layer, objectName: p.name, stoneByName: p.group === 'stone' });
+      if (look.source === 'file') p.choice = null;
+      else if (look.preset.kind === 'gem' || p.group === 'stone') p.choice = { kind: 'preset', id: gemFor({ materialName: p.source.name, layer: p.layer, objectName: p.name }) };
+      else {
+        const id = metalFor({ materialName: p.source.name, layer: p.layer, objectName: p.name }) ?? 'gold-yellow';
+        p.choice = { kind: 'preset', id, rough: blenderMetalRoughness((fileMat as THREE.MeshStandardMaterial | undefined)?.roughness, PRESETS.get(id)?.roughness) };
       }
     }
     this.axis.add(root);

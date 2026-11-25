@@ -54,10 +54,12 @@ async function loadForcedPaletteCard(glb: ArrayBuffer): Promise<THREE.MeshStanda
 }
 
 describe('forced-palette cards, through the real GLTF loader', () => {
-  it('replaces unmarked materials with the shared preset its material name picks', async () => {
+  it('keeps a real baked material even when the file is not marked authored', async () => {
     const material = await loadForcedPaletteCard(buildGlb());
-    // Material "Gold_black_rhodium": the shared picker reads the material name first.
-    expect(material.color.getHex()).toBe(JEWELRY_PRESETS.blackRhodium.color);
+    // One rule in every viewer: a real file material is shown as baked.
+    expect(material.name).toBe('Gold_black_rhodium');
+    expect(material.metalness).toBe(1);
+    expect(material.color.getHex()).not.toBe(JEWELRY_PRESETS.blackRhodium.color);
   });
 
   it('keeps the file materials on a GLB marked formanovaMaterials: "authored"', async () => {

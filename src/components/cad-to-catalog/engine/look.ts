@@ -9,7 +9,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { installReferenceToneMapping } from './gems';
-import { STUDIO_BACKDROP_LINEAR, STUDIO_EXPOSURE, createStudioEquirect, linearToSrgb, studioBackdropColor } from '@/lib/jewelry-look';
+import { GEM_ENV_WORLD, STUDIO_BACKDROP_LINEAR, STUDIO_EXPOSURE, createStudioEquirect, linearToSrgb, studioBackdropColor } from '@/lib/jewelry-look';
 
 /** What the metal reflects; stones always refract the 1k brown studio, as in FormaNova. */
 export const STUDIOS = [
@@ -77,7 +77,7 @@ export class Look {
     scene.background = studioBackdropColor();
 
     // Stones refract the same studio light the metal reflects (no download).
-    this.gemEnv = createStudioEquirect();
+    this.gemEnv = createStudioEquirect(GEM_ENV_WORLD);
     this.setupComposer();
   }
 

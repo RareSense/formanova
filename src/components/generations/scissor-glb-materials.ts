@@ -1,6 +1,6 @@
 import { modelHasTextureMaps } from '@/lib/gltf-texture-maps';
 import * as THREE from 'three';
-import { JEWELRY_PRESETS, blenderMetalRoughness, isStoneLayer, layerOf, makeJewelryMaterial, pickGem, pickMetal, type PartHints } from '@/lib/jewelry-look';
+import { JEWELRY_PRESETS, blenderMetalRoughness, isStoneLayer, isUsableFileMaterial, layerOf, makeJewelryMaterial, pickGem, pickMetal, type PartHints } from '@/lib/jewelry-look';
 
 export const HAS_EMBEDDED_GLTF_MATERIAL = '__historyHasEmbeddedGltfMaterial';
 /** Set on a mesh whose file declares that its materials are the real, finished
@@ -86,7 +86,25 @@ export function historyPresetKey(meshName: string, hints: Omit<PartHints, 'objec
 /** Preserve authored materials; add display-only fallbacks to materialless GLTF primitives.
  * `forceJewelryPalette` overrides embedded materials (pipeline GLBs embed grey
  * clay), except on a file that marks its materials as authored. */
-export function applyHistoryPreviewMaterials(model: THREE.Object3D, forceJewelryPalette = false): void {
+/** three's transmission pass draws black in this scissor-split canvas, so a
+ * baked see-through stone keeps its colour but is drawn as the Simple gem:
+ * mirror-like solid with a little self-light. */
+function solidForScissor(material: THREE.Material): THREE.Material {
+  const m = material as THREE.MeshPhysicalMaterial;
+  if (!m.isMeshPhysicalMaterial || !(m.transmission > 0)) return material;
+  const tint = m.attenuationColor && m.attenuationDistance < Infinity ? m.attenuationColor.clone() : m.color.clone();
+  m.transmission = 0;
+  m.color.copy(tint);
+  m.metalness = 0.55;
+  m.roughness = Math.min(m.roughness, 0.02);
+  m.clearcoat = 1;
+  m.emissive.copy(tint);
+  m.emissiveIntensity = 0.35;
+  return m;
+}
+
+/** `_forceJewelryPalette` is kept for callers; the rule is now the same everywhere. */
+export function applyHistoryPreviewMaterials(model: THREE.Object3D, _forceJewelryPalette = false): void {
   // Baked textures mean the file is authored even without the extras mark.
   const textured: THREE.Material[] = [];
   model.traverse((child) => {
@@ -100,14 +118,17 @@ export function applyHistoryPreviewMaterials(model: THREE.Object3D, forceJewelry
     if (!(child as THREE.Mesh).isMesh) return;
 
     const mesh = child as THREE.Mesh;
-    const keepEmbedded = forceJewelryPalette
-      ? mesh.userData[HAS_AUTHORED_GLTF_MATERIAL] === true
-        || (authoredTextures && mesh.userData[HAS_EMBEDDED_GLTF_MATERIAL] === true)
-      : mesh.userData[HAS_EMBEDDED_GLTF_MATERIAL] === true;
+    // One rule for every viewer (jewelry-look resolvePartLook): a real baked
+    // material is shown as authored; a missing or placeholder one (grey clay,
+    // "Material", wax) falls back to the shared preset picker.
+    const embedded = mesh.userData[HAS_EMBEDDED_GLTF_MATERIAL] === true;
+    const first = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+    const keepEmbedded = mesh.userData[HAS_AUTHORED_GLTF_MATERIAL] === true
+      || (embedded && (authoredTextures || isUsableFileMaterial(first)));
     if (keepEmbedded) {
       mesh.material = Array.isArray(mesh.material)
-        ? mesh.material.map((material) => material.clone())
-        : mesh.material.clone();
+        ? mesh.material.map((material) => solidForScissor(material.clone()))
+        : solidForScissor(mesh.material.clone());
       return;
     }
 

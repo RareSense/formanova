@@ -36,19 +36,37 @@ export function makeJewelryMaterial(p: JewelryPreset, opts: JewelryMaterialOptio
     // Blender black_stone(): near-black base, roughness 0.03, full coat.
     m = new THREE.MeshPhysicalMaterial({ color: p.color, metalness: 0, roughness: p.rough ?? 0.03, clearcoat: 1, clearcoatRoughness: 0, envMapIntensity: STUDIO_ENV_INTENSITY.gem, side });
   } else if (opts.simpleGem) {
-    m = new THREE.MeshPhysicalMaterial({ color: p.color, metalness: 0.55, roughness: 0.02, clearcoat: 1, clearcoatRoughness: 0, envMapIntensity: STUDIO_ENV_INTENSITY.gem, side });
+    // Deep stone colour plus a little self-light standing in for the light a real
+    // stone gathers inside; without it the stone reads grey against the dark world.
+    const deep = new THREE.Color(p.atten ?? p.color);
+    m = new THREE.MeshPhysicalMaterial({
+      color: deep, metalness: 0.55, roughness: 0.02, clearcoat: 1, clearcoatRoughness: 0,
+      emissive: deep, emissiveIntensity: 0.35, envMapIntensity: STUDIO_ENV_INTENSITY.gem, side,
+    });
   } else {
     // Blender gem_material(): clear glass, roughness 0, transmission 1, IOR, colour by absorption.
     const size = Math.max(opts.stoneSize ?? 1, 1e-4);
     m = new THREE.MeshPhysicalMaterial({
       color: 0xffffff, metalness: 0, roughness: 0, transmission: 1,
       ior: Math.min(p.ior ?? 1.5, 2.333), thickness: size, specularIntensity: 1,
-      // atten is the colour after GEM_REFERENCE_PATH_M (about three stone diameters of light path).
-      attenuationColor: new THREE.Color(p.atten ?? 0xffffff), attenuationDistance: size * 3,
+      // atten is the colour after GEM_REFERENCE_PATH_M (about seven stone diameters of light path).
+      attenuationColor: new THREE.Color(p.atten ?? 0xffffff), attenuationDistance: size * 7,
       envMapIntensity: STUDIO_ENV_INTENSITY.gem, side,
     });
   }
   m.name = p.label;
   m.userData.jewelryPreset = p.key;
   return m;
+}
+
+/** Brightness of the environment seen through a stone in the refraction
+ * shaders (Studio + CAD to Catalog/admin). Above 1 because the browser traces
+ * one refraction into a mostly dark world, where Cycles gathers light from many
+ * internal bounces off the softboxes and the bright metal seat. Tuned against
+ * the Blender stone close-ups. */
+export const GEM_SHADER_ENV_INTENSITY = 2.5;
+
+/** Colour factor for the refraction shaders: the stone's deep colour. */
+export function gemShaderColor(p: { color: number; atten?: number }): THREE.Color {
+  return new THREE.Color(p.atten ?? p.color);
 }
