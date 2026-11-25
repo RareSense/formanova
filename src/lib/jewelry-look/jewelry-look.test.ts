@@ -107,3 +107,16 @@ describe('resolvePartLook: one rule for every viewer', () => {
     expect(resolvePartLook({ libraryId: 'ruby', fileMaterial: baked, objectName: 'band' })).toMatchObject({ source: 'library', preset: { key: 'ruby' } });
   });
 });
+
+describe('flat baked stones', () => {
+  it('an opaque baked gem falls back to the refractive preset its name picks', async () => {
+    const THREE = await import('three');
+    const ruby = new THREE.MeshStandardMaterial({ name: 'Ruby_lab', color: 0x9b142d, metalness: 0, roughness: 0 });
+    const orange = new THREE.MeshStandardMaterial({ name: 'Sapphire_orange_lab', color: 0xf28a1a, metalness: 0, roughness: 0 });
+    const gold = new THREE.MeshStandardMaterial({ name: 'Gold_18k_yellow', color: 0xffc356, metalness: 1, roughness: 0.18 });
+    expect(isUsableFileMaterial(ruby)).toBe(false);
+    expect(resolvePartLook({ fileMaterial: orange, materialName: orange.name })).toMatchObject({ source: 'picker' });
+    expect(pickGem({ materialName: 'Sapphire_orange_lab' })).toBe('orangeSapphire');
+    expect(isUsableFileMaterial(gold)).toBe(true);
+  });
+});

@@ -1,6 +1,6 @@
 import { modelHasTextureMaps } from '@/lib/gltf-texture-maps';
 import * as THREE from 'three';
-import { JEWELRY_PRESETS, blenderMetalRoughness, isStoneLayer, isUsableFileMaterial, layerOf, makeJewelryMaterial, pickGem, pickMetal, type PartHints } from '@/lib/jewelry-look';
+import { JEWELRY_PRESETS, blenderMetalRoughness, isStoneLayer, isFlatGemMaterial, isUsableFileMaterial, layerOf, makeJewelryMaterial, pickGem, pickMetal, type PartHints } from '@/lib/jewelry-look';
 
 export const HAS_EMBEDDED_GLTF_MATERIAL = '__historyHasEmbeddedGltfMaterial';
 /** Set on a mesh whose file declares that its materials are the real, finished
@@ -123,7 +123,7 @@ export function applyHistoryPreviewMaterials(model: THREE.Object3D, _forceJewelr
     // "Material", wax) falls back to the shared preset picker.
     const embedded = mesh.userData[HAS_EMBEDDED_GLTF_MATERIAL] === true;
     const first = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
-    const keepEmbedded = mesh.userData[HAS_AUTHORED_GLTF_MATERIAL] === true
+    const keepEmbedded = (mesh.userData[HAS_AUTHORED_GLTF_MATERIAL] === true && !isFlatGemMaterial(first))
       || (embedded && (authoredTextures || isUsableFileMaterial(first)));
     if (keepEmbedded) {
       mesh.material = Array.isArray(mesh.material)
