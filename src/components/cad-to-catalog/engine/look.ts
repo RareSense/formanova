@@ -9,22 +9,25 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { installReferenceToneMapping } from './gems';
+import { STUDIO_BACKDROP_LINEAR, STUDIO_EXPOSURE, createStudioEquirect, linearToSrgb, studioBackdropColor } from '@/lib/jewelry-look';
 
 /** What the metal reflects; stones always refract the 1k brown studio, as in FormaNova. */
 export const STUDIOS = [
+  // FormaNova's Blender studio light (src/lib/jewelry-look), drawn locally: the default everywhere.
+  { id: 'studio', name: 'FormaNova Studio', url: null },
   { id: 'photo', name: 'Studio', url: 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/brown_photostudio_02_2k.hdr' },
   { id: 'softbox', name: 'Softboxes', url: '/hdri/jewelry-studio-v2.hdr' },
   { id: 'diamond', name: 'Diamond', url: '/hdri/diamond-studio.hdr' },
-] as const;
+] as const satisfies readonly { id: string; name: string; url: string | null }[];
 export type StudioId = (typeof STUDIOS)[number]['id'];
-const GEM_ENV_URL = 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/brown_photostudio_02_1k.hdr';
 
 export type Backdrop = 'view' | 'white' | 'clear';
 // RenderPass / ShaderPass draw into the read buffer they are given; the write buffer is unused.
 const NO_TARGET = null as unknown as THREE.WebGLRenderTarget;
 const srgb = (hex: number) => new THREE.Vector3(((hex >> 16) & 255) / 255, ((hex >> 8) & 255) / 255, (hex & 255) / 255);
 const BACKDROPS: Record<Backdrop, [THREE.Vector3, THREE.Vector3, number]> = {
-  view: [srgb(0xffffff), srgb(0xc9cdd4), 1], white: [srgb(0xffffff), srgb(0xffffff), 1], clear: [srgb(0), srgb(0), 0],
+  // Blender studio backdrop: flat linear 0.88 grey.
+  view: [new THREE.Vector3(...STUDIO_BACKDROP_LINEAR.map(linearToSrgb)), new THREE.Vector3(...STUDIO_BACKDROP_LINEAR.map(linearToSrgb)), 1], white: [srgb(0xffffff), srgb(0xffffff), 1], clear: [srgb(0), srgb(0), 0],
 };
 
 export class Look {
@@ -32,7 +35,7 @@ export class Look {
   readonly sun: THREE.DirectionalLight;
   /** The raw studio HDRI the gem shader samples (null until loaded). */
   gemEnv: THREE.Texture | null = null;
-  studioId: StudioId = 'photo';
+  studioId: StudioId = 'studio';
   studioReady = false;
   private envMap: THREE.Texture | null = null;
   private pmrem: THREE.PMREMGenerator;
@@ -49,12 +52,13 @@ export class Look {
   constructor(private renderer: THREE.WebGLRenderer, private scene: THREE.Scene, private camera: THREE.PerspectiveCamera, private onChange: () => void) {
     installReferenceToneMapping();
     renderer.toneMapping = THREE.CustomToneMapping;
-    renderer.toneMappingExposure = 1;
+    renderer.toneMappingExposure = STUDIO_EXPOSURE;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.VSMShadowMap; // blurred: a soft drop shadow
     this.pmrem = new THREE.PMREMGenerator(renderer);
 
-    const key = new THREE.DirectionalLight(0xffffff, 0.55);
+    // Off: the Blender studio light is environment-only (kept so callers that move it still work).
+    const key = new THREE.DirectionalLight(0xffffff, 0);
     key.position.set(1.5, 8, 2);
     scene.add(key);
     // Shadow only (no visible floor), so pictures work on any background.
@@ -70,13 +74,10 @@ export class Look {
     this.floor.rotation.x = -Math.PI / 2;
     this.floor.receiveShadow = true;
     scene.add(this.floor);
-    scene.background = this.viewBackdrop();
+    scene.background = studioBackdropColor();
 
-    new RGBELoader().loadAsync(GEM_ENV_URL).then((t) => {
-      t.mapping = THREE.EquirectangularReflectionMapping;
-      this.gemEnv = t;
-      this.onChange();
-    }).catch((e) => console.warn('studio light for stones not loaded', e));
+    // Stones refract the same studio light the metal reflects (no download).
+    this.gemEnv = createStudioEquirect();
     this.setupComposer();
   }
 
@@ -86,7 +87,8 @@ export class Look {
     const st = STUDIOS.find((x) => x.id === id) || STUDIOS[0];
     this.studioId = st.id;
     if (!this.studioMaps.has(st.id)) {
-      this.studioMaps.set(st.id, new RGBELoader().loadAsync(st.url).then((t) => {
+      const url = st.url;
+      this.studioMaps.set(st.id, (url ? new RGBELoader().loadAsync(url) : Promise.resolve(createStudioEquirect() as THREE.Texture)).then((t) => {
         t.mapping = THREE.EquirectangularReflectionMapping;
         return this.pmrem.fromEquirectangular(t).texture;
       }));
@@ -220,20 +222,5 @@ export class Look {
       console.warn('crevice shading off', e);
       this.composer = null;
     }
-  }
-
-  // The view's backdrop as FormaNova's viewer draws it: white at the top fading to #c9cdd4.
-  private viewBackdrop() {
-    const c = document.createElement('canvas');
-    c.width = 2; c.height = 512;
-    const g = c.getContext('2d')!;
-    const grad = g.createLinearGradient(0, 0, 0, 512);
-    grad.addColorStop(0, '#ffffff');
-    grad.addColorStop(1, '#c9cdd4');
-    g.fillStyle = grad;
-    g.fillRect(0, 0, 2, 512);
-    const t = new THREE.CanvasTexture(c);
-    t.colorSpace = THREE.SRGBColorSpace;
-    return t;
   }
 }

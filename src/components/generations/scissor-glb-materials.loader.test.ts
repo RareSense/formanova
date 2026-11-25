@@ -1,3 +1,4 @@
+import { JEWELRY_PRESETS } from '@/lib/jewelry-look';
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -53,9 +54,10 @@ async function loadForcedPaletteCard(glb: ArrayBuffer): Promise<THREE.MeshStanda
 }
 
 describe('forced-palette cards, through the real GLTF loader', () => {
-  it('shows gold on a GLB that does not mark its materials (unchanged behaviour)', async () => {
+  it('replaces unmarked materials with the shared preset its material name picks', async () => {
     const material = await loadForcedPaletteCard(buildGlb());
-    expect(material.color.getHex()).toBe(0xffd88a);
+    // Material "Gold_black_rhodium": the shared picker reads the material name first.
+    expect(material.color.getHex()).toBe(JEWELRY_PRESETS.blackRhodium.color);
   });
 
   it('keeps the file materials on a GLB marked formanovaMaterials: "authored"', async () => {

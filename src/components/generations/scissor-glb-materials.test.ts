@@ -4,6 +4,7 @@ import {
   applyHistoryPreviewMaterials,
   markEmbeddedGltfMaterials,
 } from './scissor-glb-materials';
+import { JEWELRY_PRESETS } from '@/lib/jewelry-look';
 
 function meshNamed(name: string, material = new THREE.MeshStandardMaterial()): THREE.Mesh {
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), material);
@@ -22,8 +23,8 @@ describe('applyHistoryPreviewMaterials', () => {
     const material = mesh.material as THREE.MeshStandardMaterial;
     expect(material.metalness).toBe(1);
     expect(material.roughness).toBeLessThan(0.4);
-    // Same gold as CADCanvas gold18k, so history matches the Studio.
-    expect(material.color.getHex()).toBe(0xffd88a);
+    // Same gold as every viewer: the shared Blender-derived preset.
+    expect(material.color.getHex()).toBe(JEWELRY_PRESETS.gold18k.color);
   });
 
   it('uses the explicit pink semantic for Top_CenterStone_Pink', () => {
@@ -32,14 +33,12 @@ describe('applyHistoryPreviewMaterials', () => {
     model.add(mesh);
 
     applyHistoryPreviewMaterials(model);
-
     const material = mesh.material as THREE.MeshPhysicalMaterial;
-    expect(material.metalness).toBe(0);
-    expect(material.transmission).toBeGreaterThan(0);
-    expect(material.color.getHex()).toBe(0xf4c6c6);
+    expect(material.metalness).toBeGreaterThan(0);
+    expect(material.userData.jewelryPreset).toBe('pinkSapphire');
   });
 
-  it('uses a visible blue fallback for a gem without a color semantic', () => {
+  it('shows a gem without a color semantic as diamond', () => {
     const model = new THREE.Group();
     const mesh = meshNamed('CenterStone');
     model.add(mesh);
@@ -47,8 +46,8 @@ describe('applyHistoryPreviewMaterials', () => {
     applyHistoryPreviewMaterials(model);
 
     const material = mesh.material as THREE.MeshPhysicalMaterial;
-    expect(material.color.getHex()).toBe(0x4f7ce0);
-    expect(material.transmission).toBeGreaterThan(0);
+    expect(material.userData.jewelryPreset).toBe('diamond');
+    expect(material.clearcoat).toBe(1);
     expect(material.roughness).toBeLessThan(0.3);
   });
 
@@ -96,7 +95,7 @@ describe('applyHistoryPreviewMaterials', () => {
     applyHistoryPreviewMaterials(model, true);
 
     const material = mesh.material as THREE.MeshStandardMaterial;
-    expect(material.color.getHex()).toBe(0xffd88a);
+    expect(material.color.getHex()).toBe(JEWELRY_PRESETS.gold18k.color);
     expect(material.metalness).toBe(1);
   });
 
@@ -141,7 +140,7 @@ describe('applyHistoryPreviewMaterials', () => {
 
     applyHistoryPreviewMaterials(model, true);
 
-    expect((mesh.material as THREE.MeshStandardMaterial).color.getHex()).toBe(0xffd88a);
+    expect((mesh.material as THREE.MeshStandardMaterial).color.getHex()).toBe(JEWELRY_PRESETS.gold18k.color);
   });
 
   it('ignores any other marker value and keeps forcing the palette', () => {
@@ -160,7 +159,7 @@ describe('applyHistoryPreviewMaterials', () => {
 
       applyHistoryPreviewMaterials(model, true);
 
-      expect((mesh.material as THREE.MeshStandardMaterial).color.getHex()).toBe(0xffd88a);
+      expect((mesh.material as THREE.MeshStandardMaterial).color.getHex()).toBe(JEWELRY_PRESETS.gold18k.color);
     }
   });
 

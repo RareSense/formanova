@@ -1,5 +1,6 @@
 import { modelHasTextureMaps } from '@/lib/gltf-texture-maps';
 import * as THREE from 'three';
+import { JEWELRY_PRESETS, blenderMetalRoughness, isStoneLayer, layerOf, makeJewelryMaterial, pickGem, pickMetal, type PartHints } from '@/lib/jewelry-look';
 
 export const HAS_EMBEDDED_GLTF_MATERIAL = '__historyHasEmbeddedGltfMaterial';
 /** Set on a mesh whose file declares that its materials are the real, finished
@@ -32,24 +33,8 @@ interface ParsedGltfMaterialMetadata {
   };
 }
 
-const GEM_RE = /diamond|gem|stone|crystal|jewel|brill|ruby|emerald|sapphire|topaz|opal|garnet|amethyst|pearl|cz|cubic|solitaire|pave|prong_stone|accent_stone|center_stone|main_stone/i;
+const GEM_RE = /diamond|gem|stone|crystal|jewel|brill|ruby|emerald|sapphire|topaz|opal|garnet|amethyst|pearl|cz|cubic|solitaire|pave|prong_stone|accent_stone|center_stone|main_stone|padparad/i;
 const METAL_RE = /band|ring|shank|prong|setting|mount|bezel|basket|gallery|shoulder|bridge|head|collet|metal|gold|silver|platinum|frame|base/i;
-
-/** Taken from CADCanvas's REFERENCE_MATERIALS so a stone reads as the same
- * colour in history as it does in the Studio. The previous values were several
- * shades darker, which made every gem look like a different stone once the
- * design was opened. */
-const GEM_COLORS: Array<[RegExp, number]> = [
-  [/(?:^|[_\s.-])pink(?:$|[_\s.-])/i, 0xf4c6c6],
-  [/(?:^|[_\s.-])red(?:$|[_\s.-])|ruby/i, 0xf26a8c],
-  [/(?:^|[_\s.-])green(?:$|[_\s.-])|emerald/i, 0x46c684],
-  [/(?:^|[_\s.-])blue(?:$|[_\s.-])|sapphire/i, 0x4f7ce0],
-  [/(?:^|[_\s.-])purple(?:$|[_\s.-])|amethyst/i, 0xb488e2],
-];
-
-function fallbackGemColor(name: string): number {
-  return GEM_COLORS.find(([pattern]) => pattern.test(name))?.[1] ?? 0x4f7ce0;
-}
 
 function declaresAuthoredMaterials(extras: unknown): boolean {
   return typeof extras === 'object' && extras !== null
@@ -73,54 +58,29 @@ export function markEmbeddedGltfMaterials(gltf: ParsedGltfMaterialMetadata): voi
   });
 }
 
-// Glass windows (lockets, amulet frames) must stay see-through so whatever sits
-// behind them shows; the gem fallback below is a mostly opaque blue.
+// Glass windows (lockets, amulet frames) must stay see-through so whatever sits behind them shows.
 const GLASS_RE = /glass|window/i;
 
-export function createHistoryFallbackMaterial(meshName: string): THREE.Material {
-  if (GLASS_RE.test(meshName)) {
-    return new THREE.MeshPhysicalMaterial({
-      color: 0xffffff,
-      metalness: 0,
-      roughness: 0,
-      transparent: true,
-      opacity: 0.12,
-      depthWrite: false,
-      envMapIntensity: 1,
-      side: THREE.DoubleSide,
-    });
-  }
+/** Display material for a part without an authored one, from the shared
+ * jewelry-look presets (the same table the Studio and admin viewers use). */
+export function createHistoryFallbackMaterial(
+  meshName: string,
+  hints: Omit<PartHints, 'objectName'> = {},
+  stoneSize?: number,
+  fileRoughness?: number | null,
+): THREE.Material {
+  const preset = JEWELRY_PRESETS[historyPresetKey(meshName, hints)];
+  const look = preset.kind === 'metal' ? { ...preset, rough: blenderMetalRoughness(fileRoughness, preset.rough) } : preset;
+  // Simple gems: three's transmission pass renders black in the scissor-split grid canvas.
+  return makeJewelryMaterial(look, { stoneSize, simpleGem: true });
+}
 
-  const isGem = GEM_RE.test(meshName) && !METAL_RE.test(meshName);
-
-  if (isGem) {
-    return new THREE.MeshPhysicalMaterial({
-      color: fallbackGemColor(meshName),
-      metalness: 0,
-      roughness: 0.04,
-      transmission: 0.22,
-      thickness: 0.35,
-      ior: 2.1,
-      clearcoat: 1,
-      clearcoatRoughness: 0.08,
-      // CADCanvas REFERENCE_BASE_ENV.gem. Gems take far more environment than
-      // metal, which is most of why a stone looked flat here.
-      envMapIntensity: 2.3,
-      side: THREE.DoubleSide,
-    });
-  }
-
-  // Matches CADCanvas's gold18k reference material (0xffd88a at roughness
-  // 0.08) so a ring looks the same in history as it does once opened in the
-  // Studio. The previous darker, rougher gold read as a different metal.
-  return new THREE.MeshStandardMaterial({
-    color: 0xffd88a,
-    metalness: 1,
-    roughness: 0.08,
-    // CADCanvas REFERENCE_BASE_ENV.metal.
-    envMapIntensity: 1.15,
-    side: THREE.DoubleSide,
-  });
+export function historyPresetKey(meshName: string, hints: Omit<PartHints, 'objectName'> = {}): string {
+  const all = { ...hints, objectName: meshName };
+  if (GLASS_RE.test(meshName)) return 'clearGlass';
+  const text = `${hints.materialName ?? ''} ${meshName}`;
+  const isGem = isStoneLayer(hints.layer) || (GEM_RE.test(text) && !METAL_RE.test(meshName));
+  return isGem ? pickGem(all) : pickMetal(all);
 }
 
 /** Preserve authored materials; add display-only fallbacks to materialless GLTF primitives.
@@ -151,6 +111,14 @@ export function applyHistoryPreviewMaterials(model: THREE.Object3D, forceJewelry
       return;
     }
 
-    mesh.material = createHistoryFallbackMaterial(mesh.name);
+    const original = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+    mesh.geometry.computeBoundingBox();
+    const size = mesh.geometry.boundingBox?.getSize(new THREE.Vector3());
+    mesh.material = createHistoryFallbackMaterial(
+      mesh.name,
+      { materialName: mesh.userData[HAS_EMBEDDED_GLTF_MATERIAL] === true ? original?.name : null, layer: layerOf(mesh) },
+      size ? Math.max((size.x + size.y + size.z) / 3, 1e-4) : undefined,
+      mesh.userData[HAS_EMBEDDED_GLTF_MATERIAL] === true ? (original as THREE.MeshStandardMaterial)?.roughness : null,
+    );
   });
 }
