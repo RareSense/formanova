@@ -18,7 +18,7 @@ export interface JewelryMaterialOptions {
   simpleGem?: boolean;
 }
 
-export function makeJewelryMaterial(p: JewelryPreset, opts: JewelryMaterialOptions = {}): THREE.MeshPhysicalMaterial {
+export function makeJewelryMaterial(p: Omit<JewelryPreset, "key" | "blender">, opts: JewelryMaterialOptions = {}): THREE.MeshPhysicalMaterial {
   const side = opts.side ?? THREE.DoubleSide;
   let m: THREE.MeshPhysicalMaterial;
   if (p.kind === 'metal') {
@@ -55,7 +55,7 @@ export function makeJewelryMaterial(p: JewelryPreset, opts: JewelryMaterialOptio
     });
   }
   m.name = p.label;
-  m.userData.jewelryPreset = p.key;
+  if ("key" in p) m.userData.jewelryPreset = (p as JewelryPreset).key;
   return m;
 }
 

@@ -36,7 +36,7 @@ import { findMaterial, findMaterialByName } from "@/components/cad-studio/materi
 import type { MaterialDef } from "@/components/cad-studio/materials";
 import { classifyCadPartName, isCadGemName } from "@/lib/cad-part-classifier";
 import {
-  JEWELRY_PRESETS, LIBRARY_ID_TO_PRESET, STUDIO_ENV_INTENSITY, STUDIO_EXPOSURE,
+  JEWELRY_PRESETS, LIBRARY_ID_TO_PRESET, makeJewelryMaterial, STUDIO_ENV_INTENSITY, STUDIO_EXPOSURE,
   GEM_SHADER_ENV_INTENSITY, blenderMetalRoughness, isUsableFileMaterial, createStudioLight, gemShaderColor, gemFamily, isStoneLayer, layerOf, pickGem, pickMetal, studioBackdropColor,
   type PartHints,
 } from "@/lib/jewelry-look";
@@ -160,18 +160,9 @@ function makeReferencePhysicalMaterial(spec: ReferenceMaterialSpec): THREE.MeshP
       side: THREE.DoubleSide,
     });
   } else {
-    // Exact FAST GEMS fallback from the reference implementation.
-    material = new THREE.MeshPhysicalMaterial({
-      color: spec.color,
-      // Simple gems: a mirror-like solid so facets read as light and dark planes,
-      // instead of a see-through glow that washed diamonds out to a white blob.
-      metalness: 0.55,
-      roughness: spec.rough ?? 0.02,
-      envMapIntensity: 1.6,
-      clearcoat: 1,
-      clearcoatRoughness: 0,
-      side: THREE.DoubleSide,
-    });
+    // Simple gems: the shared mirror-like solid stone (deep stone colour plus a
+    // little self-light), the same one the history cards use, so a ruby reads ruby.
+    material = makeJewelryMaterial(spec, { simpleGem: true });
   }
   material.name = spec.label;
   material.userData.referenceMaterial = true;

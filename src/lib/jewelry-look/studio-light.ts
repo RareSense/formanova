@@ -12,8 +12,10 @@
  */
 import * as THREE from 'three';
 
-/** Blender: world grey seen in reflections (env_level for a plain backdrop). */
-export const STUDIO_WORLD = 0.05;
+/** World grey seen in reflections. Blender uses 0.05, but its gold also gathers light
+ * from the lit backdrop and floor; at 0.05 the browser gold went dull olive. 0.6
+ * matches the Blender three-quarter ring render (bright polished yellow). */
+export const STUDIO_WORLD = 0.6;
 /** Blender: --light-scale default when the world is dark. */
 export const STUDIO_LIGHT_SCALE = 10;
 /** Blender: --exposure default when the world is dark, in stops. */
