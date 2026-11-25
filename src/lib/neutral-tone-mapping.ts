@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { STUDIO_EXPOSURE } from '@/lib/jewelry-look/studio-light';
 
 /**
  * Khronos PBR Neutral tone mapping, installed over three's CustomToneMapping
@@ -37,8 +36,8 @@ vec3 CustomToneMapping( vec3 color ) {
 }
 `;
 
-/** Blender studio_render.py exposure (-1.4 stops), shared by every viewer. */
-export const NEUTRAL_TONE_MAPPING_EXPOSURE = STUDIO_EXPOSURE;
+/** Matches CADCanvas's default (1.0 * intensity, intensity defaulting to 1). */
+export const NEUTRAL_TONE_MAPPING_EXPOSURE = 1.0;
 
 let installed = false;
 
@@ -57,4 +56,43 @@ export function applyNeutralToneMapping(renderer: THREE.WebGLRenderer): void {
   }
   renderer.toneMapping = THREE.CustomToneMapping;
   renderer.toneMappingExposure = NEUTRAL_TONE_MAPPING_EXPOSURE;
+}
+
+/**
+ * The environment CADCanvas lights with by default (its `photostudio` key).
+ *
+ * On polished metal the environment IS the appearance: every highlight and
+ * reflection is the room, not the lights. The history preview used to load a
+ * different HDRI, so matching the tone mapping and the light rig still left it
+ * looking like a different piece once opened in the Studio.
+ */
+export const STUDIO_ENVIRONMENT_HDR =
+  'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/brown_photostudio_02_1k.hdr';
+
+/**
+ * The Studio viewport's backdrop: a vertical white to light grey gradient,
+ * mirroring CADCanvas's makeReferenceBackground.
+ *
+ * Deliberately fixed rather than themed. It is a photographic sweep, the same
+ * idea as the paper behind a product shot, so the ring is judged against a
+ * neutral ground in every theme. History previews used the theme background
+ * instead, which is near-black in dark mode and made the same model read
+ * completely differently.
+ *
+ * CADCanvas is protected and cannot import this, so the two must stay in step.
+ */
+export function makeStudioBackdrop(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 2;
+  canvas.height = 512;
+  const context = canvas.getContext('2d');
+  if (!context) return new THREE.CanvasTexture(canvas);
+  const gradient = context.createLinearGradient(0, 0, 0, 512);
+  gradient.addColorStop(0, '#ffffff');
+  gradient.addColorStop(1, '#c9cdd4');
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, 2, 512);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
 }

@@ -1,6 +1,5 @@
 import { modelHasTextureMaps } from '@/lib/gltf-texture-maps';
 import * as THREE from 'three';
-import { JEWELRY_PRESETS, blenderMetalRoughness, isStoneLayer, isFlatGemMaterial, isUsableFileMaterial, layerOf, makeJewelryMaterial, pickGem, pickMetal, type PartHints } from '@/lib/jewelry-look';
 
 export const HAS_EMBEDDED_GLTF_MATERIAL = '__historyHasEmbeddedGltfMaterial';
 /** Set on a mesh whose file declares that its materials are the real, finished
@@ -33,8 +32,24 @@ interface ParsedGltfMaterialMetadata {
   };
 }
 
-const GEM_RE = /diamond|gem|stone|crystal|jewel|brill|ruby|emerald|sapphire|topaz|opal|garnet|amethyst|pearl|cz|cubic|solitaire|pave|prong_stone|accent_stone|center_stone|main_stone|padparad/i;
+const GEM_RE = /diamond|gem|stone|crystal|jewel|brill|ruby|emerald|sapphire|topaz|opal|garnet|amethyst|pearl|cz|cubic|solitaire|pave|prong_stone|accent_stone|center_stone|main_stone/i;
 const METAL_RE = /band|ring|shank|prong|setting|mount|bezel|basket|gallery|shoulder|bridge|head|collet|metal|gold|silver|platinum|frame|base/i;
+
+/** Taken from CADCanvas's REFERENCE_MATERIALS so a stone reads as the same
+ * colour in history as it does in the Studio. The previous values were several
+ * shades darker, which made every gem look like a different stone once the
+ * design was opened. */
+const GEM_COLORS: Array<[RegExp, number]> = [
+  [/(?:^|[_\s.-])pink(?:$|[_\s.-])/i, 0xf4c6c6],
+  [/(?:^|[_\s.-])red(?:$|[_\s.-])|ruby/i, 0xf26a8c],
+  [/(?:^|[_\s.-])green(?:$|[_\s.-])|emerald/i, 0x46c684],
+  [/(?:^|[_\s.-])blue(?:$|[_\s.-])|sapphire/i, 0x4f7ce0],
+  [/(?:^|[_\s.-])purple(?:$|[_\s.-])|amethyst/i, 0xb488e2],
+];
+
+function fallbackGemColor(name: string): number {
+  return GEM_COLORS.find(([pattern]) => pattern.test(name))?.[1] ?? 0x4f7ce0;
+}
 
 function declaresAuthoredMaterials(extras: unknown): boolean {
   return typeof extras === 'object' && extras !== null
@@ -58,53 +73,60 @@ export function markEmbeddedGltfMaterials(gltf: ParsedGltfMaterialMetadata): voi
   });
 }
 
-// Glass windows (lockets, amulet frames) must stay see-through so whatever sits behind them shows.
+// Glass windows (lockets, amulet frames) must stay see-through so whatever sits
+// behind them shows; the gem fallback below is a mostly opaque blue.
 const GLASS_RE = /glass|window/i;
 
-/** Display material for a part without an authored one, from the shared
- * jewelry-look presets (the same table the Studio and admin viewers use). */
-export function createHistoryFallbackMaterial(
-  meshName: string,
-  hints: Omit<PartHints, 'objectName'> = {},
-  stoneSize?: number,
-  fileRoughness?: number | null,
-): THREE.Material {
-  const preset = JEWELRY_PRESETS[historyPresetKey(meshName, hints)];
-  const look = preset.kind === 'metal' ? { ...preset, rough: blenderMetalRoughness(fileRoughness, preset.rough) } : preset;
-  // Simple gems: three's transmission pass renders black in the scissor-split grid canvas.
-  return makeJewelryMaterial(look, { stoneSize, simpleGem: true });
-}
+export function createHistoryFallbackMaterial(meshName: string): THREE.Material {
+  if (GLASS_RE.test(meshName)) {
+    return new THREE.MeshPhysicalMaterial({
+      color: 0xffffff,
+      metalness: 0,
+      roughness: 0,
+      transparent: true,
+      opacity: 0.12,
+      depthWrite: false,
+      envMapIntensity: 1,
+      side: THREE.DoubleSide,
+    });
+  }
 
-export function historyPresetKey(meshName: string, hints: Omit<PartHints, 'objectName'> = {}): string {
-  const all = { ...hints, objectName: meshName };
-  if (GLASS_RE.test(meshName)) return 'clearGlass';
-  const text = `${hints.materialName ?? ''} ${meshName}`;
-  const isGem = isStoneLayer(hints.layer) || (GEM_RE.test(text) && !METAL_RE.test(meshName));
-  return isGem ? pickGem(all) : pickMetal(all);
+  const isGem = GEM_RE.test(meshName) && !METAL_RE.test(meshName);
+
+  if (isGem) {
+    return new THREE.MeshPhysicalMaterial({
+      color: fallbackGemColor(meshName),
+      metalness: 0,
+      roughness: 0.04,
+      transmission: 0.22,
+      thickness: 0.35,
+      ior: 2.1,
+      clearcoat: 1,
+      clearcoatRoughness: 0.08,
+      // CADCanvas REFERENCE_BASE_ENV.gem. Gems take far more environment than
+      // metal, which is most of why a stone looked flat here.
+      envMapIntensity: 2.3,
+      side: THREE.DoubleSide,
+    });
+  }
+
+  // Matches CADCanvas's gold18k reference material (0xffd88a at roughness
+  // 0.08) so a ring looks the same in history as it does once opened in the
+  // Studio. The previous darker, rougher gold read as a different metal.
+  return new THREE.MeshStandardMaterial({
+    color: 0xffd88a,
+    metalness: 1,
+    roughness: 0.08,
+    // CADCanvas REFERENCE_BASE_ENV.metal.
+    envMapIntensity: 1.15,
+    side: THREE.DoubleSide,
+  });
 }
 
 /** Preserve authored materials; add display-only fallbacks to materialless GLTF primitives.
  * `forceJewelryPalette` overrides embedded materials (pipeline GLBs embed grey
  * clay), except on a file that marks its materials as authored. */
-/** three's transmission pass draws black in this scissor-split canvas, so a
- * baked see-through stone keeps its colour but is drawn as the Simple gem:
- * mirror-like solid with a little self-light. */
-function solidForScissor(material: THREE.Material): THREE.Material {
-  const m = material as THREE.MeshPhysicalMaterial;
-  if (!m.isMeshPhysicalMaterial || !(m.transmission > 0)) return material;
-  const tint = m.attenuationColor && m.attenuationDistance < Infinity ? m.attenuationColor.clone() : m.color.clone();
-  m.transmission = 0;
-  m.color.copy(tint);
-  m.metalness = 0.55;
-  m.roughness = Math.min(m.roughness, 0.02);
-  m.clearcoat = 1;
-  m.emissive.copy(tint);
-  m.emissiveIntensity = 0.35;
-  return m;
-}
-
-/** `_forceJewelryPalette` is kept for callers; the rule is now the same everywhere. */
-export function applyHistoryPreviewMaterials(model: THREE.Object3D, _forceJewelryPalette = false): void {
+export function applyHistoryPreviewMaterials(model: THREE.Object3D, forceJewelryPalette = false): void {
   // Baked textures mean the file is authored even without the extras mark.
   const textured: THREE.Material[] = [];
   model.traverse((child) => {
@@ -118,28 +140,17 @@ export function applyHistoryPreviewMaterials(model: THREE.Object3D, _forceJewelr
     if (!(child as THREE.Mesh).isMesh) return;
 
     const mesh = child as THREE.Mesh;
-    // One rule for every viewer (jewelry-look resolvePartLook): a real baked
-    // material is shown as authored; a missing or placeholder one (grey clay,
-    // "Material", wax) falls back to the shared preset picker.
-    const embedded = mesh.userData[HAS_EMBEDDED_GLTF_MATERIAL] === true;
-    const first = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
-    const keepEmbedded = (mesh.userData[HAS_AUTHORED_GLTF_MATERIAL] === true && !isFlatGemMaterial(first))
-      || (embedded && (authoredTextures || isUsableFileMaterial(first)));
+    const keepEmbedded = forceJewelryPalette
+      ? mesh.userData[HAS_AUTHORED_GLTF_MATERIAL] === true
+        || (authoredTextures && mesh.userData[HAS_EMBEDDED_GLTF_MATERIAL] === true)
+      : mesh.userData[HAS_EMBEDDED_GLTF_MATERIAL] === true;
     if (keepEmbedded) {
       mesh.material = Array.isArray(mesh.material)
-        ? mesh.material.map((material) => solidForScissor(material.clone()))
-        : solidForScissor(mesh.material.clone());
+        ? mesh.material.map((material) => material.clone())
+        : mesh.material.clone();
       return;
     }
 
-    const original = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
-    mesh.geometry.computeBoundingBox();
-    const size = mesh.geometry.boundingBox?.getSize(new THREE.Vector3());
-    mesh.material = createHistoryFallbackMaterial(
-      mesh.name,
-      { materialName: mesh.userData[HAS_EMBEDDED_GLTF_MATERIAL] === true ? original?.name : null, layer: layerOf(mesh) },
-      size ? Math.max((size.x + size.y + size.z) / 3, 1e-4) : undefined,
-      mesh.userData[HAS_EMBEDDED_GLTF_MATERIAL] === true ? (original as THREE.MeshStandardMaterial)?.roughness : null,
-    );
+    mesh.material = createHistoryFallbackMaterial(mesh.name);
   });
 }

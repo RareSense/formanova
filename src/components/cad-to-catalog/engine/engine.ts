@@ -8,8 +8,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { loadCad, UNIT_SCALE, type LoadInfo, type LoadOptions } from './formats';
 import { classify, collectParts, buildSets, splitByConnectivity, type Part, type PartSet, type PartGroup } from './parts';
-import { MaterialCache, PRESETS, gemFor, metalFor, type Choice } from './materials';
-import { STUDIO_EXPOSURE, blenderMetalRoughness, resolvePartLook } from '@/lib/jewelry-look';
+import { MaterialCache, PRESETS, gemFromName, type Choice } from './materials';
 import { Look, type Backdrop } from './look';
 import { gemEntryStep } from './gems';
 import type { GemMode } from '@/components/text-to-cad/GemInstanceRenderer';
@@ -70,7 +69,7 @@ export class CatalogEngine {
     this.holder.add(this.axis);
     this.scene.add(this.holder);
     this.look = new Look(this.renderer, this.scene, this.camera, () => this.refreshGems());
-    this.look.setStudio('studio').catch((e) => console.warn(e));
+    this.look.setStudio('photo').catch((e) => console.warn(e));
     this.renderer.setAnimationLoop(() => {
       if (this.busy) return;
       if (this.controls.update()) this.needsRender = true;
@@ -141,16 +140,10 @@ export class CatalogEngine {
           (mat as THREE.ShaderMaterial).uniformsNeedUpdate = true;
         }
       };
-      // Shared rule (jewelry-look resolvePartLook): the file's own material when it is a
-      // real one; otherwise a shared preset picked from material name, layer, object name.
-      const fileMat = p.mesh.userData.c2p?.sourceMaterial as THREE.Material | undefined;
-      const look = resolvePartLook({ fileMaterial: p.source.isDefault ? null : fileMat, materialName: p.source.name, layer: p.layer, objectName: p.name, stoneByName: p.group === 'stone' });
-      if (look.source === 'file') p.choice = null;
-      else if (look.preset.kind === 'gem' || p.group === 'stone') p.choice = { kind: 'preset', id: gemFor({ materialName: p.source.name, layer: p.layer, objectName: p.name }) };
-      else {
-        const id = metalFor({ materialName: p.source.name, layer: p.layer, objectName: p.name }) ?? 'gold-yellow';
-        p.choice = { kind: 'preset', id, rough: blenderMetalRoughness((fileMat as THREE.MeshStandardMaterial | undefined)?.roughness, PRESETS.get(id)?.roughness) };
-      }
+      // Stones start as refractive gems (a flat file colour cannot refract); metal
+      // keeps what the file says; parts with no material at all start as yellow gold.
+      p.choice = p.group === 'stone' ? { kind: 'preset', id: gemFromName(`${p.source.name} ${p.name}`) }
+        : p.source.isDefault ? { kind: 'preset', id: 'gold-yellow' } : null;
     }
     this.axis.add(root);
     this.axis.scale.setScalar(UNIT_SCALE[info.units] || 1);
@@ -343,7 +336,7 @@ export class CatalogEngine {
   fitDistanceFor(radius: number, focal: number) { return fitDistance(this, radius, focal); }
   modelSphere() { return this.sphere(); }
 
-  setLight(v: number) { this.renderer.toneMappingExposure = STUDIO_EXPOSURE * v; this.needsRender = true; }
+  setLight(v: number) { this.renderer.toneMappingExposure = v; this.needsRender = true; }
   /** Stones as the refraction shader (Refract) or physical glass (Simple), as the other CAD pages' gem toggle. */
   setGemMode(mode: GemMode) {
     if (mode === this.gemMode) return;

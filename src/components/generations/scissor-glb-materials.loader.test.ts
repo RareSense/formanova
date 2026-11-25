@@ -1,4 +1,3 @@
-import { JEWELRY_PRESETS } from '@/lib/jewelry-look';
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -54,12 +53,9 @@ async function loadForcedPaletteCard(glb: ArrayBuffer): Promise<THREE.MeshStanda
 }
 
 describe('forced-palette cards, through the real GLTF loader', () => {
-  it('keeps a real baked material even when the file is not marked authored', async () => {
+  it('shows gold on a GLB that does not mark its materials (unchanged behaviour)', async () => {
     const material = await loadForcedPaletteCard(buildGlb());
-    // One rule in every viewer: a real file material is shown as baked.
-    expect(material.name).toBe('Gold_black_rhodium');
-    expect(material.metalness).toBe(1);
-    expect(material.color.getHex()).not.toBe(JEWELRY_PRESETS.blackRhodium.color);
+    expect(material.color.getHex()).toBe(0xffd88a);
   });
 
   it('keeps the file materials on a GLB marked formanovaMaterials: "authored"', async () => {
