@@ -21,9 +21,10 @@ import React, {
   useMemo,
 } from 'react';
 import * as THREE from 'three';
-import { applyNeutralToneMapping } from '@/lib/neutral-tone-mapping';
-import { createStudioLight, studioBackdropColor } from '@/lib/jewelry-look';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { applyNeutralToneMapping, makeStudioBackdrop, STUDIO_ENVIRONMENT_HDR } from '@/lib/neutral-tone-mapping';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { RGBELoader } from 'three-stdlib';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Box } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
@@ -97,14 +98,12 @@ export function ScissorGLBGrid({ children, continuous = true }: ScissorGLBGridPr
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const cardsRef = useRef<Map<string, CardEntry>>(new Map());
-  // Dev only: lets the local viewer-look check put every viewer on the same camera.
-  if (__DEV__ && typeof window !== 'undefined') (window as unknown as { __scissorCards?: unknown }).__scissorCards = cardsRef.current;
   const listenersRef = useRef<Map<string, Set<CardStateListener>>>(new Map());
   const rafRef = useRef<number>(0);
   const envMapRef = useRef<THREE.Texture | null>(null);
   /** One backdrop shared by every card, built lazily so it is not created
    * during SSR or before a scene needs it. */
-  const backdropRef = useRef<THREE.Color | null>(null);
+  const backdropRef = useRef<THREE.Texture | null>(null);
   const gltfLoaderRef = useRef(new GLTFLoader());
   const pendingRegistrationsRef = useRef(new PendingCardRegistrationQueue<HTMLDivElement>());
   const requestRenderRef = useRef<() => void>(() => undefined);
@@ -141,15 +140,30 @@ export function ScissorGLBGrid({ children, continuous = true }: ScissorGLBGridPr
     rendererRef.current = renderer;
     setRendererReady(true);
 
-    // The Blender studio light (shared jewelry-look module), built locally:
-    // no download, so the first preview is already lit the final way.
-    const studio = createStudioLight(renderer);
-    envMapRef.current = studio.env;
+    // Neutral studio box as the immediate environment, replaced by the HDRI
+    // once it arrives. Studio does the same, and without it a preview rendered
+    // before the download finished would be lit by the directional alone.
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const roomTarget = pmrem.fromScene(new RoomEnvironment(), 0.04);
+    envMapRef.current = roomTarget.texture;
+    pmrem.dispose();
+
+    // Preload HDRI environment
+    const rgbeLoader = new RGBELoader();
+    rgbeLoader.load(STUDIO_ENVIRONMENT_HDR, (texture) => {
+      texture.mapping = THREE.EquirectangularReflectionMapping;
+      envMapRef.current = texture;
+      for (const card of cardsRef.current.values()) {
+        card.scene.environment = texture;
+      }
+      requestRenderRef.current();
+    });
+
 
     return () => {
       cancelAnimationFrame(rafRef.current);
       renderer.dispose();
-      studio.dispose();
+      envMapRef.current?.dispose();
       rendererRef.current = null;
       pendingRegistrations.clear();
     };
@@ -340,11 +354,16 @@ export function ScissorGLBGrid({ children, continuous = true }: ScissorGLBGridPr
     const scene = new THREE.Scene();
     // The Studio's fixed backdrop, not the theme colour: the ring should sit
     // on the same neutral sweep it will sit on once opened.
-    if (!backdropRef.current) backdropRef.current = studioBackdropColor();
+    if (!backdropRef.current) backdropRef.current = makeStudioBackdrop();
     scene.background = backdropRef.current;
 
-    // Lit by the studio environment alone, like the Blender render and the
-    // Studio viewport (whose directional light only casts the floor shadow).
+    // Matches the Studio rig: one directional light at the same intensity and
+    // angle, with the environment doing the rest. The ambient light that used
+    // to sit here flattened the metal by filling the shadows that give it its
+    // shape.
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.55);
+    dirLight.position.set(1.5, 8, 2);
+    scene.add(dirLight);
 
     if (envMapRef.current) {
       scene.environment = envMapRef.current;

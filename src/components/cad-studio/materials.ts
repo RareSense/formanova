@@ -1,5 +1,4 @@
 import * as THREE from "three";
-import { JEWELRY_PRESETS, LIBRARY_ID_TO_PRESET, makeJewelryMaterial } from "@/lib/jewelry-look";
 
 // ── Refraction config for gemstones (used by MeshRefractionMaterial overlay) ──
 export interface GemRefractionConfig {
@@ -332,30 +331,6 @@ export const MATERIAL_LIBRARY: MaterialDef[] = [
     }),
   },
 ];
-
-// Coloured sapphires: added with the shared Blender-derived presets.
-const swatch = (key: string) => `#${JEWELRY_PRESETS[key].atten!.toString(16).padStart(6, "0")}`;
-for (const [id, key, name] of [
-  ["orange-sapphire", "orangeSapphire", "Orange Sapphire"],
-  ["pink-sapphire", "pinkSapphire", "Pink Sapphire"],
-  ["yellow-sapphire", "yellowSapphire", "Yellow Sapphire"],
-  ["padparadscha", "padparadscha", "Padparadscha"],
-] as const) {
-  const p = JEWELRY_PRESETS[key];
-  MATERIAL_LIBRARY.push({
-    id, name, category: "gemstone",
-    preview: `linear-gradient(135deg, ${swatch(key)}, #ffffff)`,
-    refractionConfig: { color: swatch(key), ior: p.ior!, sparkle: p.disp ?? 0.01, brightness: 1, bounces: 3, fresnel: 0.25 },
-    create: () => makeJewelryMaterial(p),
-  });
-}
-
-// Every library entry with a shared preset builds its material from that
-// preset, so "Ruby" here is the same Ruby the Studio, history and admin show.
-for (const def of MATERIAL_LIBRARY) {
-  const key = LIBRARY_ID_TO_PRESET[def.id];
-  if (key) def.create = () => makeJewelryMaterial(JEWELRY_PRESETS[key]);
-}
 
 // ── Legacy ID mapping for backward compat ──
 const LEGACY_ID_MAP: Record<string, string> = {

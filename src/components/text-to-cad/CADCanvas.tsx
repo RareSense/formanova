@@ -7,8 +7,9 @@ import {
   GizmoHelper,
   GizmoViewport,
 } from "@react-three/drei";
-import { OrbitControls as OrbitControlsImpl } from "three-stdlib";
+import { OrbitControls as OrbitControlsImpl, RGBELoader } from "three-stdlib";
 import * as THREE from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
@@ -35,11 +36,6 @@ import {
 import { findMaterial, findMaterialByName } from "@/components/cad-studio/materials";
 import type { MaterialDef } from "@/components/cad-studio/materials";
 import { classifyCadPartName, isCadGemName } from "@/lib/cad-part-classifier";
-import {
-  JEWELRY_PRESETS, LIBRARY_ID_TO_PRESET, STUDIO_ENV_INTENSITY, STUDIO_EXPOSURE,
-  GEM_SHADER_ENV_INTENSITY, blenderMetalRoughness, isUsableFileMaterial, createStudioLight, gemShaderColor, gemFamily, isStoneLayer, layerOf, pickGem, pickMetal, studioBackdropColor,
-  type PartHints,
-} from "@/lib/jewelry-look";
 import { computeExplodeOffsets, easeExplode, EXPLODE_DURATION_S } from "@/lib/cad-explode";
 import { getQualitySettings, getGPURendererString, getSettingsForMode, getDynamicGemCaps } from "@/lib/gpu-detect";
 import type { QualityMode } from "@/lib/gpu-detect";
@@ -76,9 +72,42 @@ interface ReferenceMaterialSpec {
   dark?: boolean;
 }
 
-// One table for every viewer, derived from the Blender studio renderer
-// (src/lib/jewelry-look/presets.ts). History, admin and CAD to Catalog read it too.
-const REFERENCE_MATERIALS: Record<string, ReferenceMaterialSpec> = JEWELRY_PRESETS;
+// Exact material constants from the approved standalone reference.
+const REFERENCE_MATERIALS: Record<string, ReferenceMaterialSpec> = {
+  gold18k:      { label: "Yellow Gold", kind: "metal", color: 0xffd88a, rough: 0.08 },
+  roseGold:     { label: "Rose Gold", kind: "metal", color: 0xf6c1a6, rough: 0.08 },
+  whiteGold:    { label: "White Gold", kind: "metal", color: 0xf7f4ec, rough: 0.07 },
+  platinum:     { label: "Platinum", kind: "metal", color: 0xe9e9e7, rough: 0.11 },
+  silver:       { label: "Silver", kind: "metal", color: 0xfbfaf6, rough: 0.05 },
+  blackRhodium: { label: "Black Rhodium", kind: "metal", color: 0x3b3b40, rough: 0.28 },
+  // Default look on load, before the user picks a material: green casting wax for
+  // metal and steel blue for stones, the way CAD tools show unassigned parts.
+  wax:          { label: "Casting Wax", kind: "pearl", color: 0x1f6e44 },
+  stoneBlue:    { label: "Stone Blue", kind: "metal", color: 0x3f6fc4, rough: 0.22 },
+
+  diamond:      { label: "Diamond", kind: "gem", color: 0xffffff, atten: 0xffffff, ior: 2.42, disp: 0.02 },
+  champagne:    { label: "Champagne", kind: "gem", color: 0xf6e3bd, atten: 0xc89a4e, ior: 2.42, disp: 0.02 },
+  ruby:         { label: "Ruby", kind: "gem", color: 0xf26a8c, atten: 0x9e0f34, ior: 1.76 },
+  sapphire:     { label: "Sapphire", kind: "gem", color: 0x4f7ce0, atten: 0x0c2f9e, ior: 1.76 },
+  emerald:      { label: "Emerald", kind: "gem", color: 0x46c684, atten: 0x02702f, ior: 1.57, rough: 0.03 },
+  amethyst:     { label: "Amethyst", kind: "gem", color: 0xb488e2, atten: 0x5c1e96, ior: 1.54 },
+  citrine:      { label: "Citrine", kind: "gem", color: 0xf2bb4d, atten: 0xa96400, ior: 1.54 },
+  aquamarine:   { label: "Aquamarine", kind: "gem", color: 0xaee2de, atten: 0x2f9e96, ior: 1.57 },
+  topaz:        { label: "London Topaz", kind: "gem", color: 0x4b9dbd, atten: 0x0e4a66, ior: 1.61 },
+  garnet:       { label: "Garnet", kind: "gem", color: 0xcd5050, atten: 0x570a10, ior: 1.73 },
+  peridot:      { label: "Peridot", kind: "gem", color: 0xbcd45c, atten: 0x647f04, ior: 1.65 },
+  tanzanite:    { label: "Tanzanite", kind: "gem", color: 0x7480e2, atten: 0x28329e, ior: 1.69 },
+  morganite:    { label: "Morganite", kind: "gem", color: 0xf4c6c6, atten: 0xc06a78, ior: 1.58 },
+  blackDiamond: { label: "Black Diamond", kind: "gem", color: 0x17171c, atten: 0x000000, ior: 2.42, rough: 0.04, dark: true },
+  // Locket and amulet windows: clear, glass-like refraction, no fire, so what sits behind shows.
+  clearGlass:   { label: "Clear Glass", kind: "glass", color: 0xffffff },
+
+  pearlWhite:   { label: "White Pearl", kind: "pearl", color: 0xfdfaf3, sheen: 0xf6dfda },
+  pearlGolden:  { label: "Golden Pearl", kind: "pearl", color: 0xf0d9a2, sheen: 0xf6c86a },
+  pearlPink:    { label: "Pink Pearl", kind: "pearl", color: 0xf6d5d8, sheen: 0xf2aab6 },
+  pearlBlack:   { label: "Tahitian", kind: "pearl", color: 0x2e3438, sheen: 0x4fa08c, irid: 0.85 },
+  opal:         { label: "Opal", kind: "pearl", color: 0xf2f0ea, sheen: 0xffffff, irid: 1, opal: true },
+};
 
 /** Whether a reference look is a stone, including the unassigned-stone default. */
 export function isStoneLook(key: string | null): boolean {
@@ -88,36 +117,58 @@ export function isStoneLook(key: string | null): boolean {
   return REFERENCE_MATERIALS[key]?.kind !== "metal";
 }
 
-// The shared studio light is calibrated to Blender, so no per-kind boost.
-const REFERENCE_BASE_ENV = STUDIO_ENV_INTENSITY;
+const REFERENCE_BASE_ENV = { metal: 1.15, gem: 2.3, pearl: 1.1 } as const;
+const REFERENCE_ENVIRONMENTS = {
+  room: null,
+  photostudio: "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/brown_photostudio_02_1k.hdr",
+  bright: "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/studio_small_08_1k.hdr",
+  sunset: "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r180/examples/textures/equirectangular/venice_sunset_1k.hdr",
+} as const;
+type ReferenceEnvironmentKey = keyof typeof REFERENCE_ENVIRONMENTS;
 
 const REFERENCE_TYPE_RULES: [RegExp, string][] = [
   [/glass/i, "clearGlass"],
   [/pearl/i, "pearlWhite"], [/opal/i, "opal"],
+  [/ruby/i, "ruby"], [/sapphire/i, "sapphire"], [/emerald/i, "emerald"],
+  [/amethyst/i, "amethyst"], [/citrine/i, "citrine"], [/aqua/i, "aquamarine"],
+  [/topaz/i, "topaz"], [/garnet/i, "garnet"], [/peridot/i, "peridot"],
+  [/tanzanit/i, "tanzanite"], [/morganite/i, "morganite"],
+  [/onyx|black[_ ]?diamond/i, "blackDiamond"],
 ];
-function classifyReferenceMaterial(name: string, hints: Omit<PartHints, "objectName"> = {}): string {
-  const all = { ...hints, objectName: name };
-  const stone = isCadGemName(name) || isStoneLayer(hints.layer) || !!gemFamily(hints.materialName);
-  if (!stone) return pickMetal(all);
+function classifyReferenceMaterial(name: string): string {
+  if (!isCadGemName(name)) return "gold18k";
   for (const [pattern, key] of REFERENCE_TYPE_RULES) {
     if (pattern.test(name)) return key;
   }
-  return pickGem(all);
+  return "diamond";
 }
 
-export function referenceKeyForMaterial(
-  material: MaterialDef | undefined,
-  meshName: string,
-  hints: Omit<PartHints, "objectName"> = {},
-): string | null {
-  if (material?.id && LIBRARY_ID_TO_PRESET[material.id]) return LIBRARY_ID_TO_PRESET[material.id];
+export function referenceKeyForMaterial(material: MaterialDef | undefined, meshName: string): string | null {
+  const idMap: Record<string, string> = {
+    "gold-yellow-polished": "gold18k",
+    "gold-rose-polished": "roseGold",
+    "gold-white-polished": "whiteGold",
+    "platinum-natural-polished": "platinum",
+    "silver-natural-polished": "silver",
+    "rhodium-black-polished": "blackRhodium",
+    diamond: "diamond",
+    ruby: "ruby",
+    sapphire: "sapphire",
+    emerald: "emerald",
+    amethyst: "amethyst",
+    topaz: "topaz",
+    aquamarine: "aquamarine",
+    "black-diamond": "blackDiamond",
+  };
+
+  if (material?.id && idMap[material.id]) return idMap[material.id];
   if (material?.id?.startsWith("flat-")) {
     return material.category === "gemstone" ? "stoneBlue" : "wax";
   }
 
   // Preserve unsupported explicit CAD material definitions. Unassigned meshes
-  // use the shared picker: material name, then layer, then object name.
-  if (!material) return classifyReferenceMaterial(meshName, hints);
+  // use the reference's exact name-based ring-pipeline classification.
+  if (!material) return classifyReferenceMaterial(meshName);
   return null;
 }
 
@@ -312,11 +363,11 @@ referenceWhiteEnvironment.needsUpdate = true;
 
 interface ReferenceEnvironmentState {
   rawEnvironment: THREE.Texture | null;
-  environmentKey: "studio";
+  environmentKey: ReferenceEnvironmentKey;
 }
 const ReferenceEnvironmentContext = React.createContext<ReferenceEnvironmentState>({
   rawEnvironment: null,
-  environmentKey: "studio",
+  environmentKey: "photostudio",
 });
 
 interface MotionQualityApi {
@@ -390,39 +441,114 @@ const NO_RAYCAST = () => null;
 function LightController({ intensity }: { intensity: number }) {
   const { gl, invalidate: inv } = useThree();
   useEffect(() => {
-    gl.toneMappingExposure = STUDIO_EXPOSURE * intensity;
+    gl.toneMappingExposure = 1.0 * intensity;
     inv();
   }, [intensity, gl, inv]);
   return null;
 }
 
-/** The Blender studio light from the shared jewelry-look module: same
- * softboxes, world and backdrop as research-vm studio_render.py. */
+function makeReferenceBackground(): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 2;
+  canvas.height = 512;
+  const context = canvas.getContext("2d");
+  if (!context) return new THREE.CanvasTexture(canvas);
+  const gradient = context.createLinearGradient(0, 0, 0, 512);
+  gradient.addColorStop(0, "#ffffff");
+  gradient.addColorStop(1, "#c9cdd4");
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, 2, 512);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+function getRequestedReferenceEnvironment(): ReferenceEnvironmentKey {
+  if (typeof window === "undefined") return "photostudio";
+  const requested = new URLSearchParams(window.location.search).get("cadEnvironment");
+  return requested && requested in REFERENCE_ENVIRONMENTS
+    ? requested as ReferenceEnvironmentKey
+    : "photostudio";
+}
+
 function ReferenceStudioEnvironment({ children }: { children: React.ReactNode }) {
   const { gl, scene, invalidate: inv } = useThree();
+  const environmentKey = useMemo(getRequestedReferenceEnvironment, []);
   const [rawEnvironment, setRawEnvironment] = useState<THREE.Texture | null>(null);
 
   useEffect(() => {
+    let disposed = false;
+    let rawTexture: THREE.Texture | null = null;
+    let activeTarget: THREE.WebGLRenderTarget | null = null;
     const previousEnvironment = scene.environment;
     const previousBackground = scene.background;
     const previousBackgroundBlurriness = scene.backgroundBlurriness;
-    const studio = createStudioLight(gl);
-    scene.background = studioBackdropColor();
+    const pmrem = new THREE.PMREMGenerator(gl);
+    pmrem.compileEquirectangularShader();
+
+    const background = makeReferenceBackground();
+    scene.background = background;
     scene.backgroundBlurriness = 0;
-    scene.environment = studio.env;
-    setRawEnvironment(studio.gemRaw);
+
+    const room = new RoomEnvironment();
+    const roomTarget = pmrem.fromScene(room, 0.04);
+    room.traverse((object) => {
+      const mesh = object as THREE.Mesh;
+      mesh.geometry?.dispose();
+      const materials = Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : [];
+      materials.forEach((material) => material.dispose());
+    });
+    activeTarget = roomTarget;
+    scene.environment = roomTarget.texture;
     inv();
+
+    const sourceUrl = REFERENCE_ENVIRONMENTS[environmentKey];
+    if (sourceUrl) {
+      const loader = new RGBELoader();
+      loader.load(
+        sourceUrl,
+        (texture) => {
+          if (disposed) {
+            texture.dispose();
+            return;
+          }
+          texture.mapping = THREE.EquirectangularReflectionMapping;
+          rawTexture = texture;
+          const target = pmrem.fromEquirectangular(texture);
+          if (activeTarget && activeTarget !== roomTarget && activeTarget !== target) activeTarget.dispose();
+          activeTarget = target;
+          scene.environment = target.texture;
+          setRawEnvironment(texture);
+          inv();
+        },
+        undefined,
+        (error) => {
+          console.error(`[CADCanvas] Failed to load ${environmentKey} environment; using Soft Studio`, error);
+          if (!disposed) {
+            setRawEnvironment(null);
+            scene.environment = roomTarget.texture;
+            inv();
+          }
+        },
+      );
+    }
+
     return () => {
+      disposed = true;
       scene.environment = previousEnvironment;
       scene.background = previousBackground;
       scene.backgroundBlurriness = previousBackgroundBlurriness;
-      studio.dispose();
+      rawTexture?.dispose();
+      activeTarget?.dispose();
+      if (activeTarget !== roomTarget) roomTarget.dispose();
+      background.dispose();
+      pmrem.dispose();
     };
-  }, [gl, inv, scene]);
+  }, [environmentKey, gl, inv, scene]);
 
   const value = useMemo(
-    () => ({ rawEnvironment, environmentKey: "studio" as const }),
-    [rawEnvironment],
+    () => ({ rawEnvironment, environmentKey }),
+    [rawEnvironment, environmentKey],
   );
   return <ReferenceEnvironmentContext.Provider value={value}>{children}</ReferenceEnvironmentContext.Provider>;
 }
@@ -446,8 +572,7 @@ function ReferenceStudioLighting() {
 
   return (
     <>
-      {/* Shadow only: the Blender studio light (environment) does all the lighting. */}
-      <directionalLight ref={lightRef} color={0xffffff} intensity={0.0001} position={[1.5, 8, 2]} castShadow />
+      <directionalLight ref={lightRef} color={0xffffff} intensity={0.55} position={[1.5, 8, 2]} castShadow />
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.35, 0]} receiveShadow>
         <planeGeometry args={[12, 12]} />
         <shadowMaterial transparent opacity={0.13} />
@@ -850,8 +975,6 @@ interface MeshData {
   name: string;
   geometry: THREE.BufferGeometry;
   originalMaterial: THREE.Material;
-  /** Layer from the file (glTF extras), for the stone picker. */
-  layer?: string | null;
   position: THREE.Vector3;
   quaternion: THREE.Quaternion;
   rotationDeg: [number, number, number]; // cumulative degrees, can exceed ±360
@@ -1058,7 +1181,6 @@ const LoadedModel = forwardRef<
           name,
           geometry: mesh.geometry,
           originalMaterial: origMat,
-          layer: layerOf(mesh),
           position: pos.clone(),
           quaternion: quat.clone(),
           rotationDeg: [...initDeg],
@@ -1084,17 +1206,119 @@ const LoadedModel = forwardRef<
     // Baked textures (antiqued finish, AO, normals) are shown as authored.
     const authoredTextures = modelHasTextureMaps(list.map((md) => md.originalMaterial));
 
-    // No default look: parts show the material baked into the file. Only a file
-    // material named after a library material (exported earlier from FormaNova)
-    // becomes that library assignment. Parts with no usable material fall back to
-    // the shared preset picker at render time (jewelry-look resolvePartLook).
-    void magicTexturing;
-    if (!authoredTextures) {
+    if (authoredTextures) {
+      console.log("[CADCanvas] GLB has texture maps; keeping its embedded materials");
+    } else if (magicTexturing) {
+    // PRIORITY 0: If the GLB's embedded material name matches a library material
+    //             (i.e. previously exported from Formanova), honour that assignment
+    //             and skip heuristics entirely.
+    let recognisedCount = 0;
+
+    list.forEach((md) => {
+      const matName = md.originalMaterial?.name;
+      if (matName) {
+        const libMatch = findMaterialByName(matName);
+        if (libMatch) {
+          autoMaterials[md.name] = libMatch;
+          recognisedCount++;
+          console.log(`[MagicTex] "${md.name}" → ${libMatch.name} (recognised from GLB material name "${matName}")`);
+        }
+      }
+    });
+
+    // If the majority of meshes had recognised materials, skip heuristic texturing
+    const useRecognised = recognisedCount > 0 && recognisedCount >= list.length * 0.5;
+
+    if (useRecognised) {
+      // Fill any unrecognised meshes with a sensible fallback based on the recognised set
+      const fallbackGold = findMaterial("yellow-gold")!;
+      const fallbackDiamond = findMaterial("diamond")!;
       list.forEach((md) => {
-        const libMatch = md.originalMaterial?.name ? findMaterialByName(md.originalMaterial.name) : undefined;
-        if (libMatch) autoMaterials[md.name] = libMatch;
+        if (!autoMaterials[md.name]) {
+          autoMaterials[md.name] = isCadGemName(md.name) ? fallbackDiamond : fallbackGold;
+        }
+      });
+      console.log(`[MagicTex] Recognised ${recognisedCount}/${list.length} materials from GLB — skipping heuristics`);
+    } else {
+      // ── Standard heuristic texturing for fresh/pipeline GLBs ──
+      const diamondMatDef = findMaterial("diamond")!;
+      const goldMatDef = findMaterial("yellow-gold")!;
+
+      // Compute median vertex count to identify small meshes (likely gems)
+      const vertCounts = list.map((md) => md.geometry?.attributes?.position?.count || 0).sort((a, b) => a - b);
+      const medianVerts = vertCounts[Math.floor(vertCounts.length / 2)] || 0;
+
+      // Helper: detect if original material looks like a gem (transparent, refractive, non-metallic)
+      const looksLikeGem = (mat: THREE.Material): boolean => {
+        if (!(mat instanceof THREE.MeshPhysicalMaterial || mat instanceof THREE.MeshStandardMaterial)) return false;
+        const phys = mat as THREE.MeshPhysicalMaterial;
+        if (phys.transmission !== undefined && phys.transmission > 0.1) return true;
+        if (phys.transparent && phys.opacity < 0.8) return true;
+        if (phys.metalness < 0.3 && phys.roughness < 0.15) return true;
+        if (phys.metalness < 0.3) {
+          const c = phys.color;
+          if (c && c.r > 0.7 && c.g > 0.7 && c.b > 0.7 && phys.roughness < 0.4) return true;
+        }
+        return false;
+      };
+
+      const looksLikeMetal = (mat: THREE.Material): boolean => {
+        if (!(mat instanceof THREE.MeshPhysicalMaterial || mat instanceof THREE.MeshStandardMaterial)) return false;
+        return mat.metalness > 0.7;
+      };
+
+      list.forEach((md) => {
+        if (autoMaterials[md.name]) return; // already recognised above
+        const lower = md.name.toLowerCase();
+        const verts = md.geometry?.attributes?.position?.count || 0;
+
+        const kind = classifyCadPartName(md.name);
+        if (kind === "gem") {
+          autoMaterials[md.name] = diamondMatDef;
+        } else if (kind === "metal") {
+          autoMaterials[md.name] = goldMatDef;
+        } else if (looksLikeGem(md.originalMaterial)) {
+          autoMaterials[md.name] = diamondMatDef;
+          console.log(`[MagicTex] "${md.name}" → diamond (material heuristic)`);
+        } else if (verts > 0 && verts < medianVerts * 0.3 && !looksLikeMetal(md.originalMaterial)) {
+          autoMaterials[md.name] = diamondMatDef;
+          console.log(`[MagicTex] "${md.name}" → diamond (size heuristic: ${verts} verts)`);
+        } else {
+          autoMaterials[md.name] = goldMatDef;
+        }
       });
     }
+    } else {
+      // ── Flat mesh classification (default when magic texturing is off) ──
+      // gem → blue (#4a90d9), metal → green (#77dd77), flat shading, no maps
+      // Built from the shared list so the flat preview and the real materials
+      // agree on what a gem is: `wing_accent_right` is a stone here too, and
+      // only `accent_stone` used to match.
+
+      list.forEach((md) => {
+        const lower = md.name.toLowerCase();
+        const phys = md.originalMaterial as THREE.MeshPhysicalMaterial;
+        const kind = classifyCadPartName(lower);
+        let isGem = kind === "gem";
+        if (kind === null) {
+          if (phys.transmission > 0.5 || phys.ior > 2.0) isGem = true;
+        }
+        const color = isGem ? 0x4a90d9 : 0x77dd77;
+        autoMaterials[md.name] = {
+          preview: `#${color.toString(16).padStart(6, '0')}`,
+          id: `flat-${isGem ? 'gem' : 'metal'}-${md.name}`,
+          name: isGem ? 'Gem (flat)' : 'Metal (flat)',
+          category: isGem ? 'gemstone' : 'metal',
+          create: () => new THREE.MeshPhysicalMaterial({
+            color,
+            metalness: 0,
+            roughness: isGem ? 0.6 : 0.8,
+            flatShading: true,
+            side: THREE.DoubleSide,
+          }),
+        };
+      });
+    } // end if (magicTexturing) / else
 
     // ── Scene complexity guardrail ──
     const totalVerts = list.reduce((sum, md) => sum + (md.geometry?.attributes?.position?.count || 0), 0);
@@ -1244,7 +1468,6 @@ const LoadedModel = forwardRef<
                   name,
                   geometry: mesh.geometry,
                   originalMaterial: origMat,
-                  layer: layerOf(mesh),
                   position: pos.clone(),
                   quaternion: quat.clone(),
                   rotationDeg: [...partDeg],
@@ -1818,7 +2041,7 @@ const LoadedModel = forwardRef<
           // Generate the runtime material from the MaterialDef, then copy only
           // GLTF-serialisable properties into a clean MeshPhysicalMaterial so the
           // exporter never encounters custom shaders or leftover internal state.
-          const referenceKey = referenceKeyForMaterial(assigned, md.name, { materialName: md.originalMaterial?.name, layer: md.layer });
+          const referenceKey = referenceKeyForMaterial(assigned, md.name);
           const referenceSpec = referenceKey ? REFERENCE_MATERIALS[referenceKey] : undefined;
           const src = referenceSpec
             ? makeReferencePhysicalMaterial(referenceSpec)
@@ -2013,9 +2236,7 @@ const LoadedModel = forwardRef<
 
       const isSelected = selectedMeshNames.has(md.name);
       const assigned = assignedMaterials[md.name];
-      // Shared rule: library pick > baked file material > picker fallback.
-      const fileLook = !assigned && (keepAuthored || isUsableFileMaterial(md.originalMaterial));
-      const referenceKey = fileLook ? null : referenceKeyForMaterial(assigned, md.name, { materialName: md.originalMaterial?.name, layer: md.layer });
+      const referenceKey = !assigned && keepAuthored ? null : referenceKeyForMaterial(assigned, md.name);
       const referenceSpec = referenceKey ? REFERENCE_MATERIALS[referenceKey] : undefined;
 
       // Selection highlight — show blue overlay when selected, UNLESS the user
@@ -2079,12 +2300,8 @@ const LoadedModel = forwardRef<
         : assigned ? `assigned_${md.name}_${assigned.id}` : `orig_${md.name}`;
       let material = materialCache.current.get(cacheKey);
       if (!material) {
-        // Picker-styled metal keeps the file's roughness the way the Blender restyle does.
-        const fileRough = (md.originalMaterial as THREE.MeshStandardMaterial).roughness;
         material = referenceSpec
-          ? makeReferencePhysicalMaterial(referenceSpec.kind === "metal" && !assigned
-            ? { ...referenceSpec, rough: blenderMetalRoughness(fileRough, referenceSpec.rough) }
-            : referenceSpec)
+          ? makeReferencePhysicalMaterial(referenceSpec)
           : assigned ? assigned.create() : md.originalMaterial.clone();
         if ('side' in material) (material as THREE.MeshStandardMaterial).side = THREE.DoubleSide;
         materialCache.current.set(cacheKey, material);
@@ -2107,7 +2324,7 @@ const LoadedModel = forwardRef<
       const positionCount = mesh.geometry.attributes.position?.count ?? 0;
       triangleCount += (mesh.geometry.index?.count ?? positionCount) / 3;
       const assigned = assignedMaterials[mesh.name];
-      const referenceKey = !assigned && isUsableFileMaterial(mesh.originalMaterial) ? null : referenceKeyForMaterial(assigned, mesh.name, { materialName: mesh.originalMaterial?.name, layer: mesh.layer });
+      const referenceKey = referenceKeyForMaterial(assigned, mesh.name);
       if (referenceKey) { if (isStoneLook(referenceKey)) gemCount++; }
       else if (!referenceKey && assigned?.category === "gemstone") gemCount++;
     }
@@ -2360,7 +2577,10 @@ function ReferenceGemMesh({
 }) {
   const { rawEnvironment } = React.useContext(ReferenceEnvironmentContext);
   const gemMaterial = useMemo(() => {
-    const filter = gemShaderColor(materialSpec);
+    const filter = new THREE.Color(materialSpec.color).lerp(
+      new THREE.Color(materialSpec.atten ?? materialSpec.color),
+      materialSpec.atten === 0xffffff ? 0 : 0.55,
+    );
     const material = new THREE.ShaderMaterial({
       uniforms: {
         envMap: { value: rawEnvironment ?? referenceWhiteEnvironment },
@@ -2371,7 +2591,7 @@ function ReferenceGemMesh({
         aberrationStrength: { value: materialSpec.disp ?? 0.008 },
         fresnel: { value: 0.25 },
         colorFactor: { value: filter },
-        envIntensity: { value: GEM_SHADER_ENV_INTENSITY },
+        envIntensity: { value: 1.2 },
         selected: { value: 0 },
       },
       vertexShader: REFERENCE_GEM_VERTEX_SHADER,
@@ -2678,7 +2898,7 @@ const CADCanvas = forwardRef<CADCanvasHandle, CADCanvasProps>(
             alpha: false,
             preserveDrawingBuffer: true,
             toneMapping: THREE.CustomToneMapping,
-            toneMappingExposure: STUDIO_EXPOSURE * lightIntensity,
+            toneMappingExposure: 1.0 * lightIntensity,
             powerPreference: effectiveQ.tier === "low" ? "low-power" : "high-performance",
           }}
           dpr={baseDpr}
@@ -2688,7 +2908,7 @@ const CADCanvas = forwardRef<CADCanvasHandle, CADCanvasProps>(
           onCreated={({ gl }) => {
             installReferenceNeutralToneMapping();
             gl.toneMapping = THREE.CustomToneMapping;
-            gl.toneMappingExposure = STUDIO_EXPOSURE * lightIntensity;
+            gl.toneMappingExposure = 1.0 * lightIntensity;
             gl.outputColorSpace = THREE.SRGBColorSpace;
             gl.shadowMap.enabled = true;
             gl.shadowMap.type = THREE.PCFSoftShadowMap;

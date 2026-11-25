@@ -4,7 +4,6 @@
 // raw studio HDRI with per-channel dispersion, and mix with the reflection.
 
 import * as THREE from 'three';
-import { GEM_SHADER_ENV_INTENSITY, gemShaderColor } from '@/lib/jewelry-look';
 import { MeshBVH, MeshBVHUniformStruct, SAH, shaderStructs, shaderIntersectFunction } from 'three-mesh-bvh';
 
 export interface GemSpec {
@@ -112,7 +111,7 @@ void main(){
  * Pass the same step relative to the piece: 0.001 * pieceSize / 2.2 (gemEntryStep).
  */
 export function referenceGemMaterial(geometry: THREE.BufferGeometry, envMap: THREE.Texture, spec: GemSpec, name: string, entryStep = 0.001) {
-  const filter = gemShaderColor(spec);
+  const filter = new THREE.Color(spec.color).lerp(new THREE.Color(spec.atten ?? spec.color), spec.atten === 0xffffff ? 0 : 0.55);
   const m = new THREE.ShaderMaterial({
     name,
     vertexShader,
@@ -128,7 +127,7 @@ export function referenceGemMaterial(geometry: THREE.BufferGeometry, envMap: THR
       aberrationStrength: { value: spec.disp ?? 0.008 },
       fresnel: { value: 0.25 },
       colorFactor: { value: filter },
-      envIntensity: { value: GEM_SHADER_ENV_INTENSITY },
+      envIntensity: { value: 1.2 },
       entryStep: { value: entryStep },
     },
   });
