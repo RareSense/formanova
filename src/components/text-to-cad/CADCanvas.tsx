@@ -37,7 +37,7 @@ import type { MaterialDef } from "@/components/cad-studio/materials";
 import { classifyCadPartName, isCadGemName } from "@/lib/cad-part-classifier";
 import {
   JEWELRY_PRESETS, LIBRARY_ID_TO_PRESET, makeJewelryMaterial, STUDIO_ENV_INTENSITY, STUDIO_EXPOSURE,
-  GEM_SHADER_ENV_INTENSITY, blenderMetalRoughness, isUsableFileMaterial, createStudioLight, gemShaderColor, gemFamily, isStoneLayer, layerOf, pickGem, pickMetal, studioBackdropColor,
+  makeGemShaderMaterial, blenderMetalRoughness, isUsableFileMaterial, createStudioLight, gemFamily, isStoneLayer, layerOf, pickGem, pickMetal, studioBackdropColor,
   type PartHints,
 } from "@/lib/jewelry-look";
 import { computeExplodeOffsets, easeExplode, EXPLODE_DURATION_S } from "@/lib/cad-explode";
@@ -196,86 +196,6 @@ function makeReferenceGemPlaceholder(
   material.userData.referenceMaterial = true;
   return material;
 }
-
-const REFERENCE_GEM_VERTEX_SHADER = /* glsl */`
-varying vec3 vWorldPosition;
-varying vec3 vNormal;
-void main(){
-  vec4 wp=modelMatrix*vec4(position,1.0);
-  vWorldPosition=wp.xyz;
-  vNormal=normalize(mat3(modelMatrix)*normal);
-  gl_Position=projectionMatrix*viewMatrix*wp;
-}`;
-
-const REFERENCE_GEM_FRAGMENT_SHADER = /* glsl */`
-precision highp isampler2D;
-precision highp usampler2D;
-varying vec3 vWorldPosition;
-varying vec3 vNormal;
-uniform mat4 modelMatrix;
-uniform mat4 modelMatrixInverse;
-uniform sampler2D envMap;
-uniform float bounces;
-${shaderStructs}
-${shaderIntersectFunction}
-uniform BVH bvh;
-uniform float ior;
-uniform float fresnel;
-uniform float aberrationStrength;
-uniform vec3 colorFactor;
-uniform float envIntensity;
-uniform float selected;
-
-vec3 sampleEnv(vec3 dir){
-  vec2 uv=vec2(atan(dir.z,dir.x)*0.1591549431+0.5,asin(clamp(dir.y,-1.0,1.0))*0.3183098862+0.5);
-  return texture2D(envMap,uv).rgb;
-}
-vec3 totalInternalReflection(vec3 incoming,float ior_){
-  vec3 rayDirection=refract(incoming,vNormal,1.0/ior_);
-  vec3 rayOrigin=vWorldPosition+rayDirection*0.001;
-  rayOrigin=(modelMatrixInverse*vec4(rayOrigin,1.0)).xyz;
-  rayDirection=normalize((modelMatrixInverse*vec4(rayDirection,0.0)).xyz);
-  for(float i=0.0;i<8.0;i++){
-    if(i>=bounces)break;
-    uvec4 faceIndices=uvec4(0u);
-    vec3 faceNormal=vec3(0.0,0.0,1.0);
-    vec3 barycoord=vec3(0.0);
-    float side=1.0;
-    float dist=0.0;
-    bvhIntersectFirstHit(bvh,rayOrigin,rayDirection,faceIndices,faceNormal,barycoord,side,dist);
-    vec3 hitPos=rayOrigin+rayDirection*max(dist-0.001,0.0);
-    vec3 tempDir=refract(rayDirection,faceNormal*side,ior_);
-    if(length(tempDir)!=0.0){rayDirection=tempDir;break;}
-    rayDirection=reflect(rayDirection,faceNormal*side);
-    rayOrigin=hitPos+rayDirection*0.01;
-  }
-  return normalize((modelMatrix*vec4(rayDirection,0.0)).xyz);
-}
-void main(){
-  vec3 viewDirection=normalize(vWorldPosition-cameraPosition);
-  vec3 dG=totalInternalReflection(viewDirection,max(ior,1.0));
-  vec3 col;
-  if(aberrationStrength>0.0){
-    vec3 dR=totalInternalReflection(viewDirection,max(ior*(1.0-aberrationStrength),1.0));
-    vec3 dB=totalInternalReflection(viewDirection,max(ior*(1.0+aberrationStrength),1.0));
-    col=vec3(sampleEnv(dR).r,sampleEnv(dG).g,sampleEnv(dB).b);
-  }else{
-    col=sampleEnv(dG);
-  }
-  col*=envIntensity*colorFactor;
-  vec3 reflDir=reflect(viewDirection,vNormal);
-  vec3 reflCol=sampleEnv(reflDir)*envIntensity;
-  float cosT=clamp(-dot(viewDirection,vNormal),0.0,1.0);
-  float F0=pow((ior-1.0)/(ior+1.0),2.0);
-  float F=F0+(1.0-F0)*pow(1.0-cosT,5.0);
-  col=mix(col,reflCol,F);
-  float f=pow(max(0.0,1.0+dot(viewDirection,vNormal)),10.0)*fresnel;
-  col=mix(col,vec3(1.0),f);
-  col=mix(col,vec3(0.0,0.9,1.0),selected*0.4);
-  gl_FragColor=vec4(col,1.0);
-  #include <tonemapping_fragment>
-  #include <colorspace_fragment>
-}`;
 
 const referenceBvhCache = new Map<string, MeshBVHUniformStruct>();
 function referenceBvhFor(geometry: THREE.BufferGeometry): MeshBVHUniformStruct {
@@ -2351,25 +2271,8 @@ function ReferenceGemMesh({
 }) {
   const { rawEnvironment } = React.useContext(ReferenceEnvironmentContext);
   const gemMaterial = useMemo(() => {
-    const filter = gemShaderColor(materialSpec);
-    const material = new THREE.ShaderMaterial({
-      uniforms: {
-        envMap: { value: rawEnvironment ?? referenceWhiteEnvironment },
-        bvh: { value: referenceBvhFor(geometry) },
-        modelMatrixInverse: { value: new THREE.Matrix4() },
-        bounces: { value: 3 },
-        ior: { value: materialSpec.ior ?? 1.5 },
-        aberrationStrength: { value: materialSpec.disp ?? 0.008 },
-        fresnel: { value: 0.25 },
-        colorFactor: { value: filter },
-        envIntensity: { value: GEM_SHADER_ENV_INTENSITY },
-        selected: { value: 0 },
-      },
-      vertexShader: REFERENCE_GEM_VERTEX_SHADER,
-      fragmentShader: REFERENCE_GEM_FRAGMENT_SHADER,
-      side: THREE.FrontSide,
-      toneMapped: true,
-    });
+    // The shared jewelry-look gem shader (same as history cards and admin / CAD to Catalog).
+    const material = makeGemShaderMaterial(geometry, rawEnvironment ?? referenceWhiteEnvironment, materialSpec);
     material.name = materialSpec.label;
     material.userData.referenceGem = materialKey;
     return material;
