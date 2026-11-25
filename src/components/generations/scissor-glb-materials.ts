@@ -1,6 +1,6 @@
 import { modelHasTextureMaps } from '@/lib/gltf-texture-maps';
 import * as THREE from 'three';
-import { JEWELRY_PRESETS, blenderMetalRoughness, isStoneLayer, isFlatGemMaterial, isUsableFileMaterial, layerOf, makeJewelryMaterial, pickGem, pickMetal, type PartHints } from '@/lib/jewelry-look';
+import { JEWELRY_PRESETS, blenderMetalRoughness, isStoneLayer, isFlatGemMaterial, isUsableFileMaterial, layerOf, makeJewelryMaterial, makeGemShaderMaterial, updateGemShaderMatrix, gemEntryStep, gemFamily, type JewelryPreset, pickGem, pickMetal, type PartHints } from '@/lib/jewelry-look';
 
 export const HAS_EMBEDDED_GLTF_MATERIAL = '__historyHasEmbeddedGltfMaterial';
 /** Set on a mesh whose file declares that its materials are the real, finished
@@ -104,7 +104,24 @@ function solidForScissor(material: THREE.Material): THREE.Material {
 }
 
 /** `_forceJewelryPalette` is kept for callers; the rule is now the same everywhere. */
-export function applyHistoryPreviewMaterials(model: THREE.Object3D, _forceJewelryPalette = false): void {
+export interface HistoryGemShader {
+  /** Raw studio equirect (createStudioLight().gemRaw). */
+  env: THREE.Texture;
+  /** Piece size in world units after the card's fit (sets the shader's entry step). */
+  pieceSize: number;
+}
+
+/** A stone drawn with the shared refraction shader; identical stones share one material. */
+function gemShaderFor(mesh: THREE.Mesh, spec: Pick<JewelryPreset, 'color' | 'atten' | 'ior' | 'disp'> & { label?: string }, gem: HistoryGemShader, cache: Map<string, THREE.Material>): THREE.Material {
+  const key = `${mesh.geometry.uuid}|${spec.color}|${spec.atten}|${spec.ior}`;
+  let m = cache.get(key);
+  if (!m) { m = makeGemShaderMaterial(mesh.geometry, gem.env, spec, gemEntryStep(gem.pieceSize)); cache.set(key, m); }
+  mesh.onBeforeRender = (_r, _s, _c, _g, mat) => updateGemShaderMatrix(mesh, mat);
+  return m;
+}
+
+export function applyHistoryPreviewMaterials(model: THREE.Object3D, _forceJewelryPalette = false, gem?: HistoryGemShader): void {
+  const gemCache = new Map<string, THREE.Material>();
   // Baked textures mean the file is authored even without the extras mark.
   const textured: THREE.Material[] = [];
   model.traverse((child) => {
@@ -126,6 +143,14 @@ export function applyHistoryPreviewMaterials(model: THREE.Object3D, _forceJewelr
     const keepEmbedded = (mesh.userData[HAS_AUTHORED_GLTF_MATERIAL] === true && !isFlatGemMaterial(first))
       || (embedded && (authoredTextures || isUsableFileMaterial(first)));
     if (keepEmbedded) {
+      const fm = first as THREE.MeshPhysicalMaterial;
+      if (gem && !Array.isArray(mesh.material) && fm?.isMeshPhysicalMaterial && fm.transmission > 0 && !GLASS_RE.test(`${fm.name} ${mesh.name}`)) {
+        const fam = gemFamily(fm.name) ?? gemFamily(mesh.name);
+        const preset = fam ? JEWELRY_PRESETS[pickGem({ materialName: fm.name, objectName: mesh.name, layer: layerOf(mesh) })] : undefined;
+        const tint = (fm.attenuationDistance < Infinity ? fm.attenuationColor : fm.color).getHex();
+        mesh.material = gemShaderFor(mesh, { label: fm.name, color: tint, atten: tint, ior: fm.ior, disp: preset?.disp }, gem, gemCache);
+        return;
+      }
       mesh.material = Array.isArray(mesh.material)
         ? mesh.material.map((material) => solidForScissor(material.clone()))
         : solidForScissor(mesh.material.clone());
@@ -135,6 +160,12 @@ export function applyHistoryPreviewMaterials(model: THREE.Object3D, _forceJewelr
     const original = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
     mesh.geometry.computeBoundingBox();
     const size = mesh.geometry.boundingBox?.getSize(new THREE.Vector3());
+    const key = historyPresetKey(mesh.name, { materialName: mesh.userData[HAS_EMBEDDED_GLTF_MATERIAL] === true ? original?.name : null, layer: layerOf(mesh) });
+    const preset = JEWELRY_PRESETS[key];
+    if (gem && preset.kind === 'gem' && !preset.dark) {
+      mesh.material = gemShaderFor(mesh, preset, gem, gemCache);
+      return;
+    }
     mesh.material = createHistoryFallbackMaterial(
       mesh.name,
       { materialName: mesh.userData[HAS_EMBEDDED_GLTF_MATERIAL] === true ? original?.name : null, layer: layerOf(mesh) },

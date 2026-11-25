@@ -58,15 +58,3 @@ export function makeJewelryMaterial(p: Omit<JewelryPreset, "key" | "blender">, o
   if ("key" in p) m.userData.jewelryPreset = (p as JewelryPreset).key;
   return m;
 }
-
-/** Brightness of the environment seen through a stone in the refraction
- * shaders (Studio + CAD to Catalog/admin). Above 1 because the browser traces
- * one refraction into a mostly dark world, where Cycles gathers light from many
- * internal bounces off the softboxes and the bright metal seat. Tuned against
- * the Blender stone close-ups. */
-export const GEM_SHADER_ENV_INTENSITY = 2.5;
-
-/** Colour factor for the refraction shaders: the stone's deep colour. */
-export function gemShaderColor(p: { color: number; atten?: number }): THREE.Color {
-  return new THREE.Color(p.atten ?? p.color);
-}

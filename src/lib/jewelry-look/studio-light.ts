@@ -13,9 +13,10 @@
 import * as THREE from 'three';
 
 /** World grey seen in reflections. Blender uses 0.05, but its gold also gathers light
- * from the lit backdrop and floor; at 0.05 the browser gold went dull olive. 0.6
- * matches the Blender three-quarter ring render (bright polished yellow). */
-export const STUDIO_WORLD = 0.6;
+ * from the lit backdrop and floor (Cycles bounces); our viewers have no such surfaces,
+ * so the world stands in for them. 1.0 gives the closest gold to the Blender
+ * three-quarter render (mean gold colour dE ~7; 0.6 was dE 10 and darker, 1.5 dE 13 and too bright). */
+export const STUDIO_WORLD = 1.0;
 /** Blender: --light-scale default when the world is dark. */
 export const STUDIO_LIGHT_SCALE = 10;
 /** Blender: --exposure default when the world is dark, in stops. */

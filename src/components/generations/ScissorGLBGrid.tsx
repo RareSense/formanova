@@ -102,6 +102,8 @@ export function ScissorGLBGrid({ children, continuous = true }: ScissorGLBGridPr
   const listenersRef = useRef<Map<string, Set<CardStateListener>>>(new Map());
   const rafRef = useRef<number>(0);
   const envMapRef = useRef<THREE.Texture | null>(null);
+  /** Raw studio equirect the shared gem refraction shader samples. */
+  const gemEnvRef = useRef<THREE.Texture | null>(null);
   /** One backdrop shared by every card, built lazily so it is not created
    * during SSR or before a scene needs it. */
   const backdropRef = useRef<THREE.Color | null>(null);
@@ -145,6 +147,7 @@ export function ScissorGLBGrid({ children, continuous = true }: ScissorGLBGridPr
     // no download, so the first preview is already lit the final way.
     const studio = createStudioLight(renderer);
     envMapRef.current = studio.env;
+    gemEnvRef.current = studio.gemRaw;
 
     return () => {
       cancelAnimationFrame(rafRef.current);
@@ -312,7 +315,8 @@ export function ScissorGLBGrid({ children, continuous = true }: ScissorGLBGridPr
     model.position.set(-center.x * scale, -center.y * scale, -center.z * scale);
     model.scale.setScalar(scale);
 
-    applyHistoryPreviewMaterials(model, card.forceJewelryPalette);
+    // Stones: the shared refraction shader (no transmission pass, so it works in this scissor canvas).
+    applyHistoryPreviewMaterials(model, card.forceJewelryPalette, gemEnvRef.current ? { env: gemEnvRef.current, pieceSize: 3 } : undefined);
 
     card.scene.add(model);
 
