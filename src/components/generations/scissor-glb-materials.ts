@@ -32,7 +32,7 @@ interface ParsedGltfMaterialMetadata {
   };
 }
 
-const GEM_RE = /diamond|gem|stone|crystal|jewel|brill|ruby|emerald|sapphire|topaz|opal|garnet|amethyst|pearl|cz|cubic|solitaire|pave|prong_stone|accent_stone|center_stone|main_stone/i;
+const GEM_RE = /diamond|gem|stone|crystal|jewel|brill|ruby|emerald|sapphire|topaz|opal|garnet|amethyst|pearl|cz|cubic|solitaire|pave|cabochon|briolette|moissanite|peridot|aquamarine|citrine|tanzanite|morganite|onyx|prong_stone|accent_stone|center_stone|main_stone/i;
 const METAL_RE = /band|ring|shank|prong|setting|mount|bezel|basket|gallery|shoulder|bridge|head|collet|metal|gold|silver|platinum|frame|base/i;
 
 /** Taken from CADCanvas's REFERENCE_MATERIALS so a stone reads as the same

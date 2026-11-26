@@ -52,6 +52,18 @@ describe('applyHistoryPreviewMaterials', () => {
     expect(material.roughness).toBeLessThan(0.3);
   });
 
+  it('renders a green cabochon as a green gem, not gold', () => {
+    const model = new THREE.Group();
+    const mesh = meshNamed('Green cabochon');
+    model.add(mesh);
+
+    applyHistoryPreviewMaterials(model);
+
+    const material = mesh.material as THREE.MeshPhysicalMaterial;
+    expect(material.metalness).toBe(0);
+    expect(material.color.getHex()).toBe(0x46c684);
+  });
+
   it('preserves authored embedded material properties', () => {
     const authored = new THREE.MeshPhysicalMaterial({
       color: 0x123456,
