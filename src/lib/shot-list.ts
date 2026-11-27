@@ -64,6 +64,8 @@ export type ShotListAction =
   | { type: 'separateAll'; newRowIds: string[] }
   | { type: 'reset' }
   | { type: 'removeSelected' }
+  /** After upload: remember url + asset id per angle so later batches reuse them. */
+  | { type: 'setAngleUploads'; uploads: { angleId: string; url: string; assetId?: string }[] }
   | { type: 'setAssignees'; rowIds: string[]; kind: AssigneeKind; assignees: ShotAssignee[] }
   | { type: 'replaceAssignee'; rowId: string; oldId: string; assignee: ShotAssignee }
   | { type: 'removeAssignee'; rowId: string; assigneeId: string }
@@ -275,6 +277,25 @@ export function shotListReducer(state: ShotListState, action: ShotListAction): S
         ),
       );
       return { rows, selectedIds: [] };
+    }
+
+    case 'setAngleUploads': {
+      const byId = new Map(action.uploads.map((u) => [u.angleId, u]));
+      if (!byId.size) return state;
+      return {
+        ...state,
+        rows: state.rows.map((r) => (
+          r.angles.some((a) => byId.has(a.id))
+            ? {
+                ...r,
+                angles: r.angles.map((a) => {
+                  const u = byId.get(a.id);
+                  return u ? { ...a, url: u.url, assetId: u.assetId ?? a.assetId } : a;
+                }),
+              }
+            : r
+        )),
+      };
     }
 
     case 'removeSelected': {

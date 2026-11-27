@@ -1,6 +1,7 @@
 /**
- * Sticky bar for selected pieces: Assign / Merge / Remove / Clear.
- * Full width on mobile with safe-area padding; floating and centered from md up.
+ * Bar for selected pieces: Assign / Merge / Remove / Clear. Lives in the
+ * bottom dock above the Generate bar (never overlapping it): full width on
+ * mobile, a centered floating strip from md up.
  */
 import { Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -26,7 +27,7 @@ export function SelectionBar({ count, kind, canMerge, onAssign, onMerge, onRemov
     <div
       role="toolbar"
       aria-label="Selected pieces"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:inset-x-auto md:left-1/2 md:bottom-6 md:-translate-x-1/2 md:border md:pb-3 md:shadow-lg"
+      className="pointer-events-auto border-t border-border bg-background px-4 py-3 md:mx-auto md:mb-3 md:w-fit md:border md:shadow-lg"
     >
       <div className="grid grid-cols-[1fr_auto] items-center gap-2 md:flex">
         <span className={`${MONO} whitespace-nowrap md:mr-2`}>{count} selected</span>

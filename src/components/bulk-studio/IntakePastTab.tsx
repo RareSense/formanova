@@ -34,7 +34,8 @@ function toAngles(group: PastGroup): ShotAngle[] {
     id: newId(),
     previewUrl: a.thumbnail_url,
     assetId: a.id,
-    url: a.url ?? a.artifact_url ?? undefined,
+    // Same URL the wizard sends for a vault pick (StudioUploadStep onProductSelect).
+    url: a.thumbnail_url,
   }));
 }
 

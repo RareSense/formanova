@@ -50,7 +50,7 @@ for (const vp of VIEWPORTS) {
     localStorage.setItem('formanova_onboarding_qa', 'true');
   });
   const json = (body) => ({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
-  await ctx.route((url) => (!url.href.startsWith(BASE) && !/fonts\.(googleapis|gstatic)\.com/.test(url.hostname)) || url.pathname.startsWith('/api/') || url.pathname.endsWith('/assets'), (r) => {
+  await ctx.route((url) => (!/^(blob|data):/.test(url.protocol) && !url.href.startsWith(BASE) && !/fonts\.(googleapis|gstatic)\.com/.test(url.hostname)) || url.pathname.startsWith('/api/') || url.pathname.endsWith('/assets'), (r) => {
     const u = new URL(r.request().url());
     if (u.pathname.endsWith('/assets')) {
       const jewelry = u.searchParams.get('asset_type') === 'jewelry_photo';

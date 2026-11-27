@@ -2,20 +2,28 @@
  * Bulk Studio — single-canvas production workspace (behind BULK_STUDIO_ENABLED).
  * Route: /studio/bulk/:type. The legacy wizard at /studio/:type is untouched.
  *
- * M1: header + Shot List. M2: Smart Intake Drawer (upload / past jewelry,
- * grouping). Photos upload at Generate time (M4), like the High Effort path,
- * so grouping can change freely without minting stale server-side sets.
+ * Header -> Shot List (pieces x models/scenes) -> bottom dock (selection bar
+ * stacked above the Generate bar) -> Results (docked from xl, sheet below).
+ * Photos upload at Generate time, so grouping can change freely; every run is
+ * tracked by GenerationsContext, so the list stays editable while shots render.
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { BULK_STUDIO_ENABLED } from '@/lib/feature-flags';
 import { trackStudioModeSwitched } from '@/lib/posthog-events';
+import { TO_SINGULAR } from '@/lib/jewelry-utils';
+import { useAuth } from '@/contexts/AuthContext';
 import { useShotList } from '@/hooks/useShotList';
+import { useBulkGenerate } from '@/hooks/useBulkGenerate';
+import { useBulkPostActions } from '@/hooks/useBulkPostActions';
 import { BulkStudioHeader } from '@/components/bulk-studio/BulkStudioHeader';
 import { BULK_JEWELRY_TYPES, PrecisionDefault, ShootMode, isPieceDrag } from '@/lib/bulk-studio';
 import { IntakeDrawer, type IntakeTab } from '@/components/bulk-studio/IntakeDrawer';
 import { AssignDrawer, type AssignRequest } from '@/components/bulk-studio/AssignDrawer';
 import { SelectionBar } from '@/components/bulk-studio/SelectionBar';
+import { GenerateBar } from '@/components/bulk-studio/GenerateBar';
+import { ResultsDock, ResultsSheet } from '@/components/bulk-studio/ResultsPanel';
+import { CreditPreflightModal } from '@/components/CreditPreflightModal';
 import { canMergeSelected, rowAssignees, type ShotAssignee } from '@/lib/shot-list';
 import { isLikelyImageFile, normalizeImageFiles } from '@/lib/image-normalize';
 import { ShotList } from '@/components/bulk-studio/ShotList';
@@ -26,10 +34,25 @@ function readPrecision(): PrecisionDefault {
   try { return localStorage.getItem(PRECISION_KEY) === 'multi' ? 'multi' : 'single'; } catch { return 'single'; }
 }
 
+/** Height of the fixed bottom dock, so the page can pad itself and never hide rows. */
+function useHeight<T extends HTMLElement>() {
+  const ref = useRef<T>(null);
+  const [h, setH] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => setH(el.getBoundingClientRect().height));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, h] as const;
+}
+
 export default function BulkStudio() {
   const { type = 'rings' } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const stateMode = (location.state as { mode?: ShootMode } | null)?.mode;
   const queryMode = new URLSearchParams(location.search).get('mode');
@@ -43,12 +66,25 @@ export default function BulkStudio() {
   const [intakeOpen, setIntakeOpen] = useState(false);
   const [intakeTab, setIntakeTab] = useState<IntakeTab>('upload');
   const [assignRequest, setAssignRequest] = useState<AssignRequest | null>(null);
+  const [resultsOpen, setResultsOpen] = useState(false);
   const kind = mode === 'product-shot' ? 'scene' : 'model';
+  const { state, dispatch } = shotList;
+
+  const gen = useBulkGenerate({ state, dispatch, kind, category: TO_SINGULAR[type] ?? type });
+  const post = useBulkPostActions({
+    checkCredits: gen.preflight.checkCredits,
+    addFix: gen.queue.addFix,
+    markHumanReview: gen.queue.markHumanReview,
+    userEmail: user?.email,
+  });
+  const [dockRef, dockHeight] = useHeight<HTMLDivElement>();
 
   if (!BULK_STUDIO_ENABLED) return <Navigate to={`/studio/${type}`} replace state={{ mode }} />;
   if (!BULK_JEWELRY_TYPES.some((t) => t.id === type)) return <Navigate to="/dashboard" replace />;
 
   const jewelryLabel = BULK_JEWELRY_TYPES.find((t) => t.id === type)?.label ?? type;
+  const selectedCount = state.selectedIds.length;
+  const { views, counts } = gen.queue;
 
   const openIntake = (tab: IntakeTab = 'upload') => { setIntakeTab(tab); setIntakeOpen(true); };
 
@@ -59,9 +95,6 @@ export default function BulkStudio() {
     staging.addFilesAsPieces(await normalizeImageFiles(images));
     openIntake('upload');
   };
-
-  const { state, dispatch } = shotList;
-  const selectedCount = state.selectedIds.length;
 
   const confirmAssign = (request: AssignRequest, picked: ShotAssignee[]) => {
     if (request.mode === 'single') {
@@ -81,6 +114,13 @@ export default function BulkStudio() {
       return a.length === first.length && a.every((x, i) => x.id === first[i].id);
     });
     setAssignRequest({ mode: 'multi', rowIds: rows.map((r) => r.id), initial: shared ? first : [] });
+  };
+
+  const results = {
+    views, counts,
+    onFixAI: post.openFixAI,
+    onFixHuman: post.openFixHuman,
+    onUpscaled: (item: { id: string }, url: string) => gen.queue.setUpscaled(item.id, url),
   };
 
   return (
@@ -108,18 +148,52 @@ export default function BulkStudio() {
         onAddJewelry={() => openIntake()}
       />
 
-      <main className={`flex flex-1 flex-col px-4 md:px-6 pt-6 ${selectedCount ? 'pb-36 md:pb-28' : 'pb-6'}`}>
-        <ShotList
-          state={state}
-          dispatch={dispatch}
-          precisionDefault={precision}
+      <div className="flex flex-1 items-start">
+        <main className="flex min-w-0 flex-1 flex-col self-stretch px-4 md:px-6 pt-6" style={{ paddingBottom: dockHeight + 24 }}>
+          <ShotList
+            state={state}
+            dispatch={dispatch}
+            precisionDefault={precision}
+            kind={kind}
+            onAssign={setAssignRequest}
+            onAddFilesToRow={shotList.addFilesAsAngles}
+            onSplit={shotList.splitRow}
+            onAddJewelry={() => openIntake()}
+          />
+        </main>
+        <ResultsDock {...results} />
+      </div>
+
+      {/* Bottom dock: selection bar stacked above the Generate bar — they never overlap. */}
+      <div ref={dockRef} className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex flex-col xl:right-[420px] 2xl:right-[520px]">
+        <SelectionBar
+          count={selectedCount}
           kind={kind}
-          onAssign={setAssignRequest}
-          onAddFilesToRow={shotList.addFilesAsAngles}
-          onSplit={shotList.splitRow}
-          onAddJewelry={() => openIntake()}
+          canMerge={canMergeSelected(state)}
+          onAssign={assignSelected}
+          onMerge={() => dispatch({ type: 'mergeSelected' })}
+          onRemove={() => dispatch({ type: 'removeSelected' })}
+          onClear={() => dispatch({ type: 'clearSelection' })}
         />
-      </main>
+        {state.rows.length > 0 && (
+          <GenerateBar
+            aspectRatio={gen.output.aspectRatio}
+            onAspectRatio={gen.setAspectRatio}
+            resolution={gen.output.resolution}
+            onResolution={gen.setResolution}
+            cost={gen.cost}
+            costLoading={gen.costLoading}
+            cta={gen.labels.cta}
+            hint={gen.labels.hint}
+            canGenerate={gen.plan.shots.length > 0}
+            submitting={gen.submitting}
+            onGenerate={() => void gen.generate()}
+            results={{ active: counts.active, total: counts.total, onOpen: () => setResultsOpen(true) }}
+          />
+        )}
+      </div>
+
+      <ResultsSheet open={resultsOpen} onOpenChange={setResultsOpen} {...results} />
 
       <IntakeDrawer
         open={intakeOpen}
@@ -140,15 +214,16 @@ export default function BulkStudio() {
         onConfirm={confirmAssign}
       />
 
-      <SelectionBar
-        count={selectedCount}
-        kind={kind}
-        canMerge={canMergeSelected(state)}
-        onAssign={assignSelected}
-        onMerge={() => dispatch({ type: 'mergeSelected' })}
-        onRemove={() => dispatch({ type: 'removeSelected' })}
-        onClear={() => dispatch({ type: 'clearSelection' })}
-      />
+      {post.modals}
+
+      {gen.preflight.showInsufficientModal && gen.preflight.preflightResult && (
+        <CreditPreflightModal
+          open
+          onOpenChange={(o) => { if (!o) gen.preflight.dismissModal(); }}
+          estimatedCredits={gen.preflight.preflightResult.estimatedCredits}
+          currentBalance={gen.preflight.preflightResult.currentBalance}
+        />
+      )}
 
       {dragging && (
         <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center border-2 border-formanova-hero-accent bg-background/80">
