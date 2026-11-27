@@ -40,6 +40,7 @@ for (const vp of VIEWPORTS) {
   await ctx.addInitScript(() => {
     localStorage.setItem('formanova_auth_token', 'qa-token');
     localStorage.setItem('formanova_auth_user', JSON.stringify({ id: 'qa', email: 'qa@example.com', full_name: 'QA' }));
+    localStorage.setItem('formanova_onboarding_qa', 'true');
   });
   const json = (body) => ({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
   await ctx.route((url) => !url.href.startsWith(BASE) || url.pathname.startsWith('/api/'), (r) => {
