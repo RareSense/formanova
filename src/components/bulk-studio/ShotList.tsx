@@ -1,5 +1,7 @@
 import { Diamond } from 'lucide-react';
-import type { ShotListAction, ShotListState } from '@/lib/shot-list';
+import { MAX_ANGLES_PER_PIECE, canMergeSelected, type ShotListAction, type ShotListState } from '@/lib/shot-list';
+import { Button } from '@/components/ui/button';
+import { toast } from '@/hooks/use-toast';
 import { ShotRow } from './ShotRow';
 import type { PrecisionDefault, ShootMode } from '@/lib/bulk-studio';
 
@@ -33,6 +35,8 @@ export function ShotList({
   }
 
   const allSelected = state.selectedIds.length === state.rows.length;
+  const mergeable = canMergeSelected(state);
+  const selectedCount = state.selectedIds.length;
 
   return (
     <section className="flex flex-col gap-3">
@@ -40,13 +44,28 @@ export function ShotList({
         <span className="font-mono text-[10px] uppercase tracking-wider text-foreground/60">
           {state.rows.length} {state.rows.length === 1 ? 'piece' : 'pieces'}
         </span>
-        <button
-          type="button"
-          onClick={() => dispatch({ type: allSelected ? 'clearSelection' : 'selectAll' })}
-          className="font-mono text-[10px] uppercase tracking-wider text-foreground/60 hover:text-foreground"
-        >
-          {allSelected ? 'Clear selection' : 'Select all'}
-        </button>
+        <div className="flex items-center gap-2">
+          {selectedCount >= 2 && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!mergeable}
+              title={mergeable ? undefined : 'A piece can have up to 3 angles'}
+              onClick={() => dispatch({ type: 'mergeSelected' })}
+              className="h-9 px-4 font-mono text-[10px] uppercase tracking-wider"
+            >
+              Merge {selectedCount} into 1 piece
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => dispatch({ type: allSelected ? 'clearSelection' : 'selectAll' })}
+            className="h-9 px-4 font-mono text-[10px] uppercase tracking-wider text-foreground/60"
+          >
+            {allSelected ? 'Clear selection' : 'Select all'}
+          </Button>
+        </div>
       </div>
       <ol className="flex flex-col gap-3">
         {state.rows.map((row, i) => (
@@ -63,6 +82,14 @@ export function ShotList({
             onMoveAngle={(from, to) => dispatch({ type: 'moveAngle', rowId: row.id, from, to })}
             onSplit={() => onSplit(row.id, row.angles.length)}
             onRemove={() => dispatch({ type: 'removeRow', rowId: row.id })}
+            onMergeFrom={(sourceId) => {
+              const source = state.rows.find((r) => r.id === sourceId);
+              if (source && source.angles.length + row.angles.length > MAX_ANGLES_PER_PIECE) {
+                toast({ title: `A piece can have up to ${MAX_ANGLES_PER_PIECE} angles` });
+                return;
+              }
+              dispatch({ type: 'mergeRows', sourceId, targetId: row.id });
+            }}
           />
         ))}
       </ol>

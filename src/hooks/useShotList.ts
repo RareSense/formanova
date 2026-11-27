@@ -3,10 +3,11 @@ import {
   ShotAngle,
   initialShotListState,
   shotListReducer,
+  totalAngles,
   totalShotCount,
 } from '@/lib/shot-list';
 
-const newId = () =>
+export const newId = () =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
     : `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -15,28 +16,38 @@ export function angleFromFile(file: File): ShotAngle {
   return { id: newId(), previewUrl: URL.createObjectURL(file), file };
 }
 
+export function revokeAngleBlobs(angles: ShotAngle[]) {
+  angles.forEach((a) => { if (a.previewUrl.startsWith('blob:')) URL.revokeObjectURL(a.previewUrl); });
+}
+
 /**
- * Shot List state + intent-level actions. Owns local object URLs and revokes
- * them once a photo leaves the list.
+ * Shot List state + intent-level actions.
+ * `ownsBlobs` (the main list): revoke a local preview URL once its photo leaves
+ * the list. The intake drawer's staging list passes false because its photos
+ * move into the main list rather than being discarded.
  */
-export function useShotList() {
+export function useShotList({ ownsBlobs = true }: { ownsBlobs?: boolean } = {}) {
   const [state, dispatch] = useReducer(shotListReducer, initialShotListState);
 
   const liveBlobs = useRef(new Set<string>());
   useEffect(() => {
+    if (!ownsBlobs) return;
     const now = new Set(
       state.rows.flatMap((r) => r.angles.map((a) => a.previewUrl)).filter((u) => u.startsWith('blob:')),
     );
     liveBlobs.current.forEach((u) => { if (!now.has(u)) URL.revokeObjectURL(u); });
     liveBlobs.current = now;
-  }, [state.rows]);
+  }, [state.rows, ownsBlobs]);
   useEffect(() => () => liveBlobs.current.forEach((u) => URL.revokeObjectURL(u)), []);
 
-  /** Each file becomes its own piece (M2 adds grouping in the intake drawer). */
-  const addFilesAsPieces = useCallback((files: File[]) => {
-    const pieces = files.map((f) => [angleFromFile(f)]);
-    dispatch({ type: 'addPieces', pieces, rowIds: pieces.map(newId) });
+  const addPieces = useCallback((pieces: ShotAngle[][]) => {
+    if (pieces.length) dispatch({ type: 'addPieces', pieces, rowIds: pieces.map(() => newId()) });
   }, []);
+
+  /** Each file becomes its own piece. */
+  const addFilesAsPieces = useCallback((files: File[]) => {
+    addPieces(files.map((f) => [angleFromFile(f)]));
+  }, [addPieces]);
 
   const addFilesAsAngles = useCallback((rowId: string, files: File[]) => {
     dispatch({ type: 'addAngles', rowId, angles: files.map(angleFromFile) });
@@ -46,7 +57,16 @@ export function useShotList() {
     dispatch({ type: 'splitRow', rowId, newRowIds: Array.from({ length: angleCount - 1 }, newId) });
   }, []);
 
+  const separateAll = useCallback(() => {
+    const extra = totalAngles(state) - state.rows.length;
+    dispatch({ type: 'separateAll', newRowIds: Array.from({ length: extra }, newId) });
+  }, [state]);
+
   const shotCount = useMemo(() => totalShotCount(state), [state]);
 
-  return { state, dispatch, addFilesAsPieces, addFilesAsAngles, splitRow, shotCount };
+  return {
+    state, dispatch, addPieces, addFilesAsPieces, addFilesAsAngles, splitRow, separateAll, shotCount,
+  };
 }
+
+export type ShotListApi = ReturnType<typeof useShotList>;

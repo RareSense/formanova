@@ -5,6 +5,8 @@ import {
   ShotListAction,
   ShotListState,
   canAddAngle,
+  canGroupAll,
+  canMergeSelected,
   initialShotListState,
   rowPrecision,
   shotListReducer,
@@ -125,5 +127,45 @@ describe('shotListReducer', () => {
       ],
     };
     expect(totalShotCount(s)).toBe(2);
+  });
+});
+
+describe('bulk grouping', () => {
+  const three = () => run({ type: 'addPieces', pieces: [[angle('a')], [angle('b')], [angle('c')]], rowIds: ['r1', 'r2', 'r3'] });
+
+  it('tap-to-merge joins selected pieces into the first selected, in list order', () => {
+    let s = three();
+    s = shotListReducer(s, { type: 'toggleSelect', rowId: 'r3' });
+    expect(canMergeSelected(s)).toBe(false); // needs 2+
+    s = shotListReducer(s, { type: 'toggleSelect', rowId: 'r1' });
+    expect(canMergeSelected(s)).toBe(true);
+    s = shotListReducer(s, { type: 'mergeSelected' });
+    expect(s.rows.map((r) => r.id)).toEqual(['r1', 'r2']);
+    expect(angleIds(s, 'r1')).toEqual(['a', 'c']);
+    expect(s.selectedIds).toEqual([]);
+  });
+
+  it('refuses tap-to-merge past 3 angles', () => {
+    let s = run(
+      { type: 'addPieces', pieces: [[angle('a'), angle('b')], [angle('c'), angle('d')]], rowIds: ['r1', 'r2'] },
+      { type: 'selectAll' },
+    );
+    expect(canMergeSelected(s)).toBe(false);
+    expect(shotListReducer(s, { type: 'mergeSelected' })).toBe(s);
+    s = shotListReducer(s, { type: 'clearSelection' });
+    expect(canGroupAll(s)).toBe(false);
+  });
+
+  it('group all makes one piece; separate all restores one piece per photo', () => {
+    let s = shotListReducer(three(), { type: 'groupAll' });
+    expect(s.rows).toHaveLength(1);
+    expect(angleIds(s, 'r1')).toEqual(['a', 'b', 'c']);
+    s = shotListReducer(s, { type: 'separateAll', newRowIds: ['n1', 'n2'] });
+    expect(s.rows.map((r) => r.angles[0].id)).toEqual(['a', 'b', 'c']);
+    expect(s.rows.map((r) => r.id)).toEqual(['r1', 'n1', 'n2']);
+  });
+
+  it('reset empties the list', () => {
+    expect(shotListReducer(three(), { type: 'reset' }).rows).toEqual([]);
   });
 });

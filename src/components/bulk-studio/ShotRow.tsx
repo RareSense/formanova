@@ -2,14 +2,15 @@
  * One Shot List row = one jewelry piece:
  * [ Piece & angles ] -> [ Model(s) / Scene(s) ] -> [ Output ]
  */
-import { Split, Trash2, UserRound, Image as ImageIcon } from 'lucide-react';
+import { useState } from 'react';
+import { GripVertical, Split, Trash2, UserRound, Image as ImageIcon } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import {
   MAX_ANGLES_PER_PIECE, ShotRow as Row, canAddAngle, rowPrecision, rowShotCount,
 } from '@/lib/shot-list';
 import { AngleThumb, EmptyAngleSlot } from './AngleSlot';
-import type { PrecisionDefault, ShootMode } from '@/lib/bulk-studio';
+import { PIECE_DRAG_MIME, isPieceDrag, type PrecisionDefault, type ShootMode } from '@/lib/bulk-studio';
 
 interface ShotRowProps {
   row: Row;
@@ -23,25 +24,41 @@ interface ShotRowProps {
   onMoveAngle: (from: number, to: number) => void;
   onSplit: () => void;
   onRemove: () => void;
+  /** Another piece was dropped on this one: merge it in. */
+  onMergeFrom: (sourceRowId: string) => void;
 }
 
 export function ShotRow({
   row, index, selected, precisionDefault, mode,
-  onToggleSelect, onAddAngles, onRemoveAngle, onMoveAngle, onSplit, onRemove,
+  onToggleSelect, onAddAngles, onRemoveAngle, onMoveAngle, onSplit, onRemove, onMergeFrom,
 }: ShotRowProps) {
   const multi = rowPrecision(row) === 'multi-angle';
   const room = MAX_ANGLES_PER_PIECE - row.angles.length;
   const shots = rowShotCount(row);
   const isProduct = mode === 'product-shot';
   const AssignIcon = isProduct ? ImageIcon : UserRound;
+  const [dropTarget, setDropTarget] = useState(false);
 
   return (
     <li
+      draggable
+      onDragStart={(e) => { e.dataTransfer.setData(PIECE_DRAG_MIME, row.id); e.dataTransfer.effectAllowed = 'move'; }}
+      onDragOver={(e) => { if (isPieceDrag(e)) { e.preventDefault(); e.stopPropagation(); setDropTarget(true); } }}
+      onDragLeave={() => setDropTarget(false)}
+      onDrop={(e) => {
+        if (!isPieceDrag(e)) return;
+        e.preventDefault(); e.stopPropagation(); setDropTarget(false);
+        const source = e.dataTransfer.getData(PIECE_DRAG_MIME);
+        if (source && source !== row.id) onMergeFrom(source);
+      }}
       className={`group/row grid grid-cols-[auto_minmax(0,1fr)] md:grid-cols-[auto_minmax(0,1fr)_minmax(0,14rem)_8rem] items-center gap-4 border px-4 py-3 transition-colors ${
-        selected ? 'border-formanova-hero-accent/60 bg-muted/40' : 'border-border'
+        dropTarget ? 'border-formanova-hero-accent border-dashed' : selected ? 'border-formanova-hero-accent/60 bg-muted/40' : 'border-border'
       }`}
     >
-      <Checkbox checked={selected} onCheckedChange={onToggleSelect} aria-label={`Select piece ${index + 1}`} />
+      <div className="flex items-center gap-1">
+        <GripVertical aria-hidden className="hidden [@media(hover:hover)]:block h-4 w-4 cursor-grab text-foreground/30" />
+        <Checkbox checked={selected} onCheckedChange={onToggleSelect} aria-label={`Select piece ${index + 1}`} />
+      </div>
 
       {/* 1. Piece & angles */}
       <div className="flex min-w-0 items-center gap-2 overflow-x-auto">

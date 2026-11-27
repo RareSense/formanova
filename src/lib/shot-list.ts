@@ -51,6 +51,10 @@ export type ShotListAction =
   | { type: 'moveAngle'; rowId: string; from: number; to: number }
   | { type: 'mergeRows'; sourceId: string; targetId: string }
   | { type: 'splitRow'; rowId: string; newRowIds: string[] }
+  | { type: 'mergeSelected' }
+  | { type: 'groupAll' }
+  | { type: 'separateAll'; newRowIds: string[] }
+  | { type: 'reset' }
   | { type: 'toggleSelect'; rowId: string }
   | { type: 'selectAll' }
   | { type: 'clearSelection' };
@@ -73,6 +77,41 @@ export function totalShotCount(state: ShotListState): number {
 
 export function canAddAngle(row: ShotRow): boolean {
   return row.angles.length < MAX_ANGLES_PER_PIECE;
+}
+
+function selectedRows(state: ShotListState): ShotRow[] {
+  return state.rows.filter((r) => state.selectedIds.includes(r.id));
+}
+
+function angleTotal(rows: ShotRow[]): number {
+  return rows.reduce((n, r) => n + r.angles.length, 0);
+}
+
+/** Tap-to-merge: 2+ pieces selected and the result fits the 3-angle cap. */
+export function canMergeSelected(state: ShotListState): boolean {
+  const rows = selectedRows(state);
+  return rows.length >= 2 && angleTotal(rows) <= MAX_ANGLES_PER_PIECE;
+}
+
+export function canGroupAll(state: ShotListState): boolean {
+  return state.rows.length >= 2 && angleTotal(state.rows) <= MAX_ANGLES_PER_PIECE;
+}
+
+export function totalAngles(state: ShotListState): number {
+  return angleTotal(state.rows);
+}
+
+/** Merge `rows` (in list order) into the first one; others are dropped. */
+function mergeInto(state: ShotListState, rows: ShotRow[]): ShotListState {
+  if (rows.length < 2 || angleTotal(rows) > MAX_ANGLES_PER_PIECE) return state;
+  const [target, ...rest] = rows;
+  const gone = new Set(rest.map((r) => r.id));
+  return {
+    rows: state.rows
+      .filter((r) => !gone.has(r.id))
+      .map((r) => (r.id === target.id ? { ...r, angles: rows.flatMap((x) => x.angles) } : r)),
+    selectedIds: [],
+  };
 }
 
 function mapRow(state: ShotListState, rowId: string, fn: (r: ShotRow) => ShotRow): ShotListState {
@@ -169,6 +208,29 @@ export function shotListReducer(state: ShotListState, action: ShotListAction): S
       rows.splice(idx, 1, ...pieces);
       return { ...state, rows };
     }
+
+    case 'mergeSelected':
+      return mergeInto(state, selectedRows(state));
+
+    case 'groupAll':
+      return mergeInto(state, state.rows);
+
+    case 'separateAll': {
+      const needed = angleTotal(state.rows) - state.rows.length;
+      if (needed <= 0 || action.newRowIds.length < needed) return state;
+      let k = 0;
+      const rows = state.rows.flatMap((row) =>
+        row.angles.map((angle, i) =>
+          i === 0
+            ? { ...row, angles: [angle] }
+            : { id: action.newRowIds[k++], angles: [angle], assignees: [...row.assignees] },
+        ),
+      );
+      return { rows, selectedIds: [] };
+    }
+
+    case 'reset':
+      return state.rows.length || state.selectedIds.length ? initialShotListState : state;
 
     case 'toggleSelect': {
       if (!state.rows.some((r) => r.id === action.rowId)) return state;

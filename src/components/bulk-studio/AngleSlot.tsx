@@ -6,6 +6,7 @@ import { useRef } from 'react';
 import { ChevronLeft, ChevronRight, Plus, X } from 'lucide-react';
 import type { ShotAngle } from '@/lib/shot-list';
 import { IMAGE_ACCEPT } from '@/lib/bulk-studio';
+import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
 
 
 interface FilledProps {
@@ -17,9 +18,11 @@ interface FilledProps {
 }
 
 export function AngleThumb({ angle, index, total, onRemove, onMove }: FilledProps) {
+  // Past Jewelry previews are artifact proxy URLs and need the auth header; blob: passes through.
+  const src = useAuthenticatedImage(angle.previewUrl);
   return (
     <figure className="group/angle relative h-20 w-20 shrink-0 border border-border bg-muted">
-      <img src={angle.previewUrl} alt={`Angle ${index + 1}`} className="h-full w-full object-cover" />
+      {src ? <img src={src} alt={`Angle ${index + 1}`} draggable={false} className="h-full w-full object-cover" /> : <div className="h-full w-full animate-pulse bg-muted" />}
       <figcaption className="absolute left-0 bottom-0 bg-background/85 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider">
         Angle {index + 1}
       </figcaption>
