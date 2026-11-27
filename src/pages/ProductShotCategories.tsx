@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { studioPathFor } from '@/lib/feature-flags';
 import { ArrowRight } from 'lucide-react';
 import { OptimizedImage } from '@/components/ui/optimized-image';
 import { trackCategorySelected } from '@/lib/posthog-events';
@@ -48,7 +49,7 @@ const ProductShotCategories = () => {
       is_first_selection: isFirst,
       mode: 'product-shot',
     });
-    navigate(`/studio/${category.id}`, { state: { mode: 'product-shot' } });
+    navigate(studioPathFor(category.id), { state: { mode: 'product-shot' } });
   };
 
   return (

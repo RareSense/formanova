@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { studioPathFor } from '@/lib/feature-flags';
 import { ArrowRight } from 'lucide-react';
 import { OptimizedImage } from '@/components/ui/optimized-image';
 import { trackCategorySelected } from '@/lib/posthog-events';
@@ -86,7 +87,7 @@ const PhotographyStudio = () => {
       is_first_selection: isFirst,
       mode: 'model-shot',
     });
-    navigate(`/studio/${category.id}`, { state: { mode: 'model-shot' } });
+    navigate(studioPathFor(category.id), { state: { mode: 'model-shot' } });
   };
 
   return (

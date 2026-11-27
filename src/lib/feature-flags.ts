@@ -81,3 +81,15 @@ export function isCadUploadEnabled(email: string | undefined | null): boolean {
 /**
  * Bottom-left test menu (upload guide, product shot guide, role picker).
  */
+
+/**
+ * Bulk Studio workspace (/studio/bulk/:type) — controlled by VITE_BULK_STUDIO_ENABLED.
+ * "true" routes the category screens into the new workspace; anything else keeps
+ * the legacy wizard at /studio/:type. Remove once the workspace replaces the wizard.
+ */
+export const BULK_STUDIO_ENABLED = import.meta.env.VITE_BULK_STUDIO_ENABLED === 'true';
+
+/** Where a category card should send the user. */
+export function studioPathFor(type: string): string {
+  return BULK_STUDIO_ENABLED ? `/studio/bulk/${type}` : `/studio/${type}`;
+}
