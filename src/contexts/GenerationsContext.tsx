@@ -162,6 +162,8 @@ export interface TrackedGeneration {
   parentWorkflowId?: string;
   /** Original model/reference image of the parent generation (upscale carries this). */
   parentModelUrl?: string;
+  /** No completion/failure toasts for this run (see TrackGenerationParams). */
+  quietCompletion?: boolean;
   /**
    * Which pipeline this run belongs to. Absent means 'photoshoot' so every
    * existing row and call site keeps its current meaning.
@@ -225,6 +227,8 @@ export interface TrackGenerationParams {
   parentWorkflowId?: string;
   /** Original model/reference image of the parent generation. */
   parentModelUrl?: string;
+  /** Skip the completion/failure toasts (the caller shows its own queue, e.g. Bulk Studio). */
+  quietCompletion?: boolean;
 }
 
 /**
@@ -473,6 +477,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
         ...(params.timeoutMs ? { timeoutMs: params.timeoutMs } : {}),
         ...(params.parentWorkflowId ? { parentWorkflowId: params.parentWorkflowId } : {}),
         ...(params.parentModelUrl ? { parentModelUrl: params.parentModelUrl } : {}),
+        ...(params.quietCompletion ? { quietCompletion: true } : {}),
       },
     ]);
   }, []);
@@ -959,6 +964,9 @@ export function GenerationsContextProvider({ children }: { children: React.React
         continue;
       }
 
+      // Bulk Studio runs show progress in their own queue: no per-run toasts.
+      const notify = (...args: Parameters<typeof toast>) => { if (!gen.quietCompletion) toast(...args); };
+
       // Smooth progress animation while polling
       const ticker = setInterval(() => {
         setGenerations(prev => prev.map(g => {
@@ -1037,7 +1045,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
               markGenerationCompleted(gen.workflowId, startTime);
               refreshCredits();
               controllers.current.delete(gen.workflowId);
-              toast({
+              notify({
                 title: 'Your photoshoot is ready',
                 description: `${label} · ${duration}s`,
                 action: (
@@ -1073,7 +1081,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
           ));
           markGenerationFailed(gen.workflowId, 'workflow-failed', startTime);
           controllers.current.delete(gen.workflowId);
-          toast({ variant: 'destructive', title: 'Generation failed', description: 'Try again from the studio' });
+          notify({ variant: 'destructive', title: 'Generation failed', description: 'Try again from the studio' });
           return;
         }
         const duration = Math.round((Date.now() - startTime) / 1000);
@@ -1088,7 +1096,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
         refreshCredits();
         controllers.current.delete(gen.workflowId);
 
-        toast({
+        notify({
           title: 'Your photoshoot is ready',
           description: `${label} · ${duration}s`,
           action: (
@@ -1133,7 +1141,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
             markGenerationCompleted(gen.workflowId, startTime);
             refreshCredits();
             controllers.current.delete(gen.workflowId);
-            toast({
+            notify({
               title: 'Your photoshoot is ready',
               description: `${label} · ${duration}s`,
               action: (
@@ -1166,7 +1174,7 @@ export function GenerationsContextProvider({ children }: { children: React.React
         ));
         markGenerationFailed(gen.workflowId, err?.message, startTime);
         controllers.current.delete(gen.workflowId);
-        toast({ variant: 'destructive', title: 'Generation failed', description: 'Try again from the studio' });
+        notify({ variant: 'destructive', title: 'Generation failed', description: 'Try again from the studio' });
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps

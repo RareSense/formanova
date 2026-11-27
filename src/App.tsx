@@ -58,6 +58,7 @@ const FeedbackRedirect = lazyWithRetry(() => import("./pages/FeedbackRedirect"))
 const PhotographyStudioCategories = lazyWithRetry(() => import("./pages/PhotographyStudioCategories"));
 const ProductShotCategories = lazyWithRetry(() => import("./pages/ProductShotCategories"));
 const UnifiedStudio = lazyWithRetry(() => import("./pages/UnifiedStudio"));
+const BulkStudio = lazyWithRetry(() => import("./pages/BulkStudio"));
 // PRESERVED: Old single-upload studio - uncomment to restore
 // const JewelryStudio = lazyWithRetry(() => import("./pages/JewelryStudio"));
 // PRESERVED: Batch upload studio - uncomment to restore batch workflow
@@ -232,6 +233,7 @@ const MainApp = () => (
                   <Route path="/studio" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/studio/categories" element={<ProtectedRoute><PhotographyStudioCategories /></ProtectedRoute>} />
                   <Route path="/studio/product-shot/categories" element={<ProtectedRoute><ProductShotCategories /></ProtectedRoute>} />
+                  <Route path="/studio/bulk/:type" element={<ProtectedRoute><BulkStudio /></ProtectedRoute>} />
                   <Route path="/studio/:type" element={<ProtectedRoute><UnifiedStudio /></ProtectedRoute>} />
                   {/* PRESERVED: Old single-upload route - uncomment to restore */}
                   {/* <Route path="/studio/:type" element={<ProtectedRoute><JewelryStudio /></ProtectedRoute>} /> */}

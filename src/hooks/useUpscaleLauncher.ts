@@ -29,7 +29,7 @@ export interface UpscaleLaunchArgs {
   isProductShot: boolean;
   jewelryType: string;
   /** Fired once the tracked upscale completes (e.g. to refresh the history list). */
-  onCompleted?: () => void;
+  onCompleted?: (resultImages: string[]) => void;
 }
 
 export interface UseUpscaleLauncherReturn {
@@ -54,7 +54,7 @@ export function useUpscaleLauncher(): UseUpscaleLauncherReturn {
   const [status, setStatus] = useState<UpscaleRunStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const onCompletedRef = useRef<(() => void) | undefined>(undefined);
+  const onCompletedRef = useRef<((resultImages: string[]) => void) | undefined>(undefined);
 
   // Props captured at launch so the completion effect can emit upscale_completed
   // with the upscale's OWN dimensions (never the tracked generation's cost).
@@ -76,7 +76,7 @@ export function useUpscaleLauncher(): UseUpscaleLauncherReturn {
       if (completedPropsRef.current) {
         trackUpscaleCompleted({ ...completedPropsRef.current, surface: 'history' });
       }
-      onCompletedRef.current?.();
+      onCompletedRef.current?.(tracked.resultImages);
       clearGeneration(activeId);
       setActiveId(null);
     } else if (tracked.status === 'failed') {

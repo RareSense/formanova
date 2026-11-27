@@ -42,3 +42,18 @@ describe('allowlist gates', () => {
     expect('isRubyCallEnabled' in flags).toBe(false);
   });
 });
+
+describe('bulk studio gate', () => {
+  afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); });
+
+  it('keeps category cards on the legacy wizard unless enabled', async () => {
+    vi.resetModules();
+    const off = await import('./feature-flags');
+    expect(off.studioPathFor('rings')).toBe('/studio/rings');
+
+    vi.stubEnv('VITE_BULK_STUDIO_ENABLED', 'true');
+    vi.resetModules();
+    const on = await import('./feature-flags');
+    expect(on.studioPathFor('rings')).toBe('/studio/bulk/rings');
+  });
+});

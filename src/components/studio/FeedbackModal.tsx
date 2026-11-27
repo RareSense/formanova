@@ -64,6 +64,8 @@ interface Props {
   category: FeedbackCategory;
   userEmail?: string | null;
   humanFixCost?: number | null;
+  /** Fired once the request is accepted (e.g. to badge the result "In Human Review"). */
+  onSubmitted?: () => void;
 }
 
 export function FeedbackModal({
@@ -78,6 +80,7 @@ export function FeedbackModal({
   category,
   userEmail,
   humanFixCost,
+  onSubmitted,
 }: Props) {
   const [text, setText] = useState('');
   const [profanityError, setProfanityError] = useState(false);
@@ -138,6 +141,7 @@ export function FeedbackModal({
         workflow_id: workflowId,
       });
       setSubmitted(true);
+      onSubmitted?.();
     } catch {
       setError('Something went wrong. Please try again.');
     } finally {
