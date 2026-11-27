@@ -1,4 +1,4 @@
-// QA screenshots for /studio/bulk/:type at several widths. Run on the H100:
+// QA screenshots for /studio/bulk/:type at several widths (run on a server, not the PC):
 //   BASE=http://localhost:5199 OUT=./shots node e2e/qa/bulk-studio-shots.mjs
 // Fakes a stored session and stubs every backend call (no real API traffic).
 import { chromium } from 'playwright';
@@ -8,11 +8,20 @@ import path from 'node:path';
 const BASE = process.env.BASE ?? 'http://localhost:5199';
 const OUT = process.env.OUT ?? './shots';
 const ROUTE = process.env.ROUTE ?? '/studio/bulk/rings';
+const ONLY = process.env.ONLY?.split(',');
 fs.mkdirSync(OUT, { recursive: true });
 
 const imgDir = 'src/assets/jewelry';
-const imgs = fs.readdirSync(imgDir).filter((f) => f.endsWith('.webp')).slice(0, 4)
-  .map((f) => ({ name: f, mimeType: 'image/webp', buffer: fs.readFileSync(path.join(imgDir, f)) }));
+const imgFiles = fs.readdirSync(imgDir).filter((f) => f.endsWith('.webp')).slice(0, 5);
+const imgs = imgFiles.map((f) => ({ name: f, mimeType: 'image/webp', buffer: fs.readFileSync(path.join(imgDir, f)) }));
+
+// Past Jewelry: one 2-angle set + three singles, thumbnails served by vite.
+const t = (i) => `2026-11-0${i + 1}T00:00:00Z`;
+const pastAssets = imgFiles.slice(0, 5).map((f, i) => ({
+  id: `asset-${i}`, asset_type: 'jewelry_photo', created_at: t(i),
+  thumbnail_url: `${BASE}/src/assets/jewelry/${f}`, name: `Piece ${i + 1}`,
+  set_ids: i < 2 ? ['set-a'] : null, input_group_id: i < 2 ? 'set-a' : null,
+}));
 
 const VIEWPORTS = [
   { name: '360', width: 360, height: 780, touch: true },
@@ -20,9 +29,9 @@ const VIEWPORTS = [
   { name: '768', width: 768, height: 1024, touch: true },
   { name: '1440', width: 1440, height: 900, touch: false },
   { name: '2560', width: 2560, height: 1300, touch: false },
-];
+].filter((v) => !ONLY || ONLY.includes(v.name));
 
-const browser = await chromium.launch({ args: ['--use-angle=gl-egl'] });
+const browser = await chromium.launch();
 const report = [];
 for (const vp of VIEWPORTS) {
   const ctx = await browser.newContext({
@@ -32,8 +41,12 @@ for (const vp of VIEWPORTS) {
     localStorage.setItem('formanova_auth_token', 'qa-token');
     localStorage.setItem('formanova_auth_user', JSON.stringify({ id: 'qa', email: 'qa@example.com', full_name: 'QA' }));
   });
-  await ctx.route((url) => !url.href.startsWith(BASE), (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
-  await ctx.route(`${BASE}/api/**`, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
+  const json = (body) => ({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+  await ctx.route((url) => !url.href.startsWith(BASE) || url.pathname.startsWith('/api/'), (r) => {
+    const u = new URL(r.request().url());
+    if (u.pathname.endsWith('/assets')) return r.fulfill(json({ items: pastAssets, total: pastAssets.length, page: 0, page_size: 60 }));
+    return r.fulfill(json({}));
+  });
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
@@ -41,34 +54,54 @@ for (const vp of VIEWPORTS) {
   await page.waitForTimeout(800);
 
   const overflow = () => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-  const shot = async (tag) => {
-    await page.screenshot({ path: `${OUT}/${vp.name}-${tag}.png`, fullPage: true });
-    report.push({ vp: vp.name, tag, overflowPx: await overflow(), url: page.url() });
+  const shot = async (tag, opts = {}) => {
+    await page.waitForTimeout(350);
+    await page.screenshot({ path: `${OUT}/${vp.name}-${tag}.png`, fullPage: !opts.viewportOnly });
+    report.push({ vp: vp.name, tag, overflowPx: await overflow(), url: page.url().replace(BASE, '') });
   };
-  await shot('empty');
+  const step = async (tag, fn) => {
+    try { await fn(); } catch (e) { report.push({ vp: vp.name, tag, failed: String(e).split('\n')[0] }); }
+  };
 
-  await page.locator('input[type=file][multiple]').last().setInputFiles(imgs.slice(0, 3));
-  await page.waitForTimeout(400);
-  await shot('single');
+  await shot('01-empty');
 
-  await page.getByRole('radio', { name: 'Multi-Angle' }).click();
-  await page.waitForTimeout(300);
-  await shot('multi');
+  await step('drawer-upload', async () => {
+    await page.getByRole('button', { name: 'Add Jewelry' }).first().click();
+    await page.locator('[role=dialog] input[type=file]').setInputFiles(imgs.slice(0, 4));
+    await shot('02-drawer-staged', { viewportOnly: true });
+    // tap-to-merge pieces 1 and 2
+    await page.getByRole('checkbox', { name: 'Select piece 1' }).click();
+    await page.getByRole('checkbox', { name: 'Select piece 2' }).click();
+    await shot('03-drawer-selected', { viewportOnly: true });
+    await page.getByRole('button', { name: /^Merge 2$/ }).click();
+    await shot('04-drawer-merged', { viewportOnly: true });
+    await page.getByRole('button', { name: /to Shot List$/ }).click();
+  });
+  await shot('05-list-single');
 
-  // give row 1 a second angle -> High Precision
-  const slot = page.locator('li').first().locator('input[type=file]').first();
-  await slot.setInputFiles([imgs[3]]);
-  await page.waitForTimeout(300);
-  await shot('multi-2angles');
+  await step('multi', async () => {
+    await page.getByRole('radio', { name: 'Multi-Angle' }).click();
+    await shot('06-list-multi');
+    await page.getByRole('checkbox', { name: 'Select piece 2' }).click();
+    await page.getByRole('checkbox', { name: 'Select piece 3' }).click();
+    await shot('07-list-selected');
+  });
 
-  // button heights in header must match
+  await step('drawer-past', async () => {
+    await page.getByRole('button', { name: 'Add Jewelry' }).first().click();
+    await page.getByRole('tab', { name: 'Past Jewelry' }).click();
+    await page.getByRole('checkbox', { name: 'Piece 1' }).click();
+    await shot('08-drawer-past', { viewportOnly: true });
+    await page.getByRole('button', { name: /Selected to Shot List$/ }).click();
+  });
+  await shot('09-list-with-past');
+
   const heights = await page.locator('header button, header [role=combobox]').evaluateAll((els) =>
-    els.filter((e) => e.closest('[role=radiogroup]') === null || e.getAttribute('role') === 'radio')
-      .map((e) => Math.round(e.getBoundingClientRect().height)));
+    els.map((e) => Math.round(e.getBoundingClientRect().height)));
   report.push({ vp: vp.name, tag: 'header-heights', heights: [...new Set(heights)] });
   if (errors.length) report.push({ vp: vp.name, tag: 'errors', errors });
   await ctx.close();
 }
 await browser.close();
 fs.writeFileSync(`${OUT}/report.json`, JSON.stringify(report, null, 2));
-console.log(JSON.stringify(report));
+console.log(JSON.stringify(report, null, 1));
