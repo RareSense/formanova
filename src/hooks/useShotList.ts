@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useReducer, useRef } from 'react';
 import {
   ShotAngle,
   initialShotListState,
   shotListReducer,
   totalAngles,
-  totalShotCount,
 } from '@/lib/shot-list';
 
 export const newId = () =>
@@ -62,10 +61,9 @@ export function useShotList({ ownsBlobs = true }: { ownsBlobs?: boolean } = {}) 
     dispatch({ type: 'separateAll', newRowIds: Array.from({ length: extra }, newId) });
   }, [state]);
 
-  const shotCount = useMemo(() => totalShotCount(state), [state]);
 
   return {
-    state, dispatch, addPieces, addFilesAsPieces, addFilesAsAngles, splitRow, separateAll, shotCount,
+    state, dispatch, addPieces, addFilesAsPieces, addFilesAsAngles, splitRow, separateAll,
   };
 }
 

@@ -14,6 +14,9 @@ import { useShotList } from '@/hooks/useShotList';
 import { BulkStudioHeader } from '@/components/bulk-studio/BulkStudioHeader';
 import { BULK_JEWELRY_TYPES, PrecisionDefault, ShootMode, isPieceDrag } from '@/lib/bulk-studio';
 import { IntakeDrawer, type IntakeTab } from '@/components/bulk-studio/IntakeDrawer';
+import { AssignDrawer, type AssignRequest } from '@/components/bulk-studio/AssignDrawer';
+import { SelectionBar } from '@/components/bulk-studio/SelectionBar';
+import { canMergeSelected, rowAssignees, type ShotAssignee } from '@/lib/shot-list';
 import { isLikelyImageFile, normalizeImageFiles } from '@/lib/image-normalize';
 import { ShotList } from '@/components/bulk-studio/ShotList';
 
@@ -39,6 +42,8 @@ export default function BulkStudio() {
   const staging = useShotList({ ownsBlobs: false });
   const [intakeOpen, setIntakeOpen] = useState(false);
   const [intakeTab, setIntakeTab] = useState<IntakeTab>('upload');
+  const [assignRequest, setAssignRequest] = useState<AssignRequest | null>(null);
+  const kind = mode === 'product-shot' ? 'scene' : 'model';
 
   if (!BULK_STUDIO_ENABLED) return <Navigate to={`/studio/${type}`} replace state={{ mode }} />;
   if (!BULK_JEWELRY_TYPES.some((t) => t.id === type)) return <Navigate to="/dashboard" replace />;
@@ -53,6 +58,29 @@ export default function BulkStudio() {
     if (!images.length) return;
     staging.addFilesAsPieces(await normalizeImageFiles(images));
     openIntake('upload');
+  };
+
+  const { state, dispatch } = shotList;
+  const selectedCount = state.selectedIds.length;
+
+  const confirmAssign = (request: AssignRequest, picked: ShotAssignee[]) => {
+    if (request.mode === 'single') {
+      dispatch({ type: 'replaceAssignee', rowId: request.rowId, oldId: request.oldId, assignee: picked[0] });
+    } else {
+      dispatch({ type: 'setAssignees', rowIds: request.rowIds, kind, assignees: picked });
+    }
+    setAssignRequest(null);
+  };
+
+  /** Bulk assign starts from the selection's shared pairing, or empty when rows differ. */
+  const assignSelected = () => {
+    const rows = state.rows.filter((r) => state.selectedIds.includes(r.id));
+    const first = rows[0] ? rowAssignees(rows[0], kind) : [];
+    const shared = rows.every((r) => {
+      const a = rowAssignees(r, kind);
+      return a.length === first.length && a.every((x, i) => x.id === first[i].id);
+    });
+    setAssignRequest({ mode: 'multi', rowIds: rows.map((r) => r.id), initial: shared ? first : [] });
   };
 
   return (
@@ -80,12 +108,13 @@ export default function BulkStudio() {
         onAddJewelry={() => openIntake()}
       />
 
-      <main className="flex flex-1 flex-col px-4 md:px-6 py-6">
+      <main className={`flex flex-1 flex-col px-4 md:px-6 pt-6 ${selectedCount ? 'pb-36 md:pb-28' : 'pb-6'}`}>
         <ShotList
-          state={shotList.state}
-          dispatch={shotList.dispatch}
+          state={state}
+          dispatch={dispatch}
           precisionDefault={precision}
-          mode={mode}
+          kind={kind}
+          onAssign={setAssignRequest}
           onAddFilesToRow={shotList.addFilesAsAngles}
           onSplit={shotList.splitRow}
           onAddJewelry={() => openIntake()}
@@ -101,6 +130,24 @@ export default function BulkStudio() {
         jewelryType={type}
         jewelryLabel={jewelryLabel}
         onAddPieces={shotList.addPieces}
+      />
+
+      <AssignDrawer
+        request={assignRequest}
+        kind={kind}
+        jewelryType={type}
+        onClose={() => setAssignRequest(null)}
+        onConfirm={confirmAssign}
+      />
+
+      <SelectionBar
+        count={selectedCount}
+        kind={kind}
+        canMerge={canMergeSelected(state)}
+        onAssign={assignSelected}
+        onMerge={() => dispatch({ type: 'mergeSelected' })}
+        onRemove={() => dispatch({ type: 'removeSelected' })}
+        onClear={() => dispatch({ type: 'clearSelection' })}
       />
 
       {dragging && (

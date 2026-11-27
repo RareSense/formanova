@@ -115,18 +115,9 @@ describe('shotListReducer', () => {
     expect(shotListReducer(s, { type: 'toggleSelect', rowId: 'nope' })).toBe(s);
   });
 
-  it('counts one shot per assignee', () => {
-    const s: ShotListState = {
-      selectedIds: [],
-      rows: [
-        { id: 'r1', angles: [angle('a')], assignees: [
-          { id: 'm1', kind: 'model', name: 'A', imageUrl: '' },
-          { id: 'm2', kind: 'model', name: 'B', imageUrl: '' },
-        ] },
-        { id: 'r2', angles: [angle('b')], assignees: [] },
-      ],
-    };
-    expect(totalShotCount(s)).toBe(2);
+  it('counts no shots until models are assigned', () => {
+    const s = run({ type: 'addPieces', pieces: [[angle('a')], [angle('b')]], rowIds: ['r1', 'r2'] });
+    expect(totalShotCount(s, 'model')).toBe(0);
   });
 });
 

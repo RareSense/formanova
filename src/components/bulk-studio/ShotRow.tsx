@@ -3,21 +3,25 @@
  * [ Piece & angles ] -> [ Model(s) / Scene(s) ] -> [ Output ]
  */
 import { useState } from 'react';
-import { GripVertical, Split, Trash2, UserRound, Image as ImageIcon } from 'lucide-react';
+import { GripVertical, Split, Trash2 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import {
-  MAX_ANGLES_PER_PIECE, ShotRow as Row, canAddAngle, rowPrecision, rowShotCount,
+  MAX_ANGLES_PER_PIECE, ShotRow as Row, canAddAngle, rowPrecision,
 } from '@/lib/shot-list';
 import { AngleThumb, EmptyAngleSlot } from './AngleSlot';
-import { PIECE_DRAG_MIME, isPieceDrag, type PrecisionDefault, type ShootMode } from '@/lib/bulk-studio';
+import { PIECE_DRAG_MIME, isPieceDrag, type PrecisionDefault } from '@/lib/bulk-studio';
+import { AssignmentCell } from './AssignmentCell';
+
+type AssignProps = Parameters<typeof AssignmentCell>[0];
 
 interface ShotRowProps {
   row: Row;
   index: number;
   selected: boolean;
   precisionDefault: PrecisionDefault;
-  mode: ShootMode;
+  /** Column 2: models/scenes for this piece. */
+  assign: AssignProps;
   onToggleSelect: () => void;
   onAddAngles: (files: File[]) => void;
   onRemoveAngle: (angleId: string) => void;
@@ -29,14 +33,13 @@ interface ShotRowProps {
 }
 
 export function ShotRow({
-  row, index, selected, precisionDefault, mode,
+  row, index, selected, precisionDefault, assign,
   onToggleSelect, onAddAngles, onRemoveAngle, onMoveAngle, onSplit, onRemove, onMergeFrom,
 }: ShotRowProps) {
   const multi = rowPrecision(row) === 'multi-angle';
   const room = MAX_ANGLES_PER_PIECE - row.angles.length;
-  const shots = rowShotCount(row);
-  const isProduct = mode === 'product-shot';
-  const AssignIcon = isProduct ? ImageIcon : UserRound;
+  const m = assign.assignees.length;
+  const noun = assign.kind === 'model' ? 'model' : 'scene';
   const [dropTarget, setDropTarget] = useState(false);
 
   return (
@@ -51,7 +54,7 @@ export function ShotRow({
         const source = e.dataTransfer.getData(PIECE_DRAG_MIME);
         if (source && source !== row.id) onMergeFrom(source);
       }}
-      className={`group/row grid grid-cols-[auto_minmax(0,1fr)] md:grid-cols-[auto_minmax(0,1fr)_minmax(0,14rem)_8rem] items-center gap-4 border px-4 py-3 transition-colors ${
+      className={`group/row grid grid-cols-[auto_minmax(0,1fr)] lg:grid-cols-[auto_minmax(0,1fr)_minmax(0,18rem)_9rem] items-center gap-4 border px-4 py-3 transition-colors ${
         dropTarget ? 'border-formanova-hero-accent border-dashed' : selected ? 'border-formanova-hero-accent/60 bg-muted/40' : 'border-border'
       }`}
     >
@@ -84,25 +87,24 @@ export function ShotRow({
           : <EmptyAngleSlot compact label="Angle" maxFiles={room} onFiles={onAddAngles} />)}
       </div>
 
-      {/* 2. Model(s) / Scene(s) — picker arrives in M3 */}
-      <div className="col-span-2 md:col-span-1 flex h-12 md:h-20 min-w-0 items-center gap-2 border border-dashed border-border px-3 text-foreground/40">
-        <AssignIcon className="h-4 w-4 shrink-0" />
-        <span className="truncate font-mono text-[10px] uppercase tracking-wider">
-          {isProduct ? 'No scene yet' : 'No model yet'}
-        </span>
-      </div>
+      {/* 2. Model(s) / Scene(s) */}
+      <AssignmentCell {...assign} />
 
       {/* 3. Output */}
-      <div className="col-span-2 md:col-span-1 flex min-w-0 items-center justify-between md:flex-col md:items-end gap-2">
+      <div className="col-span-2 lg:col-span-1 flex min-w-0 items-center justify-between lg:flex-col lg:items-end gap-2">
         <span
-          className={`px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider border ${
+          className={`whitespace-nowrap px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider border ${
             multi ? 'border-formanova-hero-accent text-formanova-hero-accent' : 'border-border text-foreground/60'
           }`}
         >
           {multi ? 'High Precision' : 'Standard'}
         </span>
-        <span className="font-mono text-[10px] uppercase tracking-wider text-foreground/60">
-          {shots} {shots === 1 ? 'shot' : 'shots'}
+        <span
+          className="flex flex-col whitespace-nowrap font-mono text-[10px] uppercase tracking-wider text-foreground/60 lg:items-end"
+          aria-label={`1 piece times ${m} ${noun}s equals ${m} shots`}
+        >
+          <span>1 × {m} {m === 1 ? noun : `${noun}s`}</span>
+          <span className={m ? 'text-foreground' : undefined}>= {m} {m === 1 ? 'shot' : 'shots'}</span>
         </span>
         <div className="flex gap-1">
           {multi && (

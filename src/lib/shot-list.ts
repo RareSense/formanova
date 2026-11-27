@@ -23,11 +23,19 @@ export interface ShotAngle {
   url?: string;
 }
 
+export type AssigneeKind = 'model' | 'scene';
+
+/** A model (On-Model) or scene (Product Shot) paired with a piece. One per shot. */
 export interface ShotAssignee {
+  /** Stable key: `preset:<id>` or `asset:<id>`, so the same model is never on a row twice. */
   id: string;
-  kind: 'model' | 'scene';
+  kind: AssigneeKind;
   name: string;
+  /** Artifact proxy URL; render via useAuthenticatedImage. */
   imageUrl: string;
+  source: 'preset' | 'user';
+  /** Preset id (source=preset) or asset id (source=user). */
+  refId: string;
 }
 
 export interface ShotRow {
@@ -55,6 +63,11 @@ export type ShotListAction =
   | { type: 'groupAll' }
   | { type: 'separateAll'; newRowIds: string[] }
   | { type: 'reset' }
+  | { type: 'removeSelected' }
+  | { type: 'setAssignees'; rowIds: string[]; kind: AssigneeKind; assignees: ShotAssignee[] }
+  | { type: 'replaceAssignee'; rowId: string; oldId: string; assignee: ShotAssignee }
+  | { type: 'removeAssignee'; rowId: string; assigneeId: string }
+  | { type: 'applyToAll'; fromRowId: string; kind: AssigneeKind }
   | { type: 'toggleSelect'; rowId: string }
   | { type: 'selectAll' }
   | { type: 'clearSelection' };
@@ -66,13 +79,48 @@ export function rowPrecision(row: ShotRow): RowPrecision {
   return row.angles.length >= 2 ? 'multi-angle' : 'standard';
 }
 
-/** One shot per assigned model/scene. */
-export function rowShotCount(row: ShotRow): number {
-  return row.assignees.length;
+/**
+ * Assignees of the active kind. Rows keep models and scenes side by side, so
+ * switching On-Model / Product Shot never drops a pairing.
+ */
+export function rowAssignees(row: ShotRow, kind: AssigneeKind): ShotAssignee[] {
+  return row.assignees.filter((a) => a.kind === kind);
 }
 
-export function totalShotCount(state: ShotListState): number {
-  return state.rows.reduce((sum, r) => sum + rowShotCount(r), 0);
+/** One shot per assigned model/scene of the active kind. */
+export function rowShotCount(row: ShotRow, kind: AssigneeKind): number {
+  return rowAssignees(row, kind).length;
+}
+
+export function totalShotCount(state: ShotListState, kind: AssigneeKind): number {
+  return state.rows.reduce((sum, r) => sum + rowShotCount(r, kind), 0);
+}
+
+function sameAssignees(a: ShotAssignee[], b: ShotAssignee[]): boolean {
+  return a.length === b.length && a.every((x, i) => x.id === b[i].id);
+}
+
+/** True when some other row's pairing differs, so "Apply to all" would change something. */
+export function canApplyToAll(state: ShotListState, rowId: string, kind: AssigneeKind): boolean {
+  const row = state.rows.find((r) => r.id === rowId);
+  if (!row || state.rows.length < 2) return false;
+  const mine = rowAssignees(row, kind);
+  return mine.length > 0 && state.rows.some((r) => r.id !== rowId && !sameAssignees(rowAssignees(r, kind), mine));
+}
+
+function dedupe(list: ShotAssignee[]): ShotAssignee[] {
+  const seen = new Set<string>();
+  return list.filter((a) => {
+    if (seen.has(a.id)) return false;
+    seen.add(a.id);
+    return true;
+  });
+}
+
+/** Replace the row's assignees of `kind`, keeping the other kind untouched. */
+function withAssignees(row: ShotRow, kind: AssigneeKind, next: ShotAssignee[]): ShotRow {
+  const others = row.assignees.filter((a) => a.kind !== kind);
+  return { ...row, assignees: [...others, ...dedupe(next.filter((a) => a.kind === kind))] };
 }
 
 export function canAddAngle(row: ShotRow): boolean {
@@ -227,6 +275,48 @@ export function shotListReducer(state: ShotListState, action: ShotListAction): S
         ),
       );
       return { rows, selectedIds: [] };
+    }
+
+    case 'removeSelected': {
+      if (!state.selectedIds.length) return state;
+      const gone = new Set(state.selectedIds);
+      return { rows: state.rows.filter((r) => !gone.has(r.id)), selectedIds: [] };
+    }
+
+    case 'setAssignees': {
+      const ids = new Set(action.rowIds);
+      if (!state.rows.some((r) => ids.has(r.id))) return state;
+      return {
+        ...state,
+        rows: state.rows.map((r) => (ids.has(r.id) ? withAssignees(r, action.kind, action.assignees) : r)),
+      };
+    }
+
+    case 'replaceAssignee':
+      return mapRow(state, action.rowId, (r) => {
+        const i = r.assignees.findIndex((a) => a.id === action.oldId);
+        if (i < 0) return r;
+        if (action.assignee.id !== action.oldId && r.assignees.some((a) => a.id === action.assignee.id)) {
+          // Already paired with this row: just drop the old one.
+          return { ...r, assignees: r.assignees.filter((a) => a.id !== action.oldId) };
+        }
+        const assignees = [...r.assignees];
+        assignees[i] = action.assignee;
+        return { ...r, assignees };
+      });
+
+    case 'removeAssignee':
+      return mapRow(state, action.rowId, (r) =>
+        r.assignees.some((a) => a.id === action.assigneeId)
+          ? { ...r, assignees: r.assignees.filter((a) => a.id !== action.assigneeId) }
+          : r,
+      );
+
+    case 'applyToAll': {
+      const from = state.rows.find((r) => r.id === action.fromRowId);
+      if (!from) return state;
+      const src = rowAssignees(from, action.kind);
+      return { ...state, rows: state.rows.map((r) => (r.id === from.id ? r : withAssignees(r, action.kind, src))) };
     }
 
     case 'reset':
